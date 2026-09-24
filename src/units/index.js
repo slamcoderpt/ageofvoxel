@@ -14,6 +14,9 @@ import { pose } from './anim.js';
 // are derived automatically. Combat sets u.anim.attackT (seconds since the
 // last strike) and u.flashT (hit flash).
 const CORPSE_TIME = 6;
+// Per-unit horse coat tints (multiplied into the dappled grey base):
+// grey, near-white, dun, bay, dark bay.
+const COATS = [[1, 1, 1], [1.06, 1.06, 1.05], [0.95, 0.86, 0.7], [0.72, 0.5, 0.34], [0.5, 0.36, 0.27], [1, 0.98, 0.95]];
 
 export class Units {
   constructor(game) {
@@ -38,7 +41,7 @@ export class Units {
   _buildRig(type) {
     const R = RIGS[type];
     const parts = R.build().map((p) => ({
-      name: p.name, joint: p.joint, parent: p.parent,
+      name: p.name, joint: p.joint, parent: p.parent, show: p.show || null, coat: !!p.coat, portrait: p.portrait !== false && !p.show,
       geo: buildVoxelGeometry(p.model, { size: R.voxel, pivot: p.pivot, jitter: 0.05 }),
       mesh: null, cap: 0,
     }));
@@ -146,13 +149,28 @@ export class Units {
         this._q.setFromEuler(this._e.set(0, rot, 0));
         this._root.compose(this._v.set(x, y + bob * V, z), this._q, this._s.set(1, 1, 1));
         if (u.dead) {
-          const k = Math.min(1, u.anim.dieT / 0.6);
-          const sink = Math.max(0, u.anim.dieT - CORPSE_TIME + 2) * 0.5;
-          this._tmp.makeRotationX(-k * Math.PI / 2 * 0.95);
-          this._root.multiply(this._tmp);
+          const dt0 = u.anim.dieT;
+          const sink = Math.max(0, dt0 - CORPSE_TIME + 2) * 0.5;
+          if (rig.kind === 'horse') {
+            // horse keels over onto its side (away from the killer's side, by id)
+            const k = Math.min(1, dt0 / 0.8);
+            const f = k * k * (3 - 2 * k);
+            const side = u.id % 2 ? 1 : -1;
+            this._root.multiply(this._tmp.makeTranslation(0, f * 0.3, 0));
+            this._root.multiply(this._tmp.makeRotationZ(side * f * Math.PI / 2 * 0.92));
+          } else {
+            // stagger back, then topple; a small bounce when hitting the ground
+            const k = Math.min(1, dt0 / 0.6);
+            const f = k * k;
+            const bounce = dt0 > 0.6 && dt0 < 0.8 ? Math.sin((dt0 - 0.6) / 0.2 * Math.PI) * 0.06 : 0;
+            this._root.multiply(this._tmp.makeTranslation(0, 0.12 * f, -0.25 * Math.min(1, dt0 / 0.4)));
+            this._tmp.makeRotationX(-(f * Math.PI / 2 * 0.95 - bounce));
+            this._root.multiply(this._tmp);
+          }
           this._root.premultiply(this._tmp.makeTranslation(0, -sink, 0));
         }
         const pc = game.players[u.owner].color;
+        const coat = COATS[u.id % COATS.length];
         this._c.setHex(pc);
         const flash = Math.min(1, u.flashT * 4) * 0.8;
         for (let pi = 0; pi < rig.parts.length; pi++) {
@@ -160,17 +178,14 @@ export class Units {
           const parent = p.parentIdx >= 0 ? world[p.parentIdx] : this._root;
           const r = rig.rot[p.name];
           this._q.setFromEuler(this._e.set(r[0], r[1], r[2]));
-          let sc = 1;
-          if (p.name === 'carry') sc = u.carry && u.carry.amount > 0 ? 1 : 0;
+          const sc = p.show && !p.show(u) ? 0 : 1;
           this._m.compose(this._v.set(p.joint[0] * V, p.joint[1] * V, p.joint[2] * V), this._q, this._s.set(sc, sc, sc));
           const m = world[pi].multiplyMatrices(parent, this._m);
           p.mesh.setMatrixAt(i, m);
           p.mesh.userData.team.setXYZ(i, this._c.r, this._c.g, this._c.b);
           p.mesh.userData.flash.setX(i, flash);
-          if (p.name === 'carry') {
-            const ct = u.carry?.type;
-            const col = ct === 'gold' ? [2.2, 1.7, 0.3] : ct === 'food' ? [1.9, 0.6, 0.5] : [1, 1, 1];
-            p.mesh.setColorAt(i, this._c.setRGB(col[0], col[1], col[2]));
+          if (p.coat) {
+            p.mesh.setColorAt(i, this._c.setRGB(coat[0], coat[1], coat[2]));
             this._c.setHex(pc);
           }
         }
@@ -186,7 +201,7 @@ export class Units {
 
   // Unit height in world units (for health bars etc.)
   heightOf(u) {
-    return { villager: 1.7, hoplite: 1.9, toxotes: 1.7, hippikon: 2.3, minotaur: 3.0 }[u.type] ?? 1.8;
+    return { villager: 2.0, hoplite: 2.25, toxotes: 2.05, hippikon: 2.75, minotaur: 3.4 }[u.type] ?? 1.8;
   }
 
   portraitObject(type, owner = 1) {
@@ -196,10 +211,10 @@ export class Units {
     const world = new Map();
     const V = rig.voxel;
     for (const p of rig.parts) {
-      if (p.name === 'carry') continue;
       const m = new THREE.Matrix4().makeTranslation(p.joint[0] * V, p.joint[1] * V, p.joint[2] * V);
       if (p.parent) m.premultiply(world.get(p.parent));
       world.set(p.name, m);
+      if (!p.portrait) continue;
       const mesh = new THREE.Mesh(p.geo, mat);
       mesh.matrixAutoUpdate = false;
       mesh.matrix.copy(m);
