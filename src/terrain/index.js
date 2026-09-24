@@ -2,6 +2,7 @@ import { GAIA } from '../core/constants.js';
 import { TerrainMesh } from './TerrainMesh.js';
 import { Water } from './Water.js';
 import { ResourceRenderer } from './ResourceRenderer.js';
+import { GroundDetails } from './GroundDetails.js';
 import { RESOURCE_DEFS } from './resourceDefs.js';
 
 // Terrain piece: voxel ground, water, and gaia resource props.
@@ -13,8 +14,10 @@ export class Terrain {
     this.game = game;
     this.mesh = new TerrainMesh(game);
     game.scene.add(this.mesh.group);
-    this.water = new Water(game);
+    this.water = new Water(game, this.mesh);
     game.scene.add(this.water.mesh);
+    this.details = new GroundDetails(game, this.mesh);
+    game.scene.add(this.details.group);
     this.props = new ResourceRenderer(game);
     game.scene.add(this.props.group);
     game.map.onChange = (r) => {
@@ -56,5 +59,6 @@ export class Terrain {
     if (this.mesh.dirty.size) this.mesh.rebuildDirty();
     this.water.update(this.game.time);
     this.props.render();
+    this.details.render();
   }
 }

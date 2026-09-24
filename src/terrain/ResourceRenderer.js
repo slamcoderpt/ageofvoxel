@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { buildVoxelGeometry, voxelMaterialFor } from '../core/voxel.js';
+import { voxelMaterialFor } from '../core/voxel.js';
+import { buildGreedyGeometry } from './greedy.js';
 import { hash2 } from '../core/rng.js';
 import { makeTree, makeGoldMine, makeBerryBush, PROP_VOXEL } from './models.js';
 
@@ -28,7 +29,7 @@ export class ResourceRenderer {
       if (key.startsWith('tree')) { m = makeTree(+key.slice(4)); pivot = [1, 0, 1]; }
       else if (key === 'gold') { m = makeGoldMine(); pivot = [8, 0, 8]; }
       else { m = makeBerryBush(); pivot = [2.5, 0, 2.5]; }
-      this.geos.set(key, buildVoxelGeometry(m, { size: PROP_VOXEL, pivot, jitter: 0.1 }));
+      this.geos.set(key, buildGreedyGeometry(m, { size: PROP_VOXEL, pivot, jitter: 0.06, minMergeAO: 1 }));
     }
     return this.geos.get(key);
   }
