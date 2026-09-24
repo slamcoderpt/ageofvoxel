@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { buildVoxelGeometry, voxelMaterialFor } from '../core/voxel.js';
 import { GROUND } from '../core/GameMap.js';
 import { BUILDING_DEFS, BUILDING_VOXEL } from './defs.js';
-import { BUILDING_MODELS } from './models.js';
+import { BUILDING_MODELS, BUILDING_VARIANTS } from './models.js';
+import { constructionModel, CONSTRUCTION_STAGES } from './construction.js';
+import { hash3 } from '../core/rng.js';
 import { Placement } from './placement.js';
 
 // Buildings piece: spawning, construction ('build' order), destruction,
@@ -39,14 +41,49 @@ export class Buildings {
     });
   }
 
-  geometry(type) {
-    if (!this.geos.has(type)) {
+  geometry(type, variant = 0) {
+    const k = `${type}:${variant}`;
+    if (!this.geos.has(k)) {
       const def = BUILDING_DEFS[type];
-      const model = BUILDING_MODELS[type]();
-      const geo = buildVoxelGeometry(model, { size: BUILDING_VOXEL, pivot: [def.w * 2, 0, def.h * 2], jitter: 0.06 });
-      this.geos.set(type, geo);
+      const model = BUILDING_MODELS[type](variant);
+      this.geos.set(k, buildVoxelGeometry(model, { size: BUILDING_VOXEL, pivot: [def.w * 2, 0, def.h * 2], jitter: 0.06 }));
     }
-    return this.geos.get(type);
+    return this.geos.get(k);
+  }
+
+  // Geometry of a construction stage (0..CONSTRUCTION_STAGES-1).
+  stageGeometry(type, variant, stage) {
+    const k = `${type}:${variant}:s${stage}`;
+    if (!this.geos.has(k)) {
+      const def = BUILDING_DEFS[type];
+      const model = constructionModel(type, variant, stage, def.w, def.h);
+      this.geos.set(k, buildVoxelGeometry(model, { size: BUILDING_VOXEL, pivot: [def.w * 2, 0, def.h * 2], jitter: 0.06 }));
+    }
+    return this.geos.get(k);
+  }
+
+  variantOf(b) {
+    const n = BUILDING_VARIANTS[b.type] || 1;
+    return n > 1 ? Math.floor(hash3(b.tx, 7, b.tz, 31) * n) % n : 0;
+  }
+
+  // Paint a paved plaza (irregular disc) around a building, skipping tiles
+  // that are blocked, water or other buildings' footprints.
+  pavePlaza(tx, tz, w, h, r) {
+    const map = this.game.map;
+    const cx = tx + w / 2, cz = tz + h / 2;
+    const R = Math.max(w, h) / 2 + r;
+    for (let z = Math.floor(cz - R); z <= Math.ceil(cz + R); z++)
+      for (let x = Math.floor(cx - R); x <= Math.ceil(cx + R); x++) {
+        const dx = x + 0.5 - cx, dz = z + 0.5 - cz;
+        const d = Math.hypot(dx, dz) + (hash3(x, 3, z, 41) - 0.5) * 1.6;
+        if (d > R) continue;
+        if (!map.isWalkable(x, z)) continue;
+        let taken = false;
+        for (const o of this.game.entities.buildings())
+          if (x >= o.tx && x < o.tx + o.w && z >= o.tz && z < o.tz + o.h) { taken = true; break; }
+        if (!taken) map.paintTiles(x, z, 1, 1, GROUND.PAVED);
+      }
   }
 
   canPlace(type, tx, tz) {
@@ -68,7 +105,8 @@ export class Buildings {
     const game = this.game, map = game.map;
     game.terrain.clearRect(tx, tz, def.w, def.h);
     map.flattenTiles(tx, tz, def.w, def.h, null, def.farm ? GROUND.FARM : type === 'town_center' || type === 'temple' ? GROUND.PAVED : GROUND.DIRT);
-    if (type === 'town_center') map.paintTiles(tx - 1, tz - 1, def.w + 2, def.h + 2, GROUND.PAVED), map.paintTiles(tx, tz, def.w, def.h, GROUND.PAVED);
+    if (type === 'town_center') this.pavePlaza(tx, tz, def.w, def.h, 3.5);
+    else if (type === 'temple') this.pavePlaza(tx, tz, def.w, def.h, 1.5);
     const b = game.entities.add({
       kind: 'building', type, owner, def,
       tx, tz, w: def.w, h: def.h,
@@ -148,19 +186,12 @@ export class Buildings {
       let m = this.meshes.get(b.id);
       if (!m) {
         m = new THREE.Group();
-        const mesh = new THREE.Mesh(this.geometry(b.type), voxelMaterialFor(game.players[b.owner].color));
+        const mesh = new THREE.Mesh(this.geometry(b.type, this.variantOf(b)), voxelMaterialFor(game.players[b.owner].color));
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         m.add(mesh);
         m.userData.mesh = mesh;
-        // construction foundation
-        const f = new THREE.Mesh(new THREE.BoxGeometry(b.w - 0.1, 0.12, b.h - 0.1), voxelMaterialFor(0xffffff));
-        f.geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Array(f.geometry.attributes.position.count * 3).fill(0.45), 3));
-        f.geometry.setAttribute('team', new THREE.Float32BufferAttribute(new Array(f.geometry.attributes.position.count).fill(0), 1));
-        f.geometry.setAttribute('glow', new THREE.Float32BufferAttribute(new Array(f.geometry.attributes.position.count).fill(0), 1));
-        f.receiveShadow = true;
-        m.add(f);
-        m.userData.foundation = f;
+        m.userData.variant = this.variantOf(b);
         this.group.add(m);
         this.meshes.set(b.id, m);
       }
@@ -169,14 +200,10 @@ export class Buildings {
       const visible = b.owner === game.localPlayer || game.fog.isExplored(b.x, b.z);
       m.visible = visible;
       const mesh = m.userData.mesh;
-      if (b.built) {
-        mesh.scale.y = 1;
-        m.userData.foundation.visible = false;
-      } else {
-        mesh.scale.y = Math.max(0.04, b.progress);
-        m.userData.foundation.visible = true;
-        m.userData.foundation.position.y = 0.06;
-      }
+      const v = m.userData.variant;
+      const geo = b.built ? this.geometry(b.type, v)
+        : this.stageGeometry(b.type, v, Math.min(CONSTRUCTION_STAGES - 1, Math.floor(b.progress * CONSTRUCTION_STAGES)));
+      if (mesh.geometry !== geo) mesh.geometry = geo;
     }
     this.placement.render();
   }
