@@ -21,9 +21,10 @@ export class Lighting {
     this.renderer = renderer;
     const scene = game.scene;
 
-    // Sun: warm, fairly high, from the south-west so shadows fall towards the camera's right.
-    this.sunDir = new THREE.Vector3(-0.55, 0.78, 0.32).normalize();
-    this.sun = new THREE.DirectionalLight(0xfff0d6, 3.4);
+    // Sun: golden late-afternoon light (~40 deg elevation) so buildings and
+    // trees throw long, readable shadows like Retold's town shots.
+    this.sunDir = new THREE.Vector3(-0.6, 0.66, 0.4).normalize();
+    this.sun = new THREE.DirectionalLight(0xffdcaa, 3.9);
     this.sun.castShadow = true;
     const sm = post === 'high' ? 4096 : 2048;
     this.sun.shadow.mapSize.set(sm, sm);
@@ -33,15 +34,17 @@ export class Lighting {
     this.shadowExtent = 60;
     scene.add(this.sun, this.sun.target);
 
-    this.hemi = new THREE.HemisphereLight(0xb4d2ff, 0x6d6a3c, 1.25);
+    // Sky light is cool and the ground bounce warm-brown: shadowed faces go
+    // blue-grey instead of saturated dark green, sunlit ones stay golden.
+    this.hemi = new THREE.HemisphereLight(0x9ab8e6, 0x7a5f3e, 1.35);
     scene.add(this.hemi);
-    this.fill = new THREE.DirectionalLight(0xa8c4ff, 0.35); // cool bounce from the opposite side
+    this.fill = new THREE.DirectionalLight(0x9db8ee, 0.55); // cool bounce from the opposite side
     this.fill.position.set(0.6, 0.5, -0.5);
     scene.add(this.fill);
 
     this.sky = new Sky(this.sunDir);
     scene.add(this.sky.mesh);
-    this.hazeColor = new THREE.Color(0xc4dcf0);
+    this.hazeColor = new THREE.Color(0xd9d2bf);
     scene.fog = new THREE.Fog(this.hazeColor, 80, 400);
     scene.background = this.hazeColor.clone();
 
