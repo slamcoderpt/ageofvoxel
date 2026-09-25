@@ -100,6 +100,104 @@ export class Buildings {
       }
   }
 
+  groundAt(tx, tz) {
+    const map = this.game.map, c = map.cps;
+    return map.inCols(tx * c, tz * c) ? map.ground[map.cIdx(tx * c, tz * c)] : -1;
+  }
+
+  // Worn-earth yard around a building: only over grass, never over paving,
+  // farms or other footprints.
+  yard(tx, tz, w, h, r) {
+    const map = this.game.map;
+    for (let z = tz - r; z < tz + h + r; z++)
+      for (let x = tx - r; x < tx + w + r; x++) {
+        // rounded, ragged edge rather than a speckle
+        const ex = Math.max(tx - x, x - (tx + w - 1), 0), ez = Math.max(tz - z, z - (tz + h - 1), 0);
+        if (Math.hypot(ex, ez) + hash3(x, 5, z, 43) * 1.4 > r + 0.3) continue;
+        if (!map.isWalkable(x, z)) continue;
+        const g = this.groundAt(x, z);
+        if (g !== GROUND.GRASS && g !== GROUND.DRYGRASS) continue;
+        if (this.inFootprint(x, z)) continue;
+        map.paintTiles(x, z, 1, 1, GROUND.DIRT);
+      }
+  }
+
+  inFootprint(x, z) {
+    for (const o of this.game.entities.buildings())
+      if (x >= o.tx && x < o.tx + o.w && z >= o.tz && z < o.tz + o.h) return true;
+    return false;
+  }
+
+  // A 2-tile paved street from a building's door (+z side) to the nearest
+  // town centre of the same owner: out from the door, then along x, then
+  // along z to the plaza. Tiles that are blocked, farmed or inside another
+  // footprint are skipped, so a street simply ducks under obstacles.
+  paveStreet(b) {
+    const map = this.game.map;
+    let tc = null, best = Infinity;
+    for (const o of this.game.entities.buildings()) {
+      if (o.type !== 'town_center' || o.owner !== b.owner || o === b) continue;
+      const d = Math.hypot(o.x - b.x, o.z - b.z);
+      if (d < best) { best = d; tc = o; }
+    }
+    if (!tc || best > 26) return;
+    const paint = (x, z) => {
+      for (const [ox, oz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+        const X = x + ox, Z = z + oz;
+        if (!map.isWalkable(X, Z) || this.inFootprint(X, Z)) continue;
+        const g = this.groundAt(X, Z);
+        if (g === GROUND.FARM || g === GROUND.SAND || g === GROUND.ROCK || g < 0) continue;
+        map.paintTiles(X, Z, 1, 1, GROUND.PAVED);
+      }
+    };
+    // door point: middle of the front edge, one tile out
+    let x = Math.floor(b.tx + b.w / 2) - 1, z = b.tz + b.h;
+    // target: nearest point on the TC plaza edge
+    const gx = Math.max(tc.tx - 1, Math.min(tc.tx + tc.w - 1, x));
+    const gz = Math.max(tc.tz - 1, Math.min(tc.tz + tc.h - 1, z));
+    // leave the door by 2 tiles, then run along x, then z
+    const z1 = gz > z ? z + 2 : z;
+    for (; z < z1; z++) paint(x, z);
+    const sx = Math.sign(gx - x);
+    for (; x !== gx; x += sx) paint(x, z);
+    const sz = Math.sign(gz - z);
+    for (; z !== gz; z += sz) paint(x, z);
+    paint(x, z);
+  }
+
+  // Cobbled roads leaving a town centre's plaza in the four directions, with
+  // worn-earth shoulders, so the town sits on a street grid instead of being
+  // one paved blob on grass. Roads stop at water/cliffs and skip blocked
+  // tiles (trees, mines) and existing footprints.
+  paveRoads(tc) {
+    const map = this.game.map;
+    const cx = Math.floor(tc.tx + tc.w / 2) - 1, cz = Math.floor(tc.tz + tc.h / 2) - 1;
+    const set = (x, z, g) => {
+      if (!map.isWalkable(x, z) || this.inFootprint(x, z)) return;
+      const cur = this.groundAt(x, z);
+      if (cur < 0 || cur === GROUND.FARM || cur === GROUND.SAND || cur === GROUND.ROCK) return;
+      if (g === GROUND.DIRT && cur === GROUND.PAVED) return;
+      map.paintTiles(x, z, 1, 1, g);
+    };
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const len = 20 + Math.floor(hash3(tc.tx + dx, 11, tc.tz + dz, 47) * 6);
+      let wob = 0;
+      for (let i = 0; i < len; i++) {
+        if (i % 5 === 4) wob = Math.max(-1, Math.min(1, wob + (hash3(i, dx, dz, 48) < 0.5 ? -1 : 1)));
+        const ox = dz !== 0 ? wob : 0, oz = dx !== 0 ? wob : 0;
+        const x = cx + dx * i + ox, z = cz + dz * i + oz;
+        const px = dz !== 0 ? 1 : 0, pz = dx !== 0 ? 1 : 0;   // perpendicular
+        const tail = i > len - 4;                           // road frays out
+        for (let k = -1; k <= 2; k++) {
+          const X = x + px * k, Z = z + pz * k;
+          const edge = k === -1 || k === 2;
+          if (edge) { if (hash3(X, 12, Z, 49) < 0.75) set(X, Z, GROUND.DIRT); }
+          else set(X, Z, tail && hash3(X, 13, Z, 50) < 0.5 ? GROUND.DIRT : GROUND.PAVED);
+        }
+      }
+    }
+  }
+
   canPlace(type, tx, tz) {
     const def = BUILDING_DEFS[type];
     const map = this.game.map;
@@ -119,9 +217,10 @@ export class Buildings {
     const game = this.game, map = game.map;
     game.terrain.clearRect(tx, tz, def.w, def.h);
     map.flattenTiles(tx, tz, def.w, def.h, null, def.farm ? GROUND.FARM : type === 'town_center' || type === 'temple' ? GROUND.PAVED : GROUND.DIRT);
-    if (type === 'town_center') this.pavePlaza(tx, tz, def.w, def.h, 5);
+    if (type === 'town_center') this.pavePlaza(tx, tz, def.w, def.h, 6);
     else if (type === 'temple') this.pavePlaza(tx, tz, def.w, def.h, 2.5);
     else if (!def.farm) this.pavePlaza(tx, tz, def.w, def.h, 1.2);
+    if (!def.farm) this.yard(tx, tz, def.w, def.h, type === 'town_center' ? 0 : 3);
     const b = game.entities.add({
       kind: 'building', type, owner, def,
       tx, tz, w: def.w, h: def.h,
@@ -132,6 +231,8 @@ export class Buildings {
       radius: Math.max(def.w, def.h) / 2,
     });
     if (!def.walkable) map.block(tx, tz, def.w, def.h, b.id);
+    if (!def.farm && type !== 'town_center') this.paveStreet(b);
+    if (type === 'town_center') this.paveRoads(b);
     // nudge any units standing inside the footprint out of it
     for (const u of game.entities.units()) {
       if (u.x >= tx && u.x < tx + def.w && u.z >= tz && u.z < tz + def.h && !def.walkable) {
