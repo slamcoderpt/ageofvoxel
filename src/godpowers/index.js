@@ -1,4 +1,4 @@
-import { BoltRenderer } from './effects.js';
+import { BoltRenderer, boltLines } from './effects.js';
 import { RNG, hash2 } from '../core/rng.js';
 
 // God powers: favor-costed abilities cast on a target point.
@@ -113,34 +113,34 @@ export class GodPowers {
   }
 
   // Voxel chunks of earth, turf and soot blown out of a strike crater, plus a few glowing embers.
-  throwDebris(x, y, z, n, power = 1, seed = 1) {
+  throwDebris(x, y, z, n, power = 1, seed = 1, blue = false) {
     const vr = new RNG(seed);
     const COLS = [0x5b4430, 0x6e5238, 0x4a3726, 0x4e7a2e, 0x3f6526, 0x1c1814, 0x2a2420, 0x7a7468];
     const now = this.game.time;
     for (let i = 0; i < n; i++) {
       const a = vr.range(0, Math.PI * 2), sp = vr.range(1.5, 5.5) * power;
-      const ember = i < Math.ceil(n * 0.4);
+      const ember = i < Math.ceil(n * (blue ? 0.15 : 0.4));
       this.debris.push({
         x: x + Math.cos(a) * 0.3, y: y + 0.2, z: z + Math.sin(a) * 0.3,
         vx: Math.cos(a) * sp, vy: vr.range(4, 10) * power, vz: Math.sin(a) * sp,
         rx: vr.range(0, 6), ry: vr.range(0, 6), rz: vr.range(0, 6),
         wx: vr.range(-12, 12), wy: vr.range(-8, 8), wz: vr.range(-12, 12),
         s: ember ? vr.range(0.1, 0.18) : vr.range(0.12, 0.34), color: vr.pick(COLS),
-        ember, cool: vr.range(1.2, 2.6), t0: now, settled: false, die: now + vr.range(7, 11),
+        ember, blue, cool: blue ? vr.range(0.4, 0.9) : vr.range(1.2, 2.6), t0: now, settled: false, die: now + vr.range(7, 11),
       });
     }
     if (this.debris.length > 460) this.debris.splice(0, this.debris.length - 460);
   }
 
   // White-hot sparks flung out of the impact (drawn as velocity streaks).
-  throwSparks(x, y, z, n, seed, power = 1, dim = 1) {
+  throwSparks(x, y, z, n, seed, power = 1, dim = 1, warm = false) {
     const vr = new RNG(seed ^ 0x5bd1e995), now = this.game.time;
     for (let i = 0; i < n; i++) {
       const a = vr.range(0, Math.PI * 2), sp = vr.range(5, 13) * power;
       // each spark starts a few ms into its flight (the discharge is already
       // throwing them as the first stroke lands), so the burst reads at once
       const vx = Math.cos(a) * sp, vz = Math.sin(a) * sp, vy = vr.range(3, 10) * power, t = vr.range(0.03, 0.2);
-      this.sparks.push({ x: x + vx * t, y: y + 0.25 + vy * t - 10 * t * t, z: z + vz * t, vx, vy: vy - 20 * t, vz, t0: now, life: vr.range(0.35, 0.8) * (0.6 + 0.4 * power), dim, warm: dim >= 1 && i % 5 < 2 });
+      this.sparks.push({ x: x + vx * t, y: y + 0.25 + vy * t - 10 * t * t, z: z + vz * t, vx, vy: vy - 20 * t, vz, t0: now, life: vr.range(0.35, 0.8) * (0.6 + 0.4 * power), dim, warm: warm && i % 5 < 2 });
     }
     if (this.sparks.length > 400) this.sparks.splice(0, this.sparks.length - 400);
   }
@@ -161,8 +161,12 @@ export class GodPowers {
     const game = this.game;
     const y = game.map.heightAt(x, z);
     const seed = (game.tickCount * 7919 + this.bolts.length * 31 + (x * 13 | 0)) >>> 0;
-    this.bolts.push({ x, y, z, t0: game.time, life: 0.75, seed });
+    // the channel (with its forks) is laid out now, so the forks that earth
+    // themselves leave their own small scorch
+    const lines = boltLines(seed, x, y, z, (px, pz) => game.map.heightAt(px, pz));
+    this.bolts.push({ x, y, z, t0: game.time, life: 0.75, seed, lines });
     this.scorches.push({ x, y, z, t0: game.time, seed });
+    for (const e of lines.ends) this.scorches.push({ x: e.x, y: e.y, z: e.z, t0: game.time, seed: seed ^ ((e.x * 97) | 0), size: 1.5 + e.w });
     const thrown = game.movement.hash.near(x, z, Math.max(2.6, splash + 0.8), (o) => !o.dead && game.isEnemy(owner, o.owner));
     if (target) { game.combat.damage(target, damage, { owner, id: 0 }); this.zap(target); }
     if (splash > 0) {
@@ -172,9 +176,9 @@ export class GodPowers {
       }
     }
     for (const o of thrown) this.knock(o, x, z, o === target ? 1.1 : 0.8);
-    this.throwDebris(x, y, z, 26, 1, seed);
+    this.throwDebris(x, y, z, 22, 1, seed, true);
     this.charRim(x, y, z, seed);
-    this.throwSparks(x, y, z, 36, seed);
+    this.throwSparks(x, y, z, 16, seed);
     // the storm perimeter answers each strike: arcs flare on the side it hit
     for (const s of this.storms) {
       const d = Math.hypot(x - s.x, z - s.z);
@@ -185,11 +189,10 @@ export class GodPowers {
       }
     }
     // white-hot sparks, blue electric motes, earth and smoke
-    game.fx.emit({ x, y: y + 0.3, z, count: 30, color: 0xcfe2ff, size: 0.2, life: 0.5, speed: 9, up: 6, gravity: -16, additive: true, drag: 0.5 });
-    game.fx.emit({ x, y: y + 0.6, z, count: 10, color: 0x3d6cdf, size: 0.4, life: 0.7, speed: 3.5, up: 2.5, gravity: -2, additive: true, spread: 0.6 });
+    game.fx.emit({ x, y: y + 0.3, z, count: 14, color: 0xcfe2ff, size: 0.14, life: 0.45, speed: 9, up: 6, gravity: -16, additive: true, drag: 0.5 });
+    game.fx.emit({ x, y: y + 0.6, z, count: 6, color: 0x3d6cdf, size: 0.3, life: 0.6, speed: 3.5, up: 2.5, gravity: -2, additive: true, spread: 0.6 });
     game.fx.emit({ x, y: y + 0.2, z, count: 8, color: 0x5a5550, size: 0.45, life: 1.4, speed: 1.6, up: 1.5, gravity: 0.6, grow: 1.6 });
     game.fx.emit({ x, y: y + 0.2, z, count: 14, color: 0x5d4a33, size: 0.2, life: 1.0, speed: 4.5, up: 6, gravity: -16 });
-    game.fx.emit({ x, y: y + 0.2, z, count: 10, color: 0xff9a3a, size: 0.22, life: 1.2, speed: 1.2, up: 2.5, gravity: 1.5, additive: true, spread: 0.5 });
   }
 
   impactMeteor(m) {
@@ -232,8 +235,8 @@ export class GodPowers {
         }
       }
       // static crawling along the storm perimeter
-      for (let k = 0; k < 2; k++) {
-        if (!vr.chance(0.55)) continue;
+      for (let k = 0; k < 1; k++) {
+        if (!vr.chance(0.35)) continue;
         const a0 = vr.range(0, Math.PI * 2), span = vr.range(0.18, 0.5) * (vr.chance(0.5) ? 1 : -1);
         this.bolts.push({ kind: 'rim', x: s.x, z: s.z, r: s.radius, a0, span, t0: game.time, life: vr.range(0.12, 0.3), seed: (vr.next() * 1e9) >>> 0 });
         // sparks spit where the arc earths itself on the perimeter
@@ -245,7 +248,7 @@ export class GodPowers {
       if (s.sky <= 0) {
         s.sky = vr.range(0.25, 0.7);
         const a = vr.range(0, Math.PI * 2), r = s.radius * vr.range(0.9, 1.6);
-        const y = game.map.heightAt(s.x, s.z) + vr.range(13, 16);
+        const y = game.map.heightAt(s.x, s.z) + vr.range(20, 24);
         this.bolts.push({ kind: 'sky', x: s.x + Math.cos(a) * r, y, z: s.z + Math.sin(a) * r, t0: game.time, life: 0.35, seed: (vr.next() * 1e9) >>> 0 });
       }
     }
@@ -264,10 +267,10 @@ export class GodPowers {
       const k = 1 - age / f.dur;
       // tongues of flame licking up out of the crater and the wreck, a hot
       // yellow heart, and a thick column of black smoke
-      for (let j = 0; j < 4; j++) {
-        const a = vr.range(0, Math.PI * 2), r = Math.sqrt(vr.next()) * f.r;
+      for (let j = 0; j < 5; j++) {
+        const a = vr.range(0, Math.PI * 2), r = Math.sqrt(vr.next()) * f.r * 0.8;
         const fx = f.x + Math.cos(a) * r, fz = f.z + Math.sin(a) * r, fy = game.map.heightAt(fx, fz);
-        game.fx.emit({ x: fx, y: fy + 0.3 + vr.range(0, 2.2) * (1 - r / f.r), z: fz, count: Math.ceil(4 * k), color: j & 1 ? 0xff7a20 : 0xff5a10, size: 1.1, life: 0.85, speed: 0.35, up: 3.4, gravity: 2.2, additive: true, grow: -0.55, spread: 0.45 });
+        game.fx.emit({ x: fx, y: fy + 0.3 + vr.range(0, 2.4) * (1 - r / f.r), z: fz, count: Math.ceil(5 * k), color: j & 1 ? 0xff7a20 : 0xff5a10, size: 1.35, life: 0.9, speed: 0.35, up: 3.6, gravity: 2.2, additive: true, grow: -0.55, spread: 0.45 });
       }
       game.fx.emit({ x: f.x + vr.range(-1, 1), y: f.y + 0.4, z: f.z + vr.range(-1, 1), count: Math.ceil(2 * k), color: 0xffc050, size: 0.8, life: 0.6, speed: 0.3, up: 3.8, gravity: 2, additive: true, grow: -0.6, spread: 0.6 });
       if (vr.chance(0.7 * k)) game.fx.emit({ x: f.x + vr.range(-1.5, 1.5), y: f.y + 2.2, z: f.z + vr.range(-1.5, 1.5), count: 1, color: vr.chance(0.5) ? 0x1e1b1a : 0x2e2a28, size: 1.6, life: 3.2, speed: 0.3, up: 2.4, gravity: 0.5, grow: 2.4 });
@@ -275,7 +278,7 @@ export class GodPowers {
     // lightning craters smoke: a dark column that thins out over a few seconds
     for (const s of this.scorches) {
       const age = game.time - s.t0;
-      if (s.blast || age > 5) continue;
+      if (s.blast || s.size || age > 5) continue;
       const k = 1 - age / 5;
       if (vr.chance(0.25 + 0.6 * k)) game.fx.emit({ x: s.x + vr.range(-0.4, 0.4), y: s.y + 0.3, z: s.z + vr.range(-0.4, 0.4), count: 1, color: vr.chance(0.5) ? 0x2a2826 : 0x3d3a38, size: 0.55 + 0.35 * k, life: 2.2, speed: 0.25, up: 1.6, gravity: 0.9, grow: 1.8, spread: 0.3 });
     }

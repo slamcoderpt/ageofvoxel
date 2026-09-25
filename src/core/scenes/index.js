@@ -70,7 +70,7 @@ registerScene('godpower', {
     game.fastForward(2.4);
     // step until a fresh bolt is on screen so the capture always shows one
     for (let i = 0; i < 60; i++) {
-      const fresh = game.godpowers.bolts.some((b) => game.time - b.t0 < 0.12);
+      const fresh = game.godpowers.bolts.some((b) => !b.kind && game.time - b.t0 < 0.12 && Math.hypot(b.x - cx, b.z - cz) < 6);
       if (fresh) break;
       game.tick();
     }
