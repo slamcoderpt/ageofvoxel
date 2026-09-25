@@ -15,11 +15,16 @@ import { fieldHeroesAndMyth, engageHeroesAndMyth } from '../units/battleHost.js'
 const S = Math.SQRT1_2;
 // a: along the front (screen right is +a); d: depth (towards the camera is +d)
 const P = (cx, cz, a, d) => [cx + (a + d) * S, cz + (d - a) * S];
-// The two fronts have collided: a packed, interlocking line of single
-// combats along the seam (a pair every pace and a half, each man overlapping
-// his foe from the camera), a second rank pressed up hard behind the first
-// and thrusting over its shoulders, and men from the rear still coming up.
-const COL = 1.5;
+// The two fronts have met and stopped at a visible seam: a line of single
+// combats (a pair every couple of paces, the two men a long spear-thrust
+// apart so from the camera each foe stands clear of the other with a strip
+// of ground between them), a second rank a full pace behind its own front,
+// shields up and set half a file over so every man shows between the two
+// in front of him, and a loose third rank in reserve. Units never overlap.
+const COL = 1.9;
+const FRONT = 1.1;    // depth of each duellist from the seam (gap = 2x)
+const SECOND = 3.5;   // depth of the second rank
+const THIRD = 5.8;    // depth of the reserve
 const HERO_RING = (a, d) => Math.abs(a) < 2.0 && Math.abs(d) < 1.4;
 // the two ends of the line belong to the giants (minotaur vs cyclops)
 const END = 14;
@@ -44,7 +49,7 @@ function place(game, type, owner, x, z, rot) {
 // a ragged third rank still pushing up from behind, two knots of archers
 // loosing over the melee, a cavalry wing on the flank and a minotaur at the
 // left end of the line.
-function army(game, owner, side, cx, cz) {
+function army(game, owner, side, cx, cz, ranks) {
   const rng = game.rng;
   const rot = side > 0 ? -3 * Math.PI / 4 : Math.PI / 4; // face the enemy
   const units = { hoplite: [], toxotes: [], hippikon: [], minotaur: [], reserve: [], second: [] };
@@ -54,27 +59,29 @@ function army(game, owner, side, cx, cz) {
     units[type].push(u);
     return u;
   };
-  // second rank: packed in right behind the fighters, half a file over
-  for (let a = -END + 2.4; a < END - 2.2; a += COL) {
-    if (rng.chance(0.12)) continue;
-    const aa = a + rng.range(-0.25, 0.25) + (side > 0 ? 0 : 0.3);
-    if (Math.abs(aa) < 1.4) continue;
-    const u = at('hoplite', aa, 1.45 + rng.range(-0.15, 0.25));
-    u.combat_leash = 2.6;
-    u.combat_reach = 1.25;
-    u.combat_line = { cx, cz, nx: S * side, nz: S * side, d0: 1.15 };
-    u.maxHp *= 3; u.hp = u.maxHp * rng.range(0.6, 1);
+  // second rank: a full pace behind the fighters, half a file over, holding
+  // (shields up, spears ready; they do not step into the duels)
+  for (let a = -END + 1.7 + COL / 2; a < END - 2.2; a += COL) {
+    if (rng.chance(0.15)) continue;
+    const aa = a + rng.range(-0.2, 0.2);
+    if (Math.abs(aa) < 2.2) continue;
+    const dd = SECOND + rng.range(-0.15, 0.3);
+    const u = at('hoplite', aa, dd);
+    u.combat_leash = 0.2;
+    u.combat_line = { cx, cz, nx: S * side, nz: S * side, d0: SECOND - 0.3 };
+    u.maxHp *= 3; u.hp = u.maxHp * rng.range(0.75, 1);
     units.second.push(u);
+    ranks.push([aa * side, dd * side]);
   }
-  // third rank: men coming up from behind to join the press (ordered forward
-  // in battleScene.after, caught mid-stride)
-  for (let i = 0; i < 12; i++) {
-    const a = (i - 5.5) * 2.2 + rng.range(-0.5, 0.5);
-    const d = 4.0 + rng.range(-0.2, 1.2);
+  // third rank: a loose reserve standing ready behind the second
+  for (let i = 0; i < 9; i++) {
+    const a = (i - 4) * 2.9 + rng.range(-0.4, 0.4);
+    const d = THIRD + rng.range(-0.2, 0.8);
     const u = at('hoplite', a, d);
-    u.combat_leash = 0.8;
-    u.combat_line = { cx, cz, nx: S * side, nz: S * side, d0: 2.3 };
+    u.combat_leash = 0.2;
+    u.combat_line = { cx, cz, nx: S * side, nz: S * side, d0: THIRD - 0.5 };
     units.reserve.push(u);
+    ranks.push([a * side, d * side]);
   }
   // archers in two loose knots, duelling the enemy archers over the melee
   for (let i = 0; i < 8; i++) {
@@ -113,15 +120,18 @@ function duels(game, cx, cz, slots) {
     for (const side of [1, -1]) {
       const owner = side > 0 ? PLAYER : ENEMY;
       const lat = a + side * skew + rng.range(-0.1, 0.1);
-      const [x, z] = P(cx, cz, lat, o + side * 0.52);
+      const [x, z] = P(cx, cz, lat, o + side * FRONT);
       const u = place(game, 'hoplite', owner, x, z, side > 0 ? -3 * Math.PI / 4 : Math.PI / 4);
       // champions: still on their feet, trading blows, when the frame is
       // taken (scene-only hardiness), visibly hurt
+      // (a few badly hurt, the rest fresh: only the hurt show health bars)
       u.maxHp *= 4;
-      u.hp = u.maxHp * rng.range(0.5, 1.0);
-      u.combat_leash = 1.4;
-      u.combat_reach = 0.3;
-      u.combat_line = { cx, cz, nx: S * side, nz: S * side, d0: side * o + 0.3 };
+      u.hp = u.maxHp * (rng.chance(0.15) ? rng.range(0.3, 0.45) : rng.range(0.65, 1.0));
+      u.combat_leash = 2.2;
+      // spear's length: they fight across the seam without closing into
+      // one another, and never step past their own side of it
+      u.combat_reach = 0.85;
+      u.combat_line = { cx, cz, nx: S * side, nz: S * side, d0: side * o + FRONT - 0.08 };
       u.attackCd = rng.range(0, u.def.attack.cooldown);
       pair.push(u);
     }
@@ -147,10 +157,11 @@ function fallen(game, cx, cz, taken) {
     return u;
   };
   let n = 0;
-  for (let k = 0; k < 600 && n < 9; k++) {
-    // the dead lie just behind the duel line, on their own side of it
-    const a = rng.range(-END + 1, END - 1), d = (rng.chance(0.5) ? 1 : -1) * rng.range(2.0, 3.1);
-    if (HERO_RING(a, d) || !clear(a, d, 1.7)) continue;
+  for (let k = 0; k < 600 && n < 10; k++) {
+    // the dead lie just behind the duel line, on their own side of it,
+    // between the duellists and the second rank
+    const a = rng.range(-END + 1, END - 1), d = (rng.chance(0.5) ? 1 : -1) * rng.range(2.0, 2.7);
+    if (HERO_RING(a, d) || !clear(a, d, 1.15)) continue;
     const owner = d > 0 ? PLAYER : ENEMY;
     body(rng.chance(0.12) ? 'toxotes' : 'hoplite', owner, a, d);
     n++;
@@ -160,9 +171,9 @@ function fallen(game, cx, cz, taken) {
   body('hippikon', PLAYER, END + 2.5, -0.8);
   // loose gear in the trampled ground behind both fronts: shields, helmets,
   // spears and broken shafts dropped as the ranks pushed over them
-  for (let i = 0, got = 0; i < 80 && got < 16; i++) {
-    const a = rng.range(-END + 1, END - 1), d = (rng.chance(0.5) ? 1 : -1) * rng.range(1.9, 3.4);
-    if (!clear(a, d, 0.8)) continue;
+  for (let i = 0, got = 0; i < 120 && got < 12; i++) {
+    const a = rng.range(-END + 1, END - 1), d = (rng.chance(0.5) ? 1 : -1) * rng.range(1.6, 4.2);
+    if (!clear(a, d, 0.75)) continue;
     got++;
     const [x, z] = P(cx, cz, a, d);
     const owner = d > 0 ? PLAYER : ENEMY;
@@ -236,8 +247,9 @@ export const battleScene = {
     const grade = { uToeLift: 0.05, uKnee: 0.72, uShoulder: 1.3, uSaturation: 1.06, uContrast: 1.14, uChromaLimit: 0.2 };
     if (gu) for (const k in grade) if (gu[k]) gu[k].value = grade[k];
     trample(game, cx, cz);
-    const blue = army(game, PLAYER, 1, cx, cz);
-    const red = army(game, ENEMY, -1, cx, cz);
+    const ranks = [];
+    const blue = army(game, PLAYER, 1, cx, cz, ranks);
+    const red = army(game, ENEMY, -1, cx, cz, ranks);
     const myth = [...fieldHeroesAndMyth(game, PLAYER, 1, (a, d) => P(cx, cz, a, d), -3 * Math.PI / 4), ...fieldHeroesAndMyth(game, ENEMY, -1, (a, d) => P(cx, cz, a, d), Math.PI / 4)];
     // the two heroes meet in the open ring at the centre of the field; each
     // cyclops holds the right end of its own line opposite the enemy minotaur
@@ -271,19 +283,14 @@ export const battleScene = {
     charge(red, blue);
     const slots = duelSlots(game.rng);
     // keep bodies clear of the duels, the hero ring and the giants
-    const taken = [...slots.map(([a, d]) => [a, d]), [0, 0], [-END, 0], [END, 0], [-END + 1, 1.5], [END - 1, -1.5]];
+    const taken = [...slots.flatMap(([a, d]) => [[a, d + FRONT], [a, d - FRONT]]), ...ranks, [0, 0], [-END, 0], [END, 0], [-END + 1, 1.5], [END - 1, -1.5]];
     fallen(game, cx, cz, taken);
     churn(game, cx, cz, [...slots.map(([a, d]) => [a, d, 1.1]), [0, 0.3, 1.8], [-END, 0.3, 1.8], [END, 0.3, 1.8]]);
     duels(game, cx, cz, slots);
-    // the second rank thrusts over its own front at the nearest enemy duellist
-    for (const u of [...blue.second, ...red.second]) {
-      const t = game.combat.findEnemyNear(u, 3.5, (o) => o.type === 'hoplite');
-      if (t) game.commands.order(u, { type: 'attack', targetId: t.id, auto: true });
-    }
     engageHeroesAndMyth(game, myth);
     const heroes = myth.filter((u) => u.type === 'hero');
     const cyc = myth.filter((u) => u.type === 'cyclops');
-    for (const h of heroes) { h.combat_line.d0 = 0.75; h.combat_leash = 3; }
+    for (const h of heroes) { h.combat_line.d0 = 1.0; h.combat_leash = 3; }
     if (heroes.length === 2) {
       game.commands.order(heroes[0], { type: 'attack', targetId: heroes[1].id, auto: true });
       game.commands.order(heroes[1], { type: 'attack', targetId: heroes[0].id, auto: true });
@@ -298,20 +305,13 @@ export const battleScene = {
   // at a time, up to a second and a half, until several men along the field
   // have just been struck (sparks in the air, dust at their feet).
   after(game) {
-    // the third rank pushes up into the press: caught mid-stride, not parked
-    for (const u of game.entities.units()) {
-      const L = u.combat_line;
-      if (u.dead || !L || L.d0 !== 2.3) continue;
-      const lat = game.rng.range(-0.6, 0.6);
-      game.commands.order(u, { type: 'move', x: u.x - L.nx * 3.6 + L.nz * lat, z: u.z - L.nz * 3.6 - L.nx * lat });
-    }
     for (let i = 0; i < 10; i++) game.fastForward(1 / 30);
     const hot = () => {
       let n = 0;
       for (const u of game.entities.units()) if (!u.dead && game.time - (u.combat_hitT ?? -99) < 0.1 && !u.def.attack?.projectile) n++;
       return n;
     };
-    for (let i = 0; i < 75 && hot() < 5; i++) game.fastForward(1 / 30);
+    for (let i = 0; i < 90 && hot() < 7; i++) game.fastForward(1 / 30);
   },
   camera: { x: 64.2, z: 63.4, distance: 42, pitch: 54 },
 };

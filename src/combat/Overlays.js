@@ -139,8 +139,8 @@ export class Overlays {
       // Bars are short (about a third of a man's width on screen at the
       // battle zoom) and sit at one fixed height per unit type above the
       // ground under the man, so a row of fighters gets a level row of bars.
-      const struck = game.time - (u.combat_hitT ?? -99) < 1.6;
-      if (selected || hover === u.id || (struck && f < (big ? 0.95 : 0.6)))
+      const struck = game.time - (u.combat_hitT ?? -99) < 1.2;
+      if (selected || hover === u.id || (struck && f < (big ? 0.8 : 0.5)))
         addBar(u, x, game.map.heightAt(u.x, u.z) + game.units.heightOf(u) + 0.25, z, big ? 72 : u.def.class === 'cavalry' ? 54 : 46, 1);
     }
     for (const b of game.entities.buildings()) {

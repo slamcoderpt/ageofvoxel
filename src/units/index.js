@@ -445,8 +445,11 @@ export class Units {
         const tr = this._c.r * ck, tg = this._c.g * ck, tb = this._c.b * ck;
         // a hard white flash on the frame (or two) a blow lands, then a faint
         // afterglow while flashT runs out
-        const pop = !u.dead && (u.units_hitT ?? 9) < 0.07 && u.flashT > 0 ? 0.26 : 0;
-        const flash = Math.max(pop, u.dead ? 0 : Math.min(1, u.flashT / 0.1) * 0.16, u.gp_hit || 0);
+        // (kept low: a strong additive wash turns the man pastel and he reads
+        // as a translucent ghost; the hot sparks at the contact point carry
+        // the blow, the flash just lifts him a touch)
+        const pop = !u.dead && (u.units_hitT ?? 9) < 0.07 && u.flashT > 0 ? 0.05 : 0;
+        const flash = Math.max(pop, u.dead ? 0 : Math.min(1, u.flashT / 0.1) * 0.02, u.gp_hit || 0);
         const fade = u.dead ? 1 - Math.min(1, Math.max(0, (u.anim.dieT - FADE_START) / (CORPSE_TIME - 0.3 - FADE_START))) : 1;
         for (let pi = 0; pi < rig.parts.length; pi++) {
           const p = rig.parts[pi];
