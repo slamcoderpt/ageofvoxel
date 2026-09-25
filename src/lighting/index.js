@@ -49,7 +49,7 @@ export class Lighting {
     scene.fog = new THREE.Fog(this.hazeColor, 80, 400);
     scene.background = this.hazeColor.clone();
 
-    this.patcher = new MaterialPatcher(scene);
+    this.patcher = new MaterialPatcher(game);
 
     this.post = post === 'off' ? null : new PostFX(renderer, scene, game.camera, post);
   }

@@ -28,10 +28,12 @@ const GradeShader = {
     uHighTint: { value: new THREE.Vector3(1.05, 1.0, 0.93) },
     uVignette: { value: 0.12 },
     uToeLift: { value: 0.06 },
+    uKnee: { value: 0.62 },
+    uShoulder: { value: 1.5 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uToeLift, uChromaLimit, uExposure, uSaturation, uGreenShift, uGreenDesat, uContrast, uVignette;
+    uniform sampler2D tDiffuse; uniform float uKnee, uShoulder, uToeLift, uChromaLimit, uExposure, uSaturation, uGreenShift, uGreenDesat, uContrast, uVignette;
     uniform vec3 uShadowTint, uHighTint; varying vec2 vUv;
     const vec3 LW = vec3(0.2126, 0.7152, 0.0722);
     void main(){
@@ -61,6 +63,10 @@ const GradeShader = {
       vec3 k = smoothstep(0.18, 0.55, c);
       c = mix(c, s, (uContrast - 1.0 + 0.25) * k);
       c = c + uToeLift * (1.0 - c) * (1.0 - smoothstep(0.0, 0.35, c));
+      // --- highlight shoulder: pale stone and white marble roll off instead of
+      // clipping, so plaza and roofs keep their texture next to the forest
+      l = dot(c, LW);
+      if (l > uKnee) { float e = l - uKnee; c *= (uKnee + e / (1.0 + e * uShoulder)) / l; }
       // --- split tone: cool blue-green shadows, warm highlights
       l = dot(c, LW);
       float hi = smoothstep(0.25, 0.9, l);
@@ -83,9 +89,9 @@ export class PostFX {
     this.composer.addPass(new RenderPass(scene, camera));
     if (quality === 'high') {
       this.gtao = new GTAOPass(scene, camera, size.x, size.y);
-      this.gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.6, thickness: 2.5, scale: 1.25, samples: 12, distanceFallOff: 1.0 });
+      this.gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.6, thickness: 2.5, scale: 1.45, samples: 12, distanceFallOff: 1.0 });
       this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
-      this.gtao.blendIntensity = 0.75;
+      this.gtao.blendIntensity = 1.0;
       // Let pieces opt objects out of the AO g-buffer with object.userData.noAO
       // (water, overlays, effects).
       const orig = this.gtao._overrideVisibility.bind(this.gtao);

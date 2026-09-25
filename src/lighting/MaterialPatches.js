@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { addShaderPatch, prependFragment, injectFragment } from '../core/shaderPatch.js';
+import { addShaderPatch, prependFragment, prependVertex, injectFragment, injectVertex } from '../core/shaderPatch.js';
+import { CanopyMap, canopyUniforms } from './Canopy.js';
 
 // Lighting-owned shader patches layered on top of every voxel material
 // (anything carrying core's 'voxelTeam' / 'voxelTeamInst' patch):
@@ -9,6 +10,12 @@ import { addShaderPatch, prependFragment, injectFragment } from '../core/shaderP
 //    near-black wall (Retold's forests stay mid-value in shade).
 //  - Leaf translucency: faces of foliage turned toward the sun (and the
 //    silhouettes wrapping round it) get a warm yellow-green subsurface lift.
+//  - Canopy AO (see Canopy.js): crown interiors, undersides and the gaps
+//    between neighbouring crowns fall into deep cool blue-green shade by how
+//    far below the local canopy top they sit; lit crown tops keep the sun.
+//    The forest floor under the canopy edge (terrain, tufts) is darkened too.
+//  - Per-tree crown tint: warm olive / neutral / cool deep green families
+//    with +-18% brightness, seeded from each instance's map position.
 //  - Daylight emissive: glow voxels (windows, braziers, torches) are scaled by
 //    the sun's elevation, so at midday they sit as a soft warm glow instead of
 //    blooming out to white; they return to full strength at dusk.
@@ -19,39 +26,116 @@ import { addShaderPatch, prependFragment, injectFragment } from '../core/shaderP
 export const atmosUniforms = {
   uSunDirView: { value: new THREE.Vector3(0, 1, 0) },
   uFoliageSky: { value: new THREE.Color(0.30, 0.38, 0.44) },
-  uFoliageSun: { value: new THREE.Color(0.40, 0.32, 0.12) },
+  uFoliageSun: { value: new THREE.Color(0.20, 0.17, 0.05) },
   uGlowScale: { value: 2.5 },
+  uDeepShade: { value: new THREE.Color(0.24, 0.35, 0.46) }, // indirect multiplier at full canopy occlusion (cool blue-green)
+  uCanopyAO: { value: 1.0 },
+  uUnderstory: { value: 1.0 },
 };
 
 const VOXEL_KEYS = ['voxelTeam', 'voxelTeamInst'];
 
-function patch(shader) {
-  Object.assign(shader.uniforms, atmosUniforms);
+// Shared by both variants: world position, a per-instance seed (one value per
+// tree/tuft, from the instance's map position) and the canopy occlusion terms.
+function patchCommon(shader) {
+  Object.assign(shader.uniforms, atmosUniforms, canopyUniforms);
+  prependVertex(shader, 'varying vec3 vAtmWorld;\nvarying float vAtmSeed;');
+  injectVertex(shader, '#include <project_vertex>', `
+    {
+      vec4 aw = vec4(transformed, 1.0);
+      #ifdef USE_INSTANCING
+        aw = instanceMatrix * aw;
+        vec2 ip = floor(instanceMatrix[3].xz * 2.0 + 0.5);
+        vAtmSeed = fract(sin(dot(ip, vec2(12.9898, 78.233))) * 43758.5453);
+      #else
+        vAtmSeed = 0.5;
+      #endif
+      vAtmWorld = (modelMatrix * aw).xyz;
+    }`);
+  prependFragment(shader, `varying vec3 vAtmWorld;\nvarying float vAtmSeed;
+uniform sampler2D uCanopy;\nuniform float uCanopyInvSize, uCanopyOn;
+uniform vec3 uSunDirView, uFoliageSky, uFoliageSun, uDeepShade;\nuniform float uGlowScale, uCanopyAO, uUnderstory;
+// dens: forest density here; depth: 1 at the forest floor .. 0 at crown tops
+void atmCanopy(out float dens, out float hA) {
+  dens = 0.0; hA = 10.0;
+  if (uCanopyOn > 0.5) {
+    vec4 cm = texture2D(uCanopy, vAtmWorld.xz * uCanopyInvSize);
+    dens = cm.r; hA = vAtmWorld.y - cm.g;
+  }
+}`);
+}
+
+// Voxel materials: per-tree crown tint, canopy AO inside and between crowns,
+// foliage sky fill + translucency, understory darkening, daylight emissive.
+function patchVoxel(shader) {
+  patchCommon(shader);
   // Core multiplies glow by a constant 2.5; route it through the daylight scale.
   shader.fragmentShader = shader.fragmentShader.replace('vGlow * 2.5', 'vGlow * uGlowScale');
-  prependFragment(shader, 'uniform vec3 uSunDirView, uFoliageSky, uFoliageSun;\nuniform float uGlowScale;');
+  // per-tree tint and brightness (before the material's diffuse is fixed)
+  shader.fragmentShader = shader.fragmentShader.replace('#include <lights_physical_fragment>', `
+    float atmLeaf;
+    {
+      vec3 a = diffuseColor.rgb;
+      atmLeaf = smoothstep(0.08, 0.35, (a.g - max(a.r, a.b)) / max(a.g, 1e-3));
+      if (atmLeaf > 0.0) {
+        float s = vAtmSeed, s2 = fract(s * 7.31 + 0.17);
+        // warm olive / neutral / cool deep green families, +-18% brightness
+        vec3 tint = s < 0.3 ? vec3(1.12, 1.02, 0.74) : (s < 0.62 ? vec3(0.97, 1.0, 0.95) : vec3(0.78, 0.92, 1.02));
+        float br = 0.80 + 0.34 * s2;
+        diffuseColor.rgb = mix(a, a * tint * br, atmLeaf);
+      }
+    }
+    #include <lights_physical_fragment>`);
   injectFragment(shader, '#include <lights_fragment_end>', `
     {
       vec3 alb = diffuseColor.rgb;
-      float gdom = (alb.g - max(alb.r, alb.b)) / max(alb.g, 1e-3);
-      float leaf = smoothstep(0.08, 0.35, gdom);
+      float leaf = atmLeaf;
+      vec3 wn = normalize(normal);
+      vec3 wN = inverseTransformDirection(wn, viewMatrix);
+      float dens, hA; atmCanopy(dens, hA);
+      // canopy AO: how deep inside the forest volume this point sits; faces
+      // pointing down or sideways into the canopy see less sky
+      float depth = 1.0 - smoothstep(1.2, 5.6, hA);
+      // (foliage always gets some self-occlusion so even lone crowns have volume)
+      float densL = mix(dens, mix(0.5, 1.0, dens), atmLeaf);
+      float occ = clamp(densL * depth * (1.2 - 0.5 * wN.y), 0.0, 1.0);
+      float down = smoothstep(0.2, 0.9, -wN.y);
+      float occL = clamp(occ * uCanopyAO + down * 0.5, 0.0, 1.0) * leaf;
+      // understory: anything low under/near the canopy that is not foliage
+      float under = smoothstep(0.1, 0.8, dens) * (1.0 - smoothstep(0.3, 2.6, hA)) * (1.0 - leaf) * uUnderstory;
+      float o = max(occL, under);
+      reflectedLight.indirectDiffuse *= mix(vec3(1.0), uDeepShade, o);
+      reflectedLight.directDiffuse *= 1.0 - (0.55 + 0.2 * leaf) * o;
       if (leaf > 0.0) {
-        vec3 wn = normalize(normal);
         float ndl = dot(wn, uSunDirView);
-        // sky fill: strongest on faces the sun does not reach, a little everywhere
+        // sky fill: strongest on faces the sun does not reach; fades out in the canopy interior
         float away = 1.0 - smoothstep(-0.15, 0.6, ndl);
-        vec3 fill = uFoliageSky * (0.45 + 0.55 * away);
-        // translucency: wrap lighting toward the sun, plus a thin rim on back faces
+        vec3 fill = uFoliageSky * (0.2 + 0.6 * away) * (1.0 - 0.9 * occL);
+        // translucency: wrap lighting toward the sun, only on the outer shell
         float wrap = smoothstep(-0.35, 1.0, ndl);
-        vec3 sss = uFoliageSun * (wrap * wrap);
+        vec3 sss = uFoliageSun * (wrap * wrap) * (1.0 - occL);
         reflectedLight.indirectDiffuse += alb * (fill + sss) * leaf;
       }
     }`);
 }
 
+// Terrain: only the understory darkening under the canopy edge.
+function patchGround(shader) {
+  patchCommon(shader);
+  injectFragment(shader, '#include <lights_fragment_end>', `
+    {
+      float dens, hA; atmCanopy(dens, hA);
+      float under = smoothstep(0.1, 0.8, dens) * (1.0 - smoothstep(0.3, 2.6, hA)) * uUnderstory;
+      reflectedLight.indirectDiffuse *= mix(vec3(1.0), uDeepShade, under);
+      reflectedLight.directDiffuse *= 1.0 - 0.55 * under;
+    }`);
+}
+
 export class MaterialPatcher {
-  constructor(scene) {
-    this.scene = scene;
+  constructor(game) {
+    this.game = game;
+    this.scene = game.scene;
+    this.canopy = new CanopyMap(game);
     this.seen = new WeakSet();
     this.frame = 0;
   }
@@ -59,9 +143,10 @@ export class MaterialPatcher {
   _patchMaterial(m) {
     if (!m || this.seen.has(m)) return;
     this.seen.add(m);
+    if (m === this.game.terrain?.mesh?.material) { addShaderPatch(m, 'lightingGround', patchGround); return; }
     const p = m.userData?.patches;
     if (!p || !VOXEL_KEYS.some((k) => p.has(k))) return;
-    addShaderPatch(m, 'lightingAtmos', patch);
+    addShaderPatch(m, 'lightingAtmos', patchVoxel);
   }
 
   // Walk the scene for new voxel materials. Cheap enough every few frames;
@@ -78,6 +163,7 @@ export class MaterialPatcher {
 
   // Per-frame uniforms: sun direction in view space and daylight glow scale.
   update(sunDir, camera) {
+    this.canopy.update();
     atmosUniforms.uSunDirView.value.copy(sunDir).transformDirection(camera.matrixWorldInverse);
     // sun elevation in degrees; full glow below ~5 deg, soft ember above ~20 deg
     const elev = THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(sunDir.y, -1, 1)));
