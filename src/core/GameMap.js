@@ -27,7 +27,6 @@ export class GameMap {
     this.passable = new Uint8Array(sizeTiles * sizeTiles);  // terrain-only passability
     this.blocked = new Uint16Array(sizeTiles * sizeTiles);  // occupancy refcount (buildings, trees, mines)
     this.blockers = new Map();             // tile index -> entity id (last blocker), for picking
-    this.dirtyRegions = [];                // column rects changed since the terrain last rebuilt
     this.onChange = null;                  // callback(rect) set by Game
   }
 
@@ -146,9 +145,7 @@ export class GameMap {
   }
 
   markDirty(cx0, cz0, cx1, cz1) {
-    const r = { cx0, cz0, cx1, cz1 };
-    this.dirtyRegions.push(r);
-    if (this.onChange) this.onChange(r);
+    if (this.onChange) this.onChange({ cx0, cz0, cx1, cz1 });
   }
 }
 

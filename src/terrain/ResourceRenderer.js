@@ -37,16 +37,26 @@ export class ResourceRenderer {
   _touch(e, add) {
     const k = `${this.modelKey(e)}|${Math.floor(e.tx / CHUNK)}|${Math.floor(e.tz / CHUNK)}`;
     let b = this.buckets.get(k);
-    if (!b) { b = { key: this.modelKey(e), ents: new Set(), mesh: null, dirty: true }; this.buckets.set(k, b); }
+    if (!b) { b = { key: this.modelKey(e), cx: Math.floor(e.tx / CHUNK), cz: Math.floor(e.tz / CHUNK), ents: new Set(), mesh: null, dirty: true }; this.buckets.set(k, b); }
     if (add) b.ents.add(e); else b.ents.delete(e);
     b.dirty = true;
   }
 
+  // Terrain under a tile rect changed height: re-seat the props of the
+  // buckets that overlap it (only those; rebuilding every bucket re-uploaded
+  // all ~400 instance buffers on each building placement).
+  markTiles(tx0, tz0, tx1, tz1) {
+    const c0 = Math.floor((tx0 - 1) / CHUNK), c1 = Math.floor((tx1 + 1) / CHUNK);
+    const r0 = Math.floor((tz0 - 1) / CHUNK), r1 = Math.floor((tz1 + 1) / CHUNK);
+    for (const b of this.buckets.values()) if (b.cx >= c0 && b.cx <= c1 && b.cz >= r0 && b.cz <= r1) b.dirty = true;
+  }
+
   render() {
     const map = this.game.map;
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
-    const col = new THREE.Color();
-    const up = new THREE.Vector3(0, 1, 0);
+    const { m4, q, s, p, col, up } = this._tmp || (this._tmp = {
+      m4: new THREE.Matrix4(), q: new THREE.Quaternion(), s: new THREE.Vector3(), p: new THREE.Vector3(),
+      col: new THREE.Color(), up: new THREE.Vector3(0, 1, 0),
+    });
     for (const b of this.buckets.values()) {
       if (!b.dirty) continue;
       b.dirty = false;

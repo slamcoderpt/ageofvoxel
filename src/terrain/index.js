@@ -23,7 +23,8 @@ export class Terrain {
     game.map.onChange = (r) => {
       this.mesh.markDirtyCols(r.cx0, r.cz0, r.cx1, r.cz1);
       // props sitting on changed terrain need their height refreshed
-      for (const b of this.props.buckets.values()) b.dirty = true;
+      const c = game.map.cps;
+      this.props.markTiles(Math.floor(r.cx0 / c), Math.floor(r.cz0 / c), Math.floor((r.cx1 - 1) / c), Math.floor((r.cz1 - 1) / c));
     };
   }
 

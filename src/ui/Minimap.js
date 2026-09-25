@@ -25,7 +25,10 @@ export class Minimap {
     this.dirty = true;
     this.timer = 0;
     this.showTerrain = true; // toggled from the minimap button ring
-    game.events.on('entity:removed', (e) => { if (e.kind === 'resource') this.dirty = true; });
+    // a felled tree or an emptied mine only repaints its own tiles (a full
+    // redraw walks the whole map and every resource)
+    this.cleared = [];
+    game.events.on('entity:removed', (e) => { if (e.kind === 'resource') this.cleared.push(e); });
     game.events.on('building:placed', () => { this.dirty = true; });
     const toWorld = (ev) => {
       const r = this.canvas.getBoundingClientRect();
@@ -50,23 +53,38 @@ export class Minimap {
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
+  groundTile(img, tx, tz) {
+    const map = this.game.map, N = map.size;
+    const cx = tx * map.cps, cz = tz * map.cps;
+    const l = map.level(cx, cz);
+    let rgb;
+    if (l < map.waterLevel) rgb = l < map.waterLevel - 2 ? [34, 90, 150] : [60, 150, 170];
+    else rgb = GROUND_RGB[map.groundAt(cx, cz)] || GROUND_RGB[0];
+    const lw = tx > 0 && tz > 0 ? map.level(cx - map.cps, cz - map.cps) : l;
+    const shade = Math.max(-0.22, Math.min(0.22, (l - lw) * 0.09));
+    const k = (0.84 + Math.min(0.25, Math.max(-0.2, (l - 4) * 0.03))) * (1 + shade);
+    const i = (tz * N + tx) * 4;
+    img.data[i] = rgb[0] * k; img.data[i + 1] = rgb[1] * k; img.data[i + 2] = rgb[2] * k; img.data[i + 3] = 255;
+  }
+
+  // repaint the ground under resources removed since the last draw
+  clearResources() {
+    const N = this.game.map.size, img = this.baseImg;
+    for (const r of this.cleared) {
+      if (!Number.isInteger(r.tx) || !Number.isInteger(r.tz)) continue; // animals are not on the base layer
+      for (let z = r.tz; z < r.tz + r.h; z++) for (let x = r.tx; x < r.tx + r.w; x++) if (x >= 0 && z >= 0 && x < N && z < N) this.groundTile(img, x, z);
+    }
+    this.cleared.length = 0;
+    this.base.getContext('2d').putImageData(img, 0, 0);
+  }
+
   drawBase() {
     const map = this.game.map, N = map.size;
     const ctx = this.base.getContext('2d');
-    const img = ctx.createImageData(N, N);
+    const img = this.baseImg = ctx.createImageData(N, N);
     for (let tz = 0; tz < N; tz++)
-      for (let tx = 0; tx < N; tx++) {
-        const cx = tx * map.cps, cz = tz * map.cps;
-        const l = map.level(cx, cz);
-        let rgb;
-        if (l < map.waterLevel) rgb = l < map.waterLevel - 2 ? [34, 90, 150] : [60, 150, 170];
-        else rgb = GROUND_RGB[map.groundAt(cx, cz)] || GROUND_RGB[0];
-        const lw = tx > 0 && tz > 0 ? map.level(cx - map.cps, cz - map.cps) : l;
-        const shade = Math.max(-0.22, Math.min(0.22, (l - lw) * 0.09));
-        const k = (0.84 + Math.min(0.25, Math.max(-0.2, (l - 4) * 0.03))) * (1 + shade);
-        const i = (tz * N + tx) * 4;
-        img.data[i] = rgb[0] * k; img.data[i + 1] = rgb[1] * k; img.data[i + 2] = rgb[2] * k; img.data[i + 3] = 255;
-      }
+      for (let tx = 0; tx < N; tx++) this.groundTile(img, tx, tz);
+    this.cleared.length = 0;
     for (const r of this.game.entities.resources()) {
       const col = r.type === 'tree' ? [30, 70, 26] : r.type === 'gold' ? [255, 214, 70] : [214, 70, 88];
       for (let z = r.tz; z < r.tz + r.h; z++)
@@ -85,6 +103,7 @@ export class Minimap {
     this.timer = 0.2;
     const game = this.game, N = game.map.size, ctx = this.ctx, S = this.S;
     if (this.dirty) this.drawBase();
+    else if (this.cleared.length) this.clearResources();
     const rot = `${(game.cameraCtl.yaw * 180) / Math.PI}deg`;
     if (rot !== this._rot) { this._rot = rot; this.parent.style.setProperty('--mm-rot', rot); }
     ctx.imageSmoothingEnabled = true;

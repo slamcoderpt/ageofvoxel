@@ -196,10 +196,14 @@ export class UI {
     const game = this.game, me = game.localPlayer;
     for (const [id, d] of Object.entries(this.powerEls)) {
       const def = game.godpowers.powers[id];
+      // (runs every frame: only touch the DOM when something changed)
+      const cd = game.godpowers.cooldownLeft(me, id);
+      const key = `${game.godpowers.canCast(me, id).ok}|${this.selection.mode?.id === id}|${Math.round((cd / def.cooldown) * 200)}`;
+      if (d._key === key) continue;
+      d._key = key;
       d.classList.toggle('disabled', !game.godpowers.canCast(me, id).ok);
       d.classList.toggle('active', this.selection.mode?.id === id);
-      const cd = game.godpowers.cooldownLeft(me, id);
-      d.querySelector('.cd').style.setProperty('--p', `${(cd / def.cooldown) * 100}%`);
+      (d._cd || (d._cd = d.querySelector('.cd'))).style.setProperty('--p', `${(cd / def.cooldown) * 100}%`);
     }
   }
 
