@@ -85,8 +85,8 @@ export class GodPowers {
   zap(o) {
     const game = this.game;
     const h = game.units?.heightOf ? game.units.heightOf(o) : 1.2;
-    // rim flash on the struck unit itself (units' hit-flash emissive)
-    o.flashT = Math.max(o.flashT || 0, 0.16);
+    // (the struck unit's own hit flash comes from combat.damage; the blue
+    // strike light does the rest)
     this.zaps.push({ u: o, x: o.x, y: game.map.heightAt(o.x, o.z), z: o.z, h: (h || 1.8) * 0.8, t0: game.time, life: 0.7, seed: (game.tickCount * 131 + o.id * 17) >>> 0 });
   }
 
@@ -119,7 +119,7 @@ export class GodPowers {
     const now = this.game.time;
     for (let i = 0; i < n; i++) {
       const a = vr.range(0, Math.PI * 2), sp = vr.range(1.5, 5.5) * power;
-      const ember = i < Math.ceil(n * 0.2);
+      const ember = i < Math.ceil(n * 0.4);
       this.debris.push({
         x: x + Math.cos(a) * 0.3, y: y + 0.2, z: z + Math.sin(a) * 0.3,
         vx: Math.cos(a) * sp, vy: vr.range(4, 10) * power, vz: Math.sin(a) * sp,
@@ -136,10 +136,13 @@ export class GodPowers {
   throwSparks(x, y, z, n, seed, power = 1, dim = 1) {
     const vr = new RNG(seed ^ 0x5bd1e995), now = this.game.time;
     for (let i = 0; i < n; i++) {
-      const a = vr.range(0, Math.PI * 2), sp = vr.range(4, 11) * power;
-      this.sparks.push({ x, y: y + 0.25, z, vx: Math.cos(a) * sp, vy: vr.range(3, 10) * power, vz: Math.sin(a) * sp, t0: now, life: vr.range(0.35, 0.8) * (0.6 + 0.4 * power), dim });
+      const a = vr.range(0, Math.PI * 2), sp = vr.range(5, 13) * power;
+      // each spark starts a few ms into its flight (the discharge is already
+      // throwing them as the first stroke lands), so the burst reads at once
+      const vx = Math.cos(a) * sp, vz = Math.sin(a) * sp, vy = vr.range(3, 10) * power, t = vr.range(0.03, 0.2);
+      this.sparks.push({ x: x + vx * t, y: y + 0.25 + vy * t - 10 * t * t, z: z + vz * t, vx, vy: vy - 20 * t, vz, t0: now, life: vr.range(0.35, 0.8) * (0.6 + 0.4 * power), dim, warm: dim >= 1 && i % 5 < 2 });
     }
-    if (this.sparks.length > 240) this.sparks.splice(0, this.sparks.length - 240);
+    if (this.sparks.length > 400) this.sparks.splice(0, this.sparks.length - 400);
   }
 
   // Charred clods heaped round the crater lip (already at rest).
@@ -171,7 +174,7 @@ export class GodPowers {
     for (const o of thrown) this.knock(o, x, z, o === target ? 1.1 : 0.8);
     this.throwDebris(x, y, z, 26, 1, seed);
     this.charRim(x, y, z, seed);
-    this.throwSparks(x, y, z, 26, seed);
+    this.throwSparks(x, y, z, 36, seed);
     // the storm perimeter answers each strike: arcs flare on the side it hit
     for (const s of this.storms) {
       const d = Math.hypot(x - s.x, z - s.z);
