@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { hash2 } from '../core/rng.js';
+import { makeTree, PROP_VOXEL } from '../terrain/models.js';
 
 // Canopy occlusion map: a low-res top-down texture over the whole map that
 // the lighting shader patches sample by world XZ.
@@ -14,7 +16,37 @@ export const canopyUniforms = {
   uCanopy: { value: null },
   uCanopyInvSize: { value: 1 / 128 },
   uCanopyOn: { value: 0 },
+  // Canopy envelope: a finer top-down heightfield of the forest's upper
+  // surface (world y of the highest leaf voxel in each column, the ground
+  // where there is no tree), rasterised from the real tree models. The
+  // lighting patches march it like a horizon map, so every leaf face and
+  // every patch of ground between trees knows how much sky its neighbouring
+  // crowns hide: crown skirts and the gaps between crowns go dark, caps and
+  // clearings keep the sky.
+  uCanopyTop: { value: null },
 };
+const RES_TOP = 4; // envelope texels per tile
+
+// per tree variant: the column tops of the model, as [dx, dz, top] in world
+// units relative to the trunk pivot (before instance rotation and scale)
+const columnCache = new Map();
+function treeColumns(variant) {
+  let c = columnCache.get(variant);
+  if (c) return c;
+  const m = makeTree(variant);
+  const tops = new Map();
+  for (const k of m.vox.keys()) {
+    const x = ((k >> 20) & 1023) - 512, y = ((k >> 10) & 1023) - 512, z = (k & 1023) - 512;
+    const ck = x * 4096 + z;
+    const t = tops.get(ck);
+    if (t === undefined || y > t[2]) tops.set(ck, [x, z, y]);
+  }
+  c = [];
+  // pivot [1, 0, 1] (see terrain/ResourceRenderer.js); centre of the column
+  for (const [x, z, y] of tops.values()) c.push([(x + 0.5 - 1) * PROP_VOXEL, (z + 0.5 - 1) * PROP_VOXEL, (y + 1) * PROP_VOXEL]);
+  columnCache.set(variant, c);
+  return c;
+}
 
 export class CanopyMap {
   constructor(game) {
@@ -91,8 +123,47 @@ export class CanopyMap {
       this.tex.image.data = data;
     }
     this.tex.needsUpdate = true;
+    this._buildTop(map);
     canopyUniforms.uCanopy.value = this.tex;
     canopyUniforms.uCanopyInvSize.value = 1 / ws;
     canopyUniforms.uCanopyOn.value = 1;
+  }
+
+  // Canopy envelope heightfield (see canopyUniforms.uCanopyTop).
+  _buildTop(map) {
+    const N = map.size * RES_TOP, ws = map.worldSize;
+    const cell = ws / N;
+    const top = new Float32Array(N * N);
+    for (let z = 0; z < N; z++) for (let x = 0; x < N; x++) top[z * N + x] = map.heightAt((x + 0.5) * cell, (z + 0.5) * cell);
+    for (const e of this.game.entities.resources()) {
+      if (e.type !== 'tree' || e.dead) continue;
+      // same instance transform as terrain/ResourceRenderer.js
+      const rot = Math.floor(hash2(e.tx, e.tz, 77) * 4) * Math.PI / 2;
+      const sc = 0.85 + hash2(e.tx, e.tz, 5) * 0.35;
+      const sy = sc * (0.9 + hash2(e.tx, e.tz, 9) * 0.2);
+      const base = map.heightAt(e.x, e.z) - 0.05;
+      const cr = Math.cos(rot), sr = Math.sin(rot);
+      for (const [dx, dz, ty] of treeColumns((e.variant ?? 0) % 10)) {
+        const lx = dx * sc, lz = dz * sc;
+        const wx = e.x + lx * cr + lz * sr, wz = e.z - lx * sr + lz * cr;
+        const tx = Math.floor(wx / cell), tz = Math.floor(wz / cell);
+        if (tx < 0 || tz < 0 || tx >= N || tz >= N) continue;
+        const i = tz * N + tx, h = base + ty * sy;
+        if (h > top[i]) top[i] = h;
+      }
+    }
+    const data = new Uint16Array(N * N);
+    for (let i = 0; i < N * N; i++) data[i] = THREE.DataUtils.toHalfFloat(top[i]);
+    if (!this.topTex || this.topTex.image.width !== N) {
+      this.topTex?.dispose();
+      this.topTex = new THREE.DataTexture(data, N, N, THREE.RedFormat, THREE.HalfFloatType);
+      this.topTex.magFilter = THREE.LinearFilter;
+      this.topTex.minFilter = THREE.LinearFilter;
+      this.topTex.wrapS = this.topTex.wrapT = THREE.ClampToEdgeWrapping;
+    } else {
+      this.topTex.image.data = data;
+    }
+    this.topTex.needsUpdate = true;
+    canopyUniforms.uCanopyTop.value = this.topTex;
   }
 }
