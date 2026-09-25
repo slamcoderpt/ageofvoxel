@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { buildVoxelGeometry, voxelMaterialFor } from '../core/voxel.js';
 import { GROUND } from '../core/GameMap.js';
 import { BUILDING_DEFS, BUILDING_VOXEL } from './defs.js';
-import { BUILDING_MODELS, BUILDING_VARIANTS } from './models.js';
+import { BUILDING_MODELS, BUILDING_VARIANTS, HOUSE_PLANS } from './models.js';
 import { constructionModel, CONSTRUCTION_STAGES } from './construction.js';
 import { hash3 } from '../core/rng.js';
 import { Placement } from './placement.js';
@@ -89,12 +89,12 @@ export class Buildings {
         if (o === b || o.type !== b.type || o.bld_variant === undefined) continue;
         const d = Math.hypot(o.x - b.x, o.z - b.z);
         if (d >= 30) continue;
-        // same variant counts fully, same plan (variant mod 5) in the
-        // other finish counts most of the way
+        // same variant counts fully, same plan in the other finish
+        // counts most of the way
         const wgt = 1 + (30 - d) / 30;
         for (let c = 0; c < n; c++) {
           if (c === o.bld_variant) score[c] += wgt;
-          else if (n > 5 && c % 5 === o.bld_variant % 5) score[c] += 0.7 * wgt;
+          else if (b.type === 'house' && c % HOUSE_PLANS === o.bld_variant % HOUSE_PLANS) score[c] += 0.7 * wgt;
         }
       }
       const start = Math.floor(hash3(b.tx, 7, b.tz, 31) * n) % n;
@@ -108,16 +108,12 @@ export class Buildings {
     return v;
   }
 
-  // Houses are not all squared to the grid: each turns a quarter turn one
-  // way or the other (or right round) and then a few degrees off square, so
-  // a street's rooflines vary in direction and the rows read as grown, not
-  // stamped. Visual only; the footprint stays the same square.
+  // Houses stand square to the street grid, fronts to +z: a planned town's
+  // plots line up, and the variety comes from the plans themselves (their
+  // footprints, heights and ridge directions differ). Turning them made the
+  // rotated corners overlap the side courts and neighbours into one heap.
   houseYaw(b) {
-    if (b.bld_yaw !== undefined) return b.bld_yaw;
-    const h = hash3(b.tx, 9, b.tz, 33);
-    const q = h < 0.34 ? 0 : h < 0.6 ? 1 : h < 0.86 ? 3 : 2;
-    const j = (hash3(b.tx, 10, b.tz, 34) - 0.5) * 0.24;
-    b.bld_yaw = q * Math.PI / 2 + j;
+    if (b.bld_yaw === undefined) b.bld_yaw = 0;
     return b.bld_yaw;
   }
 
