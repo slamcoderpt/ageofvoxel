@@ -110,15 +110,11 @@ export class Buildings {
     return v;
   }
 
-  // Houses turn on their square plots in quarter turns (a gable end or a
-  // side yard to the street instead of every front in a row) with a few
-  // degrees of slack, so the lots do not line up like a kit; the rotated
-  // footprint is still the same 3x3 square, so nothing reaches a neighbour.
+  // Houses stand square to the street grid, door to the street (+z).
   houseYaw(b) {
     if (b.bld_yaw === undefined) {
-      const h = hash3(b.tx, 17, b.tz, 91);
-      const q = h < 0.5 ? 0 : h < 0.72 ? 1 : h < 0.92 ? -1 : 2;
-      b.bld_yaw = q * Math.PI / 2 + (hash3(b.tx, 18, b.tz, 92) - 0.5) * 0.09;
+      // every house fronts its street square on, door toward the camera
+      b.bld_yaw = 0;
     }
     return b.bld_yaw;
   }
@@ -377,7 +373,7 @@ export class Buildings {
       }
       const y = game.map.heightAt(b.x, b.z);
       m.position.set(b.x, y, b.z);
-      if (b.type === 'house') { m.rotation.y = this.houseYaw(b); m.position.z -= this.houseSetback(b); m.scale.x = hash3(b.tx, 23, b.tz, 94) < 0.5 ? -1 : 1; }
+      if (b.type === 'house') { m.rotation.y = this.houseYaw(b); m.position.z -= this.houseSetback(b); }
       const visible = b.owner === game.localPlayer || game.fog.isExplored(b.x, b.z);
       m.visible = visible;
       const mesh = m.userData.mesh;

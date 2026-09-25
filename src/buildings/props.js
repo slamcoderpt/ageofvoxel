@@ -3,7 +3,7 @@ import { VoxelModel, TEAM, buildVoxelGeometry, voxelMaterialFor } from '../core/
 import { hash3 } from '../core/rng.js';
 import { BUILDING_VOXEL } from './defs.js';
 import { GROUND } from '../core/GameMap.js';
-import { withExtras } from './shapes.js';
+import { withExtras, gableRoof, TILES } from './shapes.js';
 import {
   WOOD, DARKWOOD, STONE, MARBLE, MARBLE_SHADE, BRONZE, GOLD, FIRE, LEAF,
   amphora, pithos, potPlant, cypress, olive, statue, hopliteStatue, roofTile, shade,
@@ -54,7 +54,7 @@ const PROPS = {
     w: 1, h: 1,
     build(m) {
       m.box(0, 0, 0, 4, 1, 4, MARBLE_SHADE);
-      m.box(1, 1, 1, 2, 7, 2, MARBLE); m.box(1, 3, 1, 2, 1, 2, 0xa8372a); m.box(1, 4, 1, 2, 1, 2, 0xd2a847);
+      m.box(1, 1, 1, 2, 7, 2, MARBLE); m.box(1, 7, 1, 2, 1, 2, MARBLE_SHADE);
       m.box(0, 8, 0, 4, 1, 4, BRONZE);
       m.box(1, 9, 1, 2, 1, 2, FIRE, { glow: 0.4 });
       m.set(1, 10, 2, 0xffd27a, { glow: 0.4 });
@@ -239,40 +239,28 @@ function court(m, kind) {
 }
 
 function market(m) {
+  // an open market hall: a paved stone floor, white square piers under a
+  // marble beam, one solid terracotta gable roof with a white fascia and a
+  // thin team-coloured valance along the front eave; counters and goods in
+  // the shade underneath
   const L = 12, D = 8;
   m.box(0, 0, 0, L, 1, D, (x, y, z) => ((x + z) & 1 ? 0xd6cfbf : 0xcbc3b0));
-  const PX = [0, 6, 11];
-  for (const x of PX) for (const z of [0, D - 1]) { m.set(x, 1, z, 0x9a9382); m.box(x, 2, z, 1, 8, 1, WOOD); }
-  // wall plates along the long sides, tie beams across at every post
-  for (const z of [0, D - 1]) m.box(0, 10, z, L, 1, 1, DARKWOOD);
-  for (const x of PX) m.box(x, 10, 0, 1, 1, D, DARKWOOD);
-  // king posts and a ridge beam, rafters every other voxel, one purlin
-  for (const x of PX) m.box(x, 11, 3, 1, 2, 2, WOOD);
-  m.box(0, 13, 3, L, 1, 2, DARKWOOD);
-  const slope = [[0, 10], [1, 11], [2, 12]];   // [z, y] on the back slope
-  for (let x = 0; x < L; x += 2) for (const [z, y] of slope) { m.set(x, y + 1, z, WOOD); m.set(x, y + 1, D - 1 - z, WOOD); }
-  for (const zz of [1, D - 2]) m.box(0, 12, zz, L, 1, 1, DARKWOOD);
-  // striped cloths over some bays: the front left bay in team stripes, the
-  // back right bay in ochre stripes; the rest of the frame stays open
-  const cloth = (x0, x1, front, c) => {
-    for (let x = x0; x <= x1; x++) for (const [z, y] of slope) {
-      const zz = front ? D - 1 - z : z;
-      m.set(x, y + 2, zz, (x & 1) ? c : 0xf2ede2);
-    }
-    for (let x = x0; x <= x1; x++) m.set(x, 11, front ? D : -1, (x & 1) ? c : 0xf2ede2);
-  };
-  cloth(0, 5, true, TEAM);
-  cloth(6, 11, false, 0xc98a2e);
+  m.box(0, 1, 0, L, 1, D, 0xe2dccf);
+  for (const x of [0, 4, 7, 11]) for (const z of [0, D - 1]) {
+    m.box(x, 2, z, 1, 7, 1, 0xf1ece2);
+    m.set(x, 2, z, 0xd6cfbf);
+  }
+  m.box(0, 9, 0, L, 1, D, 0xe7e1d4);
+  m.box(0, 9, D - 1, L, 1, 1, 0x34528a);
+  for (let x = 1; x < L - 1; x++) if (x !== 4 && x !== 7) m.set(x, 8, D - 1, x & 1 ? TEAM : 0xf2ede2);
+  gableRoof(m, { wx0: 0, wx1: L, wz0: 0, wz1: D, top: 10, axis: 'x', pitch: 0.5, ov: 1.1, ovG: 0.7, tiles: TILES.warm, fill: 0xf1ece2, seed: 71 });
   // counters and goods
-  m.box(1, 1, 5, 4, 2, 1, 0x7a5230); m.box(1, 3, 5, 4, 1, 1, 0x9b7040);
+  m.box(1, 2, 5, 3, 2, 1, 0x7a5230); m.box(1, 4, 5, 3, 1, 1, 0x9b7040);
   const goods = [0xc0392b, 0x6f9a36, 0xe0b93a, 0x6b3a6e, 0xd35400];
-  for (let x = 1; x < 5; x++) m.set(x, 4, 5, goods[x % goods.length]);
-  m.box(7, 1, 2, 4, 2, 1, 0x7a5230); m.box(7, 3, 2, 4, 1, 1, 0x9b7040);
-  for (let x = 7; x < 11; x += 2) amphora(m, x, 4, 2, x & 2 ? 0xa65a34 : 0xc47440);
-  pithos(m, 9, 1, 5, 0xb8683e); amphora(m, 10, 1, 6, 0xa65a34); amphora(m, 2, 1, 2, 0xc47440);
-  m.box(3, 1, 1, 2, 1, 2, 0xb08850); m.set(3, 2, 1, 0xc0392b).set(4, 2, 2, 0xe0b93a);
-  // hanging cloths from the tie beam
-  for (let z = 2; z < 6; z++) if (z !== 4) m.box(6, 7, z, 1, 3, 1, [0xc0392b, 0x2e6fb0, 0xd49a3a][z % 3]);
+  for (let x = 1; x < 4; x++) m.set(x, 5, 5, goods[x % goods.length]);
+  m.box(8, 2, 2, 3, 2, 1, 0x7a5230); m.box(8, 4, 2, 3, 1, 1, 0x9b7040);
+  for (let x = 8; x < 11; x += 2) amphora(m, x, 5, 2, x & 2 ? 0xa65a34 : 0xc47440);
+  pithos(m, 9, 2, 5, 0xb8683e); amphora(m, 2, 2, 2, 0xc47440);
 }
 
 function kiln(m) {
@@ -350,12 +338,12 @@ function stall(m, kind) {
   for (const [x, z] of [[0, 0], [7, 0], [0, 3], [7, 3]]) m.box(x, 0, z, 1, 6, 1, WOOD);
   m.box(0, 2, 2, 8, 1, 2, 0x9b7040);                 // counter
   m.box(1, 0, 3, 6, 2, 1, 0x7a5230);
-  // striped awning sloping down to the front
-  // awning stripes: only the cloth seller flies the owner's colour
-  const stripe = kind === 'food' ? 0xa8372a : kind === 'pots' ? 0xc98a2e : TEAM;
+  // plain canvas awning sloping down to the front; only the cloth seller
+  // hangs a thin valance in the owner's colour
+  const CANVAS = (x, y, z) => (hash3(x, y, z, 86) < 0.5 ? 0xefe9dc : 0xe8e1d2);
   for (let x = -1; x < 9; x++) {
-    const c = (x & 1) ? stripe : 0xf2ede2;
-    m.set(x, 7, 0, c).set(x, 7, 1, c).set(x, 6, 2, c).set(x, 6, 3, c).set(x, 5, 4, c);
+    m.set(x, 7, 0, CANVAS).set(x, 7, 1, CANVAS).set(x, 6, 2, CANVAS).set(x, 6, 3, CANVAS);
+    m.set(x, 5, 4, kind === 'cloth' ? TEAM : CANVAS);
   }
   if (kind === 'food') {
     const goods = [0xc0392b, 0x6f9a36, 0xe0b93a, 0x6b3a6e, 0xd35400];
@@ -389,12 +377,9 @@ function anchorsFor(b) {
       ['statue', [[w + 1, -3], [w + 1, -2]]],
       ['cypress', [[-2, -2], [-1, -2]]], ['cypress', [[w + 1, 0], [w, -2]]],
     ];
-    // each house keeps its dressing inside its own walled side court; the
-    // front onto the street stays clear
+    // houses stand clear on open ground; now and then a cypress beside one
     case 'house': return [
-      [['court_a', 'court_b', 'court_c', 'court_d'][(v + (b.bld_variant | 0)) & 3], [[w, 0]]],
-      ['wall_x', [[0, -1]]],
-      ...(v & 2 ? [['cypress', [[-1, 0]]]] : []),
+      ...(v & 2 ? [['cypress', [[w, 0]]]] : []),
     ];
     // storehouse goods stay inside a fenced work yard beside and behind it
     case 'storehouse': return [
