@@ -9,9 +9,9 @@ import { RNG, hash2 } from '../core/rng.js';
 //    wide blue halo that blooms; ground-crawling arcs at the impact; an
 //    impact glow sprite, expanding shockwave ring, pooled flash lights and
 //    scorch decals with cooling ember cracks.
-//  - Storm: multiplicative storm-shadow over the area (flash-lit), swirling
-//    cloud vortex framing the target from the viewer, rain streaks, an
-//    animated electric boundary ring and intra-cloud lightning.
+//  - Storm: multiplicative storm-shadow over the area (flash-lit), rain
+//    streaks, a glowing ground band and a wall of comet-like energy bands
+//    orbiting the perimeter, and intra-cloud lightning.
 //  - Zaps: little arcs crawling over struck units.
 //  - Meteor: falling fireball with a flame trail, warning ring, fire-orange
 //    impact flash/shockwave and a large glowing crater.
@@ -158,11 +158,20 @@ export function boltLines(seed, x, groundY, z, heightAt, height = 21) {
   const ta = away + (seed & 1 ? 1 : -1) * rng.range(0.5, 1.6), off = rng.range(2.5, 6);
   const top = { x: x + Math.cos(ta) * off, y: groundY + height * rng.range(0.8, 0.95), z: z + Math.sin(ta) * off };
   const main = fractalPath(rng, top, { x, y: groundY + 0.05, z }, 7, 0.07);
-  // leader tapers the other way from a brush stroke: hair-thin and dim in the
-  // cloud, thick and white-hot where it earths (width x5, intensity x3)
-  lines.push({ pts: main, w: 0.03, i: 0.5, taper: -4.2, fade: -1.9 });
-  lines.push({ pts: main, w: 0.09, i: 0.12, taper: -3.0, fade: -2.2, halo: true });
-  lines.push({ pts: main, w: 0.45, i: 0.03, taper: -1.8, fade: -2.5, halo: true });
+  // Width hierarchy (half-widths in world units at 36 units from the camera,
+  // ~36 px per unit): the leader is a real channel - a white-hot core ~2 px in
+  // the cloud swelling to ~6 px where it earths, inside a cyan sheath ~3x as
+  // wide and a soft electric-blue/violet glow ~12x as wide that fades out.
+  // Forks leave the leader at its local width and taper to nothing, their
+  // sub-forks thinner again: a trunk-and-branches read, not one line reused.
+  const W0 = 0.045, W1 = 0.15;
+  const wAt = (f) => W0 + (W1 - W0) * f; // leader core width at fraction f
+  const tap = 1 - W1 / W0;
+  lines.push({ pts: main, w: W0, i: 0.75, taper: tap, fade: -0.6 });
+  // (the outer glow does not swell at the ground and dims there, so the
+  // struck men under it keep their silhouettes)
+  lines.push({ pts: main, w: W0 * 3, i: 0.42, taper: tap * 0.8, fade: -0.4, halo: true });
+  lines.push({ pts: main, w: W0 * 10, i: 0.2, taper: tap * 0.4, fade: 0.45, halo: true });
   const nf = rng.int(2, 4);
   for (let f = 0; f < nf; f++) {
     const i = rng.int(Math.floor(main.length * (0.3 + f * 0.14)), Math.floor(main.length * (0.44 + f * 0.14)));
@@ -176,31 +185,33 @@ export function boltLines(seed, x, groundY, z, heightAt, height = 21) {
     end.y = Math.max(end.y, gy);
     if (grounded) lines.ends.push({ x: end.x, y: gy, z: end.z, w: f === 0 ? 1 : 0.7 });
     const fork = fractalPath(rng, p, end, 5, 0.12);
-    // primary fork: half the leader's core, its own sheath
-    lines.push({ pts: fork, w: 0.03, i: 1.05, taper: grounded ? 0.3 : 0.9, fade: grounded ? 0.15 : 0.75 });
-    lines.push({ pts: fork, w: 0.1, i: 0.24, taper: 0.5, fade: grounded ? 0.2 : 0.8, halo: true });
-    lines.push({ pts: fork, w: 0.4, i: 0.04, taper: 0.6, fade: 0.5, halo: true });
+    // primary fork: ~60% of the leader where it branches, tapering out
+    const fw = wAt(i / (main.length - 1)) * 0.6, ft = grounded ? 0.55 : 0.92;
+    lines.push({ pts: fork, w: fw, i: 0.85, taper: ft, fade: grounded ? 0.3 : 0.85 });
+    lines.push({ pts: fork, w: fw * 3, i: 0.34, taper: ft, fade: grounded ? 0.35 : 0.9, halo: true });
+    lines.push({ pts: fork, w: fw * 9, i: 0.11, taper: ft * 0.8, fade: 0.8, halo: true });
     // sub-forks: thinner again, dying out in the air
     for (let k = 0; k < 3; k++) {
-      if (!rng.chance(0.75)) continue;
+      if (!rng.chance(0.7)) continue;
       const j = rng.int(3, fork.length - 5), q = fork[j], l2 = len * rng.range(0.2, 0.38), b2 = a + rng.range(-1.3, 1.3);
       const sub = fractalPath(rng, q, { x: q.x + Math.cos(b2) * l2, y: Math.max(q.y - l2 * 0.8, heightAt(q.x, q.z) + 0.2), z: q.z + Math.sin(b2) * l2 }, 3, 0.2);
-      lines.push({ pts: sub, w: 0.018, i: 0.75, taper: 0.9, fade: 0.8 });
-      lines.push({ pts: sub, w: 0.09, i: 0.18, taper: 0.9, fade: 0.8, halo: true });
+      const sw = fw * (1 - (j / (fork.length - 1)) * ft) * 0.55;
+      lines.push({ pts: sub, w: sw, i: 0.6, taper: 0.95, fade: 0.85 });
+      lines.push({ pts: sub, w: sw * 4, i: 0.2, taper: 0.95, fade: 0.9, halo: true });
     }
   }
   // hair-thin feelers crawling off the upper channel
-  for (let f = 0; f < 5; f++) {
+  for (let f = 0; f < 3; f++) {
     const i = rng.int(2, Math.floor(main.length * 0.45)), p = main[i], len = rng.range(1.5, 4), a = rng.range(0, Math.PI * 2);
     const pts = fractalPath(rng, p, { x: p.x + Math.cos(a) * len, y: p.y - len * 0.5, z: p.z + Math.sin(a) * len }, 3, 0.22);
-    lines.push({ pts, w: 0.014, i: 0.6, taper: 0.9, fade: 0.9 });
-    lines.push({ pts, w: 0.07, i: 0.12, taper: 0.9, fade: 0.9, halo: true });
+    lines.push({ pts, w: 0.014, i: 0.45, taper: 0.95, fade: 0.9 });
+    lines.push({ pts, w: 0.06, i: 0.1, taper: 0.95, fade: 0.9, halo: true });
   }
-  // short ground arcs crawling out from the impact
-  const na = rng.int(4, 6);
+  // short ground arcs crawling out from the impact, thick at the root
+  const na = rng.int(3, 5);
   for (let k = 0; k < na; k++) {
     const a = (k / na) * Math.PI * 2 + rng.range(-0.4, 0.4);
-    const len = rng.range(0.9, 2.0);
+    const len = rng.range(0.9, 1.8);
     const pts = [];
     const n = 9;
     let ox = 0, oz = 0;
@@ -210,8 +221,8 @@ export function boltLines(seed, x, groundY, z, heightAt, height = 21) {
       const px = x + Math.cos(a) * len * t + ox * t, pz = z + Math.sin(a) * len * t + oz * t;
       pts.push({ x: px, y: heightAt(px, pz) + 0.08 + rng.range(0, 0.12), z: pz });
     }
-    lines.push({ pts, w: 0.022, i: 0.9, taper: 0.8, fade: 0.8 });
-    lines.push({ pts, w: 0.11, i: 0.22, taper: 0.8, fade: 0.8, halo: true });
+    lines.push({ pts, w: 0.035, i: 0.8, taper: 0.95, fade: 0.9 });
+    lines.push({ pts, w: 0.13, i: 0.18, taper: 0.9, fade: 0.9, halo: true });
   }
   return lines;
 }
@@ -247,37 +258,19 @@ function zapLines(seed, h) {
   return lines;
 }
 
-// Small arc crawling along the storm perimeter: hops between points on the
-// (wobbly) boundary, lifted off the ground in little jagged loops.
-function rimLines(seed, cx, cz, R, a0, span, heightAt) {
-  const rng = new RNG(seed);
-  const n = 14, pts = [];
-  for (let s = 0; s <= n; s++) {
-    const a = a0 + span * (s / n);
-    const r = R + rng.range(-0.45, 0.45);
-    const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-    const lift = Math.sin((s / n) * Math.PI) * rng.range(0.5, 2.0);
-    pts.push({ x, y: heightAt(x, z) + 0.2 + lift, z });
-  }
-  const lines = [];
-  channel(lines, pts, 0.07, 1.0, 0.3, 0, 5, 0.4);
-  // a leg or two stabbing down to the ground
-  for (let k = 0; k < 2; k++) {
-    const p = pts[rng.int(3, n - 3)];
-    channel(lines, fractalPath(rng, p, { x: p.x + rng.range(-0.6, 0.6), y: heightAt(p.x, p.z) + 0.05, z: p.z + rng.range(-0.6, 0.6) }, 2, 0.25), 0.05, 0.7, 0.6, 0, 5, 0.4);
-  }
-  return lines;
-}
-
 // Ground strike brightness: a blinding first stroke, then a held channel that
 // re-brightens with return strokes (the eye reads a strike as ~half a second
 // of flicker), then a quick fade.
 function boltEnv(age, life, seed) {
-  if (age < 0.05) return 1.5;
-  const hold = life * 0.6;
-  const strobe = 0.72 + 0.4 * Math.abs(Math.sin(age * 38 + (seed % 7)));
-  if (age < hold) return strobe;
-  return strobe * Math.pow(Math.max(0, 1 - (age - hold) / (life - hold)), 1.5);
+  // first stroke, one return stroke ~0.1 s later, then a quick decay (an
+  // older bolt is only a dim afterimage when the next one lands, so the
+  // freshest strike reads on its own instead of three stacking into glare)
+  if (age < 0.05) return 1.3;
+  const rs = 0.1 + (seed % 5) * 0.012;
+  const ret = Math.exp(-Math.pow((age - rs) / 0.03, 2)) * 0.45;
+  const flick = 0.85 + 0.15 * Math.abs(Math.sin(age * 38 + (seed % 7)));
+  const decay = Math.exp(-(age - 0.05) / 0.16) * Math.max(0, 1 - age / life);
+  return (decay * flick + ret) * 1.0;
 }
 
 // ---------------------------------------------------------------- textures
@@ -782,13 +775,6 @@ export class BoltRenderer {
     const alive = new Set();
     let li = 0;
     const sorted = bolts.slice().sort((a, b) => b.t0 - a.t0);
-    // strike envelope first, so the perimeter arcs can pulse with it
-    let strikeFlash = 0;
-    for (const b of sorted) {
-      if (b.kind) continue;
-      const age = now - b.t0;
-      if (age <= b.life) strikeFlash = Math.max(strikeFlash, boltEnv(age, b.life, b.seed));
-    }
     for (const b of sorted) {
       const age = now - b.t0;
       if (age > b.life) continue;
@@ -796,10 +782,8 @@ export class BoltRenderer {
       let v = this.meshes.get(b);
       const kind = b.kind || 'ground';
       if (!v) {
-        const lines = kind === 'sky' ? skyLines(b.seed, b.x, b.y, b.z)
-          : kind === 'rim' ? rimLines(b.seed, b.x, b.z, b.r, b.a0, b.span, heightAt)
-            : (b.lines || boltLines(b.seed, b.x, b.y, b.z, heightAt));
-        const mesh = this.addMesh(new THREE.Mesh(ribbonGeometry(lines), this.boltMat.clone()), kind === 'rim' ? 47 : 52);
+        const lines = kind === 'sky' ? skyLines(b.seed, b.x, b.y, b.z) : (b.lines || boltLines(b.seed, b.x, b.y, b.z, heightAt));
+        const mesh = this.addMesh(new THREE.Mesh(ribbonGeometry(lines), this.boltMat.clone()), 52);
         v = { mesh, extra: [] };
         if (kind === 'ground') {
           // thin channels need a hotter core colour to read white against the halo
@@ -831,12 +815,6 @@ export class BoltRenderer {
         this.meshes.set(b, v);
       }
       const k = age / b.life;
-      if (kind === 'rim') {
-        // perimeter arcs flicker on and off, always well below the bolts
-        const f = Math.floor(now * 30);
-        v.mesh.material.uniforms.uAlpha.value = (1 - k * 0.7) * (hash2(f, b.seed & 0xffff, 5) > 0.3 ? 0.95 : 0.2) * (0.8 + 0.7 * Math.min(1.2, strikeFlash));
-        continue;
-      }
       // return strokes: a couple of re-brightenings, then a fast decay
       const env = kind === 'ground' ? boltEnv(age, b.life, b.seed)
         : Math.pow(1 - k, 1.4) * (age < 0.06 ? 1.4 : (0.55 + 0.45 * Math.abs(Math.sin(age * 55 + b.seed % 7))));
@@ -853,16 +831,16 @@ export class BoltRenderer {
         // horizontal flare; per-bolt gain so no two strikes look alike
         const pin = age < 0.08 ? 1 : Math.max(0, 1 - (age - 0.08) / 0.3);
         const g = v.gain ?? 1, e = Math.min(1.5, env) * g;
-        v.mesh.material.uniforms.uAlpha.value = Math.min(1.25, env) * g;
-        v.hot.material.uniforms.uO.value = Math.min(1.1, e * 0.8) * pin;
-        v.hot.scale.setScalar(1.0 + 1.1 * pin);
-        v.pin.material.uniforms.uO.value = Math.min(1.8, e * 1.3) * (0.35 + 0.65 * pin);
+        v.mesh.material.uniforms.uAlpha.value = Math.min(1.1, env) * g;
+        v.hot.material.uniforms.uO.value = Math.min(0.75, e * 0.55) * pin;
+        v.hot.scale.setScalar(0.8 + 0.9 * pin);
+        v.pin.material.uniforms.uO.value = Math.min(1.3, e) * (0.3 + 0.7 * pin);
         v.pin.scale.setScalar(1.1);
-        v.gflash.material.uniforms.uO.value = Math.min(1.3, e) * (0.25 + 0.75 * pin);
-        v.gflash.scale.setScalar(2.8 + 1.0 * pin);
-        v.glow.material.uniforms.uO.value = Math.min(0.2, e * 0.15) * (0.3 + 0.7 * pin);
+        v.gflash.material.uniforms.uO.value = Math.min(0.85, e * 0.75) * (0.2 + 0.8 * pin);
+        v.gflash.scale.setScalar(2.4 + 0.8 * pin);
+        v.glow.material.uniforms.uO.value = Math.min(0.14, e * 0.11) * (0.3 + 0.7 * pin);
         v.glow.scale.setScalar(4.5 + 2.5 * pin);
-        v.flare.material.uniforms.uO.value = Math.min(0.8, e * 0.6) * pin;
+        v.flare.material.uniforms.uO.value = Math.min(0.45, e * 0.35) * pin;
         v.flare.scale.set(6 * pin + 1, 0.25 * pin + 0.08, 1);
         for (const s of v.extra) {
           s.material.uniforms.uO.value = Math.min(1.2, env * 0.9) * s.userData.w * (0.3 + 0.7 * pin);
@@ -871,7 +849,7 @@ export class BoltRenderer {
         const sk = Math.min(1, age / 0.42);
         v.shock.scale.setScalar(0.5 + Math.sqrt(sk) * 4.2);
         v.shock.material.uniforms.uA.value = Math.pow(1 - sk, 1.6) * 0.7;
-        pools.push({ x: b.x, z: b.z, i: Math.min(0.6, e * 0.42) * (0.45 + 0.55 * pin), r: 3.8 + 1.0 * (1 - k) });
+        pools.push({ x: b.x, z: b.z, i: Math.min(0.3, e * 0.22) * (0.45 + 0.55 * pin), r: 3.4 + 0.8 * (1 - k) });
         for (const st of storms) {
           const dx = b.x - st.x, dz = b.z - st.z, d = Math.hypot(dx, dz);
           const w = Math.min(1.2, env) * (0.45 + 0.55 * Math.min(1, d / st.radius)) * Math.pow(1 - k, 0.7);
@@ -883,9 +861,9 @@ export class BoltRenderer {
           // low and blue, reaching ~1/3 of the ring: bright blue rim light
           // on the units and walls round the strike
           l.color.setHex(0x4f86ff);
-          l.position.set(b.x, b.y + 3.0, b.z);
-          l.distance = 9.5;
-          l.intensity = 42 * Math.min(1.3, e) * (0.4 + 0.6 * pin);
+          l.position.set(b.x, b.y + 4.2, b.z);
+          l.distance = 9;
+          l.intensity = 12 * Math.min(1.2, e) * (0.4 + 0.6 * pin);
         }
       } else flash = Math.max(flash, env * 0.5);
     }
@@ -904,7 +882,7 @@ export class BoltRenderer {
       this.spot.position.set(spotB.x + 0.1, spotB.y + 2.6, spotB.z + 0.1);
       this.spot.target.position.set(spotB.x, spotB.y, spotB.z);
       this.spot.target.updateMatrixWorld();
-      this.spot.intensity = 16 * Math.min(1.2, spotEnv);
+      this.spot.intensity = 3 * Math.min(1.1, spotEnv);
     } else {
       this.spot.visible = false;
       this.spot.intensity = 0;
@@ -1047,7 +1025,7 @@ export class BoltRenderer {
       this._v.set(m.position.x - cam.x, 0, m.position.z - cam.z).normalize().multiplyScalar(0.55);
       rim.position.set(m.position.x + this._v.x, m.position.y + z.h * 0.55, m.position.z + this._v.z);
       rim.scale.setScalar(z.h * 1.4);
-      rim.material.uniforms.uO.value = Math.pow(1 - k, 1.3) * 0.4;
+      rim.material.uniforms.uO.value = Math.pow(1 - k, 1.3) * 0.28;
     }
     for (const [z, zv] of this.zapMeshes) {
       if (aliveZ.has(z)) continue;
@@ -1082,6 +1060,7 @@ export class BoltRenderer {
         m.material.uniforms.uHotA.value = v.hotA ?? 0;
         m.material.uniforms.uHotW.value = v.hotW ?? 0;
       }
+      this.renderBands(st, v, now, k, fl);
       v.rain.position.set(st.x, y, st.z);
       v.rain.material.uniforms.uK.value = k;
       v.rain.material.uniforms.uTime.value = now;
@@ -1089,7 +1068,9 @@ export class BoltRenderer {
     }
     for (const [st, v] of this.stormVisuals) {
       if (aliveStorms.has(st)) continue;
-      this.group.remove(v.ring, v.rain, v.curtain);
+      this.group.remove(v.ring, v.rain, v.curtain, v.bands);
+      if (v.bands.geometry !== this._emptyGeo) v.bands.geometry.dispose();
+      v.bands.material.dispose();
       v.ring.geometry.dispose(); v.ring.material.dispose();
       v.curtain.geometry.dispose(); v.curtain.material.dispose();
       v.rain.geometry.dispose(); v.rain.material.dispose();
@@ -1136,6 +1117,41 @@ export class BoltRenderer {
       if (light.intensity !== st.set) st.base = light.intensity; // someone else changed it
       st.set = light.intensity = st.base * (1 - dim * k);
     }
+  }
+
+  // Orbiting energy bands of the storm wall, rebuilt each frame.
+  renderBands(st, v, now, k, flash) {
+    const lines = [], NA = v.gh.length, TAU = Math.PI * 2;
+    const ghAt = (a) => {
+      const f = ((a % TAU) + TAU) % TAU / TAU * NA, i = Math.floor(f), t = f - i;
+      return v.gh[i % NA] * (1 - t) + v.gh[(i + 1) % NA] * t;
+    };
+    const hotA = v.hotA ?? 0, hotW = v.hotW ?? 0;
+    for (const b of v.bandDefs) {
+      const head = b.a0 + b.sp * now;
+      // each band breathes on its own beat; the stretch facing the latest
+      // strike surges brighter, so brightness varies round the circumference
+      const da = Math.abs(((head - hotA) % TAU + TAU * 1.5) % TAU - Math.PI);
+      const pulse = 0.25 + 0.75 * Math.pow(0.5 + 0.5 * Math.sin(now * b.pf + b.ph), 1.5);
+      const i = b.i * k * pulse * (0.75 + 0.9 * hotW * Math.exp(-da * da * 1.5) + 0.25 * Math.min(1, flash));
+      if (i < 0.02) continue;
+      const pts = [], n = 36;
+      for (let s = 0; s <= n; s++) {
+        const a = head - b.span * (s / n);
+        const r = b.r + 0.12 * Math.sin(a * 5 + now * 3 + b.ph);
+        pts.push({
+          x: st.x + Math.cos(a) * r,
+          y: ghAt(a) + b.y0 + b.ya * Math.sin(a * b.yf + now * 1.3 + b.ph) * (0.5 + 0.5 * s / n),
+          z: st.z + Math.sin(a) * r,
+        });
+      }
+      lines.push({ pts, w: b.w, i: 0.9 * i, taper: 0.92, fade: 1 });
+      lines.push({ pts, w: b.w * 3.2, i: 0.42 * i, taper: 0.85, fade: 0.95, halo: true });
+      lines.push({ pts, w: b.w * 13, i: 0.17 * i, taper: 0.7, fade: 0.9, halo: true });
+    }
+    if (v.bands.geometry !== this._emptyGeo) v.bands.geometry.dispose();
+    v.bands.geometry = lines.length ? ribbonGeometry(lines) : this._emptyGeo;
+    v.bands.visible = lines.length > 0;
   }
 
   // Spark streaks, rebuilt each frame as ribbons (the same path the bolts
@@ -1194,7 +1210,31 @@ export class BoltRenderer {
     const curtain = this.addMesh(new THREE.Mesh(curtainGeometry(st.x, st.z, R, 4.6, heightAt), curtainMat()), 45);
     curtain.position.set(st.x, 0, st.z);
     const rain = this.addMesh(new THREE.LineSegments(rainGeometry(st.t0 * 1000 | 0, R), rainMat()), 46);
-    const v = { ring, rain, curtain };
+    // the energy wall: comet-like bands of light orbiting the perimeter at
+    // different heights and speeds (the Retold vortex), each a thick white
+    // head tapering into a fading blue-violet tail. Ground heights round the
+    // ring are smoothed along the circle so the bands glide over voxel steps.
+    const NA = 256, gh = new Float32Array(NA), raw = new Float32Array(NA);
+    for (let i = 0; i < NA; i++) {
+      const a = (i / NA) * Math.PI * 2;
+      raw[i] = heightAt(st.x + Math.cos(a) * R, st.z + Math.sin(a) * R);
+    }
+    for (let i = 0; i < NA; i++) {
+      let m = -1e9, sum = 0;
+      for (let d = -6; d <= 6; d++) { const h = raw[(i + d + NA) % NA]; sum += h; m = Math.max(m, h); }
+      gh[i] = Math.max(sum / 13, m - 0.35);
+    }
+    const rng = new RNG((st.t0 * 1000 | 0) ^ 0x9e3779b9);
+    const bandDefs = [];
+    for (let j = 0; j < 12; j++) {
+      bandDefs.push({
+        a0: (j / 12) * Math.PI * 2 + rng.range(-0.3, 0.3), sp: rng.range(1.3, 2.4), span: rng.range(0.8, 1.8),
+        r: R + rng.range(-0.35, 0.2), y0: j % 3 === 0 ? rng.range(0.2, 0.6) : rng.range(0.8, 4.2), ya: rng.range(0.4, 1.3),
+        yf: rng.int(1, 3), ph: rng.range(0, 6.28), w: rng.range(0.07, 0.13), i: rng.range(0.7, 1.1), pf: rng.range(1.5, 3.5),
+      });
+    }
+    const bands = this.addMesh(new THREE.Mesh(new THREE.BufferGeometry(), makeRibbonMaterial(new THREE.Color(0x5a78ff), new THREE.Color(0xeee8ff), 1.7, new THREE.Color(0x8a30ff))), 48);
+    const v = { ring, rain, curtain, bands, bandDefs, gh };
     this.stormVisuals.set(st, v);
     return v;
   }

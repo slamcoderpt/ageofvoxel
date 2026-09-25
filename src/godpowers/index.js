@@ -168,26 +168,18 @@ export class GodPowers {
     this.scorches.push({ x, y, z, t0: game.time, seed });
     for (const e of lines.ends) this.scorches.push({ x: e.x, y: e.y, z: e.z, t0: game.time, seed: seed ^ ((e.x * 97) | 0), size: 1.5 + e.w });
     const thrown = game.movement.hash.near(x, z, Math.max(2.6, splash + 0.8), (o) => !o.dead && game.isEnemy(owner, o.owner));
-    if (target) { game.combat.damage(target, damage, { owner, id: 0 }); this.zap(target); }
+    // combat's white hit flash is an emissive lift; under the storm-dimmed
+    // light it greys struck men out, so lightning hits keep only a trace of it
+    // (the blue zap rim marks who was struck)
+    const hit = (o, dmg) => { game.combat.damage(o, dmg, { owner, id: 0 }); if (o.flashT > 0.03) o.flashT = 0.03; this.zap(o); };
+    if (target) hit(target, damage);
     if (splash > 0) {
-      for (const o of game.movement.hash.near(x, z, splash, (o) => !o.dead && o !== target && game.isEnemy(owner, o.owner))) {
-        game.combat.damage(o, damage * 0.4, { owner, id: 0 });
-        this.zap(o);
-      }
+      for (const o of game.movement.hash.near(x, z, splash, (o) => !o.dead && o !== target && game.isEnemy(owner, o.owner))) hit(o, damage * 0.4);
     }
     for (const o of thrown) this.knock(o, x, z, o === target ? 1.1 : 0.8);
     this.throwDebris(x, y, z, 22, 1, seed, true);
     this.charRim(x, y, z, seed);
     this.throwSparks(x, y, z, 34, seed);
-    // the storm perimeter answers each strike: arcs flare on the side it hit
-    for (const s of this.storms) {
-      const d = Math.hypot(x - s.x, z - s.z);
-      if (d > s.radius * 1.3) continue;
-      const a0 = Math.atan2(z - s.z, x - s.x);
-      for (let k = 0; k < 3; k++) {
-        this.bolts.push({ kind: 'rim', x: s.x, z: s.z, r: s.radius, a0: a0 + this.vrng.range(-0.9, 0.9), span: this.vrng.range(0.25, 0.6) * (this.vrng.chance(0.5) ? 1 : -1), t0: game.time, life: this.vrng.range(0.2, 0.4), seed: (this.vrng.next() * 1e9) >>> 0 });
-      }
-    }
     // white-hot sparks, blue electric motes, earth and smoke
     game.fx.emit({ x, y: y + 0.3, z, count: 14, color: 0xcfe2ff, size: 0.14, life: 0.45, speed: 9, up: 6, gravity: -16, additive: true, drag: 0.5 });
     game.fx.emit({ x, y: y + 0.6, z, count: 6, color: 0x3d6cdf, size: 0.3, life: 0.6, speed: 3.5, up: 2.5, gravity: -2, additive: true, spread: 0.6 });
@@ -234,13 +226,11 @@ export class GodPowers {
           this.strike(s.owner, s.x + Math.cos(a) * r, s.z + Math.sin(a) * r, 0, s.def.splash, null);
         }
       }
-      // static crawling along the storm perimeter
+      // sparks spitting off the foot of the perimeter wall (the wall itself
+      // is drawn by the renderer as orbiting energy bands, see effects.js)
       for (let k = 0; k < 2; k++) {
         if (!vr.chance(0.45)) continue;
-        const a0 = vr.range(0, Math.PI * 2), span = vr.range(0.18, 0.5) * (vr.chance(0.5) ? 1 : -1);
-        this.bolts.push({ kind: 'rim', x: s.x, z: s.z, r: s.radius, a0, span, t0: game.time, life: vr.range(0.12, 0.3), seed: (vr.next() * 1e9) >>> 0 });
-        // sparks spit where the arc earths itself on the perimeter
-        const ea = a0 + span * vr.range(0.2, 0.8), ex = s.x + Math.cos(ea) * s.radius, ez = s.z + Math.sin(ea) * s.radius;
+        const ea = vr.range(0, Math.PI * 2), ex = s.x + Math.cos(ea) * s.radius, ez = s.z + Math.sin(ea) * s.radius;
         this.throwSparks(ex, game.map.heightAt(ex, ez) - 0.15, ez, 3, (vr.next() * 1e9) >>> 0, 0.35, 0.3);
       }
       // cosmetic cloud-to-cloud lightning
