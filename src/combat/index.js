@@ -1,6 +1,7 @@
 import { Projectiles } from './Projectiles.js';
 import { Overlays } from './Overlays.js';
 import { EnemyAI } from './EnemyAI.js';
+import { BattleFX } from './BattleFX.js';
 import { ENEMY } from '../core/constants.js';
 
 // Combat piece: 'attack' orders, auto-targeting, melee & ranged damage,
@@ -9,11 +10,14 @@ import { ENEMY } from '../core/constants.js';
 //   combat.damage(target, amount, attacker)
 //   combat.kill(entity, killer)
 //   combat.findEnemyNear(entity, radius)
+//   combat.fx   (BattleFX: ground scars, dust, hit sparks)
 export class Combat {
   constructor(game) {
     this.game = game;
     this.projectiles = new Projectiles(game, this);
     this.overlays = new Overlays(game);
+    this.fx = new BattleFX(game);
+    this.attackers = new Map(); // targetId -> number of units attacking it (refreshed every scan)
     this.ai = new EnemyAI(game, ENEMY);
     this.scanTimer = 0;
     game.commands.register('attack', {
@@ -47,6 +51,29 @@ export class Combat {
     return best;
   }
 
+  // Target choice that spreads attackers across the enemy line instead of
+  // piling onto the nearest unit: distance, plus a crowding penalty, minus a
+  // preference for classes this unit has a bonus against (cavalry hunt archers).
+  pickTarget(u, radius) {
+    const game = this.game;
+    const melee = !u.def.attack?.projectile;
+    const bonus = u.def.bonus;
+    let best = null, bs = Infinity;
+    game.movement.hash.forEachNear(u.x, u.z, radius, (o) => {
+      if (o.dead || !game.isEnemy(u.owner, o.owner)) return;
+      const d = Math.hypot(o.x - u.x, o.z - u.z);
+      if (d > radius) return;
+      const n = this.attackers.get(o.id) || 0;
+      const cap = o.def.myth ? 4 : o.def.class === 'cavalry' ? 3 : 2;
+      let s = d + (melee ? 1.8 * Math.max(0, n + 1 - cap) + 0.35 * n : 0.25 * n);
+      if (bonus && bonus[o.def.class]) s -= melee ? 2.5 : 1.0;
+      if (o.def.gatherer) s += 3;
+      if (s < bs) { bs = s; best = o; }
+    });
+    if (best) this.attackers.set(best.id, (this.attackers.get(best.id) || 0) + 1);
+    return best;
+  }
+
   findEnemyBuildingNear(e, radius) {
     let best = null, bd = radius * radius;
     for (const b of this.game.entities.buildings()) {
@@ -57,7 +84,7 @@ export class Combat {
     return best;
   }
 
-  damage(target, amount, attacker) {
+  damage(target, amount, attacker, kind) {
     if (!target || target.dead || target.removed) return;
     const game = this.game;
     let dmg = amount;
@@ -67,8 +94,8 @@ export class Combat {
     dmg *= 1 - (target.def?.armor ?? 0);
     target.hp -= dmg;
     target.flashT = 0.18;
-    const y = game.map.heightAt(target.x, target.z) + (target.kind === 'building' ? 1.5 : 1.0);
-    game.fx.emit({ x: target.x, y, z: target.z, count: target.kind === 'building' ? 5 : 4, color: target.kind === 'building' ? 0xb8a888 : 0x9c1c1c, size: 0.16, life: 0.5, speed: 2, up: 2.5, gravity: -12, spread: 0.2 });
+    target.combat_hitT = game.time;
+    this.fx.hit(target, attacker, kind || (attacker?.kind === 'unit' && attacker.def?.attack && !attacker.def.attack.projectile ? 'melee' : 'arrow'));
     game.events.emit('unit:damaged', { target, attacker, amount: dmg });
     // retaliate
     if (target.kind === 'unit' && attacker && attacker.id && !attacker.dead && target.def.attack) {
@@ -89,7 +116,7 @@ export class Combat {
       game.movement.stop(e);
       e.anim.dieT = 0;
       e.carry = { type: null, amount: 0 };
-      game.fx.emit({ x: e.x, y: game.map.heightAt(e.x, e.z) + 0.3, z: e.z, count: 8, color: 0xa89878, size: 0.35, life: 0.9, speed: 1.2, up: 0.8, gravity: -1, grow: 1.5 });
+      this.fx.death(e);
     } else if (e.kind === 'building') {
       e.dead = true;
       game.buildings.destroy(e);
@@ -101,14 +128,19 @@ export class Combat {
     const game = this.game;
     this.scanTimer -= dt;
     const scan = this.scanTimer <= 0;
-    if (scan) this.scanTimer = 0.5;
+    if (scan) {
+      this.scanTimer = 0.5;
+      this.attackers.clear();
+      for (const u of game.entities.units())
+        if (!u.dead && u.order?.type === 'attack') this.attackers.set(u.order.targetId, (this.attackers.get(u.order.targetId) || 0) + 1);
+    }
     for (const u of game.entities.units()) {
       if (u.dead || !u.def.attack) continue;
       u.attackCd = Math.max(0, u.attackCd - dt);
       const ot = u.order?.type;
       // auto-acquire for idle soldiers
       if (ot === 'idle' && scan && !u.def.gatherer) {
-        const e = this.findEnemyNear(u, u.sight);
+        const e = this.pickTarget(u, u.sight);
         if (e) game.commands.order(u, { type: 'attack', targetId: e.id, auto: true });
         continue;
       }
@@ -120,7 +152,7 @@ export class Combat {
         if (e) { u.order.targetId = e.id; t = e; }
       }
       if (!t || t.dead || t.removed) {
-        const e = !u.def.gatherer ? this.findEnemyNear(u, u.sight) : null;
+        const e = !u.def.gatherer ? this.pickTarget(u, u.sight) : null;
         if (e) { u.order.targetId = e.id; this.approach(u, e); }
         else if (u.order.thenBuildings) {
           const b = this.findEnemyBuildingNear(u, 200);
@@ -133,11 +165,13 @@ export class Combat {
       if (dist > range + 0.25) {
         u.order.repath = (u.order.repath || 0) - dt;
         if (!u.moving || u.order.repath <= 0) { this.approach(u, t); u.order.repath = 0.6; }
+        if (scan && u.def.class === 'cavalry' && u.moving) this.fx.scuff(u, true);
         continue;
       }
       if (u.moving) game.movement.stop(u);
       u.rot = Math.atan2(t.x - u.x, t.z - u.z);
       u.anim.want = 'attack';
+      if (scan && !u.def.attack.projectile) this.fx.scuff(u, false);
       if (u.attackCd <= 0) {
         const a = u.def.attack;
         u.attackCd = a.cooldown;
@@ -149,7 +183,7 @@ export class Combat {
             game.movement.hash.forEachNear(t.x, t.z, a.splash, (o) => {
               if (o !== t && !o.dead && game.isEnemy(u.owner, o.owner) && Math.hypot(o.x - t.x, o.z - t.z) < a.splash) this.damage(o, a.damage * 0.5, u);
             });
-            game.fx.emit({ x: t.x, y: game.map.heightAt(t.x, t.z) + 0.1, z: t.z, count: 12, color: 0x9d8a66, size: 0.4, life: 0.7, speed: 3, up: 1.2, gravity: -4 });
+            this.fx.slam(t.x, t.z, a.splash);
           }
         }
       }
@@ -164,11 +198,15 @@ export class Combat {
       if (e) { b.attackCd = a.cooldown; this.projectiles.fire(b, e, a.damage, { fromY: 4 }); }
     }
     this.projectiles.update(dt);
+    this.fx.update(dt);
     this.ai.update(dt);
   }
 
   render(dt, alpha) {
     this.projectiles.render();
+    this.fx.render();
     this.overlays.render(alpha);
   }
+
+  resize(w, h) { this.fx.resize(w, h); }
 }

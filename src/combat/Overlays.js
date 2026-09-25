@@ -29,7 +29,7 @@ export class Overlays {
           vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
           vec3 up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
           float w = aInfo.y;
-          vec3 p = aPos + right * position.x * w + up * position.y * 0.13;
+          vec3 p = aPos + right * position.x * w + up * position.y * 0.1;
           gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
         }`,
       fragmentShader: `
@@ -99,8 +99,11 @@ export class Overlays {
       const x = u.prevX + (u.x - u.prevX) * alpha, z = u.prevZ + (u.z - u.prevZ) * alpha;
       const selected = sel.has(u.id);
       if (selected || hover === u.id) addRing(u, x, z, u.radius * 1.5 + 0.1);
-      if (selected || u.hp < u.maxHp || hover === u.id)
-        addBar(u, x, game.map.heightAt(x, z) + game.units.heightOf(u) + 0.35, z, u.def.myth ? 1.4 : 0.9);
+      // In a big fight bars over every scratched unit bury the action: show
+      // them for selected/hovered units, and briefly for units just hit.
+      const recent = u.combat_hitT !== undefined && game.time - u.combat_hitT < 1.6;
+      if (selected || hover === u.id || (recent && u.hp < u.maxHp))
+        addBar(u, x, game.map.heightAt(x, z) + game.units.heightOf(u) + 0.3, z, u.def.myth ? 1.2 : selected || hover === u.id ? 0.9 : 0.6);
     }
     for (const b of game.entities.buildings()) {
       if (b.owner !== game.localPlayer && !game.fog.isExplored(b.x, b.z)) continue;

@@ -1,4 +1,5 @@
 import { PLAYER, ENEMY } from '../constants.js';
+import { battleScene } from '../../combat/BattleScene.js';
 import { standardStart, buildTown, spawnBlock, placeNear, nearestResource, assignGatherers } from './helpers.js';
 
 // Scene registry for the deterministic screenshot harness.
@@ -43,31 +44,8 @@ registerScene('town', {
   camera: (game, ctx) => ({ x: ctx.focus.x + 1, z: ctx.focus.z + 1, distance: 50, pitch: 50 }),
 });
 
-registerScene('battle', {
-  description: 'Two Greek armies clash on open ground.',
-  preset: 'battle', seed: 11, hud: false, revealAll: true, ai: false, fastForward: 7.5,
-  setup(game) {
-    const cx = 64, cz = 64;
-    const a = Math.PI / 4; // armies approach along the camera diagonal
-    const mk = (owner, sign) => {
-      const bx = cx + sign * 9, bz = cz + sign * 9;
-      const rot = sign > 0 ? a + Math.PI : a;
-      const units = [
-        ...spawnBlock(game, 'hoplite', owner, 20, bx, bz, { cols: 5, spacing: 1.0, rot }),
-        ...spawnBlock(game, 'toxotes', owner, 10, bx + sign * 4, bz + sign * 4, { cols: 5, spacing: 1.0, rot }),
-        ...spawnBlock(game, 'hippikon', owner, 6, bx + sign * 1 + 6, bz + sign * 1 - 6, { cols: 3, spacing: 1.8, rot }),
-        ...spawnBlock(game, 'minotaur', owner, 1, bx - 4, bz + 4, { rot }),
-      ];
-      return units;
-    };
-    const blue = mk(PLAYER, 1), red = mk(ENEMY, -1);
-    for (const u of blue) game.commands.order(u, { type: 'move', x: u.x - 6, z: u.z - 6 });
-    for (const u of red) game.commands.order(u, { type: 'move', x: u.x + 6, z: u.z + 6 });
-    // switch to idle after a moment so auto-targeting engages
-    return { focus: { x: cx, z: cz } };
-  },
-  camera: { x: 64, z: 64, distance: 34, pitch: 48 },
-});
+// The battle scene lives with the combat piece (src/combat/BattleScene.js).
+registerScene('battle', battleScene);
 
 registerScene('godpower', {
   description: "Zeus's Lightning Storm striking an enemy army.",
