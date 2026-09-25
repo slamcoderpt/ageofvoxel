@@ -65,6 +65,7 @@ export function pose(kind, u, out) {
   const add = (name, x, y = 0, z = 0) => { const r = out[name]; if (r) { r[0] += x; r[1] += y; r[2] += z; } };
 
   const v = variantOf(u, 3);
+  const av = Math.floor(uhash(u, 9) * 4);   // attack style (independent of the idle stance)
   const rec = st === 'die' ? 0 : recoilOf(u);
   if (kind === 'horse') return horsePose(u, st, t, set, add);
   if (kind === 'centaur') {
@@ -147,6 +148,7 @@ export function pose(kind, u, out) {
       const arc = -1.5 * wind + 1.2 * extend;
       set('armR', -1.35 - 0.3 * wind, 0, -0.4 + arc * 0.9); set('armL', -0.9 + 0.3 * extend, 0, 0.3);
       set('weapon', 1.1, 0, 0);
+      set('foreR', -0.7 * wind - 0.2); set('foreL', -0.6);
       set('torso', 0.15 + 0.2 * extend, -0.6 * wind + 0.7 * extend, 0);
       set('head', 0.1, 0.3 * wind - 0.3 * extend);
       set('legL', -0.5); set('shinL', 0.35); set('legR', 0.45); set('shinR', 0.3);
@@ -158,12 +160,24 @@ export function pose(kind, u, out) {
       const arm = -1.1 - up * 1.9 + down * 0.7;
       set('armR', arm, 0, -0.15); set('armL', arm + 0.1, 0, 0.35);
       set('weapon', 0.4 + down * 0.4);
+      set('foreR', -0.3 - up * 0.6 + down * 0.25); set('foreL', -0.35 - up * 0.5 + down * 0.2);
       set('torso', -0.15 * up + 0.4 * down, 0.1);
       set('head', 0.2 * down - 0.1 * up);
       set('legL', -0.45); set('shinL', 0.3); set('legR', 0.35); set('shinR', 0.25);
       bob = -1.5 * down;
       fwd = 0.35 * down - 0.12 * up;
-    } else if (hoplite && v === 1) {
+    } else if (hoplite && av === 3) {
+      // shield flung high against a blow from above, spear driven up under it
+      const arm = -1.2 - extend * 0.5 + wind * 0.3;
+      set('armR', arm, 0.2, -0.25);
+      set('weapon', 1.57 - arm - 0.35);
+      set('armL', -2.0 + extend * 0.2, 0.3, 0.35);
+      set('torso', 0.35 + extend * 0.15, 0.25 - extend * 0.4);
+      set('head', -0.3);
+      set('legL', -0.9 - extend * 0.2); set('shinL', 0.9); set('legR', 0.6); set('shinR', 0.7);
+      bob = -2.6;
+      fwd = (hero ? 0.4 : 0.22) * extend - 0.06 * wind;
+    } else if (hoplite && av === 1) {
       // low underhand thrust: spear drawn back at the hip, driven in level
       const arm = -0.85 + wind * 0.45 - extend * 0.75;
       set('armR', arm, 0.15, -0.2);
@@ -174,7 +188,7 @@ export function pose(kind, u, out) {
       set('legL', -0.75); set('shinL', 0.55); set('legR', 0.5); set('shinR', 0.5);
       bob = -2.0;
       fwd = (hero ? 0.5 : 0.32) * extend - 0.1 * wind;
-    } else if (hoplite && v === 2) {
+    } else if (hoplite && av === 2) {
       // shield punch, then a downward stab over the rim
       const bash = smooth((a - 0.45) / 0.25) * (1 - wind);
       const arm = -2.6 - wind * 0.2 + extend * 0.4;
@@ -204,6 +218,11 @@ export function pose(kind, u, out) {
       set('torso', 0.15 + extend * 0.2);
       set('legL', -0.3); set('legR', 0.25);
     }
+    if (hoplite) {
+      // footwork: step in with the lead foot on the strike, rock back on the wind-up
+      const step = extend - 0.5 * wind;
+      add('legL', -0.3 * step); add('shinL', 0.2 * Math.max(0, step)); add('legR', 0.25 * step); add('shinR', 0.25 * Math.max(0, -step));
+    }
   } else if (st === 'die') {
     // crumple: recoil, knees buckle and the torso folds (0..0.3 s), then the
     // body rolls onto its side (root, in index.js) and curls up: hips and
@@ -223,11 +242,6 @@ export function pose(kind, u, out) {
     set('shield', 0.4 * curl);
     set('arrow', 0);
     bob = beast ? -7 * buckle : -4.2 * buckle;
-  }
-  if (rec > 0) {
-    // hit: the head snaps back, the torso rocks, the unit is shoved back a step
-    add('torso', -0.35 * rec); add('head', -0.3 * rec);
-    fwd -= (beast ? 0.06 : 0.18) * rec;
   } else {
     // idle: breathing, weight shift, glances
     const b = S(t * 1.7);
@@ -251,10 +265,78 @@ export function pose(kind, u, out) {
       set('torso', 0.1 + b * 0.03);
       set('armR', -0.25, 0, -0.15); set('armL', b * 0.05, 0, 0.18); set('weapon', 0.4);
       set('legL', -0.15, 0, 0.05); set('shinL', 0.2); set('legR', 0.1, 0, -0.05); set('shinR', 0.2);
+      set('foreR', -0.55); set('foreL', -0.3 + b * 0.05);
       bob = -0.3 + b * 0.2;
     }
   }
+  if (beast && st === 'walk') { set('foreR', -0.45 + S(t * 7) * 0.2); set('foreL', -0.35 - S(t * 7) * 0.2); }
+
+  // ---- hit reactions: 4 variants, picked afresh for every blow taken ----
+  const hr = st === 'die' ? null : hitReact(u);
+  if (hr) {
+    const w = hr.w;
+    const mix = (name, x, y = 0, z = 0) => { const r = out[name]; if (r) { r[0] += (x - r[0]) * w; r[1] += (y - r[1]) * w; r[2] += (z - r[2]) * w; } };
+    const hv = beast || hero ? (hr.v === 2 ? 2 : 0) : hr.v;
+    const k = beast ? 0.5 : hero ? 0.6 : 1;
+    if (hv === 0) {
+      // snapped back: head and chest thrown back, arms flung wide, a step back
+      add('torso', -0.5 * w * k); add('head', -0.55 * w * k);
+      add('armR', 0.35 * w * k, 0, -0.55 * w * k); add('armL', 0, 0, 0.35 * w * k);
+      mix('legR', 0.5 * k, 0, -0.05); mix('shinR', 0.4 * k); mix('legL', -0.25 * k);
+      fwd -= 0.24 * w * k;
+    } else if (hv === 1) {
+      // stagger: spun half round by the blow, the near knee giving way
+      const sd = hr.side;
+      add('torso', 0.15 * w, 0.75 * sd * w, 0.3 * sd * w); add('head', 0.25 * w, 0.45 * sd * w, 0.25 * sd * w);
+      add('armR', 0.3 * w, 0, -0.4 * w); add('weapon', -0.5 * w, 0, 0.3 * sd * w);
+      mix('legL', -0.55); mix('shinL', 0.9); mix('legR', 0.4, 0, -0.15); mix('shinR', 0.35);
+      bob -= 1.6 * w; fwd -= 0.14 * w;
+    } else if (hv === 2) {
+      // brace: crouched hard behind the raised shield, taking the blow on it
+      mix('armL', -1.75 * (beast ? 0.6 : 1), 0.5, 0.2); mix('legL', -0.8 * k); mix('shinL', 1.0 * k); mix('legR', 0.55 * k); mix('shinR', 0.9 * k);
+      mix('torso', 0.5 * k, -0.25); mix('head', -0.1);
+      bob -= 2.8 * w * k; fwd -= 0.1 * w;
+    } else {
+      // knocked down to one knee, weapon dropping, head bowed
+      mix('legL', -1.45, 0, 0.1); mix('shinL', 1.45); mix('legR', 0.25, 0, -0.1); mix('shinR', 1.65);
+      mix('torso', 0.55, 0.2 * hr.side); mix('head', 0.4); mix('armR', -0.35, 0, -0.55); mix('armL', -0.7, 0.2, 0.35);
+      mix('weapon', 0.95, 0, 0.2);
+      bob -= 6.2 * w; fwd -= 0.16 * w;
+    }
+  }
+
+  // ---- per-soldier kit angles: no two spears or shields held quite alike ----
+  if (u.type === 'hoplite' && st !== 'die') {
+    add('weapon', (uhash(u, 11) - 0.5) * 0.45, 0, (uhash(u, 12) - 0.5) * 0.4);
+    add('shield', (uhash(u, 13) - 0.5) * 0.4, (uhash(u, 14) - 0.5) * 0.7, (uhash(u, 15) - 0.5) * 0.5);
+    add('head', (uhash(u, 17) - 0.5) * 0.2, (uhash(u, 16) - 0.5) * 0.5, (uhash(u, 18) - 0.5) * 0.2);
+  }
   return { bob, lean: 0, fwd };
+}
+
+// Hit reaction for the last blow taken (units_hitT / units_hitN are kept by
+// Units.update from hp drops): weight 0..1 and a variant chosen per blow.
+function hitReact(u) {
+  const ht = u.units_hitT;
+  if (ht === undefined) return null;
+  const n = u.units_hitN || 0;
+  const v = Math.floor(uhash(u, 30 + n * 3) * 4);
+  const dur = v === 3 ? 1.25 : 0.75;
+  if (ht >= dur) return null;
+  const w = smooth(ht / 0.07) * (1 - smooth((ht - dur * 0.5) / (dur * 0.5)));
+  return { w, v, side: uhash(u, 31 + n * 3) < 0.5 ? 1 : -1 };
+}
+
+// Per-soldier kit: helmet (Chalcidian, Corinthian, Attic, pilos), cloak
+// (none, long, short) and shield device. Cached on the entity.
+export function gearOf(u) {
+  if (u.units_gear) return u.units_gear;
+  const h = uhash(u, 20), c = uhash(u, 21), s = uhash(u, 22);
+  return (u.units_gear = {
+    helm: h < 0.3 ? 0 : h < 0.58 ? 1 : h < 0.8 ? 2 : 3,
+    cloak: c < 0.38 ? 1 : c < 0.7 ? 2 : 0,
+    shield: s < 0.34 ? 0 : s < 0.56 ? 1 : s < 0.78 ? 2 : 3,
+  });
 }
 
 // Medusa: a slithering tail (travelling wave down three segments), a coil

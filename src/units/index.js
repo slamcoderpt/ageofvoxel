@@ -28,7 +28,7 @@ const SPREAD_SPEED = 1.6; // max drift, tiles/second
 // little taller or shorter, and in melee presses in towards its foe so the
 // contact line interlocks instead of holding a clean seam.
 const JITTER = 0.3;        // tiles, static per unit
-const YAW_JITTER = 0.32;   // radians, eased in while standing / fighting
+const YAW_JITTER = 0.26;   // radians, eased in while standing / fighting
 const PRESS_RATE = 3;      // per second
 const COATS = [[1, 1, 1], [1.06, 1.06, 1.05], [0.95, 0.86, 0.7], [0.72, 0.5, 0.34], [0.5, 0.36, 0.27], [1, 0.98, 0.95]];
 
@@ -68,13 +68,13 @@ export class Units {
   _buildRig(type) {
     const R = RIGS[type];
     const parts = R.build().map((p) => ({
-      name: p.name, joint: p.joint, parent: p.parent, show: p.show || null, coat: !!p.coat, portrait: p.portrait !== false && !p.show,
+      name: p.name, anim: p.anim || p.name, joint: p.joint, parent: p.parent, show: p.show || null, coat: !!p.coat, portrait: p.portrait ?? !p.show,
       geo: buildVoxelGeometry(p.model, { size: R.voxel * (p.scale || 1), pivot: p.pivot, jitter: 0.05 }),
       mesh: null, cap: 0,
     }));
     const rig = { type, parts, kind: R.anim, voxel: R.voxel, rot: {}, world: parts.map(() => new THREE.Matrix4()) };
     for (const p of parts) {
-      rig.rot[p.name] = [0, 0, 0];
+      rig.rot[p.anim] = [0, 0, 0];
       p.parentIdx = p.parent ? parts.findIndex((q) => q.name === p.parent) : -1;
     }
     this.rigs.set(type, rig);
@@ -132,6 +132,10 @@ export class Units {
       a.t += dt;
       if (u.flashT > 0) u.flashT = Math.max(0, u.flashT - dt);
       a.attackT = (a.attackT ?? 1) + dt;
+      // hit reactions (anim.js hitReact): a fresh one for every blow taken
+      if (u.units_hitT !== undefined) u.units_hitT += dt;
+      if (u.units_hp !== undefined && u.hp < u.units_hp - 0.01 && !u.dead) { u.units_hitT = 0; u.units_hitN = (u.units_hitN || 0) + 1; }
+      u.units_hp = u.hp;
       if (u.dead) {
         a.state = 'die';
         a.dieT += dt;
@@ -142,11 +146,13 @@ export class Units {
       a.want = null;
       // visual press into melee contact and a standing facing offset
       let press = 0;
-      if (a.state === 'attack' && u.def.attack && !u.def.attack.projectile) {
+      // Only the big units shoulder into the enemy line; infantry hold their
+      // ground at spear reach so the two fronts keep a readable seam.
+      if (a.state === 'attack' && u.def.attack && !u.def.attack.projectile && (u.def.hero || u.def.myth)) {
         const t = game.entities.get(u.order?.targetId);
         if (t && t.kind === 'unit') {
           const d = Math.hypot(t.x - u.x, t.z - u.z);
-          const want = (u.def.hero ? 0.35 : u.def.myth ? 0.2 : 0.12) + uhash(u, 3) * 0.42;
+          const want = (u.def.hero ? 0.35 : 0.2) + uhash(u, 3) * 0.3;
           press = Math.max(0, Math.min(want, (d - (u.radius + t.radius) * 0.95) / 2 - 0.22));
         }
       }
@@ -228,8 +234,11 @@ export class Units {
         // static slot jitter + melee press + lunge/recoil along the facing
         const push = u.dead ? 0 : (u.units_press || 0) + fwd;
         const big = u.def.myth || u.def.hero;
-        const jx = (uhash(u, 5) - 0.5) * 2 * JITTER * (big ? 0.3 : 1), jz = (uhash(u, 6) - 0.5) * 2 * JITTER * (big ? 0.3 : 1);
-        const px = x + jx + Math.sin(rot) * push, pz = z + jz + Math.cos(rot) * push;
+        // slot jitter mostly sideways along the rank, little along the facing,
+        // so a fighting front stays a line instead of a scatter
+        const jl = (uhash(u, 5) - 0.5) * 2 * JITTER * (big ? 0.3 : 1);
+        const jf = (uhash(u, 6) - 0.5) * 2 * JITTER * (big ? 0.3 : u.anim.state === 'attack' ? 0.2 : 0.6);
+        const px = x + Math.cos(rot) * jl + Math.sin(rot) * (push + jf), pz = z - Math.sin(rot) * jl + Math.cos(rot) * (push + jf);
         const y = game.map.heightAt(px, pz);
         const sc = big ? 1 : 0.93 + uhash(u, 7) * 0.13;
         // root transform (with death topple + sink)
@@ -271,7 +280,7 @@ export class Units {
         for (let pi = 0; pi < rig.parts.length; pi++) {
           const p = rig.parts[pi];
           const parent = p.parentIdx >= 0 ? world[p.parentIdx] : this._root;
-          const r = rig.rot[p.name];
+          const r = rig.rot[p.anim];
           this._q.setFromEuler(this._e.set(r[0], r[1], r[2]));
           const sc = p.show && !p.show(u) ? 0 : 1;
           this._m.compose(this._v.set(p.joint[0] * V, p.joint[1] * V, p.joint[2] * V), this._q, this._s.set(sc, sc, sc));
