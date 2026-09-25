@@ -82,7 +82,8 @@ export class CommandPanel {
     const game = this.game;
     const sel = this.ui.selection.selected;
     const p = game.players[game.localPlayer];
-    const sig = sel.map((e) => e.id).join(',') + `|${p.age}|${!!p.advancing}`;
+    // (a selected foundation gets its train buttons the moment it is finished)
+    const sig = sel.map((e) => e.id + (e.built === false ? 'f' : '')).join(',') + `|${p.age}|${!!p.advancing}`;
     if (sig !== this.sig) { this.sig = sig; this.rebuild(sel); this.timer = 0; }
     return sel;
   }
