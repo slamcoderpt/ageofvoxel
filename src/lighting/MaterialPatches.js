@@ -39,7 +39,7 @@ export const atmosUniforms = {
   uSand: { value: new THREE.Vector3(1.0, 0.85, 0.61) },
   uSandAmt: { value: 0.9 },
   uSandWall: { value: 0.5 },
-  uContactAO: { value: 1.0 }, // strength of the wall-base band and ground halos
+  uContactAO: { value: 0.65 }, // strength of the wall-base band and ground halos
   // Leaf shadow balance: foliage in the sun's shadow (cast by the crowns next
   // to it) loses this much of its sky/fill light and turns cool, so crown-on-
   // crown and crown-on-floor shadows read as deep blue-green, not mid olive.
@@ -55,11 +55,11 @@ export const atmosUniforms = {
   // paving albedo (keeps sunlit roads off the clip), uGroundBounce is the warm
   // light the sunlit ground throws back into nearby shade.
   uPave: { value: 1.0 },
-  uPaveAlb: { value: 0.58 },
+  uPaveAlb: { value: 0.5 },
   uPaveScale: { value: 4.2 },  // cobbles per world unit
   uPaveJoint: { value: 0.3 },  // joint darkening
   uGroundBounce: { value: new THREE.Color(0.11, 0.085, 0.055) },
-  uHalo: { value: 1.0 },
+  uHalo: { value: 0.6 },
   // Crown value range: the shaded half of every crown (faces turned from the
   // sun, undersides, crevices) is desaturated toward a cool dark green by
   // uLeafShadeDesat; uLeafRim is the warm highlight on the sun-facing

@@ -69,7 +69,7 @@ export class Lighting {
     // crowns shade the crowns beside them.
     this.sunDir = new THREE.Vector3(-0.6, 0.47, 0.4).normalize();
     // The sun carries all of the frame's warmth (the grade adds none).
-    this.sun = new THREE.DirectionalLight(0xffcf82, 5.4);
+    this.sun = new THREE.DirectionalLight(0xffd9a0, 5.2);
     this.sun.castShadow = true;
     const sm = post === 'high' ? 4096 : 2048;
     this.sun.shadow.mapSize.set(sm, sm);
@@ -84,9 +84,9 @@ export class Lighting {
 
     // Sky light is a soft cool blue and the ground bounce warm-brown: shadows
     // read as clean cool shade against the warm sunlit stone and roofs.
-    this.hemi = new THREE.HemisphereLight(0x98b0d0, 0x7a6448, 0.7);
+    this.hemi = new THREE.HemisphereLight(0x9ec4ea, 0x6e6a52, 0.85);
     scene.add(this.hemi);
-    this.fill = new THREE.DirectionalLight(0xa0b4d0, 0.2); // soft cool bounce from the opposite side
+    this.fill = new THREE.DirectionalLight(0xa4c0e0, 0.3); // soft cool bounce from the opposite side
     this.fill.position.set(0.6, 0.5, -0.5);
     scene.add(this.fill);
 

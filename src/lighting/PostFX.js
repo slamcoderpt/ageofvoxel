@@ -5,7 +5,6 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
-import { Pass, FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 
 // Final colour grade in display space. The renderer tone-maps with Khronos
 // PBR Neutral (index.js), which keeps hue and saturation up to the highlights,
@@ -26,26 +25,26 @@ import { Pass, FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js'
 const GradeShader = {
   uniforms: {
     tDiffuse: { value: null },
-    uExposure: { value: 1.0 },
+    uExposure: { value: 0.93 },
     uChromaLimit: { value: 0.42 },
-    uSaturation: { value: 0.72 },
-    uGreenShift: { value: 0.5 },
+    uSaturation: { value: 0.84 },
+    uGreenShift: { value: 0.34 },
     uGreenDesat: { value: 0.14 },
     uContrast: { value: 1.0 },
     // mid S-curve: lit ground and roofs lift, shade drops (no milky mid-grey)
-    uMidContrast: { value: 0.22 },
+    uMidContrast: { value: 0.24 },
     // shade keeps its colour: chroma boost in the darks instead of a grey veil
     uShadowSat: { value: 0.0 },
     uShadowTint: { value: new THREE.Vector3(0.99, 0.97, 0.98) }, // near neutral: shade reads warm-olive (ground bounce), never lavender
     uBlackFloor: { value: new THREE.Vector3(0.03, 0.036, 0.026) },
     uVignette: { value: 0.0 },
     uToeLift: { value: 0.0 },
-    uKnee: { value: 0.72 },
-    uShoulder: { value: 4.3 }, // highlights approach uKnee + 1 / uShoulder (~0.95)
+    uKnee: { value: 0.68 },
+    uShoulder: { value: 3.8 }, // highlights approach uKnee + 1 / uShoulder (~0.9)
     // Top-edge aerial haze: in the RTS view the top of the frame is always
     // the far distance, so it loses contrast and saturation and lifts toward
     // a cool grey-blue (the far forest and shoreline recede).
-    uTopHaze: { value: 0.0 },
+    uTopHaze: { value: 0.26 },
     // Measured tonal targets (scripts/lumstats.py vs Retold ss_02): foliage
     // luminance is compressed into ~0.19..0.53 by a linear remap
     // (l' = uLeafLum.x + uLeafLum.y * l, soft-capped at uLeafLum.z) on pixels
@@ -53,24 +52,13 @@ const GradeShader = {
     // to black in shade nor bleach to mint on sunlit tops; uLeafChroma adds
     // back a little saturation. Everything else gets a soft value floor
     // (l' = sqrt(l^2 + uFloor^2)) so the darkest non-foliage shade sits ~0.2.
-    uLeafLum: { value: new THREE.Vector3(0.19, 0.41, 0.5) },
+    uLeafLum: { value: new THREE.Vector3(0.09, 0.68, 0.57) },
     uLeafChroma: { value: 0.16 },
-    uFloor: { value: 0.15 },
-    uTopHazeColor: { value: new THREE.Vector3(0.7, 0.75, 0.78) },
-    // Local contrast (Retold's punch is local, not global): tLocal is a
-    // blurred copy of the frame (LocalMeanPass, ~1/8 res). The tonal remap
-    // above is applied to the local mean, and each pixel's ratio to that mean
-    // is raised to uClarity (foliage: uLeafClarity), so crevices between
-    // crowns, eaves and cast-shadow edges get darker/brighter against their
-    // surroundings while the frame's percentiles stay on target.
-    tLocal: { value: null },
-    uLocalTexel: { value: new THREE.Vector2(1 / 240, 1 / 135) },
-    uClarity: { value: 1.3 },
-    uLeafClarity: { value: 1.5 },
-    // local split tone: pixels darker than their surroundings lean cool
-    // blue, brighter ones lean golden (sun ~5000K vs sky shade)
-    uSplitWarm: { value: new THREE.Vector3(1.06, 1.0, 0.86) },
-    uSplitCool: { value: new THREE.Vector3(0.9, 0.98, 1.14) },
+    uFloor: { value: 0.1 },
+    uTopHazeColor: { value: new THREE.Vector3(0.7, 0.78, 0.85) },
+    // Cool sky-fill tint applied to the shade (multiplicative, luminance
+    // preserved): canopy undersides and cast shadows read blue-green.
+    uSplitCool: { value: new THREE.Vector3(0.88, 1.0, 1.16) },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
@@ -78,16 +66,7 @@ const GradeShader = {
     uniform float uMidContrast, uShadowSat, uLeafChroma, uFloor; uniform vec3 uLeafLum;
     uniform float uKnee, uShoulder, uToeLift, uChromaLimit, uExposure, uSaturation, uGreenShift, uGreenDesat, uContrast, uVignette;
     uniform vec3 uShadowTint, uBlackFloor; varying vec2 vUv;
-    uniform sampler2D tLocal; uniform vec2 uLocalTexel; uniform float uClarity, uLeafClarity; uniform vec3 uSplitWarm, uSplitCool;
-    vec3 localMean(){
-      vec2 o = uLocalTexel * 2.0;
-      vec3 m = texture2D(tLocal, vUv).rgb * 0.28;
-      m += (texture2D(tLocal, vUv + vec2(o.x, 0.0)).rgb + texture2D(tLocal, vUv - vec2(o.x, 0.0)).rgb +
-            texture2D(tLocal, vUv + vec2(0.0, o.y)).rgb + texture2D(tLocal, vUv - vec2(0.0, o.y)).rgb) * 0.12;
-      m += (texture2D(tLocal, vUv + o).rgb + texture2D(tLocal, vUv - o).rgb +
-            texture2D(tLocal, vUv + vec2(o.x, -o.y)).rgb + texture2D(tLocal, vUv + vec2(-o.x, o.y)).rgb) * 0.06;
-      return m;
-    }
+    uniform vec3 uSplitCool;
     const vec3 LW = vec3(0.2126, 0.7152, 0.0722);
     void main(){
       vec4 t = texture2D(tDiffuse, vUv);
@@ -138,24 +117,20 @@ const GradeShader = {
         hc /= 6.0;
         float wf = smoothstep(0.13, 0.18, hc) * (1.0 - smoothstep(0.44, 0.5, hc)) * smoothstep(0.16, 0.28, sc);
         float l0 = dot(c, LW);
-        // detail ratio against the local mean (measured on the input frame)
-        float dRaw = max(dot(t.rgb, LW), 1e-4) / max(dot(localMean(), LW), 1e-3);
-        float dr = clamp(dRaw, 0.4, 2.2);
-        float lm = l0 / dr; // this pixel's surroundings, in graded space
-        float lf = uLeafLum.x + uLeafLum.y * lm;
+        // Per-pixel tonal remap only: no local-mean ratio, no clarity. Any
+        // neighbourhood-based gain grows dark rims wherever a dark crown or
+        // roof meets pale paving, so edges come from AO and lighting alone.
+        // Foliage: gentle linear remap (keeps the crown's own sun/shade
+        // contrast) with a soft cap so sunlit tops never bleach.
+        float lf = uLeafLum.x + uLeafLum.y * l0;
         float k = uLeafLum.z - 0.06;
         if (lf > k) { float e = lf - k; lf = k + e / (1.0 + e * 8.0); }
-        float lg = sqrt(lm * lm + uFloor * uFloor);
-        // detail gain in log space, strongest on small local steps (crevices,
-        // eaves, crown gaps) and fading back to 1:1 on big edges (white wall
-        // against dark forest) so they do not grow halos
-        float xd = log2(dr);
-        float gw = exp(-xd * xd * 2.2);
-        float lt = mix(lg * exp2(xd * mix(1.0, uClarity, gw)), lf * exp2(xd * mix(1.0, uLeafClarity, gw)), wf);
-        // local split tone: below the local mean -> cool, above -> golden
-        float sd = clamp(log2(dr) * 1.6, -1.0, 1.0);
-        vec3 split = sd < 0.0 ? mix(vec3(1.0), uSplitCool, -sd) : mix(vec3(1.0), uSplitWarm, sd);
-        c *= split / dot(split, LW);
+        // Everything else: soft floor under the darks.
+        float lg = sqrt(l0 * l0 + uFloor * uFloor);
+        float lt = mix(lg, lf, wf);
+        // cool sky fill in the shade: darks lean blue-green, not brown-black
+        float shd = 1.0 - smoothstep(0.1, 0.42, lt);
+        c *= mix(vec3(1.0), uSplitCool, shd) / mix(1.0, dot(uSplitCool, LW), shd);
         c *= lt / max(l0, 1e-4);
         c = max(mix(vec3(lt), c, 1.0 + uLeafChroma * wf), 0.0);
       }
@@ -172,51 +147,6 @@ const GradeShader = {
     }`,
 };
 
-// Blurred, downsampled copy of the frame for the grade's local contrast:
-// 1/4 res (4 bilinear taps = 8x8 box), then 1/8 res (another 2x). Does not
-// swap buffers; the grade samples it as tLocal.
-class LocalMeanPass extends Pass {
-  constructor(grade) {
-    super();
-    this.needsSwap = false;
-    this.grade = grade;
-    const o = { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false };
-    this.rtA = new THREE.WebGLRenderTarget(1, 1, o);
-    this.rtB = new THREE.WebGLRenderTarget(1, 1, o);
-    this.mat = new THREE.ShaderMaterial({
-      uniforms: { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() } },
-      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: `uniform sampler2D tSrc; uniform vec2 uTexel; varying vec2 vUv;
-        void main(){
-          vec2 o = uTexel;
-          gl_FragColor = 0.25 * (texture2D(tSrc, vUv + vec2(-o.x, -o.y)) + texture2D(tSrc, vUv + vec2(o.x, -o.y)) +
-                                 texture2D(tSrc, vUv + vec2(-o.x, o.y)) + texture2D(tSrc, vUv + vec2(o.x, o.y)));
-        }`,
-      depthTest: false, depthWrite: false,
-    });
-    this.quad = new FullScreenQuad(this.mat);
-  }
-  setSize(w, h) {
-    this.w = w; this.h = h;
-    this.rtA.setSize(Math.max(1, Math.round(w / 4)), Math.max(1, Math.round(h / 4)));
-    this.rtB.setSize(Math.max(1, Math.round(w / 8)), Math.max(1, Math.round(h / 8)));
-    this.grade.uniforms.uLocalTexel.value.set(1 / this.rtA.width, 1 / this.rtA.height);
-  }
-  render(renderer, writeBuffer, readBuffer) {
-    const w = readBuffer.width, h = readBuffer.height;
-    if (w !== this.w || h !== this.h) this.setSize(w, h);
-    const prev = renderer.getRenderTarget();
-    this.mat.uniforms.tSrc.value = readBuffer.texture;
-    this.mat.uniforms.uTexel.value.set(1 / w, 1 / h); // 4 bilinear taps over a 4x4 block
-    renderer.setRenderTarget(this.rtA); this.quad.render(renderer);
-    this.mat.uniforms.tSrc.value = this.rtA.texture;
-    this.mat.uniforms.uTexel.value.set(0.5 / this.rtA.width, 0.5 / this.rtA.height);
-    renderer.setRenderTarget(this.rtB); this.quad.render(renderer);
-    renderer.setRenderTarget(prev);
-    this.grade.uniforms.tLocal.value = this.rtA.texture;
-  }
-}
-
 export class PostFX {
   constructor(renderer, scene, camera, quality = 'high') {
     this.quality = quality;
@@ -228,7 +158,7 @@ export class PostFX {
       this.gtao = new GTAOPass(scene, camera, size.x, size.y);
       this.gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.6, thickness: 2.5, scale: 1.6, samples: 12, distanceFallOff: 1.0 });
       this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
-      this.gtao.blendIntensity = 0.72;
+      this.gtao.blendIntensity = 0.6;
       // Let pieces opt objects out of the AO g-buffer with object.userData.noAO
       // (water, overlays, effects).
       const orig = this.gtao._overrideVisibility.bind(this.gtao);
@@ -243,8 +173,6 @@ export class PostFX {
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
     this.grade = new ShaderPass(GradeShader);
-    this.localMean = new LocalMeanPass(this.grade);
-    this.composer.addPass(this.localMean);
     this.composer.addPass(this.grade);
   }
   setSize(w, h) { this.composer.setSize(w, h); }
