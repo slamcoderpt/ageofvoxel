@@ -52,9 +52,45 @@ export class Buildings {
       const def = BUILDING_DEFS[type];
       const model = BUILDING_MODELS[type](variant);
       const pivot = [def.w * 2, 0, def.h * 2];
-      this.geos.set(k, withExtras(buildVoxelGeometry(model, { size: BUILDING_VOXEL, pivot, jitter: 0.06 }), model, BUILDING_VOXEL, pivot));
+      const geo = withExtras(buildVoxelGeometry(model, { size: BUILDING_VOXEL, pivot, jitter: 0.06 }), model, BUILDING_VOXEL, pivot);
+      // chimney flue (voxel coords) for the smoke, relative to the pivot
+      if (model.chimney) geo.userData.chimney = model.chimney.map((c, i) => (c - pivot[i]) * BUILDING_VOXEL);
+      this.geos.set(k, geo);
     }
     return this.geos.get(k);
+  }
+
+  // Where a house mesh stands: detached plans (not the row plots, which
+  // join wall to wall) sit a little off the plot grid and a few degrees off
+  // square, so a street does not read as a stamped row.
+  housePose(b) {
+    const row = [2, 3].includes(this.variantOf(b) % HOUSE_PLANS);
+    const j = row ? 0 : hash3(b.tx, 29, b.tz, 95) - 0.5, k = row ? 0 : hash3(b.tx, 31, b.tz, 96) - 0.5;
+    return { x: b.x + k * 0.45, z: b.z - this.houseSetback(b), yaw: this.houseYaw(b) + j * 0.14 };
+  }
+
+  // Hearth smoke: every finished house breathes a thin column of pale grey
+  // voxel puffs from its chimney that drifts downwind and thins out.
+  // Simulated in the fixed tick so paused captures show it.
+  chimneySmoke(dt) {
+    const game = this.game;
+    this.smokeT = (this.smokeT || 0) + dt;
+    if (this.smokeT < 0.1) return;
+    this.smokeT -= 0.1;
+    this.smokeN = (this.smokeN || 0) + 1;
+    for (const b of game.entities.buildings()) {
+      if (b.type !== 'house' || !b.built || b.dead) continue;
+      if (b.owner !== game.localPlayer && !game.fog.isExplored(b.x, b.z)) continue;
+      const c = this.geometry('house', this.variantOf(b)).userData.chimney;
+      if (!c) continue;
+      // each hearth puffs at its own rhythm, some cold for a while
+      if (hash3(b.tx, this.smokeN >> 7, b.tz, 97) < 0.2) continue;
+      const p = this.housePose(b);
+      const cs = Math.cos(p.yaw), sn = Math.sin(p.yaw);
+      const x = p.x + c[0] * cs + c[2] * sn, z = p.z - c[0] * sn + c[2] * cs;
+      const y = game.map.heightAt(b.x, b.z) + c[1];
+      game.fx.emit({ x, y, z, count: 1, color: 0xcfcbc3, colorVar: 0.08, size: 0.17, life: 3.0, speed: 0.1, up: 0.75, gravity: 0.05, drag: 0.25, spread: 0.04, grow: 3 });
+    }
   }
 
   // Geometry of a construction stage (0..CONSTRUCTION_STAGES-1).
@@ -341,6 +377,7 @@ export class Buildings {
       b.hp = Math.min(b.maxHp, b.hp + (b.progress - before) * b.maxHp * 0.9);
       if (b.progress >= 1) this.complete(b);
     }
+    this.chimneySmoke(dt);
   }
 
   complete(b) {
@@ -379,11 +416,10 @@ export class Buildings {
         // detached plans (not the row plots, which join wall to wall) sit a
         // little off the plot grid and a few degrees off square, so a street
         // does not read as a stamped row
-        const row = [2, 3].includes(this.variantOf(b) % HOUSE_PLANS);
-        const j = row ? 0 : hash3(b.tx, 29, b.tz, 95) - 0.5, k = row ? 0 : hash3(b.tx, 31, b.tz, 96) - 0.5;
-        m.rotation.y = this.houseYaw(b) + j * 0.14;
-        m.position.z -= this.houseSetback(b);
-        m.position.x += k * 0.45;
+        const p = this.housePose(b);
+        m.rotation.y = p.yaw;
+        m.position.x = p.x;
+        m.position.z = p.z;
       }
       const visible = b.owner === game.localPlayer || game.fog.isExplored(b.x, b.z);
       m.visible = visible;

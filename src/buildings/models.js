@@ -566,7 +566,7 @@ export function townCenterModel(variant = 0, m = new VoxelModel()) {
 
 // House variants: variant % HOUSE_PLANS is the plan (silhouette),
 // floor(variant / HOUSE_PLANS) the roof tint; see houseModel.
-export const HOUSE_PLANS = 5;
+export const HOUSE_PLANS = 6;
 const OCHRE_PLASTER = (x, y, z) => { const h = hash3(x >> 1, y >> 1, z >> 1, 74); return h < 0.5 ? 0xd49a58 : h < 0.85 ? 0xca904f : 0xdca766; };
 const HOUSE_PLASTER = [WHITEWASH, OCHRE_PLASTER];
 const HOUSE_FILL = [0xf1ede4, 0xd29a5a];
@@ -594,13 +594,15 @@ const houseTiles = (base, plane, extra = {}) => ({ ...base, ...extra, plane: { .
 // house roofs: clean fired terracotta in two close tints, a regular
 // cover-tile rhythm, no missing or odd tiles and almost no weathering
 const cleanTiles = (base) => ({ ...base, plane: { ...(base.plane || {}), missing: 0, weather: 0.08, bandEvery: 0 } });
+const SAGE_PLANE = { ribGap: 1.5, ribW: 0.36, ribH: 0.46, bandEvery: 0, weather: 0.12, lip: 0.22, antefixH: 0.3, missing: 0 };
+// Four roof families so a street never reads as one roof stamped along it:
+// Retold's pale sage glaze (white ridge, white fascia), fired terracotta, a
+// greyer lichen-weathered sage and sun-faded orange tiles.
 const HOUSE_ROOFS = [
+  { ...TILES.sage, tones: [0x9db69a, 0x92ab8f, 0xa7bfa3, 0x8ba688], butt: 0x5f775d, fascia: 0xf0ece2, ridge: 0xe9e6dc, soffit: 0x3c4a40, antefix: 0xf3f0e6, plane: SAGE_PLANE },
   cleanTiles({ ...TILES.warm, tones: [0xd9602c, 0xd25a2a, 0xdf6a33, 0xd65d2d], butt: 0x8a3a1e, ridge: 0xa4431f }),
-  cleanTiles({ ...TILES.warmRed, tones: [0xc8522a, 0xc04c27, 0xcf5b31, 0xc44f29], butt: 0x7a321b, ridge: 0x94391c }),
-  // sun-faded paler orange
+  { ...TILES.sage, tones: [0xaab7a6, 0xa0ae9c, 0xb4c0b0, 0x98a795], butt: 0x69766a, fascia: 0xece8de, ridge: 0xdedbd0, soffit: 0x3f4640, antefix: 0xf1eee4, plane: SAGE_PLANE },
   cleanTiles({ ...TILES.warm, tones: [0xe1804b, 0xda7845, 0xe68a55, 0xdd7c48], butt: 0x9a5030, ridge: 0xb05a34 }),
-  // older, deeper brick red
-  cleanTiles({ ...TILES.warmRed, tones: [0xb2523a, 0xa94c35, 0xba5a40, 0xae5038], butt: 0x6a2a1c, ridge: 0x82321f }),
 ];
 export const HOUSE_TINTS = HOUSE_ROOFS.length;
 
@@ -702,7 +704,9 @@ const GRAPE = 0x5a2d52;
 export function houseModel(variant = 0, m = new VoxelModel()) {
   const plan = variant % HOUSE_PLANS, tint = Math.floor(variant / HOUSE_PLANS) % HOUSE_TINTS;
   const tiles = HOUSE_ROOFS[tint];
-  const tiles2 = HOUSE_ROOFS[(tint + 1 + (plan & 1)) % HOUSE_TINTS];
+  // wings take the sister tint of the same family (sage / grey sage,
+  // terracotta / faded), never a clashing one
+  const tiles2 = HOUSE_ROOFS[tint ^ 2];
   const wash = (plan + tint) % 3;
   // plinth course (y 0), plaster to h, optional painted band on the top row
   const body = (x0, z0, w, d, h, { wall = HOUSE_STUCCO[wash], band = false } = {}) => {
@@ -744,8 +748,10 @@ export function houseModel(variant = 0, m = new VoxelModel()) {
     win(x, y, zf);
     for (let yy = y; yy < y + 2; yy++) { m.set(x - 1, yy, zf + 1, sh(yy)); m.set(x + 2, yy, zf + 1, sh(yy)); }
   };
-  const gable = (o) => gableRoof(m, { ov: 1.1, ovG: 0.7, pitch: 0.36, tiles, fill: HOUSE_GABLE[wash], ...o });
-  const hip = (o) => hipRoof(m, { ov: 1.1, pitch: 0.38, tiles, ...o });
+  // eaves stand 1.6 voxels proud of the walls so every roof throws a
+  // shadow line onto its wall; gable ends keep a shorter verge
+  const gable = (o) => gableRoof(m, { ov: 1.6, ovG: 0.8, pitch: 0.36, tiles, fill: HOUSE_GABLE[wash], ...o });
+  const hip = (o) => hipRoof(m, { ov: 1.6, pitch: 0.38, tiles, ...o });
   const yardWall = (x0, z0, x1, z1, h = 3, gate = null) => {
     for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
       if (gate && x >= gate[0] && x <= gate[1] && z >= gate[2] && z <= gate[3]) continue;
@@ -776,10 +782,22 @@ export function houseModel(variant = 0, m = new VoxelModel()) {
     }
   };
 
+  // a rubble-stone chimney stack, 2 x 2, from the wall top at y0 to y1,
+  // a projecting cap slab and a sooty flue; the smoke rises from m.chimney
+  const chimney = (x, z, y0, y1) => {
+    m.box(x, y0, z, 2, y1 - y0, 2, (xx, yy, zz) => (hash3(xx, yy >> 1, zz, 151) < 0.5 ? 0xa39b8b : 0x958d7d));
+    m.box(x, y1, z, 2, 1, 2, 0x6f685c);
+    m.set(x, y1 + 1, z, 0x7d766a); m.set(x + 1, y1 + 1, z + 1, 0x7d766a);
+    m.set(x + 1, y1 + 1, z, 0x2a2420); m.set(x, y1 + 1, z + 1, 0x2a2420);
+    m.chimney = [x + 1, y1 + 2, z + 1];
+  };
+  const up = (r) => Math.ceil(r.ridgeY) + 2;
+
   if (plan === 0) {
     // back hall across the plot, gable-ended wing on the left to the street
     const top = body(0, 0, 12, 5, 9);
-    gable({ wx0: 0, wx1: 12, wz0: 0, wz1: 5, top, axis: 'x', seed: 11 + variant });
+    const r0 = gable({ wx0: 0, wx1: 12, wz0: 0, wz1: 5, top, axis: 'x', seed: 11 + variant });
+    chimney(9, 2, top, up(r0));
     const tw = body(0, 5, 5, 6, 8);
     gable({ wx0: 0, wx1: 5, wz0: 5, wz1: 11, top: tw, axis: 'z', ovG: 0.5, seed: 12 + variant });
     door(1, 10);
@@ -805,7 +823,8 @@ export function houseModel(variant = 0, m = new VoxelModel()) {
     // parapet, jars and a small awning, reached by a door from the upper
     // floor; a lean-to shed with a shed roof on the right, firewood by it
     const top = body(0, 1, 8, 5, 13, { band: true });
-    gable({ wx0: 0, wx1: 8, wz0: 1, wz1: 6, top, axis: 'x', seed: 21 + variant });
+    const r1 = gable({ wx0: 0, wx1: 8, wz0: 1, wz1: 6, top, axis: 'x', seed: 21 + variant });
+    chimney(1, 3, top, up(r1));
     const ft = body(0, 6, 8, 4, 7);
     m.box(0, ft, 6, 8, 1, 4, ROOFDECK);
     for (let x = 0; x < 8; x++) m.set(x, ft + 1, 9, (x & 1) ? YARD_WALL : COPING);
@@ -834,7 +853,8 @@ export function houseModel(variant = 0, m = new VoxelModel()) {
     // two narrow row houses sharing a party wall at x = 6, walls to the
     // plot edges; the left one taller, the right under another roof tint
     const ta = body(0, 1, 6, 10, 11, { band: true });
-    gable({ wx0: 0, wx1: 6, wz0: 1, wz1: 11, top: ta, axis: 'z', ovG: 0.6, ov: 0.25, seed: 31 + variant });
+    const r2 = gable({ wx0: 0, wx1: 6, wz0: 1, wz1: 11, top: ta, axis: 'z', ovG: 0.6, ov: 0.25, seed: 31 + variant });
+    chimney(2, 3, ta, up(r2));
     const tb = body(6, 2, 6, 9, 8, { wall: HOUSE_STUCCO[(wash + 1) % 3] });
     gable({ wx0: 6, wx1: 12, wz0: 2, wz1: 11, top: tb, axis: 'x', ovG: 0.2, tiles: tiles2, fill: HOUSE_GABLE[(wash + 1) % 3], seed: 32 + variant });
     door(1, 10);
@@ -853,7 +873,8 @@ export function houseModel(variant = 0, m = new VoxelModel()) {
     // gable-ended row house with a flat-roofed annex: roof terrace with a
     // parapet, laundry drying, pots along the edge
     const ta = body(0, 0, 7, 11, 10);
-    gable({ wx0: 0, wx1: 7, wz0: 0, wz1: 11, top: ta, axis: 'z', ov: 0.3, ovG: 0.7, seed: 41 + variant });
+    const r3 = gable({ wx0: 0, wx1: 7, wz0: 0, wz1: 11, top: ta, axis: 'z', ov: 0.3, ovG: 0.7, seed: 41 + variant });
+    chimney(3, 7, ta, up(r3));
     const tb = body(7, 1, 5, 10, 7, { band: true });
     m.box(7, tb, 1, 5, 1, 10, ROOFDECK);
     for (let x = 7; x < 12; x++) { m.set(x, tb + 1, 1, YARD_WALL); m.set(x, tb + 1, 10, YARD_WALL); }
@@ -870,12 +891,43 @@ export function houseModel(variant = 0, m = new VoxelModel()) {
     amphora(m, 5, 0, 11, 0xc47440);
     return m;
   }
+  if (plan === 5) {
+    // tower house: a three-storey tower at the back left under a steep
+    // pyramid roof, a gable-fronted hall beside it running to the street
+    // with the chimney, and a walled front yard before the tower with a
+    // vine pergola, jars and a well-head
+    const tw = body(0, 0, 6, 6, 18, { band: true });
+    hip({ wx0: 0, wx1: 6, wz0: 0, wz1: 6, top: tw, pitch: 0.55, ov: 1.4 });
+    m.box(0, 7, 0, 6, 1, 6, MARBLE_SHADE);                            // floor string courses
+    m.box(0, 12, 0, 6, 1, 6, MARBLE_SHADE);
+    win(2, 9, 5); win(2, 14, 5); win(5, 9, 2, '+x'); win(5, 14, 2, '+x');
+    win(0, 9, 2, '-x'); win(0, 14, 2, '-x'); win(2, 14, 0, '-z');
+    const hl = body(6, 1, 6, 9, 8, { wall: HOUSE_STUCCO[(wash + 1) % 3] });
+    const r5 = gable({ wx0: 6, wx1: 12, wz0: 1, wz1: 10, top: hl, axis: 'z', ov: 1.4, ovG: 0.8, tiles: tiles2, fill: HOUSE_GABLE[(wash + 1) % 3], seed: 61 + variant });
+    chimney(8, 3, hl, up(r5));
+    door(8, 9, tint & 1 ? HOUSE_DOOR_BLUE : HOUSE_DOOR);
+    win(11, 3, 5, '+x'); win(11, 3, 2, '+x'); win(7, 3, 1, '-z');
+    // porch: two posts and a short shed roof over the hall door
+    for (const px of [7, 10]) m.box(px, 0, 11, 1, 5, 1, DARKWOOD);
+    shedRoof(m, { wx0: 7, wx1: 11, wz0: 10, wz1: 12, top: 5, dir: '+z', pitch: 0.35, ov: 0.6, ovS: 0.3, tiles: tiles2, seed: 62 + variant, fill: HOUSE_GABLE[wash] });
+    for (let x = 0; x < 6; x++) for (let z = 6; z < 12; z++) m.set(x, 0, z, YARD);
+    yardWall(0, 11, 5, 11, 3, [2, 3, 11, 11]);
+    yardWall(0, 6, 0, 10, 3);
+    hole(2, 1, 5, 2, 4, '+z', HOUSE_DOOR);
+    pergola(1, 6, 5, 8, 5, variant + 5);
+    pithos(m, 1, 1, 9, 0xb8683e); amphora(m, 4, 1, 10, 0xc47440); amphora(m, 5, 1, 9, 0xa65a34);
+    // well-head: a round stone kerb
+    m.box(3, 1, 9, 1, 2, 1, 0xa39b8b);
+    potPlant(m, 11, 0, 11, variant);
+    return m;
+  }
   // U-plan courtyard house: a hip-roofed back range, a gable-ended wing
   // on the left fronting the street, a lower flat-roofed store on the
   // right, and between them a yard behind a gated wall with a vine
   // pergola off the back range, a fruit tree and storage jars
   const top = body(0, 0, 12, 5, 9, { band: true });
-  hip({ wx0: 0, wx1: 12, wz0: 0, wz1: 5, top, seed: 51 + variant });
+  const r4 = hip({ wx0: 0, wx1: 12, wz0: 0, wz1: 5, top, seed: 51 + variant });
+  chimney(9, 1, top, up(r4));
   const lw = body(0, 5, 4, 7, 8);
   gable({ wx0: 0, wx1: 4, wz0: 5, wz1: 12, top: lw, axis: 'z', ov: 0.6, ovG: 0.4, tiles: tiles2, seed: 52 + variant });
   const rw = body(8, 5, 4, 5, 6);
