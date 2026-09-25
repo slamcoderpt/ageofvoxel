@@ -102,6 +102,13 @@ export const TILES = {
     plane: { ribGap: 1.5, ribW: 0.34, ribH: 0.42, bandEvery: 0, weather: 0.3, lip: 0.2, antefixH: 0.3 } },
   faded: { tones: [0xe8a878, 0xe09e6e, 0xefb385, 0xdc9a6b], butt: 0xa86840, fascia: 0xf1ece2, ridge: 0xc07a4c, soffit: 0x6a4a3a, antefix: 0xf4efe4,
     plane: { ribGap: 1.5, ribW: 0.34, ribH: 0.42, bandEvery: 0, weather: 0.35, lip: 0.2, antefixH: 0.3 } },
+  // dark blue-grey slate for the military buildings, with bronze-painted
+  // antefixes and a darker ridge (reads apart from every tiled roof)
+  darkSlate: { tones: [0x434c59, 0x3b4350, 0x4b5562, 0x363e4a], butt: 0x22282f, fascia: 0x3a414a, ridge: 0x8a6a3a, soffit: 0x262a30, antefix: 0xb88a42,
+    plane: { ribGap: 0, bandEvery: 0, weather: 0.3, lip: 0.26, tileW: 1.2 } },
+  // split-timber shingles (storehouses, sheds): grey-brown weathered wood
+  shingle: { tones: [0x8a7458, 0x7e6a50, 0x97805f, 0x746249], butt: 0x4e4030, fascia: 0x5a4632, ridge: 0x5e4a34, soffit: 0x3a2e24, antefix: null,
+    plane: { ribGap: 3.2, ribW: 0.3, ribH: 0.3, bandEvery: 0, weather: 0.6, lip: 0.28 } },
   weathered: { tones: [0xa88a72, 0x9d806a, 0xb3967e, 0x927762], butt: 0x5e4a3c, fascia: 0xe6e0d2, ridge: 0x6e5646, soffit: 0x3e342c, antefix: 0xe6e0d2,
     plane: { ribGap: 1.5, ribW: 0.34, ribH: 0.42, bandEvery: 0, weather: 0.5, lip: 0.2, antefixH: 0.3 } },
 };

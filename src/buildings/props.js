@@ -3,7 +3,7 @@ import { VoxelModel, TEAM, buildVoxelGeometry, voxelMaterialFor } from '../core/
 import { hash3 } from '../core/rng.js';
 import { BUILDING_VOXEL } from './defs.js';
 import { GROUND } from '../core/GameMap.js';
-import { withExtras, shedRoof, roundColumn, TILES } from './shapes.js';
+import { withExtras } from './shapes.js';
 import {
   WOOD, DARKWOOD, STONE, MARBLE, MARBLE_SHADE, BRONZE, GOLD, FIRE, LEAF,
   amphora, pithos, potPlant, cypress, olive, statue, hopliteStatue, roofTile, shade,
@@ -41,11 +41,10 @@ const PROPS = {
   stall_food: { w: 2, h: 1, build: (m) => stall(m, 'food') },
   stall_pots: { w: 2, h: 1, build: (m) => stall(m, 'pots') },
   stall_cloth: { w: 2, h: 1, build: (m) => stall(m, 'cloth') },
-  // stoa: a long open colonnade on the agora's edge, facing +x: two-step
-  // stylobate, a plastered back wall with shop doors and a red dado, five
-  // round columns under a painted architrave and a tiled lean-to roof;
-  // benches, jars and a hung team cloth inside
-  stoa: { w: 2, h: 5, build: (m) => stoa(m) },
+  // market hall: an open timber frame on a paved floor, no tiled roof -
+  // posts on stone bases, tie beams, a ridge beam and open slatted rafters
+  // with striped cloths thrown over some bays, counters with goods beneath
+  market: { w: 3, h: 2, build: (m) => market(m) },
   // potter's workshop yard: a domed clay kiln with a glowing stoke hole, a
   // wheel under a small shed, rows of drying pots, a fence round it
   kiln: { w: 2, h: 2, build: (m) => kiln(m) },
@@ -239,30 +238,41 @@ function court(m, kind) {
   }
 }
 
-function stoa(m) {
-  const L = 20;
-  const WASH = (x, y, z) => (hash3(x >> 1, y >> 1, z >> 1, 110) < 0.55 ? 0xf1ede4 : 0xe8e2d6);
-  m.box(0, 0, 0, 8, 1, L, (x, y, z) => (hash3(x >> 1, 0, z >> 1, 111) < 0.5 ? 0x8f887a : 0x857e70));
-  m.box(0, 1, 0, 7, 1, L, (x, y, z) => ((x + z) & 1 ? 0xd6cfbf : 0xcfc7b4));
-  // back wall and end walls
-  m.box(0, 2, 0, 2, 9, L, WASH);
-  m.box(0, 2, 0, 2, 2, L, 0x9a3b2c);
-  for (const z of [0, L - 1]) { m.box(0, 2, z, 6, 9, 1, WASH); m.box(0, 2, z, 6, 2, 1, 0x9a3b2c); }
-  // shop doors in the back wall, recessed, with pale frames
-  for (const z0 of [3, 9, 15]) {
-    m.box(1, 2, z0, 1, 5, 2, 0x16110d);
-    m.box(2, 7, z0 - 1, 1, 1, 4, 0xd6cfbf); m.box(2, 2, z0 - 1, 1, 5, 1, 0xd6cfbf); m.box(2, 2, z0 + 2, 1, 5, 1, 0xd6cfbf);
-  }
-  // colonnade and architrave
-  for (let i = 0; i < 5; i++) roundColumn(m, 6.5, 2, 2 + i * 4, 0.5, 8);
-  m.box(5, 10, 0, 3, 1, L, 0xece6da);
-  m.box(5, 11, 0, 3, 1, L, (x, y, z) => (z % 4 === 0 ? 0xd2a847 : 0x34528a));
-  m.box(0, 11, 0, 5, 1, L, WASH);
-  shedRoof(m, { wx0: 0, wx1: 8, wz0: 0, wz1: L, top: 12, dir: '+x', pitch: 0.3, ov: 1, ovS: 0.6, tiles: TILES.warm, seed: 17, fill: 0xece6da });
-  // inside: benches, jars, a hanging team cloth
-  m.box(2, 2, 6, 1, 1, 2, 0xcfc7b4); m.box(2, 2, 12, 1, 1, 2, 0xcfc7b4);
-  pithos(m, 2, 2, 1, 0xb8683e); amphora(m, 3, 2, 17, 0xa65a34); amphora(m, 2, 2, 18, 0xc47440);
-  for (let y = 6; y < 10; y++) for (let z = 7; z < 11; z++) if (z !== 9) m.set(2, y, z, TEAM);
+function market(m) {
+  const L = 12, D = 8;
+  m.box(0, 0, 0, L, 1, D, (x, y, z) => ((x + z) & 1 ? 0xd6cfbf : 0xcbc3b0));
+  const PX = [0, 6, 11];
+  for (const x of PX) for (const z of [0, D - 1]) { m.set(x, 1, z, 0x9a9382); m.box(x, 2, z, 1, 8, 1, WOOD); }
+  // wall plates along the long sides, tie beams across at every post
+  for (const z of [0, D - 1]) m.box(0, 10, z, L, 1, 1, DARKWOOD);
+  for (const x of PX) m.box(x, 10, 0, 1, 1, D, DARKWOOD);
+  // king posts and a ridge beam, rafters every other voxel, one purlin
+  for (const x of PX) m.box(x, 11, 3, 1, 2, 2, WOOD);
+  m.box(0, 13, 3, L, 1, 2, DARKWOOD);
+  const slope = [[0, 10], [1, 11], [2, 12]];   // [z, y] on the back slope
+  for (let x = 0; x < L; x += 2) for (const [z, y] of slope) { m.set(x, y + 1, z, WOOD); m.set(x, y + 1, D - 1 - z, WOOD); }
+  for (const zz of [1, D - 2]) m.box(0, 12, zz, L, 1, 1, DARKWOOD);
+  // striped cloths over some bays: the front left bay in team stripes, the
+  // back right bay in ochre stripes; the rest of the frame stays open
+  const cloth = (x0, x1, front, c) => {
+    for (let x = x0; x <= x1; x++) for (const [z, y] of slope) {
+      const zz = front ? D - 1 - z : z;
+      m.set(x, y + 2, zz, (x & 1) ? c : 0xf2ede2);
+    }
+    for (let x = x0; x <= x1; x++) m.set(x, 11, front ? D : -1, (x & 1) ? c : 0xf2ede2);
+  };
+  cloth(0, 5, true, TEAM);
+  cloth(6, 11, false, 0xc98a2e);
+  // counters and goods
+  m.box(1, 1, 5, 4, 2, 1, 0x7a5230); m.box(1, 3, 5, 4, 1, 1, 0x9b7040);
+  const goods = [0xc0392b, 0x6f9a36, 0xe0b93a, 0x6b3a6e, 0xd35400];
+  for (let x = 1; x < 5; x++) m.set(x, 4, 5, goods[x % goods.length]);
+  m.box(7, 1, 2, 4, 2, 1, 0x7a5230); m.box(7, 3, 2, 4, 1, 1, 0x9b7040);
+  for (let x = 7; x < 11; x += 2) amphora(m, x, 4, 2, x & 2 ? 0xa65a34 : 0xc47440);
+  pithos(m, 9, 1, 5, 0xb8683e); amphora(m, 10, 1, 6, 0xa65a34); amphora(m, 2, 1, 2, 0xc47440);
+  m.box(3, 1, 1, 2, 1, 2, 0xb08850); m.set(3, 2, 1, 0xc0392b).set(4, 2, 2, 0xe0b93a);
+  // hanging cloths from the tie beam
+  for (let z = 2; z < 6; z++) if (z !== 4) m.box(6, 7, z, 1, 3, 1, [0xc0392b, 0x2e6fb0, 0xd49a3a][z % 3]);
 }
 
 function kiln(m) {
@@ -368,13 +378,14 @@ function stall(m, kind) {
 function anchorsFor(b) {
   const w = b.w, h = b.h, v = Math.floor(hash3(b.tx, 5, b.tz, 71) * 4);
   switch (b.type) {
-    // the agora: a market row on the front-left, the well front-right, a
-    // statue on the open north-east corner; everything else stays clear
+    // the agora: an open timber market hall on the front-left corner, a
+    // tile clear of the Town Center, with its stalls in a row on the lane
+    // below it; the well front-right, a statue on the north-east corner;
+    // the front and sides of the Town Center stay open paving
     case 'town_center': return [
-      ['stoa', [[-3, 5], [-4, 5]]], ['stoa', [[-3, -3], [-3, -4]]],
-      ['pillar', [[-1, h], [-1, h + 1]]], ['pillar', [[w, h], [w, h + 1]]],
-      ['stall_food', [[0, h], [-1, h + 1]]], ['stall_pots', [[0, h + 2], [-1, h + 2]]], ['stall_cloth', [[w - 2, h + 2], [w - 1, h + 2]]],
-      ['well', [[w + 1, h], [w + 1, h + 1]]],
+      ['market', [[-3, h + 1], [-3, h]]],
+      ['stall_food', [[-3, h + 4], [-3, h + 3]]], ['stall_cloth', [[0, h + 4], [0, h + 3]]],
+      ['well', [[w + 1, h], [w + 1, h - 1]]],
       ['statue', [[w + 1, -3], [w + 1, -2]]],
       ['cypress', [[-2, -2], [-1, -2]]], ['cypress', [[w + 1, 0], [w, -2]]],
     ];
