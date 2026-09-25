@@ -159,6 +159,10 @@ const PROPS = {
   // temenos boundary wall (sits on paving, unlike garden walls)
   twall_x: { w: 3, h: 1, build: (m) => peribolos(m, 12, 'x') },
   twall_z: { w: 1, h: 3, build: (m) => peribolos(m, 12, 'z') },
+  // temenos colonnade (sides and back): a stepped stylobate, square-set
+  // marble columns with capitals, an architrave and a painted frieze
+  tcol_x: { w: 3, h: 1, build: (m) => colonnade(m, 12, 'x') },
+  tcol_z: { w: 1, h: 3, build: (m) => colonnade(m, 12, 'z') },
   planter: {
     w: 1, h: 1,
     build(m) {
@@ -293,6 +297,26 @@ function peribolos(m, len, axis) {
   }
 }
 
+function colonnade(m, len, axis) {
+  const put = (a, y, k, c) => (axis === 'x' ? m.set(a, y, k, c) : m.set(k, y, a, c));
+  for (let a = 0; a < len; a++) {
+    for (let k = 0; k < 4; k++) put(a, 0, k, hash3(a >> 1, 0, k, 114) < 0.5 ? 0x8d8676 : 0x9a9382);
+    for (let k = 0; k < 4; k++) put(a, 1, k, (a + k) & 1 ? 0xd8d0bf : 0xcfc7b4);
+    for (let k = 0; k < 4; k++) {
+      put(a, 10, k, k === 0 || k === 3 ? 0xe2dccd : 0xece6da);
+      put(a, 11, k, k === 0 || k === 3 ? ((a & 3) === 1 ? 0xd2a847 : (a & 1) ? 0x2d4b82 : 0x34528a) : 0xe2dccd);
+      put(a, 12, k, (a + k) & 1 ? 0xd6cfbf : 0xcdc5b3);
+    }
+    // columns: 2x2 shafts every 4 voxels with a base and a spreading capital
+    const c = a % 4;
+    if (c === 1 || c === 2) for (const k of [1, 2]) {
+      put(a, 2, k, 0xd6cfbf);
+      for (let y = 3; y < 9; y++) put(a, y, k, (a + k + y) & 1 ? 0xf2ede3 : 0xe9e3d6);
+    }
+    if (c === 1 || c === 2) for (let k = 0; k < 4; k++) put(a, 9, k, 0xe2dccd);
+  }
+}
+
 function lowWall(m, len, axis) {
   const put = (a, y, k, c) => (axis === 'x' ? m.set(a, y, 1 + k, c) : m.set(1 + k, y, a, c));
   for (let a = 0; a < len; a++) for (let k = 0; k < 2; k++) {
@@ -398,7 +422,8 @@ function temenosAnchors(b) {
   for (const z of [0, 2, 4]) out.push(['cypress', [[-2, z]]], ['cypress', [[w + 1, z]]]);
   // boundary: back and sides in 3-tile runs, the front split by the gate
   const x0 = ex - b.tx, z0 = ez - b.tz, x1 = x0 + ew - 1, z1 = z0 + eh - 1;
-  for (let x = x0; x + 2 <= x1; x += 3) out.push(['twall_x', [[x, z0]]]);
+  for (let x = x0; x + 2 <= x1; x += 3) out.push(['tcol_x', [[x, z0]]]);
+  for (let z = z0 + 1; z + 2 <= z1 - 3; z += 3) out.push(['tcol_z', [[x0, z]]], ['tcol_z', [[x1, z]]]);
   for (let z = z0 + 1; z + 2 <= z1; z += 3) out.push(['twall_z', [[x0, z]]], ['twall_z', [[x1, z]]]);
   const gate0 = Math.floor(w / 2) - 2, gate1 = Math.floor(w / 2) + 2;   // 3-tile gate on the axis
   for (let x = x0; x + 2 < gate0 + 1; x += 3) out.push(['twall_x', [[x, z1]]]);

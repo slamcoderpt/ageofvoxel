@@ -377,7 +377,7 @@ export class Buildings {
       }
       const y = game.map.heightAt(b.x, b.z);
       m.position.set(b.x, y, b.z);
-      if (b.type === 'house') { m.rotation.y = this.houseYaw(b); m.position.z -= this.houseSetback(b); }
+      if (b.type === 'house') { m.rotation.y = this.houseYaw(b); m.position.z -= this.houseSetback(b); m.scale.x = hash3(b.tx, 23, b.tz, 94) < 0.5 ? -1 : 1; }
       const visible = b.owner === game.localPlayer || game.fog.isExplored(b.x, b.z);
       m.visible = visible;
       const mesh = m.userData.mesh;

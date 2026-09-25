@@ -117,7 +117,7 @@ export const TILES = {
 export function tiledPlane(m, e0, e1, r0, r1, opts = {}) {
   return tiledPlane0(m, e0, e1, r0, r1, opts.tiles?.plane ? { ...opts.tiles.plane, ...opts } : opts);
 }
-function tiledPlane0(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.1, tileW = 1.4, lip = 0.24, fascia = 0.6, seed = 1, up = [0, 1, 0], closeUnder = true, eaveFascia = true, ribGap = 2.6, ribW = 0.46, ribH = 0.5, antefix = tiles.antefix ?? null, antefixH = 0.35, antefixPaint = null, bandEvery = 4, weather = 1 } = {}) {
+function tiledPlane0(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.1, tileW = 1.4, lip = 0.24, fascia = 0.6, seed = 1, up = [0, 1, 0], closeUnder = true, eaveFascia = true, ribGap = 2.6, ribW = 0.46, ribH = 0.5, antefix = tiles.antefix ?? null, antefixH = 0.35, antefixPaint = null, bandEvery = 4, weather = 1, missing = 0 } = {}) {
   const n = normal3(e0, e1, r0[0] === r1[0] && r0[1] === r1[1] && r0[2] === r1[2] ? r0 : r1, up);
   const slope = len3(sub3(lerp3(r0, r1, 0.5), lerp3(e0, e1, 0.5)));
   const N = Math.max(1, Math.round(slope / course));
@@ -146,6 +146,18 @@ function tiledPlane0(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.1, til
       }
       const p0 = add3(lerp3(L0, R0, a), n, lip), p1 = add3(lerp3(L0, R0, b), n, lip);
       const p2 = lerp3(L1, R1, b), p3 = lerp3(L1, R1, a);
+      if (missing > 0 && i > 0 && i < N - 1 && b - a > 0.3 / K) {
+        const hm = hash3(i, j, seed, 64);
+        if (hm < missing) {
+          // a slipped / missing tile: the dark batten and underlay show
+          // through a hole sunk below the course
+          const q = (p) => add3(p, n, -0.28);
+          poly(m, [q(lerp3(L0, R0, a)), q(lerp3(L0, R0, b)), q(p2), q(p3)], 0x33241c, { out: n });
+          continue;
+        }
+        // an odd replacement tile, fresher and brighter than its neighbours
+        if (hm < missing * 2.2) c = mix(c, 0xe98a4c, 0.45);
+      }
       // the lower courses read a touch darker (weathering toward the eave)
       poly(m, [p0, p1, p2, p3], c, { out: n, shade: [0.94, 0.94, 1, 1] });
     }
@@ -160,15 +172,24 @@ function tiledPlane0(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.1, til
     const span = len3(sub3(e1, e0));
     const K = Math.max(2, Math.round(span / ribGap));
     const tE = sub3(e1, e0).map((q) => q / (span || 1));
-    const tri = r0[0] === r1[0] && r0[1] === r1[1] && r0[2] === r1[2];
-    const topLen = len3(sub3(r1, r0));
-    const tR = tri ? tE : sub3(r1, r0).map((q) => q / (topLen || 1));
+    // Ribs run straight up the slope, square to the eave (on a hip or a
+    // triangle too, where each one stops at the hip line instead of
+    // fanning to the apex like a parasol).
+    const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    const D = sub3(lerp3(r0, r1, 0.5), lerp3(e0, e1, 0.5));
+    const Dp = add3(D, tE, -dot(D, tE));
+    const pL = dot(sub3(r0, e0), tE), pR = dot(sub3(r1, e1), tE);
+    const tR = tE;
     const hw = ribW, hr = ribH;
     for (let k = 0; k < K; k++) {
-      const s = (k + 0.5) / K;
+      const s = (k + 0.5) / K, a = s * span;
+      let tm = 1;
+      if (pL > 1e-6) tm = Math.min(tm, a / pL);
+      if (pR < -1e-6) tm = Math.min(tm, (span - a) / -pR);
+      if (tm < 0.12) continue;
+      if (tm < 1) tm -= Math.min(0.08, (hw * 1.2) / (len3(Dp) || 1));
       const A = add3(lerp3(e0, e1, s), n, lip * 0.6);
-      let B = add3(lerp3(r0, r1, s), n, lip * 0.6);
-      if (tri) B = lerp3(A, B, 0.86);
+      const B = add3(A, Dp, tm);
       const c = shadeHex(T[Math.floor(hash3(k, 77, seed, 58) * T.length) % T.length], 0.97 + hash3(k, 3, seed, 59) * 0.08);
       const At = add3(A, n, hr), Bt = add3(B, n, hr);
       const A1 = add3(A, tE, hw), A2 = add3(A, tE, -hw), B1 = add3(B, tR, hw), B2 = add3(B, tR, -hw);
