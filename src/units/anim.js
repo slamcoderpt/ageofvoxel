@@ -72,7 +72,10 @@ export function pose(kind, u, out) {
   const add = (name, x, y = 0, z = 0) => { const r = out[name]; if (r) { r[0] += x; r[1] += y; r[2] += z; } };
 
   const v = variantOf(u, 3);
-  const av = Math.floor(uhash(u, 9) * 4);   // attack style (independent of the idle stance)
+  // attack style (independent of the idle stance); half the spearmen fight
+  // with the spear levelled underarm, the point held out past the shield
+  const ah = uhash(u, 9);
+  const av = u.type === 'hoplite' ? (ah < 0.5 ? 1 : ah < 0.75 ? 0 : ah < 0.88 ? 2 : 3) : Math.floor(ah * 4);
   const rec = st === 'die' ? 0 : recoilOf(u);
   if (kind === 'horse') return horsePose(u, st, t, set, add);
   if (kind === 'centaur') {
@@ -173,6 +176,20 @@ export function pose(kind, u, out) {
       set('legL', -0.45); set('shinL', 0.3); set('legR', 0.35); set('shinR', 0.25);
       bob = -1.5 * down;
       fwd = 0.35 * down - 0.12 * up;
+    } else if (hoplite && !hero && gearOf(u).kit === 1) {
+      // swordsman: blade hauled up over the head on the wind-up (body
+      // turned away, big shield pushed out in front), then a hard downward
+      // cut across the body with a long step in on the strike
+      const arm = ease(ease(-1.5, -2.85, wind), -1.15, extend);
+      const tot = ease(ease(1.3, -0.55, wind), 2.1, extend);
+      set('armR', arm, 0.1 - 0.2 * wind + 0.35 * extend, -0.3 - 0.25 * wind + 0.3 * extend);
+      set('weapon', tot - arm);
+      set('armL', -1.35 + 0.15 * wind - 0.2 * extend, 0.55 - 0.25 * extend, 0.2);
+      set('torso', 0.1 + extend * 0.45 - wind * 0.15, -0.1 - wind * 0.4 + extend * 0.55);
+      set('head', -0.1 - extend * 0.15, 0.2 * wind - 0.2 * extend);
+      set('legL', -0.55 - extend * 0.35); set('shinL', 0.4); set('legR', 0.4 + extend * 0.3); set('shinR', 0.4);
+      bob = -1.4 - extend * 0.8;
+      fwd = 0.38 * extend - 0.12 * wind;
     } else if (hoplite && av === 3) {
       // shield flung high against a blow from above, spear driven up under it
       const arm = -1.2 - extend * 0.5 + wind * 0.3;
@@ -441,8 +458,13 @@ function hitReact(u) {
 export function gearOf(u) {
   if (u.units_gear) return u.units_gear;
   const h = uhash(u, 20), c = uhash(u, 21), s = uhash(u, 22);
+  // kit: 0 spearman, 1 swordsman (a scene may set u.units_kit). Swordsmen
+  // wear the Attic helmet with its crest across the head, spearmen a
+  // front-to-back crest, so the two read apart from above.
+  const kit = u.type === 'hoplite' ? (u.units_kit ?? (uhash(u, 24) < 0.3 ? 1 : 0)) : 0;
   return (u.units_gear = {
-    helm: h < 0.3 ? 0 : h < 0.58 ? 1 : h < 0.8 ? 2 : 3,
+    kit,
+    helm: kit === 1 ? 2 : h < 0.42 ? 0 : h < 0.84 ? 1 : 3,
     cloak: c < 0.18 ? 1 : c < 0.55 ? 2 : 0,
     shield: s < 0.25 ? 0 : s < 0.45 ? 1 : s < 0.8 ? 2 : 3,
     hat: h < 0.4 ? 0 : h < 0.72 ? 1 : 2,

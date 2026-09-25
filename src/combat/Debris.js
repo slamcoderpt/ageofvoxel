@@ -58,6 +58,7 @@ export class Debris {
     }
     this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._e = new THREE.Euler(0, 0, 0, 'YXZ');
     this._v = new THREE.Vector3(); this._s = new THREE.Vector3(1, 1, 1); this._c = new THREE.Color();
+    this._t = new THREE.Color();
     this.dirty = true;
   }
 
@@ -91,6 +92,9 @@ export class Debris {
       this._m.compose(this._v, this._q, this._s);
       k.mesh.setMatrixAt(n, this._m);
       this._c.setHex(d.owner ? game.players[d.owner].color : 0xd8d0c0);
+      // dropped gear is dusty and trampled: the paint dulled towards the
+      // grey-brown of the dead, so it never reads as a live man's colour
+      if (d.owner) this._c.lerp(this._t.setRGB(0.5, 0.43, 0.36), 0.6);
       k.team.setXYZ(n, this._c.r, this._c.g, this._c.b);
       counts.set(d.kind, n + 1);
     }

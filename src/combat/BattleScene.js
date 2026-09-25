@@ -21,10 +21,13 @@ const P = (cx, cz, a, d) => [cx + (a + d) * S, cz + (d - a) * S];
 // of ground between them), a second rank a full pace behind its own front,
 // shields up and set half a file over so every man shows between the two
 // in front of him, and a loose third rank in reserve. Units never overlap.
-const COL = 1.9;
-const FRONT = 1.1;    // depth of each duellist from the seam (gap = 2x)
-const SECOND = 3.5;   // depth of the second rank
-const THIRD = 5.8;    // depth of the reserve
+// (Spaced as in Retold: every duel is its own little vignette with open
+// ground on all sides, so a spearman, a swordsman and a body on the ground
+// each read at a glance instead of merging into one mass.)
+const COL = 2.75;
+const FRONT = 1.3;    // depth of each duellist from the seam (gap = 2x)
+const SECOND = 4.3;   // depth of the second rank
+const THIRD = 6.5;    // depth of the reserve
 const HERO_RING = (a, d) => Math.abs(a) < 2.0 && Math.abs(d) < 1.4;
 // the two ends of the line belong to the giants (minotaur vs cyclops)
 const END = 14;
@@ -62,20 +65,21 @@ function army(game, owner, side, cx, cz, ranks) {
   // second rank: a full pace behind the fighters, half a file over, holding
   // (shields up, spears ready; they do not step into the duels)
   for (let a = -END + 1.7 + COL / 2; a < END - 2.2; a += COL) {
-    if (rng.chance(0.15)) continue;
+    if (rng.chance(0.3)) continue;
     const aa = a + rng.range(-0.2, 0.2);
     if (Math.abs(aa) < 2.2) continue;
     const dd = SECOND + rng.range(-0.15, 0.3);
     const u = at('hoplite', aa, dd);
     u.combat_leash = 0.2;
+    u.units_kit = rng.chance(0.3) ? 1 : 0;
     u.combat_line = { cx, cz, nx: S * side, nz: S * side, d0: SECOND - 0.3 };
-    u.maxHp *= 3; u.hp = u.maxHp * rng.range(0.75, 1);
+    u.maxHp *= 3; u.hp = u.maxHp;
     units.second.push(u);
     ranks.push([aa * side, dd * side]);
   }
   // third rank: a loose reserve standing ready behind the second
-  for (let i = 0; i < 9; i++) {
-    const a = (i - 4) * 2.9 + rng.range(-0.4, 0.4);
+  for (let i = 0; i < 8; i++) {
+    const a = (i - 3.5) * 3.3 + rng.range(-0.4, 0.4);
     const d = THIRD + rng.range(-0.2, 0.8);
     const u = at('hoplite', a, d);
     u.combat_leash = 0.2;
@@ -86,10 +90,10 @@ function army(game, owner, side, cx, cz, ranks) {
   // archers in two loose knots, duelling the enemy archers over the melee
   for (let i = 0; i < 8; i++) {
     const knot = i < 4 ? -7.5 : 5.5;
-    const u = at('toxotes', knot + (i % 4 - 1.5) * 1.5 + rng.range(-0.4, 0.4), 7.4 + Math.floor((i % 4) / 2) * 1.3 + rng.range(-0.4, 0.4));
-    u.combat_reach = 13;
+    const u = at('toxotes', knot + (i % 4 - 1.5) * 1.8 + rng.range(-0.4, 0.4), 8.2 + Math.floor((i % 4) / 2) * 1.4 + rng.range(-0.4, 0.4));
+    u.combat_reach = 16;
     u.combat_leash = 0.5;
-    u.maxHp *= 4; u.hp = u.maxHp * rng.range(0.8, 1);
+    u.maxHp *= 4; u.hp = u.maxHp;
   }
   // cavalry wing on the (screen-right) flank, riding at the enemy riders
   for (let i = 0; i < 4; i++) {
@@ -100,7 +104,7 @@ function army(game, owner, side, cx, cz, ranks) {
   at('minotaur', -END, 1.2).combat_leash = 2;
   // the rear ranks take the enemy archers' volleys for the whole
   // fast-forward: scene-only hardiness so they still stand
-  for (const u of units.reserve) { u.maxHp *= 3; u.hp = u.maxHp * rng.range(0.7, 1); }
+  for (const u of units.reserve) { u.maxHp *= 3; u.hp = u.maxHp; }
   for (const list of [units.hoplite, units.minotaur, units.toxotes]) for (const u of list) u.attackCd = rng.range(0, u.def.attack.cooldown);
   for (const u of units.minotaur) u.hp = u.maxHp * rng.range(0.6, 0.9);
   return units;
@@ -122,6 +126,9 @@ function duels(game, cx, cz, slots) {
       const lat = a + side * skew + rng.range(-0.1, 0.1);
       const [x, z] = P(cx, cz, lat, o + side * FRONT);
       const u = place(game, 'hoplite', owner, x, z, side > 0 ? -3 * Math.PI / 4 : Math.PI / 4);
+      // one man of each pair a spearman, the other a swordsman with the
+      // tall shield (which side has which alternates along the line)
+      u.units_kit = (k + (side > 0 ? 0 : 1)) % 2;
       // champions: still on their feet, trading blows, when the frame is
       // taken (scene-only hardiness), visibly hurt
       // (a few badly hurt, the rest fresh: only the hurt show health bars)
@@ -130,7 +137,7 @@ function duels(game, cx, cz, slots) {
       u.combat_leash = 2.2;
       // spear's length: they fight across the seam without closing into
       // one another, and never step past their own side of it
-      u.combat_reach = 0.85;
+      u.combat_reach = 1.25;
       u.combat_line = { cx, cz, nx: S * side, nz: S * side, d0: side * o + FRONT - 0.08 };
       u.attackCd = rng.range(0, u.def.attack.cooldown);
       pair.push(u);
@@ -160,8 +167,8 @@ function fallen(game, cx, cz, taken) {
   for (let k = 0; k < 600 && n < 10; k++) {
     // the dead lie just behind the duel line, on their own side of it,
     // between the duellists and the second rank
-    const a = rng.range(-END + 1, END - 1), d = (rng.chance(0.5) ? 1 : -1) * rng.range(2.0, 2.7);
-    if (HERO_RING(a, d) || !clear(a, d, 1.15)) continue;
+    const a = rng.range(-END + 1, END - 1), d = (rng.chance(0.5) ? 1 : -1) * rng.range(2.3, 3.2);
+    if (HERO_RING(a, d) || !clear(a, d, 1.35)) continue;
     const owner = d > 0 ? PLAYER : ENEMY;
     body(rng.chance(0.12) ? 'toxotes' : 'hoplite', owner, a, d);
     n++;
@@ -171,16 +178,16 @@ function fallen(game, cx, cz, taken) {
   body('hippikon', PLAYER, END + 2.5, -0.8);
   // loose gear in the trampled ground behind both fronts: shields, helmets,
   // spears and broken shafts dropped as the ranks pushed over them
-  for (let i = 0, got = 0; i < 120 && got < 12; i++) {
+  for (let i = 0, got = 0; i < 120 && got < 9; i++) {
     const a = rng.range(-END + 1, END - 1), d = (rng.chance(0.5) ? 1 : -1) * rng.range(1.6, 4.2);
     if (!clear(a, d, 0.75)) continue;
     got++;
     const [x, z] = P(cx, cz, a, d);
     const owner = d > 0 ? PLAYER : ENEMY;
     const k = rng.next();
-    if (k < 0.4) fx.debris.drop('shield', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(-0.1, 0.3), roll: rng.range(-0.1, 0.1), life: 60 });
-    else if (k < 0.6) fx.debris.drop('helmet', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(-0.5, 0.5), roll: rng.range(1.2, 1.7), lift: 0.12, life: 60 });
-    else fx.debris.drop(k < 0.85 ? 'spear' : 'stub', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(-0.05, 0.05), life: 60 });
+    if (k < 0.5) fx.debris.drop('shield', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(-0.1, 0.3), roll: rng.range(-0.1, 0.1), life: 60 });
+    else if (k < 0.8) fx.debris.drop('helmet', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(-0.5, 0.5), roll: rng.range(1.2, 1.7), lift: 0.12, life: 60 });
+    else fx.debris.drop(k < 0.9 ? 'spear' : 'stub', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(-0.05, 0.05), life: 60 });
   }
 }
 

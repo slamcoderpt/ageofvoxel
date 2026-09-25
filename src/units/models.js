@@ -456,6 +456,41 @@ function aspis(r = 6, RIM = BRONZE, device = 0) {
   return m;
 }
 
+// Short leaf-bladed sword (xiphos): grip at the origin, blade along +y. Two
+// voxels across so it reads as a blade, not a stick, from the RTS camera.
+function swordModel() {
+  const m = new VoxelModel();
+  m.box(0, -2, 0, 1, 3, 1, LEATHER).set(0, -3, 0, BRONZE);          // grip + pommel
+  m.box(-1, 1, 0, 3, 1, 1, BRONZE).box(0, 1, -1, 1, 1, 3, BRONZE);   // cross-guard
+  m.box(0, 2, 0, 1, 10, 1, STEEL).box(-1, 4, 0, 3, 5, 1, STEEL).box(0, 4, -1, 1, 5, 3, STEEL);
+  m.set(0, 12, 0, 0xe8ecef);
+  return m;
+}
+
+// Large oblong shield (thureos) for the swordsmen: a tall team-painted
+// board curved round the body, with a bronze rim, a pale spine and a boss,
+// so from above a swordsman is a long team-coloured slab, not a disc.
+function thureos() {
+  const m = new VoxelModel();
+  const W = 5, H = 8;
+  for (let y = -H; y <= H; y++)
+    for (let x = -W; x <= W; x++) {
+      // rounded corners
+      const cx = Math.max(0, Math.abs(x) - (W - 1.5)), cy = Math.max(0, Math.abs(y) - (H - 1.5));
+      if (cx * cx + cy * cy > 2.4) continue;
+      const z = -Math.round((x * x) / 14);           // curved round the body
+      const rim = Math.abs(x) === W || Math.abs(y) === H || cx * cx + cy * cy > 1.0;
+      let c = rim ? BRONZE(x, y, 0) : TEAM;
+      if (!rim && x === 0 && Math.abs(y) > 1) c = SHIELD_FACE(x, y, 3);   // spine
+      if (!rim && Math.abs(x) <= 1 && Math.abs(y) <= 1) c = BRONZE(x, y, 1); // boss
+      m.set(x, y, 1 + z, c);
+      m.set(x, y, z, rim ? BRONZE_DK : (x === 0 || y === 1) ? LEATHER_DK : WOOD);
+    }
+  m.set(0, 0, 2, BRONZE(0, 0, 2));
+  m.box(0, -1, -1, 1, 3, 1, LEATHER);
+  return m;
+}
+
 function bowModel() {
   const m = new VoxelModel();
   // a deep recurve arc, read as a bow from any angle
@@ -553,6 +588,7 @@ export function villagerRig() {
 // Per-soldier kit (helmet, cloak, shield device) as alternative parts that
 // share one animation channel; gearOf() in anim.js picks them per unit.
 const gearIs = (k, v) => (u) => gearOf(u)[k] === v;
+const spearGear = (k, v) => (u) => { const g = gearOf(u); return g.kit === 0 && g[k] === v; };
 export function hopliteRig() {
   const helm = (style, v) => ({ ...head(style), name: v ? `head${v}` : 'head', anim: 'head', show: gearIs('helm', v), portrait: !v });
   return [
@@ -560,9 +596,13 @@ export function hopliteRig() {
     helm('hoplite', 0), helm('hopCor', 1), helm('hopAttic', 2), helm('hopPilos', 3),
     part('cloakLong', cloakModel('long'), [4, 0, 2], [0, 0, 0], 'torso', { show: gearIs('cloak', 1), portrait: true }),
     part('cloakShort', cloakModel('short'), [4, 0, 2], [0, 0, 0], 'torso', { show: gearIs('cloak', 2) }),
-    part('weapon', spearModel(32), [0, 0, 0], HAND, 'armR'),
-    part('pennant', pennantModel(32), [0, 0, 0], HAND, 'armR', { anim: 'weapon', show: gearIs('pennant', 1), portrait: false }),
-    ...[0, 1, 2, 3].map((v) => part(v ? `shield${v}` : 'shield', aspis(6, BRONZE, v), [0, 0, 0], [1.5, -4, 3.2], 'armL', { anim: 'shield', show: gearIs('shield', v), portrait: !v })),
+    // spearmen: a long spear and a round aspis; swordsmen: a short blade
+    // and a tall oblong shield (gearOf(u).kit)
+    part('weapon', spearModel(34), [0, 0, 0], HAND, 'armR', { show: gearIs('kit', 0), portrait: true }),
+    part('pennant', pennantModel(34), [0, 0, 0], HAND, 'armR', { anim: 'weapon', show: spearGear('pennant', 1), portrait: false }),
+    part('sword', swordModel(), [0, 0, 0], HAND, 'armR', { anim: 'weapon', show: gearIs('kit', 1), portrait: false }),
+    ...[0, 1, 2, 3].map((v) => part(v ? `shield${v}` : 'shield', aspis(6, BRONZE, v), [0, 0, 0], [1.5, -4, 3.2], 'armL', { anim: 'shield', show: spearGear('shield', v), portrait: !v })),
+    part('thureos', thureos(), [0, 0, 0], [1.5, -3.5, 3.2], 'armL', { anim: 'shield', show: gearIs('kit', 1), portrait: false }),
   ];
 }
 

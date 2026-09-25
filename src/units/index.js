@@ -283,7 +283,7 @@ export class Units {
         const ro = o.radius || 0.3;
         // men of a battle line (BattleScene) stand shoulder to shoulder and
         // face to face with their foe, not at arm's length
-        const want = r + ro + (u.combat_line && o.combat_line ? 0.35 : SPREAD_GAP) * Math.min(r, ro);
+        const want = r + ro + (u.combat_line && o.combat_line ? 0.9 : SPREAD_GAP) * Math.min(r, ro);
         const dx = u.x - o.x, dz = u.z - o.z;
         const d2 = dx * dx + dz * dz;
         if (d2 >= want * want) return;
@@ -423,6 +423,8 @@ export class Units {
             this._root.multiply(this._tmp.makeTranslation(0, 0.26 * f, -0.12 * dir * f));
             this._root.multiply(this._tmp.makeRotationX(dir * (f * 1.5 - bounce)));
             this._root.multiply(this._tmp.makeRotationZ(side * 0.12 * f));
+            // pressed flat into the turf, lower than any man still standing
+            this._root.premultiply(this._tmp.makeTranslation(0, -y, 0)).premultiply(this._tmp.makeScale(1, 1 - 0.4 * f, 1)).premultiply(this._tmp.makeTranslation(0, y - 0.05 * f, 0));
           }
           this._root.premultiply(this._tmp.makeTranslation(0, -sink, 0));
         }
@@ -435,11 +437,13 @@ export class Units {
         // the dead lose their colour: team dye fades to grey-brown, the body darkens
         // the dead keep their army's colour, darkened (so a fallen man still
         // says whose he was) while the rest of him goes dull
-        const dk = u.dead ? Math.min(1, u.anim.dieT / 0.8) * 0.72 : 0;
+        const dk = u.dead ? Math.min(1, u.anim.dieT / 1.2) : 0;
         if (dk) {
-          // and half its saturation: a dull, dusty version of the dye
-          const l = this._c.r * 0.3 + this._c.g * 0.59 + this._c.b * 0.11, m = dk * 0.2;
-          this._c.setRGB(this._c.r + (l - this._c.r) * m, this._c.g + (l - this._c.g) * m, this._c.b + (l - this._c.b) * m).multiplyScalar(1 - dk * 0.35);
+          // the dead go to a dull grey-brown: the dye all but drained out
+          // (a trace of hue left, so a body still hints whose it was), so a
+          // corpse never reads as a live man in his army's colour
+          const m = dk * 0.85;
+          this._c.setRGB(this._c.r + (0.46 - this._c.r) * m, this._c.g + (0.4 - this._c.g) * m, this._c.b + (0.34 - this._c.b) * m).multiplyScalar(1 - dk * 0.3);
         }
         const ck = 1 - (u.gp_char || 0); // god power char (lightning-struck)
         const tr = this._c.r * ck, tg = this._c.g * ck, tb = this._c.b * ck;
@@ -466,7 +470,7 @@ export class Units {
           p.mesh.userData.flash.setX(i, flash);
           p.mesh.userData.fade.setX(i, fade);
           if (p.coat) p.mesh.setColorAt(i, this._c.setRGB(coat[0] * (1 - dk) * ck, coat[1] * (1 - dk) * ck, coat[2] * (1 - dk) * ck));
-          else p.mesh.setColorAt(i, this._c.setRGB((1 - dk * 0.3) * ck, (1 - dk * 0.34) * ck, (1 - dk * 0.38) * ck));
+          else p.mesh.setColorAt(i, this._c.setRGB((1 - dk * 0.42) * ck, (1 - dk * 0.47) * ck, (1 - dk * 0.52) * ck));
         }
       }
       for (const p of rig.parts) {

@@ -409,7 +409,7 @@ export class BattleFX {
       this.debris.drop('shield', x, z, { rot: r.range(0, 6.28), owner: e.owner, tilt: r.chance(0.3) ? r.range(0.2, 0.5) : r.range(-0.08, 0.08), roll: r.range(-0.1, 0.1), life });
     }
     // (a loose spear is rare: a field of sticks reads as clutter, not bodies)
-    if (cls !== 'archer' && r.chance(0.45)) {
+    if (cls !== 'archer' && r.chance(0.25)) {
       const [x, z] = at(r.range(0.3, 0.8), r.range(-0.4, 0.5));
       this.debris.drop(r.chance(0.3) ? 'stub' : 'spear', x, z, { rot: (e.rot || 0) + r.range(-1.2, 1.2), owner: e.owner, tilt: r.range(-0.05, 0.05), life });
     }
