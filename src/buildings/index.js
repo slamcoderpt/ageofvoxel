@@ -110,11 +110,13 @@ export class Buildings {
     return v;
   }
 
-  // Houses stand square to the street grid, door to the street (+z).
+  // Houses stand square to the street grid; the planned town sets each
+  // house's facing (bld_yaw), elsewhere it comes from a tile hash.
   houseYaw(b) {
     if (b.bld_yaw === undefined) {
-      // every house fronts its street square on, door toward the camera
-      b.bld_yaw = 0;
+      // most houses front their street square on; some turn a side to it
+      const h = hash3(b.tx, 23, b.tz, 94);
+      b.bld_yaw = h < 0.6 ? 0 : h < 0.82 ? Math.PI / 2 : -Math.PI / 2;
     }
     return b.bld_yaw;
   }

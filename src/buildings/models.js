@@ -575,7 +575,7 @@ export function townCenterModel(variant = 0, m = new VoxelModel()) {
 
 // House variants: variant % HOUSE_PLANS is the plan (silhouette),
 // floor(variant / HOUSE_PLANS) the roof tint; see houseModel.
-export const HOUSE_PLANS = 4;
+export const HOUSE_PLANS = 5;
 const OCHRE_PLASTER = (x, y, z) => { const h = hash3(x >> 1, y >> 1, z >> 1, 74); return h < 0.5 ? 0xd49a58 : h < 0.85 ? 0xca904f : 0xdca766; };
 const HOUSE_PLASTER = [WHITEWASH, OCHRE_PLASTER];
 const HOUSE_FILL = [0xf1ede4, 0xd29a5a];
@@ -606,6 +606,10 @@ const cleanTiles = (base) => ({ ...base, plane: { ...(base.plane || {}), missing
 const HOUSE_ROOFS = [
   cleanTiles({ ...TILES.warm, tones: [0xd9602c, 0xd25a2a, 0xdf6a33, 0xd65d2d], butt: 0x8a3a1e, ridge: 0xa4431f }),
   cleanTiles({ ...TILES.warmRed, tones: [0xc8522a, 0xc04c27, 0xcf5b31, 0xc44f29], butt: 0x7a321b, ridge: 0x94391c }),
+  // sun-faded paler orange
+  cleanTiles({ ...TILES.warm, tones: [0xe1804b, 0xda7845, 0xe68a55, 0xdd7c48], butt: 0x9a5030, ridge: 0xb05a34 }),
+  // older, deeper brick red
+  cleanTiles({ ...TILES.warmRed, tones: [0xb2523a, 0xa94c35, 0xba5a40, 0xae5038], butt: 0x6a2a1c, ridge: 0x82321f }),
 ];
 export const HOUSE_TINTS = HOUSE_ROOFS.length;
 
@@ -667,87 +671,207 @@ function gardenBed(m, x, z, w, d, seed = 0) {
   }
 }
 
-// A house is one clean stack, the same on every plan so a street reads at
-// RTS zoom: a pale stone footing one voxel proud, a stone plinth course,
-// flat near-white stucco walls, a single thin blue painted band under the
-// eave, and one continuous terracotta roof (gable or hip) with a single
-// ridge and a white fascia over a dark soffit that throws a crisp shadow.
-// The street face always has the dark door on the left and square window
-// openings to its right; the +x side has a window too. Plans differ only in
-// silhouette: a long gabled house, a two-storey hip-roofed house, a gable
-// end to the street, and an L of a gabled hall with a lower gabled wing.
+// Houses: five plans so a quarter reads as a lived-in town, not one asset
+// stamped over and over. Every plan shares the grammar (lime-washed walls
+// on a grey stone plinth course, terracotta roofs, dark doors and window
+// holes) but not the shape:
+//   0  courtyard house: an L of a back hall and a gable-ended street wing
+//      round a walled yard with a vine pergola, jars and a gate
+//   1  two-storey house with a timber balcony on posts over the door and a
+//      single-storey lean-to (shed roof) beside it, firewood stacked in front
+//   2  a pair of row houses sharing a party wall, different heights and
+//      roof tints; walls run to the plot edge so neighbouring row plots join
+//   3  row house with a flat-roofed annex: a parapet roof terrace with
+//      laundry drying on a line, pots along the edge
+//   4  cottage behind a walled front yard: vine pergola across its front,
+//      a fruit tree, storage jars
+// Plots are 12 x 12 voxels; the street (door) side is +z. Walls, windows
+// and doors exist on every face so a house can be turned to its street.
 const HOUSE_STUCCO = [
-  [(x, y, z) => (hash3(x >> 2, y >> 2, z >> 2, 141) < 0.72 ? 0xf5f1e9 : 0xeee9df), 0xf3efe7],
-  [(x, y, z) => (hash3(x >> 2, y >> 2, z >> 2, 142) < 0.72 ? 0xf2ece0 : 0xebe4d6), 0xf0eadd],
+  (x, y, z) => (hash3(x >> 2, y >> 2, z >> 2, 141) < 0.72 ? 0xf5f1e9 : 0xeee9df),
+  (x, y, z) => (hash3(x >> 2, y >> 2, z >> 2, 142) < 0.72 ? 0xf1eadc : 0xe9e1d1),
+  (x, y, z) => (hash3(x >> 2, y >> 2, z >> 2, 145) < 0.72 ? 0xeee0c4 : 0xe6d7b9),   // warm cream wash
 ];
+const HOUSE_GABLE = [0xf3efe7, 0xefe8da, 0xebdcc0];
 const HOUSE_PLINTH = (x, y, z) => (hash3(x >> 1, y, z >> 1, 143) < 0.5 ? 0xa39b8a : 0x978f7f);
-const HOUSE_FOOT = (x, y, z) => (hash3(x >> 1, y, z >> 1, 144) < 0.5 ? 0xb9b2a2 : 0xafa898);
 const HOUSE_DOOR = (x, y, z) => ((x + z) & 1 ? 0x3d2a1c : 0x352419);
+const HOUSE_DOOR_BLUE = (x, y, z) => ((x + z) & 1 ? 0x2f4c72 : 0x2a4467);
 const HOUSE_WIN = 0x1f1813;
+const YARD = (x, y, z) => pick(hash3(x, 0, z, 146), [0xb09572, 0xa68b68, 0xb99e7a, 0xa08564]);
+const YARD_WALL = (x, y, z) => (hash3(x >> 1, y, z >> 1, 147) < 0.6 ? 0xefe9de : 0xe5ded0);
+const COPING = (x, y, z) => ((x + z) % 3 === 0 ? 0xc0633a : 0xdcd5c4);
+const VINE = (x, y, z) => pick(hash3(x, y, z, 148), [0x4a7b36, 0x3f6a2c, 0x55863b, 0x5e8c3a]);
+const GRAPE = 0x5a2d52;
 
 export function houseModel(variant = 0, m = new VoxelModel()) {
   const plan = variant % HOUSE_PLANS, tint = Math.floor(variant / HOUSE_PLANS) % HOUSE_TINTS;
-  const [WALL, fill] = HOUSE_STUCCO[(plan + tint) & 1];
   const tiles = HOUSE_ROOFS[tint];
-  // footing (y 0, one voxel proud), plinth (y 1), stucco, blue band (top row)
-  const body = (x0, z0, w, d, h) => {
-    for (let x = x0 - 1; x <= x0 + w; x++) for (let z = z0 - 1; z <= z0 + d; z++) if (!m.has(x, 0, z)) m.set(x, 0, z, HOUSE_FOOT);
-    m.box(x0, 0, z0, w, 1, d, HOUSE_FOOT);
-    m.box(x0, 1, z0, w, h - 1, d, WALL);
-    m.box(x0, 1, z0, w, 1, d, HOUSE_PLINTH);
-    m.box(x0, h - 1, z0, w, 1, d, PAINT_BLUE);
+  const tiles2 = HOUSE_ROOFS[(tint + 1 + (plan & 1)) % HOUSE_TINTS];
+  const wash = (plan + tint) % 3;
+  // plinth course (y 0), plaster to h, optional painted band on the top row
+  const body = (x0, z0, w, d, h, { wall = HOUSE_STUCCO[wash], band = false } = {}) => {
+    m.box(x0, 0, z0, w, 1, d, HOUSE_PLINTH);
+    m.box(x0, 1, z0, w, h - 1, d, wall);
+    if (band) m.box(x0, h - 1, z0, w, 1, d, PAINT_BLUE);
     return h;
   };
-  // openings sunk one voxel into the wall; face '+z' at z = zf, '+x' at x = xf
+  // an opening sunk one voxel into the wall face
   const hole = (x, y, z, w, h, face, c) => {
     for (let a = 0; a < w; a++) for (let yy = y; yy < y + h; yy++) {
       if (face === '+z') { m.remove(x + a, yy, z); m.set(x + a, yy, z - 1, c); }
-      else { m.remove(x, yy, z + a); m.set(x - 1, yy, z + a, c); }
+      else if (face === '-z') { m.remove(x + a, yy, z); m.set(x + a, yy, z + 1, c); }
+      else if (face === '+x') { m.remove(x, yy, z + a); m.set(x - 1, yy, z + a, c); }
+      else { m.remove(x, yy, z + a); m.set(x + 1, yy, z + a, c); }
     }
   };
-  const door = (x, zf) => {
-    hole(x, 1, zf, 2, 4, '+z', HOUSE_DOOR);
+  const door = (x, zf, c = HOUSE_DOOR) => {
+    hole(x, 1, zf, 2, 4, '+z', c);
     m.box(x - 1, 5, zf, 4, 1, 1, MARBLE_SHADE);                 // stone lintel
     m.box(x, 0, zf + 1, 2, 1, 1, MARBLE);                       // threshold step
   };
-  const win = (x, y, zf) => hole(x, y, zf, 2, 2, '+z', HOUSE_WIN);
-  const sideWin = (xf, y, z) => hole(xf, y, z, 2, 2, '+x', HOUSE_WIN);
-  const gable = (o) => gableRoof(m, { ov: 1.2, ovG: 0.8, pitch: 0.5, tiles, fill, ...o });
-  const hip = (o) => hipRoof(m, { ov: 1.2, pitch: 0.5, tiles, ...o });
+  const win = (x, y, zf, face = '+z') => hole(x, y, zf, 2, 2, face, HOUSE_WIN);
+  // a window with painted board shutters folded back either side
+  const winS = (x, y, zf, sh) => {
+    win(x, y, zf);
+    for (let yy = y; yy < y + 2; yy++) { m.set(x - 1, yy, zf + 1, sh(yy)); m.set(x + 2, yy, zf + 1, sh(yy)); }
+  };
+  const gable = (o) => gableRoof(m, { ov: 1.1, ovG: 0.7, pitch: 0.5, tiles, fill: HOUSE_GABLE[wash], ...o });
+  const hip = (o) => hipRoof(m, { ov: 1.1, pitch: 0.5, tiles, ...o });
+  const yardWall = (x0, z0, x1, z1, h = 3, gate = null) => {
+    for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+      if (gate && x >= gate[0] && x <= gate[1] && z >= gate[2] && z <= gate[3]) continue;
+      m.set(x, 0, z, HOUSE_PLINTH);
+      for (let y = 1; y < h; y++) m.set(x, y, z, YARD_WALL);
+      m.set(x, h, z, COPING);
+    }
+  };
+  // timber pergola: posts at the corners of [x0,x1] x [z0,z1], beams and
+  // slats at y, a ragged vine canopy with a few grape clusters
+  const pergola = (x0, z0, x1, z1, y, seed) => {
+    for (const [px, pz] of [[x0, z1], [x1, z1]]) m.box(px, 0, pz, 1, y, 1, DARKWOOD);
+    for (let x = x0; x <= x1; x++) m.set(x, y, z1, DARKWOOD);
+    for (let x = x0; x <= x1; x += 2) for (let z = z0; z <= z1; z++) m.set(x, y, z, WOOD);
+    for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+      const h = hash3(x, seed, z, 149);
+      if (h < 0.62) m.set(x, y + 1, z, VINE);
+      if (h < 0.07 && z > z0) m.set(x, y - 1, z, GRAPE);
+    }
+  };
+  // laundry line between two posts, cloths hanging along it
+  const laundry = (x, y, z0, z1) => {
+    m.box(x, y, z0, 1, 4, 1, DARKWOOD); m.box(x, y, z1, 1, 4, 1, DARKWOOD);
+    for (let z = z0 + 1; z < z1; z++) {
+      m.set(x, y + 3, z, 0xcdb98a);
+      const c = CLOTH[Math.floor(hash3(x, z, variant, 150) * CLOTH.length)];
+      if (((z - z0) % 3) !== 0) { m.set(x, y + 2, z, c); if ((z & 1) === 0) m.set(x, y + 1, z, c); }
+    }
+  };
 
   if (plan === 0) {
-    // long single-storey house, ridge along the street
-    const top = body(1, 3, 10, 7, 8);
-    gable({ wx0: 1, wx1: 11, wz0: 3, wz1: 10, top, axis: 'x', seed: 11 + variant });
-    door(3, 9); win(6, 3, 9); win(8, 3, 9);
-    sideWin(10, 3, 5);
+    // back hall across the plot, gable-ended wing on the left to the street
+    const top = body(0, 0, 12, 5, 9);
+    gable({ wx0: 0, wx1: 12, wz0: 0, wz1: 5, top, axis: 'x', seed: 11 + variant });
+    const tw = body(0, 5, 5, 6, 8);
+    gable({ wx0: 0, wx1: 5, wz0: 5, wz1: 11, top: tw, axis: 'z', ovG: 0.5, seed: 12 + variant });
+    door(1, 10);
+    win(4, 3, 7, '+x');
+    win(0, 3, 6, '-x'); win(0, 4, 1, '-x'); win(4, 5, 0, '-z'); win(8, 5, 0, '-z');
+    // the yard: packed earth, a low wall with a gate on the street
+    for (let x = 5; x < 12; x++) for (let z = 5; z < 12; z++) m.set(x, 0, z, YARD);
+    yardWall(5, 11, 11, 11, 3, [7, 8, 11, 11]);
+    yardWall(11, 5, 11, 10, 3);
+    // the hall's yard front: a door, a window, a vine pergola off it
+    hole(8, 1, 4, 2, 4, '+z', HOUSE_DOOR);
+    win(5, 4, 4);
+    win(11, 4, 1, '+x');
+    pergola(5, 5, 10, 8, 5, variant);
+    pithos(m, 9, 1, 9, 0xb8683e); amphora(m, 10, 1, 10, 0xc47440); amphora(m, 6, 1, 10, 0xa65a34);
+    m.box(6, 1, 8, 1, 1, 2, 0xcfc7b4);                           // bench under the vine
+    potPlant(m, 3, 0, 11, variant);
     return m;
   }
   if (plan === 1) {
-    // two-storey house under a hip roof
-    const top = body(2, 2, 8, 8, 12);
-    hip({ wx0: 2, wx1: 10, wz0: 2, wz1: 10, top, seed: 21 + variant });
-    door(3, 9); win(7, 3, 9); win(3, 8, 9); win(7, 8, 9);
-    sideWin(9, 3, 5); sideWin(9, 8, 5);
+    // two storeys, hip roof; a balcony over the door on two posts
+    const top = body(0, 1, 8, 8, 13, { band: true });
+    hip({ wx0: 0, wx1: 8, wz0: 1, wz1: 9, top, seed: 21 + variant });
+    door(1, 8, tint & 1 ? HOUSE_DOOR_BLUE : HOUSE_DOOR);
+    win(5, 3, 8);
+    hole(2, 7, 8, 2, 4, '+z', HOUSE_DOOR);                      // door onto the balcony
+    win(5, 8, 8);
+    win(0, 3, 3, '-x'); win(0, 8, 5, '-x'); win(2, 8, 1, '-z'); win(5, 3, 1, '-z');
+    // balcony: plank floor with joist ends, a rail with turned balusters
+    m.box(0, 6, 9, 8, 1, 2, PLANK);
+    for (let x = 0; x < 8; x += 2) m.set(x, 6, 11, DARKWOOD);
+    for (let x = 0; x < 8; x++) { if ((x & 1) === 0) m.set(x, 7, 10, DARKWOOD); m.set(x, 8, 10, DARKWOOD); }
+    for (const x of [0, 7]) m.box(x, 0, 10, 1, 6, 1, DARKWOOD);
+    // a rug thrown over the rail, a pot on the balcony
+    const rug = CLOTH[1 + (variant % 3)];
+    m.box(4, 6, 11, 2, 3, 1, rug); m.box(4, 8, 10, 2, 1, 1, rug);
+    potPlant(m, 1, 7, 9, variant);
+    // lean-to on the right under a shed roof, its own door
+    const lt = body(8, 3, 4, 6, 6);
+    shedRoof(m, { wx0: 8, wx1: 12, wz0: 3, wz1: 9, top: lt, dir: '+x', pitch: 0.35, ov: 0.8, ovS: 0.4, tiles: tiles2, seed: 22 + variant, fill: HOUSE_GABLE[wash] });
+    hole(9, 1, 8, 2, 3, '+z', DARKWOOD);
+    win(11, 3, 5, '+x');
+    woodpile(m, 8, 0, 10, 4, 3, 2);
+    amphora(m, 3, 0, 10, 0xc47440);
     return m;
   }
   if (plan === 2) {
-    // gable end to the street, ridge running back
-    const top = body(2, 1, 7, 10, 9);
-    gable({ wx0: 2, wx1: 9, wz0: 1, wz1: 11, top, axis: 'z', seed: 31 + variant });
-    door(3, 10); win(6, 3, 10);
-    sideWin(8, 3, 3); sideWin(8, 3, 7);
+    // two narrow row houses sharing a party wall at x = 6, walls to the
+    // plot edges; the left one taller, the right under another roof tint
+    const ta = body(0, 1, 6, 10, 11, { band: true });
+    gable({ wx0: 0, wx1: 6, wz0: 1, wz1: 11, top: ta, axis: 'z', ovG: 0.6, ov: 0.25, seed: 31 + variant });
+    const tb = body(6, 2, 6, 9, 8, { wall: HOUSE_STUCCO[(wash + 1) % 3] });
+    gable({ wx0: 6, wx1: 12, wz0: 2, wz1: 11, top: tb, axis: 'x', ovG: 0.2, tiles: tiles2, fill: HOUSE_GABLE[(wash + 1) % 3], seed: 32 + variant });
+    door(1, 10);
+    winS(3, 7, 10, SHUTTERS[variant % 4]);
+    win(4, 3, 10);
+    door(9, 10, HOUSE_DOOR_BLUE);
+    win(7, 3, 10);
+    win(0, 6, 4, '-x'); win(11, 3, 5, '+x'); win(2, 6, 1, '-z'); win(8, 3, 2, '-z');
+    // doorsteps: a pot plant by one, a bench and a jar by the other
+    potPlant(m, 4, 0, 11, variant);
+    m.box(6, 0, 11, 2, 1, 1, 0xcfc7b4);
+    amphora(m, 11, 0, 11, 0xb8683e);
     return m;
   }
-  // L: a gabled hall along the back and a lower gabled wing on the right
-  // whose gable end faces the street
-  const top = body(0, 1, 11, 6, 9);
-  gable({ wx0: 0, wx1: 11, wz0: 1, wz1: 7, top, axis: 'x', seed: 41 + variant });
-  const tw = body(6, 7, 5, 4, 7);
-  gable({ wx0: 6, wx1: 11, wz0: 7, wz1: 11, top: tw, axis: 'z', ovG: 0.6, seed: 42 + variant });
-  door(1, 6); win(4, 3, 6);
-  win(7, 3, 10);
-  sideWin(10, 3, 2); sideWin(10, 3, 8);
+  if (plan === 3) {
+    // gable-ended row house with a flat-roofed annex: roof terrace with a
+    // parapet, laundry drying, pots along the edge
+    const ta = body(0, 0, 7, 11, 10);
+    gable({ wx0: 0, wx1: 7, wz0: 0, wz1: 11, top: ta, axis: 'z', ov: 0.3, ovG: 0.7, seed: 41 + variant });
+    const tb = body(7, 1, 5, 10, 7, { band: true });
+    m.box(7, tb, 1, 5, 1, 10, ROOFDECK);
+    for (let x = 7; x < 12; x++) { m.set(x, tb + 1, 1, YARD_WALL); m.set(x, tb + 1, 10, YARD_WALL); }
+    for (let z = 1; z < 11; z++) m.set(11, tb + 1, z, YARD_WALL);
+    laundry(9, tb + 1, 2, 9);
+    potPlant(m, 8, tb + 1, 9, variant); pithos(m, 7, tb + 1, 3, 0xa65a34);
+    door(1, 10);
+    winS(2, 6, 10, SHUTTERS[(variant + 1) % 4]);
+    win(4, 3, 10);
+    hole(8, 1, 10, 2, 4, '+z', HOUSE_DOOR_BLUE);
+    m.box(7, 5, 10, 4, 1, 1, MARBLE_SHADE);
+    win(11, 3, 4, '+x'); win(0, 3, 3, '-x'); win(0, 6, 7, '-x'); win(3, 3, 0, '-z');
+    m.box(10, 0, 11, 2, 1, 1, 0xcfc7b4);
+    amphora(m, 5, 0, 11, 0xc47440);
+    return m;
+  }
+  // cottage at the back of a walled front yard
+  const top = body(1, 0, 10, 6, 8, { band: true });
+  hip({ wx0: 1, wx1: 11, wz0: 0, wz1: 6, top, seed: 51 + variant });
+  door(3, 5, tint & 1 ? HOUSE_DOOR : HOUSE_DOOR_BLUE);
+  win(7, 3, 5);
+  win(10, 3, 2, '+x'); win(1, 3, 2, '-x'); win(5, 3, 0, '-z');
+  for (let x = 0; x < 12; x++) for (let z = 6; z < 12; z++) m.set(x, 0, z, YARD);
+  yardWall(0, 11, 11, 11, 2, [3, 4, 11, 11]);
+  yardWall(0, 6, 0, 10, 2);
+  yardWall(11, 6, 11, 10, 2);
+  pergola(1, 6, 6, 8, 5, variant + 3);
+  fruitTree(m, 8, 1, 9, variant);
+  pithos(m, 1, 1, 9, 0xb8683e);
+  m.box(6, 1, 6, 2, 1, 1, 0xcfc7b4);
+  woodpile(m, 9, 1, 6, 2, 2, 1);
   return m;
 }
 
