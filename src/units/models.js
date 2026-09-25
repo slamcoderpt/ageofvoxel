@@ -550,8 +550,8 @@ export function hopliteRig() {
     helm('hoplite', 0), helm('hopCor', 1), helm('hopAttic', 2), helm('hopPilos', 3),
     part('cloakLong', cloakModel('long'), [4, 0, 2], [0, 0, 0], 'torso', { show: gearIs('cloak', 1), portrait: true }),
     part('cloakShort', cloakModel('short'), [4, 0, 2], [0, 0, 0], 'torso', { show: gearIs('cloak', 2) }),
-    part('weapon', spearModel(34), [0, 0, 0], HAND, 'armR'),
-    part('pennant', pennantModel(34), [0, 0, 0], HAND, 'armR', { anim: 'weapon', show: gearIs('pennant', 1), portrait: false }),
+    part('weapon', spearModel(28), [0, 0, 0], HAND, 'armR'),
+    part('pennant', pennantModel(28), [0, 0, 0], HAND, 'armR', { anim: 'weapon', show: gearIs('pennant', 1), portrait: false }),
     ...[0, 1, 2, 3].map((v) => part(v ? `shield${v}` : 'shield', aspis(5, BRONZE, v), [0, 0, 0], [1.5, -4, 2.8], 'armL', { anim: 'shield', show: gearIs('shield', v), portrait: !v })),
   ];
 }

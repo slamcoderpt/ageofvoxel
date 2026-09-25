@@ -81,7 +81,7 @@ export class Overlays {
   resize(w, h) {
     const u = this.bars.material.uniforms;
     u.uResY.value = h;
-    u.uBarPx.value = Math.round(Math.min(15, Math.max(8, h / 1080 * 12)));
+    u.uBarPx.value = Math.round(Math.min(12, Math.max(6, h / 1080 * 8)));
   }
 
   render(alpha) {
@@ -132,9 +132,12 @@ export class Overlays {
       // giants as soon as they are scratched). Every bar sits the same
       // fixed distance above its man's head and is a fixed pixel size per
       // class, so the bars line up instead of wandering.
-      const struck = game.time - (u.combat_hitT ?? -99) < 3.5;
-      if (selected || hover === u.id || (struck && f < (big ? 0.97 : 0.75)))
-        addBar(u, x, game.map.heightAt(x, z) + game.units.heightOf(u) + 0.3, z, big ? 76 : u.def.class === 'cavalry' ? 54 : 44, 1);
+      // Bars are short (about a third of a man's width on screen at the
+      // battle zoom) and sit at one fixed height per unit type above the
+      // ground under the man, so a row of fighters gets a level row of bars.
+      const struck = game.time - (u.combat_hitT ?? -99) < 2.5;
+      if (selected || hover === u.id || (struck && f < (big ? 0.9 : 0.5)))
+        addBar(u, x, game.map.heightAt(u.x, u.z) + game.units.heightOf(u) + 0.25, z, big ? 38 : u.def.class === 'cavalry' ? 27 : 22, 1);
     }
     for (const b of game.entities.buildings()) {
       if (b.owner !== game.localPlayer && !game.fog.isExplored(b.x, b.z)) continue;

@@ -243,7 +243,9 @@ export class Units {
       let yaw = u.moving ? 0 : (uhash(u, 8) < 0.5 ? -1 : 1) * (0.087 + uhash(u, 4) * 0.175) * 1.15;
       if (!u.moving && u.order?.type === 'attack' && !u.def.attack?.projectile && !u.def.myth) {
         const n = Math.floor(a.t / (2.2 + uhash(u, 63) * 1.6) + uhash(u, 64) * 7);
-        yaw = (uhash(u, 65 + n) - 0.5) * 2 * 0.52;
+        // (but never so far off that the spear stops pointing at the man
+        // he is fighting)
+        yaw = (uhash(u, 65 + n) - 0.5) * 2 * 0.14;
       }
       const k = Math.min(1, dt * PRESS_RATE);
       u.units_press = (u.units_press || 0) + (press - (u.units_press || 0)) * k;
@@ -419,14 +421,18 @@ export class Units {
         // the dead lose their colour: team dye fades to grey-brown, the body darkens
         // the dead keep their army's colour, darkened (so a fallen man still
         // says whose he was) while the rest of him goes dull
-        const dk = u.dead ? Math.min(1, u.anim.dieT / 0.8) * 0.5 : 0;
+        const dk = u.dead ? Math.min(1, u.anim.dieT / 0.8) * 0.72 : 0;
         if (dk) {
           // and half its saturation: a dull, dusty version of the dye
           const l = this._c.r * 0.3 + this._c.g * 0.59 + this._c.b * 0.11, m = dk * 1.1;
           this._c.setRGB(this._c.r + (l - this._c.r) * m, this._c.g + (l - this._c.g) * m, this._c.b + (l - this._c.b) * m).multiplyScalar(1 - dk * 0.9);
         }
-        const tr = this._c.r, tg = this._c.g, tb = this._c.b;
-        const flash = u.dead ? 0 : Math.min(1, u.flashT / 0.1) * 0.07;
+        const ck = 1 - (u.gp_char || 0); // god power char (lightning-struck)
+        const tr = this._c.r * ck, tg = this._c.g * ck, tb = this._c.b * ck;
+        // a hard white flash on the frame (or two) a blow lands, then a faint
+        // afterglow while flashT runs out
+        const pop = !u.dead && (u.units_hitT ?? 9) < 0.07 && u.flashT > 0 ? 0.16 : 0;
+        const flash = Math.max(pop, u.dead ? 0 : Math.min(1, u.flashT / 0.1) * 0.07, u.gp_hit || 0);
         const fade = u.dead ? 1 - Math.min(1, Math.max(0, (u.anim.dieT - FADE_START) / (CORPSE_TIME - 0.3 - FADE_START))) : 1;
         for (let pi = 0; pi < rig.parts.length; pi++) {
           const p = rig.parts[pi];
@@ -442,8 +448,8 @@ export class Units {
           p.mesh.userData.team.setXYZ(i, tr, tg, tb);
           p.mesh.userData.flash.setX(i, flash);
           p.mesh.userData.fade.setX(i, fade);
-          if (p.coat) p.mesh.setColorAt(i, this._c.setRGB(coat[0] * (1 - dk), coat[1] * (1 - dk), coat[2] * (1 - dk)));
-          else p.mesh.setColorAt(i, this._c.setRGB(1 - dk * 0.6, 1 - dk * 0.64, 1 - dk * 0.68));
+          if (p.coat) p.mesh.setColorAt(i, this._c.setRGB(coat[0] * (1 - dk) * ck, coat[1] * (1 - dk) * ck, coat[2] * (1 - dk) * ck));
+          else p.mesh.setColorAt(i, this._c.setRGB((1 - dk * 0.6) * ck, (1 - dk * 0.64) * ck, (1 - dk * 0.68) * ck));
         }
       }
       for (const p of rig.parts) {
