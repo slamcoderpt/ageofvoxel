@@ -12,7 +12,7 @@ import { fieldHeroesAndMyth, engageHeroesAndMyth } from '../units/battleHost.js'
 const S = Math.SQRT1_2;
 // half the gap between the two shield walls (centre to centre), in tiles:
 // the walls hold well back and leave a strip of churned no-man's-land
-const SEAM = 2.7;
+const SEAM = 3.2;
 // Single combats fought out in the open strip, staggered along the front:
 // [a along the front, depth shift of the pair towards blue (+) or red (-)].
 const DUELS = [[-8.3, 0.35], [-5.8, -0.3], [-3.5, 0.15], [3.6, -0.35], [6.0, 0.3], [8.5, -0.1]];
@@ -99,9 +99,13 @@ function army(game, owner, side, cx, cz) {
 // duels are fought: men of both armies lying where they fell (rolled on their
 // side, shields and spears dropped beside them), plus the bodies in the empty
 // slots of the ranks and loose gear in the churned earth.
-function fallen(game, units, owner, side, cx, cz) {
+function fallen(game, units, owner, side, cx, cz, taken) {
   const rng = game.rng, fx = game.combat.fx;
+  // every body gets its own patch of ground: bodies never pile on each
+  // other or under a pair still fighting, so each reads as a fallen man
+  const clear = (a, d) => taken.every(([ta, td]) => Math.hypot(ta - a, (td - d) * 1.4) > 1.9);
   const body = (type, a, d) => {
+    taken.push([a * side, d * side]);
     const [x, z] = P(cx, cz, a * side, d * side);
     const u = place(game, type, owner, x, z, rng.range(0, Math.PI * 2));
     game.combat.kill(u);
@@ -109,26 +113,25 @@ function fallen(game, units, owner, side, cx, cz) {
     return u;
   };
   // in the strip, between the duels (never under a pair still fighting)
-  const free = (a) => Math.abs(a) > 2.4 && DUELS.every(([da]) => Math.abs(da * side - a) > 1.1) && Math.abs(a) < 10.2;
+  const free = (a) => Math.abs(a) > 2.4 && DUELS.every(([da]) => Math.abs(da * side - a) > 1.2) && Math.abs(a) < 10.2;
   let n = 0;
-  for (let k = 0; k < 40 && n < 6; k++) {
-    const a = rng.range(-10, 10);
-    if (!free(a)) continue;
+  for (let k = 0; k < 60 && n < 5; k++) {
+    const a = rng.range(-10, 10), d = rng.range(-1.4, 1.2);
+    if (!free(a) || !clear(a * side, d * side)) continue;
     // mostly on the enemy's half: they fell pressing forward
-    body('hoplite', a, rng.range(-1.6, 0.9));
+    body('hoplite', a, d);
     n++;
   }
-  for (const [a, d] of units.gaps) body('hoplite', a + rng.range(-0.2, 0.2), d + rng.range(-0.2, 0.3));
+  // a man or two down in the empty slots of the front rank
+  for (const [a, d] of units.gaps) if (clear(a * side, (d + 1) * side)) body('hoplite', a, d + 1);
   // a rider cut down where the cavalry wings met
   body('hippikon', side * rng.range(16, 18), rng.range(3, 5));
-  // loose gear in the strip between the lines
-  for (let i = 0; i < 10; i++) {
+  // a little loose gear in the strip between the lines
+  for (let i = 0; i < 5; i++) {
     const [x, z] = P(cx, cz, (rng.chance(0.5) ? 1 : -1) * rng.range(2.4, 10.5) * side, rng.range(-1.8, 1.8) * side);
     const k = rng.next();
-    if (k < 0.45) fx.debris.drop('shield', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(-0.1, 0.3), roll: rng.range(-0.1, 0.1), life: 60 });
-    else if (k < 0.65) fx.debris.drop('stub', x, z, { rot: rng.range(0, 6.28), owner, life: 60 });
-    else if (k < 0.8) fx.debris.drop('helmet', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(-0.5, 0.5), roll: rng.range(1.2, 1.7), lift: 0.12, life: 60 });
-    else fx.debris.drop('spear', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(0.9, 1.2), lift: 0.45, life: 60 });
+    if (k < 0.6) fx.debris.drop('shield', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(-0.1, 0.3), roll: rng.range(-0.1, 0.1), life: 60 });
+    else fx.debris.drop('helmet', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(-0.5, 0.5), roll: rng.range(1.2, 1.7), lift: 0.12, life: 60 });
   }
 }
 
@@ -137,11 +140,16 @@ function fallen(game, units, owner, side, cx, cz) {
 // of step, so every pair reads as its own fight (lunge, block, reel).
 function duels(game, cx, cz) {
   const rng = game.rng;
+  let k = 0;
   for (const [a, o] of DUELS) {
     const pair = [];
+    // the two men square up on a diagonal, not one straight behind the
+    // other: from the camera they stand side by side with daylight between
+    // them, and the lunge of each reads across the gap
+    const skew = (k++ % 2 ? 1 : -1) * 0.45;
     for (const side of [1, -1]) {
       const owner = side > 0 ? PLAYER : ENEMY;
-      const lat = a + rng.range(-0.15, 0.15);
+      const lat = a + side * skew + rng.range(-0.1, 0.1);
       const [x, z] = P(cx, cz, lat, o + side * 0.72);
       const u = place(game, 'hoplite', owner, x, z, side > 0 ? -3 * Math.PI / 4 : Math.PI / 4);
       // champions: they must still be on their feet, trading blows, when the
@@ -228,8 +236,10 @@ export const battleScene = {
     bp('temple', 19, -17.5);
     charge(blue, red);
     charge(red, blue);
-    fallen(game, blue, PLAYER, 1, cx, cz);
-    fallen(game, red, ENEMY, -1, cx, cz);
+    // keep bodies clear of the duels and the hero ring
+    const taken = [...DUELS.map(([a, o]) => [a, o]), [0, 0], [-10.8, 0], [10.8, 0]];
+    fallen(game, blue, PLAYER, 1, cx, cz, taken);
+    fallen(game, red, ENEMY, -1, cx, cz, taken);
     churn(game, cx, cz);
     duels(game, cx, cz);
     engageHeroesAndMyth(game, myth);
@@ -252,12 +262,14 @@ export const battleScene = {
   // at a time, up to a second and a half, until several duellists are
   // mid-hit (white flash, chips and sparks in the air).
   after(game) {
+    // count the fresh melee hit flashes (the big sprites) still bright
+    const fx = game.combat.fx;
     const hot = () => {
       let n = 0;
-      for (const u of game.entities.units()) if (!u.dead && u.flashT > 0.1 && u.def.class === 'infantry') n++;
+      for (let i = 0; i < fx.sN; i++) if (fx.sBase[i] >= 1.8 && fx.sLife[i] > fx.sMax[i] * 0.45) n++;
       return n;
     };
-    for (let i = 0; i < 45 && hot() < 3; i++) game.fastForward(1 / 30);
+    for (let i = 0; i < 75 && hot() < 4; i++) game.fastForward(1 / 30);
   },
   camera: { x: 64.2, z: 63.4, distance: 41, pitch: 54 },
 };

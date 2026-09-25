@@ -14,9 +14,10 @@ import { pose, uhash } from './anim.js';
 // u.anim.want = 'gather' | 'build' | 'attack' | 'worship'. Walking and dying
 // are derived automatically. Combat sets u.anim.attackT (seconds since the
 // last strike) and u.flashT (hit flash).
-const CORPSE_TIME = 6;
-const DEAD_TEAM = new THREE.Color(0x4a4640); // corpse dye: the dead carry no team colour
-const FADE_START = 3.4;   // corpses dither out between FADE_START and CORPSE_TIME
+// The dead lie where they fell for the rest of the fight (Retold leaves
+// bodies on the field a long while), then dither out.
+const CORPSE_TIME = 26;
+const FADE_START = 22.5;  // corpses dither out between FADE_START and CORPSE_TIME
 // Local avoidance for units standing their ground (fighting, idle soldiers):
 // keep about half a body-width of air between neighbours so a melee line
 // reads as separate figures rather than one interpenetrating blob.
@@ -387,17 +388,28 @@ export class Units {
             const side = u.id % 2 ? 1 : -1;
             this._root.multiply(this._tmp.makeTranslation(0, f * 0.3, 0));
             this._root.multiply(this._tmp.makeRotationZ(side * f * Math.PI / 2 * 0.92));
-          } else {
+          } else if (rig.kind === 'beast') {
             // crumple: knees buckle (pose), then the body rolls onto its side
             // and settles curled up, so a corpse keeps a 3D figure silhouette
             const k = Math.min(1, Math.max(0, (dt0 - 0.22) / 0.5));
             const f = k * k * (3 - 2 * k);
             const side = u.id % 2 ? 1 : -1;
             const bounce = dt0 > 0.72 && dt0 < 0.92 ? Math.sin((dt0 - 0.72) / 0.2 * Math.PI) * 0.05 : 0;
-            const lift = (rig.kind === 'beast' ? 0.45 : 0.24) * f;
-            this._root.multiply(this._tmp.makeTranslation(side * 0.1 * f, lift, 0.12 * f));
+            this._root.multiply(this._tmp.makeTranslation(side * 0.1 * f, 0.45 * f, 0.12 * f));
             this._root.multiply(this._tmp.makeRotationZ(side * (f * 1.42 - bounce)));
             this._root.multiply(this._tmp.makeRotationX(0.3 * f));
+          } else {
+            // a man goes over full length, most onto their backs (thrown by
+            // the blow), some pitched forward on their faces, and lies flat,
+            // with a small bounce as he hits the ground
+            const k = Math.min(1, Math.max(0, (dt0 - 0.18) / 0.5));
+            const f = k * k;
+            const dir = uhash(u, 70) < 0.3 ? 1 : -1;
+            const side = u.id % 2 ? 1 : -1;
+            const bounce = dt0 > 0.68 && dt0 < 0.9 ? Math.sin((dt0 - 0.68) / 0.22 * Math.PI) * 0.08 : 0;
+            this._root.multiply(this._tmp.makeTranslation(0, 0.26 * f, -0.12 * dir * f));
+            this._root.multiply(this._tmp.makeRotationX(dir * (f * 1.5 - bounce)));
+            this._root.multiply(this._tmp.makeRotationZ(side * 0.12 * f));
           }
           this._root.premultiply(this._tmp.makeTranslation(0, -sink, 0));
         }
@@ -405,10 +417,12 @@ export class Units {
         const coat = COATS[u.id % COATS.length];
         this._c.setHex(pc);
         // the dead lose their colour: team dye fades to grey-brown, the body darkens
+        // the dead keep their army's colour, darkened (so a fallen man still
+        // says whose he was) while the rest of him goes dull
         const dk = u.dead ? Math.min(1, u.anim.dieT / 0.8) * 0.5 : 0;
-        if (dk) this._c.lerp(DEAD_TEAM, dk * 0.9); // the dead keep a dusty trace of their army's dye
+        if (dk) this._c.multiplyScalar(1 - dk * 1.1);
         const tr = this._c.r, tg = this._c.g, tb = this._c.b;
-        const flash = u.dead ? 0 : Math.min(1, u.flashT / 0.1) * 0.14;
+        const flash = u.dead ? 0 : Math.min(1, u.flashT / 0.1) * 0.07;
         const fade = u.dead ? 1 - Math.min(1, Math.max(0, (u.anim.dieT - FADE_START) / (CORPSE_TIME - 0.3 - FADE_START))) : 1;
         for (let pi = 0; pi < rig.parts.length; pi++) {
           const p = rig.parts[pi];
@@ -442,7 +456,7 @@ export class Units {
 
   // Unit height in world units (for health bars etc.)
   heightOf(u) {
-    return { villager: 2.0, hoplite: 2.25, toxotes: 2.05, hippikon: 2.75, minotaur: 3.4, hero: 3.1, cyclops: 5.0, centaur: 2.9, medusa: 2.6 }[u.type] ?? 1.8;
+    return { villager: 2.0, hoplite: 2.25, toxotes: 2.05, hippikon: 2.75, minotaur: 3.4, hero: 3.7, cyclops: 5.0, centaur: 2.9, medusa: 2.6 }[u.type] ?? 1.8;
   }
 
   portraitObject(type, owner = 1) {

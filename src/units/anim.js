@@ -188,34 +188,37 @@ export function pose(kind, u, out) {
       set('armR', arm, 0.15, -0.2);
       set('weapon', 1.57 - arm - 0.1);
       set('armL', -1.3 + extend * 0.2, 0.6, 0.2);
-      set('torso', 0.25 + extend * 0.3 - wind * 0.1, 0.35 - extend * 0.6);
-      set('head', -0.2);
-      set('legL', -0.75); set('shinL', 0.55); set('legR', 0.5); set('shinR', 0.5);
-      bob = -2.0;
-      fwd = (hero ? 0.5 : 0.32) * extend - 0.1 * wind;
+      set('torso', 0.25 + extend * 0.5 - wind * 0.2, 0.35 - extend * 0.6 + wind * 0.3);
+      set('head', -0.2 - extend * 0.2);
+      set('legL', -0.75 - extend * 0.3); set('shinL', 0.55); set('legR', 0.5 + extend * 0.3); set('shinR', 0.5);
+      bob = -2.0 - extend * 0.6;
+      fwd = (hero ? 0.55 : 0.4) * extend - 0.14 * wind;
     } else if (hoplite && av === 2) {
       // shield punch, then a downward stab over the rim
       const bash = smooth((a - 0.45) / 0.25) * (1 - wind);
-      const arm = -2.6 - wind * 0.2 + extend * 0.4;
-      set('armR', arm, 0.1, -0.15);
+      const arm = -2.6 - wind * 0.45 + extend * 0.6;
+      set('armR', arm, 0.1, -0.15 - wind * 0.15);
       set('weapon', 1.57 + 0.45 - arm);
       set('armL', -1.2 - bash * 0.55, 0.45 - bash * 0.3, 0.15);
-      set('torso', 0.2 + extend * 0.3 + bash * 0.15, -0.1 + extend * 0.25);
+      set('torso', 0.2 + extend * 0.5 + bash * 0.2 - wind * 0.15, -0.1 + extend * 0.25);
       set('head', -0.1);
       set('legL', -0.6); set('shinL', 0.45); set('legR', 0.4); set('shinR', 0.4);
       bob = -1.5;
       fwd = (hero ? 0.45 : 0.25) * Math.max(extend, bash) - 0.05 * wind;
     } else if (hoplite) {
-      // overhand spear thrust behind the raised shield
-      const arm = -2.25 + wind * -0.25 + extend * 0.55;
-      set('armR', arm, 0.1, -0.12);
-      set('weapon', 1.57 + 0.18 - arm);
-      set('armL', -1.15, 0.45, 0.15);
-      set('torso', 0.08 + extend * 0.2 - wind * 0.08, -0.2 + extend * 0.3);
-      set('head', -0.05);
-      set('legL', -0.5); set('shinL', 0.35); set('legR', 0.35); set('shinR', 0.35);
-      bob = -1.2;
-      fwd = (hero ? 0.55 : 0.28) * extend - 0.08 * wind;
+      // overhand spear thrust: on the wind-up the spear arm is hauled right
+      // back over the head (shaft raised high behind the helmet, the body
+      // rocked back onto the rear foot); on the strike the whole man pitches
+      // forward and lunges a long pace, arm driven out and down
+      const arm = -2.2 - wind * 0.85 + extend * 0.75;
+      set('armR', arm, 0.1 - wind * 0.15, -0.12 - wind * 0.2);
+      set('weapon', 1.57 + 0.18 - arm + wind * 0.55);
+      set('armL', -1.15 + wind * 0.2, 0.45, 0.15 + wind * 0.15);
+      set('torso', 0.08 + extend * 0.5 - wind * 0.22, -0.2 + extend * 0.4 - wind * 0.25);
+      set('head', -0.05 - extend * 0.2 + wind * 0.1);
+      set('legL', -0.5 - extend * 0.35); set('shinL', 0.35); set('legR', 0.35 + extend * 0.3); set('shinR', 0.35);
+      bob = -1.2 - extend * 0.8;
+      fwd = (hero ? 0.6 : 0.42) * extend - 0.14 * wind;
     } else {
       // villager: axe/fists, overhead strike
       const arm = -1.0 - wind * 1.6 + extend * 0.8;
@@ -229,24 +232,41 @@ export function pose(kind, u, out) {
       add('legL', -0.3 * step); add('shinL', 0.2 * Math.max(0, step)); add('legR', 0.25 * step); add('shinR', 0.25 * Math.max(0, -step));
     }
   } else if (st === 'die') {
-    // crumple: recoil, knees buckle and the torso folds (0..0.3 s), then the
-    // body rolls onto its side (root, in index.js) and curls up: hips and
-    // knees drawn in, arms slack, head lolling; weapon arm flung out.
     const dT = an.dieT;
     const hit = smooth(dT / 0.1) * (1 - smooth((dT - 0.1) / 0.2));
     const buckle = smooth(dT / 0.32);
-    const curl = smooth((dT - 0.3) / 0.6);
     const side = u.id % 2 ? 1 : -1;
-    set('legL', -0.95 * buckle - 0.45 * curl, 0, 0.1 * curl); set('shinL', 1.55 * buckle + 0.35 * curl);
-    set('legR', -0.6 * buckle - 0.8 * curl, 0, -0.1 * curl); set('shinR', 1.35 * buckle + 0.5 * curl);
-    set('torso', -0.35 * hit + 0.45 * buckle + 0.25 * curl, 0.15 * side * curl, 0);
-    set('head', -0.3 * hit + 0.5 * buckle - 0.2 * curl, 0.35 * side * curl, -0.25 * side * curl);
-    set('armL', -0.9 * buckle - 0.5 * curl, 0, 0.25 + 0.5 * hit + 0.35 * curl);
-    set('armR', -0.4 * buckle - 1.4 * curl, 0, -0.3 - 0.6 * hit - 0.2 * curl);
-    set('weapon', 0.3 + 0.6 * curl);
-    set('shield', 0.4 * curl);
+    if (beast) {
+      // giants crumple: knees buckle, the torso folds, the body rolls onto
+      // its side (root, in index.js) and curls up
+      const curl = smooth((dT - 0.3) / 0.6);
+      set('legL', -0.95 * buckle - 0.45 * curl, 0, 0.1 * curl); set('shinL', 1.55 * buckle + 0.35 * curl);
+      set('legR', -0.6 * buckle - 0.8 * curl, 0, -0.1 * curl); set('shinR', 1.35 * buckle + 0.5 * curl);
+      set('torso', -0.35 * hit + 0.45 * buckle + 0.25 * curl, 0.15 * side * curl, 0);
+      set('head', -0.3 * hit + 0.5 * buckle - 0.2 * curl, 0.35 * side * curl, -0.25 * side * curl);
+      set('armL', -0.9 * buckle - 0.5 * curl, 0, 0.25 + 0.5 * hit + 0.35 * curl);
+      set('armR', -0.4 * buckle - 1.4 * curl, 0, -0.3 - 0.6 * hit - 0.2 * curl);
+      set('weapon', 0.3 + 0.6 * curl);
+      bob = -7 * buckle;
+    } else {
+      // a man cut down: thrown back by the blow, knees give, then he goes
+      // over full length (root, in index.js) and lies flat and spread on the
+      // ground, arms flung wide, legs apart, head rolled to one side, so from
+      // the RTS camera a body reads as a fallen figure, not a heap
+      const fall = smooth((dT - 0.18) / 0.5);
+      const up = 1 - fall;
+      const sp = 0.8 + uhash(u, 71) * 0.5;   // how wide the arms are flung
+      set('legL', -0.95 * buckle * up - 0.08 * fall, 0, 0.1 + 0.22 * fall); set('shinL', 1.55 * buckle * up + 0.2 * fall * uhash(u, 72));
+      set('legR', -0.6 * buckle * up + 0.1 * fall, 0, -0.1 - 0.28 * fall); set('shinR', 1.35 * buckle * up + 0.35 * fall * uhash(u, 73));
+      set('torso', -0.35 * hit + 0.45 * buckle * up, 0.12 * side * fall, 0);
+      set('head', -0.3 * hit + 0.5 * buckle * up, 0.75 * side * fall, 0.15 * side * fall);
+      set('armL', -0.9 * buckle * up - 0.35 * fall, 0, 0.25 + 0.5 * hit + 1.1 * sp * fall);
+      set('armR', -0.4 * buckle * up - 0.6 * fall * uhash(u, 74), 0, -0.3 - 0.6 * hit - 1.0 * sp * fall);
+      set('weapon', 0.3);
+      bob = -4.2 * buckle * up;
+    }
+    set('shield', 0);
     set('arrow', 0);
-    bob = beast ? -7 * buckle : -4.2 * buckle;
   } else {
     // idle: breathing, weight shift, glances
     const b = S(t * 1.7);
@@ -334,7 +354,7 @@ export function pose(kind, u, out) {
       add('torso', -0.5 * w * k); add('head', -0.55 * w * k);
       add('armR', 0.35 * w * k, 0, -0.55 * w * k); add('armL', 0, 0, 0.35 * w * k);
       mix('legR', 0.5 * k, 0, -0.05); mix('shinR', 0.4 * k); mix('legL', -0.25 * k);
-      fwd -= 0.24 * w * k;
+      fwd -= 0.34 * w * k;
     } else if (hv === 1) {
       // stagger: spun half round by the blow, the near knee giving way
       const sd = hr.side;
@@ -421,7 +441,7 @@ export function gearOf(u) {
   const h = uhash(u, 20), c = uhash(u, 21), s = uhash(u, 22);
   return (u.units_gear = {
     helm: h < 0.3 ? 0 : h < 0.58 ? 1 : h < 0.8 ? 2 : 3,
-    cloak: c < 0.45 ? 1 : c < 0.85 ? 2 : 0,
+    cloak: c < 0.18 ? 1 : c < 0.55 ? 2 : 0,
     shield: s < 0.25 ? 0 : s < 0.45 ? 1 : s < 0.8 ? 2 : 3,
     hat: h < 0.4 ? 0 : h < 0.72 ? 1 : 2,
     pennant: uhash(u, 23) < 0.22 ? 1 : 0,

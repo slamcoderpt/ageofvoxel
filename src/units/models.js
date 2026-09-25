@@ -135,7 +135,7 @@ function torsoModel(style, cloak = true) {
     // team chiton skirt showing under leather pteryges strips
     // leather and linen strips all round, with a team tunic panel showing
     // down the middle front and back (and a team hem under the strips)
-    const strip = (i) => (i % 3 === 1 ? LEATHER : TEAM);
+    const strip = (i) => (i % 2 === 1 ? LEATHER : TEAM);
     for (let x = 0; x < 8; x++) for (const z of [-1, 4]) m.box(x, -4, z, 1, 4, 1, strip(x));
     for (let z = 0; z < 4; z++) { m.box(-1, -4, z, 1, 4, 1, strip(z + 1)); m.box(8, -4, z, 1, 4, 1, strip(z)); }
     m.box(0, 0, 0, 8, 1, 4, BRONZE_DK);
@@ -150,10 +150,10 @@ function torsoModel(style, cloak = true) {
       m.box(0, 8, -1, 8, 1, 3, TEAM);                                      // mantle over the shoulders
       m.box(1, 1, -1, 6, 7, 1, TEAM);                                      // cloak hanging down the back
       // skirt of the cloak in vertical folds (alternating depth catches AO)
-      const bot = long ? -8 : -4;
+      const bot = long ? -6 : -4;
       for (let x = long ? -1 : 0; x <= (long ? 8 : 7); x++) {
         const deep = x % 2 === 0;
-        m.box(x, bot, deep ? -2 : -3, 1, 2 - bot, 1, TEAM);
+        if (deep) m.box(x, bot, -2, 1, 2 - bot, 1, TEAM); else tbox(m, x, bot, -3, 1, 2 - bot, 1, TEAM_SHADE);
         m.set(x, bot - 1, deep ? -2 : -3, long ? GOLD(x, bot, 0) : TEAM_TRIM);
       }
       if (long) for (let y = bot; y <= 8; y += 2) { m.set(-1, Math.min(y, 1), -2, GOLD(0, y, 1)); m.set(8, Math.min(y, 1), -2, GOLD(1, y, 1)); m.set(1, y, -1, GOLD(2, y, 1)); m.set(6, y, -1, GOLD(3, y, 1)); }
@@ -215,11 +215,13 @@ function cloakModel(kind) {
   } else {
     // short chlamys swept off the left shoulder, hem slanting across the
     // back, undyed with a team edge
+    // (undyed wool, so a rank seen from behind is a mix of bronze backs,
+    // pale cloaks and dyed ones, not a carpet of team paint)
     m.box(0, 8, -1, 6, 1, 3, TEAM);
     for (let x = 0; x <= 7; x++) {
       const bot = 3 + Math.round(x * 0.45);
-      if (x % 2) tbox(m, x, bot, -2, 1, 8 - bot, 1, TEAM_SHADE); else m.box(x, bot, -1, 1, 8 - bot, 1, TEAM);
-      m.set(x, bot - 1, x % 2 ? -2 : -1, TEAM_TRIM);
+      for (let y = bot; y < 8; y++) m.set(x, y, x % 2 ? -2 : -1, x % 2 ? 0xb4a482 : WOOL(x, y, 0));
+      m.set(x, bot - 1, x % 2 ? -2 : -1, TEAM);
     }
     m.set(7, 8, 3, BRONZE(7, 8, 3)).set(7, 8, 4, BRONZE(7, 8, 4)); // brooch
   }

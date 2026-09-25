@@ -313,9 +313,12 @@ export class BattleFX {
       const big = attacker?.def?.myth || attacker?.def?.hero || target.def?.myth || target.def?.hero;
       const landed = big || r.next() < 0.7;
       if (landed) {
-        const s = big ? 2.4 : 1.35;
-        this.spark(px, y, pz, { count: 1, color: 0xffb050, bright: big ? 2.0 : 1.6, size: s * r.range(0.9, 1.1), life: big ? 0.6 : 0.5, speed: 0, up: 0, gravity: 0 });
-        this.spark(px, y, pz, { count: big ? 6 : r.int(3, 4), color: r.chance(0.5) ? 0xff8a20 : 0xffc048, bright: 2.0, size: big ? 0.7 : 0.5, life: 0.6, speed: r.range(3, 4.5), up: 2.6 });
+        // the blow lands: a big white-yellow flash at the point of contact
+        // (white-hot core, warm halo) with a hot outer bloom, and a spray of
+        // sparks, so from RTS height you see who struck whom
+        const s = big ? 3.3 : 2.6;
+        this.spark(px, y, pz, { count: 1, color: 0xffeeb0, bright: big ? 1.8 : 1.9, size: s * r.range(0.9, 1.1), life: big ? 0.6 : 0.5, speed: 0, up: 0, gravity: 0 });
+        this.spark(px, y, pz, { count: big ? 8 : r.int(5, 6), color: r.chance(0.5) ? 0xffd070 : 0xfff0b0, bright: 2.2, size: big ? 0.8 : 0.6, life: 0.65, speed: r.range(3.5, 5), up: 2.8 });
       }
       // voxel chips: chunky solid cubes that tumble out and drop
       const team = game.players?.[target.owner]?.color ?? 0x888888;
@@ -327,8 +330,12 @@ export class BattleFX {
         game.fx.emit({ x: px, y: y - 0.1, z: pz, count: r.int(4, 6), color: 0x7a0e08, colorVar: 0.2, size: 0.15, life: 0.55, speed: 2.0, up: 2.0, gravity: -12, spread: 0.1 });
         this.scar(x + r.range(-0.3, 0.3), z + r.range(-0.3, 0.3), 0.35, 0.1, 0.5);
       }
-      // feet scrabbling: a puff of dust at the feet and a clod or two of earth
-      this.puff(px + r.range(-0.3, 0.3), pz + r.range(-0.3, 0.3), { count: big ? 3 : 1, size: r.range(1.0, 1.4) * (big ? 1.4 : 1), life: 1.7, alpha: 0.34, speed: 0.6, up: 0.08, y: 0.1, spread: 0.3, color: OCHRE[r.int(0, OCHRE.length - 1)] });
+      // feet scrabbling: the man struck is driven back a step and kicks up a
+      // short puff of pale dust from the dirt round his feet (lighter than
+      // the trampled earth so it reads against it), plus a clod or two
+      const bx = attacker ? x - (attacker.x - x) * 0.15 : x, bz = attacker ? z - (attacker.z - z) * 0.15 : z;
+      this.puff(bx, bz, { count: big ? 4 : 2, size: r.range(1.1, 1.5) * (big ? 1.5 : 1), life: 1.4, alpha: 0.5, speed: 0.9, up: 0.25, y: 0.12, spread: 0.3, color: r.chance(0.5) ? 0xb39472 : 0xa4855f });
+      this.puff(px, pz, { count: 1, size: r.range(1.0, 1.4) * (big ? 1.4 : 1), life: 1.7, alpha: 0.3, speed: 0.6, up: 0.08, y: 0.1, spread: 0.3, color: OCHRE[r.int(0, OCHRE.length - 1)] });
       game.fx.emit({ x: px, y: gy + 0.15, z: pz, count: r.int(2, 4), color: 0x4e3620, colorVar: 0.2, size: 0.15, life: 0.55, speed: 2.0, up: 2.8, gravity: -14, spread: 0.25 });
       this.scar(px, pz, 0.5, 0.3, 0.0);
     } else if (kind === 'arrow') {

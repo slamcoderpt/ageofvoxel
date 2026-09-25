@@ -35,7 +35,7 @@ export class Overlays {
           vec3 up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
           vec4 mv = viewMatrix * vec4(aPos, 1.0);
           float wpp = -mv.z / (projectionMatrix[1][1] * uResY * 0.5); // world units per pixel
-          float w = max(aInfo.y, wpp * 30.0);
+          float w = aInfo.z > 0.5 ? wpp * aInfo.y : max(aInfo.y, wpp * 30.0);
           float h = wpp * uBarPx;
           vPx = vec2(w / wpp, uBarPx);
           vec3 p = aPos + right * position.x * w + up * position.y * h;
@@ -81,7 +81,7 @@ export class Overlays {
   resize(w, h) {
     const u = this.bars.material.uniforms;
     u.uResY.value = h;
-    u.uBarPx.value = Math.round(Math.min(11, Math.max(6, h / 1080 * 9)));
+    u.uBarPx.value = Math.round(Math.min(12, Math.max(7, h / 1080 * 10)));
   }
 
   render(alpha) {
@@ -89,15 +89,17 @@ export class Overlays {
     const sel = game.selection || new Set();
     const hover = game.hoverId;
     let n = 0, r = 0;
-    const addBar = (e, x, y, z, w) => {
+    const addBar = (e, x, y, z, w, px = 0) => {
       if (n >= MAX) return;
       this.aPos.setXYZ(n, x, y, z);
-      this.aInfo.setXYZW(n, Math.max(0, e.hp / e.maxHp), w, 0, 0);
+      this.aInfo.setXYZW(n, Math.max(0, e.hp / e.maxHp), w, px, 0);
       const f = e.hp / e.maxHp;
-      if (e.owner === game.localPlayer) this._c.setRGB(0.1, 0.95, 0.25);
-      else if (e.owner === 0) this._c.setRGB(0.9, 0.85, 0.6);
-      else this._c.setRGB(1.0, 0.12, 0.08);
-      if (f < 0.35 && e.owner === game.localPlayer) this._c.setRGB(1.0, 0.7, 0.05);
+      // the fill says how hurt the man is (green, amber, red), the same for
+      // both armies: team is already carried by the soldier under the bar
+      if (e.owner === 0) this._c.setRGB(0.9, 0.85, 0.6);
+      else if (f > 0.6) this._c.setRGB(0.25, 0.95, 0.2);
+      else if (f > 0.3) this._c.setRGB(1.0, 0.78, 0.1);
+      else this._c.setRGB(1.0, 0.18, 0.08);
       this.aCol.setXYZ(n, this._c.r, this._c.g, this._c.b);
       n++;
     };
@@ -126,9 +128,14 @@ export class Overlays {
       // is noise over the crowd).
       const f = u.hp / u.maxHp;
       const big = u.def.myth || u.def.hero;
-      const fighting = u.order?.type === 'attack' || game.time - (u.combat_hitT ?? -99) < 4;
-      if (selected || hover === u.id || (fighting && f < (big ? 0.97 : 0.9)))
-        addBar(u, x, game.map.heightAt(x, z) + game.units.heightOf(u) + 0.35, z, u.def.myth || u.def.hero ? 1.8 : u.def.class === 'cavalry' ? 1.2 : 1.0);
+      // Only the wounded who are in the thick of it: a man struck in the
+      // last few seconds and down to three quarters or less (heroes and
+      // giants as soon as they are scratched). Every bar sits the same
+      // fixed distance above its man's head and is a fixed pixel size per
+      // class, so the bars line up instead of wandering.
+      const struck = game.time - (u.combat_hitT ?? -99) < 3.5;
+      if (selected || hover === u.id || (struck && f < (big ? 0.97 : 0.75)))
+        addBar(u, x, game.map.heightAt(x, z) + game.units.heightOf(u) + 0.3, z, big ? 64 : u.def.class === 'cavalry' ? 46 : 36, 1);
     }
     for (const b of game.entities.buildings()) {
       if (b.owner !== game.localPlayer && !game.fog.isExplored(b.x, b.z)) continue;
