@@ -10,8 +10,11 @@ import { RNG, hash2 } from '../core/rng.js';
 //    impact glow sprite, expanding shockwave ring, pooled flash lights and
 //    scorch decals with cooling ember cracks.
 //  - Storm: multiplicative storm-shadow over the area (flash-lit), rain
-//    streaks, a glowing ground band and a wall of comet-like energy bands
-//    orbiting the perimeter, and intra-cloud lightning.
+//    streaks, a funnel with a dark semi-opaque cloud body and bright energy
+//    ribbons on its silhouette, a dust wall and a ground shockwave (flattened
+//    grass, scoured soil, rolling dust rings) at its foot, trails and rim
+//    light on the men it carries, a high violet-white light that pulses with
+//    each strike over the whole field, and intra-cloud lightning.
 //  - Zaps: little arcs crawling over struck units.
 //  - Meteor: falling fireball with a flame trail, warning ring, fire-orange
 //    impact flash/shockwave and a large glowing crater.
@@ -396,7 +399,7 @@ const PERIM_GLSL = `
       float fl = h1(si * 2.13 + floor(t * (9.0 + 8.0 * h1(si * 5.1))));
       float on = step(0.28, fl) * (0.55 + 0.45 * fl);
       float len = mix(0.7, 1.0, h1(si * 7.7));
-      float tap = smoothstep(0.0, 0.12, sf) * smoothstep(len, len - 0.18, sf);
+      float tap = smoothstep(0.0, 0.12, sf) * (1.0 - smoothstep(len - 0.18, len, sf));
       return vec4(on * bright, thick, tap, si);
     }
     // the wall answers the strikes: a hotspot on the stretch nearest the
@@ -431,7 +434,7 @@ const wallMat = () => new THREE.ShaderMaterial({
       float facing = dot(vN.xz, vh);                     // +1 near side of the funnel .. -1 far side
       float ndv = abs(facing);
       float fres = pow(1.0 - ndv, 1.4);                  // 1 edge-on .. 0 face-on
-      float body = mix(0.08, 1.0, fres * fres * (3.0 - 2.0 * fres));
+      float body = fres * fres;
       // near strands bright, the far side of the funnel a dim veil behind the army
       float front = mix(0.3, 1.15, smoothstep(-0.75, 0.85, facing));
       // two turbulent layers spiralling up the funnel with the spin
@@ -444,14 +447,14 @@ const wallMat = () => new THREE.ShaderMaterial({
       // vertical profile: a hot foot on the ground ring, a torn sheet that
       // thins as the funnel flares, frayed into the cloud at the top
       float foot = exp(-y / 0.28) * smoothstep(0.0, 0.04, y) * (0.6 + 0.4 * fres);
-      float top = smoothstep(1.0, 0.45 + 0.3 * t2, h);
+      float top = 1.0 - smoothstep(0.45 + 0.3 * t2, 1.0, h);
       float sheet = smoothstep(0.0, 0.12, h) * pow(1.0 - h, 0.9) * top;
       vec3 cFoot = mix(vec3(0.7, 0.25, 1.8), vec3(1.2, 0.95, 1.95), fres);
       vec3 cLow = vec3(0.55, 0.3, 1.5), cHigh = vec3(0.3, 0.08, 0.85);
       vec3 cBody = mix(cLow, cHigh, smoothstep(0.1, 0.9, h));
       vec3 col = cFoot * foot * (0.7 + 0.3 * t1) * (1.0 + 0.4 * fres) * (0.8 + 1.2 * hot)
-               + cBody * sheet * body * (0.03 + 0.5 * s1 + 0.3 * s2) * (0.85 + 1.0 * hot)
-               + vec3(0.85, 0.75, 1.6) * fil * sheet * (0.3 + 0.7 * fres) * 0.8;
+               + cBody * sheet * body * (0.3 * s1 + 0.2 * s2) * (0.85 + 1.0 * hot)
+               + vec3(0.85, 0.75, 1.6) * fil * sheet * fres * 0.8;
       gl_FragColor = vec4(col * front * gfl * uK, 1.0);
     }`,
   transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false,
@@ -489,6 +492,107 @@ function funnelGeometry(gh, rb, rt, H, seg = 192, rows = 18) {
   return g;
 }
 
+// The funnel's body: a semi-opaque shell of dark storm cloud and dust
+// (alpha-blended, so it darkens and hides what is behind it instead of adding
+// light). Billowing cloud spirals up it with the spin; it is thin where the
+// shell is seen face-on (the men caught inside read through it) and dense
+// where it is seen edge-on at the silhouette, lit violet from inside near the
+// foot and flashing with the strikes. Drawn as two meshes: the far wall
+// (back faces, before everything inside) and the near wall (front faces).
+const bodyMat = (front) => new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uK: { value: 0 }, uFlash: { value: 0 }, uH: { value: 11 } },
+  vertexShader: `attribute float aH; attribute float aA; varying float vH; varying float vA; varying vec3 vW; varying vec3 vN;
+    void main(){ vH = aH; vA = aA; vN = normalize(vec3(position.x, 0.0, position.z));
+      vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz;
+      gl_Position = projectionMatrix * viewMatrix * w; }`,
+  fragmentShader: `uniform float uTime, uK, uFlash, uH; varying float vH; varying float vA; varying vec3 vW; varying vec3 vN;
+    float hs2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float vn2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hs2(i), hs2(i + vec2(1.0, 0.0)), f.x), mix(hs2(i + vec2(0.0, 1.0)), hs2(i + vec2(1.0, 1.0)), f.x), f.y); }
+    float fbm(vec2 p){ return vn2(p) * 0.5 + vn2(p * 2.03 + 5.2) * 0.28 + vn2(p * 4.1 + 1.7) * 0.14 + vn2(p * 8.3 + 3.1) * 0.08; }
+    void main(){
+      float h = vH, y = h * uH, x = vA * 7.0;
+      vec3 v = normalize(cameraPosition - vW);
+      float facing = dot(vN.xz, normalize(v.xz + 1e-5));
+      float fres = pow(1.0 - abs(facing), 1.3);
+      // billows climbing the spiral, torn by faster streaks
+      float b = fbm(vec2(x * 0.42 + y * 0.55 - uTime * 1.5, y * 0.32 - uTime * 0.45));
+      float st = fbm(vec2(x * 1.3 + y * 1.9 - uTime * 3.4, y * 0.5 - uTime * 1.2));
+      float dens = (0.55 + 0.45 * smoothstep(0.2, 0.62, b)) * (0.8 + 0.2 * st);
+      float prof = smoothstep(0.0, 0.07, h) * (1.0 - smoothstep(0.62, 1.0, h));
+      ${front ? 'float faceA = 0.5, edgeA = 1.7;' : 'float faceA = 1.2, edgeA = 1.7;'}
+      float cov = dens * prof * mix(faceA, edgeA, fres);
+      // dark storm cloud, lit from inside: violet near the glowing foot,
+      // cooler and darker up the funnel; billow crests catch the light
+      vec3 dark = mix(vec3(0.08, 0.06, 0.13), vec3(0.11, 0.09, 0.18), smoothstep(0.1, 0.8, h));
+      float inner = ${front ? '0.35' : '1.0'} * exp(-y / 2.4);
+      vec3 col = dark + vec3(0.22, 0.08, 0.46) * inner * (0.5 + 0.5 * b)
+               + vec3(0.13, 0.1, 0.22) * smoothstep(0.5, 0.85, b) * (0.5 + 0.5 * fres)
+               + vec3(0.18, 0.14, 0.36) * min(1.2, uFlash) * (0.35 + 0.65 * st) * (0.4 + 0.6 * fres);
+      gl_FragColor = vec4(col * 0.22, clamp(cov * uK, 0.0, 0.95));
+    }`,
+  transparent: true, depthWrite: false, side: front ? THREE.BackSide : THREE.FrontSide, fog: false, // (the funnel's rings wind clockwise seen from outside)
+});
+
+// Ground shockwave round the funnel's foot, laid on the terrain: a scoured
+// band of dark soil at the foot, grass flattened in curved streaks swept
+// round with the spin, and rings of dust rolling outward over it.
+const groundRingMat = () => new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uK: { value: 0 }, uFlash: { value: 0 } },
+  vertexShader: `attribute float aR; attribute float aA; varying float vR; varying float vA;
+    void main(){ vR = aR; vA = aA; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform float uTime, uK, uFlash; varying float vR; varying float vA;
+    float hs2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float vn2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hs2(i), hs2(i + vec2(1.0, 0.0)), f.x), mix(hs2(i + vec2(0.0, 1.0)), hs2(i + vec2(1.0, 1.0)), f.x), f.y); }
+    void main(){
+      float r = vR;                       // 1 = the funnel's foot
+      float sw = vA - 1.4 * r;            // curved streak coordinate, swept with the spin
+      float st = vn2(vec2(sw * 38.0, r * 2.2)) * 0.65 + vn2(vec2(sw * 90.0, r * 5.0)) * 0.35;
+      float grass = smoothstep(0.45, 0.8, st) * smoothstep(0.92, 1.08, r) * (1.0 - smoothstep(1.3, 1.7, r));
+      float scour = exp(-pow((r - 1.02) / 0.07, 2.0));
+      // two dust rings rolling out from the foot
+      float dust = 0.0;
+      for (int i = 0; i < 2; i++) {
+        float ph = fract(uTime * 0.55 + float(i) * 0.5);
+        float rr = 1.02 + ph * 0.65;
+        float n = 0.6 + 0.4 * vn2(vec2(vA * 9.0 + float(i) * 3.0, uTime * 1.5));
+        dust += exp(-pow((r - rr) / (0.05 + 0.1 * ph), 2.0)) * (1.0 - ph) * n;
+      }
+      vec3 cGrass = vec3(0.34, 0.36, 0.2), cSoil = vec3(0.09, 0.07, 0.06), cDust = vec3(0.3, 0.25, 0.3);
+      vec3 col = cGrass; float cov = grass * 0.5;
+      col = mix(col, cSoil, scour); cov = max(cov, scour * 0.6);
+      col = mix(col, cDust + vec3(0.12, 0.05, 0.25) * (1.0 + uFlash), min(1.0, dust)); cov = max(cov, min(0.7, dust * 0.75));
+      cov *= 1.0 - smoothstep(1.45, 1.75, r);
+      cov *= smoothstep(0.84, 0.94, r);
+      gl_FragColor = vec4(col * 0.45 * (1.0 + 0.5 * uFlash), cov * uK);
+    }`,
+  transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3,
+});
+
+// Terrain-following annulus (r0..r1 round (cx, cz)); aR = r / rb.
+function groundRingGeometry(heightAt, cx, cz, rb, r0, r1, na = 220, nr = 30) {
+  const pos = [], aR = [], aA = [], idx = [];
+  for (let j = 0; j <= nr; j++) {
+    const r = r0 + (r1 - r0) * (j / nr);
+    for (let i = 0; i <= na; i++) {
+      const a = (i / na) * Math.PI * 2, x = Math.cos(a) * r, z = Math.sin(a) * r;
+      pos.push(x, heightAt(cx + x, cz + z) + 0.05, z);
+      aR.push(r / rb); aA.push(a);
+      if (i > 0 && j > 0) {
+        const p = (j - 1) * (na + 1) + i - 1, q = j * (na + 1) + i - 1;
+        idx.push(p, q, p + 1, p + 1, q, q + 1);
+      }
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aR', new THREE.Float32BufferAttribute(aR, 1));
+  g.setAttribute('aA', new THREE.Float32BufferAttribute(aA, 1));
+  g.setIndex(idx);
+  return g;
+}
+
 // Dust wall at the funnel's foot: earth and grass torn up and whirled round,
 // alpha-blended (dust darkens and hazes what is behind it, unlike the light),
 // lit violet from inside by the storm, spiralling with the spin.
@@ -510,13 +614,14 @@ const dustMat = () => new THREE.ShaderMaterial({
       float n = fbm(vec2(x * 0.7 + y * 1.4 - uTime * 3.0, y * 0.9 - uTime * 0.8));
       float n2 = fbm(vec2(x * 1.9 - uTime * 5.0 + y * 2.0, y * 2.2));
       float prof = smoothstep(0.0, 0.05, vH) * pow(1.0 - vH, 1.2);
-      float a = smoothstep(0.25, 0.7, n) * prof * (0.6 + 0.4 * n2);
+      // (not named 'a': SwiftShader's GLSL compile zeroed a local of that name)
+      float cov = smoothstep(0.25, 0.7, n) * prof * (0.6 + 0.4 * n2);
       // edge-on stretches read thicker (a wall of dust seen through its depth)
-      a *= mix(0.55, 1.0, pow(1.0 - abs(facing), 1.2));
+      cov *= mix(0.55, 1.0, pow(1.0 - abs(facing), 1.2));
       vec3 dust = vec3(0.2, 0.15, 0.17);
-      vec3 lit = vec3(0.42, 0.22, 0.75) * (0.4 + 0.7 * smoothstep(0.6, 0.0, vH));
+      vec3 lit = vec3(0.42, 0.22, 0.75) * (0.4 + 0.7 * (1.0 - smoothstep(0.0, 0.6, vH)));
       vec3 col = mix(dust, lit, 0.3 + 0.35 * n2) * (1.0 + 0.6 * uFlash);
-      gl_FragColor = vec4(col, clamp(a * 1.6 * uK, 0.0, 0.9));
+      gl_FragColor = vec4(col * 0.35, clamp(cov * 1.6 * uK, 0.0, 0.9));
     }`,
   transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
 });
@@ -535,7 +640,7 @@ const stormGradeMat = (add = false) => new THREE.ShaderMaterial({
     uInvVP: { value: new THREE.Matrix4() }, uPlaneY: { value: 0 }, uCenter: { value: new THREE.Vector2() },
     uR: { value: 10 }, uK: { value: 0 }, uFlash: { value: 0 }, uTime: { value: 0 },
     uPools: { value: Array.from({ length: MAX_POOLS }, () => new THREE.Vector4()) },
-    uPoolCol: { value: new THREE.Color(1.8, 1.85, 2.7) },
+    uPoolCol: { value: new THREE.Color(1.05, 1.1, 1.7) },
   },
   vertexShader: `varying vec2 vNdc; void main(){ vNdc = position.xy; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
   fragmentShader: `uniform mat4 uInvVP; uniform float uPlaneY, uR, uK, uFlash, uTime; uniform vec2 uCenter;
@@ -566,12 +671,16 @@ const stormGradeMat = (add = false) => new THREE.ShaderMaterial({
       float ga = atan(g.y - uCenter.y, g.x - uCenter.x);
       float arms = 0.5 + 0.5 * sin(3.0 * ga + 5.0 * r - uTime * 2.6);
       arms = arms * arms * (0.6 + 0.4 * vn(g * 0.35 + uTime * 0.4));
-      vec3 inC = mix(vec3(0.82, 0.74, 1.12), vec3(0.66, 0.5, 1.08), smoothstep(0.2, 1.0, r)) * (0.9 + 0.15 * shade)
-               + vec3(0.34, 0.1, 0.8) * arms * (0.25 + 0.55 * smoothstep(0.1, 0.95, r));
-      vec3 midC = vec3(0.3, 0.33, 0.52) * (0.75 + 0.35 * shade);
-      vec3 m = mix(vec3(0.34, 0.37, 0.52), midC, near);
+      vec3 inC = mix(vec3(0.58, 0.53, 0.86), vec3(0.56, 0.44, 0.94), smoothstep(0.2, 1.0, r)) * (0.9 + 0.15 * shade)
+               + vec3(0.2, 0.06, 0.55) * arms * (0.1 + 0.4 * smoothstep(0.3, 0.95, r));
+      vec3 midC = vec3(0.4, 0.4, 0.6) * (0.8 + 0.3 * shade);
+      vec3 m = mix(vec3(0.42, 0.43, 0.5), midC, near);
       m = mix(m, inC, inside);
       m += vec3(0.04, 0.07, 0.16) * uFlash * (0.3 + 0.7 * inside);
+      // each strike throws violet-white light far out over the land round
+      // the storm (the funnel is the brightest thing in the world)
+      float reach = exp(-max(0.0, r - 0.9) * 0.75) * (1.0 - inside * 0.6);
+      m += vec3(0.3, 0.3, 0.75) * min(1.2, uFlash) * reach * 0.3 + vec3(0.05, 0.04, 0.18) * reach * uK * 0.6;
       // screen vignette: the frame edges fall off into storm dark
       float vg = length(vNdc * vec2(0.9, 1.0));
       m *= 1.0 - 0.5 * smoothstep(0.55, 1.45, vg);
@@ -718,9 +827,12 @@ export class BoltRenderer {
     }
     // violet storm lights: carried round inside the funnel with the spin,
     // so the whirl lights the ground and the walls and men inside it
+    // (light 0 hangs over the funnel's heart: a strong violet-white light
+    // that pulses with every strike and reaches the land and the armies all
+    // round the storm; light 1 circles inside the funnel)
     this.stormLights = [];
     for (let i = 0; i < 2; i++) {
-      const l = new THREE.PointLight(0x9a60ff, 0, 14, 1.6);
+      const l = i === 0 ? new THREE.PointLight(0xd4c8ff, 0, 0, 0.9) : new THREE.PointLight(0x9a60ff, 0, 14, 1.6);
       this.group.add(l);
       this.stormLights.push(l);
     }
@@ -908,10 +1020,10 @@ export class BoltRenderer {
           // (a short, strong flash that reaches the walls of the buildings
           // and the men all round the contact)
           l.color.setHex(0x9cbcff);
-          l.position.set(b.x, b.y + 2.4, b.z);
+          l.position.set(b.x, b.y + 3.2, b.z);
           l.distance = 10;
           const snapL = age < 0.1 ? 1 : Math.exp(-(age - 0.1) / 0.12);
-          l.intensity = 28 * Math.min(1.2, e) * (0.06 + 0.94 * snapL);
+          l.intensity = 17 * Math.min(1.1, e) * (0.06 + 0.94 * snapL);
         }
       } else flash = Math.max(flash, env * 0.5);
     }
@@ -1042,8 +1154,8 @@ export class BoltRenderer {
       const l = this.lights[li++];
       l.color.setHex(0xff7a2a);
       l.position.set(f.x + (hash2(fl, 1) - 0.5) * 0.6, f.y + 2.4, f.z + (hash2(fl, 2) - 0.5) * 0.6);
-      l.distance = 16;
-      l.intensity = 38 * fk * (0.8 + 0.4 * hash2(fl, 3));
+      l.distance = 10;
+      l.intensity = 16 * fk * (0.8 + 0.4 * hash2(fl, 3));
     }
     for (; li < this.lights.length; li++) this.lights[li].intensity = 0;
 
@@ -1093,6 +1205,7 @@ export class BoltRenderer {
     // ---- storms
     const aliveStorms = new Set();
     let gradeK = 0, gst = null;
+    for (const g of this.rimPool || []) g.visible = false;
     for (const st of storms) {
       aliveStorms.add(st);
       let v = this.stormVisuals.get(st);
@@ -1105,7 +1218,7 @@ export class BoltRenderer {
       // hotspot eases off once its strike fades (held briefly between bolts)
       const hw = st._hotT === now ? st._hotW : 0;
       if (hw >= (v.hotW ?? 0) * 0.8 && hw > 0) { v.hotW = hw; v.hotA = st._hotA; } else v.hotW = (v.hotW ?? 0) * 0.9;
-      for (const m of [v.dust]) {
+      for (const m of [v.dust, v.bodyBack, v.bodyFront, v.ground]) {
         m.material.uniforms.uK.value = k;
         m.material.uniforms.uTime.value = now;
         m.material.uniforms.uFlash.value = fl;
@@ -1118,6 +1231,7 @@ export class BoltRenderer {
         m.material.uniforms.uHotW.value = v.hotW ?? 0;
       }
       this.renderBands(st, v, now, k, fl);
+      this.renderTrails(st, v, state.airborne || [], k);
       v.rain.position.set(st.x, y, st.z);
       v.rain.material.uniforms.uK.value = k;
       v.rain.material.uniforms.uTime.value = now;
@@ -1125,8 +1239,11 @@ export class BoltRenderer {
     }
     for (const [st, v] of this.stormVisuals) {
       if (aliveStorms.has(st)) continue;
-      this.group.remove(v.rain, v.curtain, v.dust, v.bands, v.bands2);
+      this.group.remove(v.rain, v.curtain, v.dust, v.bands, v.bands2, v.bodyBack, v.bodyFront, v.ground, v.trails);
       v.dust.geometry.dispose(); v.dust.material.dispose();
+      v.fg.dispose(); v.bodyBack.material.dispose(); v.bodyFront.material.dispose();
+      v.ground.geometry.dispose(); v.ground.material.dispose();
+      if (v.trails.geometry !== this._emptyGeo) v.trails.geometry.dispose(); v.trails.material.dispose();
       for (const bm of [v.bands, v.bands2]) { if (bm.geometry !== this._emptyGeo) bm.geometry.dispose(); bm.material.dispose(); }
       v.curtain.geometry.dispose(); v.curtain.material.dispose();
       v.rain.geometry.dispose(); v.rain.material.dispose();
@@ -1140,10 +1257,17 @@ export class BoltRenderer {
     this.stormLights.forEach((l, i) => {
       const sv = gst && this.stormVisuals.get(gst);
       if (!sv) { l.intensity = 0; return; }
+      if (i === 0) {
+        // (hung high with a slow falloff: a wash over the whole battlefield,
+        // not a hot disc on the ground under it)
+        l.position.set(gst.x, heightAt(gst.x, gst.z) + 24, gst.z);
+        l.intensity = gradeK * (5 + 45 * Math.min(1.2, flash));
+        return;
+      }
       const a = now * 2.0 + i * Math.PI, r = sv.rb * (0.45 + 0.1 * Math.sin(now * 1.3 + i));
       const px = gst.x + Math.cos(a) * r, pz = gst.z + Math.sin(a) * r;
-      l.position.set(px, heightAt(px, pz) + 2.2, pz);
-      l.intensity = 34 * gradeK * (0.85 + 0.15 * Math.sin(now * 7 + i * 2)) + 10 * Math.min(1, flash);
+      l.position.set(px, heightAt(px, pz) + 5, pz);
+      l.intensity = 7 * gradeK * (0.85 + 0.15 * Math.sin(now * 7 + i * 2)) + 10 * Math.min(1, flash);
     });
     const ov = game.combat?.overlays;
     if (ov?.bars) {
@@ -1244,23 +1368,59 @@ export class BoltRenderer {
         const g = ghAt(a);
         const face = Math.cos(a - cd); // +1 on the side toward the camera
         const fr = smoothstep(-0.75, 0.85, face);
+        // bright on the funnel's silhouette (seen edge-on), faint across its
+        // face so the body and the men inside read through it
+        const rim = Math.pow(1 - Math.abs(face), 1.4);
         pts.push({
           x: st.x + Math.cos(a) * r,
           y: g + (base - g) * Math.min(1, hf * 2.5) + 0.15 + hf * v.H + b.ya * Math.sin(a * b.yf + now * 2.3 + b.ph),
           z: st.z + Math.sin(a) * r,
-          m: 0.22 + 0.9 * fr, wm: (0.55 + 0.6 * fr) * (0.8 + 0.5 * hf),
+          m: 0.06 + 0.16 * fr + 1.05 * rim, wm: (0.6 + 0.9 * rim) * (0.8 + 0.5 * hf),
         });
       }
       const L = layers[b.layer];
       L.push({ pts, w: b.w, i: 0.8 * ii, taper: 0.94, fade: 1 });
       L.push({ pts, w: b.w * 3.2, i: 0.3 * ii, taper: 0.85, fade: 0.95, halo: true });
-      L.push({ pts, w: b.w * 9, i: 0.11 * ii, taper: 0.7, fade: 0.9, halo: true });
+      L.push({ pts, w: b.w * 5.5, i: 0.07 * ii, taper: 0.7, fade: 0.9, halo: true });
     }
     [v.bands, v.bands2].forEach((m, j) => {
       if (m.geometry !== this._emptyGeo) m.geometry.dispose();
       m.geometry = layers[j].length ? ribbonGeometry(layers[j]) : this._emptyGeo;
       m.visible = layers[j].length > 0;
     });
+  }
+
+  // Motion trails of the men carried round the funnel: a violet streak from
+  // the waist back along the last ~0.4 s of flight, fading to nothing.
+  renderTrails(st, v, airborne, k) {
+    const lines = [];
+    let rim = 0;
+    this.rimPool = this.rimPool || [];
+    for (const u of airborne) {
+      const a = u.gp_air, tr = a?.trail;
+      if (!tr || tr.length < 12 || (a.vortex !== st && !a.flung) || u.airY < 0.4) continue;
+      const n = tr.length / 3, pts = [];
+      for (let i = n - 1; i >= 0; i--) pts.push({ x: tr[i * 3], y: tr[i * 3 + 1], z: tr[i * 3 + 2] });
+      const i0 = 0.8 * k * Math.min(1, u.airY / 1.5);
+      lines.push({ pts, w: 0.15, i: i0 * 1.3, taper: 0.9, fade: 1 });
+      lines.push({ pts, w: 0.55, i: i0 * 0.5, taper: 0.8, fade: 1, halo: true });
+      // a violet back light just behind the man (depth-tested, so his body
+      // masks its centre): each flying figure reads as a dark silhouette with
+      // a glowing rim against the storm, not one more red chunk in a heap
+      if (rim < 24) {
+        const g = this.rimPool[rim] || (this.rimPool[rim] = this.glowSprite(0x9a6cff, 43, 0, true));
+        const cam = this.game.camera.position, t = tr.length - 3;
+        this._v.set(tr[t] - cam.x, 0, tr[t + 2] - cam.z).normalize().multiplyScalar(0.6);
+        g.position.set(tr[t] + this._v.x, tr[t + 1] + 0.1, tr[t + 2] + this._v.z);
+        g.scale.setScalar(2.4);
+        g.material.uniforms.uO.value = 0.4 * k * Math.min(1, u.airY / 1.5);
+        g.visible = true;
+        rim++;
+      }
+    }
+    if (v.trails.geometry !== this._emptyGeo) v.trails.geometry.dispose();
+    v.trails.geometry = lines.length ? ribbonGeometry(lines) : this._emptyGeo;
+    v.trails.visible = lines.length > 0;
   }
 
   // Debris torn up and whirled round the funnel (visual only, a function of
@@ -1373,7 +1533,7 @@ export class BoltRenderer {
     const heightAt = (x, z) => this.game.map.heightAt(x, z);
     // the funnel: a ground ring just inside the strike radius flaring out
     // as it climbs into the cloud
-    const rb = R * 0.85, rt = R * 1.18, H = 11, DUST_H = 3.6;
+    const rb = R * 0.85, rt = R * 1.18, H = 11, DUST_H = 4.2;
     // ground heights round the foot ring, smoothed along the circle so the
     // foot and the bands glide over voxel steps
     const NA = 256, gh = new Float32Array(NA), raw = new Float32Array(NA);
@@ -1389,7 +1549,14 @@ export class BoltRenderer {
     const curtain = this.addMesh(new THREE.Mesh(funnelGeometry(gh, rb, rt, H), wallMat()), 45);
     curtain.material.uniforms.uH.value = H;
     curtain.position.set(st.x, 0, st.z);
-    const dust = this.addMesh(new THREE.Mesh(funnelGeometry(gh, rb * 1.0, rb * 1.3, DUST_H, 160, 8), dustMat()), 30);
+    const fg = funnelGeometry(gh, rb * 0.97, rt * 0.97, H, 160, 22);
+    const bodyBack = this.addMesh(new THREE.Mesh(fg, bodyMat(false)), 40);
+    const bodyFront = this.addMesh(new THREE.Mesh(fg, bodyMat(true)), 44);
+    for (const m of [bodyBack, bodyFront]) { m.material.uniforms.uH.value = H; m.position.set(st.x, 0, st.z); }
+    const ground = this.addMesh(new THREE.Mesh(groundRingGeometry(heightAt, st.x, st.z, rb, rb * 0.8, rb * 1.75), groundRingMat()), 6);
+    ground.position.set(st.x, 0, st.z);
+    const trails = this.addMesh(new THREE.Mesh(new THREE.BufferGeometry(), makeRibbonMaterial(new THREE.Color(0x8a60ff), new THREE.Color(0xe8dcff), 1.2, new THREE.Color(0x6a30ff))), 47);
+    const dust = this.addMesh(new THREE.Mesh(funnelGeometry(gh, rb * 0.98, rb * 1.4, DUST_H, 160, 8), dustMat()), 30);
     dust.material.uniforms.uH.value = DUST_H;
     dust.position.set(st.x, 0, st.z);
     const rain = this.addMesh(new THREE.LineSegments(rainGeometry(st.t0 * 1000 | 0, R), rainMat()), 46);
@@ -1425,7 +1592,7 @@ export class BoltRenderer {
         sy: kind === 'grass' ? rng.range(2.5, 4) : 1,
         col: kind === 'earth' ? rng.pick(EARTH) : rng.pick(TURF), glow: kind === 'glow', rx: rng.range(-9, 9), rz: rng.range(-9, 9) });
     }
-    const v = { curtain, dust, rain, bands, bands2, bandDefs, gh, pull, rb, rt, H };
+    const v = { curtain, dust, rain, bands, bands2, bandDefs, gh, pull, rb, rt, H, bodyBack, bodyFront, ground, trails, fg };
     this.stormVisuals.set(st, v);
     return v;
   }

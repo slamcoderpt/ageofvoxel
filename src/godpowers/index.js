@@ -74,9 +74,11 @@ export class GodPowers {
     return true;
   }
 
-  findTarget(owner, x, z, r, random = false) {
+  findTarget(owner, x, z, r, random = false, grounded = false) {
     const game = this.game;
-    const cands = game.movement.hash.near(x, z, r, (o) => !o.dead && game.isEnemy(owner, o.owner));
+    // (grounded: skip men carried up the whirl - a bolt earthing right under
+    // a flying man bleached him white in its point light)
+    const cands = game.movement.hash.near(x, z, r, (o) => !o.dead && game.isEnemy(owner, o.owner) && !(grounded && o.gp_air && !o.gp_air.done));
     if (!cands.length) return null;
     if (random) return cands[Math.floor(game.rng.next() * cands.length)];
     cands.sort((a, b) => (a.x - x) ** 2 + (a.z - z) ** 2 - ((b.x - x) ** 2 + (b.z - z) ** 2));
@@ -96,6 +98,7 @@ export class GodPowers {
   // Throw a unit away from (x, z). Deterministic (hash of id + tick).
   knock(o, x, z, power) {
     if (o.kind !== 'unit') return;
+    if (o.gp_air && !o.gp_air.done && o.gp_air.vortex && !o.gp_air.flung) return;
     const game = this.game;
     let dx = o.x - x, dz = o.z - z, d = Math.hypot(dx, dz);
     if (d < 0.08) { const a = hash2(o.id, game.tickCount, 7) * Math.PI * 2; dx = Math.cos(a); dz = Math.sin(a); d = 1; }
@@ -103,7 +106,7 @@ export class GodPowers {
     const heavy = (o.maxHp ?? 100) > 300 ? 0.3 : 1;
     const f = power * (1 - Math.min(1, d / 3) * 0.55) * heavy * (0.8 + hash2(o.id, game.tickCount, 3) * 0.4);
     const a = o.gp_air || (o.gp_air = {});
-    a.done = false; a.vortex = null;
+    a.done = false; a.vortex = null; a.trail = a.trail || [];
     a.vx = dx * 3.4 * f; a.vz = dz * 3.4 * f; a.vy = 5.5 + 5 * f;
     // tumble backwards, away from the blast (axis perpendicular to the throw, in the unit's frame)
     const c = Math.cos(o.rot || 0), s = Math.sin(o.rot || 0);
@@ -221,7 +224,7 @@ export class GodPowers {
       s.next -= dt;
       if (s.next <= 0) {
         s.next = s.def.interval * (0.6 + game.rng.next() * 0.8);
-        const t = this.findTarget(s.owner, s.x, s.z, s.radius * 0.78, true);
+        const t = this.findTarget(s.owner, s.x, s.z, s.radius * 0.78, true, true);
         if (t) this.strike(s.owner, t.x, t.z, s.def.damage, s.def.splash, t);
         else {
           const a = game.rng.range(0, Math.PI * 2), r = Math.sqrt(game.rng.next()) * s.radius * 0.7;
@@ -293,22 +296,30 @@ export class GodPowers {
   vortex(s, dt) {
     const game = this.game, age = game.time - s.t0;
     if (age < 0.35 || age > s.duration - 1.2) return;
-    const ramp = Math.min(1, (age - 0.35) / 0.8);
+    const ramp = Math.min(1, (age - 0.35) / 0.6);
     const cands = game.movement.hash.near(s.x, s.z, s.radius * 0.95, (o) => !o.dead && o.kind === 'unit' && game.isEnemy(s.owner, o.owner));
     for (const u of cands) {
       if ((u.maxHp ?? 100) > 300) continue;
       if (u.gp_air && !u.gp_air.done) continue;
-      if (game.rng.next() > 0.42 * dt * ramp) continue;
+      if (game.rng.next() > 1.2 * dt * ramp) continue;
       const a = u.gp_air || (u.gp_air = {});
       a.done = false;
       a.vortex = s;
       a.t0 = game.time;
-      a.hold = 0.9 + game.rng.next() * 1.4;
+      // each man is carried to his own height and orbit up the funnel, so
+      // the caught read as separate figures strung up the whirl, not a heap
+      a.hT = 1.8 + game.rng.next() * 7.8;
+      a.orb = 0.42 + game.rng.next() * 0.34;
+      a.hold = 2.2 + game.rng.next() * 2.2;
       a.flung = false;
-      a.vx = 0; a.vz = 0; a.vy = 3.2 + game.rng.next() * 2.4;
+      a.vx = 0; a.vz = 0; a.vy = 2.5 + game.rng.next() * 1.5;
+      // carried men lean and sway (a bounded tilt, so the silhouette stays a
+      // man, not a spinning blur); the full tumble comes when they are flung
+      a.tilt = 0.35 + game.rng.next() * 0.45; a.wf = 2 + game.rng.next() * 2.5; a.ph = game.rng.next() * 6.28;
       const sp = 3 + game.rng.next() * 5;
       a.wx = (game.rng.next() - 0.5) * sp; a.wz = (game.rng.next() - 0.5) * sp;
-      a.yaw = (4 + game.rng.next() * 5);
+      a.yaw = (3 + game.rng.next() * 3);
+      a.trail = [];
       u.airY = Math.max(u.airY || 0, 0.02); u.airRx = u.airRx || 0; u.airRz = u.airRz || 0;
       if (!this.airborne.includes(u)) this.airborne.push(u);
       if (game.commands?.order) game.commands.order(u, { type: 'idle' });
@@ -339,7 +350,7 @@ export class GodPowers {
     const now = this.game.time;
     for (const u of this.struck) {
       const age = now - u.gp_hitT;
-      u.gp_hit = age < 0.06 ? 1.4 : Math.max(0, 1.4 * (1 - (age - 0.06) / 0.14));
+      u.gp_hit = age < 0.05 ? 0.4 : Math.max(0, 0.4 * (1 - (age - 0.05) / 0.1));
       const on = Math.min(1, Math.max(0, (age - 0.05) / 0.25));
       const off = u.dead ? 1 : 1 - Math.min(1, Math.max(0, (age - 4) / 3));
       u.gp_char = 0.5 * on * off;
@@ -354,29 +365,43 @@ export class GodPowers {
       const a = u.gp_air;
       const s = a.vortex;
       if (s && !a.flung) {
-        // carried round the funnel: pulled toward an orbit just inside the
-        // wall, swept along the spin (counter-clockwise seen from above),
-        // buoyed up while it holds, then flung out along the spin
+        // carried round the funnel: pulled toward the man's own orbit (it
+        // widens as he climbs with the flaring funnel), swept along the spin
+        // (counter-clockwise seen from above), buoyed toward his own height,
+        // then flung out along the spin
         let dx = u.x - s.x, dz = u.z - s.z, d = Math.hypot(dx, dz);
         if (d < 0.05) { dx = 1; dz = 0; d = 1; } else { dx /= d; dz /= d; }
-        const tx = -dz, tz = dx, orbit = s.radius * 0.55;
-        const vt = 5.5, vr = (orbit - d) * 1.6;
+        const tx = -dz, tz = dx;
+        const hf = Math.min(1, (u.airY || 0) / 11);
+        const orbit = s.radius * 0.85 * (1 + 0.39 * Math.pow(hf, 1.7)) * a.orb;
+        const vt = 4.2 + 1.8 * (a.orb ?? 0.55), vr = (orbit - d) * 1.8;
         a.vx += ((tx * vt + dx * vr) - a.vx) * Math.min(1, 3 * dt);
         a.vz += ((tz * vt + dz * vr) - a.vz) * Math.min(1, 3 * dt);
-        a.vy += (1.6 - a.vy) * Math.min(1, 1.2 * dt) - 1.2 * dt;
+        const want = Math.max(-1.5, Math.min(4.6, ((a.hT ?? 4) - u.airY) * 1.4));
+        a.vy += (want - a.vy) * Math.min(1, 2.2 * dt);
         u.rot = (u.rot || 0) + a.yaw * dt;
-        if (this.game.time - a.t0 > a.hold || s.done) {
+        const ca = game.time - a.t0;
+        u.airRx = (a.tilt ?? 0.4) * Math.sin(ca * (a.wf ?? 3) + (a.ph ?? 0));
+        u.airRz = (a.tilt ?? 0.4) * 0.8 * Math.cos(ca * (a.wf ?? 3) * 0.7 + (a.ph ?? 0));
+        if (ca > a.hold || s.done) {
           a.flung = true;
-          a.vx = tx * 6.5 + dx * 5; a.vz = tz * 6.5 + dz * 5; a.vy = 4.5;
+          a.vx = tx * 6.5 + dx * 5; a.vz = tz * 6.5 + dz * 5; a.vy = 3.5;
           a.wx *= 1.6; a.wz *= 1.6;
         }
-      } else a.vy -= 18 * dt;
+      } else {
+        a.vy -= 18 * dt;
+        u.airRx += a.wx * dt; u.airRz += a.wz * dt;
+      }
       u.airY += a.vy * dt;
       const nx = u.x + a.vx * dt, nz = u.z + a.vz * dt;
       if (map.isWalkable(Math.floor(nx), Math.floor(nz))) { u.x = nx; u.z = nz; } else { a.vx = 0; a.vz = 0; }
-      u.airRx += a.wx * dt; u.airRz += a.wz * dt;
+      // motion trail (sim state, so paused captures show it): the man's
+      // waist over the last ~0.4 s
+      const tr = a.trail || (a.trail = []);
+      tr.push(u.x, map.heightAt(u.x, u.z) + u.airY + 0.7, u.z);
+      if (tr.length > 36) tr.splice(0, tr.length - 36);
       if (u.airY <= 0 && a.vy < 0) {
-        u.airY = 0; u.airRx = 0; u.airRz = 0; a.done = true; a.vortex = null;
+        u.airY = 0; u.airRx = 0; u.airRz = 0; a.done = true; a.vortex = null; a.trail = [];
         game.fx.emit({ x: u.x, y: map.heightAt(u.x, u.z) + 0.1, z: u.z, count: 6, color: 0x6b5a44, size: 0.35, life: 0.8, speed: 1.4, up: 0.8, gravity: -2, grow: 1.2 });
       }
     }
