@@ -79,6 +79,13 @@ export const TILES = {
   rose: { tones: [0xcb8e74, 0xbe8066, 0xd69c80, 0xc58870], butt: 0x86533f, fascia: 0x80523f, ridge: 0x94583f, soffit: 0x4a3a30, antefix: 0xece6d8 },
   umber: { tones: [0xae6e55, 0xa1634b, 0xbb7a5f, 0xa86b52], butt: 0x6e3f30, fascia: 0x6c4232, ridge: 0x7a4634, soffit: 0x45362c, antefix: 0xe2dac8 },
   slate: { tones: [0xbcc7b1, 0xabb7a0, 0xcad3bf, 0xb4c0aa], butt: 0x7a8670, fascia: 0x75806c, ridge: 0x7f8c76, soffit: 0x4a4540, antefix: 0xeeeae0 },
+  // weathered pale sage glaze (civic halls, as in Retold's towns)
+  sage: { tones: [0xa3b89c, 0x96ad90, 0xadc1a6, 0x8fa689], butt: 0x62785f, fascia: 0x6b7f69, ridge: 0x72876f, soffit: 0x3f4640, antefix: 0xf1eee4 },
+  // Parian marble tiles (the temple)
+  marble: { tones: [0xd9d8d0, 0xcccbc2, 0xe3e2da, 0xc3c3b9], butt: 0x8f8d84, fascia: 0xa3a197, ridge: 0xb9b7ad, soffit: 0x57524c, antefix: 0xf7f4ec },
+  // deep red fired tiles and pale ochre tiles (house roofs vary)
+  brick: { tones: [0xa9543d, 0x9c4a35, 0xb65e44, 0xa3503a], butt: 0x5e2b20, fascia: 0x5c2d23, ridge: 0x6f3427, soffit: 0x3e2e28, antefix: 0xe6ddcb },
+  ochre: { tones: [0xd8a267, 0xcb955b, 0xe2af76, 0xd29c62], butt: 0x86592f, fascia: 0x7f5632, ridge: 0x93633a, soffit: 0x4a3a30, antefix: 0xefe8d8 },
 };
 
 // A tiled roof plane: eave edge e0-e1 (low), top edge r0-r1 (r0 above e0;

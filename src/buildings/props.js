@@ -46,7 +46,7 @@ const PROPS = {
     w: 1, h: 1,
     build(m) {
       m.box(0, 0, 0, 4, 1, 4, MARBLE_SHADE);
-      m.box(1, 1, 1, 2, 7, 2, MARBLE); m.box(1, 3, 1, 2, 1, 2, TEAM);
+      m.box(1, 1, 1, 2, 7, 2, MARBLE); m.box(1, 3, 1, 2, 1, 2, 0xa8372a); m.box(1, 4, 1, 2, 1, 2, 0xd2a847);
       m.box(0, 8, 0, 4, 1, 4, BRONZE);
       m.box(1, 9, 1, 2, 1, 2, FIRE, { glow: 0.4 });
       m.set(1, 10, 2, 0xffd27a, { glow: 0.4 });

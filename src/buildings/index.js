@@ -82,7 +82,14 @@ export class Buildings {
       for (const o of this.game.entities.buildings()) {
         if (o === b || o.type !== b.type || o.bld_variant === undefined) continue;
         const d = Math.hypot(o.x - b.x, o.z - b.z);
-        if (d < 30) score[o.bld_variant] += 1 + (30 - d) / 30;
+        if (d >= 30) continue;
+        // same variant counts fully, same plan (variant mod 5) in the
+        // other finish counts most of the way
+        const wgt = 1 + (30 - d) / 30;
+        for (let c = 0; c < n; c++) {
+          if (c === o.bld_variant) score[c] += wgt;
+          else if (n > 5 && c % 5 === o.bld_variant % 5) score[c] += 0.7 * wgt;
+        }
       }
       const start = Math.floor(hash3(b.tx, 7, b.tz, 31) * n) % n;
       let best = Infinity;
