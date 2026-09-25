@@ -86,6 +86,13 @@ export const TILES = {
   // deep red fired tiles and pale ochre tiles (house roofs vary)
   brick: { tones: [0xa9543d, 0x9c4a35, 0xb65e44, 0xa3503a], butt: 0x5e2b20, fascia: 0x5c2d23, ridge: 0x6f3427, soffit: 0x3e2e28, antefix: 0xe6ddcb },
   ochre: { tones: [0xd8a267, 0xcb955b, 0xe2af76, 0xd29c62], butt: 0x86592f, fascia: 0x7f5632, ridge: 0x93633a, soffit: 0x4a3a30, antefix: 0xefe8d8 },
+  // warm orange-red fired tiles for the town's houses and workshops: close
+  // hues (so no single tile reads as a plank), dense regular cover-tile
+  // ribs, no dark banding - a crisp tile rhythm rather than boards
+  warm: { tones: [0xe0703f, 0xd9683a, 0xe67a47, 0xdc6d3c], butt: 0x9c4426, fascia: 0xf0ebe0, ridge: 0xb24a2a, soffit: 0x6a4436, antefix: 0xf4efe4,
+    plane: { ribGap: 1.5, ribW: 0.34, ribH: 0.42, bandEvery: 0, weather: 0.25, lip: 0.2, antefixH: 0.3 } },
+  warmRed: { tones: [0xdc6438, 0xd45d35, 0xe36d40, 0xd8613a], butt: 0x8e3a22, fascia: 0xf0ebe0, ridge: 0xa84027, soffit: 0x643f33, antefix: 0xf4efe4,
+    plane: { ribGap: 1.5, ribW: 0.34, ribH: 0.42, bandEvery: 0, weather: 0.25, lip: 0.2, antefixH: 0.3 } },
 };
 
 // A tiled roof plane: eave edge e0-e1 (low), top edge r0-r1 (r0 above e0;
@@ -94,7 +101,12 @@ export const TILES = {
 // the rows; tiles within a course take one of the palette hues, offset by
 // half a tile every other course. A fascia drops from the eave and the
 // underside is closed with a dark soffit.
-export function tiledPlane(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.1, tileW = 1.4, lip = 0.24, fascia = 0.6, seed = 1, up = [0, 1, 0], closeUnder = true, eaveFascia = true, ribGap = 2.6, ribW = 0.46, ribH = 0.5, antefix = tiles.antefix ?? null, antefixH = 0.35, antefixPaint = null, bandEvery = 4, weather = 1 } = {}) {
+// A tile palette may carry its own plane defaults (`tiles.plane`); explicit
+// options still win.
+export function tiledPlane(m, e0, e1, r0, r1, opts = {}) {
+  return tiledPlane0(m, e0, e1, r0, r1, opts.tiles?.plane ? { ...opts.tiles.plane, ...opts } : opts);
+}
+function tiledPlane0(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.1, tileW = 1.4, lip = 0.24, fascia = 0.6, seed = 1, up = [0, 1, 0], closeUnder = true, eaveFascia = true, ribGap = 2.6, ribW = 0.46, ribH = 0.5, antefix = tiles.antefix ?? null, antefixH = 0.35, antefixPaint = null, bandEvery = 4, weather = 1 } = {}) {
   const n = normal3(e0, e1, r0[0] === r1[0] && r0[1] === r1[1] && r0[2] === r1[2] ? r0 : r1, up);
   const slope = len3(sub3(lerp3(r0, r1, 0.5), lerp3(e0, e1, 0.5)));
   const N = Math.max(1, Math.round(slope / course));

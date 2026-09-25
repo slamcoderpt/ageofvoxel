@@ -138,22 +138,23 @@ const PROPS = {
   },
 };
 
+// Low whitewashed garden wall: plaster on a grey footing with a thin red
+// painted band, square piers every three voxels and a terracotta coping.
 function fence(m, len, axis, ox = 0, oz = 0) {
   const put = (a, y, c) => (axis === 'x' ? m.set(ox + a, y, oz, c) : m.set(ox, y, oz + a, c));
   for (let a = 0; a < len; a++) {
-    const post = a % 3 === 0 || a === len - 1;
-    if (post) { put(a, 0, 0x6a4a2c); put(a, 1, 0x6a4a2c); put(a, 2, 0x6a4a2c); put(a, 3, 0x5a3e24); }
-    else { put(a, 1, (a & 1) ? 0x8b6139 : 0x7a5230); put(a, 3, (a & 1) ? 0x7a5230 : 0x8b6139); }
+    const pier = a % 4 === 0 || a === len - 1;
+    const wash = hash3(a >> 1, 1, ox + oz, 84) < 0.5 ? 0xf1ede4 : 0xe8e2d6;
+    put(a, 0, 0xb3ab9a); put(a, 1, 0xa8452f); put(a, 2, wash);
+    if (pier) { put(a, 3, wash); put(a, 4, 0xdcd5c4); } else put(a, 3, (a & 1) ? 0xdcd5c4 : 0xd2cbb9);
   }
 }
 
 function lowWall(m, len, axis) {
   const put = (a, y, k, c) => (axis === 'x' ? m.set(a, y, 1 + k, c) : m.set(1 + k, y, a, c));
   for (let a = 0; a < len; a++) for (let k = 0; k < 2; k++) {
-    for (let y = 0; y < 3; y++) {
-      const h = hash3(a >> 1, y, k, 83);
-      put(a, y, k, h < 0.35 ? 0xa39a86 : h < 0.7 ? 0x958c78 : 0xb2a993);
-    }
+    put(a, 0, k, 0xb3ab9a);
+    for (let y = 1; y < 3; y++) put(a, y, k, hash3(a >> 1, y, k, 83) < 0.5 ? 0xf1ede4 : 0xe9e3d7);
     put(a, 3, k, (a & 3) === 0 ? 0xcfc7b4 : 0xdcd5c4);
   }
 }
@@ -217,10 +218,9 @@ function anchorsFor(b) {
     case 'house': {
       const side = v & 1 ? [w + 1, 0] : [-3, 0];
       return [
-        ['garden', [side, v & 1 ? [-3, 0] : [w + 1, 0], [0, -3]]],
-        ['pithoi', [[w, h - 1], [-2, h - 1], [w, h]]],
-        [v & 2 ? 'wall_x' : 'fence_x', [[0, -1], [0, h + 2]]],
-        [['flowers', 'amphorae', 'crates', 'flowers'][v], [[0, h], [1, h], [-2, h]]],
+        ...(v & 1 ? [['garden', [side, [0, -3]]]] : []),
+        ['wall_x', [[0, -1]]],
+        [['flowers', 'amphorae', 'planter', 'flowers'][v], [[0, h], [1, h]]],
         [v & 1 ? 'cypress' : 'olive', [[-1, 0], [w, 1], [w, -1]]],
       ];
     }

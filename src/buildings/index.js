@@ -242,7 +242,17 @@ export class Buildings {
     else if (type === 'temple') this.pavePlaza(tx, tz, def.w, def.h, 3);
     // houses and storehouses sit on their own worn-earth lot (no paving),
     // so the paved streets between them read as streets, not one slab
-    if (!def.farm) this.yard(tx, tz, def.w, def.h, type === 'town_center' ? 0 : type === 'temple' ? 2 : 1.6);
+    const lot = type === 'house' || type === 'storehouse';
+    if (!def.farm) this.yard(tx, tz, def.w, def.h, type === 'town_center' ? 0 : type === 'temple' ? 2 : lot ? 1 : 1.6);
+    // houses and storehouses: a paved forecourt across the front (+z)
+    if (lot) {
+      for (let x = tx; x < tx + def.w; x++) {
+        if (!map.isWalkable(x, tz + def.h) || this.inFootprint(x, tz + def.h)) continue;
+        const g = this.groundAt(x, tz + def.h);
+        if (g === GROUND.FARM || g === GROUND.SAND || g === GROUND.ROCK || g < 0) continue;
+        map.paintTiles(x, tz + def.h, 1, 1, GROUND.PAVED);
+      }
+    }
     const b = game.entities.add({
       kind: 'building', type, owner, def,
       tx, tz, w: def.w, h: def.h,
