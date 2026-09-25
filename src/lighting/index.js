@@ -45,7 +45,7 @@ export class Lighting {
 
     this.sky = new Sky(this.sunDir);
     scene.add(this.sky.mesh);
-    this.hazeColor = new THREE.Color(0xd9d2bf);
+    this.hazeColor = new THREE.Color(0xc4cfd2); // light warm-blue aerial haze
     scene.fog = new THREE.Fog(this.hazeColor, 80, 400);
     scene.background = this.hazeColor.clone();
 
@@ -72,8 +72,10 @@ export class Lighting {
     this.sun.position.set(cx + this.sunDir.x * 150, t.y + this.sunDir.y * 150, cz + this.sunDir.z * 150);
     this.sun.target.updateMatrixWorld();
     const f = this.game.scene.fog;
-    f.near = ctl.distance * 1.6;
-    f.far = ctl.distance * 6 + 120;
+    // aerial perspective: starts just past the view centre so the top third of
+    // an RTS frame lifts and desaturates while the focal area stays clean
+    f.near = ctl.distance * 0.9;
+    f.far = ctl.distance * 2.8 + 20;
     this.sky.follow(this.game.camera);
     // with fog of war on, everything beyond the explored map reads as black (AoM style)
     const fow = fowUniforms.fowStrength.value > 0;

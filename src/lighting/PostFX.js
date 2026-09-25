@@ -26,7 +26,7 @@ const GradeShader = {
     uContrast: { value: 1.08 },
     uShadowTint: { value: new THREE.Vector3(0.035, 0.055, 0.065) },
     uHighTint: { value: new THREE.Vector3(1.05, 1.0, 0.93) },
-    uVignette: { value: 0.12 },
+    uVignette: { value: 0.05 },
     uToeLift: { value: 0.06 },
     uKnee: { value: 0.62 },
     uShoulder: { value: 1.5 },
@@ -61,7 +61,7 @@ const GradeShader = {
       c = clamp(c, 0.0, 1.2);
       vec3 s = c * c * (3.0 - 2.0 * c);
       vec3 k = smoothstep(0.18, 0.55, c);
-      c = mix(c, s, (uContrast - 1.0 + 0.25) * k);
+      c = mix(c, s, (uContrast - 1.0 + 0.25) * k * (1.0 - 0.6 * g));
       c = c + uToeLift * (1.0 - c) * (1.0 - smoothstep(0.0, 0.35, c));
       // --- highlight shoulder: pale stone and white marble roll off instead of
       // clipping, so plaza and roofs keep their texture next to the forest
@@ -89,7 +89,7 @@ export class PostFX {
     this.composer.addPass(new RenderPass(scene, camera));
     if (quality === 'high') {
       this.gtao = new GTAOPass(scene, camera, size.x, size.y);
-      this.gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.6, thickness: 2.5, scale: 1.45, samples: 12, distanceFallOff: 1.0 });
+      this.gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.6, thickness: 2.5, scale: 1.25, samples: 12, distanceFallOff: 1.0 });
       this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
       this.gtao.blendIntensity = 1.0;
       // Let pieces opt objects out of the AO g-buffer with object.userData.noAO
