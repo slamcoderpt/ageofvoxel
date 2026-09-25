@@ -48,27 +48,47 @@ export class BattleFX {
     geo.setAttribute('psize', this.gsSize);
     geo.setAttribute('palpha', this.gsAlpha);
     geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
+    // velocity feeds the streak direction: every spark is drawn as a short
+    // hot line along its screen-space motion (a head and a fading tail), not
+    // as a round bloom sprite
+    this.gsVel = new THREE.BufferAttribute(this.sVel, 3).setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('pvel', this.gsVel);
     const mat = new THREE.ShaderMaterial({
       uniforms: { uScale: { value: 900 } },
       vertexShader: `
-        attribute float psize; attribute float palpha; varying vec3 vCol; varying float vA;
+        attribute float psize; attribute float palpha; attribute vec3 pvel;
+        varying vec3 vCol; varying float vA; varying vec2 vDir; varying float vLen; varying float vPx;
         uniform float uScale;
         void main(){
           vCol = color; vA = palpha;
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
-          gl_PointSize = max(2.0, psize * uScale / -mv.z);
-          gl_Position = projectionMatrix * mv;
+          vec4 c0 = projectionMatrix * mv;
+          vec4 c1 = projectionMatrix * (modelViewMatrix * vec4(position + pvel * 0.03, 1.0));
+          vec2 sd = c1.xy / c1.w - c0.xy / c0.w;
+          sd.y = -sd.y; // gl_PointCoord runs top-down
+          float sl = length(sd);
+          vDir = sl > 1e-5 ? sd / sl : vec2(1.0, 0.0);
+          float ps = max(3.0, psize * uScale / -mv.z);
+          gl_PointSize = ps;
+          vPx = ps;
+          // a still spark is a dot, a fast one a streak across the sprite
+          vLen = clamp(sl * 0.5 * uScale / ps * 2.0, 0.15, 0.7);
+          gl_Position = c0;
         }`,
       fragmentShader: `
-        varying vec3 vCol; varying float vA;
+        varying vec3 vCol; varying float vA; varying vec2 vDir; varying float vLen; varying float vPx;
         void main(){
           vec2 p = gl_PointCoord - 0.5;
-          float d = length(p) * 2.0;
-          float core = 1.0 - smoothstep(0.1, 0.6, d);
-          float halo = 1.0 - smoothstep(0.3, 1.0, d);
-          float a = vA * (core + 0.6 * halo * halo);
-          if (a < 0.01) discard;
-          gl_FragColor = vec4(mix(vCol, vec3(3.0), core * 0.5) * a, a);
+          float along = dot(p, vDir);
+          float across = abs(dot(p, vec2(-vDir.y, vDir.x))) * vPx;
+          float h = 0.5 * vLen;
+          if (abs(along) > h) discard;
+          float t = along / h * 0.5 + 0.5;          // 0 tail .. 1 head
+          float w = mix(1.0, 2.8, t);                // thin tail, fat head (pixels)
+          float a = vA * (1.0 - smoothstep(w, w + 1.0, across)) * (0.35 + 0.65 * t);
+          if (a < 0.02) discard;
+          // orange-hot tail, white-hot head
+          gl_FragColor = vec4(mix(vCol, vec3(3.0, 2.7, 2.0), t * t * t) * a, 1.0);
         }`,
       vertexColors: true,
       transparent: true,
@@ -83,13 +103,17 @@ export class BattleFX {
     this.game.scene.add(this.sparks);
   }
 
-  spark(x, y, z, { count = 6, color = 0xffa030, bright = 2.2, size = 0.25, life = 0.35, speed = 4, up = 2.5, gravity = -12 } = {}) {
+  // dx, dz (unit vector) + cone (radians): spray in a fan along that
+  // direction instead of all round (a blow throws its sparks away from the
+  // striker)
+  spark(x, y, z, { count = 6, color = 0xffa030, bright = 2.2, size = 0.25, life = 0.35, speed = 4, up = 2.5, gravity = -12, dx = 0, dz = 0, cone = Math.PI } = {}) {
     const r = this.rng;
     this._dc.set(color);
+    const base = dx || dz ? Math.atan2(dz, dx) : 0;
     for (let n = 0; n < count; n++) {
       if (this.sN >= MAX_SPARK) return;
       const i = this.sN++, k = i * 3;
-      const a = r.range(0, Math.PI * 2), sp = speed * r.range(0.3, 1);
+      const a = dx || dz ? base + r.range(-cone, cone) : r.range(0, Math.PI * 2), sp = speed * r.range(0.45, 1);
       this.sPos[k] = x + r.range(-0.06, 0.06); this.sPos[k + 1] = y + r.range(-0.06, 0.06); this.sPos[k + 2] = z + r.range(-0.06, 0.06);
       this.sVel[k] = Math.cos(a) * sp; this.sVel[k + 1] = up * r.range(0.4, 1.3); this.sVel[k + 2] = Math.sin(a) * sp;
       this.sCol[k] = this._dc.r * bright; this.sCol[k + 1] = this._dc.g * bright; this.sCol[k + 2] = this._dc.b * bright;
@@ -118,7 +142,7 @@ export class BattleFX {
       this.sPos[k] += this.sVel[k] * dt; this.sPos[k + 1] += this.sVel[k + 1] * dt; this.sPos[k + 2] += this.sVel[k + 2] * dt;
       const t = 1 - this.sLife[i] / this.sMax[i];
       this.sAlpha[i] = Math.min(1, (1 - t) * 1.8);
-      this.sSize[i] = this.sBase[i] * (1 - 0.5 * t);
+      this.sSize[i] = this.sBase[i] * (1 - 0.3 * t);
       i++;
     }
   }
@@ -311,32 +335,34 @@ export class BattleFX {
       // of contact, dust kicks up round the feet, and most blows add a hot
       // spark that catches the bloom.
       const big = attacker?.def?.myth || attacker?.def?.hero || target.def?.myth || target.def?.hero;
-      const landed = big || r.next() < 0.7;
+      // direction of the blow (striker -> struck), on the ground plane
+      let bx = 0, bz = 0;
+      if (attacker && attacker.x !== undefined) { const d = Math.hypot(x - attacker.x, z - attacker.z) || 1; bx = (x - attacker.x) / d; bz = (z - attacker.z) / d; }
+      const landed = big || r.next() < 0.75;
       if (landed) {
-        // the blow lands: a big white-yellow flash at the point of contact
-        // (white-hot core, warm halo) with a hot outer bloom, and a spray of
-        // sparks, so from RTS height you see who struck whom
-        const s = big ? 3.3 : 2.6;
-        this.spark(px, y, pz, { count: 1, color: 0xffeeb0, bright: big ? 1.8 : 1.9, size: s * r.range(0.9, 1.1), life: big ? 0.6 : 0.5, speed: 0, up: 0, gravity: 0 });
-        this.spark(px, y, pz, { count: big ? 8 : r.int(5, 6), color: r.chance(0.5) ? 0xffd070 : 0xfff0b0, bright: 2.2, size: big ? 0.8 : 0.6, life: 0.65, speed: r.range(3.5, 5), up: 2.8 });
+        // bronze on bronze: a tiny white-hot pin at the point of contact and a
+        // fan of short spark streaks thrown on through the man struck, rising
+        // and falling away - a directional burst, not a round bloom
+        this.spark(px, y, pz, { count: 1, color: 0xfff2c0, bright: 1.6, size: big ? 0.8 : 0.6, life: 0.14, speed: 0, up: 0, gravity: 0 });
+        this.spark(px, y, pz, { count: big ? 12 : r.int(8, 10), color: r.chance(0.5) ? 0xff8a20 : 0xffb040, bright: 2.6, size: big ? 1.9 : 1.6, life: 0.4, speed: r.range(5.0, 7.0), up: 3.0, gravity: -18, dx: bx, dz: bz, cone: 1.1 });
       }
       // voxel chips: chunky solid cubes that tumble out and drop
       const team = game.players?.[target.owner]?.color ?? 0x888888;
-      game.fx.emit({ x: px, y, z: pz, count: big ? 7 : 4, color: 0xc08a3e, colorVar: 0.25, size: 0.13, life: 0.75, speed: 2.8, up: 3.2, gravity: -16, spread: 0.12 });
-      game.fx.emit({ x: px, y: y - 0.1, z: pz, count: 2, color: team, colorVar: 0.15, size: 0.12, life: 0.75, speed: 2.4, up: 2.8, gravity: -16, spread: 0.1 });
-      game.fx.emit({ x: px, y, z: pz, count: 2, color: 0x7a5534, colorVar: 0.2, size: 0.1, life: 0.7, speed: 2.2, up: 3.0, gravity: -16, spread: 0.1 });
+      game.fx.emit({ x: px, y, z: pz, count: big ? 6 : 3, color: 0xc08a3e, colorVar: 0.25, size: 0.12, life: 0.7, speed: 2.6, up: 3.0, gravity: -16, spread: 0.12 });
+      game.fx.emit({ x: px, y: y - 0.1, z: pz, count: 2, color: team, colorVar: 0.15, size: 0.11, life: 0.7, speed: 2.2, up: 2.6, gravity: -16, spread: 0.1 });
       if (r.chance(0.4)) {
         // a wound: a short dark spray and blood on the ground
-        game.fx.emit({ x: px, y: y - 0.1, z: pz, count: r.int(4, 6), color: 0x7a0e08, colorVar: 0.2, size: 0.15, life: 0.55, speed: 2.0, up: 2.0, gravity: -12, spread: 0.1 });
+        game.fx.emit({ x: px, y: y - 0.1, z: pz, count: r.int(4, 6), color: 0x7a0e08, colorVar: 0.2, size: 0.14, life: 0.55, speed: 2.0, up: 2.0, gravity: -12, spread: 0.1 });
         this.scar(x + r.range(-0.3, 0.3), z + r.range(-0.3, 0.3), 0.35, 0.1, 0.5);
       }
-      // feet scrabbling: the man struck is driven back a step and kicks up a
-      // short puff of pale dust from the dirt round his feet (lighter than
-      // the trampled earth so it reads against it), plus a clod or two
-      const bx = attacker ? x - (attacker.x - x) * 0.15 : x, bz = attacker ? z - (attacker.z - z) * 0.15 : z;
-      this.puff(bx, bz, { count: big ? 4 : 2, size: r.range(1.1, 1.5) * (big ? 1.5 : 1), life: 1.4, alpha: 0.5, speed: 0.9, up: 0.25, y: 0.12, spread: 0.3, color: r.chance(0.5) ? 0xb39472 : 0xa4855f });
-      this.puff(px, pz, { count: 1, size: r.range(1.0, 1.4) * (big ? 1.4 : 1), life: 1.7, alpha: 0.3, speed: 0.6, up: 0.08, y: 0.1, spread: 0.3, color: OCHRE[r.int(0, OCHRE.length - 1)] });
-      game.fx.emit({ x: px, y: gy + 0.15, z: pz, count: r.int(2, 4), color: 0x4e3620, colorVar: 0.2, size: 0.15, life: 0.55, speed: 2.0, up: 2.8, gravity: -14, spread: 0.25 });
+      // the man struck is driven back and his heels plough the dirt: a low
+      // brown fan of dust kicked out behind him along the blow, hugging the
+      // ground, plus clods of earth flung the same way
+      const fx0 = x + bx * 0.25, fz0 = z + bz * 0.25;
+      const dcol = () => [0x8a6a46, 0x7d5f3e, 0x957453][r.int(0, 2)];
+      this.puff(fx0, fz0, { count: big ? 5 : 3, size: r.range(1.1, 1.4) * (big ? 1.5 : 1), life: 1.2, alpha: 0.7, speed: 0.4, up: 0.12, y: 0.45, spread: 0.2, color: dcol(), dx: bx * 1.6, dz: bz * 1.6 });
+      this.puff(x, z, { count: 1, size: r.range(1.0, 1.2) * (big ? 1.4 : 1), life: 1.4, alpha: 0.5, speed: 0.3, up: 0.05, y: 0.4, spread: 0.2, color: dcol(), dx: -bz * 0.6, dz: bx * 0.6 });
+      game.fx.emit({ x: fx0, y: gy + 0.12, z: fz0, count: r.int(3, 5), color: 0x5a3e22, colorVar: 0.2, size: 0.13, life: 0.55, speed: 1.2, up: 2.4, gravity: -14, spread: 0.2 });
       this.scar(px, pz, 0.5, 0.3, 0.0);
     } else if (kind === 'arrow') {
       if (r.chance(0.5)) game.fx.emit({ x, y, z, count: 3, color: 0x7a0c08, size: 0.08, life: 0.4, speed: 1.2, up: 1.2, gravity: -12, spread: 0.05 });
@@ -365,7 +391,7 @@ export class BattleFX {
       const [x, z] = at(r.range(-0.7, -0.3), r.range(-0.3, 0.4));
       this.debris.drop('shield', x, z, { rot: r.range(0, 6.28), owner: e.owner, tilt: r.chance(0.3) ? r.range(0.2, 0.5) : r.range(-0.08, 0.08), roll: r.range(-0.1, 0.1), life });
     }
-    if (cls !== 'archer' && r.chance(0.65)) {
+    if (cls !== 'archer' && r.chance(0.35)) {
       const [x, z] = at(r.range(0.3, 0.8), r.range(-0.4, 0.5));
       this.debris.drop(r.chance(0.3) ? 'stub' : 'spear', x, z, { rot: (e.rot || 0) + r.range(-1.2, 1.2), owner: e.owner, tilt: r.range(-0.05, 0.05), life });
     }
@@ -460,7 +486,7 @@ export class BattleFX {
   render() {
     this.debris.render();
     this.sparks.geometry.setDrawRange(0, this.sN);
-    this.gsPos.needsUpdate = this.gsCol.needsUpdate = this.gsSize.needsUpdate = this.gsAlpha.needsUpdate = true;
+    this.gsPos.needsUpdate = this.gsCol.needsUpdate = this.gsSize.needsUpdate = this.gsAlpha.needsUpdate = this.gsVel.needsUpdate = true;
     this.dust.geometry.setDrawRange(0, this.dN);
     this.gdPos.needsUpdate = this.gdCol.needsUpdate = this.gdSize.needsUpdate = this.gdAlpha.needsUpdate = true;
     if (this.scarDirty) {

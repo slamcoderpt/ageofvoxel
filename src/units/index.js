@@ -420,7 +420,11 @@ export class Units {
         // the dead keep their army's colour, darkened (so a fallen man still
         // says whose he was) while the rest of him goes dull
         const dk = u.dead ? Math.min(1, u.anim.dieT / 0.8) * 0.5 : 0;
-        if (dk) this._c.multiplyScalar(1 - dk * 1.1);
+        if (dk) {
+          // and half its saturation: a dull, dusty version of the dye
+          const l = this._c.r * 0.3 + this._c.g * 0.59 + this._c.b * 0.11, m = dk * 1.1;
+          this._c.setRGB(this._c.r + (l - this._c.r) * m, this._c.g + (l - this._c.g) * m, this._c.b + (l - this._c.b) * m).multiplyScalar(1 - dk * 0.9);
+        }
         const tr = this._c.r, tg = this._c.g, tb = this._c.b;
         const flash = u.dead ? 0 : Math.min(1, u.flashT / 0.1) * 0.07;
         const fade = u.dead ? 1 - Math.min(1, Math.max(0, (u.anim.dieT - FADE_START) / (CORPSE_TIME - 0.3 - FADE_START))) : 1;
