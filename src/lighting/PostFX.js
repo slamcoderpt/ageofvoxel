@@ -19,7 +19,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 const GradeShader = {
   uniforms: {
     tDiffuse: { value: null },
-    uExposure: { value: 1.1 },
+    uExposure: { value: 1.26 },
     uChromaLimit: { value: 0.5 },
     uSaturation: { value: 0.96 },
     uGreenShift: { value: 0.42 },
@@ -28,7 +28,7 @@ const GradeShader = {
     uShadowTint: { value: new THREE.Vector3(0.035, 0.055, 0.065) },
     uHighTint: { value: new THREE.Vector3(1.05, 1.0, 0.93) },
     uVignette: { value: 0.0 },
-    uToeLift: { value: 0.05 },
+    uToeLift: { value: 0.08 },
     uKnee: { value: 0.56 },
     uShoulder: { value: 2.2 },
   },

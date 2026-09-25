@@ -22,9 +22,10 @@ export class Lighting {
     this.renderer = renderer;
     const scene = game.scene;
 
-    // Sun: golden late-afternoon light (~40 deg elevation) so buildings and
-    // trees throw long, readable shadows like Retold's town shots.
-    this.sunDir = new THREE.Vector3(-0.6, 0.66, 0.4).normalize();
+    // Sun: golden late-afternoon light (~37 deg elevation) so buildings and
+    // trees throw long, readable shadows like Retold's town shots, and tree
+    // crowns shade the crowns beside them.
+    this.sunDir = new THREE.Vector3(-0.6, 0.55, 0.4).normalize();
     this.sun = new THREE.DirectionalLight(0xffdcaa, 3.9);
     this.sun.castShadow = true;
     const sm = post === 'high' ? 4096 : 2048;

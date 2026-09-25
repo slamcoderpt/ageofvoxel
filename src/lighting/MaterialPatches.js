@@ -34,6 +34,14 @@ export const atmosUniforms = {
   uUnderstory: { value: 1.0 },
   uPale: { value: 0.8 },      // albedo scale for pale neutral stone/marble (keeps whites off the clip)
   uContactAO: { value: 1.0 }, // strength of the wall-base band and ground halos
+  // Leaf shadow balance: foliage in the sun's shadow (cast by the crowns next
+  // to it) loses this much of its sky/fill light and turns cool, so crown-on-
+  // crown and crown-on-floor shadows read as deep blue-green, not mid olive.
+  uLeafShadowAmb: { value: 0.7 },
+  uShadeCool: { value: new THREE.Vector3(0.72, 0.92, 1.25) },
+  uLeafSun: { value: 1.2 },   // direct sun on foliage (lit crown tops glow warm)
+  uFloorShade: { value: 0.65 }, // extra darkening of shadowed forest floor
+  uCrownRound: { value: 1.0 },  // tree crowns shaded as rounded masses
 };
 
 const VOXEL_KEYS = ['voxelTeam', 'voxelTeamInst'];
@@ -42,7 +50,7 @@ const VOXEL_KEYS = ['voxelTeam', 'voxelTeamInst'];
 // tree/tuft, from the instance's map position) and the canopy occlusion terms.
 function patchCommon(shader) {
   Object.assign(shader.uniforms, atmosUniforms, canopyUniforms, contactUniforms);
-  prependVertex(shader, 'varying vec3 vAtmWorld;\nvarying float vAtmSeed;');
+  prependVertex(shader, 'varying vec3 vAtmWorld;\nvarying float vAtmSeed;\nvarying vec4 vAtmCrown;');
   injectVertex(shader, '#include <project_vertex>', `
     {
       vec4 aw = vec4(transformed, 1.0);
@@ -50,14 +58,20 @@ function patchCommon(shader) {
         aw = instanceMatrix * aw;
         vec2 ip = floor(instanceMatrix[3].xz * 2.0 + 0.5);
         vAtmSeed = fract(sin(dot(ip, vec2(12.9898, 78.233))) * 43758.5453);
+        // crown centre of this instance (tree geometry has its pivot at the
+        // trunk base; crowns sit ~2.4 units up) and the local height, so tall
+        // foliage can be shaded as one rounded mass
+        vAtmCrown = vec4((modelMatrix * instanceMatrix * vec4(0.0, 2.4, 0.0, 1.0)).xyz, transformed.y);
       #else
         vAtmSeed = 0.5;
+        vAtmCrown = vec4(0.0, 0.0, 0.0, -10.0);
       #endif
       vAtmWorld = (modelMatrix * aw).xyz;
     }`);
-  prependFragment(shader, `varying vec3 vAtmWorld;\nvarying float vAtmSeed;
+  prependFragment(shader, `varying vec3 vAtmWorld;\nvarying float vAtmSeed;\nvarying vec4 vAtmCrown;\nuniform float uCrownRound;
 uniform sampler2D uCanopy;\nuniform float uCanopyInvSize, uCanopyOn;
-uniform vec3 uSunDirView, uFoliageSky, uFoliageSun, uDeepShade;\nuniform float uGlowScale, uCanopyAO, uUnderstory, uPale, uContactAO;
+uniform vec3 uSunDirView, uFoliageSky, uFoliageSun, uDeepShade;\nuniform float uGlowScale, uCanopyAO, uUnderstory, uPale, uContactAO, uLeafShadowAmb, uLeafSun, uFloorShade;
+uniform vec3 uShadeCool;
 uniform sampler2D uContact;\nuniform vec2 uContactOrigin;\nuniform float uContactInvSize, uContactOn;
 // contact map: occ = footprint occupancy near here, hG = height above the ground
 void atmContact(out float occ, out float hG) {
@@ -86,6 +100,19 @@ void atmCanopy(out float dens, out float hA) {
     dens = cm.r; hA = vAtmWorld.y - cm.g;
   }
 }`);
+  injectFragment(shader, '#include <shadowmap_pars_fragment>', `
+// the sun's shadow term (shadow-casting directional light 0 is the sun)
+float atmSunShadow() {
+  float sh = 1.0;
+  #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+    if (receiveShadow) {
+      DirectionalLightShadow s0 = directionalLightShadows[ 0 ];
+      sh = getShadow( directionalShadowMap[ 0 ], s0.shadowMapSize, s0.shadowIntensity, s0.shadowBias, s0.shadowRadius, vDirectionalShadowCoord[ 0 ] );
+    }
+  #endif
+  return sh;
+}
+`);
 }
 
 // Voxel materials: per-tree crown tint, canopy AO inside and between crowns,
@@ -114,8 +141,18 @@ function patchVoxel(shader) {
     // steps. Sides turned from the sun pick up some sun and sky, sun-facing
     // risers lose a little, so the per-step light/dark flip calms down while
     // real shadows (shadow map, canopy AO) keep the volume.
+    // Crown rounding: tree crowns (tall instanced foliage) also bend their
+    // normals toward a sphere around the crown centre, so every crown gets a
+    // sun side and a far side instead of the same lit-top/dark-riser pattern.
     vec3 atmFaceN = normal;
-    normal = normalize(mix(normal, normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz), 0.5 * atmLeaf));
+    {
+      vec3 up = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
+      float rw = atmLeaf * smoothstep(0.9, 1.5, vAtmCrown.w) * uCrownRound;
+      vec3 rn = normalize((viewMatrix * vec4((vAtmWorld - vAtmCrown.xyz) * vec3(1.0, 1.25, 1.0), 0.0)).xyz);
+      vec3 nb = mix(normal, rn, 0.6 * rw);
+      nb = mix(nb, up, (0.5 - 0.25 * rw) * atmLeaf);
+      normal = normalize(nb);
+    }
     #include <lights_physical_fragment>`);
   injectFragment(shader, '#include <lights_fragment_end>', `
     {
@@ -148,18 +185,31 @@ function patchVoxel(shader) {
       band *= mix(0.55, 1.0, smoothstep(0.2, 0.8, cOcc)) * (1.0 - 0.5 * leaf) * uContactAO;
       reflectedLight.indirectDiffuse *= 1.0 - 0.72 * band;
       reflectedLight.directDiffuse *= 1.0 - 0.5 * band;
+      // sun shadow cast by neighbouring crowns (and buildings): shaded
+      // foliage and forest floor lose part of their sky light and turn cool
+      // (only sampled where it matters: foliage and the forest floor)
+      float sh = (leaf > 0.0 || dens > 0.1) ? atmSunShadow() : 1.0;
+      float inShadow = 1.0 - sh;
+      float faceLit = sh * smoothstep(-0.05, 0.3, dot(normalize(atmFaceN), uSunDirView));
       if (leaf > 0.0) {
         float ndl = dot(wn, uSunDirView);
         // sky fill: strongest on faces the sun does not reach; fades out in the canopy interior
         float away = 1.0 - smoothstep(-0.15, 0.6, ndl);
         vec3 fill = uFoliageSky * (0.35 + 0.75 * away) * (1.0 - 0.45 * occL);
         // translucency: wrap lighting toward the sun, only on the outer shell
+        // and only where the sun actually reaches (not through a neighbour)
         float wrap = smoothstep(-0.35, 1.0, ndl);
-        vec3 sss = uFoliageSun * (wrap * wrap) * (1.0 - 0.6 * occL);
-        // soften the per-step light/dark flip on crown tops: tame direct sun on
-        // leaves a little and let the (normal-independent) fill carry the rest
-        reflectedLight.directDiffuse *= 1.0 - 0.18 * leaf;
-        reflectedLight.indirectDiffuse += alb * (fill + sss) * leaf;
+        vec3 sss = uFoliageSun * (wrap * wrap) * (1.0 - 0.6 * occL) * sh;
+        reflectedLight.directDiffuse *= mix(1.0, uLeafSun, leaf);
+        // cast shadow: less sky; every face away from the sun: cooler, bluer
+        float amb = mix(1.0, 1.0 - uLeafShadowAmb, inShadow * leaf);
+        vec3 cool = mix(vec3(1.0), uShadeCool, (1.0 - faceLit) * leaf);
+        reflectedLight.indirectDiffuse *= amb * cool;
+        reflectedLight.indirectDiffuse += alb * (fill * amb * cool + sss) * leaf;
+      } else {
+        // grass tufts, rocks, trunks on the forest floor in crown shadow
+        float fl = inShadow * smoothstep(0.1, 0.6, dens) * (1.0 - smoothstep(0.5, 2.5, hA));
+        reflectedLight.indirectDiffuse *= mix(vec3(1.0), uShadeCool * (1.0 - uFloorShade), fl);
       }
     }`);
 }
@@ -176,6 +226,9 @@ function patchGround(shader) {
       float under = smoothstep(0.1, 0.8, dens) * (1.0 - smoothstep(0.3, 2.6, hA)) * uUnderstory;
       reflectedLight.indirectDiffuse *= mix(vec3(1.0), uDeepShade, under);
       reflectedLight.directDiffuse *= 1.0 - 0.55 * under;
+      // forest floor in the crowns' sun shadow: deep, cool green-black gaps
+      float fl = dens > 0.1 ? (1.0 - atmSunShadow()) * smoothstep(0.1, 0.6, dens) : 0.0;
+      reflectedLight.indirectDiffuse *= mix(vec3(1.0), uShadeCool * (1.0 - uFloorShade), fl);
       // contact halo round every building, prop and unit standing here
       float cOcc, hG; atmContact(cOcc, hG);
       float halo = smoothstep(0.02, 0.75, cOcc) * uContactAO;
