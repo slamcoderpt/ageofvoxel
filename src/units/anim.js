@@ -260,7 +260,35 @@ export function pose(kind, u, out) {
       set('armR', -0.55, 0, -0.25); set('weapon', 0.55, 0, 0.25);
       set('armL', -0.15, 0.1, 0.12); set('torso', 0.06, 0.2 + S(t * 0.37) * 0.1, -0.04);
       set('legL', -0.15, 0, 0.1); set('legR', 0.12, 0, -0.02);
-    } else if (hoplite) { set('armL', -0.4, 0.2, 0.1); set('armR', -0.25, 0, -0.1); set('weapon', 0.2); }
+    } else if (hoplite) { set('armL', -0.45, 0.2, 0.32); set('armR', -0.3, 0, -0.3); set('weapon', 0.2, 0, 0.18); }
+    if (hoplite && u.order?.type === 'attack' && !hero) {
+      // waiting behind the fighting rank: each man picks a guard for a few
+      // seconds at a time (own clock), so the rear of a melee is a mix of
+      // raised shields, levelled spears and men stepping back, not a
+      // parade rank
+      const rv = Math.floor(uhash(u, 60 + Math.floor(t / 2.7 + uhash(u, 61) * 5)) * 3);
+      const sw = S(t * 2.3) * 0.05;
+      bob = 0;
+      if (rv === 0) {
+        // shield up high against arrows, spear cocked overhand
+        set('armL', -1.75 + sw, 0.45, 0.35); set('armR', -2.35, 0.15, -0.3); set('weapon', 1.57 + 0.2 + 2.35);
+        set('torso', 0.2, -0.25); set('head', -0.15);
+        set('legL', -0.6); set('shinL', 0.5); set('legR', 0.4); set('shinR', 0.45);
+        bob = -1.6;
+      } else if (rv === 1) {
+        // spear levelled at the hip, shield pushed out in front
+        set('armR', -0.95, 0.2, -0.35); set('weapon', 1.57 + 0.95 - 0.12, 0, 0.1);
+        set('armL', -1.25 + sw, 0.55, 0.35); set('torso', 0.28, 0.3); set('head', -0.25);
+        set('legL', -0.8); set('shinL', 0.6); set('legR', 0.55); set('shinR', 0.35);
+        bob = -2.0;
+      } else {
+        // falling back a pace: weight on the rear foot, shield across the body
+        set('armL', -1.05, 0.7, 0.2); set('armR', -1.6 + sw, 0.1, -0.4); set('weapon', 1.57 + 1.6 - 0.5);
+        set('torso', -0.12, -0.35); set('head', 0.1, 0.3);
+        set('legL', -0.15); set('shinL', 0.1); set('legR', 0.7); set('shinR', 0.8);
+        bob = -1.2;
+      }
+    }
     if (archer) archerUpper(u, st, t, set, v % 2);
     if (beast) {
       set('torso', 0.1 + b * 0.03);
@@ -311,6 +339,13 @@ export function pose(kind, u, out) {
     add('weapon', (uhash(u, 11) - 0.5) * 0.3, 0, (uhash(u, 12) - 0.5) * 0.16);
     add('shield', (uhash(u, 13) - 0.5) * 0.25, (uhash(u, 14) - 0.5) * 0.5, (uhash(u, 15) - 0.5) * 0.3);
     add('head', (uhash(u, 17) - 0.5) * 0.2, (uhash(u, 16) - 0.5) * 0.5, (uhash(u, 18) - 0.5) * 0.2);
+  }
+  // A fighting stance: feet planted apart with daylight between the legs,
+  // so each man stands on two legs instead of one post.
+  if (!beast && (st === 'idle' || st === 'attack') && u.type !== 'villager') {
+    const w = 0.13 + uhash(u, 62) * 0.1;
+    add('legL', 0, 0, w); add('legR', 0, 0, -w); add('shinL', 0, 0, -w * 0.6); add('shinR', 0, 0, w * 0.6);
+    bob -= w * 2;
   }
   // idle fidgets: every few seconds (own period per man) a soldier shifts
   // his weight, turns to the man beside him and re-grips his weapon, so a
@@ -367,6 +402,7 @@ export function gearOf(u) {
     cloak: c < 0.38 ? 1 : c < 0.7 ? 2 : 0,
     shield: s < 0.25 ? 0 : s < 0.45 ? 1 : s < 0.8 ? 2 : 3,
     hat: h < 0.4 ? 0 : h < 0.72 ? 1 : 2,
+    pennant: uhash(u, 23) < 0.22 ? 1 : 0,
   });
 }
 

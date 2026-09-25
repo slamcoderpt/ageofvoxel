@@ -236,7 +236,14 @@ export class Units {
         }
       }
       // every man stands 5-15 degrees off true, to his own side
-      const yaw = u.moving ? 0 : (uhash(u, 8) < 0.5 ? -1 : 1) * (0.087 + uhash(u, 4) * 0.175) * (a.state === 'attack' ? 0.85 : 1.15);
+      // In a fight each man turns up to ~30 degrees off his foe, re-picked
+      // every few seconds on his own clock (squaring up to a new threat,
+      // side-stepping a thrust), so a melee is not a grid of parallel men.
+      let yaw = u.moving ? 0 : (uhash(u, 8) < 0.5 ? -1 : 1) * (0.087 + uhash(u, 4) * 0.175) * 1.15;
+      if (!u.moving && u.order?.type === 'attack' && !u.def.attack?.projectile && !u.def.myth) {
+        const n = Math.floor(a.t / (2.2 + uhash(u, 63) * 1.6) + uhash(u, 64) * 7);
+        yaw = (uhash(u, 65 + n) - 0.5) * 2 * 0.52;
+      }
       const k = Math.min(1, dt * PRESS_RATE);
       u.units_press = (u.units_press || 0) + (press - (u.units_press || 0)) * k;
       u.units_yaw = (u.units_yaw || 0) + (yaw - (u.units_yaw || 0)) * k;
@@ -408,7 +415,9 @@ export class Units {
           const parent = p.parentIdx >= 0 ? world[p.parentIdx] : this._root;
           const r = rig.rot[p.anim];
           this._q.setFromEuler(this._e.set(r[0], r[1], r[2]));
-          const sc = p.show && !p.show(u) ? 0 : 1;
+          // the dead let go of their spears (they lie under the body), so a
+          // field of corpses is not a litter of loose sticks over the melee
+          const sc = (p.show && !p.show(u)) || (u.dead && p.anim === 'weapon' && u.anim.dieT > 0.5 && rig.kind !== 'archer') ? 0 : 1;
           this._m.compose(this._v.set(p.joint[0] * V, p.joint[1] * V, p.joint[2] * V), this._q, this._s.set(sc, sc, sc));
           const m = world[pi].multiplyMatrices(parent, this._m);
           p.mesh.setMatrixAt(i, m);
