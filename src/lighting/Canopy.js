@@ -22,8 +22,8 @@ export class CanopyMap {
     this.dirty = true;
     this.cooldown = 0;
     this.tex = null;
-    game.events.on('entity:added', (e) => { if (e.kind === 'resource') this.dirty = true; });
-    game.events.on('entity:removed', (e) => { if (e.kind === 'resource') this.dirty = true; });
+    game.events.on('entity:added', (e) => { if (e.type === 'tree') this.dirty = true; });
+    game.events.on('entity:removed', (e) => { if (e.type === 'tree') this.dirty = true; }); // (only trees cast canopy)
   }
 
   update() {
