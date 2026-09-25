@@ -351,12 +351,38 @@ export class Buildings {
     b.progress = 1;
     b.hp = Math.max(b.hp, b.maxHp);
     game.events.emit('building:completed', b);
+    // builders move on: one of them works a new farm, the rest help on the
+    // nearest unfinished site of their own, else go back to what they were
+    // doing before they were sent to build, else stand idle
+    let farmer = !b.def.farm;
     for (const u of game.entities.units()) {
-      if (u.order?.type === 'build' && u.order.targetId === b.id) {
-        if (b.def.farm) game.commands.order(u, { type: 'gather', targetId: b.id });
-        else game.commands.idle(u);
-      }
+      if (u.dead || u.order?.type !== 'build' || u.order.targetId !== b.id) continue;
+      const resume = u.order.resume;
+      if (!farmer && game.commands.order(u, { type: 'gather', targetId: b.id })) { farmer = true; continue; }
+      const site = this.nearestSite(u, 12);
+      if (site) { game.commands.order(u, { type: 'build', targetId: site.id }); if (resume) u.order.resume = resume; continue; }
+      if (resume && this.resume(u, resume)) continue;
+      game.commands.idle(u);
     }
+  }
+
+  nearestSite(u, maxDist) {
+    let best = null, bd = maxDist * maxDist;
+    for (const o of this.game.entities.buildings()) {
+      if (o.built || o.dead || o.owner !== u.owner) continue;
+      const d = (o.x - u.x) ** 2 + (o.z - u.z) ** 2;
+      if (d < bd) { bd = d; best = o; }
+    }
+    return best;
+  }
+
+  resume(u, r) {
+    const game = this.game;
+    const t = game.entities.get(r.targetId);
+    if (t && !t.removed && !t.dead && game.commands.order(u, { type: r.type, targetId: t.id })) return true;
+    if (r.type !== 'gather' || !r.resType) return false;
+    const alt = game.economy.nearestResource(u.x, u.z, r.resType, 16);
+    return !!alt && game.commands.order(u, { type: 'gather', targetId: alt.id });
   }
 
   // ---- rendering ---------------------------------------------------------

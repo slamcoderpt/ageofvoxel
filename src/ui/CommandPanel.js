@@ -36,7 +36,12 @@ export class CommandPanel {
           cmds.push({
             key: def.hotkey, img: this.portraitBuilding(t, me), title: `Build ${def.name}`, cost: def.cost,
             enabled: p.canAfford(def.cost) && (def.minAge ?? 0) <= p.age,
-            run: () => game.buildings.placement.begin(t, units.filter((u) => u.def.builder)),
+            run: () => {
+              game.buildings.placement.begin(t, units.filter((u) => u.def.builder));
+              // show the ghost under the cursor straight away, not at the map corner
+              const m = game.input.mouse;
+              if (m.inside) this.ui.selection.hoverPlacement(m.x, m.y);
+            },
           });
         }
       }

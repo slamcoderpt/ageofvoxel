@@ -38,7 +38,13 @@ export class Placement {
     const player = game.players[game.localPlayer];
     if (!player.pay(a.def.cost)) return false;
     const b = this.buildings.spawn(a.type, game.localPlayer, a.tx, a.tz, { built: false });
-    for (const u of a.builders) game.commands.order(u, { type: 'build', targetId: b.id });
+    for (const u of a.builders) {
+      // remember what the builder was doing, so it goes back to it afterwards
+      const prev = u.order?.type === 'build' ? u.order.resume : u.order;
+      game.commands.order(u, { type: 'build', targetId: b.id });
+      if (u.order.type === 'build' && prev && (prev.type === 'gather' || prev.type === 'worship'))
+        u.order.resume = { type: prev.type, targetId: prev.targetId, resType: u.econ?.resType };
+    }
     this.cancel();
     return b;
   }

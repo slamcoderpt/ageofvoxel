@@ -65,7 +65,9 @@ export class SelectionController {
     // resources: check projected canopy centre for trees, footprint for others
     bd = Infinity;
     for (const r of game.entities.resources()) {
-      if (!game.fog.isExplored(r.x, r.z)) continue;
+      // a tree whose crown shows at the edge of the fog is clickable even if
+      // its trunk tile is still unexplored
+      if (!this.exploredNear(r)) continue;
       if (r.type === 'tree') {
         if (Math.abs(r.x - g.x) > 7 || Math.abs(r.z - g.z) > 7) continue;
         const s = game.worldToScreen(r.x, game.map.heightAt(r.x, r.z) + 2.5, r.z);
@@ -76,11 +78,20 @@ export class SelectionController {
     return best;
   }
 
+  exploredNear(r) {
+    const fog = this.game.fog;
+    for (let z = r.tz - 2; z <= r.tz + r.h + 1; z++)
+      for (let x = r.tx - 2; x <= r.tx + r.w + 1; x++) if (fog.isExplored(x + 0.5, z + 0.5)) return true;
+    return false;
+  }
+
   // ---- mouse ----------------------------------------------------------
   onDown(e) {
     const game = this.game;
     if (e.button === 0) {
       if (game.buildings.placement.active) {
+        // validate at the click point (the cursor may not have moved since the hotkey)
+        this.hoverPlacement(e.clientX, e.clientY);
         const b = game.buildings.placement.confirm();
         if (!b) this.ui.message('Cannot place building here');
         else if (e.shiftKey) {
@@ -122,12 +133,16 @@ export class SelectionController {
     if (bs.length) this.ui.marker(x, z, 0xffd84a);
   }
 
+  hoverPlacement(cx, cy) {
+    const game = this.game;
+    if (!game.buildings.placement.active) return;
+    const g = game.pickGround(cx, cy);
+    if (g) game.buildings.placement.hover(g.x, g.z);
+  }
+
   onMove(e) {
     const game = this.game;
-    if (game.buildings.placement.active) {
-      const g = game.pickGround(e.clientX, e.clientY);
-      if (g) game.buildings.placement.hover(g.x, g.z);
-    }
+    this.hoverPlacement(e.clientX, e.clientY);
     if (this.drag) {
       const d = this.drag;
       if (!d.active && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5) d.active = true;

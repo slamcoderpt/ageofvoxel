@@ -177,11 +177,14 @@ export class Combat {
       // soldiers attacking a building switch to nearby enemy units
       if (scan && t && t.kind === 'building' && !u.def.gatherer) {
         const e = this.findEnemyNear(u, 6);
-        if (e) { u.order.targetId = e.id; t = e; }
+        // (remember the building, so the attack goes back to it afterwards)
+        if (e) { u.order.buildingId = t.id; u.order.targetId = e.id; t = e; }
       }
       if (!t || t.dead || t.removed) {
         const e = !u.def.gatherer ? this.pickTarget(u, u.combat_leash || u.sight) : null;
+        const back = u.order.buildingId !== undefined ? game.entities.get(u.order.buildingId) : null;
         if (e) { u.order.targetId = e.id; this.approach(u, e); }
+        else if (back && !back.dead && !back.removed) { u.order.targetId = back.id; this.approach(u, back); }
         else if (u.order.thenBuildings) {
           const b = this.findEnemyBuildingNear(u, 200);
           if (b) { u.order.targetId = b.id; this.approach(u, b); } else game.commands.idle(u);
