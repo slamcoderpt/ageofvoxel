@@ -7,6 +7,7 @@ import { constructionModel, CONSTRUCTION_STAGES } from './construction.js';
 import { hash3 } from '../core/rng.js';
 import { Placement } from './placement.js';
 import { Props } from './props.js';
+import { withExtras } from './shapes.js';
 
 // Buildings piece: spawning, construction ('build' order), destruction,
 // rendering and the placement flow.
@@ -48,7 +49,8 @@ export class Buildings {
     if (!this.geos.has(k)) {
       const def = BUILDING_DEFS[type];
       const model = BUILDING_MODELS[type](variant);
-      this.geos.set(k, buildVoxelGeometry(model, { size: BUILDING_VOXEL, pivot: [def.w * 2, 0, def.h * 2], jitter: 0.06 }));
+      const pivot = [def.w * 2, 0, def.h * 2];
+      this.geos.set(k, withExtras(buildVoxelGeometry(model, { size: BUILDING_VOXEL, pivot, jitter: 0.06 }), model, BUILDING_VOXEL, pivot));
     }
     return this.geos.get(k);
   }
@@ -59,7 +61,8 @@ export class Buildings {
     if (!this.geos.has(k)) {
       const def = BUILDING_DEFS[type];
       const model = constructionModel(type, variant, stage, def.w, def.h);
-      this.geos.set(k, buildVoxelGeometry(model, { size: BUILDING_VOXEL, pivot: [def.w * 2, 0, def.h * 2], jitter: 0.06 }));
+      const pivot = [def.w * 2, 0, def.h * 2];
+      this.geos.set(k, withExtras(buildVoxelGeometry(model, { size: BUILDING_VOXEL, pivot, jitter: 0.06 }), model, BUILDING_VOXEL, pivot, { maxY: model.extraMaxY }));
     }
     return this.geos.get(k);
   }
@@ -70,12 +73,23 @@ export class Buildings {
   variantOf(b) {
     if (b.bld_variant !== undefined) return b.bld_variant;
     const n = BUILDING_VARIANTS[b.type] || 1;
-    let v = n > 1 ? Math.floor(hash3(b.tx, 7, b.tz, 31) * n) % n : 0;
+    let v = 0;
     if (n > 1) {
-      const near = new Set();
-      for (const o of this.game.entities.buildings())
-        if (o !== b && o.type === b.type && o.bld_variant !== undefined && Math.hypot(o.x - b.x, o.z - b.z) < 8) near.add(o.bld_variant);
-      for (let i = 0; i < n && near.has(v); i++) v = (v + 1) % n;
+      // least-used variant among this owner's same-type buildings nearby
+      // (closest ones weigh most), ties broken by a tile hash, so a town
+      // shows every plan before it repeats one
+      const score = new Array(n).fill(0);
+      for (const o of this.game.entities.buildings()) {
+        if (o === b || o.type !== b.type || o.bld_variant === undefined) continue;
+        const d = Math.hypot(o.x - b.x, o.z - b.z);
+        if (d < 30) score[o.bld_variant] += 1 + (30 - d) / 30;
+      }
+      const start = Math.floor(hash3(b.tx, 7, b.tz, 31) * n) % n;
+      let best = Infinity;
+      for (let i = 0; i < n; i++) {
+        const c = (start + i) % n;
+        if (score[c] < best - 1e-6) { best = score[c]; v = c; }
+      }
     }
     b.bld_variant = v;
     return v;

@@ -63,6 +63,8 @@ export function constructionModel(type, variant, stage, w, h) {
   const { full, top, upper } = modelInfo(type, variant);
   const cut = stage <= 0 ? 1 : Math.max(2, Math.round(1 + (top - 1) * Math.pow(stage / N, 0.9)));
   const m = clippedModel(full, cut);
+  // smooth parts (roofs, domes) appear once the work has risen past them
+  if (full.extra) { m.extra = full.extra; m.extraMaxY = stage >= N - 1 ? Infinity : cut; }
   const W = w * 4, D = h * 4;
   const clampX = (v) => Math.max(0, Math.min(W - 1, v));
   const clampZ = (v) => Math.max(0, Math.min(D - 1, v));

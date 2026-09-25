@@ -1,5 +1,6 @@
 import { VoxelModel, TEAM } from '../core/voxel.js';
 import { hash3 } from '../core/rng.js';
+import { TILES, gableRoof, hipRoof, shedRoof, dome, cylinder, roundColumn, cone } from './shapes.js';
 
 // Greek voxel buildings described in code, styled after Age of Mythology:
 // Retold's towns: white marble and plastered walls on stone plinths, shallow
@@ -310,47 +311,7 @@ function leanTo(m, x, y, z, w, d, dir, { run = 2, tone = 'civic' } = {}) {
   return y + Math.floor((n - 1) / run) + 1;
 }
 
-// Mono-pitch (shed) roof over [x, x+w) x [z, z+d), high at the back (-z) and
-// falling to a projecting front eave with dark rafter ends; tiled terracotta
-// with marble-capped side verges.
-function shedRoof(m, x, y, z, w, d, { run = 2, tone = 'terra', wall = MARBLE_SHADE } = {}) {
-  const T = ROOF_TONES[tone];
-  const rise = Math.floor((d - 1) / run);
-  for (let k = 0; k < d; k++) {
-    const h = Math.floor((d - 1 - k) / run);
-    for (let i = 0; i < w; i++) {
-      const verge = i === 0 || i === w - 1;
-      const c = verge ? MARBLE_SHADE : k === d - 1 ? T.eave : roofTile(x + i, y + h, z + k, true, T.tones, T.rib);
-      m.set(x + i, y + h, z + k, c);
-      for (let yy = y; yy < y + h; yy++) if (k > 0 && k < d - 1) m.set(x + i, yy, z + k, T.eave);
-    }
-  }
-  // back wall rises to meet the high edge
-  for (let i = 0; i < w; i++) for (let yy = y; yy < y + rise; yy++) m.set(x + i, yy, z, wall);
-  // front eave: dark rafter ends under the overhang and antefixes on top
-  for (let i = 0; i < w; i++) {
-    m.set(x + i, y - 1, z + d - 1, (i & 1) ? SOFFIT : null);
-    if (i % 3 === 1) m.set(x + i, y + 1, z + d - 1, T.antefix);
-  }
-  return y + rise + 1;
-}
 
-// Shallow terracotta hip roof over [x, x+w) x [z, z+d).
-function hipRoof(m, x, y, z, w, d, { run = 2, finial = GOLD } = {}) {
-  let hmax = 0;
-  const H = (i, k) => Math.floor(Math.min(i, w - 1 - i, k, d - 1 - k) / run);
-  for (let i = 0; i < w; i++) for (let k = 0; k < d; k++) hmax = Math.max(hmax, H(i, k));
-  for (let i = 0; i < w; i++) for (let k = 0; k < d; k++) {
-    const h = H(i, k);
-    const ring = Math.min(i, w - 1 - i, k, d - 1 - k);
-    const hipLine = (i === k || w - 1 - i === k || i === d - 1 - k || w - 1 - i === d - 1 - k);
-    const c = ring === 0 ? EAVE_T : h === hmax || hipLine ? RIDGE_T : roofTile(x + i, y + h, z + k, Math.min(k, d - 1 - k) < Math.min(i, w - 1 - i));
-    m.set(x + i, y + h, z + k, c);
-    if (h > 0) m.set(x + i, y + h - 1, z + k, EAVE_T);
-  }
-  if (finial) m.set(x + (w >> 1), y + hmax + 1, z + (d >> 1), finial);
-  return y + hmax + 1;
-}
 
 // Flat roof: slab with a low marble parapet and a team band under it.
 function flatRoof(m, x, y, z, w, d) {
@@ -472,76 +433,156 @@ function hopliteStatue(m, x, y, z) {
 }
 
 // ---- buildings ---------------------------------------------------------------
-// Town Center: a peripteral civic hall on a three-step stylobate: four
-// round-reading Doric columns across the front and back (plus the flanks)
-// in front of a red-painted cella, a team-coloured frieze under a marble
-// cornice, and a matte terracotta gable ending front and back in a sculpted
-// pediment. A forecourt with braziers, banners and an altar.
+// Roofs, pediments, domes and round shafts are smooth parts (shapes.js);
+// walls, bases and ornament stay voxel. Each type has its own silhouette:
+//   Town Center   a walled civic court round a domed tholos and a colossus
+//   Temple        the one true temple front: podium, columns, pediment
+//   Academy       a long stoa across the back and a tall watch tower
+//   Storehouse    an open shed with two domed granary silos
+//   House         five plans: courtyard house, L-house with pergola,
+//                 two-storey house, porch cottage, tower house (pyrgos)
+const FILL = 0xebe6da, FILL_WARM = 0xe6dac2, FILL_ASHLAR = 0xe0d9ca;
+const TYMP_BLUE = 0x2f4570;
+
+// Upscale a voxel model by an integer factor into m at an offset.
+function mergeScaled(m, src, k, ox, oy, oz, filter = () => true) {
+  const b = src.bounds();
+  for (let y = b.min[1]; y < b.max[1]; y++)
+    for (let z = b.min[2]; z < b.max[2]; z++)
+      for (let x = b.min[0]; x < b.max[0]; x++) {
+        const v = src.get(x, y, z);
+        if (!v || !filter(x, y, z)) continue;
+        m.box(ox + x * k, oy + y * k, oz + z * k, k, k, k, v.team ? TEAM : v.c, v.glow ? { glow: v.glow } : undefined);
+      }
+}
+
+// Colossal marble god (the statue figure at twice the scale) standing on a
+// tall plinth with a painted band; (cx, cz) centre of the plinth.
+function colossus(m, cx, y, cz) {
+  m.box(cx - 4, y, cz - 4, 8, 1, 8, MARBLE_SHADE);
+  m.box(cx - 3, y + 1, cz - 3, 6, 5, 6, MARBLE);
+  m.box(cx - 3, y + 4, cz - 3, 6, 1, 6, (x, yy, z) => ((x + z) % 3 === 0 ? GILT : PAINT_BLUE));
+  m.box(cx - 4, y + 6, cz - 4, 8, 1, 8, MARBLE_SHADE);
+  const tmp = new VoxelModel();
+  statue(tmp, 0, 0, 0, { bolt: true });
+  // figure starts at y 5 of the statue; its body is centred on x 2, z 2
+  mergeScaled(m, tmp, 2, cx - 4, y + 7 - 10, cz - 4, (x, yy) => yy >= 5);
+}
+
+// A round granary silo with a domed cap.
+function silo(m, cx, y, cz, r, h) {
+  cylinder(m, cx, y, cz, r + 0.3, 1, 0x9a9382, { segs: 16 });
+  cylinder(m, cx, y + 1, cz, r, h - 1, 0xeee8dc, { segs: 16, cap: false });
+  cylinder(m, cx, y + h - 2, cz, r + 0.05, 0.6, PAINT_BLUE, { segs: 16, cap: false });
+  dome(m, cx, y + h + 0.4, cz, r + 0.2, { segs: 16, rings: 5, k: 0.75, tones: [0xe7e1d4, 0xdcd5c6], rib: 0xf5f1e8, ribEvery: 4 });
+  cylinder(m, cx, y + h + 0.4 + (r + 0.2) * 0.75, cz, 0.35, 0.8, BRONZE, { segs: 6 });
+}
+
+// Town Center: a walled civic court. At the back a round tholos (ring of
+// fluted columns, tiled conical peristyle roof, drum and ribbed dome)
+// between two gabled halls; down both sides colonnaded stoas under shed
+// roofs; across the front a low wall and a pedimented gateway; in the court
+// a colossal Zeus on a tall plinth.
 export function townCenterModel(variant = 0, m = new VoxelModel()) {
-  const S = 28;
-  steps(m, 0, 0, S, S, 2, [STONE, PAVE]);
-  // stylobate: three marble steps under the hall, dark-light-bright so each
-  // tread reads
-  m.box(0, 2, 0, 28, 1, 23, MARBLE_DARK);
-  m.box(1, 3, 1, 26, 1, 21, MARBLE_SHADE);
-  m.box(2, 4, 2, 24, 1, 19, MARBLE);
-  const y = 5, CH = 14;
-  // cella: ashlar core, its porch faces painted Pompeian red so the white
-  // colonnade stands out against it; bronze door, dark windows
-  m.box(8, y, 5, 12, CH, 9, ASHLAR);
-  m.box(8, y + 1, 13, 12, CH - 1, 1, PORCH_RED);
-  m.box(19, y + 1, 5, 1, CH - 1, 9, PORCH_RED);
-  m.box(8, y, 13, 12, 1, 1, MARBLE_SHADE);
-  m.box(12, y, 13, 4, 8, 1, DOOR);
-  m.box(11, y + 8, 13, 6, 1, 1, MARBLE);
-  m.box(13, y + 3, 13, 2, 1, 1, BRONZE);
-  for (const x of [9, 17]) m.box(x, y + 4, 13, 2, 4, 1, DARK);
-  for (const z of [7, 10]) m.box(19, y + 5, z, 1, 4, 2, DARK);
-  // peristyle
-  for (const x of [3, 9, 15, 21]) { column4(m, x, y, 15, CH); column4(m, x, y, 3, CH); }
-  for (const z of [9]) { column4(m, 3, y, z, CH); column4(m, 21, y, z, CH); }
-  const t = entablature(m, 3, y + CH, 3, 22, 16);
-  templeRoof(m, 1, t, 1, 26, 19, 'z', { run: 2, relief: 'both' });
-  banner(m, 6, 2, 25, 7, 'x'); banner(m, 20, 2, 25, 7, 'x');
-  // ---- forecourt: braziers, banners and an altar
-  brazier(m, 1, 2, 24); brazier(m, 25, 2, 24);
-  m.box(12, 2, 23, 4, 2, 3, MARBLE); m.box(12, 3, 23, 4, 1, 3, RED);   // altar
-  m.box(13, 4, 24, 2, 1, 1, FIRE, { glow: 0.5 });
-  pithos(m, 7, 2, 24, 0xb8683e); amphora(m, 20, 2, 24); amphora(m, 21, 2, 25, 0xa65a34);
+  steps(m, 0, 0, 28, 28, 2, [STONE, PAVE]);
+  const y = 2;
+  // ---- back halls either side of the tholos
+  for (const x0 of [1, 19]) {
+    socle(m, x0, y, 1, 8, 8);
+    m.box(x0, y + 2, 1, 8, 12, 8, ASHLAR);
+    m.box(x0, y + 12, 1, 8, 1, 8, MARBLE_SHADE);
+    // windows and a door onto the court
+    m.box(x0 + 2, y + 6, 9, 1, 3, 1, DARK); m.box(x0 + 5, y + 6, 9, 1, 3, 1, DARK);
+    m.box(x0 + 3, y + 2, 9, 2, 5, 1, DOOR);
+    m.box(x0 + 2, y + 7, 8, 4, 1, 1, MARBLE);
+    if (x0 === 19) for (const z of [3, 6]) m.box(27, y + 6, z, 1, 3, 1, DARK);
+    gableRoof(m, { wx0: x0, wx1: x0 + 8, wz0: 1, wz1: 9, top: y + 14, axis: 'z', pitch: 0.36, ov: 0.8, ovG: 0.5, tiles: TILES.rose, fill: FILL_ASHLAR, seed: x0 });
+  }
+  wallBanner(m, 28, y + 4, 3, '+x', 6);
+  // ---- tholos
+  const tx = 14, tz = 8;
+  cylinder(m, tx, y, tz, 7, 0.8, 0x9a9382, { segs: 28 });
+  cylinder(m, tx, y + 0.8, tz, 6.5, 0.7, MARBLE_SHADE, { segs: 28 });
+  cylinder(m, tx, y + 1.5, tz, 4.2, 15, 0xefe9dc, { segs: 24, cap: false });
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2 + Math.PI / 12;
+    roundColumn(m, tx + Math.cos(a) * 5.5, y + 1.5, tz + Math.sin(a) * 5.5, 0.6, 10);
+  }
+  cylinder(m, tx, y + 11.5, tz, 6.3, 0.9, MARBLE_SHADE, { segs: 28, cap: false });
+  cylinder(m, tx, y + 12.4, tz, 6.2, 0.9, PAINT_BLUE, { segs: 28, cap: false });
+  cylinder(m, tx, y + 13.3, tz, 6.7, 0.6, MARBLE, { segs: 28 });
+  cone(m, tx, tz, 6.8, y + 13.9, 4.3, y + 15.4, { tiles: TILES.rose, segs: 28 });
+  cylinder(m, tx, y + 15.4, tz, 4.3, 1.2, MARBLE, { segs: 24, cap: false });
+  dome(m, tx, y + 16.9, tz, 4.5, { segs: 24, rings: 7, k: 0.85, tones: [0xc98c72, 0xbd7f66], rib: 0xf0ebe0, ribEvery: 3 });
+  cylinder(m, tx, y + 16.9 + 4.5 * 0.85 - 0.2, tz, 0.5, 1.3, GOLD, { segs: 8 });
+  // ---- side stoas: an outer wall, four columns on the court side, shed roof
+  for (const [wx, cx, dir] of [[1, 7.5, '+x'], [23, 20.5, '-x']]) {
+    socle(m, wx, y, 12, 4, 12);
+    m.box(wx, y + 2, 12, 4, 7, 12, ASHLAR);
+    m.box(dir === '+x' ? wx + 4 : wx - 1, y, 12, 1, 1, 12, MARBLE_SHADE);
+    for (let i = 0; i < 4; i++) roundColumn(m, cx, y + 1, 13.5 + i * 3, 0.55, 8);
+    const bx = dir === '+x' ? 5 : 19;
+    m.box(bx, y + 9, 12, 4, 1, 12, MARBLE_SHADE);
+    m.box(bx, y + 10, 12, 4, 1, 12, MARBLE);
+    shedRoof(m, { wx0: dir === '+x' ? 1 : 19, wx1: dir === '+x' ? 9 : 27, wz0: 12, wz1: 24, top: y + 11, dir, pitch: 0.3, ov: 0.8, ovS: 0.4, tiles: TILES.rose, fill: FILL_ASHLAR, seed: wx + 3 });
+    if (dir === '-x') { for (const z of [14, 18, 21]) m.box(27, y + 5, z, 1, 2, 1, DARK); wallBanner(m, 27, y + 1, 16, '+x', 6); }
+  }
+  // ---- court: paved, a colossus facing the gate, planters and jars
+  m.box(9, y, 11, 10, 1, 13, PAVE);
+  m.box(10, y + 1, 13, 8, 1, 8, MARBLE_SHADE);
+  m.box(11, y + 2, 14, 6, 2, 6, MARBLE);
+  statue(m, 12, y + 4, 15, { bolt: true });
+  pithos(m, 10, y + 1, 21, 0xb8683e); amphora(m, 11, y + 1, 22, 0xa65a34);
+  pithos(m, 17, y + 1, 21, 0xa65a34);
+  // ---- front: low coped wall and a pedimented gateway
+  for (const [x0, w] of [[1, 9], [18, 9]]) {
+    m.box(x0, y, 24, w, 4, 2, ASHLAR);
+    m.box(x0, y + 4, 24, w, 1, 2, MARBLE);
+  }
+  for (const x0 of [9.5, 16.5]) roundColumn(m, x0 + 0.5, y, 26, 0.7, 9);
+  m.box(10, y, 23, 2, 9, 2, MARBLE); m.box(16, y, 23, 2, 9, 2, MARBLE);
+  m.box(8, y + 9, 22, 12, 1, 6, MARBLE_SHADE);
+  m.box(8, y + 10, 22, 12, 1, 6, PAINT_BLUE);
+  m.box(8, y + 11, 22, 12, 1, 6, MARBLE);
+  gableRoof(m, { wx0: 8, wx1: 20, wz0: 22, wz1: 28, top: y + 12, axis: 'z', pitch: 0.34, ov: 0.6, ovG: 0.5, ends: 'pediment', tiles: TILES.rose, tymp: TYMP_BLUE, rakeH: 0.8, seed: 41 });
+  banner(m, 6, y, 27, 7, 'x'); banner(m, 20, y, 27, 7, 'x');
+  brazier(m, 3, y, 26); brazier(m, 23, y, 26);
   return m;
 }
 
-// House variants, each with its own silhouette:
-//   0 flat-roofed courtyard house        1 L-shaped house with a vine pergola
-//   2 two-storey house with a balcony     3 pedimented cottage with a porch
+// House variants, each its own silhouette and height:
+//   0 low courtyard house with flat terraces   1 L-house with a vine pergola
+//   2 two-storey house with a balcony          3 pedimented porch cottage
+//   4 tower house (pyrgos) with a low barn
 export function houseModel(variant = 0, m = new VoxelModel()) {
   m.box(0, 0, 0, 12, 1, 12, STONE);
-  const PL = variant === 1 || variant === 3 ? PLASTER_WARM : PLASTER;
+  const warm = variant === 1 || variant === 3;
+  const PL = warm ? PLASTER_WARM : PLASTER;
+  const fill = warm ? FILL_WARM : FILL;
   if (variant === 0) {
-    // rooms at the back (tall) and down the east side (lower), flat roofs
+    // rooms at the back (taller) and down the east side (lower), flat roofs
     m.box(0, 1, 0, 12, 7, 5, PL); m.box(0, 1, 0, 12, 2, 5, BASE_STONE);
-    band(m, 0, 7, 4, 12, 1, 1); band(m, 11, 7, 0, 1, 1, 5);
+    m.box(0, 7, 4, 12, 1, 1, MARBLE_SHADE); m.box(11, 7, 0, 1, 1, 5, MARBLE_SHADE);
     flatRoof(m, 0, 8, 0, 12, 5);
     m.box(8, 1, 5, 4, 6, 7, PL); m.box(8, 1, 5, 4, 2, 7, BASE_STONE);
-    band(m, 8, 6, 11, 4, 1, 1); band(m, 11, 6, 5, 1, 1, 7);
+    m.box(8, 6, 11, 4, 1, 1, MARBLE_SHADE); m.box(11, 6, 5, 1, 1, 7, MARBLE_SHADE);
     flatRoof(m, 8, 7, 5, 4, 7);
     // courtyard walls with a marble coping and a gate
     m.box(0, 1, 5, 1, 4, 7, PL); m.box(0, 1, 11, 8, 4, 1, PL);
     m.box(0, 5, 5, 1, 1, 7, MARBLE); m.box(0, 5, 11, 8, 1, 1, MARBLE);
     m.carve(3, 1, 11, 2, 4, 1); m.carve(3, 5, 11, 2, 1, 1);
-    m.box(2, 1, 11, 1, 6, 1, MARBLE); m.box(5, 1, 11, 1, 6, 1, MARBLE); band(m, 2, 7, 11, 4, 1, 1);
+    m.box(2, 1, 11, 1, 6, 1, MARBLE); m.box(5, 1, 11, 1, 6, 1, MARBLE); m.box(2, 7, 11, 4, 1, 1, MARBLE_SHADE);
     m.box(1, 1, 5, 7, 1, 6, PAVE);
     // tiled lean-to along the back rooms, on two wooden posts
-    for (let x = 1; x < 8; x++) { m.set(x, 6, 5, roofTile(x, 6, 5, false)); m.set(x, 5, 6, roofTile(x, 5, 6, false)); }
-    m.box(1, 2, 6, 1, 3, 1, WOOD); m.box(7, 2, 6, 1, 3, 1, WOOD);
+    m.box(1, 2, 7, 1, 3, 1, WOOD); m.box(7, 2, 7, 1, 3, 1, WOOD);
+    shedRoof(m, { wx0: 0.5, wx1: 8, wz0: 5, wz1: 7.5, top: 5, dir: '+z', pitch: 0.45, ov: 0.4, ovS: 0, tiles: TILES.umber, fill, seed: 7 });
     m.box(4, 2, 4, 2, 3, 1, DOOR);
-    // olive tree, pithoi and a loom-bench in the court
     olive(m, 3, 2, 9);
-    pithos(m, 6, 2, 8, 0xb8683e); amphora(m, 6, 2, 10, 0xa65a34);
-    // windows on the show faces, rooftop jars and a chimney pot
+    pithos(m, 6, 2, 9, 0xb8683e); amphora(m, 6, 2, 10, 0xa65a34);
     m.box(9, 3, 11, 2, 2, 1, DARK); m.box(11, 3, 7, 1, 2, 2, DARK);
-    wallBanner(m, 12, 0, 9, '+x', 5);
     m.box(11, 4, 1, 1, 2, 1, DARK); m.box(11, 4, 3, 1, 2, 1, DARK);
+    wallBanner(m, 12, 0, 9, '+x', 5);
+    // chimney and rooftop jars
     m.box(2, 10, 1, 1, 2, 1, PL); m.set(2, 12, 1, 0x3a3430);
     amphora(m, 9, 9, 7, 0xa65a34); amphora(m, 9, 9, 9);
     return m;
@@ -550,10 +591,8 @@ export function houseModel(variant = 0, m = new VoxelModel()) {
     // L-shape: back wing across the lot, side wing down the west edge
     m.box(0, 1, 0, 12, 6, 5, PL); m.box(0, 1, 0, 12, 2, 5, BASE_STONE);
     m.box(0, 1, 5, 5, 6, 7, PL); m.box(0, 1, 5, 5, 2, 7, BASE_STONE);
-    band(m, 5, 6, 4, 7, 1, 1); band(m, 11, 6, 0, 1, 1, 5);
-    band(m, 0, 6, 11, 5, 1, 1); band(m, 4, 6, 5, 1, 1, 6);
-    gable(m, 0, 7, -1, 13, 7, 'x', { run: 1.5, tymp: MARBLE_SHADE, acro: false });
-    gable(m, -1, 7, 4, 7, 9, 'z', { run: 1.5, acro: true });
+    gableRoof(m, { wx0: 0, wx1: 12, wz0: 0, wz1: 5, top: 7, axis: 'x', pitch: 0.42, ov: 0.6, ovG: 0.4, tiles: TILES.terra, fill, seed: 11 });
+    gableRoof(m, { wx0: 0, wx1: 5, wz0: 2.5, wz1: 12, top: 7, axis: 'z', pitch: 0.42, ov: 0.6, ovG: 0.4, tiles: TILES.terra, fill, seed: 12 });
     awning(m, 1, 6, 12, 2);
     m.box(1, 2, 11, 2, 3, 1, DOOR); m.box(1, 5, 11, 2, 1, 1, MARBLE);
     m.box(4, 3, 7, 1, 2, 2, DARK); m.box(11, 3, 2, 1, 2, 2, DARK); m.box(7, 3, 4, 2, 2, 1, DARK);
@@ -569,74 +608,93 @@ export function houseModel(variant = 0, m = new VoxelModel()) {
     }
     m.box(8, 2, 8, 2, 1, 2, WOOD); m.box(8, 3, 8, 2, 1, 2, 0x9b7040); m.set(8, 4, 8, 0x6b3a6e);
     pithos(m, 5, 2, 10, 0xa65a34); amphora(m, 10, 2, 5);
+    m.box(9, 7, 1, 1, 4, 1, PL); m.set(9, 11, 1, 0x3a3430);
     return m;
   }
   if (variant === 2) {
     // two storeys, a wooden balcony across the front on marble posts
     m.box(1, 1, 1, 10, 12, 7, PL); m.box(1, 1, 1, 10, 2, 7, BASE_STONE);
     m.box(1, 7, 7, 10, 1, 1, MARBLE); m.box(10, 7, 1, 1, 1, 7, MARBLE);
-    band(m, 1, 12, 7, 10, 1, 1); band(m, 10, 12, 1, 1, 1, 7);
-    shedRoof(m, 0, 13, 0, 12, 10, { run: 2, wall: PL });
-    // ground floor: door and windows
+    m.box(1, 12, 7, 10, 1, 1, MARBLE_SHADE); m.box(10, 12, 1, 1, 1, 7, MARBLE_SHADE);
+    shedRoof(m, { wx0: 1, wx1: 11, wz0: 1, wz1: 8, top: 13, dir: '+z', pitch: 0.32, ov: 0.8, ovS: 0.5, tiles: TILES.rose, fill, seed: 21 });
     m.box(5, 2, 7, 2, 4, 1, DOOR); m.box(2, 3, 7, 2, 2, 1, DARK); m.box(8, 3, 7, 2, 2, 1, DARK);
     m.box(10, 3, 3, 1, 2, 2, DARK);
-    // upper floor: balcony door, shuttered windows
     m.box(5, 8, 7, 2, 4, 1, DARK); m.box(2, 9, 7, 2, 2, 1, DARK); m.box(8, 9, 7, 2, 2, 1, DARK);
-    for (const sx of [1, 4, 7, 10]) m.box(sx, 9, 7, 1, 2, 1, PAINT_BLUE_D);
-    // team drapes hung under the balcony
+    for (const sx of [1, 4, 7, 10]) m.box(sx, 9, 7, 1, 2, 1, 0x5d7f6a);
     for (const sx of [3, 7]) { m.box(sx, 4, 9, 2, 3, 1, TEAM); m.box(sx, 6, 9, 2, 1, 1, GILT); }
     m.box(10, 9, 5, 1, 2, 2, DARK); m.box(10, 7, 1, 1, 4, 2, DOOR);
-    // balcony
     m.box(1, 7, 8, 10, 1, 2, WOOD);
     for (let x = 1; x < 11; x += 2) m.set(x, 8, 9, DARKWOOD);
     m.box(1, 9, 9, 10, 1, 1, DARKWOOD); m.box(1, 8, 8, 1, 2, 1, DARKWOOD); m.box(10, 8, 8, 1, 2, 1, DARKWOOD);
     m.box(1, 1, 9, 1, 6, 1, MARBLE); m.box(10, 1, 9, 1, 6, 1, MARBLE);
-    m.set(3, 8, 8, 0xc0392b).set(8, 8, 8, 0x9b59b6);         // flower pots on the balcony
-    // exterior stair up the east side
+    m.set(3, 8, 8, 0xc0392b).set(8, 8, 8, 0x9b59b6);
     for (let i = 0; i < 6; i++) m.box(11, 1 + i, 7 - i, 1, 1, 1, STONE);
-    // front yard
     m.box(1, 1, 10, 10, 1, 2, PAVE);
     pithos(m, 2, 2, 10, 0xb8683e); amphora(m, 8, 2, 11, 0xa65a34); amphora(m, 9, 2, 10);
+    m.box(2, 13, 2, 1, 5, 1, PL); m.set(2, 18, 2, 0x3a3430);
     return m;
   }
-  // variant 3: cottage with a two-column porch under a front pediment
-  m.box(1, 1, 1, 10, 6, 7, PL);
-  m.box(1, 1, 1, 10, 2, 7, BASE_STONE);
-  m.box(4, 1, 7, 3, 4, 1, DOOR); m.box(3, 5, 7, 5, 1, 1, MARBLE);
-  m.box(10, 3, 3, 1, 2, 2, DARK);
-  m.box(1, 1, 8, 10, 1, 3, PAVE);
-  column2(m, 2, 2, 9, 5); column2(m, 8, 2, 9, 5);
-  band(m, 1, 7, 1, 10, 1, 10);
-  m.box(0, 8, 0, 12, 1, 12, MARBLE);
-  gable(m, 0, 9, -1, 12, 14, 'z', { run: 2 });
-  wallBanner(m, 11, 1, 5, '+x', 5);
-  m.box(8, 12, 2, 2, 3, 2, PL); m.set(8, 15, 2, 0x3a3430);
-  amphora(m, 11, 1, 9);
+  if (variant === 3) {
+    // cottage with a two-column porch under a front pediment
+    m.box(1, 1, 1, 10, 6, 7, PL);
+    m.box(1, 1, 1, 10, 2, 7, BASE_STONE);
+    m.box(4, 1, 7, 3, 4, 1, DOOR); m.box(3, 5, 7, 5, 1, 1, MARBLE);
+    m.box(10, 3, 3, 1, 2, 2, DARK);
+    m.box(1, 1, 8, 10, 1, 3, PAVE);
+    column2(m, 2, 2, 9, 5); column2(m, 8, 2, 9, 5);
+    m.box(1, 7, 9, 10, 1, 2, MARBLE_SHADE);
+    gableRoof(m, { wx0: 1, wx1: 11, wz0: 1, wz1: 11, top: 8, axis: 'z', pitch: 0.4, ov: 0.6, ovG: 0.4, tiles: TILES.umber, fill, seed: 31 });
+    m.box(1, 7, 1, 10, 1, 7, MARBLE_SHADE);
+    wallBanner(m, 11, 1, 5, '+x', 5);
+    m.box(8, 8, 2, 1, 4, 1, PL); m.set(8, 12, 2, 0x3a3430);
+    amphora(m, 11, 1, 9);
+    return m;
+  }
+  // variant 4: tower house - a tall square stone tower with a pyramid roof
+  // beside a low barn under a shed roof
+  const TOWER = masonry([0xd9d1bf, 0xcfc6b2, 0xc4bba6], [0xbfb5a0, 0xb3a994, 0xcac1ad], { len: 4, course: 3, bed: 0.8, head: 0.9, seed: 29 });
+  m.box(1, 1, 1, 6, 20, 6, TOWER);
+  m.box(1, 1, 1, 6, 2, 6, BASE_STONE);
+  for (const yy of [7, 13]) m.box(1, yy, 1, 6, 1, 6, MARBLE_SHADE);
+  m.box(0, 20, 0, 8, 1, 8, MARBLE);
+  for (const [yy, hh] of [[9, 3], [15, 3]]) { m.box(3, yy, 7, 2, hh, 1, DARK); m.box(7, yy, 3, 1, hh, 2, DARK); }
+  m.box(3, 2, 7, 2, 4, 1, DOOR); m.box(2, 6, 7, 4, 1, 1, MARBLE);
+  hipRoof(m, { wx0: 0, wx1: 8, wz0: 0, wz1: 8, top: 21, pitch: 0.55, ov: 0.5, tiles: TILES.terra, seed: 41 });
+  // barn
+  m.box(7, 1, 2, 4, 5, 9, PL); m.box(7, 1, 2, 4, 2, 9, BASE_STONE);
+  m.box(11, 3, 5, 1, 2, 2, DARK);
+  m.box(8, 1, 10, 2, 4, 1, DOOR);
+  shedRoof(m, { wx0: 7, wx1: 11, wz0: 2, wz1: 11, top: 6, dir: '+x', pitch: 0.35, ov: 0.6, ovS: 0.4, tiles: TILES.umber, fill, seed: 43 });
+  // yard: hay, a cart wheel, jars
+  m.box(1, 1, 8, 5, 1, 4, PAVE);
+  m.box(1, 2, 10, 2, 2, 2, 0xcdb46a); m.set(2, 4, 10, 0xd8c079);
+  pithos(m, 4, 2, 9, 0xb8683e); amphora(m, 5, 2, 11);
   return m;
 }
 
+// Storehouse: an open-fronted timber shed under a shallow tiled gable, full
+// of goods, with two white granary silos under domed caps in front.
 export function storehouseModel(variant = 0, m = new VoxelModel()) {
   m.box(0, 0, 0, 12, 1, 12, BASE_STONE);
   m.box(1, 1, 1, 10, 1, 10, PAVE);
-  // back wall of ashlar, open colonnaded front
   m.box(1, 1, 1, 10, 7, 2, ASHLAR);
   m.box(1, 1, 1, 2, 7, 6, ASHLAR);
-  for (const x of [1, 5, 9]) { m.box(x, 1, 9, 2, 7, 2, MARBLE); m.box(x, 1, 9, 2, 1, 2, MARBLE_SHADE); }
-  m.box(10, 1, 3, 1, 7, 1, MARBLE); m.box(10, 1, 6, 1, 7, 1, MARBLE);
-  band(m, 1, 8, 1, 10, 1, 10);
-  m.box(0, 9, 0, 12, 1, 12, MARBLE);
-  gable(m, -1, 10, 0, 14, 12, 'x', { run: 2 });
-  awning(m, 3, 7, 11, 6);
-  // goods: crates, amphorae, a log pile, gold and grain sacks
+  m.box(10, 1, 1, 1, 7, 6, ASHLAR);
+  for (const x of [4.5, 7.5]) cylinder(m, x, 1, 6.3, 0.5, 7, 0x7a5230, { segs: 8 });
+  m.box(1, 7, 6, 10, 1, 1, DARKWOOD);
+  gableRoof(m, { wx0: 1, wx1: 11, wz0: 1, wz1: 7, top: 8, axis: 'x', pitch: 0.42, ov: 0.8, ovG: 0.5, tiles: TILES.terra, fill: FILL_ASHLAR, seed: 51 });
+  // goods under the shed
   m.box(3, 2, 3, 2, 2, 2, 0x9b7040).box(3, 4, 3, 2, 1, 2, 0x8a6236);
   m.box(5, 2, 3, 2, 2, 2, 0xa27a48);
   for (let i = 0; i < 3; i++) m.box(7, 2 + i, 3 + (i % 2), 3, 1, 1, 0x6e4526);
-  amphora(m, 3, 2, 6); amphora(m, 4, 2, 7, 0xa65a34); amphora(m, 3, 2, 8);
-  m.box(7, 2, 6, 2, 1, 2, GOLD, { glow: 0.1 }).set(7, 3, 6, GOLD, { glow: 0.1 });
-  m.box(6, 2, 8, 2, 1, 1, 0xd8c79a);
-  m.box(10, 1, 10, 2, 2, 2, 0x9b7040).box(10, 3, 10, 1, 1, 1, 0xa27a48);
+  amphora(m, 3, 2, 5); amphora(m, 4, 2, 6, 0xa65a34);
+  m.box(6, 2, 5, 2, 1, 1, GOLD, { glow: 0.1 }).set(6, 3, 5, GOLD, { glow: 0.1 });
+  // granary silos
+  silo(m, 3.4, 1, 9.6, 2.1, 7);
+  silo(m, 8.6, 1, 9.4, 2.3, 9);
   return m;
 }
+
 
 export function farmModel(variant = 0, m = new VoxelModel()) {
   const S = 16;
@@ -687,9 +745,10 @@ export function templeModel(variant = 0, m = new VoxelModel()) {
   for (const z of [2, 6, 10]) { m.box(18, y, z, 1, CH, 1, MARBLE); m.box(1, y, z, 1, CH, 1, MARBLE); }
   for (const z of [4, 8]) { m.box(18, y + 3, z, 1, 7, 2, TEAM); m.box(18, y + 9, z, 1, 1, 2, GILT); }
   // porch: four slim columns, wider central bay
-  for (const x of [2, 6, 11, 15]) column3(m, x, y, 17, CH);
+  for (const x of [2, 6, 11, 15]) roundColumn(m, x + 1.5, y, 18.5, 0.95, CH);
   const t = entablature(m, 1, y + CH, 2, 18, 18);
-  templeRoof(m, -1, t, 1, 22, 20, 'z', { run: 1.8, relief: 'both' });
+  const R = gableRoof(m, { wx0: 1, wx1: 19, wz0: 2, wz1: 20, top: t, axis: 'z', pitch: 0.4, ov: 1.2, ovG: 1.3, ends: 'pediment', tiles: TILES.terra, tymp: TYMP_BLUE, rakeH: 0.7, seed: 71 });
+  pedimentRelief(m, R, 20);
   banner(m, 0, 0, 22, 6, 'x'); banner(m, 18, 0, 22, 6, 'x');
   brazier(m, 1, 0, 19); brazier(m, 17, 0, 19);
   return m;
@@ -704,52 +763,73 @@ function archeryTarget(m, x, y, z) {
   }
 }
 
-// Military Academy: a gymnasium / palaestra built round an open sand court.
-// A tall hall across the back (gable turned sideways so its pediment faces
-// +x), colonnaded porticoes with lean-to roofs down both sides and across the
-// front, and a pedimented gateway (propylon) in the middle of the front.
-// Archery targets, a weapon rack and a bronze hoplite in the court.
+// Relief figures standing in a pediment's recessed tympanum (the front
+// end, voxel row z = vz), kept under the raking cornice: a taller gilt god
+// in the middle, marble figures to either side, reclining ones toward the
+// corners.
+function pedimentRelief(m, R, vz) {
+  const { top, ridgeY, um, half, pitch, rakeH } = R;
+  const span = half - rakeH / pitch, rise = ridgeY - rakeH - top;
+  const inner = (u) => top + rise * (1 - Math.abs(u - um) / span);
+  const y0 = Math.ceil(top);
+  for (let x = Math.floor(um - span); x < um + span; x++) {
+    const lim = Math.min(inner(x), inner(x + 1)) - 0.15;
+    const hgt = Math.floor(lim) - y0;
+    if (hgt < 1) continue;
+    const d = Math.abs(x + 0.5 - um);
+    const centre = d < 1;
+    if (!centre && Math.round(d) % 3 === 2) continue;
+    const hh = centre ? hgt : Math.min(hgt, d < 5 ? 2 : 1);
+    for (let yy = y0; yy < y0 + hh; yy++) m.set(x, yy, vz, centre ? GILT : yy === y0 + hh - 1 ? MARBLE_SHADE : MARBLE);
+  }
+}
+
+// Military Academy: a long stoa across the back (seven round columns before
+// a solid back wall, a low gable with pediments at both ends) and a tall
+// square watch tower at the front corner, round a sand training court.
 export function barracksModel(variant = 0, m = new VoxelModel()) {
   const S = 20;
   const SAND = (x, y, z) => (hash3(x, y, z, 14) < 0.5 ? 0xd2bd92 : 0xc4ae84);
   m.box(0, 0, 0, S, 1, S, BASE_STONE);
   m.box(1, 1, 1, 18, 1, 18, MARBLE_SHADE);
-  m.box(5, 1, 9, 13, 1, 9, SAND);
-  // ---- back hall (z 1..8)
-  m.box(1, 2, 1, 18, 8, 8, ASHLAR);
-  m.box(4, 3, 8, 12, 7, 1, PORCH_RED);
-  m.box(8, 2, 8, 4, 6, 1, DOOR);
-  for (const x of [5, 13]) m.box(x, 5, 8, 2, 3, 1, DARK);
-  for (const z of [3, 6]) m.box(18, 5, z, 1, 3, 1, DARK);
-  m.box(1, 10, 1, 18, 1, 8, TEAM);
-  m.box(0, 11, 0, 20, 1, 10, MARBLE);
-  templeRoof(m, 0, 12, 0, 20, 10, 'x', { run: 1.25, relief: 'both' });
-  // ---- west portico (z 9..17): outer wall, inner columns, a low lean-to
-  m.box(0, 2, 9, 2, 5, 9, ASHLAR);
-  for (const cz of [10, 14]) column2(m, 3, 2, cz, 5);
-  m.box(0, 7, 9, 5, 1, 9, MARBLE_SHADE);
-  leanTo(m, 0, 8, 9, 5, 9, '+x', { run: 2 });
-  // ---- east and front: a low coped wall so the court stays open to view
-  m.box(18, 2, 9, 2, 3, 11, ASHLAR);
-  m.box(19, 4, 9, 1, 1, 11, TEAM);
-  m.box(18, 5, 9, 2, 1, 11, MARBLE);
-  for (const [x0, w] of [[0, 7], [13, 5]]) {
-    m.box(x0, 2, 18, w, 3, 2, ASHLAR);
-    m.box(x0, 4, 19, w, 1, 1, TEAM);
-    m.box(x0, 5, 18, w, 1, 2, MARBLE);
-  }
-  // ---- gateway: two tall marble piers with team hangings and a lintel
-  for (const x of [7, 11]) { m.box(x, 2, 18, 2, 7, 2, MARBLE); m.box(x, 3, 20, 2, 4, 1, TEAM); m.box(x, 7, 20, 2, 1, 1, GILT); }
-  m.box(6, 9, 18, 8, 1, 2, MARBLE_SHADE);
-  m.box(6, 10, 18, 8, 1, 2, MARBLE);
-  wallBanner(m, 20, 1, 12, '+x', 4);
-  // ---- court: targets, weapon rack, a bronze hoplite, a sand pit
-  hopliteStatue(m, 11, 1, 12);
-  m.box(6, 2, 10, 1, 4, 1, WOOD).box(9, 2, 10, 1, 4, 1, WOOD).box(6, 5, 10, 4, 1, 1, WOOD);
-  for (const x of [7, 8]) { m.box(x, 2, 10, 1, 5, 1, 0x9aa0a6); m.set(x, 7, 10, 0xc9ced3); }
-  archeryTarget(m, 14, 2, 10);
-  m.box(7, 2, 15, 1, 4, 1, WOOD).box(6, 5, 15, 3, 1, 1, WOOD).box(7, 6, 15, 1, 2, 1, 0xc9b27a);
-  m.box(15, 2, 16, 2, 1, 1, 0xd8c079);
+  m.box(2, 1, 11, 11, 1, 7, SAND);
+  // ---- stoa (z 1..10)
+  m.box(0, 1, 1, 20, 1, 9, MARBLE_DARK);
+  m.box(1, 2, 1, 18, 1, 9, MARBLE);
+  m.box(1, 3, 1, 18, 9, 3, ASHLAR);
+  m.box(1, 3, 1, 18, 1, 3, BASE_STONE);
+  m.box(4, 3, 4, 3, 5, 1, DOOR); m.box(13, 3, 4, 3, 5, 1, DOOR);
+  m.box(9, 5, 4, 2, 4, 1, DARK);
+  for (const x of [5, 14]) { m.box(x - 1, 8, 4, 5, 1, 1, MARBLE); }
+  for (let i = 0; i < 7; i++) roundColumn(m, 2.6 + i * 2.47, 3, 8.4, 0.62, 8);
+  m.box(1, 11, 7, 18, 1, 3, MARBLE_SHADE);
+  m.box(1, 12, 7, 18, 1, 3, TEAM);
+  m.box(1, 12, 4, 18, 1, 3, MARBLE_SHADE);
+  gableRoof(m, { wx0: 1, wx1: 19, wz0: 1, wz1: 10, top: 13, axis: 'x', pitch: 0.4, ov: 0.9, ovG: 1, ends: 'pediment', tiles: TILES.umber, tymp: TYMP_BLUE, rakeH: 0.7, seed: 61 });
+  m.box(1, 12, 1, 18, 1, 3, MARBLE_SHADE);
+  // ---- watch tower (front right)
+  const TOWER = masonry([0xd6cebb, 0xccc3ae, 0xc1b8a3], [0xbcb29d, 0xb1a792, 0xc8bfab], { len: 4, course: 3, bed: 0.8, head: 0.9, seed: 33 });
+  m.box(13, 1, 12, 7, 2, 7, BASE_STONE);
+  m.box(14, 3, 13, 5, 21, 5, TOWER);
+  for (const yy of [9, 16]) m.box(14, yy, 13, 5, 1, 5, MARBLE_SHADE);
+  for (const yy of [11, 18]) { m.box(16, yy, 18, 1, 3, 1, DARK); m.box(19 - 1 + 1, yy, 15, 1, 3, 1, DARK); }
+  m.box(15, 3, 18, 3, 5, 1, DOOR);
+  m.box(14, 21, 18, 5, 1, 1, TEAM); m.box(19, 21, 13, 1, 1, 5, TEAM);
+  m.box(13, 24, 12, 7, 1, 7, MARBLE);
+  for (let i = 0; i < 7; i += 2) { m.set(13 + i, 25, 18, MARBLE); m.set(19, 25, 12 + i, MARBLE); m.set(13 + i, 25, 12, MARBLE); m.set(13, 25, 12 + i, MARBLE); }
+  hipRoof(m, { wx0: 14, wx1: 19, wz0: 13, wz1: 18, top: 25, pitch: 0.7, ov: 0.3, tiles: TILES.umber, seed: 63, finial: BRONZE });
+  wallBanner(m, 19, 10, 15, '+x', 5);
+  // ---- low court walls, gateway piers on the front
+  m.box(0, 2, 10, 2, 3, 9, ASHLAR); m.box(0, 5, 10, 2, 1, 9, MARBLE);
+  m.box(0, 2, 18, 5, 3, 2, ASHLAR); m.box(0, 5, 18, 5, 1, 2, MARBLE);
+  for (const x of [5, 10]) { m.box(x, 2, 18, 2, 7, 2, MARBLE); m.box(x, 3, 20, 2, 4, 1, TEAM); }
+  m.box(4, 9, 18, 9, 1, 2, MARBLE_SHADE);
+  m.box(12, 2, 18, 1, 3, 2, ASHLAR);
+  // ---- court: bronze hoplite, weapon rack, archery target
+  hopliteStatue(m, 8, 2, 13);
+  m.box(3, 2, 12, 1, 4, 1, WOOD).box(6, 2, 12, 1, 4, 1, WOOD).box(3, 5, 12, 4, 1, 1, WOOD);
+  for (const x of [4, 5]) { m.box(x, 2, 12, 1, 5, 1, 0x9aa0a6); m.set(x, 7, 12, 0xc9ced3); }
+  archeryTarget(m, 3, 2, 16);
   return m;
 }
 
@@ -763,7 +843,7 @@ export const BUILDING_MODELS = {
 };
 
 // Number of visual variants per type (picked per building from its tile).
-export const BUILDING_VARIANTS = { house: 4 };
+export const BUILDING_VARIANTS = { house: 5 };
 
 export {
   WOOD, DARKWOOD, STONE, MARBLE, MARBLE_SHADE, MARBLE_DARK, ASHLAR, PAVE, TERRACOTTA, BRONZE, GOLD, FIRE, LEAF,

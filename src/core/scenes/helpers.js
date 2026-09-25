@@ -86,8 +86,8 @@ export function buildTown(game, owner, start, { villagers = 24, soldiers = 6 } =
   const store = placeNear(game, 'storehouse', owner, ...toward(wood, 0.72), { maxR: 5 });
   const store2 = placeNear(game, 'storehouse', owner, ...toward(gold, 0.7), { maxR: 5 });
   const houses = [];
-  for (const [dx, dz] of [[-9, -6], [-9, -1], [-5, -10], [0, -10], [9, 1], [-9, 5], [5, -10]]) {
-    const h = placeNear(game, 'house', owner, sx + dx, sz + dz, { maxR: 4, gap: 2 });
+  for (const [dx, dz] of [[-6, -11], [4, -11], [-11, -6], [-11, 4], [-17, -6], [15, 4], [10, -13]]) {
+    const h = placeNear(game, 'house', owner, sx + dx, sz + dz, { maxR: 4, gap: 3 });
     if (h) houses.push(h);
   }
   const temple = placeNear(game, 'temple', owner, sx + 9, sz - 6, { maxR: 5 });
