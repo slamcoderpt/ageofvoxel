@@ -372,16 +372,18 @@ export class BattleFX {
         // fan of hot streaks is thrown on through him, one way only.
         const k = big ? r.range(1.1, 1.3) : r.range(0.5, 1.15);
         const tc = this._tc.set(game.players?.[target.owner]?.color ?? 0xffffff);
-        const hot = this._hc.setRGB(tc.r * 0.8 + 0.3, tc.g * 0.8 + 0.22, tc.b * 0.8 + 0.12);
-        const ang = Math.atan2(bz, bx) + Math.PI / 2 + r.range(-0.7, 0.7);
-        const cut = 1e-4;
-        this.spark(px, y, pz, { count: 1, color: hot.getHex(), bright: 1.6 + 1.4 * k, size: (big ? 2.8 : 2.9) * k, life: 0.3 + 0.3 * k, speed: 0, up: 0, gravity: 0 });
-        { const i = this.sN - 1; if (i >= 0) { this.sVel[i * 3] = Math.cos(ang) * cut; this.sVel[i * 3 + 1] = r.range(-0.5, 0.5) * cut; this.sVel[i * 3 + 2] = Math.sin(ang) * cut; } }
-        const n = Math.round((big ? 10 : 3) + 7 * k * r.range(0.6, 1.2));
-        this.spark(px, y, pz, { count: n, color: r.chance(0.5) ? 0xff9a30 : 0xffc050, bright: 1.8 + 1.2 * k, size: 1.3 + 1.3 * k, life: 0.3 + 0.25 * k, speed: r.range(4, 8) * (0.6 + 0.5 * k), up: r.range(1.5, 3.5), gravity: -18, dx: bx, dz: bz, cone: r.range(0.45, 0.9) });
-        // a couple of streaks in the struck man's own colour (his dye and
-        // blood knocked off him)
-        this.spark(px, y, pz, { count: r.int(1, 3), color: tc.getHex(), bright: 2.0, size: 1.0 + 0.6 * k, life: 0.3, speed: r.range(3, 5), up: 2.5, gravity: -16, dx: bx, dz: bz, cone: 1.0 });
+        const hot = this._hc.setRGB(tc.r * 1.1 + 0.12, tc.g * 1.1 + 0.08, tc.b * 1.1 + 0.05);
+        // (round 13: the still crescent flash read as a pink square glitch
+        // over the man struck; the blow is now only a directional burst: a
+        // small white-hot pin at the point of contact, a fan of hot bronze
+        // streaks thrown on through him, a second fan of streaks and chips
+        // in his own army's colour, and a few splinters kicked back at the
+        // striker, so each hit is a spray with a clear direction)
+        this.spark(px, y, pz, { count: 1, color: 0xfff0d0, bright: 1.2 + 0.5 * k, size: 0.3 + 0.2 * k, life: 0.12 + 0.1 * k, speed: 0.4, up: 0.2, gravity: 0, dx: bx, dz: bz, cone: 0.2 });
+        const n = Math.round((big ? 10 : 5) + 6 * k * r.range(0.7, 1.2));
+        this.spark(px, y, pz, { count: n, color: r.chance(0.5) ? 0xff9a30 : 0xffc050, bright: 1.8 + 1.2 * k, size: 1.2 + 1.2 * k, life: 0.3 + 0.25 * k, speed: r.range(5, 9) * (0.6 + 0.5 * k), up: r.range(1.5, 3.5), gravity: -18, dx: bx, dz: bz, cone: r.range(0.35, 0.7) });
+        this.spark(px, y, pz, { count: r.int(4, 7), color: hot.getHex(), bright: 2.2, size: 1.2 + 0.8 * k, life: 0.35 + 0.15 * k, speed: r.range(4, 7), up: 2.2, gravity: -16, dx: bx, dz: bz, cone: 0.8 });
+        this.spark(px, y, pz, { count: r.int(2, 3), color: 0xffd890, bright: 1.6, size: 0.9, life: 0.25, speed: r.range(3, 5), up: 2.8, gravity: -18, dx: -bx, dz: -bz, cone: 0.6 });
         // a burst of pale dust round the point of contact, blown along the
         // blow (big and bright enough to read at RTS height), and a ring of
         // it kicked up at the feet of the man struck
@@ -389,13 +391,13 @@ export class BattleFX {
         // the man struck out to a pale ghost)
         for (let q = 0; q < 4; q++) {
           const a = Math.atan2(bz, bx) + (q - 1.5) * 0.8 + r.range(-0.3, 0.3);
-          this.puff(x + Math.cos(a) * 0.35, z + Math.sin(a) * 0.35, { count: 1, size: 0.55 + 0.3 * k, life: 0.7, alpha: 0.5, speed: 0.1, up: 0.2, y: 0.08, spread: 0.05, color: 0xe2d0a8, dx: Math.cos(a) * 1.8, dz: Math.sin(a) * 1.8 });
+          this.puff(x + Math.cos(a) * 0.35, z + Math.sin(a) * 0.35, { count: 1, size: 0.8 + 0.4 * k, life: 1.1, alpha: 0.42, speed: 0.1, up: 0.15, y: 0.4, spread: 0.08, color: 0xcdb896, dx: Math.cos(a) * 1.2, dz: Math.sin(a) * 1.2 });
         }
       }
       // voxel chips: chunky solid cubes that tumble out and drop
       const team = game.players?.[target.owner]?.color ?? 0x888888;
       game.fx.emit({ x: px, y, z: pz, count: big ? 6 : 3, color: 0xc08a3e, colorVar: 0.25, size: 0.12, life: 0.7, speed: 2.6, up: 3.0, gravity: -16, spread: 0.12 });
-      game.fx.emit({ x: px, y: y - 0.1, z: pz, count: 2, color: team, colorVar: 0.15, size: 0.11, life: 0.7, speed: 2.2, up: 2.6, gravity: -16, spread: 0.1 });
+      game.fx.emit({ x: px + bx * 0.15, y: y - 0.1, z: pz + bz * 0.15, count: big ? 6 : 4, color: team, colorVar: 0.15, size: 0.12, life: 0.75, speed: 2.8, up: 2.6, gravity: -16, spread: 0.1 });
       if (r.chance(0.4)) {
         // a wound: a short dark spray and blood on the ground
         game.fx.emit({ x: px, y: y - 0.1, z: pz, count: r.int(4, 6), color: 0x7a0e08, colorVar: 0.2, size: 0.14, life: 0.55, speed: 2.0, up: 2.0, gravity: -12, spread: 0.1 });
@@ -407,7 +409,7 @@ export class BattleFX {
       const fx0 = x + bx * 0.25, fz0 = z + bz * 0.25;
       // only a small, short, low wisp of soft dust at his heels (big soft
       // sprites veil the fighters and turn the line into a haze)
-      this.puff(fx0, fz0, { count: 1, size: big ? 1.1 : 0.7, life: 0.7, alpha: 0.4, speed: 0.3, up: 0.05, y: 0.08, spread: 0.1, color: 0xd2bf98, dx: bx * 0.8, dz: bz * 0.8 });
+      this.puff(fx0, fz0, { count: 2, size: big ? 1.5 : 1.0, life: 1.2, alpha: 0.4, speed: 0.3, up: 0.05, y: 0.08, spread: 0.1, color: 0xd2bf98, dx: bx * 0.8, dz: bz * 0.8 });
       game.fx.emit({ x: fx0, y: gy + 0.12, z: fz0, count: r.int(3, 5), color: 0x5a3e22, colorVar: 0.2, size: 0.13, life: 0.55, speed: 1.2, up: 2.4, gravity: -14, spread: 0.2 });
       // a ring of pale voxel dust bursting out round his feet: chunky light
       // cubes that pop up and settle, so every blow reads as a burst on the
@@ -484,7 +486,9 @@ export class BattleFX {
     // a thin low skin of trodden earth on the seam (never a knee-high haze:
     // the men have to stand clear against the ground) and a few pale voxel
     // clods kicked up by the stamping feet
-    if (r.chance(0.3)) this.puff(mx, mz, { count: 1, size: r.range(0.7, 1.0), life: 1.2, alpha: r.range(0.18, 0.26), speed: 0.2, up: 0.02, y: 0.03, spread: 0.3, color: OCHRE[r.int(0, OCHRE.length - 1)] });
+    // (round 13: a real cloud of trampled dust hangs at the feet along the
+    // seam, pale against the dark earth, so the melee reads as a scrum)
+    if (r.chance(0.55)) this.puff(mx, mz, { count: 1, size: r.range(1.1, 1.7), life: 1.8, alpha: r.range(0.26, 0.36), speed: 0.25, up: 0.04, y: 0.42, spread: 0.4, color: r.chance(0.6) ? 0xc9b48e : 0xa88c66 });
     if (this.rng.next() < 0.6) this.game.fx.emit({ x: mx, y: this.game.map.heightAt(mx, mz) + 0.1, z: mz, count: 4, color: r.chance(0.5) ? 0xd6c29a : 0x6e4e2e, colorVar: 0.1, size: 0.12, life: 0.45, speed: 1.4, up: 2.0, gravity: -13, spread: 0.3 });
   }
 

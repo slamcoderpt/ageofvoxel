@@ -70,8 +70,10 @@ export class Units {
         // lighting), so a body reads as a fallen man, not as a brown clod
         // of ground clutter nor as a live man in his army's colour
         float dl = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dl) * vec3(0.94, 0.97, 1.04), vDead * 0.82);
-        vec3 teamSat = diffuseColor.rgb * vTeam * (1.0 - vDead);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dl) * vec3(0.94, 0.97, 1.04), vDead * 0.5);
+        // (r13: half drained, and a little of the dye kept lit, so the dead
+        // in the seam still say red or blue)
+        vec3 teamSat = diffuseColor.rgb * vTeam * (1.0 - vDead * 0.75);
         // (pure hue only: a grey lift turned the red army pink)
         // (round 12: a small lift only, so the dye keeps its lit/shaded
         // value split instead of reading as flat self-lit paint)

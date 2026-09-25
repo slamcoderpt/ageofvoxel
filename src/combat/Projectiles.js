@@ -14,13 +14,14 @@ export class Projectiles {
     this.combat = combat;
     this.list = [];
     this.stuck = [];
-    // a dark shaft, a bright steel head and white fletching (a cross of
-    // feathers), big enough to read as an arrow from RTS height
-    // (a pale shaft, a broad bright head and a wide red-dyed feather cross,
-    // so an arrow in flight reads as an arrow, not a grey stick)
-    const m = new VoxelModel().box(0, 0, 0, 1, 1, 9, 0x9a7040).box(0, 0, 9, 1, 1, 2, 0xe8edf2).set(-1, 0, 9, 0xc8ced4).set(1, 0, 9, 0xc8ced4)
-      .box(-1, 0, 0, 3, 1, 3, 0xfaf6ea).box(0, -1, 0, 1, 3, 3, 0xfaf6ea).set(-1, 0, 1, 0xd03020).set(1, 0, 1, 0xd03020).set(0, -1, 1, 0xd03020).set(0, 1, 1, 0xd03020);
-    const geo = buildVoxelGeometry(m, { size: 0.13, pivot: [0.5, 0.5, 5.5], ao: false });
+    // (round 13: a thin fletched shaft, not a banded post: the old fat
+    // red-and-white feather cross read as a signpost hanging in the air)
+    // a slim dark-wood shaft, a small dark steel head, and a short pair of
+    // grey-buff feather vanes at the nock; the motion streak does the work
+    // of making a volley read from RTS height
+    const m = new VoxelModel().box(0, 0, 0, 1, 1, 14, 0x6a4a2c).box(0, 0, 14, 1, 1, 2, 0x8c949c)
+      .box(-1, 0, 0, 1, 1, 3, 0xcfc6b0).box(1, 0, 0, 1, 1, 3, 0xcfc6b0).box(0, -1, 0, 1, 1, 3, 0xb8ae98).box(0, 1, 0, 1, 1, 3, 0xb8ae98);
+    const geo = buildVoxelGeometry(m, { size: 0.06, pivot: [0.5, 0.5, 8], ao: false });
     const mat = makeVoxelMaterial({ instanced: false });
     this.mesh = new THREE.InstancedMesh(geo, mat, MAX);
     this.mesh.count = 0;
@@ -46,7 +47,7 @@ export class Projectiles {
           vec3 p = mix(aTail, aHead, along);
           vec3 dir = aHead - aTail;
           vec3 side = normalize(cross(dir + vec3(1e-4), cameraPosition - p));
-          p += side * position.y * mix(0.02, 0.1, along * along);
+          p += side * position.y * mix(0.012, 0.06, along * along);
           vUv = vec2(along, position.y * 2.0);
           gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
         }`,
@@ -60,7 +61,7 @@ export class Projectiles {
           float core = 1.0 - smoothstep(0.0, 1.0, abs(vUv.y));
           float a = pow(k, 1.3) * core;
           vec3 c = mix(vec3(0.85, 0.8, 0.7), vec3(1.0, 0.97, 0.9), k);
-          gl_FragColor = vec4(c, a * 0.55);
+          gl_FragColor = vec4(c, a * 0.7);
         }`,
       transparent: true,
       depthWrite: false,
@@ -143,8 +144,8 @@ export class Projectiles {
       this.mesh.setMatrixAt(i, this._m);
       if (p.tx !== undefined) {
         const k = Math.min(1, p.t / p.dur);
-        this.posAt(p, Math.max(0, k - Math.min(0.2, 1.6 / (p.arc * 2 + p.dist))), tail);
-        this.aHead.setXYZ(t, p.x - this._d.x * 0.3, p.y - this._d.y * 0.3, p.z - this._d.z * 0.3);
+        this.posAt(p, Math.max(0, k - Math.min(0.28, 2.6 / (p.arc * 2 + p.dist))), tail);
+        this.aHead.setXYZ(t, p.x - this._d.x * 0.45, p.y - this._d.y * 0.45, p.z - this._d.z * 0.45);
         this.aTail.setXYZ(t, tail.x, tail.y, tail.z);
         t++;
       }

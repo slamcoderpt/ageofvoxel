@@ -602,8 +602,8 @@ export function hopliteRig() {
     part('cloakShort', cloakModel('short'), [4, 0, 2], [0, 0, 0], 'torso', { show: gearIs('cloak', 2) }),
     // spearmen: a long spear and a round aspis; swordsmen: a short blade
     // and a tall oblong shield (gearOf(u).kit)
-    part('weapon', spearModel(34), [0, 0, 0], HAND, 'armR', { show: gearIs('kit', 0), portrait: true }),
-    part('pennant', pennantModel(34), [0, 0, 0], HAND, 'armR', { anim: 'weapon', show: spearGear('pennant', 1), portrait: false }),
+    part('weapon', spearModel(25), [0, 0, 0], HAND, 'armR', { show: gearIs('kit', 0), portrait: true }), // (r13: 34 read as poles)
+    part('pennant', pennantModel(25), [0, 0, 0], HAND, 'armR', { anim: 'weapon', show: spearGear('pennant', 1), portrait: false }),
     part('sword', swordModel(), [0, 0, 0], HAND, 'armR', { anim: 'weapon', show: gearIs('kit', 1), portrait: false }),
     ...[0, 1, 2, 3].map((v) => part(v ? `shield${v}` : 'shield', aspis(6, BRONZE, v), [0, 0, 0], [1.5, -4, 3.2], 'armL', { anim: 'shield', show: spearGear('shield', v), portrait: !v })),
     part('thureos', thureos(), [0, 0, 0], [1.5, -3.5, 3.2], 'armL', { anim: 'shield', show: gearIs('kit', 1), portrait: false }),
