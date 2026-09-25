@@ -34,7 +34,6 @@ const STEEL = (x, y, z) => (hash3(x, y, z, 5) < 0.5 ? 0xc9ced3 : 0xb4bac0);
 const LINEN = (x, y, z) => (hash3(x, y, z, 6) < 0.6 ? 0xece2c8 : 0xe0d4b6);
 const STRAW = (x, y, z) => (hash3(x, y, z, 8) < 0.5 ? 0xdcbb6a : 0xc9a655);
 const TEAM_TRIM = 0xeee6cc;
-const JERKIN = (x, y, z) => (hash3(x, y, z, 18) < 0.55 ? 0xc49a62 : 0xb58b55);
 const WOOL = (x, y, z) => { const h = hash3(x, y, z, 17); return h < 0.5 ? 0xd8c7a2 : h < 0.85 ? 0xcbb892 : 0xe2d3b0; };
 const GOLD = (x, y, z) => { const h = hash3(x, y, z, 31); return h < 0.45 ? 0xf2c648 : h < 0.8 ? 0xe0ae30 : 0xffdc70; };
 const GOLD_DK = 0x9c6e1c;
@@ -119,8 +118,10 @@ function torsoModel(style, cloak = true) {
       m.box(1, 5, 4, 2, 2, 1, 0xf6d98a).box(5, 5, 4, 2, 2, 1, 0xf6d98a);          // polished pecs
       m.set(3, 4, 4, MET_DK).set(4, 4, 4, MET_DK).set(3, 2, 4, MET_DK).set(4, 2, 4, MET_DK);
       m.box(3, 2, -1, 2, 5, 1, MET_DK);                                            // spine channel
-      m.box(0, 7, -1, 2, 2, 6, LINEN).box(6, 7, -1, 2, 2, 6, LINEN);              // linen shoulder flaps
-      m.box(0, 7, 4, 2, 1, 1, LINEN).box(6, 7, 4, 2, 1, 1, LINEN);
+      // the army's colour is the chiton: sleeves over the shoulders (what
+      // the RTS camera sees first), the skirt under the pteryges, the cloak
+      m.box(0, 7, -1, 2, 2, 6, TEAM).box(6, 7, -1, 2, 2, 6, TEAM);                // team chiton sleeves
+      m.box(0, 7, 4, 2, 1, 1, TEAM).box(6, 7, 4, 2, 1, 1, TEAM);
       m.box(0, 1, -1, 8, 1, 6, BRONZE_DK).carve(1, 1, 1, 6, 1, 2);                // girdle
     } else {
       m.box(0, 2, 0, 8, 6, 4, MET);
@@ -134,8 +135,8 @@ function torsoModel(style, cloak = true) {
     // team chiton skirt showing under leather pteryges strips
     // leather and linen strips all round, with a team tunic panel showing
     // down the middle front and back (and a team hem under the strips)
-    const strip = (i) => (i % 2 ? LEATHER : LINEN);
-    for (let x = 0; x < 8; x++) for (const z of [-1, 4]) m.box(x, -4, z, 1, 4, 1, x === 3 || x === 4 ? TEAM : strip(x));
+    const strip = (i) => (i % 3 === 1 ? LEATHER : TEAM);
+    for (let x = 0; x < 8; x++) for (const z of [-1, 4]) m.box(x, -4, z, 1, 4, 1, strip(x));
     for (let z = 0; z < 4; z++) { m.box(-1, -4, z, 1, 4, 1, strip(z + 1)); m.box(8, -4, z, 1, 4, 1, strip(z)); }
     m.box(0, 0, 0, 8, 1, 4, BRONZE_DK);
     if (style === 'rider') {
@@ -164,9 +165,10 @@ function torsoModel(style, cloak = true) {
     m.box(0, 0, 0, 8, 8, 4, LINEN).box(1, 8, 1, 6, 1, 2, LINEN);
     // tan leather jerkin over a linen chiton; the army's colour is a tunic
     // panel down the chest, the sleeves and the shoulder yoke
-    m.box(0, 2, -1, 8, 6, 6, JERKIN); tbox(m, 1, 8, 0, 6, 1, 4, TEAM_SHADE);
-    m.box(0, 2, -1, 1, 5, 6, 0x9a7446).box(7, 2, -1, 1, 5, 6, 0x9a7446);   // shaded flanks
-    m.box(3, 1, 5, 2, 7, 1, TEAM);                                          // tunic panel
+    // team-dyed tunic under a leather harness: the archer screen reads as
+    // his army's colour from the RTS camera, not as tan jerkins
+    m.box(0, 2, -1, 8, 6, 6, TEAM); m.box(1, 8, 0, 6, 1, 4, TEAM);
+    tbox(m, 0, 2, -1, 1, 5, 6, TEAM_SHADE); tbox(m, 7, 2, -1, 1, 5, 6, TEAM_SHADE);   // shaded flanks
     m.box(0, 1, -1, 8, 2, 6, LEATHER);
     m.box(1, 4, 5, 1, 4, 1, LEATHER_DK).box(6, 4, 5, 1, 4, 1, LEATHER_DK);
     m.box(-1, 6, 0, 1, 2, 4, TEAM).box(8, 6, 0, 1, 2, 4, TEAM);    // sleeves at the shoulder
@@ -201,21 +203,23 @@ function cloakModel(kind) {
     // an undyed campaign cloak in weathered wool, deep folds (alternate
     // folds a shade darker) and a narrow team border at the hem: the man's
     // back stays a figure, not a block of team paint
-    m.box(0, 8, -1, 8, 1, 3, WOOL);
-    m.box(1, 1, -1, 6, 7, 1, WOOL);
+    // a dyed campaign cloak in the army's colour, deep folds a shade darker
+    // and a pale hem: from behind a rank reads as red or blue at a glance
+    m.box(0, 8, -1, 8, 1, 3, TEAM);
+    m.box(1, 1, -1, 6, 7, 1, TEAM);
     for (let x = 0; x <= 7; x++) {
       const deep = x % 2 === 0;
-      m.box(x, -2, deep ? -2 : -3, 1, 4, 1, deep ? WOOL : 0xa89878);
-      m.set(x, -3, deep ? -2 : -3, TEAM);
+      if (deep) m.box(x, -2, -2, 1, 4, 1, TEAM); else tbox(m, x, -2, -3, 1, 4, 1, TEAM_SHADE);
+      m.set(x, -3, deep ? -2 : -3, TEAM_TRIM);
     }
   } else {
     // short chlamys swept off the left shoulder, hem slanting across the
     // back, undyed with a team edge
-    m.box(0, 8, -1, 6, 1, 3, WOOL);
+    m.box(0, 8, -1, 6, 1, 3, TEAM);
     for (let x = 0; x <= 7; x++) {
       const bot = 3 + Math.round(x * 0.45);
-      m.box(x, bot, x % 2 ? -2 : -1, 1, 8 - bot, 1, x % 2 ? 0xb3a383 : WOOL);
-      m.set(x, bot - 1, x % 2 ? -2 : -1, TEAM);
+      if (x % 2) tbox(m, x, bot, -2, 1, 8 - bot, 1, TEAM_SHADE); else m.box(x, bot, -1, 1, 8 - bot, 1, TEAM);
+      m.set(x, bot - 1, x % 2 ? -2 : -1, TEAM_TRIM);
     }
     m.set(7, 8, 3, BRONZE(7, 8, 3)).set(7, 8, 4, BRONZE(7, 8, 4)); // brooch
   }
@@ -546,7 +550,7 @@ export function hopliteRig() {
     part('cloakShort', cloakModel('short'), [4, 0, 2], [0, 0, 0], 'torso', { show: gearIs('cloak', 2) }),
     part('weapon', spearModel(34), [0, 0, 0], HAND, 'armR'),
     part('pennant', pennantModel(34), [0, 0, 0], HAND, 'armR', { anim: 'weapon', show: gearIs('pennant', 1), portrait: false }),
-    ...[0, 1, 2, 3].map((v) => part(v ? `shield${v}` : 'shield', aspis(4, BRONZE, v), [0, 0, 0], [1.5, -4, 2.5], 'armL', { anim: 'shield', show: gearIs('shield', v), portrait: !v })),
+    ...[0, 1, 2, 3].map((v) => part(v ? `shield${v}` : 'shield', aspis(5, BRONZE, v), [0, 0, 0], [1.5, -4, 2.8], 'armL', { anim: 'shield', show: gearIs('shield', v), portrait: !v })),
   ];
 }
 

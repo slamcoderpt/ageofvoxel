@@ -231,7 +231,7 @@ export class Units {
         const t = game.entities.get(u.order?.targetId);
         if (t && t.kind === 'unit') {
           const d = Math.hypot(t.x - u.x, t.z - u.z);
-          const want = (u.def.hero ? 0.35 : 0.2) + uhash(u, 3) * 0.3;
+          const want = (u.def.hero ? 0.1 : 0.2) + uhash(u, 3) * (u.def.hero ? 0.1 : 0.3);
           press = Math.max(0, Math.min(want, (d - (u.radius + t.radius) * 0.95) / 2 - 0.22));
         }
       }

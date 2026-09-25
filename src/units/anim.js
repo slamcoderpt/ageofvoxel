@@ -399,7 +399,7 @@ export function gearOf(u) {
   const h = uhash(u, 20), c = uhash(u, 21), s = uhash(u, 22);
   return (u.units_gear = {
     helm: h < 0.3 ? 0 : h < 0.58 ? 1 : h < 0.8 ? 2 : 3,
-    cloak: c < 0.38 ? 1 : c < 0.7 ? 2 : 0,
+    cloak: c < 0.45 ? 1 : c < 0.85 ? 2 : 0,
     shield: s < 0.25 ? 0 : s < 0.45 ? 1 : s < 0.8 ? 2 : 3,
     hat: h < 0.4 ? 0 : h < 0.72 ? 1 : 2,
     pennant: uhash(u, 23) < 0.22 ? 1 : 0,
