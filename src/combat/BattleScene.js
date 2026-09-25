@@ -24,7 +24,7 @@ const P = (cx, cz, a, d) => [cx + (a + d) * S, cz + (d - a) * S];
 // (Spaced as in Retold: every duel is its own little vignette with open
 // ground on all sides, so a spearman, a swordsman and a body on the ground
 // each read at a glance instead of merging into one mass.)
-const COL = 2.75;
+const COL = 3.3;
 const FRONT = 1.3;    // depth of each duellist from the seam (gap = 2x)
 const SECOND = 4.3;   // depth of the second rank
 const THIRD = 6.5;    // depth of the reserve
@@ -65,7 +65,7 @@ function army(game, owner, side, cx, cz, ranks) {
   // second rank: a full pace behind the fighters, half a file over, holding
   // (shields up, spears ready; they do not step into the duels)
   for (let a = -END + 1.7 + COL / 2; a < END - 2.2; a += COL) {
-    if (rng.chance(0.3)) continue;
+    if (rng.chance(0.4)) continue;
     const aa = a + rng.range(-0.2, 0.2);
     if (Math.abs(aa) < 2.2) continue;
     const dd = SECOND + rng.range(-0.15, 0.3);
@@ -78,8 +78,8 @@ function army(game, owner, side, cx, cz, ranks) {
     ranks.push([aa * side, dd * side]);
   }
   // third rank: a loose reserve standing ready behind the second
-  for (let i = 0; i < 8; i++) {
-    const a = (i - 3.5) * 3.3 + rng.range(-0.4, 0.4);
+  for (let i = 0; i < 7; i++) {
+    const a = (i - 3) * 4.0 + rng.range(-0.4, 0.4);
     const d = THIRD + rng.range(-0.2, 0.8);
     const u = at('hoplite', a, d);
     u.combat_leash = 0.2;
@@ -133,7 +133,7 @@ function duels(game, cx, cz, slots) {
       // taken (scene-only hardiness), visibly hurt
       // (a few badly hurt, the rest fresh: only the hurt show health bars)
       u.maxHp *= 4;
-      u.hp = u.maxHp * (rng.chance(0.15) ? rng.range(0.3, 0.45) : rng.range(0.65, 1.0));
+      u.hp = u.maxHp * (rng.chance(0.25) ? rng.range(0.35, 0.5) : rng.range(0.7, 1.0));
       u.combat_leash = 2.2;
       // spear's length: they fight across the seam without closing into
       // one another, and never step past their own side of it

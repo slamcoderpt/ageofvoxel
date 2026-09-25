@@ -27,7 +27,7 @@ const SPREAD_SPEED = 2.0; // max drift, tiles/second
 // stands a little off its formation slot, faces a little off true, is a
 // little taller or shorter, and in melee presses in towards its foe so the
 // contact line interlocks instead of holding a clean seam.
-const JITTER = 0.3;        // tiles, static per unit
+const JITTER = 0.18;       // tiles, static per unit
 const PRESS_RATE = 3;      // per second
 const OUTLINE = 0.045;     // outline width, world units (~1 px at the RTS zoom)
 const CORPSE_CLEAR = 0.5;  // corpses slide out from under the living, tiles/second
@@ -283,7 +283,7 @@ export class Units {
         const ro = o.radius || 0.3;
         // men of a battle line (BattleScene) stand shoulder to shoulder and
         // face to face with their foe, not at arm's length
-        const want = r + ro + (u.combat_line && o.combat_line ? 0.9 : SPREAD_GAP) * Math.min(r, ro);
+        const want = r + ro + (u.combat_line && o.combat_line ? 1.3 : SPREAD_GAP) * Math.min(r, ro);
         const dx = u.x - o.x, dz = u.z - o.z;
         const d2 = dx * dx + dz * dz;
         if (d2 >= want * want) return;
@@ -424,7 +424,7 @@ export class Units {
             this._root.multiply(this._tmp.makeRotationX(dir * (f * 1.5 - bounce)));
             this._root.multiply(this._tmp.makeRotationZ(side * 0.12 * f));
             // pressed flat into the turf, lower than any man still standing
-            this._root.premultiply(this._tmp.makeTranslation(0, -y, 0)).premultiply(this._tmp.makeScale(1, 1 - 0.4 * f, 1)).premultiply(this._tmp.makeTranslation(0, y - 0.05 * f, 0));
+            this._root.premultiply(this._tmp.makeTranslation(0, -y, 0)).premultiply(this._tmp.makeScale(1, 1 - 0.6 * f, 1)).premultiply(this._tmp.makeTranslation(0, y - 0.05 * f, 0));
           }
           this._root.premultiply(this._tmp.makeTranslation(0, -sink, 0));
         }
@@ -442,8 +442,10 @@ export class Units {
           // the dead go to a dull grey-brown: the dye all but drained out
           // (a trace of hue left, so a body still hints whose it was), so a
           // corpse never reads as a live man in his army's colour
-          const m = dk * 0.85;
-          this._c.setRGB(this._c.r + (0.46 - this._c.r) * m, this._c.g + (0.4 - this._c.g) * m, this._c.b + (0.34 - this._c.b) * m).multiplyScalar(1 - dk * 0.3);
+          // (and dark: a body lies a full value step below the living, so
+          // it reads as part of the ground, not as another man)
+          const m = dk * 0.9;
+          this._c.setRGB(this._c.r + (0.4 - this._c.r) * m, this._c.g + (0.36 - this._c.g) * m, this._c.b + (0.32 - this._c.b) * m).multiplyScalar(1 - dk * 0.55);
         }
         const ck = 1 - (u.gp_char || 0); // god power char (lightning-struck)
         const tr = this._c.r * ck, tg = this._c.g * ck, tb = this._c.b * ck;
@@ -469,8 +471,8 @@ export class Units {
           p.mesh.userData.team.setXYZ(i, tr, tg, tb);
           p.mesh.userData.flash.setX(i, flash);
           p.mesh.userData.fade.setX(i, fade);
-          if (p.coat) p.mesh.setColorAt(i, this._c.setRGB(coat[0] * (1 - dk) * ck, coat[1] * (1 - dk) * ck, coat[2] * (1 - dk) * ck));
-          else p.mesh.setColorAt(i, this._c.setRGB((1 - dk * 0.42) * ck, (1 - dk * 0.47) * ck, (1 - dk * 0.52) * ck));
+          if (p.coat) p.mesh.setColorAt(i, this._c.setRGB((coat[0] * (1 - dk) + 0.3 * dk) * ck, (coat[1] * (1 - dk) + 0.27 * dk) * ck, (coat[2] * (1 - dk) + 0.24 * dk) * ck));
+          else p.mesh.setColorAt(i, this._c.setRGB((1 - dk * 0.6) * ck, (1 - dk * 0.63) * ck, (1 - dk * 0.66) * ck));
         }
       }
       for (const p of rig.parts) {

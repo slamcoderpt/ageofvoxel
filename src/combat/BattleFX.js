@@ -356,8 +356,20 @@ export class BattleFX {
         // bronze on bronze: a tiny white-hot pin at the point of contact and a
         // fan of short spark streaks thrown on through the man struck, rising
         // and falling away - a directional burst, not a round bloom
-        this.spark(px, y, pz, { count: 1, color: 0xfff2c0, bright: 2.4, size: big ? 2.2 : 1.8, life: 0.4, speed: 0, up: 0, gravity: 0 });
-        this.spark(px, y, pz, { count: big ? 12 : r.int(8, 10), color: r.chance(0.5) ? 0xff8a20 : 0xffb040, bright: 2.8, size: big ? 2.3 : 2.0, life: 0.45, speed: r.range(5.0, 7.0), up: 3.0, gravity: -18, dx: bx, dz: bz, cone: 1.1 });
+        // (sized at about half a man's height on screen: the glint spans
+        // ~1.1 world units, the streaks fly out as far again)
+        this.spark(px, y, pz, { count: 1, color: 0xfff2c0, bright: 2.6, size: big ? 3.6 : 3.0, life: 0.45, speed: 0, up: 0, gravity: 0 });
+        this.spark(px, y, pz, { count: big ? 16 : r.int(12, 14), color: r.chance(0.5) ? 0xff8a20 : 0xffb040, bright: 3.0, size: big ? 2.6 : 2.3, life: 0.5, speed: r.range(6.5, 9.0), up: 3.6, gravity: -18, dx: bx, dz: bz, cone: 1.4 });
+        // a few sparks thrown back at the striker too, so the burst is a
+        // star round the point of contact rather than a one-sided fan
+        this.spark(px, y, pz, { count: 5, color: 0xffc860, bright: 2.8, size: 2.0, life: 0.4, speed: r.range(4.5, 6.5), up: 3.0, gravity: -18, dx: -bx, dz: -bz, cone: 1.2 });
+        // and a quick burst of pale dust at the point of contact, popping out
+        // round it and gone in half a second (a low, fast puff that says
+        // "impact" without hanging over the men as a haze)
+        for (let q = 0; q < 5; q++) {
+          const a = (q / 5) * Math.PI * 2 + r.range(-0.4, 0.4);
+          this.puff(px + Math.cos(a) * 0.15, pz + Math.sin(a) * 0.15, { count: 1, size: big ? 0.9 : 0.65, life: 0.55, alpha: 0.55, speed: 0.1, up: 0.4, y: y - gy - 0.35, spread: 0.05, color: 0xe8dcc0, dx: Math.cos(a) * 2.2, dz: Math.sin(a) * 2.2 });
+        }
       }
       // voxel chips: chunky solid cubes that tumble out and drop
       const team = game.players?.[target.owner]?.color ?? 0x888888;
@@ -391,7 +403,12 @@ export class BattleFX {
   death(e) {
     const x = e.x, z = e.z;
     const big = e.def?.myth ? 1.8 : e.def?.class === 'cavalry' ? 1.4 : 1;
-    this.scar(x, z, 0.9 * big, 0.7, 0.75);
+    // a dark pool under the body, drawn out along the line he fell on (he
+    // goes over forwards or back along his facing), inside a ring of
+    // trampled earth: the body reads as a stain on the ground, not a man
+    this.scar(x, z, 1.15 * big, 0.9, 0.2);
+    const fx = Math.sin(e.rot || 0), fz = Math.cos(e.rot || 0);
+    for (const k of [-0.55, 0, 0.55]) this.scar(x + fx * k * big, z + fz * k * big, 0.62 * big, 0.3, 1.0);
     this.puff(x, z, { count: Math.round(2 * big), size: 0.8 * big, life: 1.2, alpha: 0.25, speed: 0.5, y: 0.05 });
     this.game.fx.emit({ x, y: this.game.map.heightAt(x, z) + 0.3, z, count: 6, color: 0x8a6e4e, size: 0.22, life: 0.8, speed: 1.8, up: 1.2, gravity: -6 });
     this.dropGear(e);

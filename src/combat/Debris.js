@@ -94,7 +94,7 @@ export class Debris {
       this._c.setHex(d.owner ? game.players[d.owner].color : 0xd8d0c0);
       // dropped gear is dusty and trampled: the paint dulled towards the
       // grey-brown of the dead, so it never reads as a live man's colour
-      if (d.owner) this._c.lerp(this._t.setRGB(0.5, 0.43, 0.36), 0.6);
+      if (d.owner) this._c.lerp(this._t.setRGB(0.42, 0.37, 0.31), 0.78).multiplyScalar(0.8);
       k.team.setXYZ(n, this._c.r, this._c.g, this._c.b);
       counts.set(d.kind, n + 1);
     }
