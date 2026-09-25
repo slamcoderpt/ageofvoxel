@@ -88,7 +88,7 @@ export class Game {
     for (const r of gen.resources) this.terrain.spawnResource(r.type, r.tx, r.tz, r);
 
     this.simOrder = [this.economy, this.buildings, this.combat, this.godpowers, this.units, this.movement, this.fx, this.fog];
-    this.renderOrder = [this.lighting, this.terrain, this.buildings, this.units, this.combat, this.godpowers, this.ui];
+    this.renderOrder = [this.lighting, this.terrain, this.buildings, this.units, this.economy, this.combat, this.godpowers, this.ui];
 
     addEventListener('resize', () => this.resize());
     this.resize();

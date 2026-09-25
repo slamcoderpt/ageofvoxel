@@ -1,5 +1,6 @@
 import { PLAYER, ENEMY } from '../constants.js';
 import { battleScene } from '../../combat/BattleScene.js';
+import { economyScene } from '../../economy/EconomyScene.js';
 import { standardStart, buildTown, spawnBlock, placeNear, nearestResource, assignGatherers } from './helpers.js';
 
 // Scene registry for the deterministic screenshot harness.
@@ -93,32 +94,8 @@ registerScene('coast', {
   camera: (game, ctx) => ({ x: ctx.focus.x, z: ctx.focus.z, distance: 56, pitch: 46, yaw: 20 }),
 });
 
-registerScene('economy', {
-  description: 'Villagers gathering food, wood and gold (used by the smoke test).',
-  preset: 'skirmish', seed: 3, hud: false, revealAll: true, ai: true, fastForward: 15,
-  setup(game) {
-    const [p, e] = game.starts;
-    const { tc, villagers } = standardStart(game, PLAYER, p, 14);
-    const wood = nearestResource(game, 'wood', tc.x, tc.z);
-    const store = placeNear(game, 'storehouse', PLAYER, tc.x + (wood.x - tc.x) * 0.7, tc.z + (wood.z - tc.z) * 0.7, { maxR: 5 });
-    placeNear(game, 'house', PLAYER, tc.x - 8, tc.z - 5, { maxR: 3 });
-    placeNear(game, 'house', PLAYER, tc.x - 8, tc.z, { maxR: 3 });
-    const farm = placeNear(game, 'farm', PLAYER, tc.x + 6, tc.z + 7, { maxR: 3, gap: 0 });
-    assignGatherers(game, villagers.slice(0, 5), 'wood', store || tc);
-    assignGatherers(game, villagers.slice(5, 9), 'food', tc);
-    assignGatherers(game, villagers.slice(9, 12), 'gold', tc);
-    if (farm) game.commands.order(villagers[12], { type: 'gather', targetId: farm.id });
-    game.economy.train(tc, 'villager');
-    const house = placeNear(game, 'house', PLAYER, tc.x + 8, tc.z - 5, { built: false, maxR: 3 });
-    if (house) game.commands.order(villagers[13], { type: 'build', targetId: house.id });
-    const enemy = standardStart(game, ENEMY, e, 6);
-    game.combat.ai.enabled = true;
-    game.combat.ai.nextWaveAt = 1e9; // keep the economy scene peaceful
-    void enemy;
-    return { focus: tc };
-  },
-  camera: (game, ctx) => ({ x: ctx.focus.x + 3, z: ctx.focus.z + 3, distance: 46 }),
-});
+// The economy scene lives with the economy piece (src/economy/EconomyScene.js).
+registerScene('economy', economyScene);
 
 registerScene('hud', {
   description: 'The town with the full HUD visible and a villager selected.',

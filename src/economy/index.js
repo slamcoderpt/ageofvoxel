@@ -1,4 +1,8 @@
 import { AGES } from '../core/constants.js';
+import { Wildlife } from './Wildlife.js';
+import { Fishing } from './Fishing.js';
+import { EconomyView } from './EconomyView.js';
+import { FARM_ROWS } from './constants.js';
 
 // Economy piece: gathering & drop-off, farms, worship/favor, population,
 // training queues and age advancement.
@@ -9,12 +13,21 @@ import { AGES } from '../core/constants.js';
 //   economy.nextAgeCost(owner)
 //   economy.nearestResource(x, z, resType, maxDist)
 //   economy.nearestDropoff(owner, x, z, resType)
-// Orders handled: 'gather', 'dropoff', 'worship'.
+//   economy.wildlife  (Wildlife.js: huntable deer/boar, spawnHerd(type, x, z, n))
+//   economy.fishing   (Fishing.js: fish shoals + fishing boats, spawnBoat(owner, x, z))
+//   economy.decor     [{ key, x, z, rot, scale }] static field dressing drawn by the economy
+// Orders handled: 'gather' (trees, mines, bushes, farms, and hunting animals),
+// 'dropoff', 'worship'. Farms are harvested row by row (b.econ_rows); drop-off
+// buildings grow visible stockpiles (b.econ_stock).
 
 export const AGE_COSTS = [null, { food: 400 }, { food: 800, gold: 500 }, { food: 1000, gold: 1000 }];
 export const AGE_TIME = [0, 30, 40, 50];
 const POP_MAX = 300;
 const FARM_RATE = 0.55;
+const FOOD_PER_ROW = 2.5;
+const HUNT_RANGE = 3.4;
+const SPEAR_CD = 1.5;
+const SPEAR_DMG = 3;
 
 export class Economy {
   constructor(game) {
@@ -40,7 +53,26 @@ export class Economy {
       },
     });
     this.favorAcc = {};
+    this.wildlife = new Wildlife(game);
+    this.fishing = new Fishing(game);
+    this.spears = [];
+    this.decor = [];
+    this.view = new EconomyView(game, this);
   }
+
+  render(dt, alpha) { this.view.render(dt, alpha); }
+
+  isAnimal(t) { return !!t?.def?.animal; }
+  farmSpot(u, t) {
+    // the farmer works along the row currently being harvested
+    const H = t.econ_rows || 0;
+    const row = Math.floor(H) % FARM_ROWS, f = H - Math.floor(H);
+    const back = Math.floor(H / FARM_ROWS) % 2 === 1;
+    const x = t.tx + 0.7 + (back ? 1 - f : f) * (t.w - 1.4);
+    const z = t.tz + 0.55 + (row + 0.5) * ((t.h - 1.1) / FARM_ROWS);
+    return [x, z];
+  }
+  inFarm(u, t) { return u.x > t.tx + 0.2 && u.x < t.tx + t.w - 0.2 && u.z > t.tz + 0.2 && u.z < t.tz + t.h - 0.2; }
 
   // ---- orders ---------------------------------------------------------
   startGather(u, o) {
@@ -55,10 +87,16 @@ export class Economy {
       resType = 'food';
     } else return false;
     if (u.carry.amount > 0 && u.carry.type !== resType) u.carry = { type: null, amount: 0 };
-    u.econ = { phase: 'toRes', resId: t.id, resType, dropId: null, tries: 0 };
-    if (t.def.farm) game.movement.moveTo(u, t.x + ((u.id % 3) - 1) * 0.6, t.z);
-    else game.movement.moveTo(u, t.x, t.z, { goalRect: t });
+    u.econ = { phase: 'toRes', resId: t.id, resType, dropId: null, tries: 0, throwCd: 0.4 };
+    this.approach(u, t);
     return true;
+  }
+
+  approach(u, t) {
+    const mv = this.game.movement;
+    if (t.def?.farm) { const [x, z] = this.farmSpot(u, t); mv.moveTo(u, x, z); }
+    else if (this.isAnimal(t) && t.alive) { mv.moveTo(u, t.x, t.z, { range: HUNT_RANGE - 0.4 }); u.econ.huntAt = { x: t.x, z: t.z }; }
+    else mv.moveTo(u, t.x, t.z, { goalRect: t });
   }
 
   nearestResource(x, z, resType, maxDist = 14, exclude = null) {
@@ -149,6 +187,9 @@ export class Economy {
   // ---- simulation -------------------------------------------------------
   update(dt) {
     const game = this.game;
+    this.wildlife.update(dt);
+    this.fishing.update(dt);
+    this.updateSpears(dt);
     const worshippers = {};
     for (const u of game.entities.units()) {
       if (u.dead || !u.order) continue;
@@ -212,34 +253,67 @@ export class Economy {
           game.commands.idle(u); return;
         }
         e.resId = t.id; e.phase = 'toRes'; e.tries = 0;
-        mv.moveTo(u, t.x, t.z, { goalRect: t });
+        this.approach(u, t);
+        return;
+      }
+      // ---- hunting a live animal: close to throwing range, then spear it
+      if (this.isAnimal(t) && t.alive) {
+        const d = Math.hypot(t.x - u.x, t.z - u.z);
+        if (d > HUNT_RANGE) {
+          const moved = !e.huntAt || Math.hypot(e.huntAt.x - t.x, e.huntAt.z - t.z) > 1.2;
+          if (!u.moving || moved) {
+            if (!u.moving && ++e.tries > 40) { game.commands.idle(u); return; }
+            this.approach(u, t);
+          }
+          return;
+        }
+        if (u.moving) mv.stop(u);
+        e.phase = 'gathering';
+        u.rot = Math.atan2(t.x - u.x, t.z - u.z);
+        u.anim.want = 'attack';
+        e.throwCd -= dt;
+        if (e.throwCd <= 0) {
+          e.throwCd = SPEAR_CD;
+          u.anim.attackT = 0;
+          this.throwSpear(u, t);
+        }
         return;
       }
       if (u.moving) return;
-      const reach = t.def?.farm ? 0.05 : 1.1;
-      if (mv.distanceTo(u, t) > reach) {
+      const farm = !!t.def?.farm;
+      const inReach = farm ? this.inFarm(u, t) : mv.distanceTo(u, t) <= 1.1;
+      if (!inReach) {
         if (++e.tries > 6) {
           // unreachable: try a different node
-          const alt = this.nearestResource(u.x, u.z, e.resType, 14, t);
+          const alt = farm ? null : this.nearestResource(u.x, u.z, e.resType, 14, t);
           if (!alt) { game.commands.idle(u); return; }
           e.resId = alt.id; e.tries = 0;
-          mv.moveTo(u, alt.x, alt.z, { goalRect: alt });
+          this.approach(u, alt);
           return;
         }
-        if (t.def?.farm) mv.moveTo(u, t.x + ((u.id % 3) - 1) * 0.6, t.z);
-        else mv.moveTo(u, t.x, t.z, { goalRect: t });
+        this.approach(u, t);
         return;
       }
       e.phase = 'gathering';
       e.tries = 0;
-      if (!t.def?.farm) u.rot = Math.atan2(t.x - u.x, t.z - u.z);
+      if (farm) {
+        // follow the harvest front along the row
+        const [fx, fz] = this.farmSpot(u, t);
+        if (Math.hypot(fx - u.x, fz - u.z) > 0.7) { mv.moveTo(u, fx, fz); return; }
+        const back = Math.floor((t.econ_rows || 0) / FARM_ROWS) % 2 === 1;
+        u.rot = back ? -Math.PI / 2 : Math.PI / 2;
+      } else u.rot = Math.atan2(t.x - u.x, t.z - u.z);
       u.anim.want = 'gather';
-      const rate = (t.def?.farm ? FARM_RATE : u.def.gatherRate[e.resType]) * dt;
+      const rate = (farm ? FARM_RATE : this.isAnimal(t) ? u.def.gatherRate.food * 1.35 : u.def.gatherRate[e.resType]) * dt;
       u.carry.type = e.resType;
       u.carry.amount = Math.min(cap, u.carry.amount + rate);
+      if (farm) t.econ_rows = (t.econ_rows || 0) + rate / FOOD_PER_ROW;
       if (t.kind === 'resource') {
         t.amount -= rate;
-        if (t.amount <= 0) game.terrain.removeResource(t);
+        if (t.amount <= 0) {
+          if (this.isAnimal(t)) game.entities.remove(t);
+          else game.terrain.removeResource(t);
+        }
       }
       if (u.carry.amount >= cap) this.goDrop(u);
     } else if (e.phase === 'toDrop') {
@@ -254,16 +328,41 @@ export class Economy {
       const p = game.players[u.owner];
       if (u.carry.amount > 0 && u.carry.type) {
         p.res[u.carry.type] += Math.floor(u.carry.amount * 100) / 100;
+        const src = game.entities.get(e.resId);
+        const kind = u.carry.type !== 'food' ? u.carry.type : src?.def?.farm ? 'grain' : this.isAnimal(src) ? 'meat' : 'fruit';
+        d.econ_stock = { ...(d.econ_stock || {}), [kind]: (d.econ_stock?.[kind] || 0) + u.carry.amount };
         game.events.emit('resources:changed', u.owner);
       }
       u.carry = { type: null, amount: 0 };
       if (u.order.type === 'dropoff' || !e.resId) { game.commands.idle(u); return; }
       e.phase = 'toRes'; e.tries = 0;
       const t = game.entities.get(e.resId);
-      if (t && !t.removed) {
-        if (t.def?.farm) mv.moveTo(u, t.x + ((u.id % 3) - 1) * 0.6, t.z);
-        else mv.moveTo(u, t.x, t.z, { goalRect: t });
+      if (t && !t.removed) this.approach(u, t);
+    }
+  }
+
+  throwSpear(u, t) {
+    const game = this.game;
+    const y0 = game.map.heightAt(u.x, u.z) + 1.5;
+    const d = Math.hypot(t.x - u.x, t.z - u.z);
+    const dur = 0.25 + d * 0.09;
+    // lead the target a little
+    const tx = t.x + (t.x - (t.prevX ?? t.x)) * dur * 30, tz = t.z + (t.z - (t.prevZ ?? t.z)) * dur * 30;
+    this.spears.push({ x0: u.x, z0: u.z, y0, x1: tx, z1: tz, y1: game.map.heightAt(tx, tz) + 0.5, t: 0, dur, target: t.id, from: u.id, stuck: 0 });
+  }
+
+  updateSpears(dt) {
+    const game = this.game;
+    for (let i = this.spears.length - 1; i >= 0; i--) {
+      const s = this.spears[i];
+      s.t += dt;
+      if (s.t >= s.dur && !s.hit) {
+        s.hit = true;
+        const t = game.entities.get(s.target);
+        const u = game.entities.get(s.from);
+        if (t && t.alive && Math.hypot(t.x - s.x1, t.z - s.z1) < 1.6) this.wildlife.hit(t, SPEAR_DMG, u || { x: s.x0, z: s.z0 });
       }
+      if (s.t > s.dur + 1.2) this.spears.splice(i, 1);
     }
   }
 

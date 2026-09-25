@@ -27,7 +27,7 @@ its owner. Shared code lives in `src/core/`.
 | `src/godpowers/` | favor-costed powers: Lightning Storm and Bolt (Zeus); bolt ribbons, pooled flash lights, sparks, scorch decals, storm ring/cloud | `godpowers.cast(owner, id, x, z)`, `canCast()`, `cooldownLeft()` |
 | `src/combat/` | `attack` order, auto-targeting, melee/splash/ranged damage with class bonuses, arrows, death, hit flash/particles, health bars, selection rings, Town Center arrows, **enemy AI** (`EnemyAI.js`) | `combat.damage(t, amount, attacker)`, `kill(e)`, `findEnemyNear()`, `combat.ai.enabled` |
 | `src/ui/` | HUD (resource bar, age, clock, god power buttons, portrait/stats/queue, command grid with hotkeys, rotated minimap), box/click/double-click select, right-click smart orders, control groups (Ctrl+1..9), idle villager (`.`), Town Center (`H`), placement and power targeting modes | `ui.message(text)`, `ui.selection.set(ids)`, `ui.setVisible(bool)` |
-| `src/economy/` | gathering state machine and drop-off, farms, worship → favor, population & cap, training queues, rally points, age advancement | `economy.train(b, type)`, `cancelTrain()`, `advanceAge(owner)`, `nearestResource()`, `nearestDropoff()` |
+| `src/economy/` | gathering state machine and drop-off, farms (row-by-row harvest, crop overlay), hunting (deer/boar herds, thrown spears, carcasses), fishing (shoals + fishing boats), stockpiles by drop-offs, worship → favor, population & cap, training queues, rally points, age advancement, the `economy` scene | `economy.train(b, type)`, `cancelTrain()`, `advanceAge(owner)`, `nearestResource()`, `nearestDropoff()`, `economy.wildlife.spawnHerd()`, `economy.fishing.spawnBoat()` |
 | `src/core/` | game loop (`Game.js`), entity store, events, players, map generation (`GameMap.js`), A* pathfinding + steering (`pathfinding.js`, `Movement.js`), orders (`Commands.js`), input, RTS camera, picking, fog of war, particles (`fx/`), voxel model + mesher + materials (`voxel.js`), composable shader patches, portraits, **scene registry** (`scenes/`) | see below |
 
 ### Core concepts
@@ -65,7 +65,7 @@ URL params select a reproducible setup (registered in `src/core/scenes/index.js`
 | `battle` | two mixed armies (hoplites, toxotes, hippikon, minotaur) clashing, arrows in flight |
 | `godpower` | Zeus's Lightning Storm hitting an enemy army mid-cast |
 | `coast` | seaside town, beach, cliffs, animated water |
-| `economy` | villagers gathering wood/gold/berries/farm, building, training (used by the smoke test) |
+| `economy` | busy economy: fenced block of farms round a granary, hunters on a deer herd, fishing boats, wood/gold/berries, building, training (used by the smoke test) |
 | `hud` | town with the full HUD visible and a villager selected, fog on |
 
 Params: `scene`, `seed`, `live=1` (keep simulating; scenes are paused by default), `hud=0|1`,
@@ -105,4 +105,4 @@ resources rose, units moved and nothing threw.
 - God powers: one god; no ages gating powers.
 - Combat: no attack-move command, simple AI (one attack wave pattern).
 - UI: no tech tree, no garrison, no tooltips for units in the world.
-- Economy: no hunting/fishing, no market/tribute, no techs.
+- Economy: fishing boats are economy-owned (not selectable/trainable units yet; no dock building); no market/tribute, no techs.
