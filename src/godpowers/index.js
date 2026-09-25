@@ -186,7 +186,7 @@ export class GodPowers {
     for (const o of thrown) this.knock(o, x, z, o === target ? 1.1 : 0.8);
     // voxel chunks of earth blown up out of the crater (lit by the strike),
     // a ring of charred clods, one fountain of hot sparks and a smoke puff
-    this.throwDebris(x, y, z, 18, 1.1, seed, true);
+    this.throwDebris(x, y, z, 28, 1.15, seed, true);
     this.charRim(x, y, z, seed);
     this.throwSparks(x, y, z, 24, seed, 1.0);
     game.fx.emit({ x, y: y + 0.2, z, count: 5, color: 0x2a2622, size: 0.42, life: 1.0, speed: 2.0, up: 1.2, gravity: 0.6, grow: 1.5, spread: 0.35 });

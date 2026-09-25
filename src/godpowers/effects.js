@@ -169,15 +169,17 @@ export function boltLines(seed, x, groundY, z, heightAt, height = 21) {
   // sub-forks thinner again: a trunk-and-branches read, not one line reused.
   // (round 10: a real glowing trunk - ~6 px of white-hot core in the cloud
   // swelling to ~18 px where it earths - not a 1-2 px strand)
-  const W0 = 0.085, W1 = 0.25;
+  // (round 13: thicker again - a white-hot trunk ~10 px wide in the cloud,
+  // ~30 px where it earths, so the eye lands on it before anything else)
+  const W0 = 0.15, W1 = 0.44;
   const wAt = (f) => W0 + (W1 - W0) * f; // leader core width at fraction f
   const tap = 1 - W1 / W0;
   lines.push({ pts: main, w: W0, i: 0.8, taper: tap, fade: -0.5 });
   // (the outer glow does not swell at the ground and dims there, so the
   // struck men under it keep their silhouettes)
-  lines.push({ pts: main, w: W0 * 2.4, i: 0.5, taper: tap * 0.45, fade: -0.2, halo: true });
-  lines.push({ pts: main, w: W0 * 7, i: 0.2, taper: 0.45, fade: 0.5, halo: true });
-  const nf = rng.int(2, 4);
+  lines.push({ pts: main, w: W0 * 2.6, i: 0.55, taper: tap * 0.5, fade: -0.2, halo: true });
+  lines.push({ pts: main, w: W0 * 7, i: 0.24, taper: tap * 0.3, fade: 0.2, halo: true });
+  const nf = rng.int(2, 3) + (rng.chance(0.4) ? 1 : 0);
   for (let f = 0; f < nf; f++) {
     const i = rng.int(Math.floor(main.length * (0.3 + f * 0.14)), Math.floor(main.length * (0.44 + f * 0.14)));
     const p = main[i];
@@ -520,7 +522,7 @@ const bodyMat = (front) => new THREE.ShaderMaterial({
       float st = fbm(vec2(x * 1.3 + y * 1.9 - uTime * 3.4, y * 0.5 - uTime * 1.2));
       float dens = (0.55 + 0.45 * smoothstep(0.2, 0.62, b)) * (0.8 + 0.2 * st);
       float prof = smoothstep(0.0, 0.07, h) * (1.0 - smoothstep(0.62, 1.0, h));
-      ${front ? 'float faceA = 0.5, edgeA = 1.7;' : 'float faceA = 1.2, edgeA = 1.7;'}
+      ${front ? 'float faceA = 0.5, edgeA = 1.7;' : 'float faceA = 0.7, edgeA = 1.3;'}
       float cov = dens * prof * mix(faceA, edgeA, fres);
       // dark storm cloud, lit from inside: violet near the glowing foot,
       // cooler and darker up the funnel; billow crests catch the light
@@ -565,7 +567,15 @@ const groundRingMat = () => new THREE.ShaderMaterial({
       col = mix(col, cDust + vec3(0.12, 0.05, 0.25) * (1.0 + uFlash), min(1.0, dust)); cov = max(cov, min(0.7, dust * 0.75));
       cov *= 1.0 - smoothstep(1.45, 1.75, r);
       cov *= smoothstep(0.84, 0.94, r);
-      gl_FragColor = vec4(col * 0.45 * (1.0 + 0.5 * uFlash), cov * uK);
+      col *= 0.45 * (1.0 + 0.5 * uFlash);
+      // (round 13) the kill radius, marked crisply on the ground: a dark
+      // scorched edge just outside the foot and a thin hot violet line on it
+      // (terrain-following, so it sits on every voxel step)
+      float scorch = smoothstep(1.125, 1.14, r) * (1.0 - smoothstep(1.17, 1.26, r)) * (0.75 + 0.25 * vn2(vec2(vA * 40.0, 1.0)));
+      col = mix(col, vec3(0.02, 0.015, 0.02), scorch); cov = max(cov, scorch * 0.8);
+      float line = exp(-pow((r - 1.12) / 0.014, 2.0)) * (0.8 + 0.2 * sin(uTime * 23.0 + vA * 5.0));
+      col = mix(col, vec3(2.2, 1.4, 4.0), line); cov = max(cov, line * 0.95);
+      gl_FragColor = vec4(col, cov * uK);
     }`,
   transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3,
 });
@@ -640,7 +650,7 @@ const stormGradeMat = (add = false) => new THREE.ShaderMaterial({
     uInvVP: { value: new THREE.Matrix4() }, uPlaneY: { value: 0 }, uCenter: { value: new THREE.Vector2() },
     uR: { value: 10 }, uK: { value: 0 }, uFlash: { value: 0 }, uTime: { value: 0 },
     uPools: { value: Array.from({ length: MAX_POOLS }, () => new THREE.Vector4()) },
-    uPoolCol: { value: new THREE.Color(1.05, 1.1, 1.7) },
+    uPoolCol: { value: new THREE.Color(1.2, 0.98, 1.8) },
   },
   vertexShader: `varying vec2 vNdc; void main(){ vNdc = position.xy; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
   fragmentShader: `uniform mat4 uInvVP; uniform float uPlaneY, uR, uK, uFlash, uTime; uniform vec2 uCenter;
@@ -671,8 +681,11 @@ const stormGradeMat = (add = false) => new THREE.ShaderMaterial({
       float ga = atan(g.y - uCenter.y, g.x - uCenter.x);
       float arms = 0.5 + 0.5 * sin(3.0 * ga + 5.0 * r - uTime * 2.6);
       arms = arms * arms * (0.6 + 0.4 * vn(g * 0.35 + uTime * 0.4));
-      vec3 inC = mix(vec3(0.58, 0.53, 0.86), vec3(0.56, 0.44, 0.94), smoothstep(0.2, 1.0, r)) * (0.9 + 0.15 * shade)
-               + vec3(0.2, 0.06, 0.55) * arms * (0.1 + 0.4 * smoothstep(0.3, 0.95, r));
+      // (round 13: a near-neutral stage - the old violet multiply cut red to
+      // 0.58 while keeping blue, turning the red army magenta; now red keeps
+      // ~90% and only ~30% of the violet cast reaches the floor)
+      vec3 inC = mix(vec3(0.95, 0.9, 1.0), vec3(0.82, 0.74, 0.98), smoothstep(0.35, 1.0, r)) * (0.92 + 0.1 * shade)
+               + vec3(0.08, 0.02, 0.2) * arms * (0.05 + 0.3 * smoothstep(0.5, 0.95, r));
       vec3 midC = vec3(0.4, 0.4, 0.6) * (0.8 + 0.3 * shade);
       vec3 m = mix(vec3(0.42, 0.43, 0.5), midC, near);
       m = mix(m, inC, inside);
@@ -832,7 +845,7 @@ export class BoltRenderer {
     // round the storm; light 1 circles inside the funnel)
     this.stormLights = [];
     for (let i = 0; i < 2; i++) {
-      const l = i === 0 ? new THREE.PointLight(0xd4c8ff, 0, 0, 0.9) : new THREE.PointLight(0x9a60ff, 0, 14, 1.6);
+      const l = i === 0 ? new THREE.PointLight(0xbca4ff, 0, 0, 0.9) : new THREE.PointLight(0x9a60ff, 0, 14, 1.6);
       this.group.add(l);
       this.stormLights.push(l);
     }
@@ -901,10 +914,52 @@ export class BoltRenderer {
       fragmentShader: `uniform float uA; uniform vec3 uColor; varying float vB; void main(){ float e = exp(-pow(vB - 0.4, 2.0) * 6.0); gl_FragColor = vec4(uColor * e * uA, 1.0); }`,
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
     });
+    // strike flash disc: a white-hot core with a hard, bright rim that sits
+    // crisp on the ground (uK 0..1 age: the rim opens out a little and the
+    // core narrows as it cools through violet)
+    this.discMat = new THREE.ShaderMaterial({
+      uniforms: { uO: { value: 1 }, uK: { value: 0 } },
+      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: `uniform float uO, uK; varying vec2 vUv;
+        void main(){ vec2 p = (vUv - 0.5) * 2.0; float d = length(p);
+          float rr = 0.3 + 0.2 * uK;
+          // white-hot core fading to violet toward a hard bright rim, and a
+          // charred dark collar just outside it: the contrast that makes the
+          // contact read crisp (not one more additive glow on bright grass)
+          float core = 1.0 - smoothstep(rr - 0.05, rr, d);
+          float rim = exp(-pow((d - rr) / 0.03, 2.0));
+          float coll = smoothstep(rr, rr + 0.03, d) * (1.0 - smoothstep(rr + 0.2, rr + 0.5, d));
+          vec3 hot = mix(vec3(3.2, 3.0, 3.4), vec3(1.5, 0.8, 2.8), smoothstep(0.0, rr, d) * 0.7 + 0.3 * uK);
+          vec3 c = hot * core;
+          c = mix(c, vec3(0.03, 0.02, 0.05), coll * (1.0 - core));
+          c = mix(c, vec3(2.4, 1.8, 4.0), rim);
+          float a = max(core, max(rim, coll * 0.85)) * uO;
+          gl_FragColor = vec4(c, clamp(a, 0.0, 1.0)); }`,
+      transparent: true, depthWrite: false, blending: THREE.NormalBlending, fog: false,
+      polygonOffset: true, polygonOffsetFactor: -9, polygonOffsetUnits: -9,
+    });
     // spark streaks: one preallocated ribbon quad per spark; blue-white
     // electric sparks and molten gold ones (which read against the blue glare)
     this._emptyGeo = new THREE.BufferGeometry();
     this.sparkMesh = this.addMesh(new THREE.Mesh(new THREE.BufferGeometry(), sparkMat()), 55);
+    // (round 13) drop shadows under men thrown into the air: a soft dark
+    // blot on the ground under each one, tighter and darker the lower he
+    // flies, so a flying man reads apart from the debris round him
+    // (multiplied into the frame; instanceColor.r = the blot's depth)
+    this.shadows = new THREE.InstancedMesh(this.decalGeo, new THREE.ShaderMaterial({
+      vertexShader: `varying vec2 vUv; varying float vD;
+        void main(){ vUv = uv; vD = instanceColor.r;
+          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0); }`,
+      fragmentShader: `varying vec2 vUv; varying float vD;
+        void main(){ float d = length(vUv - 0.5) * 2.0; float a = (1.0 - smoothstep(0.35, 1.0, d)) * vD;
+          gl_FragColor = vec4(vec3(1.0 - a), 1.0); }`,
+      transparent: true, depthWrite: false, fog: false,
+      blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.DstColorFactor, blendDst: THREE.ZeroFactor,
+      polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -5,
+    }), 48);
+    this.shadows.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(48 * 3), 3);
+    this.shadows.count = 0;
+    this.addMesh(this.shadows, 7);
     this.stormVisuals = new Map();
     this.meteorVisuals = new Map();
     this.zapMeshes = new Map();
@@ -977,6 +1032,16 @@ export class BoltRenderer {
           v.gflash.rotation.y = (b.seed % 628) / 100;
           // brightness varies a little from bolt to bolt
           v.gain = 0.8 + 0.35 * hash2(b.seed & 0xffff, 91);
+          // (round 13) the channel earths visibly: a tall white-hot stem of
+          // light standing on the contact, a crisp flash disc with a hard
+          // edge and a shock ring racing out over the ground
+          v.stem = this.glowSprite(0xf4f0ff, 63, 2);
+          v.stem.position.set(b.x, b.y + 1.2, b.z);
+          v.disc = this.addMesh(new THREE.Mesh(this.decalGeo, this.discMat.clone()), 23);
+          v.disc.position.set(b.x, b.y + 0.3, b.z);
+          v.ring = this.addMesh(new THREE.Mesh(this.shockGeo, this.shockMat.clone()), 46);
+          v.ring.material.uniforms.uColor.value.setRGB(0.95, 0.8, 1.6);
+          v.ring.position.set(b.x, b.y + 0.12, b.z);
         }
         this.meshes.set(b, v);
       }
@@ -998,15 +1063,28 @@ export class BoltRenderer {
         const pin = age < 0.06 ? 1 : Math.exp(-(age - 0.06) / 0.07);
         const g = v.gain ?? 1, e = Math.min(1.5, env) * g;
         v.mesh.material.uniforms.uAlpha.value = Math.min(1.1, env) * g;
-        v.hot.material.uniforms.uO.value = 1.5 * g * pin;
-        v.hot.scale.setScalar(0.7 + 1.3 * pin);
-        v.gflash.material.uniforms.uO.value = Math.min(0.9, e * 0.7) * (0.15 + 0.85 * pin);
-        v.gflash.scale.setScalar(2.0 + 1.0 * pin);
+        v.hot.material.uniforms.uO.value = 2.6 * g * pin;
+        v.hot.scale.setScalar(0.7 + 0.9 * pin);
+        v.gflash.material.uniforms.uO.value = Math.min(0.35, e * 0.3) * (0.15 + 0.85 * pin);
+        v.gflash.scale.setScalar(1.5 + 0.7 * pin);
+        // the freshest strike is the hero: its stem, disc and ring are full
+        // strength, older ones only a dim afterimage
+        const hero = b === sorted[0] ? 1 : 0.35;
+        const sk = Math.min(1, age / 0.4);
+        v.stem.material.uniforms.uO.value = 0.9 * g * hero * (age < 0.1 ? 1 : Math.exp(-(age - 0.1) / 0.18));
+        v.stem.scale.set(0.35 + 0.15 * pin, 2.4 + 0.6 * pin, 1);
+        v.disc.material.uniforms.uO.value = Math.min(1, hero * g * (age < 0.1 ? 1.3 : 1.3 * Math.exp(-(age - 0.1) / 0.2)));
+        v.disc.material.uniforms.uK.value = sk;
+        v.disc.scale.setScalar(6.2);
+        v.ring.scale.setScalar(0.6 + 3.4 * Math.pow(sk, 0.6));
+        v.ring.material.uniforms.uA.value = hero * 3.0 * Math.pow(1 - sk, 1.2);
         // the strike relights the land and the men round it: a white-blue
         // pool ~5 tiles across (150-200 px) that multiplies the albedo up to
         // ~3x for the first few frames, then dies with the channel
         const snap = age < 0.1 ? 1 : Math.exp(-(age - 0.1) / 0.12);
-        pools.push({ x: b.x, z: b.z, i: Math.min(0.85, e * 0.75) * (0.1 + 0.9 * snap), r: 3.6 + 1.2 * snap });
+        // (round 13: tighter and softer, so the flash disc keeps a crisp edge
+        // against the lit ground instead of melting into one white haze)
+        pools.push({ x: b.x, z: b.z, i: Math.min(0.5, e * 0.45) * (0.1 + 0.9 * snap) * (b === sorted[0] ? 1 : 0.3), r: 2.8 + 1.0 * snap });
         for (const st of storms) {
           const dx = b.x - st.x, dz = b.z - st.z, d = Math.hypot(dx, dz);
           const w = Math.min(1.2, env) * (0.45 + 0.55 * Math.min(1, d / st.radius)) * Math.pow(1 - k, 0.7);
@@ -1019,18 +1097,26 @@ export class BoltRenderer {
           // on the units and walls round the strike
           // (a short, strong flash that reaches the walls of the buildings
           // and the men all round the contact)
-          l.color.setHex(0x9cbcff);
-          l.position.set(b.x, b.y + 3.2, b.z);
-          l.distance = 10;
+          // the freshest strike throws violet-white light low over the
+          // voxels and the men round it; older ones stay cool blue
+          const heroL = b === sorted[0];
+          // (round 13: the hero light reaches ~1.5x the funnel radius so the
+          // grass and the unit tops all round the strike take its violet)
+          l.color.setHex(heroL ? 0xa878ff : 0x9cbcff);
+          // (hung higher with a slow falloff: an even violet tint over the
+          // whole kill radius instead of a blown-out lilac spot on the contact)
+          l.position.set(b.x, b.y + (heroL ? 4.5 : 3.2), b.z);
+          l.distance = heroL ? 12 : 10;
+          l.decay = heroL ? 1 : 2;
           const snapL = age < 0.1 ? 1 : Math.exp(-(age - 0.1) / 0.12);
-          l.intensity = 17 * Math.min(1.1, e) * (0.06 + 0.94 * snapL);
+          l.intensity = (heroL ? 7 : 17) * Math.min(1.1, e) * (0.06 + 0.94 * snapL);
         }
       } else flash = Math.max(flash, env * 0.5);
     }
     for (const [b, v] of this.meshes) {
       if (alive.has(b)) continue;
       this.group.remove(v.mesh); v.mesh.geometry.dispose(); v.mesh.material.dispose();
-      if (v.hot) { this.group.remove(v.hot, v.gflash); for (const o of [v.hot, v.gflash]) o.material.dispose(); }
+      if (v.hot) { this.group.remove(v.hot, v.gflash, v.stem, v.disc, v.ring); for (const o of [v.hot, v.gflash, v.stem, v.disc, v.ring]) o.material.dispose(); }
       for (const s of v.extra || []) { this.group.remove(s); s.material.dispose(); }
       this.meshes.delete(b);
     }
@@ -1193,15 +1279,6 @@ export class BoltRenderer {
       this.zapMeshes.delete(z);
     }
 
-    // ---- thrown debris + spark streaks
-    const pulled = [];
-    for (const st of storms) {
-      const sv = this.stormVisuals.get(st);
-      if (sv) this.pulledDebris(st, sv, now, stormK(st, now), pulled);
-    }
-    this.renderDebris(state.debris || [], now, pulled);
-    this.renderSparks(this.sparkMesh, state.sparks || [], now);
-
     // ---- storms
     const aliveStorms = new Set();
     let gradeK = 0, gst = null;
@@ -1250,6 +1327,16 @@ export class BoltRenderer {
       this.stormVisuals.delete(st);
     }
 
+    // ---- thrown debris + spark streaks
+    const pulled = [];
+    for (const st of storms) {
+      const sv = this.stormVisuals.get(st);
+      if (sv) { this.pulledDebris(st, sv, now, stormK(st, now), pulled); if (sv.ride) pulled.push(...sv.ride); }
+    }
+    this.renderDebris(state.debris || [], now, pulled);
+    this.renderShadows(state.airborne || []);
+    this.renderSparks(this.sparkMesh, state.sparks || [], now);
+
     // ---- storm light: the cloud deck dims the sun and sky light (the grade
     // below shapes it locally), so the strike lights really carry the scene;
     // health bars are hidden while the storm plays so the strike reads clean
@@ -1261,7 +1348,10 @@ export class BoltRenderer {
         // (hung high with a slow falloff: a wash over the whole battlefield,
         // not a hot disc on the ground under it)
         l.position.set(gst.x, heightAt(gst.x, gst.z) + 24, gst.z);
-        l.intensity = gradeK * (5 + 45 * Math.min(1.2, flash));
+        // (round 13: 45 -> 16 per flash - the full-strength wash turned every
+        // man in the ring pale lilac; the hero strike's own light carries the
+        // local violet now)
+        l.intensity = gradeK * (5 + 16 * Math.min(1.2, flash));
         return;
       }
       const a = now * 2.0 + i * Math.PI, r = sv.rb * (0.45 + 0.1 * Math.sin(now * 1.3 + i));
@@ -1348,6 +1438,8 @@ export class BoltRenderer {
     const cam = this.game.camera.position;
     const cd = Math.atan2(cam.z - st.z, cam.x - st.x);
     const hotA = v.hotA ?? 0, hotW = v.hotW ?? 0;
+    const ride = [];
+    v.ride = ride;
     for (const b of v.bandDefs) {
       const head = b.a0 + b.sp * now;
       const da = Math.abs(((head - hotA) % TAU + TAU * 1.5) % TAU - Math.PI);
@@ -1360,29 +1452,49 @@ export class BoltRenderer {
       const hHead = b.h0 + cyc * (1.05 - b.h0);
       const ii = i * Math.min(1, cyc * 6) * (1 - smoothstep(0.7, 1.05, hHead));
       if (ii < 0.02) continue;
-      const pts = [], n = 44;
+      const pts = [], n = 56;
       for (let s = 0; s <= n; s++) {
         const f = s / n, a = head - b.span * f;
         const hf = Math.max(0, hHead - b.climb * f);
-        const r = funnelR(v.rb, v.rt, hf) + b.dr + 0.3 * Math.sin(a * 3 + now * 2.1 + b.ph) + 0.12 * Math.sin(a * 11 - now * 5 + b.ph * 2);
+        const r = funnelR(v.rb, v.rt, hf) + b.dr + 0.22 * Math.sin(a * 3 + now * 2.1 + b.ph) + 0.08 * Math.sin(a * 11 - now * 5 + b.ph * 2);
         const g = ghAt(a);
         const face = Math.cos(a - cd); // +1 on the side toward the camera
         const fr = smoothstep(-0.75, 0.85, face);
-        // bright on the funnel's silhouette (seen edge-on), faint across its
-        // face so the body and the men inside read through it
+        // brighter on the funnel's silhouette (seen edge-on) and on the near
+        // side, dimmer where it crosses behind the army
         const rim = Math.pow(1 - Math.abs(face), 1.4);
+        // leading edge: the head swells in from a rounded point to full
+        // width and is white-hot; the tail thins and dims behind it
+        const lead = smoothstep(0, 0.05, f) * (1 + 0.5 * Math.exp(-f * 14));
         pts.push({
           x: st.x + Math.cos(a) * r,
           y: g + (base - g) * Math.min(1, hf * 2.5) + 0.15 + hf * v.H + b.ya * Math.sin(a * b.yf + now * 2.3 + b.ph),
           z: st.z + Math.sin(a) * r,
-          m: 0.06 + 0.16 * fr + 1.05 * rim, wm: (0.6 + 0.9 * rim) * (0.8 + 0.5 * hf),
+          m: (0.22 + 0.3 * fr + 0.75 * rim) * (1 + 2.2 * Math.exp(-f * 10)), wm: lead * (0.75 + 0.45 * rim) * (0.85 + 0.4 * hf),
         });
       }
       const L = layers[b.layer];
-      L.push({ pts, w: b.w, i: 0.8 * ii, taper: 0.94, fade: 1 });
-      L.push({ pts, w: b.w * 3.2, i: 0.3 * ii, taper: 0.85, fade: 0.95, halo: true });
-      L.push({ pts, w: b.w * 5.5, i: 0.07 * ii, taper: 0.7, fade: 0.9, halo: true });
+      L.push({ pts, w: b.w, i: 0.75 * ii, taper: 0.97, fade: 1 });
+      L.push({ pts, w: b.w * 2.6, i: 0.26 * ii, taper: 0.9, fade: 0.97, halo: true });
+      if (b.hero < 2) L.push({ pts, w: b.w * 5, i: 0.06 * ii, taper: 0.8, fade: 0.95, halo: true });
+      // dust, turf and leaves riding the streak: strung along its first half,
+      // drifting back along it, more and bigger on the broad sweeps
+      const nr = [26, 16, 8, 4][b.hero] ?? 0;
+      for (let q = 0; q < nr; q++) {
+        const hq = hash2(q + 17, b.hero + 3);
+        const f = ((hq + now * (0.35 + 0.2 * hash2(q, b.hero, 5))) % 1) * 0.75;
+        const p = pts[Math.min(n, Math.round(f * n))];
+        const jit = (hash2(q, b.hero, 9) - 0.5) * (0.9 + b.w * 2), jy = (hash2(q, b.hero, 11) - 0.5) * (0.6 + b.w * 2);
+        const a = head - b.span * f;
+        const kind = q % 3; // 0 earth, 1 leaf, 2 dust mote
+        const sz = (kind === 0 ? 0.1 + 0.14 * hq : kind === 1 ? 0.12 + 0.06 * hq : 0.05 + 0.04 * hq) * (0.7 + b.w) * Math.min(1, ii * 1.5) * smoothstep(0.75, 0.55, f);
+        ride.push({ x: p.x + Math.cos(a) * jit, y: p.y + jy, z: p.z + Math.sin(a) * jit,
+          rx: now * (4 + q % 5) + q, ry: a, rz: now * (3 + q % 4) - q, s: sz,
+          sy: kind === 1 ? 0.18 : 1, sx: kind === 1 ? 1.6 : 1,
+          color: kind === 0 ? (q & 4 ? 0x6a5238 : 0x4a3a2c) : kind === 1 ? (q & 4 ? 0x5f8a34 : 0x86a03a) : 0x9a8a7a, glow: kind === 2 && q % 2 === 0 });
+      }
     }
+    v.ride = ride;
     [v.bands, v.bands2].forEach((m, j) => {
       if (m.geometry !== this._emptyGeo) m.geometry.dispose();
       m.geometry = layers[j].length ? ribbonGeometry(layers[j]) : this._emptyGeo;
@@ -1408,12 +1520,12 @@ export class BoltRenderer {
       // masks its centre): each flying figure reads as a dark silhouette with
       // a glowing rim against the storm, not one more red chunk in a heap
       if (rim < 24) {
-        const g = this.rimPool[rim] || (this.rimPool[rim] = this.glowSprite(0x9a6cff, 43, 0, true));
+        const g = this.rimPool[rim] || (this.rimPool[rim] = this.glowSprite(0xc8d8ff, 43, 0, true));
         const cam = this.game.camera.position, t = tr.length - 3;
         this._v.set(tr[t] - cam.x, 0, tr[t + 2] - cam.z).normalize().multiplyScalar(0.6);
         g.position.set(tr[t] + this._v.x, tr[t + 1] + 0.1, tr[t + 2] + this._v.z);
-        g.scale.setScalar(2.4);
-        g.material.uniforms.uO.value = 0.4 * k * Math.min(1, u.airY / 1.5);
+        g.scale.setScalar(2.0);
+        g.material.uniforms.uO.value = 0.75 * k * Math.min(1, u.airY / 1.5);
         g.visible = true;
         rim++;
       }
@@ -1440,6 +1552,25 @@ export class BoltRenderer {
         rx: d.rx * now, ry: a, rz: d.rz * now, sy: d.sy,
         s: d.s * (1 - u * 0.4) * Math.min(1, k * 1.5) * Math.min(1, (1 - u) * 5) * Math.min(1, u * 12), color: d.color ?? d.col, glow: d.glow, u });
     }
+  }
+
+  renderShadows(list) {
+    const o = this._o, c = this._c, map = this.game.map;
+    let n = 0;
+    for (const u of list) {
+      if (n >= 48 || !(u.airY > 0.15) || u.dead) continue;
+      const h = u.airY;
+      o.position.set(u.x, map.heightAt(u.x, u.z) + 0.07, u.z);
+      o.rotation.set(0, 0, 0);
+      o.scale.setScalar(0.85 + h * 0.09);
+      o.updateMatrix();
+      this.shadows.setMatrixAt(n, o.matrix);
+      this.shadows.setColorAt(n, c.setRGB(0.8 * Math.max(0.35, 1 - h / 14), 0, 0));
+      n++;
+    }
+    this.shadows.count = n;
+    this.shadows.instanceMatrix.needsUpdate = true;
+    this.shadows.instanceColor.needsUpdate = true;
   }
 
   // Spark streaks, rebuilt each frame: one soft quad per spark from its head
@@ -1508,7 +1639,7 @@ export class BoltRenderer {
       if (d.s <= 0.01) continue;
       o.position.set(d.x, d.y, d.z);
       o.rotation.set(d.rx, d.ry, d.rz);
-      o.scale.set(d.s, d.s * (d.sy ?? 1), d.s);
+      o.scale.set(d.s * (d.sx ?? 1), d.s * (d.sy ?? 1), d.s);
       o.updateMatrix();
       if (d.glow && ne < EMBER_MAX) {
         this.embers.setMatrixAt(ne, o.matrix);
@@ -1565,17 +1696,25 @@ export class BoltRenderer {
     // broad bright sweeps, a middle rank and many hair-thin strands, each a
     // white-hot head tapering into a violet or blue tail, climbing as it
     // orbits with the spin
+    // (round 13: a dozen equal white arcs read as noise. Now four streaks
+    // with a clear hierarchy - one broad hero sweep, one strong second, two
+    // thin accents - each a hot leading edge thinning into a long tail, set
+    // round the funnel at different heights so the spin reads)
     const bandDefs = [];
-    const NB = 34;
-    for (let j = 0; j < NB; j++) {
-      const tier = j < 6 ? 0 : j < 16 ? 1 : 2;
+    const HERO = [
+      { w: 0.46, i: 1.0, span: 2.5, h0: 0.08, climb: 0.3, a: 0.0 },
+      { w: 0.28, i: 0.95, span: 2.0, h0: 0.28, climb: 0.35, a: 2.3 },
+      { w: 0.15, i: 0.85, span: 1.6, h0: 0.02, climb: 0.2, a: 4.1 },
+      { w: 0.08, i: 0.75, span: 1.3, h0: 0.45, climb: 0.3, a: 5.2 },
+    ];
+    for (let j = 0; j < HERO.length; j++) {
+      const H0 = HERO[j];
       bandDefs.push({
-        layer: j % 4 === 3 ? 1 : 0,
-        a0: rng.range(0, Math.PI * 2), sp: rng.range(1.3, 2.3) * (tier === 0 ? 0.9 : 1), span: tier === 0 ? rng.range(1.6, 2.6) : rng.range(0.9, 2.0),
-        h0: rng.range(0.0, 0.5), climb: rng.range(0.25, 0.55), dr: rng.range(-0.35, 0.45), ya: rng.range(0.1, 0.4),
-        yf: rng.int(2, 5), ph: rng.range(0, 6.28), pf: rng.range(1.2, 3), rate: rng.range(0.18, 0.32),
-        w: tier === 0 ? rng.range(0.34, 0.5) : tier === 1 ? rng.range(0.14, 0.22) : rng.range(0.045, 0.09),
-        i: tier === 0 ? rng.range(0.9, 1.15) : tier === 1 ? rng.range(0.7, 1.0) : rng.range(0.5, 0.9),
+        layer: j === 2 ? 1 : 0, hero: j,
+        a0: H0.a + rng.range(-0.3, 0.3), sp: 1.55 + j * 0.18, span: H0.span,
+        h0: H0.h0, climb: H0.climb, dr: rng.range(-0.1, 0.25), ya: rng.range(0.1, 0.25),
+        yf: rng.int(2, 4), ph: rng.range(0, 6.28), pf: rng.range(1.2, 2), rate: rng.range(0.1, 0.16),
+        w: H0.w, i: H0.i,
       });
     }
     const bands = this.addMesh(new THREE.Mesh(new THREE.BufferGeometry(), makeRibbonMaterial(new THREE.Color(0x7a50ff), new THREE.Color(0xf2eaff), 1.9, new THREE.Color(0x9a28ff))), 48);
