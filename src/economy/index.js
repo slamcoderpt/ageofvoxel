@@ -28,6 +28,7 @@ const FOOD_PER_ROW = 2.5;
 const HUNT_RANGE = 3.4;
 const SPEAR_CD = 1.5;
 const SPEAR_DMG = 3;
+const UNREACH_FORGET = 90; // s a node stays skipped after gatherers failed to reach it
 
 export class Economy {
   constructor(game) {
@@ -101,8 +102,12 @@ export class Economy {
 
   nearestResource(x, z, resType, maxDist = 14, exclude = null) {
     let best = null, bd = maxDist * maxDist;
+    const now = this.game.time;
     for (const r of this.game.entities.resources()) {
       if (r.resType !== resType || r === exclude || r.amount <= 0) continue;
+      // nodes nobody could reach lately (a carcass boxed in by trees, a tree
+      // walled in by buildings) are skipped for a while
+      if (r.econ_unreachT !== undefined && now - r.econ_unreachT < UNREACH_FORGET) continue;
       const d = (r.x - x) ** 2 + (r.z - z) ** 2;
       if (d < bd) { bd = d; best = r; }
     }
@@ -262,7 +267,7 @@ export class Economy {
         if (d > HUNT_RANGE) {
           const moved = !e.huntAt || Math.hypot(e.huntAt.x - t.x, e.huntAt.z - t.z) > 1.2;
           if (!u.moving || moved) {
-            if (!u.moving && ++e.tries > 40) { game.commands.idle(u); return; }
+            if (!u.moving && ++e.tries > 40) { t.econ_unreachT = game.time; game.commands.idle(u); return; }
             this.approach(u, t);
           }
           return;
@@ -284,7 +289,8 @@ export class Economy {
       const inReach = farm ? this.inFarm(u, t) : mv.distanceTo(u, t) <= 1.1;
       if (!inReach) {
         if (++e.tries > 6) {
-          // unreachable: try a different node
+          // unreachable: remember that, and try a different node
+          if (!farm) t.econ_unreachT = game.time;
           const alt = farm ? null : this.nearestResource(u.x, u.z, e.resType, 14, t);
           if (!alt) { game.commands.idle(u); return; }
           e.resId = alt.id; e.tries = 0;

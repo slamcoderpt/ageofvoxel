@@ -31,8 +31,12 @@ export class EnemyAI {
     const vills = units.filter((u) => u.def.gatherer);
     const army = units.filter((u) => !u.def.gatherer);
 
+    // saving food for the Classical Age (minotaurs need it): once the
+    // economy is up, hold back food spending for a while until it can pay
+    const ageCost = game.economy.nextAgeCost(this.owner);
+    const saving = p.age < 1 && !p.advancing && ageCost && vills.length >= 16 && game.time >= 300 && game.time < 540 && !p.canAfford(ageCost);
     // 1. villagers
-    if (vills.length < 22 && tc.queue.length < 2) game.economy.train(tc, 'villager');
+    if (!saving && vills.length < 22 && tc.queue.length < 2) game.economy.train(tc, 'villager');
     const counts = { food: 0, wood: 0, gold: 0 };
     const byType = { food: [], wood: [], gold: [] };
     for (const v of vills) if (v.order?.type === 'gather' && v.econ) { counts[v.econ.resType]++; byType[v.econ.resType].push(v); }
@@ -62,7 +66,7 @@ export class EnemyAI {
     const academy = buildings.find((b) => b.type === 'barracks');
     if (!academy && vills.length >= 10) this.tryBuild('barracks', this.pickBuilder(vills), tc);
     if (!buildings.some((b) => b.type === 'temple') && vills.length >= 14) this.tryBuild('temple', this.pickBuilder(vills), tc);
-    if (academy && academy.built && academy.queue.length < 3) {
+    if (academy && academy.built && academy.queue.length < 3 && !saving) {
       const pick = ['hoplite', 'toxotes', 'hoplite', 'hippikon'][Math.floor(game.time / 7) % 4];
       game.economy.train(academy, pick);
     }
@@ -74,7 +78,7 @@ export class EnemyAI {
       if (v) game.commands.order(v, { type: 'worship', targetId: temple.id });
     }
     // 4. age up
-    if (!p.advancing && p.age < 1 && p.res.food > 500) game.economy.advanceAge(this.owner);
+    if (!p.advancing && p.age < 1 && ageCost && (p.res.food > 500 || (vills.length >= 16 && p.canAfford(ageCost)))) game.economy.advanceAge(this.owner);
 
     // 5. attack waves
     const idleArmy = army.filter((u) => u.order?.type === 'idle' || u.order?.auto);
