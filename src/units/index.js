@@ -3,7 +3,7 @@ import { buildVoxelGeometry, makeVoxelMaterial, voxelMaterialFor } from '../core
 import { addShaderPatch, prependVertex, injectVertex, prependFragment, injectFragment } from '../core/shaderPatch.js';
 import { UNIT_DEFS } from './defs.js';
 import { RIGS } from './models.js';
-import { pose } from './anim.js';
+import { pose, uhash } from './anim.js';
 
 // Units piece: unit entities, rigs, instanced rendering, animation state.
 // Public API:
@@ -23,6 +23,13 @@ const SPREAD_GAP = 0.8;   // extra spacing, in multiples of the smaller radius
 const SPREAD_SPEED = 1.6; // max drift, tiles/second
 // Per-unit horse coat tints (multiplied into the dappled grey base):
 // grey, near-white, dun, bay, dark bay.
+// Crowd variety (visual only, never fed back into the sim): each soldier
+// stands a little off its formation slot, faces a little off true, is a
+// little taller or shorter, and in melee presses in towards its foe so the
+// contact line interlocks instead of holding a clean seam.
+const JITTER = 0.3;        // tiles, static per unit
+const YAW_JITTER = 0.32;   // radians, eased in while standing / fighting
+const PRESS_RATE = 3;      // per second
 const COATS = [[1, 1, 1], [1.06, 1.06, 1.05], [0.95, 0.86, 0.7], [0.72, 0.5, 0.34], [0.5, 0.36, 0.27], [1, 0.98, 0.95]];
 
 export class Units {
@@ -133,6 +140,20 @@ export class Units {
       }
       a.state = u.moving ? 'walk' : a.want || 'idle';
       a.want = null;
+      // visual press into melee contact and a standing facing offset
+      let press = 0;
+      if (a.state === 'attack' && u.def.attack && !u.def.attack.projectile) {
+        const t = game.entities.get(u.order?.targetId);
+        if (t && t.kind === 'unit') {
+          const d = Math.hypot(t.x - u.x, t.z - u.z);
+          const want = (u.def.hero ? 0.35 : u.def.myth ? 0.2 : 0.12) + uhash(u, 3) * 0.42;
+          press = Math.max(0, Math.min(want, (d - (u.radius + t.radius) * 0.95) / 2 - 0.22));
+        }
+      }
+      const yaw = u.moving ? 0 : (uhash(u, 4) - 0.5) * YAW_JITTER * (a.state === 'attack' ? 0.8 : 1.6);
+      const k = Math.min(1, dt * PRESS_RATE);
+      u.units_press = (u.units_press || 0) + (press - (u.units_press || 0)) * k;
+      u.units_yaw = (u.units_yaw || 0) + (yaw - (u.units_yaw || 0)) * k;
     }
     this._spread(dt);
   }
@@ -202,12 +223,18 @@ export class Units {
         let dr = u.rot - (u.prevRot ?? u.rot);
         while (dr > Math.PI) dr -= Math.PI * 2;
         while (dr < -Math.PI) dr += Math.PI * 2;
-        const rot = (u.prevRot ?? u.rot) + dr * alpha;
-        const { bob } = pose(rig.kind, u, rig.rot);
-        let y = game.map.heightAt(x, z);
+        const { bob, fwd = 0 } = pose(rig.kind, u, rig.rot);
+        const rot = (u.prevRot ?? u.rot) + dr * alpha + (u.dead ? 0 : u.units_yaw || 0);
+        // static slot jitter + melee press + lunge/recoil along the facing
+        const push = u.dead ? 0 : (u.units_press || 0) + fwd;
+        const big = u.def.myth || u.def.hero;
+        const jx = (uhash(u, 5) - 0.5) * 2 * JITTER * (big ? 0.3 : 1), jz = (uhash(u, 6) - 0.5) * 2 * JITTER * (big ? 0.3 : 1);
+        const px = x + jx + Math.sin(rot) * push, pz = z + jz + Math.cos(rot) * push;
+        const y = game.map.heightAt(px, pz);
+        const sc = big ? 1 : 0.93 + uhash(u, 7) * 0.13;
         // root transform (with death topple + sink)
         this._q.setFromEuler(this._e.set(0, rot, 0));
-        this._root.compose(this._v.set(x, y + bob * V, z), this._q, this._s.set(1, 1, 1));
+        this._root.compose(this._v.set(px, y + bob * V * sc, pz), this._q, this._s.set(sc, sc, sc));
         if (u.airY) { // thrown by a god power (src/godpowers): lift + tumble about the waist
           this._root.premultiply(this._tmp.makeTranslation(0, u.airY, 0)).multiply(this._tmp.makeTranslation(0, 0.7, 0));
           this._root.multiply(this._tmp.makeRotationFromEuler(this._e.set(u.airRx || 0, 0, u.airRz || 0))).multiply(this._tmp.makeTranslation(0, -0.7, 0));
@@ -271,7 +298,7 @@ export class Units {
 
   // Unit height in world units (for health bars etc.)
   heightOf(u) {
-    return { villager: 2.0, hoplite: 2.25, toxotes: 2.05, hippikon: 2.75, minotaur: 3.4 }[u.type] ?? 1.8;
+    return { villager: 2.0, hoplite: 2.25, toxotes: 2.05, hippikon: 2.75, minotaur: 3.4, hero: 3.1, cyclops: 5.0, centaur: 2.9, medusa: 2.6 }[u.type] ?? 1.8;
   }
 
   portraitObject(type, owner = 1) {

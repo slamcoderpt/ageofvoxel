@@ -13,6 +13,38 @@ const ease = (a, b, k) => a + (b - a) * k;
 
 // Per-unit phase offset so crowds do not move in lockstep.
 const phaseOf = (u) => ((u.id * 0.618034) % 1) * PI * 2;
+// Stable per-unit hash in [0, 1) (salt k picks an independent value).
+export const uhash = (u, k = 0) => ((Math.imul(u.id + 1, 2654435761) ^ Math.imul(k + 7, 40503)) >>> 0) % 10007 / 10007;
+// Per-unit animation variant: which idle stance / attack style this soldier uses.
+const variantOf = (u, n) => Math.floor(uhash(u, 1) * n);
+
+// Hit recoil (0..1) from the combat hit flash.
+const recoilOf = (u) => smooth((u.flashT || 0) / 0.15);
+
+// Archer upper body (toxotes, centaur, medusa): torso, head, arms, bow, arrow.
+function archerUpper(u, st, t, set, v) {
+  if (st === 'attack') {
+    const { a } = attackPhase(u);
+    const draw = a < 0.45 ? 0 : smooth((a - 0.45) / 0.6);
+    const high = v === 1 ? -0.25 : 0;                 // some loft their shots
+    set('torso', 0.02 + high * 0.3, 0.55, 0);
+    set('head', high * 0.4, -0.45);
+    set('armL', -1.5 + high, -0.45, 0.05);
+    set('weapon', 1.5, 0, 0);
+    set('armR', (a < 0.45 ? ease(-1.4, -2.5, smooth((a - 0.08) / 0.3)) : ease(-1.55, -1.5, draw)) + high, a < 0.45 ? 0 : ease(0.25, 0.9, draw), 0);
+    return true;
+  }
+  if (st === 'idle') {
+    const b = S(t * 1.7);
+    if (v === 1) {
+      // arrow nocked, bow half raised, scanning the field
+      set('armL', -0.95, -0.3, 0.06); set('weapon', 1.3); set('armR', -1.0, 0.4, 0);
+      set('torso', 0.04, 0.3 + S(t * 0.4) * 0.15); set('head', -0.05, -0.2 + S(t * 0.6) * 0.3);
+    } else { set('armL', -0.25 + b * 0.03, 0, 0.08); set('weapon', 0.25); }
+    return true;
+  }
+  return false;
+}
 
 // Attack timeline from attackT (seconds since the strike) and the cooldown:
 //   strike 0..0.12 (extend), recover 0.12..0.45, then guard -> wind-up.
@@ -32,12 +64,24 @@ export function pose(kind, u, out) {
   const set = (name, x, y = 0, z = 0) => { const r = out[name]; if (r) { r[0] = x; r[1] = y; r[2] = z; } };
   const add = (name, x, y = 0, z = 0) => { const r = out[name]; if (r) { r[0] += x; r[1] += y; r[2] += z; } };
 
+  const v = variantOf(u, 3);
+  const rec = st === 'die' ? 0 : recoilOf(u);
   if (kind === 'horse') return horsePose(u, st, t, set, add);
+  if (kind === 'centaur') {
+    const r = horsePose(u, st, t, set, add);
+    set('shield', 0);
+    if (!archerUpper(u, st, t, set, v % 2)) { if (st !== 'die') { set('armL', -0.3, 0, 0.1); set('weapon', 0.3); set('armR', -0.2, 0, -0.1); } }
+    if (st === 'attack') set('arrow', 1.55 - out.armR[0], 0, 0);
+    add('torso', -0.3 * rec);
+    return { bob: r.bob, lean: 0, fwd: -0.1 * rec };
+  }
+  if (kind === 'medusa') return medusaPose(u, st, t, set, add, v, rec, out);
 
   const beast = kind === 'beast';
   const archer = kind === 'archer';
-  const hoplite = u.type === 'hoplite';
-  let bob = 0;
+  const hoplite = u.type === 'hoplite' || u.type === 'hero';
+  const hero = u.type === 'hero';
+  let bob = 0, fwd = 0;
 
   if (st === 'walk') {
     const p = t * (beast ? 7 : 10);
@@ -49,7 +93,7 @@ export function pose(kind, u, out) {
     set('torso', beast ? 0.12 : 0.06, S(p) * 0.08, S(p) * 0.03);
     set('head', beast ? -0.08 : -0.03, -S(p) * 0.06);
     set('armL', S(p) * 0.5, 0, 0.06); set('armR', -S(p) * 0.5, 0, -0.06);
-    if (hoplite || u.type === 'hippikon') {
+    if (hoplite) {
       set('armL', -0.55 + S(p) * 0.05, 0.25, 0.1);           // shield carried in front
       set('armR', -0.15 - S(p) * 0.2, 0, -0.08);
       set('weapon', 0.15 + S(p) * 0.2);                     // spear sloped forward
@@ -95,14 +139,19 @@ export function pose(kind, u, out) {
     const { a, extend, wind } = attackPhase(u);
     if (archer) {
       // left arm holds the bow out, right hand draws to the cheek
-      const draw = a < 0.1 ? 0 : a < 0.45 ? 0 : smooth((a - 0.45) / 0.6);
-      set('torso', 0.02, 0.55, 0);
-      set('head', 0, -0.45);
-      set('armL', -1.5, -0.45, 0.05);
-      set('weapon', 1.5, 0, 0);                      // bow upright, belly forward
-      set('armR', a < 0.45 ? ease(-1.4, -2.5, smooth((a - 0.08) / 0.3)) : ease(-1.55, -1.5, draw), a < 0.45 ? 0 : ease(0.25, 0.9, draw), 0);
+      archerUpper(u, st, t, set, v % 2);
       set('arrow', 1.55 - (out.armR ? out.armR[0] : 0), 0, 0);
       set('legL', -0.25); set('legR', 0.25); set('shinR', 0.15);
+    } else if (beast && v === 1) {
+      // sweeping backhand: club wound out to the right, whipped across the body
+      const arc = -1.5 * wind + 1.2 * extend;
+      set('armR', -1.35 - 0.3 * wind, 0, -0.4 + arc * 0.9); set('armL', -0.9 + 0.3 * extend, 0, 0.3);
+      set('weapon', 1.1, 0, 0);
+      set('torso', 0.15 + 0.2 * extend, -0.6 * wind + 0.7 * extend, 0);
+      set('head', 0.1, 0.3 * wind - 0.3 * extend);
+      set('legL', -0.5); set('shinL', 0.35); set('legR', 0.45); set('shinR', 0.3);
+      bob = -1.2;
+      fwd = 0.3 * extend - 0.1 * wind;
     } else if (beast) {
       // huge overhead chop with both arms
       const up = wind * 1.0, down = extend;
@@ -113,6 +162,30 @@ export function pose(kind, u, out) {
       set('head', 0.2 * down - 0.1 * up);
       set('legL', -0.45); set('shinL', 0.3); set('legR', 0.35); set('shinR', 0.25);
       bob = -1.5 * down;
+      fwd = 0.35 * down - 0.12 * up;
+    } else if (hoplite && v === 1) {
+      // low underhand thrust: spear drawn back at the hip, driven in level
+      const arm = -0.85 + wind * 0.45 - extend * 0.75;
+      set('armR', arm, 0.15, -0.2);
+      set('weapon', 1.57 - arm - 0.1);
+      set('armL', -1.3 + extend * 0.2, 0.6, 0.2);
+      set('torso', 0.25 + extend * 0.3 - wind * 0.1, 0.35 - extend * 0.6);
+      set('head', -0.2);
+      set('legL', -0.75); set('shinL', 0.55); set('legR', 0.5); set('shinR', 0.5);
+      bob = -2.0;
+      fwd = (hero ? 0.5 : 0.32) * extend - 0.1 * wind;
+    } else if (hoplite && v === 2) {
+      // shield punch, then a downward stab over the rim
+      const bash = smooth((a - 0.45) / 0.25) * (1 - wind);
+      const arm = -2.6 - wind * 0.2 + extend * 0.4;
+      set('armR', arm, 0.1, -0.15);
+      set('weapon', 1.57 + 0.45 - arm);
+      set('armL', -1.2 - bash * 0.55, 0.45 - bash * 0.3, 0.15);
+      set('torso', 0.2 + extend * 0.3 + bash * 0.15, -0.1 + extend * 0.25);
+      set('head', -0.1);
+      set('legL', -0.6); set('shinL', 0.45); set('legR', 0.4); set('shinR', 0.4);
+      bob = -1.5;
+      fwd = (hero ? 0.45 : 0.25) * Math.max(extend, bash) - 0.05 * wind;
     } else if (hoplite) {
       // overhand spear thrust behind the raised shield
       const arm = -2.25 + wind * -0.25 + extend * 0.55;
@@ -123,6 +196,7 @@ export function pose(kind, u, out) {
       set('head', -0.05);
       set('legL', -0.5); set('shinL', 0.35); set('legR', 0.35); set('shinR', 0.35);
       bob = -1.2;
+      fwd = (hero ? 0.55 : 0.28) * extend - 0.08 * wind;
     } else {
       // villager: axe/fists, overhead strike
       const arm = -1.0 - wind * 1.6 + extend * 0.8;
@@ -149,6 +223,11 @@ export function pose(kind, u, out) {
     set('shield', 0.4 * curl);
     set('arrow', 0);
     bob = beast ? -7 * buckle : -4.2 * buckle;
+  }
+  if (rec > 0) {
+    // hit: the head snaps back, the torso rocks, the unit is shoved back a step
+    add('torso', -0.35 * rec); add('head', -0.3 * rec);
+    fwd -= (beast ? 0.06 : 0.18) * rec;
   } else {
     // idle: breathing, weight shift, glances
     const b = S(t * 1.7);
@@ -156,8 +235,18 @@ export function pose(kind, u, out) {
     set('head', S(t * 0.9) * 0.04, S(t * 0.53) * 0.3 * clamp01(S(t * 0.21) * 3));
     set('armL', b * 0.03, 0, 0.07); set('armR', -b * 0.03, 0, -0.07);
     set('legL', -0.04, 0, 0.03); set('legR', 0.04, 0, -0.03);
-    if (hoplite) { set('armL', -0.4, 0.2, 0.1); set('armR', -0.25, 0, -0.1); set('weapon', 0.2); }
-    if (archer) { set('armL', -0.25, 0, 0.08); set('weapon', 0.25); }
+    if (hoplite && v === 1) {
+      // ready stance: crouched behind the raised shield, spear overhand
+      set('armL', -1.1, 0.45, 0.15); set('armR', -2.2 + b * 0.04, 0.1, -0.12); set('weapon', 1.57 + 0.2 + 2.2);
+      set('torso', 0.12 + b * 0.02, -0.2); set('legL', -0.45); set('shinL', 0.35); set('legR', 0.3); set('shinR', 0.3);
+      bob = -1.1;
+    } else if (hoplite && v === 2) {
+      // spear grounded and leaning on it, shield resting against the leg
+      set('armR', -0.55, 0, -0.25); set('weapon', 0.55, 0, 0.25);
+      set('armL', -0.15, 0.1, 0.12); set('torso', 0.06, 0.2 + S(t * 0.37) * 0.1, -0.04);
+      set('legL', -0.15, 0, 0.1); set('legR', 0.12, 0, -0.02);
+    } else if (hoplite) { set('armL', -0.4, 0.2, 0.1); set('armR', -0.25, 0, -0.1); set('weapon', 0.2); }
+    if (archer) archerUpper(u, st, t, set, v % 2);
     if (beast) {
       set('torso', 0.1 + b * 0.03);
       set('armR', -0.25, 0, -0.15); set('armL', b * 0.05, 0, 0.18); set('weapon', 0.4);
@@ -165,7 +254,29 @@ export function pose(kind, u, out) {
       bob = -0.3 + b * 0.2;
     }
   }
-  return { bob, lean: 0 };
+  return { bob, lean: 0, fwd };
+}
+
+// Medusa: a slithering tail (travelling wave down three segments), a coil
+// that breathes, and an archer's upper body.
+function medusaPose(u, st, t, set, add, v, rec, out) {
+  const moving = st === 'walk';
+  const f = moving ? 5 : 1.6, amp = moving ? 0.6 : 0.3;
+  set('tailA', 0, S(t * f) * amp);
+  set('tailB', 0, S(t * f - 1.1) * amp * 1.2);
+  set('tailC', 0, S(t * f - 2.2) * amp * 1.4);
+  set('coil', 0, S(t * f * 0.5) * 0.05);
+  let bob = S(t * f) * 0.3;
+  if (st === 'die') {
+    const k = smooth(u.anim.dieT / 0.6);
+    set('torso', 0.9 * k, 0, 0.2 * k); set('head', 0.4 * k); set('armL', -0.6 * k, 0, 0.5 * k); set('armR', -0.4 * k, 0, -0.6 * k);
+    bob = -6 * k;
+  } else if (!archerUpper(u, st, t, set, v % 2)) {
+    set('torso', 0.05, S(t * 2.5) * 0.12); set('armL', -0.4, 0, 0.1); set('weapon', 0.3); set('armR', -0.3, 0, -0.1);
+  }
+  if (st === 'attack') set('arrow', 1.55 - out.armR[0], 0, 0);
+  add('torso', -0.35 * rec);
+  return { bob, lean: 0, fwd: -0.08 * rec };
 }
 
 // Horse: rotary gallop with folding cannons, rocking body, nodding neck and a
@@ -224,5 +335,5 @@ function horsePose(u, st, t, set, add) {
     set('weapon', moving ? 0.9 : 0.25);
   }
   if (st !== 'die') { set('armL', -0.75, 0.2, 0.25); set('shield', 0.1, 1.1, 0); }
-  return { bob, lean: 0 };
+  return { bob, lean: 0, fwd: st === 'attack' ? 0.25 * attackPhase(u).extend : 0 };
 }

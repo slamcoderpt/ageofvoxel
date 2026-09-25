@@ -1,5 +1,6 @@
 import { PLAYER, ENEMY } from '../core/constants.js';
 import { placeNear } from '../core/scenes/helpers.js';
+import { fieldHeroesAndMyth, engageHeroesAndMyth } from '../units/battleHost.js';
 
 // The 'battle' harness scene (registered by src/core/scenes/index.js): two
 // full Greek armies meeting on open ground, captured a few seconds into the
@@ -117,6 +118,7 @@ export const battleScene = {
     const cx = 64, cz = 64;
     const blue = army(game, PLAYER, 1, cx, cz);
     const red = army(game, ENEMY, -1, cx, cz);
+    const myth = [...fieldHeroesAndMyth(game, PLAYER, 1, (a, d) => P(cx, cz, a, d), -3 * Math.PI / 4), ...fieldHeroesAndMyth(game, ENEMY, -1, (a, d) => P(cx, cz, a, d), Math.PI / 4)];
     const charge = (own, foe) => {
       // each rider picks a different archer on the near end of the enemy screen
       const w = own.hippikon[0];
@@ -146,6 +148,7 @@ export const battleScene = {
     fallen(game, blue, PLAYER, 1, cx, cz);
     fallen(game, red, ENEMY, -1, cx, cz);
     churn(game, cx, cz);
+    engageHeroesAndMyth(game, myth);
     return { focus: { x: cx, z: cz } };
   },
   camera: { x: 64.2, z: 63.0, distance: 45, pitch: 54 },

@@ -33,6 +33,8 @@ const STEEL = (x, y, z) => (hash3(x, y, z, 5) < 0.5 ? 0xc9ced3 : 0xb4bac0);
 const LINEN = (x, y, z) => (hash3(x, y, z, 6) < 0.6 ? 0xece2c8 : 0xe0d4b6);
 const STRAW = (x, y, z) => (hash3(x, y, z, 8) < 0.5 ? 0xdcbb6a : 0xc9a655);
 const TEAM_TRIM = 0xeee6cc;
+const GOLD = (x, y, z) => { const h = hash3(x, y, z, 31); return h < 0.45 ? 0xf2c648 : h < 0.8 ? 0xe0ae30 : 0xffdc70; };
+const GOLD_DK = 0x9c6e1c;
 const SHIELD_FACE = (x, y, z) => (hash3(x, y, z, 15) < 0.6 ? 0xe9dfc6 : 0xddd1b4);
 
 const part = (name, model, pivot, joint, parent = null, extra = {}) => ({ name, model, pivot, joint, parent, ...extra });
@@ -88,12 +90,13 @@ function torsoModel(style) {
   m.box(1, -1, 0, 6, 1, 4, TEAM);
   m.box(0, -3, -1, 8, 2, 6, TEAM);
   m.box(1, 0, 0, 6, 1, 4, BELT);
-  if (style === 'hoplite' || style === 'rider') {
-    // bronze muscle cuirass with pectoral and abdominal lines
-    m.box(0, 2, 0, 8, 6, 4, BRONZE);
-    m.box(1, 1, 0, 6, 1, 4, BRONZE);
-    m.box(1, 5, 4, 2, 2, 1, BRONZE).box(5, 5, 4, 2, 2, 1, BRONZE);  // pecs
-    m.set(3, 4, 4, BRONZE_DK).set(4, 4, 4, BRONZE_DK).set(3, 2, 4, BRONZE_DK).set(4, 2, 4, BRONZE_DK);
+  if (style === 'hoplite' || style === 'rider' || style === 'hero') {
+    // muscle cuirass (bronze; gold for the hero) with pectoral and abdominal lines
+    const MET = style === 'hero' ? GOLD : BRONZE, MET_DK = style === 'hero' ? GOLD_DK : BRONZE_DK;
+    m.box(0, 2, 0, 8, 6, 4, MET);
+    m.box(1, 1, 0, 6, 1, 4, MET);
+    m.box(1, 5, 4, 2, 2, 1, MET).box(5, 5, 4, 2, 2, 1, MET);  // pecs
+    m.set(3, 4, 4, MET_DK).set(4, 4, 4, MET_DK).set(3, 2, 4, MET_DK).set(4, 2, 4, MET_DK);
     m.box(0, 7, 0, 2, 1, 4, LEATHER).box(6, 7, 0, 2, 1, 4, LEATHER); // linothorax shoulder flaps
     m.box(0, 7, 4, 2, 1, 1, LINEN).box(6, 7, 4, 2, 1, 1, LINEN);
     // pteryges: leather strips alternating with team linen
@@ -106,13 +109,27 @@ function torsoModel(style) {
       m.box(1, 5, -1, 6, 3, 1, TEAM).box(2, 3, -2, 4, 2, 1, TEAM);
       m.set(1, 7, 4, BRONZE(1, 7, 4));
     } else {
-      // back plate seam and a bronze belt buckle
-      m.box(3, 2, -1, 2, 6, 1, BRONZE_DK);
-      m.set(3, 0, 4, BRONZE(3, 0, 4)).set(4, 0, 4, BRONZE(4, 0, 4));
+      // Team colour where the RTS camera sees it: a mantle over both shoulders
+      // and a cloak down the back to the knees (the near army shows its back).
+      const long = style === 'hero';
+      m.box(0, 8, -1, 8, 1, 3, TEAM);                                      // mantle over the shoulders
+      m.box(1, 1, -1, 6, 7, 1, TEAM);                                      // cloak hanging down the back
+      // skirt of the cloak in vertical folds (alternating depth catches AO)
+      const bot = long ? -8 : -4;
+      for (let x = long ? -1 : 0; x <= (long ? 8 : 7); x++) {
+        const deep = x % 2 === 0;
+        m.box(x, bot, deep ? -2 : -3, 1, 2 - bot, 1, TEAM);
+        m.set(x, bot - 1, deep ? -2 : -3, long ? GOLD(x, bot, 0) : TEAM_TRIM);
+      }
+      if (long) for (let y = bot; y <= 8; y += 2) { m.set(-1, Math.min(y, 1), -2, GOLD(0, y, 1)); m.set(8, Math.min(y, 1), -2, GOLD(1, y, 1)); m.set(1, y, -1, GOLD(2, y, 1)); m.set(6, y, -1, GOLD(3, y, 1)); }
+      m.set(0, 8, 4, MET(0, 8, 4)).set(7, 8, 4, MET(7, 8, 4));             // brooches
+      m.set(3, 0, 4, MET(3, 0, 4)).set(4, 0, 4, MET(4, 0, 4));
     }
   } else if (style === 'archer') {
-    m.box(0, 3, 0, 8, 4, 4, LEATHER);
-    m.box(2, 3, 4, 4, 4, 1, LEATHER);
+    // team chiton over the whole chest, a leather shoulder cape over it
+    m.box(0, 0, 0, 8, 8, 4, TEAM).box(1, 8, 1, 6, 1, 2, TEAM);
+    m.box(-1, 6, -1, 10, 2, 6, TEAM).box(0, 8, 0, 8, 1, 4, TEAM);
+    m.box(1, 0, 0, 6, 1, 4, BELT);
     m.box(0, -3, -1, 8, 1, 6, LINEN).box(1, -1, 0, 6, 1, 4, LINEN); // chiton hem under the team skirt band
     m.line(7, 7, 4, 1, 1, 4, LEATHER_DK);           // baldric
     m.line(7, 7, -1, 1, 1, -1, LEATHER_DK);
@@ -156,11 +173,36 @@ function headModel(style) {
     m.box(1, 0, 5, 3, 1, 1, BEARD).box(0, -1, 3, 5, 1, 3, BEARD).set(2, -1, 6, BEARD); // beard
     // narrow horsehair crest in team colour: a brush front to back on a bronze holder
     m.box(2, 7, 0, 1, 1, 5, BRONZE_DK);
-    m.box(1, 8, -1, 3, 1, 7, TEAM).box(1, 9, 0, 3, 1, 5, TEAM).box(2, 10, 0, 1, 1, 4, TEAM).box(2, 9, -1, 1, 1, 1, TEAM);
-    m.box(2, 5, -2, 1, 3, 1, TEAM).box(2, 3, -3, 1, 2, 1, TEAM);  // tail falling down the back
+    m.box(1, 8, -2, 3, 2, 9, TEAM).box(1, 10, -1, 3, 1, 7, TEAM).box(2, 11, 0, 1, 1, 5, TEAM).box(2, 12, 1, 1, 1, 3, TEAM);
+    m.box(1, 3, -3, 3, 5, 1, TEAM).box(2, 0, -4, 1, 4, 1, TEAM);  // tail falling down the back
+  } else if (style === 'hero') {
+    // Corinthian helmet in gold with a towering transverse-and-long team crest
+    m.box(-1, 3, -1, 7, 3, 7, GOLD).box(0, 6, 0, 5, 1, 5, GOLD);
+    m.box(-1, -1, -1, 7, 4, 3, GOLD);
+    m.box(-1, 0, 2, 1, 3, 4, GOLD).box(5, 0, 2, 1, 3, 4, GOLD);
+    m.carve(0, 3, 5, 5, 1, 2);
+    m.box(0, 4, 5, 5, 1, 1, GOLD_DK).set(2, 3, 5, GOLD_DK);
+    m.box(1, -1, 5, 3, 1, 1, BEARD);
+    m.box(2, 7, -1, 1, 1, 7, GOLD_DK);
+    m.box(0, 8, -3, 5, 3, 11, TEAM, { glow: 0.22 }).box(1, 11, -2, 3, 2, 9, TEAM, { glow: 0.22 }).box(2, 13, -1, 1, 1, 7, TEAM, { glow: 0.22 });
+    m.box(1, 2, -4, 3, 6, 2, TEAM, { glow: 0.15 }).box(2, -2, -5, 1, 5, 1, TEAM, { glow: 0.15 });
+    m.box(-1, 7, 2, 1, 3, 1, 0xfff4d0, { glow: 0.3 }).box(5, 7, 2, 1, 3, 1, 0xfff4d0, { glow: 0.3 }); // white plume feathers
+  } else if (style === 'centaur' || style === 'medusa') {
+    m.box(-1, 3, -1, 7, 3, 7, style === 'medusa' ? 0x3f6a38 : HAIR).box(0, 6, 0, 5, 1, 5, style === 'medusa' ? 0x3f6a38 : HAIR);
+    m.box(-1, -2, -1, 7, 5, 2, style === 'medusa' ? 0x3f6a38 : HAIR);
+    m.box(-1, 4, -1, 7, 1, 7, TEAM).carve(0, 4, 5, 5, 1, 1);            // team headband
+    if (style === 'centaur') m.box(1, 0, 5, 3, 1, 1, BEARD).box(0, -1, 3, 5, 1, 3, BEARD);
+    else {
+      // writhing snake locks
+      const SN = (x, y, z) => (hash3(x, y, z, 33) < 0.5 ? 0x5f8f3a : 0x44702c);
+      for (const [x, z, dx, dz] of [[-2, 1, -1, 0], [6, 1, 1, 0], [-2, 4, -1, 1], [6, 4, 1, 1], [1, -2, 0, -1], [3, -2, 0, -1], [2, 6, 0, 0]]) {
+        m.box(x, 5, z, 1, 3, 1, SN).set(x + dx, 8, z + dz, SN).set(x + dx * 2, 8, z + dz * 2, SN).set(x + dx * 2, 9, z + dz * 2, 0xa8d060);
+      }
+      m.set(1, 2, 5, 0xd8ff60, { glow: 0.9 }).set(3, 2, 5, 0xd8ff60, { glow: 0.9 });
+    }
   } else if (style === 'archer') {
-    // felt Phrygian cap with a team band and team tip, beard
-    const FELT = (x, y, z) => (hash3(x, y, z, 14) < 0.5 ? 0xb89a6c : 0xa88a5e);
+    // felt Phrygian cap in team colour, beard
+    const FELT = TEAM;
     m.box(-1, 4, -1, 7, 2, 7, FELT).box(0, 6, 0, 5, 1, 5, FELT).box(1, 7, 2, 3, 1, 3, FELT).box(2, 7, 4, 1, 1, 2, TEAM).set(2, 8, 5, TEAM);
     m.box(-1, 3, -1, 7, 1, 7, TEAM).carve(0, 3, 5, 5, 1, 1).box(1, 3, 5, 3, 1, 1, TEAM);
     m.box(-1, 0, -1, 1, 3, 3, LEATHER).box(5, 0, -1, 1, 3, 3, LEATHER); // ear flaps
@@ -221,34 +263,36 @@ function spearModel(len = 30) {
   return m;
 }
 
-function aspis(r = 6) {
+function aspis(r = 6, RIM = BRONZE) {
   const m = new VoxelModel();
   for (let y = -r; y <= r; y++)
     for (let x = -r; x <= r; x++) {
       const d = Math.sqrt(x * x + y * y);
       if (d > r + 0.3) continue;
       const rim = d > r - 1.2;
-      let c = rim ? BRONZE(x, y, 0) : SHIELD_FACE(x, y, 1);
-      // emblem: a team-coloured lambda chevron and inner ring round a bronze boss
-      if (!rim && d < 1.3) c = BRONZE(x, y, 1);
-      else if (!rim && d > r - 2.1) c = TEAM;
-      else if (!rim && y <= 2 && y >= -4 && Math.abs(Math.abs(x) - (2 - y) * 0.6) < 0.6) c = TEAM;
+      // team-coloured face (the biggest flat area on a hoplite), a pale
+      // lambda chevron and a bronze boss
+      let c = rim ? RIM(x, y, 0) : TEAM;
+      if (!rim && d < 1.3) c = RIM(x, y, 1);
+      else if (!rim && y <= 2 && y >= -4 && Math.abs(Math.abs(x) - (2 - y) * 0.6) < 0.6) c = SHIELD_FACE(x, y, 1);
       m.set(x, y, 1, c);
       if (!rim) m.set(x, y, 0, WOOD);
-      if (rim) m.set(x, y, 0, BRONZE_DK);
+      if (rim) m.set(x, y, 0, RIM === GOLD ? GOLD_DK : BRONZE_DK);
     }
-  m.set(0, 0, 2, BRONZE(0, 0, 2));
+  m.set(0, 0, 2, RIM(0, 0, 2));
   m.box(0, -1, -1, 1, 3, 1, LEATHER); // grip
   return m;
 }
 
 function bowModel() {
   const m = new VoxelModel();
-  for (let y = -9; y <= 9; y++) {
-    const z = Math.round(2.4 - (y * y) / 30 + (Math.abs(y) > 7 ? 0.8 : 0));
-    m.set(0, y, z, Math.abs(y) < 2 ? LEATHER : Math.abs(y) > 7 ? 0x3a2414 : WOOD_DK);
+  // a deep recurve arc, read as a bow from any angle
+  for (let y = -12; y <= 12; y++) {
+    const z = Math.round(4 - (y * y) / 30 + (Math.abs(y) > 10 ? 1.2 : 0));
+    const c = Math.abs(y) < 2 ? LEATHER : Math.abs(y) > 10 ? 0x3a2414 : WOOD_DK;
+    m.set(0, y, z, c).set(1, y, z, c);
   }
-  m.box(0, -8, 0, 1, 17, 1, 0xf1ead8); // string
+  m.box(0, -11, 0, 1, 23, 1, 0xf1ead8); // string
   return m;
 }
 
@@ -337,8 +381,8 @@ export function villagerRig() {
 export function hopliteRig() {
   return [
     ...legs('hoplite'), torso('hoplite'), head('hoplite'), ...arms('hoplite'),
-    part('weapon', spearModel(32), [0, 0, 0], HAND, 'armR'),
-    part('shield', aspis(5), [0, 0, 0], [1.5, -4, 2.5], 'armL'),
+    part('weapon', spearModel(40), [0, 0, 0], HAND, 'armR'),
+    part('shield', aspis(7), [0, 0, 0], [1.5, -4, 3], 'armL'),
   ];
 }
 
@@ -564,10 +608,197 @@ export function minotaurRig() {
   ];
 }
 
+// ---- hero: Achilles (voxel 0.095, ~1.35x a hoplite) --------------------------
+// Gold cuirass and Corinthian helmet, a towering glowing team crest, a long
+// team cloak and a big gold-rimmed team shield: the brightest figure on the field.
+export function heroRig() {
+  return [
+    ...legs('hoplite'), torso('hero'), head('hero'), ...arms('hoplite'),
+    part('weapon', spearModel(38), [0, 0, 0], HAND, 'armR'),
+    part('shield', aspis(7, GOLD), [0, 0, 0], [1.5, -4, 3], 'armL'),
+  ];
+}
+
+// ---- cyclops (voxel 0.15): a one-eyed giant with a tree-trunk club ----------
+const CY_SKIN = (x, y, z) => { const h = hash3(x, y, z, 41); return h < 0.5 ? 0xd9a88a : h < 0.85 ? 0xcc9a7c : 0xe2b496; };
+const CY_SHADE = 0xa9765c;
+
+export function cyclopsRig() {
+  const thighM = new VoxelModel().box(0, 0, 0, 4, 6, 4, CY_SKIN).box(-1, 2, -1, 6, 4, 6, TEAM);   // team kilt hem over the thighs
+  const shinM = new VoxelModel().box(0, 2, 0, 3, 5, 3, CY_SKIN).box(0, 0, 0, 3, 2, 4, LEATHER_DK).box(0, 2, 0, 3, 1, 3, LEATHER);
+  const body = new VoxelModel();
+  body.box(1, 0, 0, 8, 4, 5, CY_SKIN);                 // belly
+  body.box(0, 4, -1, 10, 7, 7, CY_SKIN);               // chest
+  body.box(-1, 9, -1, 12, 3, 7, CY_SKIN);              // huge shoulders
+  body.box(1, 7, 6, 3, 3, 1, CY_SHADE).box(6, 7, 6, 3, 3, 1, CY_SHADE);
+  body.box(2, 1, 5, 6, 3, 1, CY_SKIN).set(5, 2, 6, CY_SHADE);
+  // team: a pelt over the back and left shoulder, and a deep kilt
+  body.box(7, 9, -2, 5, 4, 9, TEAM).box(8, 12, -1, 3, 1, 7, TEAM);           // pelt over the left shoulder
+  for (let i = 0; i <= 9; i++) { body.box(8 - i, 10 - i, 6, 2, 2, 1, TEAM); body.box(8 - i, 10 - i, -2, 2, 2, 1, TEAM); } // sash across chest and back
+  body.box(0, -4, -1, 10, 4, 7, TEAM).box(1, 0, -1, 8, 1, 7, BELT);
+  body.box(-1, -5, -2, 12, 1, 9, TEAM_TRIM);
+  for (let x = 1; x <= 8; x += 2) body.set(x, 0, 6, BRONZE(x, 0, 6));
+  body.line(10, 11, 6, 1, 1, 6, LEATHER_DK);
+  const headM = new VoxelModel();
+  headM.box(0, 0, 0, 6, 7, 6, CY_SKIN);
+  headM.box(0, 5, 6, 6, 1, 1, CY_SHADE);                                    // heavy brow
+  headM.box(1, 3, 6, 4, 2, 1, EYE_WHITE).set(2, 3, 7, 0x2a1a10).set(3, 3, 7, 0x2a1a10).set(2, 4, 7, 0xff6a20, { glow: 0.6 }).set(3, 4, 7, 0xff6a20, { glow: 0.6 }); // the one eye
+  headM.box(2, 2, 6, 2, 1, 1, CY_SHADE);                                    // nose
+  headM.box(1, 0, 6, 4, 1, 1, 0x7a3a2a);                                    // mouth
+  headM.box(1, 0, -1, 4, 5, 1, HAIR).box(0, 1, 0, 1, 4, 3, HAIR).box(5, 1, 0, 1, 4, 3, HAIR); // hair at back
+  headM.set(-1, 3, 3, CY_SHADE).set(6, 3, 3, CY_SHADE);
+  headM.box(2, 7, 2, 2, 2, 2, HORN).set(2, 9, 3, HORN);                      // stub horn
+  const upperArm = new VoxelModel().box(0, 0, 0, 4, 9, 4, CY_SKIN).box(0, 0, 0, 4, 2, 4, LEATHER).box(0, 6, 0, 4, 1, 4, BRONZE);
+  upperArm.box(0, -2, 0, 4, 2, 4, CY_SHADE);
+  // tree-trunk club with bronze bands
+  const club = new VoxelModel();
+  const BARK = (x, y, z) => (hash3(x, y, z, 42) < 0.5 ? 0x6b4428 : 0x573620);
+  club.box(0, -4, 0, 2, 12, 2, BARK);
+  club.box(-1, 8, -1, 4, 9, 4, BARK).box(0, 17, 0, 2, 1, 2, BARK);
+  club.box(-2, 11, -2, 6, 1, 6, BRONZE_DK).box(-2, 15, -2, 6, 1, 6, BRONZE_DK);
+  club.set(-2, 13, 0, STEEL(0, 0, 0)).set(3, 13, 1, STEEL(0, 1, 0)).set(1, 14, -2, STEEL(1, 0, 0)).set(1, 12, 3, STEEL(1, 1, 0));
+  return [
+    part('legL', thighM, [2, 6, 2], [2.5, 12, 0]),
+    part('shinL', shinM, [1.5, 7, 1.5], [0, -5, 0.5], 'legL'),
+    part('legR', thighM, [2, 6, 2], [-2.5, 12, 0]),
+    part('shinR', shinM, [1.5, 7, 1.5], [0, -5, 0.5], 'legR'),
+    part('torso', body, [5, 0, 2.5], [0, 12, 0]),
+    part('head', headM, [3, 0, 3], [0, 12, 2], 'torso'),
+    part('armL', upperArm, [2, 9, 2], [7.5, 12, 0], 'torso'),
+    part('armR', upperArm, [2, 9, 2], [-7.5, 12, 0], 'torso'),
+    part('weapon', club, [1, 0, 1], [0, -11, 0], 'armR'),
+  ];
+}
+
+// ---- centaur (voxel 0.08): chestnut horse body, bare-chested archer --------
+const CHESTNUT = (x, y, z) => { const h = hash3(x, y, z, 51); return h < 0.55 ? 0x9a5a32 : h < 0.85 ? 0x8a4e2a : 0xa9683c; };
+const recolor = (m, from, to) => { for (const v of m.vox.values()) if (!v.team && from.includes(v.c)) v.c = typeof to === 'function' ? to(0, 0, 0) : to; return m; };
+const COAT_COLS = [0xe4ded2, 0xd2cbbd, 0xbdb5a6];
+const chestnut = (m) => { let i = 0; for (const v of m.vox.values()) if (!v.team && COAT_COLS.includes(v.c)) v.c = [0x9a5a32, 0x8a4e2a, 0xa9683c][(i++ * 7) % 3]; return m; };
+
+function centaurTorso() {
+  const m = new VoxelModel();
+  m.box(1, -3, 0, 6, 3, 4, CHESTNUT);                  // horse-to-man join
+  m.box(1, 0, 0, 6, 3, 4, SKIN);
+  m.box(0, 3, 0, 8, 5, 4, SKIN);
+  m.box(1, 8, 1, 6, 1, 2, SKIN);
+  m.box(3, 8, 1, 2, 2, 2, SKIN);
+  m.box(1, 5, 4, 2, 2, 1, SKIN_SHADE).box(5, 5, 4, 2, 2, 1, SKIN_SHADE);
+  // team mantle over the shoulders and a broad team sash
+  m.box(-1, 6, -1, 10, 2, 6, TEAM).box(0, 8, -1, 8, 1, 5, TEAM).box(0, 2, -1, 8, 4, 1, TEAM);
+  m.line(7, 7, 4, 1, 1, 4, TEAM).line(6, 7, 4, 0, 1, 4, TEAM);
+  m.box(0, 0, 0, 8, 1, 4, BELT);
+  // quiver
+  m.box(5, 1, -2, 3, 8, 2, LEATHER_DK).box(5, 7, -2, 3, 1, 2, TEAM);
+  for (let i = 0; i < 3; i++) { m.set(5 + i, 9, -2 + (i % 2), WOOD); m.set(5 + i, 10, -2 + (i % 2), 0xf4f0e8); }
+  return m;
+}
+
+function centaurBlanket() {
+  // a team saddle-cloth over the whole horse back: the big readable top area
+  const m = new VoxelModel();
+  for (let z = 0; z <= 13; z++) {
+    m.box(-1, 3, z, 1, 7, 1, TEAM).box(7, 3, z, 1, 7, 1, TEAM).box(0, 10, z, 7, 1, 1, TEAM).box(0, 9, z, 7, 1, 1, TEAM);
+    m.set(-1, 2, z, TEAM_TRIM).set(7, 2, z, TEAM_TRIM);
+  }
+  for (let z = 1; z <= 13; z += 4) { m.set(-2, 5, z, BRONZE(0, z, 1)); m.set(8, 5, z, BRONZE(0, z, 2)); }
+  return m;
+}
+
+export function centaurRig() {
+  return [
+    part('body', chestnut(horseBody()), [3, 0, 10.5], [0, 10, 0]),
+    part('barding', centaurBlanket(), [3, 0, 10.5], [0, 0, 0], 'body'),
+    part('tail', recolor(horseTail(), [0x6c655c, 0x57514a], 0x3a2418), [1, 0, 0], [0, 7, -10], 'body'),
+    part('legFL', chestnut(horseUpper(false)), [1, 5, 1], [2, 1, 7], 'body'),
+    part('cannonFL', chestnut(horseLower()), [1, 7, 1], [0, -4, 0], 'legFL'),
+    part('legFR', chestnut(horseUpper(false)), [1, 5, 1], [-2, 1, 7], 'body'),
+    part('cannonFR', chestnut(horseLower()), [1, 7, 1], [0, -4, 0], 'legFR'),
+    part('legBL', chestnut(horseUpper(true)), [1, 5, 1.5], [2, 1, -6.5], 'body'),
+    part('cannonBL', chestnut(horseLower()), [1, 7, 1], [0, -4, 0], 'legBL'),
+    part('legBR', chestnut(horseUpper(true)), [1, 5, 1.5], [-2, 1, -6.5], 'body'),
+    part('cannonBR', chestnut(horseLower()), [1, 7, 1], [0, -4, 0], 'legBR'),
+    part('torso', centaurTorso(), [4, 0, 2], [0, 8, 8], 'body'),
+    head('centaur'),
+    ...arms('archer'),
+    part('weapon', bowModel(), [0, 0, 0], HAND, 'armL'),
+    part('arrow', arrowModel(), [0, 0, 0], HAND, 'armR', { show: (u) => u.anim.state === 'attack' && u.anim.attackT > 0.45, portrait: false }),
+  ];
+}
+
+// ---- medusa (voxel 0.08): gorgon on a coiled team-scaled serpent tail -------
+const SCALE_DK = (x, y, z) => (hash3(x, y, z, 61) < 0.5 ? 0x3a4a2c : 0x2e3c24);
+const BELLY = (x, y, z) => (hash3(x, y, z, 62) < 0.5 ? 0xd8c890 : 0xc8b67c);
+// banded tail: team-coloured scales with dark rings, pale belly underneath
+const tailCol = (y, z, r) => (y < -r * 0.45 ? BELLY : Math.floor(z / 3) % 3 === 0 ? SCALE_DK : TEAM);
+
+function tailSeg(len, r0, r1) {
+  const m = new VoxelModel();
+  for (let z = 0; z < len; z++) {
+    const r = r0 + (r1 - r0) * (z / len);
+    for (let y = -Math.ceil(r); y <= Math.ceil(r); y++)
+      for (let x = -Math.ceil(r); x <= Math.ceil(r); x++)
+        if (x * x + y * y <= r * r + 0.3) { const c = tailCol(y, z, r); m.set(x, y, -z, typeof c === 'function' ? c(x, y, z) : c); }
+  }
+  return m;
+}
+
+function medusaCoil() {
+  // a thick coil on the ground rising into the waist
+  const m = new VoxelModel();
+  for (let a = 0; a < 26; a++) {
+    const th = (a / 26) * Math.PI * 2 * 0.85;
+    const cx = Math.sin(th) * 5, cz = Math.cos(th) * 5 - 1;
+    const y0 = 2.2;
+    for (let y = -2; y <= 2; y++)
+      for (let dx = -2; dx <= 2; dx++)
+        for (let dz = -2; dz <= 2; dz++) {
+          if (dx * dx + dz * dz + y * y > 6) continue;
+          const c = y <= -1 ? BELLY : a % 4 === 0 ? SCALE_DK : TEAM;
+          m.set(Math.round(cx + dx), Math.round(y0 + y), Math.round(cz + dz), typeof c === 'function' ? c(dx, y, a) : c);
+        }
+  }
+  // rising column from the coil to the hips
+  for (let y = 2; y <= 10; y++) {
+    const r = 3 - (y - 2) * 0.15;
+    for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) if (x * x + z * z <= r * r) m.set(x, y, z + 1, z >= 2 ? BELLY(x, y, z) : y % 3 === 0 ? SCALE_DK(x, y, z) : TEAM);
+  }
+  return m;
+}
+
+function medusaTorso() {
+  const m = new VoxelModel();
+  m.box(1, 0, 0, 6, 3, 4, SKIN);
+  m.box(0, 3, 0, 8, 5, 4, SKIN);
+  m.box(1, 8, 1, 6, 1, 2, SKIN).box(3, 8, 1, 2, 2, 2, SKIN);
+  m.box(1, 5, 4, 2, 2, 1, BRONZE).box(5, 5, 4, 2, 2, 1, BRONZE).box(0, 4, 0, 8, 1, 5, BRONZE); // bronze breastband
+  m.box(-1, 6, -1, 10, 2, 6, TEAM).box(0, 8, -1, 8, 1, 5, TEAM);  // team shawl
+  m.box(0, -1, -1, 8, 2, 6, TEAM);                                // team girdle
+  return m;
+}
+
+export function medusaRig() {
+  return [
+    part('coil', medusaCoil(), [0, 0, 0], [0, 0, 0]),
+    part('tailA', tailSeg(8, 2.4, 2.0), [0, 0, 0], [-2, 2, -4], 'coil'),
+    part('tailB', tailSeg(8, 2.0, 1.4), [0, 0, 0], [0, 0, -8], 'tailA'),
+    part('tailC', tailSeg(8, 1.4, 0.6), [0, 0, 0], [0, 0, -8], 'tailB'),
+    part('torso', medusaTorso(), [4, 0, 2], [0, 11, 1], 'coil'),
+    head('medusa'),
+    ...arms('archer'),
+    part('weapon', bowModel(), [0, 0, 0], HAND, 'armL'),
+    part('arrow', arrowModel(), [0, 0, 0], HAND, 'armR', { show: (u) => u.anim.state === 'attack' && u.anim.attackT > 0.45, portrait: false }),
+  ];
+}
+
 export const RIGS = {
   villager: { build: villagerRig, voxel: 0.07, anim: 'human', style: 'villager' },
   hoplite: { build: hopliteRig, voxel: 0.07, anim: 'human', style: 'hoplite' },
   toxotes: { build: toxotesRig, voxel: 0.07, anim: 'archer', style: 'archer' },
   hippikon: { build: hippikonRig, voxel: 0.07, anim: 'horse', style: 'rider' },
   minotaur: { build: minotaurRig, voxel: 0.1, anim: 'beast', style: 'beast' },
+  hero: { build: heroRig, voxel: 0.12, anim: 'human', style: 'hero' },
+  cyclops: { build: cyclopsRig, voxel: 0.15, anim: 'beast', style: 'beast' },
+  centaur: { build: centaurRig, voxel: 0.08, anim: 'centaur', style: 'centaur' },
+  medusa: { build: medusaRig, voxel: 0.12, anim: 'medusa', style: 'medusa' },
 };
