@@ -27,18 +27,18 @@ const GradeShader = {
     tDiffuse: { value: null },
     uExposure: { value: 1.0 },
     uChromaLimit: { value: 0.42 },
-    uSaturation: { value: 0.98 },
+    uSaturation: { value: 0.86 },
     uGreenShift: { value: 0.5 },
     uGreenDesat: { value: 0.34 },
-    uContrast: { value: 1.14 },
+    uContrast: { value: 1.0 },
     // mid S-curve: lit ground and roofs lift, shade drops (no milky mid-grey)
-    uMidContrast: { value: 0.4 },
+    uMidContrast: { value: 0.3 },
     // shade keeps its colour: chroma boost in the darks instead of a grey veil
-    uShadowSat: { value: 0.18 },
+    uShadowSat: { value: 0.0 },
     uShadowTint: { value: new THREE.Vector3(0.99, 0.97, 0.98) }, // near neutral: shade reads warm-olive (ground bounce), never lavender
     uBlackFloor: { value: new THREE.Vector3(0.03, 0.034, 0.032) },
     uVignette: { value: 0.0 },
-    uToeLift: { value: 0.0 },
+    uToeLift: { value: 0.06 },
     uKnee: { value: 0.72 },
     uShoulder: { value: 4.3 }, // highlights approach uKnee + 1 / uShoulder (~0.95)
     // Top-edge aerial haze: in the RTS view the top of the frame is always
@@ -116,9 +116,9 @@ export class PostFX {
     this.composer.addPass(new RenderPass(scene, camera));
     if (quality === 'high') {
       this.gtao = new GTAOPass(scene, camera, size.x, size.y);
-      this.gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.6, thickness: 2.5, scale: 2.1, samples: 12, distanceFallOff: 1.0 });
+      this.gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.6, thickness: 2.5, scale: 1.6, samples: 12, distanceFallOff: 1.0 });
       this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
-      this.gtao.blendIntensity = 1.0;
+      this.gtao.blendIntensity = 0.65;
       // Let pieces opt objects out of the AO g-buffer with object.userData.noAO
       // (water, overlays, effects).
       const orig = this.gtao._overrideVisibility.bind(this.gtao);
@@ -129,7 +129,7 @@ export class PostFX {
       };
       this.composer.addPass(this.gtao);
     }
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.1, 0.25, 0.97);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.05, 0.2, 0.98);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
     this.grade = new ShaderPass(GradeShader);

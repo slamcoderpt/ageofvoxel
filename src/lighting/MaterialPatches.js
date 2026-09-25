@@ -26,11 +26,11 @@ import { ContactMap, contactUniforms } from './Contact.js';
 
 export const atmosUniforms = {
   uSunDirView: { value: new THREE.Vector3(0, 1, 0) },
-  uFoliageSky: { value: new THREE.Color(0.2, 0.28, 0.33) },
+  uFoliageSky: { value: new THREE.Color(0.42, 0.53, 0.66) },
   uFoliageSun: { value: new THREE.Color(0.34, 0.27, 0.035) },
   uGlowScale: { value: 2.5 },
-  uDeepShade: { value: new THREE.Color(0.24, 0.31, 0.37) }, // indirect multiplier at full canopy occlusion (cool blue-green)
-  uCanopyAO: { value: 1.0 },
+  uDeepShade: { value: new THREE.Color(0.58, 0.66, 0.76) }, // indirect multiplier at full canopy occlusion (cool blue-green)
+  uCanopyAO: { value: 0.5 },
   uUnderstory: { value: 1.0 },
   uPale: { value: 0.8 },      // albedo scale for pale neutral stone/marble (keeps whites off the clip)
   // Sunlit sandstone: pale neutral stone is re-tinted toward a warm
@@ -43,11 +43,11 @@ export const atmosUniforms = {
   // Leaf shadow balance: foliage in the sun's shadow (cast by the crowns next
   // to it) loses this much of its sky/fill light and turns cool, so crown-on-
   // crown and crown-on-floor shadows read as deep blue-green, not mid olive.
-  uLeafShadowAmb: { value: 0.62 },
+  uLeafShadowAmb: { value: 0.3 },
   uShadeCool: { value: new THREE.Vector3(0.72, 0.92, 1.25) },
   uLeafSun: { value: 1.45 },   // direct sun on foliage (lit crown tops glow warm)
-  uLeafAmb: { value: 0.75 },   // sky/hemisphere light on foliage (lower = more sun-vs-shade contrast)
-  uFloorShade: { value: 0.45 }, // extra darkening of shadowed forest floor
+  uLeafAmb: { value: 0.95 },   // sky/hemisphere light on foliage (lower = more sun-vs-shade contrast)
+  uFloorShade: { value: 0.2 }, // extra darkening of shadowed forest floor
   uCrownRound: { value: 1.0 },  // tree crowns shaded as rounded masses
   // Paving (terrain): Retold's roads and plazas are worn cobbles, never a flat
   // cream slab. uPave scales the procedural stone/mortar breakup, uPaveAlb the
@@ -63,7 +63,7 @@ export const atmosUniforms = {
   // sun, undersides, crevices) is desaturated toward a cool dark green by
   // uLeafShadeDesat; uLeafRim is the warm highlight on the sun-facing
   // upper shell of each crown.
-  uLeafShadeDesat: { value: 0.4 },
+  uLeafShadeDesat: { value: 0.3 },
   uLeafAlb: { value: 0.8 },   // foliage albedo scale (deep olive crowns, not lime)
   uLeafRim: { value: new THREE.Color(0.55, 0.38, 0.08) },
 };
@@ -251,7 +251,7 @@ function patchVoxel(shader) {
         float il = dot(reflectedLight.indirectDiffuse, vec3(0.2126, 0.7152, 0.0722));
         reflectedLight.indirectDiffuse = mix(reflectedLight.indirectDiffuse, vec3(il) * vec3(0.9, 1.0, 1.08), shadeW);
         // crevices and undersides lose more of what is left
-        reflectedLight.indirectDiffuse *= (1.0 - 0.35 * occL * (1.0 - faceLit)) * (1.0 - 0.28 * (1.0 - faceLit) * leaf);
+        reflectedLight.indirectDiffuse *= (1.0 - 0.2 * occL * (1.0 - faceLit)) * (1.0 - 0.1 * (1.0 - faceLit) * leaf);
         // warm rim on the sun-facing upper shell (outer crown, sun reaching it)
         float rim = faceLit * smoothstep(0.25, 0.85, ndl) * smoothstep(0.1, 0.75, dot(atmRoundN, uSunDirView)) * (0.4 + 0.6 * max(wN.y, 0.0)) * (1.0 - occL);
         reflectedLight.directDiffuse += alb * uLeafRim * rim * leaf;
