@@ -27,24 +27,24 @@ const GradeShader = {
     tDiffuse: { value: null },
     uExposure: { value: 1.0 },
     uChromaLimit: { value: 0.42 },
-    uSaturation: { value: 0.86 },
+    uSaturation: { value: 0.82 },
     uGreenShift: { value: 0.5 },
-    uGreenDesat: { value: 0.34 },
+    uGreenDesat: { value: 0.14 },
     uContrast: { value: 1.0 },
     // mid S-curve: lit ground and roofs lift, shade drops (no milky mid-grey)
-    uMidContrast: { value: 0.3 },
+    uMidContrast: { value: 0.42 },
     // shade keeps its colour: chroma boost in the darks instead of a grey veil
     uShadowSat: { value: 0.0 },
     uShadowTint: { value: new THREE.Vector3(0.99, 0.97, 0.98) }, // near neutral: shade reads warm-olive (ground bounce), never lavender
-    uBlackFloor: { value: new THREE.Vector3(0.03, 0.034, 0.032) },
+    uBlackFloor: { value: new THREE.Vector3(0.012, 0.016, 0.012) },
     uVignette: { value: 0.0 },
-    uToeLift: { value: 0.06 },
+    uToeLift: { value: 0.0 },
     uKnee: { value: 0.72 },
     uShoulder: { value: 4.3 }, // highlights approach uKnee + 1 / uShoulder (~0.95)
     // Top-edge aerial haze: in the RTS view the top of the frame is always
     // the far distance, so it loses contrast and saturation and lifts toward
     // a cool grey-blue (the far forest and shoreline recede).
-    uTopHaze: { value: 0.2 },
+    uTopHaze: { value: 0.1 },
     uTopHazeColor: { value: new THREE.Vector3(0.66, 0.72, 0.78) },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
@@ -118,7 +118,7 @@ export class PostFX {
       this.gtao = new GTAOPass(scene, camera, size.x, size.y);
       this.gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.6, thickness: 2.5, scale: 1.6, samples: 12, distanceFallOff: 1.0 });
       this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
-      this.gtao.blendIntensity = 0.65;
+      this.gtao.blendIntensity = 0.9;
       // Let pieces opt objects out of the AO g-buffer with object.userData.noAO
       // (water, overlays, effects).
       const orig = this.gtao._overrideVisibility.bind(this.gtao);
