@@ -111,17 +111,19 @@ function torsoModel(style, cloak = true) {
       // shoulders, dark side seams and back channel). His army's colour is
       // trim only: a tunic panel down the front and back under the belt,
       // the crest and the shield face.
-      const SIDE = (x, y, z) => (hash3(x, y, z, 4) < 0.5 ? 0x8a6526 : 0x7a5820);
-      m.box(0, 2, 0, 8, 6, 4, MET);
-      m.box(1, 1, 0, 6, 1, 4, MET);
-      m.box(0, 2, 0, 1, 5, 4, SIDE).box(7, 2, 0, 1, 5, 4, SIDE);                // shaded side seams
-      m.box(1, 5, 4, 2, 2, 1, 0xf6d98a).box(5, 5, 4, 2, 2, 1, 0xf6d98a);          // polished pecs
-      m.set(3, 4, 4, MET_DK).set(4, 4, 4, MET_DK).set(3, 2, 4, MET_DK).set(4, 2, 4, MET_DK);
-      m.box(3, 2, -1, 2, 5, 1, MET_DK);                                            // spine channel
-      // the army's colour is the chiton: sleeves over the shoulders (what
-      // the RTS camera sees first), the skirt under the pteryges, the cloak
-      m.box(0, 7, -1, 2, 2, 6, TEAM).box(6, 7, -1, 2, 2, 6, TEAM);                // team chiton sleeves
-      m.box(0, 7, 4, 2, 1, 1, TEAM).box(6, 7, 4, 2, 1, 1, TEAM);
+      // Round 6: the army's colour is the whole tunic. A dyed linothorax
+      // wraps the torso (chest, flanks, back and shoulders, shaded flanks),
+      // with only a bronze breastplate on the chest: from the RTS camera
+      // every man is a block of red or blue with a bronze heart.
+      m.box(0, 2, -1, 8, 7, 6, TEAM);                                             // dyed linothorax
+      tbox(m, 0, 2, -1, 1, 6, 6, TEAM_SHADE); tbox(m, 7, 2, -1, 1, 6, 6, TEAM_SHADE); // shaded flanks
+      tbox(m, 3, 2, -1, 2, 6, 1, TEAM_SHADE);                                      // back seam
+      m.box(2, 4, 5, 4, 4, 1, MET);                                                // bronze breastplate
+      m.set(2, 7, 5, 0xf6d98a).set(5, 7, 5, 0xf6d98a);                            // polished pecs
+      m.set(3, 5, 5, MET_DK).set(4, 5, 5, MET_DK);
+      m.box(0, 9, 0, 8, 1, 4, TEAM).box(2, 9, 0, 4, 1, 4, TEAM_TRIM).box(3, 9, 1, 2, 1, 2, SKIN); // dyed shoulder yoke, pale neckline
+      m.box(-1, 6, 0, 1, 3, 4, TEAM).box(8, 6, 0, 1, 3, 4, TEAM);                 // shoulder flaps
+      m.box(-1, 6, 0, 1, 1, 4, TEAM_TRIM).box(8, 6, 0, 1, 1, 4, TEAM_TRIM);
       m.box(0, 1, -1, 8, 1, 6, BRONZE_DK).carve(1, 1, 1, 6, 1, 2);                // girdle
     } else {
       m.box(0, 2, 0, 8, 6, 4, MET);
@@ -135,9 +137,11 @@ function torsoModel(style, cloak = true) {
     // team chiton skirt showing under leather pteryges strips
     // leather and linen strips all round, with a team tunic panel showing
     // down the middle front and back (and a team hem under the strips)
-    const strip = (i) => (i % 2 === 1 ? LEATHER : TEAM);
-    for (let x = 0; x < 8; x++) for (const z of [-1, 4]) m.box(x, -4, z, 1, 4, 1, strip(x));
-    for (let z = 0; z < 4; z++) { m.box(-1, -4, z, 1, 4, 1, strip(z + 1)); m.box(8, -4, z, 1, 4, 1, strip(z)); }
+    // dyed skirt all round (alternate strips a shade darker) over a pale hem
+    const dyed = style === 'hoplite' || style === 'rider';
+    const strip = (m2, x, y, z, i) => { if (!dyed && i % 2 === 1) m2.box(x, y, z, 1, 4, 1, LEATHER); else if (i % 2) tbox(m2, x, y, z, 1, 4, 1, TEAM_SHADE); else m2.box(x, y, z, 1, 4, 1, TEAM); m2.set(x, y - 1, z, dyed ? TEAM_TRIM : TEAM); };
+    for (let x = 0; x < 8; x++) for (const z of [-1, 4]) strip(m, x, -4, z, x);
+    for (let z = 0; z < 4; z++) { strip(m, -1, -4, z, z + 1); strip(m, 8, -4, z, z); }
     m.box(0, 0, 0, 8, 1, 4, BRONZE_DK);
     if (style === 'rider') {
       // short chlamys knotted at the right shoulder, a narrow fold down the back
@@ -220,8 +224,8 @@ function cloakModel(kind) {
     m.box(0, 8, -1, 6, 1, 3, TEAM);
     for (let x = 0; x <= 7; x++) {
       const bot = 3 + Math.round(x * 0.45);
-      for (let y = bot; y < 8; y++) m.set(x, y, x % 2 ? -2 : -1, x % 2 ? 0xb4a482 : WOOL(x, y, 0));
-      m.set(x, bot - 1, x % 2 ? -2 : -1, TEAM);
+      for (let y = bot; y < 8; y++) { if (x % 2) tbox(m, x, y, -2, 1, 1, 1, TEAM_SHADE); else m.set(x, y, -1, TEAM); }
+      m.set(x, bot - 1, x % 2 ? -2 : -1, TEAM_TRIM);
     }
     m.set(7, 8, 3, BRONZE(7, 8, 3)).set(7, 8, 4, BRONZE(7, 8, 4)); // brooch
   }
@@ -236,8 +240,9 @@ function crest(m, z0, z1, y0, H) {
   for (let z = z0; z <= z1; z++) {
     const k = Math.sqrt(Math.max(0, 1 - ((z - mid) / half) ** 2));
     const top = y0 + Math.max(1, Math.round(H * k));
-    m.box(2, y0, z, 1, top - y0 + 1, 1, TEAM);
-    m.set(1, top - 1, z, TEAM).set(3, top - 1, z, TEAM);   // brush spreads at the top
+    // a full three-voxel brush: a bold stroke from above, not a hairline
+    m.box(1, y0, z, 3, top - y0 + 1, 1, TEAM);
+    m.set(0, top - 1, z, TEAM).set(4, top - 1, z, TEAM);   // brush spreads at the top
   }
 }
 
@@ -328,8 +333,9 @@ function headModel(style) {
   } else if (style === 'archer') {
     // felt Phrygian cap (undyed) with a team band, beard
     const FELT = (x, y, z) => (hash3(x, y, z, 19) < 0.5 ? 0xb89a6c : 0xa88a5e);
-    m.box(-1, 4, -1, 7, 2, 7, FELT).box(0, 6, 0, 5, 1, 5, FELT).box(1, 7, 2, 3, 1, 3, FELT).box(2, 7, 4, 1, 1, 2, FELT).set(2, 8, 5, TEAM);
-    m.box(-1, 3, -1, 7, 1, 7, TEAM).carve(0, 3, 5, 5, 1, 1);
+    // dyed in the army's colour (the archer screen reads red or blue from above) over an undyed felt band
+    m.box(-1, 4, -1, 7, 2, 7, TEAM).box(0, 6, 0, 5, 1, 5, TEAM).box(1, 7, 2, 3, 1, 3, TEAM).box(2, 7, 4, 1, 1, 2, TEAM).set(2, 8, 5, TEAM);
+    m.box(-1, 3, -1, 7, 1, 7, FELT).carve(0, 3, 5, 5, 1, 1);
     m.box(-1, 0, -1, 1, 3, 3, LEATHER).box(5, 0, -1, 1, 3, 3, LEATHER); // ear flaps
     m.box(1, 0, 5, 3, 1, 1, BEARD).box(0, -1, 3, 5, 1, 2, BEARD).set(2, -1, 5, BEARD);
     m.box(0, 0, 0, 5, 3, 1, HAIR);
@@ -338,8 +344,8 @@ function headModel(style) {
     m.box(0, 3, 0, 5, 2, 5, HAIR).box(0, 1, 0, 5, 2, 1, HAIR);
     m.box(1, 0, 5, 3, 1, 1, BEARD).box(0, -1, 3, 5, 1, 2, BEARD);
     for (let z = -2; z <= 6; z++) for (let x = -2; x <= 6; x++) { const dx = x - 2, dz = z - 2; if (dx * dx + dz * dz <= 12) m.set(x, 5, z, LEATHER); }
-    m.box(0, 6, 0, 5, 1, 5, LEATHER).box(1, 7, 1, 3, 1, 3, LEATHER_DK);
-    m.box(0, 6, 0, 5, 1, 1, TEAM).box(0, 6, 4, 5, 1, 1, TEAM);
+    m.box(0, 6, 0, 5, 1, 5, TEAM).box(1, 7, 1, 3, 1, 3, TEAM);   // dyed crown
+    tbox(m, 0, 6, 0, 5, 1, 1, TEAM_SHADE); tbox(m, 0, 6, 4, 5, 1, 1, TEAM_SHADE);
   } else if (style === 'archerBare') {
     // bareheaded: dark curls bound with a team fillet
     m.box(-1, 3, -1, 7, 3, 7, HAIR).box(0, 6, 0, 5, 1, 5, HAIR).box(-1, 0, -1, 7, 3, 2, HAIR);
@@ -373,7 +379,8 @@ function armModel(style, side) {
   m.box(0, 0, 0, 2, 2, 2, SKIN);                    // hand
   m.box(0, 2, 0, 2, 3, 2, SKIN);                    // forearm
   m.box(0, 5, 0, 2, 2, 2, style === 'villager' ? (side === 'R' ? SKIN : TEAM) : SKIN);
-  if (style !== 'villager') m.box(0, 6, 0, 2, 1, 2, LINEN);   // chiton sleeve
+  if (style === 'hoplite') m.box(0, 5, 0, 2, 2, 2, TEAM).box(0, 5, 0, 2, 1, 2, TEAM_TRIM);   // dyed sleeve, pale hem
+  else if (style !== 'villager') m.box(0, 6, 0, 2, 1, 2, LINEN);   // chiton sleeve
   if (style === 'hoplite') m.box(0, 2, 0, 2, 2, 2, LEATHER);   // bracer
   if (style === 'archer') m.box(0, 2, 0, 2, 2, 2, side === 'L' ? LEATHER : SKIN);
   m.set(side === 'L' ? 0 : 1, 1, 2, SKIN_SHADE);    // thumb
@@ -587,15 +594,18 @@ function horseBody() {
 }
 
 function horseBarding() {
-  // caparison: team cloth over the back and flanks with a light hem, saddle on top
+  // saddle cloth: team cloth over the back and down the upper flanks only,
+  // with a pale hem, so the pale horse (head, neck, chest, quarters and all
+  // four legs) reads round it instead of one blue box
   const m = new VoxelModel();
-  for (let z = 6; z <= 15; z++) {
-    m.box(-1, 2, z, 1, 7, 1, TEAM).box(7, 2, z, 1, 7, 1, TEAM);
+  for (let z = 7; z <= 14; z++) {
+    const lo = z === 7 || z === 14 ? 6 : 4;
+    m.box(-1, lo, z, 1, 9 - lo, 1, TEAM).box(7, lo, z, 1, 9 - lo, 1, TEAM);
     m.box(0, 9, z, 7, 1, 1, TEAM);
-    m.set(-1, 1, z, TEAM_TRIM).set(7, 1, z, TEAM_TRIM);
-    if (z === 6 || z === 15) m.box(-1, 2, z, 1, 7, 1, TEAM_TRIM).box(7, 2, z, 1, 7, 1, TEAM_TRIM);
+    m.set(-1, lo - 1, z, TEAM_TRIM).set(7, lo - 1, z, TEAM_TRIM);
+    if (z % 2) { tbox(m, -1, lo, z, 1, 9 - lo, 1, TEAM_SHADE); tbox(m, 7, lo, z, 1, 9 - lo, 1, TEAM_SHADE); }
   }
-  for (let z = 7; z <= 14; z += 3) { m.set(-2, 4, z, BRONZE(0, z, 1)); m.set(8, 4, z, BRONZE(0, z, 2)); } // studs
+  for (let z = 8; z <= 13; z += 5) { m.set(-2, 6, z, BRONZE(0, z, 1)); m.set(8, 6, z, BRONZE(0, z, 2)); } // studs
   m.box(1, 10, 8, 5, 1, 6, LEATHER).box(2, 11, 7, 3, 1, 1, LEATHER_DK).box(2, 11, 14, 3, 1, 1, LEATHER_DK); // saddle
   // breast strap and crupper
   for (let x = 0; x <= 6; x++) m.set(x, 6, 21, LEATHER_DK);
@@ -893,10 +903,12 @@ export function cyclopsRig() {
 }
 
 // ---- centaur (voxel 0.08): chestnut horse body, bare-chested archer --------
-const CHESTNUT = (x, y, z) => { const h = hash3(x, y, z, 51); return h < 0.55 ? 0x9a5a32 : h < 0.85 ? 0x8a4e2a : 0xa9683c; };
+const CHESTNUT = (x, y, z) => { const h = hash3(x, y, z, 51); return h < 0.55 ? 0xe0a868 : h < 0.85 ? 0xd49a5a : 0xeab878; };
 const recolor = (m, from, to) => { for (const v of m.vox.values()) if (!v.team && from.includes(v.c)) v.c = typeof to === 'function' ? to(0, 0, 0) : to; return m; };
 const COAT_COLS = [0xe4ded2, 0xd2cbbd, 0xbdb5a6];
-const chestnut = (m) => { let i = 0; for (const v of m.vox.values()) if (!v.team && COAT_COLS.includes(v.c)) v.c = [0x9a5a32, 0x8a4e2a, 0xa9683c][(i++ * 7) % 3]; return m; };
+// a bright sorrel coat: lighter than the turf and the dirt, so the horse
+// half keeps its outline on either
+const chestnut = (m) => { let i = 0; for (const v of m.vox.values()) if (!v.team && COAT_COLS.includes(v.c)) v.c = [0xe0a868, 0xd49a5a, 0xeab878][(i++ * 7) % 3]; return m; };
 
 function centaurTorso() {
   const m = new VoxelModel();
@@ -917,13 +929,17 @@ function centaurTorso() {
 }
 
 function centaurBlanket() {
-  // a team saddle-cloth over the whole horse back: the big readable top area
+  // a team saddle-cloth over the middle of the horse back only, hanging to
+  // mid-flank with a pale hem: the chestnut barrel, quarters, chest and all
+  // four legs stay in view, so from above it reads as a horse, not a box
   const m = new VoxelModel();
-  for (let z = 0; z <= 13; z++) {
-    m.box(-1, 3, z, 1, 7, 1, TEAM).box(7, 3, z, 1, 7, 1, TEAM).box(0, 10, z, 7, 1, 1, TEAM).box(0, 9, z, 7, 1, 1, TEAM);
-    m.set(-1, 2, z, TEAM_TRIM).set(7, 2, z, TEAM_TRIM);
+  for (let z = 6; z <= 11; z++) {
+    const lo = z === 6 || z === 11 ? 8 : 7;
+    m.box(-1, lo, z, 1, 10 - lo, 1, TEAM).box(7, lo, z, 1, 10 - lo, 1, TEAM).box(0, 10, z, 7, 1, 1, TEAM);
+    if (z % 2) { tbox(m, -1, lo, z, 1, 10 - lo, 1, TEAM_SHADE); tbox(m, 7, lo, z, 1, 10 - lo, 1, TEAM_SHADE); }
+    m.set(-1, lo - 1, z, TEAM_TRIM).set(7, lo - 1, z, TEAM_TRIM);
   }
-  for (let z = 1; z <= 13; z += 4) { m.set(-2, 5, z, BRONZE(0, z, 1)); m.set(8, 5, z, BRONZE(0, z, 2)); }
+  m.set(-2, 7, 8, BRONZE(0, 8, 1)); m.set(8, 7, 8, BRONZE(0, 8, 2));
   return m;
 }
 

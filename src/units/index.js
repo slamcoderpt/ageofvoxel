@@ -23,8 +23,6 @@ const FADE_START = 22.5;  // corpses dither out between FADE_START and CORPSE_TI
 // reads as separate figures rather than one interpenetrating blob.
 const SPREAD_GAP = 1.35;   // extra spacing, in multiples of the smaller radius
 const SPREAD_SPEED = 2.0; // max drift, tiles/second
-// Per-unit horse coat tints (multiplied into the dappled grey base):
-// grey, near-white, dun, bay, dark bay.
 // Crowd variety (visual only, never fed back into the sim): each soldier
 // stands a little off its formation slot, faces a little off true, is a
 // little taller or shorter, and in melee presses in towards its foe so the
@@ -33,7 +31,10 @@ const JITTER = 0.3;        // tiles, static per unit
 const PRESS_RATE = 3;      // per second
 const OUTLINE = 0.045;     // outline width, world units (~1 px at the RTS zoom)
 const CORPSE_CLEAR = 0.5;  // corpses slide out from under the living, tiles/second
-const COATS = [[1, 1, 1], [1.06, 1.06, 1.05], [0.95, 0.86, 0.7], [0.72, 0.5, 0.34], [0.5, 0.36, 0.27], [1, 0.98, 0.95]];
+// Per-unit horse coat tints (multiplied into the dappled grey base).
+// Pale coats only (greys, near-whites, a light dun): a dark bay under a team
+// cloth read as a coloured box on the ground; a pale horse keeps its shape.
+const COATS = [[1, 1, 1], [1.08, 1.08, 1.07], [0.97, 0.9, 0.78], [0.86, 0.86, 0.88], [1.04, 1.02, 0.98], [0.92, 0.9, 0.86]];
 
 export class Units {
   constructor(game) {
@@ -60,7 +61,15 @@ export class Units {
     // the tinted albedo, so an army lit from behind still reads red or blue
     // instead of brown.
     addShaderPatch(this.material, 'unitTeamLift', (shader) => {
-      injectFragment(shader, '#include <emissivemap_fragment>', 'totalEmissiveRadiance += diffuseColor.rgb * vTeam * 0.42;');
+      // plus a lighter rim: faces turned edge-on to the camera (flanks,
+      // crest sides, cloak edges) glow a paler, brighter version of the
+      // dye, so each figure's team colour has a lit edge against the ground
+      injectFragment(shader, '#include <emissivemap_fragment>', `{
+        float teamRim = pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 1.6);
+        vec3 teamSat = diffuseColor.rgb * vTeam;
+        // (pure hue only: a grey lift turned the red army pink)
+        totalEmissiveRadiance += teamSat * (0.7 + teamRim * 1.0);
+      }`);
     });
     // Silhouette outline: every part is drawn a second time as a dark
     // inverted hull (back faces pushed out along their normals), so each
@@ -418,6 +427,9 @@ export class Units {
         const pc = game.players[u.owner].color;
         const coat = COATS[u.id % COATS.length];
         this._c.setHex(pc);
+        // full-saturation dye: crush the minor channels (keeping the peak),
+        // so red reads as red, not a pinkish brown, once lit and tone mapped
+        { const mx = Math.max(this._c.r, this._c.g, this._c.b, 1e-4); this._c.setRGB(mx * (this._c.r / mx) ** 2, mx * (this._c.g / mx) ** 2, mx * (this._c.b / mx) ** 2); }
         // the dead lose their colour: team dye fades to grey-brown, the body darkens
         // the dead keep their army's colour, darkened (so a fallen man still
         // says whose he was) while the rest of him goes dull
@@ -431,8 +443,8 @@ export class Units {
         const tr = this._c.r * ck, tg = this._c.g * ck, tb = this._c.b * ck;
         // a hard white flash on the frame (or two) a blow lands, then a faint
         // afterglow while flashT runs out
-        const pop = !u.dead && (u.units_hitT ?? 9) < 0.07 && u.flashT > 0 ? 0.16 : 0;
-        const flash = Math.max(pop, u.dead ? 0 : Math.min(1, u.flashT / 0.1) * 0.07, u.gp_hit || 0);
+        const pop = !u.dead && (u.units_hitT ?? 9) < 0.07 && u.flashT > 0 ? 0.26 : 0;
+        const flash = Math.max(pop, u.dead ? 0 : Math.min(1, u.flashT / 0.1) * 0.16, u.gp_hit || 0);
         const fade = u.dead ? 1 - Math.min(1, Math.max(0, (u.anim.dieT - FADE_START) / (CORPSE_TIME - 0.3 - FADE_START))) : 1;
         for (let pi = 0; pi < rig.parts.length; pi++) {
           const p = rig.parts[pi];

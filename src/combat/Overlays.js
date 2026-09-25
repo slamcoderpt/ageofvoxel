@@ -51,7 +51,10 @@ export class Overlays {
           // fill measured inside the backing, with a lit top edge and a shaded base
           float f = (px.x - 2.0) / (vPx.x - 4.0);
           float yy = (px.y - 2.0) / max(1.0, vPx.y - 4.0);
-          vec3 c = f < vFill ? vCol * (0.7 + 0.35 * yy + (yy > 0.7 ? 0.35 : 0.0)) : vec3(0.07, 0.06, 0.055);
+          // green (health left) against red (health lost), split at a hard edge
+          float lit = 0.72 + 0.3 * yy + (yy > 0.66 ? 0.28 : 0.0);
+          vec3 c = f < vFill ? vCol * lit : vec3(0.78, 0.07, 0.04) * lit;
+          if (abs(f - vFill) * (vPx.x - 4.0) < 0.75) c = vec3(0.02);
           gl_FragColor = vec4(c, 1.0);
         }`,
       depthTest: false,
@@ -81,7 +84,8 @@ export class Overlays {
   resize(w, h) {
     const u = this.bars.material.uniforms;
     u.uResY.value = h;
-    u.uBarPx.value = Math.round(Math.min(12, Math.max(6, h / 1080 * 8)));
+    // 10px at 1080p: a 2px dark frame round a 6px fill
+    u.uBarPx.value = Math.round(Math.min(14, Math.max(8, h / 1080 * 10)));
   }
 
   render(alpha) {
@@ -93,12 +97,12 @@ export class Overlays {
       if (n >= MAX) return;
       this.aPos.setXYZ(n, x, y, z);
       this.aInfo.setXYZW(n, Math.max(0, e.hp / e.maxHp), w, px, 0);
-      // the fill is the army's colour (blue / red), as in Retold, so a bar
-      // over a crowd also says whose man it is; the dark 2px frame and the
-      // near-black empty part carry how hurt he is
-      if (e.owner === 0) this._c.setRGB(0.9, 0.85, 0.6);
-      else if (e.owner === game.localPlayer) this._c.setRGB(0.08, 0.36, 1.0);
-      else this._c.setRGB(0.95, 0.06, 0.04);
+      // green fill for the health left (yellowing below half), red for what
+      // is lost: the men already wear their army's colour, so the bar only
+      // has to say who is winning
+      const f = Math.max(0, e.hp / e.maxHp);
+      if (f > 0.5) this._c.setRGB(0.22, 0.95, 0.12);
+      else this._c.setRGB(0.22 + (0.5 - f) * 1.5, 0.95 - (0.5 - f) * 0.5, 0.1);
       this.aCol.setXYZ(n, this._c.r, this._c.g, this._c.b);
       n++;
     };
@@ -136,8 +140,8 @@ export class Overlays {
       // battle zoom) and sit at one fixed height per unit type above the
       // ground under the man, so a row of fighters gets a level row of bars.
       const struck = game.time - (u.combat_hitT ?? -99) < 2.5;
-      if (selected || hover === u.id || (struck && f < (big ? 0.9 : 0.5)))
-        addBar(u, x, game.map.heightAt(u.x, u.z) + game.units.heightOf(u) + 0.25, z, big ? 38 : u.def.class === 'cavalry' ? 27 : 22, 1);
+      if (selected || hover === u.id || (struck && f < (big ? 0.9 : 0.7)))
+        addBar(u, x, game.map.heightAt(u.x, u.z) + game.units.heightOf(u) + 0.25, z, big ? 56 : u.def.class === 'cavalry' ? 38 : 32, 1);
     }
     for (const b of game.entities.buildings()) {
       if (b.owner !== game.localPlayer && !game.fog.isExplored(b.x, b.z)) continue;

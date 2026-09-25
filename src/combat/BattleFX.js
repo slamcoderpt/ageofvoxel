@@ -359,14 +359,15 @@ export class BattleFX {
       // brown fan of dust kicked out behind him along the blow, hugging the
       // ground, plus clods of earth flung the same way
       const fx0 = x + bx * 0.25, fz0 = z + bz * 0.25;
-      const dcol = () => [0x8a6a46, 0x7d5f3e, 0x957453][r.int(0, 2)];
-      this.puff(fx0, fz0, { count: big ? 5 : 3, size: r.range(1.1, 1.4) * (big ? 1.5 : 1), life: 1.2, alpha: 0.7, speed: 0.4, up: 0.12, y: 0.45, spread: 0.2, color: dcol(), dx: bx * 1.6, dz: bz * 1.6 });
-      this.puff(x, z, { count: 1, size: r.range(1.0, 1.2) * (big ? 1.4 : 1), life: 1.4, alpha: 0.5, speed: 0.3, up: 0.05, y: 0.4, spread: 0.2, color: dcol(), dx: -bz * 0.6, dz: bx * 0.6 });
+      // (pale dry dust: it has to read over dark turf and brown earth alike)
+      const dcol = () => [0xd2bf98, 0xc4b08a, 0xdccba6][r.int(0, 2)];
+      this.puff(fx0, fz0, { count: big ? 6 : 4, size: r.range(1.6, 2.0) * (big ? 1.5 : 1), life: 1.2, alpha: 0.8, speed: 0.4, up: 0.12, y: 0.45, spread: 0.2, color: dcol(), dx: bx * 1.6, dz: bz * 1.6 });
+      this.puff(x, z, { count: 2, size: r.range(1.4, 1.7) * (big ? 1.4 : 1), life: 1.4, alpha: 0.6, speed: 0.3, up: 0.05, y: 0.4, spread: 0.2, color: dcol(), dx: -bz * 0.6, dz: bx * 0.6 });
       game.fx.emit({ x: fx0, y: gy + 0.12, z: fz0, count: r.int(3, 5), color: 0x5a3e22, colorVar: 0.2, size: 0.13, life: 0.55, speed: 1.2, up: 2.4, gravity: -14, spread: 0.2 });
       // a ring of pale voxel dust bursting out round his feet: chunky light
       // cubes that pop up and settle, so every blow reads as a burst on the
       // ground even where the spark is hidden behind a shield
-      game.fx.emit({ x, y: gy + 0.15, z, count: big ? 16 : 10, color: 0xcdb48a, colorVar: 0.12, size: big ? 0.22 : 0.17, life: 0.6, speed: big ? 3.2 : 2.4, up: 1.6, gravity: -9, spread: 0.25, drag: 2.5 });
+      game.fx.emit({ x, y: gy + 0.15, z, count: big ? 20 : 14, color: 0xdcc69c, colorVar: 0.12, size: big ? 0.28 : 0.22, life: 0.7, speed: big ? 3.4 : 2.6, up: 1.6, gravity: -9, spread: 0.25, drag: 2.5 });
       this.scar(px, pz, 0.5, 0.3, 0.0);
     } else if (kind === 'arrow') {
       if (r.chance(0.5)) game.fx.emit({ x, y, z, count: 3, color: 0x7a0c08, size: 0.08, life: 0.4, speed: 1.2, up: 1.2, gravity: -12, spread: 0.05 });

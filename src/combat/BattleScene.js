@@ -1,5 +1,7 @@
 import { PLAYER, ENEMY } from '../core/constants.js';
 import { placeNear } from '../core/scenes/helpers.js';
+import { GROUND } from '../core/GameMap.js';
+import { hash2 } from '../core/rng.js';
 import { fieldHeroesAndMyth, engageHeroesAndMyth } from '../units/battleHost.js';
 
 // The 'battle' harness scene (registered by src/core/scenes/index.js): two
@@ -173,10 +175,42 @@ function churn(game, cx, cz, spots) {
       fx.scar(x, z, rng.range(0.6, 1.0) * r0, rng.range(0.6, 0.95), 0);
     }
   }
-  for (let i = 0; i < 70; i++) {
+  for (let i = 0; i < 24; i++) {
     const [x, z] = P(cx, cz, rng.range(-END - 1, END + 1), rng.range(-3.8, 3.8));
     fx.scar(x, z, rng.range(0.35, 0.7), rng.range(0.3, 0.6), 0);
   }
+}
+
+// The fight has trampled the meadow flat: a broad band of bare, pale earth
+// under the duel line (ragged at the edges, a few torn grass islands left in
+// it) inside a fringe of trodden dry grass. The figures stand on a light,
+// quiet ground instead of dark, busy tufts, so every silhouette separates.
+function trample(game, cx, cz) {
+  const map = game.map, V = map.worldSize / map.cols;
+  const soft = (x, z, f, s) => {
+    // cheap smooth value noise from the hash lattice
+    const X = x * f, Z = z * f, x0 = Math.floor(X), z0 = Math.floor(Z), ax = X - x0, az = Z - z0;
+    const sx = ax * ax * (3 - 2 * ax), sz = az * az * (3 - 2 * az);
+    const h = (i, j) => hash2(i, j, s);
+    return (h(x0, z0) * (1 - sx) + h(x0 + 1, z0) * sx) * (1 - sz) + (h(x0, z0 + 1) * (1 - sx) + h(x0 + 1, z0 + 1) * sx) * sz;
+  };
+  const R = END + 8;
+  const c0x = Math.floor((cx - R) / V), c1x = Math.ceil((cx + R) / V), c0z = Math.floor((cz - R) / V), c1z = Math.ceil((cz + R) / V);
+  for (let j = c0z; j <= c1z; j++) for (let i = c0x; i <= c1x; i++) {
+    if (!map.inCols(i, j)) continue;
+    const k = map.cIdx(i, j), g = map.ground[k];
+    if (g !== GROUND.GRASS && g !== GROUND.DRYGRASS && g !== GROUND.DIRT) continue;
+    const x = (i + 0.5) * V - cx, z = (j + 0.5) * V - cz;
+    const a = (x - z) * S, d = (x + z) * S;
+    const n = soft(i, j, 0.18, 611) - 0.5, n2 = soft(i, j, 0.5, 612) - 0.5;
+    // the band narrows past the giants at the two ends of the line
+    const ea = Math.max(0, Math.abs(a) - (END + 1.5));
+    const w = 3.4 + n * 2.4 + n2 * 0.8 - ea * 0.9;
+    const ad = Math.abs(d - 0.2);
+    if (ad < w && !(n2 > 0.36 && ad > 1.8)) map.ground[k] = GROUND.DIRT;
+    else if (ad < w + 1.6 + n2 * 1.2 && g === GROUND.GRASS) map.ground[k] = GROUND.DRYGRASS;
+  }
+  map.markDirty(c0x - 1, c0z - 1, c1x + 1, c1z + 1);
 }
 
 export const battleScene = {
@@ -190,8 +224,9 @@ export const battleScene = {
     // saturated and bright, and the melee does not read milky. Only this
     // scene's uniforms change; ?post=off is unaffected.
     const gu = game.lighting?.post?.grade?.uniforms;
-    const grade = { uToeLift: 0.05, uKnee: 0.72, uShoulder: 1.3, uSaturation: 1.06, uContrast: 1.14 };
+    const grade = { uToeLift: 0.05, uKnee: 0.72, uShoulder: 1.3, uSaturation: 1.06, uContrast: 1.14, uChromaLimit: 0.2 };
     if (gu) for (const k in grade) if (gu[k]) gu[k].value = grade[k];
+    trample(game, cx, cz);
     const blue = army(game, PLAYER, 1, cx, cz);
     const red = army(game, ENEMY, -1, cx, cz);
     const myth = [...fieldHeroesAndMyth(game, PLAYER, 1, (a, d) => P(cx, cz, a, d), -3 * Math.PI / 4), ...fieldHeroesAndMyth(game, ENEMY, -1, (a, d) => P(cx, cz, a, d), Math.PI / 4)];
