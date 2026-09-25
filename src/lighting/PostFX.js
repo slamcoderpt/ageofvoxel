@@ -12,23 +12,23 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 //    (Retold's grass is warm, never lime),
 //  - overall saturation is gently reduced and luminance-weighted so darks stay
 //    rich while highlights stay clean,
-//  - split toning: cool blue-teal in the shadows, warm gold in the highlights,
+//  - split toning: desaturated violet-grey in the shadows, warm gold in the highlights,
 //  - a filmic S-curve with lifted, coloured blacks (no crushed pure greens),
 //  - highlight shoulder so pale stone keeps detail; bloom is kept minimal and
 //    the vignette is off, so the frame reads sunlit rather than hazy.
 const GradeShader = {
   uniforms: {
     tDiffuse: { value: null },
-    uExposure: { value: 1.26 },
+    uExposure: { value: 1.4 },
     uChromaLimit: { value: 0.5 },
     uSaturation: { value: 0.96 },
     uGreenShift: { value: 0.42 },
     uGreenDesat: { value: 0.42 },
     uContrast: { value: 1.08 },
-    uShadowTint: { value: new THREE.Vector3(0.035, 0.055, 0.065) },
+    uShadowTint: { value: new THREE.Vector3(0.042, 0.042, 0.054) },
     uHighTint: { value: new THREE.Vector3(1.05, 1.0, 0.93) },
     uVignette: { value: 0.0 },
-    uToeLift: { value: 0.08 },
+    uToeLift: { value: 0.14 },
     uKnee: { value: 0.56 },
     uShoulder: { value: 2.2 },
   },

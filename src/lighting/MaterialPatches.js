@@ -29,18 +29,24 @@ export const atmosUniforms = {
   uFoliageSky: { value: new THREE.Color(0.27, 0.37, 0.41) },
   uFoliageSun: { value: new THREE.Color(0.24, 0.22, 0.04) },
   uGlowScale: { value: 2.5 },
-  uDeepShade: { value: new THREE.Color(0.34, 0.45, 0.51) }, // indirect multiplier at full canopy occlusion (cool blue-green)
+  uDeepShade: { value: new THREE.Color(0.4, 0.5, 0.55) }, // indirect multiplier at full canopy occlusion (cool blue-green)
   uCanopyAO: { value: 0.8 },
   uUnderstory: { value: 1.0 },
   uPale: { value: 0.8 },      // albedo scale for pale neutral stone/marble (keeps whites off the clip)
+  // Sunlit sandstone: pale neutral stone is re-tinted toward a warm
+  // cream/ochre (Retold's plazas and walls are honey limestone, never paper
+  // white); upward-facing paving takes the full tint, walls/marble a lighter one.
+  uSand: { value: new THREE.Vector3(1.0, 0.85, 0.61) },
+  uSandAmt: { value: 0.9 },
+  uSandWall: { value: 0.5 },
   uContactAO: { value: 1.0 }, // strength of the wall-base band and ground halos
   // Leaf shadow balance: foliage in the sun's shadow (cast by the crowns next
   // to it) loses this much of its sky/fill light and turns cool, so crown-on-
   // crown and crown-on-floor shadows read as deep blue-green, not mid olive.
-  uLeafShadowAmb: { value: 0.7 },
+  uLeafShadowAmb: { value: 0.45 },
   uShadeCool: { value: new THREE.Vector3(0.72, 0.92, 1.25) },
   uLeafSun: { value: 1.2 },   // direct sun on foliage (lit crown tops glow warm)
-  uFloorShade: { value: 0.65 }, // extra darkening of shadowed forest floor
+  uFloorShade: { value: 0.45 }, // extra darkening of shadowed forest floor
   uCrownRound: { value: 1.0 },  // tree crowns shaded as rounded masses
 };
 
@@ -71,7 +77,8 @@ function patchCommon(shader) {
   prependFragment(shader, `varying vec3 vAtmWorld;\nvarying float vAtmSeed;\nvarying vec4 vAtmCrown;\nuniform float uCrownRound;
 uniform sampler2D uCanopy;\nuniform float uCanopyInvSize, uCanopyOn;
 uniform vec3 uSunDirView, uFoliageSky, uFoliageSun, uDeepShade;\nuniform float uGlowScale, uCanopyAO, uUnderstory, uPale, uContactAO, uLeafShadowAmb, uLeafSun, uFloorShade;
-uniform vec3 uShadeCool;
+uniform vec3 uShadeCool, uSand;
+uniform float uSandAmt, uSandWall;
 uniform sampler2D uContact;\nuniform vec2 uContactOrigin;\nuniform float uContactInvSize, uContactOn;
 // contact map: occ = footprint occupancy near here, hG = height above the ground
 void atmContact(out float occ, out float hG) {
@@ -86,11 +93,16 @@ void atmContact(out float occ, out float hG) {
 }
 // pale neutral albedo (white marble, grey plaza stone) is pulled down so it
 // keeps detail under the sun instead of reading as a milky slab
-vec3 atmPale(vec3 a) {
+vec3 atmPale(vec3 a, float sandAmt) {
   float mx = max(a.r, max(a.g, a.b)), mn = min(a.r, min(a.g, a.b));
   float sat = (mx - mn) / max(mx, 1e-3);
   float pale = smoothstep(0.42, 0.75, mx) * (1.0 - smoothstep(0.12, 0.3, sat));
-  return a * mix(vec3(1.0), uPale * vec3(1.03, 1.0, 0.93), pale);
+  // pale greys that are not tinted cool (team blues stay blue) become sandstone
+  float warmable = pale * step(a.b, max(a.r, a.g) + 0.01);
+  float l = dot(a, vec3(0.2126, 0.7152, 0.0722));
+  vec3 sand = l * uSand / dot(uSand, vec3(0.2126, 0.7152, 0.0722));
+  a = mix(a, sand, warmable * sandAmt);
+  return a * mix(vec3(1.0), uPale * vec3(1.02, 1.0, 0.96), pale);
 }
 // dens: forest density here; depth: 1 at the forest floor .. 0 at crown tops
 void atmCanopy(out float dens, out float hA) {
@@ -124,7 +136,11 @@ function patchVoxel(shader) {
   // per-tree tint and brightness (before the material's diffuse is fixed)
   shader.fragmentShader = shader.fragmentShader.replace('#include <lights_physical_fragment>', `
     float atmLeaf;
-    diffuseColor.rgb = atmPale(diffuseColor.rgb);
+    {
+      // paving (upward faces) takes the full sandstone tint, walls a lighter one
+      vec3 wUp = inverseTransformDirection(normalize(normal), viewMatrix);
+      diffuseColor.rgb = atmPale(diffuseColor.rgb, mix(uSandWall, uSandAmt, smoothstep(0.5, 0.9, wUp.y)));
+    }
     {
       vec3 a = diffuseColor.rgb;
       atmLeaf = smoothstep(0.08, 0.35, (a.g - max(a.r, a.b)) / max(a.g, 1e-3));
@@ -183,8 +199,8 @@ function patchVoxel(shader) {
       float cOcc, hG; atmContact(cOcc, hG);
       float band = (1.0 - smoothstep(0.02, 0.75, hG)) * (1.0 - 0.55 * max(wN.y, 0.0));
       band *= mix(0.55, 1.0, smoothstep(0.2, 0.8, cOcc)) * (1.0 - 0.5 * leaf) * uContactAO;
-      reflectedLight.indirectDiffuse *= 1.0 - 0.72 * band;
-      reflectedLight.directDiffuse *= 1.0 - 0.5 * band;
+      reflectedLight.indirectDiffuse *= 1.0 - 0.75 * band;
+      reflectedLight.directDiffuse *= 1.0 - 0.6 * band;
       // sun shadow cast by neighbouring crowns (and buildings): shaded
       // foliage and forest floor lose part of their sky light and turn cool
       // (only sampled where it matters: foliage and the forest floor)
@@ -218,7 +234,7 @@ function patchVoxel(shader) {
 function patchGround(shader) {
   patchCommon(shader);
   shader.fragmentShader = shader.fragmentShader.replace('#include <lights_physical_fragment>', `
-    diffuseColor.rgb = atmPale(diffuseColor.rgb);
+    diffuseColor.rgb = atmPale(diffuseColor.rgb, uSandAmt);
     #include <lights_physical_fragment>`);
   injectFragment(shader, '#include <lights_fragment_end>', `
     {
@@ -232,8 +248,8 @@ function patchGround(shader) {
       // contact halo round every building, prop and unit standing here
       float cOcc, hG; atmContact(cOcc, hG);
       float halo = smoothstep(0.02, 0.75, cOcc) * uContactAO;
-      reflectedLight.indirectDiffuse *= 1.0 - 0.7 * halo;
-      reflectedLight.directDiffuse *= 1.0 - 0.38 * halo;
+      reflectedLight.indirectDiffuse *= 1.0 - 0.72 * halo;
+      reflectedLight.directDiffuse *= 1.0 - 0.5 * halo;
     }`);
 }
 

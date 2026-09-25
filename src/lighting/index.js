@@ -4,6 +4,26 @@ import { PostFX } from './PostFX.js';
 import { MaterialPatcher } from './MaterialPatches.js';
 import { fowUniforms } from '../core/FogOfWar.js';
 
+// Soft shadows without grain: three's PCF rotates a 5-tap Vogel disk by
+// per-pixel noise, which leaves a stippled, "filtered" fringe on every shadow
+// edge (leaf crowns, plaza). Replace it with a fixed 2x2 box of hardware-PCF
+// (bilinear) taps: similar softness, smooth edges, no per-pixel noise, and
+// one tap cheaper than the stock filter.
+{
+  const src = THREE.ShaderChunk.shadowmap_pars_fragment;
+  const a = src.indexOf('float phi = interleavedGradientNoise( gl_FragCoord.xy ) * PI2;');
+  const b = a < 0 ? -1 : src.indexOf(') * 0.2;', a);
+  if (a >= 0 && b > a) {
+    THREE.ShaderChunk.shadowmap_pars_fragment = src.slice(0, a) + `
+				vec2 st = vec2( radius * 0.4 );
+				shadow = 0.25 * (
+					texture( shadowMap, vec3( shadowCoord.xy + vec2( -st.x, -st.y ), shadowCoord.z ) ) +
+					texture( shadowMap, vec3( shadowCoord.xy + vec2( st.x, -st.y ), shadowCoord.z ) ) +
+					texture( shadowMap, vec3( shadowCoord.xy + vec2( -st.x, st.y ), shadowCoord.z ) ) +
+					texture( shadowMap, vec3( shadowCoord.xy + vec2( st.x, st.y ), shadowCoord.z ) ) );` + src.slice(b + ') * 0.2;'.length);
+  }
+}
+
 // Owns the renderer, sun/sky/hemisphere lights, shadows, atmospheric fog and
 // post-processing. Other pieces never touch renderer settings directly.
 //
@@ -26,7 +46,7 @@ export class Lighting {
     // trees throw long, readable shadows like Retold's town shots, and tree
     // crowns shade the crowns beside them.
     this.sunDir = new THREE.Vector3(-0.6, 0.55, 0.4).normalize();
-    this.sun = new THREE.DirectionalLight(0xffdcaa, 3.9);
+    this.sun = new THREE.DirectionalLight(0xffd6a0, 3.9);
     this.sun.castShadow = true;
     const sm = post === 'high' ? 4096 : 2048;
     this.sun.shadow.mapSize.set(sm, sm);
@@ -36,11 +56,12 @@ export class Lighting {
     this.shadowExtent = 60;
     scene.add(this.sun, this.sun.target);
 
-    // Sky light is cool and the ground bounce warm-brown: shadowed faces go
-    // blue-grey instead of saturated dark green, sunlit ones stay golden.
-    this.hemi = new THREE.HemisphereLight(0x9ab8e6, 0x7a5f3e, 1.25);
+    // Sky light is a soft violet-grey (not cyan) and the ground bounce
+    // warm-brown: shadows on pale stone read as desaturated lavender-grey
+    // that sits with the warm roofs and the shade under the trees.
+    this.hemi = new THREE.HemisphereLight(0xacb0c8, 0x80644a, 1.25);
     scene.add(this.hemi);
-    this.fill = new THREE.DirectionalLight(0x9db8ee, 0.42); // cool bounce from the opposite side
+    this.fill = new THREE.DirectionalLight(0xb4b0c8, 0.42); // soft violet-grey bounce from the opposite side
     this.fill.position.set(0.6, 0.5, -0.5);
     scene.add(this.fill);
 
