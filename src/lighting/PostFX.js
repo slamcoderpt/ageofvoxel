@@ -37,10 +37,16 @@ const GradeShader = {
     uToeLift: { value: 0.0 },
     uKnee: { value: 0.72 },
     uShoulder: { value: 4.3 }, // highlights approach uKnee + 1 / uShoulder (~0.95)
+    // Top-edge aerial haze: in the RTS view the top of the frame is always
+    // the far distance, so it loses contrast and saturation and lifts toward
+    // a cool grey-blue (the far forest and shoreline recede).
+    uTopHaze: { value: 0.16 },
+    uTopHazeColor: { value: new THREE.Vector3(0.66, 0.72, 0.78) },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uKnee, uShoulder, uToeLift, uChromaLimit, uExposure, uSaturation, uGreenShift, uGreenDesat, uContrast, uVignette;
+    uniform sampler2D tDiffuse; uniform float uTopHaze; uniform vec3 uTopHazeColor;
+    uniform float uKnee, uShoulder, uToeLift, uChromaLimit, uExposure, uSaturation, uGreenShift, uGreenDesat, uContrast, uVignette;
     uniform vec3 uShadowTint, uBlackFloor; varying vec2 vUv;
     const vec3 LW = vec3(0.2126, 0.7152, 0.0722);
     void main(){
@@ -78,6 +84,11 @@ const GradeShader = {
       if (l > uKnee) { float e = l - uKnee; c *= (uKnee + e / (1.0 + e * uShoulder)) / l; }
       // --- deep shade floor: the darkest gaps sit just above black, faintly cool
       c += uBlackFloor * pow(1.0 - clamp(l, 0.0, 1.0), 12.0);
+      // --- top-edge haze: lower contrast and saturation, cool lift
+      float th = smoothstep(0.5, 1.0, vUv.y); th *= th * uTopHaze;
+      l = dot(c, LW);
+      c = mix(c, vec3(l), th * 1.2);
+      c = mix(c, uTopHazeColor, th);
       // --- optional vignette (off by default; god powers ease it in)
       vec2 d = vUv - 0.5;
       float v = smoothstep(0.35, 0.85, length(d * vec2(1.25, 1.0)));

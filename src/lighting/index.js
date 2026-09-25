@@ -93,7 +93,7 @@ export class Lighting {
     // not white fog). It starts just in front of the view centre and ramps
     // slowly, so the forest at the top of an RTS frame recedes and loses
     // contrast while the town in the middle stays clean.
-    this.hazeColor = new THREE.Color(0xc9ccc4);
+    this.hazeColor = new THREE.Color(0xbfc9d2); // cool, low-contrast air
     this.hazeNear = 0.75; this.hazeFar = 2.5; // x camera distance
     scene.fog = new THREE.Fog(this.hazeColor, 80, 400);
     scene.background = this.hazeColor.clone();
