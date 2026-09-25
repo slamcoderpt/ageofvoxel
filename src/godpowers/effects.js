@@ -139,37 +139,46 @@ function channel(lines, pts, w, i, taper, fade, bloomW = 7, bloomI = 0.32) {
   lines.push({ pts, w: w * bloomW, i: i * bloomI, taper: Math.min(0.95, taper + 0.1), fade, halo: true });
 }
 
-export function boltLines(seed, x, groundY, z, heightAt, height = 26) {
+export function boltLines(seed, x, groundY, z, heightAt, height = 30) {
   const rng = new RNG(seed);
   const lines = [];
-  const top = { x: x + rng.range(-3.5, 3.5), y: groundY + height, z: z + rng.range(-3.5, 3.5) };
-  const main = fractalPath(rng, top, { x, y: groundY + 0.05, z }, 7, 0.085);
-  // main channel: ~12px white core (at the default camera), bloom widening
-  // toward the ground where the discharge is strongest
-  lines.push({ pts: main, w: 0.12, i: 1.0, taper: -0.25 });
-  lines.push({ pts: main, w: 0.4, i: 0.38, taper: -0.5, halo: true });
-  lines.push({ pts: main, w: 1.3, i: 0.11, taper: -0.8, halo: true });
-  // forks and sub-forks peel off the main channel (mostly in its lower half)
-  const nf = rng.int(6, 9);
+  const top = { x: x + rng.range(-2.5, 2.5), y: groundY + height, z: z + rng.range(-2.5, 2.5) };
+  const main = fractalPath(rng, top, { x, y: groundY + 0.05, z }, 7, 0.07);
+  // main channel: a thick white-hot core that swells toward the ground (where
+  // the discharge is strongest) inside a tight cyan sheath and a wide, dim
+  // violet falloff
+  lines.push({ pts: main, w: 0.22, i: 1.15, taper: -0.55 });
+  lines.push({ pts: main, w: 0.66, i: 0.36, taper: -0.3, halo: true });
+  lines.push({ pts: main, w: 1.9, i: 0.1, taper: 0.1, halo: true });
+  // two or three big forks peel off the lower half and taper to a point,
+  // each with a sub-branch or two; a handful of hair-thin feelers higher up
+  const nf = rng.int(2, 4);
   for (let f = 0; f < nf; f++) {
-    const i = rng.int(Math.floor(main.length * 0.35), main.length - 6);
+    const i = rng.int(Math.floor(main.length * (0.45 + f * 0.1)), Math.floor(main.length * (0.62 + f * 0.1)));
     const p = main[i];
-    const len = rng.range(1.5, 6) * (0.6 + 0.4 * (1 - i / main.length));
-    const a = rng.range(0, Math.PI * 2);
-    const end = { x: p.x + Math.cos(a) * len, y: p.y - len * rng.range(0.6, 1.4), z: p.z + Math.sin(a) * len };
-    end.y = Math.max(end.y, heightAt(end.x, end.z) + 0.1);
-    const fork = fractalPath(rng, p, end, 4, 0.16);
-    channel(lines, fork, 0.065, 0.9, 0.85, 0.75, 6, 0.35);
-    if (rng.chance(0.65)) {
-      const j = rng.int(3, fork.length - 4), q = fork[j], l2 = len * 0.45, b2 = a + rng.range(-1.2, 1.2);
-      channel(lines, fractalPath(rng, q, { x: q.x + Math.cos(b2) * l2, y: Math.max(q.y - l2, heightAt(q.x, q.z) + 0.1), z: q.z + Math.sin(b2) * l2 }, 3, 0.18), 0.04, 0.7, 0.9, 0.8, 6, 0.35);
+    const len = rng.range(4, 7.5) * (0.5 + 0.5 * (1 - i / main.length) * 2);
+    const a = (f / nf) * Math.PI * 2 + rng.range(-0.8, 0.8);
+    const end = { x: p.x + Math.cos(a) * len, y: p.y - len * rng.range(0.7, 1.4), z: p.z + Math.sin(a) * len };
+    const gy = heightAt(end.x, end.z) + 0.05;
+    const grounded = end.y <= gy + 0.3;
+    end.y = Math.max(end.y, gy);
+    const fork = fractalPath(rng, p, end, 5, 0.13);
+    channel(lines, fork, 0.17, 0.95, grounded ? 0.55 : 0.97, grounded ? 0.2 : 0.7, 5, 0.3);
+    for (let k = 0; k < 2; k++) {
+      if (!rng.chance(0.7)) continue;
+      const j = rng.int(4, fork.length - 6), q = fork[j], l2 = len * rng.range(0.3, 0.5), b2 = a + rng.range(-1.2, 1.2);
+      channel(lines, fractalPath(rng, q, { x: q.x + Math.cos(b2) * l2, y: Math.max(q.y - l2, heightAt(q.x, q.z) + 0.1), z: q.z + Math.sin(b2) * l2 }, 3, 0.18), 0.05, 0.7, 0.97, 0.85, 5, 0.3);
     }
   }
+  for (let f = 0; f < 4; f++) {
+    const i = rng.int(3, Math.floor(main.length * 0.5)), p = main[i], len = rng.range(1.5, 3.5), a = rng.range(0, Math.PI * 2);
+    channel(lines, fractalPath(rng, p, { x: p.x + Math.cos(a) * len, y: p.y - len * 0.7, z: p.z + Math.sin(a) * len }, 3, 0.2), 0.04, 0.55, 0.95, 0.9, 5, 0.3);
+  }
   // ground arcs crawling out from the impact
-  const na = rng.int(6, 9);
+  const na = rng.int(5, 7);
   for (let k = 0; k < na; k++) {
     const a = (k / na) * Math.PI * 2 + rng.range(-0.4, 0.4);
-    const len = rng.range(1.6, 3.6);
+    const len = rng.range(1.4, 3.0);
     const pts = [];
     const n = 10;
     let ox = 0, oz = 0;
@@ -179,7 +188,7 @@ export function boltLines(seed, x, groundY, z, heightAt, height = 26) {
       const px = x + Math.cos(a) * len * t + ox * t, pz = z + Math.sin(a) * len * t + oz * t;
       pts.push({ x: px, y: heightAt(px, pz) + 0.1 + rng.range(0, 0.18), z: pz });
     }
-    channel(lines, pts, 0.055, 1.0, 0.8, 0.6, 6, 0.4);
+    channel(lines, pts, 0.06, 1.0, 0.9, 0.7, 5, 0.35);
   }
   return lines;
 }
@@ -344,20 +353,123 @@ const ringMat = (dash = 0) => new THREE.ShaderMaterial({
         gl_FragColor = vec4(uColor * (edge * 0.7 + exp(-b * b * 3.0) * 0.18 + dash) * uK, 1.0);
         return;
       }
-      // wandering centre line: slow large wobble + fast jagged jitter
-      float wob = (vn(ang * 3.0 + uTime * 0.7) - 0.5) * 0.9 + (vn(ang * 70.0 + ft * 5.3) - 0.5) * 0.3;
-      float bb = b - wob;
-      // stretches of the perimeter flare up and die out
-      float live = smoothstep(0.35, 0.75, vn(ang * 5.0 - uTime * 2.3 + 11.0));
-      float spark = step(0.93, h(floor(ang * 90.0) * 1.7 + ft));
-      float core = exp(-bb * bb * 60.0) * (0.25 + 0.9 * live) + exp(-bb * bb * 200.0) * spark * 1.4;
-      float glow = exp(-bb * bb * 9.0) * (0.02 + 0.07 * live);
-      float pulse = uFlash * (0.6 + 0.8 * live);
-      float a = (core * 0.55 * (0.55 + pulse * 1.4) + glow * (1.0 + pulse * 2.0)) * uK;
-      gl_FragColor = vec4(uColor * a, 1.0);
+      gl_FragColor = vec4(0.0);
     }`,
   transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, fog: false,
 });
+
+// Storm perimeter, laid on the terrain (depth-tested, so units stand in it).
+// vD = signed distance from the nominal radius in world units, vA = angle.
+// The edge is broken into ~40 drifting segments; each has its own thickness,
+// brightness and flicker, tapers to nothing at its ends and wanders off the
+// circle, so it reads as a crackling wall of static rather than a decal. A
+// soft glowing ground band spills inward, and the ends of live segments
+// flare where the arcs earth themselves.
+const PERIM_GLSL = `
+    float h1(float n){ return fract(sin(n * 12.9898) * 43758.5453); }
+    float vn1(float x){ float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(h1(i), h1(i + 1.0), f); }
+    // per-angle segment state: x = liveness (0..1), y = thickness, z = taper, w = segment id
+    vec4 seg(float ang, float t){
+      float sx = ang * 6.3662 + t * 0.35;
+      float si = floor(sx), sf = fract(sx);
+      float thick = mix(0.25, 1.0, h1(si * 1.37 + 3.1));
+      float bright = mix(0.35, 1.0, h1(si * 3.17 + 1.3));
+      float fl = h1(si * 2.13 + floor(t * (9.0 + 8.0 * h1(si * 5.1))));
+      float on = step(0.28, fl) * (0.55 + 0.45 * fl);
+      float len = mix(0.7, 1.0, h1(si * 7.7));
+      float tap = smoothstep(0.0, 0.12, sf) * smoothstep(len, len - 0.18, sf);
+      return vec4(on * bright, thick, tap, si);
+    }`;
+const perimMat = () => new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uK: { value: 0 }, uFlash: { value: 0 } },
+  vertexShader: `attribute float aD; attribute float aA; varying float vD; varying float vA;
+    void main(){ vD = aD; vA = aA; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform float uTime, uK, uFlash; varying float vD; varying float vA;
+    ${PERIM_GLSL}
+    void main(){
+      vec4 S = seg(vA, uTime);
+      float ft = floor(uTime * 24.0);
+      float wob = (vn1(vA * 9.5493 + uTime * 0.8) - 0.5) * 0.7 + (vn1(vA * 95.493 + ft * 3.7) - 0.5) * 0.18 * S.y;
+      float d = vD - wob;
+      float w = 0.05 + 0.13 * S.y;
+      float live = S.x * S.z;
+      float core = exp(-d * d / (w * w)) * live;
+      float sheath = exp(-d * d / (w * w * 16.0)) * live;
+      // ground band: glow spilling inward over the storm floor, plus a thin
+      // outer lip; broken up by slow noise and brightened by live segments
+      float n = vn1(vA * 14.3239 - uTime * 1.3) * 0.6 + 0.4;
+      float band = (vD < 0.0 ? exp(vD * 1.3) : exp(-vD * 4.0)) * n * (0.6 + 0.4 * vn1(vA * 6.3662 + uTime * 0.35 - 0.5));
+      // flares where a segment earths itself (its ends)
+      float sx = fract(vA * 6.3662 + uTime * 0.35);
+      float fl = exp(-pow((sx - 0.1) * 60.0, 2.0) - d * d * 60.0) * S.x;
+      float pulse = 1.0 + uFlash * 0.5;
+      vec3 col = vec3(0.8, 0.92, 1.1) * core * 0.75
+               + vec3(0.22, 0.5, 1.0) * sheath * 0.3
+               + vec3(0.14, 0.26, 0.8) * band * 0.5
+               + vec3(0.7, 0.85, 1.2) * fl * 0.4;
+      gl_FragColor = vec4(col * pulse * uK, 1.0);
+    }`,
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+  polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+});
+// A low curtain of rising static on the perimeter, lit where segments are live.
+const curtainMat = () => new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uK: { value: 0 }, uFlash: { value: 0 } },
+  vertexShader: `attribute float aH; attribute float aA; varying float vH; varying float vA;
+    void main(){ vH = aH; vA = aA; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform float uTime, uK, uFlash; varying float vH; varying float vA;
+    ${PERIM_GLSL}
+    void main(){
+      vec4 S = seg(vA, uTime);
+      float streak = vn1(vA * 159.155 + floor(vH * 3.0 - uTime * 4.0) * 17.0);
+      streak = pow(streak, 5.0);
+      float fall = pow(1.0 - vH, 2.2);
+      float a = (0.1 + streak * 0.9) * fall * S.x * S.z * (1.0 + uFlash);
+      gl_FragColor = vec4(vec3(0.3, 0.55, 1.1) * a * 0.22 * uK, 1.0);
+    }`,
+  transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false,
+});
+
+// Terrain-conforming annulus (local to the storm centre) with per-vertex signed
+// distance from the radius and angle.
+function perimGeometry(cx, cz, R, rIn, rOut, heightAt, rows = 7, seg = 256) {
+  const pos = [], aD = [], aA = [], idx = [];
+  for (let i = 0; i <= seg; i++) {
+    const a = (i / seg) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
+    for (let j = 0; j < rows; j++) {
+      const r = rIn + (rOut - rIn) * (j / (rows - 1));
+      const x = c * r, z = s * r;
+      pos.push(x, heightAt(cx + x, cz + z) + 0.07, z);
+      aD.push(r - R); aA.push(a);
+      if (i > 0 && j > 0) {
+        const p = (i - 1) * rows + j - 1, q = i * rows + j - 1;
+        idx.push(p, q, p + 1, p + 1, q, q + 1);
+      }
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aD', new THREE.Float32BufferAttribute(aD, 1));
+  g.setAttribute('aA', new THREE.Float32BufferAttribute(aA, 1));
+  g.setIndex(idx);
+  return g;
+}
+function curtainGeometry(cx, cz, R, H, heightAt, seg = 256) {
+  const pos = [], aH = [], aA = [], idx = [];
+  for (let i = 0; i <= seg; i++) {
+    const a = (i / seg) * Math.PI * 2, x = Math.cos(a) * R, z = Math.sin(a) * R;
+    const y = heightAt(cx + x, cz + z);
+    pos.push(x, y, z, x, y + H, z);
+    aH.push(0, 1); aA.push(a, a);
+    if (i > 0) { const p = (i - 1) * 2, q = i * 2; idx.push(p, q, p + 1, p + 1, q, q + 1); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aH', new THREE.Float32BufferAttribute(aH, 1));
+  g.setAttribute('aA', new THREE.Float32BufferAttribute(aA, 1));
+  g.setIndex(idx);
+  return g;
+}
 
 // Full-frame storm grade, drawn after the opaque world and before the
 // additive effects with multiplicative blending (dst * src). Each pixel's
@@ -387,24 +499,31 @@ const stormGradeMat = (add = false) => new THREE.ShaderMaterial({
       vec3 d = b.xyz - a.xyz;
       vec2 g = d.y < -1e-4 ? a.xz + d.xz * ((uPlaneY - a.y) / d.y) : a.xz + normalize(d.xz + 1e-5) * 300.0;
       float r = length(g - uCenter) / uR;
-      float inside = 1.0 - smoothstep(0.75, 2.4, r);
-      vec2 q = g * 0.055 + vec2(uTime * 0.09, uTime * 0.035);
+      float inside = 1.0 - smoothstep(0.8, 1.15, r);
+      float near = 1.0 - smoothstep(1.0, 3.2, r);
+      // drifting cloud shadows (two octaves), strongest over the storm
+      vec2 q = g * 0.06 + vec2(uTime * 0.12, uTime * 0.05);
       float n = vn(q) * 0.6 + vn(q * 2.7 + 7.1) * 0.4;
-      vec3 far = vec3(0.2, 0.235, 0.34);
-      vec3 near = vec3(0.125, 0.155, 0.25);
-      vec3 m = mix(far, near, inside) * (0.78 + 0.4 * n);
-      m += vec3(0.07, 0.09, 0.15) * uFlash * (0.35 + 0.65 * inside);
+      float shade = smoothstep(0.3, 0.75, n);
+      // multiplier: blue-grey storm light under the cloud deck, lighter beyond
+      vec3 inC = vec3(0.3, 0.34, 0.5) * (0.6 + 0.6 * shade);
+      vec3 midC = vec3(0.44, 0.47, 0.62) * (0.75 + 0.4 * shade);
+      vec3 m = mix(vec3(0.58, 0.61, 0.74), midC, near);
+      m = mix(m, inC, inside);
+      m += vec3(0.05, 0.07, 0.13) * uFlash * (0.3 + 0.7 * inside);
       m = mix(vec3(1.0), m, uK);
       float pool = 0.0;
       for (int i = 0; i < ${MAX_POOLS}; i++) {
         vec4 P = uPools[i];
         if (P.z <= 0.0) continue;
         float dd = length(g - P.xy) / P.w;
-        pool += P.z * (exp(-dd * dd * 3.0) * 1.3 + exp(-dd * dd * 0.45) * 0.4);
+        pool += P.z * (exp(-dd * dd * 3.5) * 0.9 + exp(-dd * dd * 0.6) * 0.22);
       }
       #ifdef ADD_POOL
-        // additive part of the strike light: cool blue light on dark ground
-        gl_FragColor = vec4(vec3(0.16, 0.3, 0.75) * pool * 0.22, 1.0);
+        // additive part: blue-grey rain haze over the storm floor (lifts and
+        // desaturates the darkened ground) + cool strike light on dark ground
+        vec3 fog = vec3(0.028, 0.034, 0.05) * (inside * 0.8 + near * 0.35 + 0.25) * (0.7 + 0.6 * (1.0 - shade)) * uK;
+        gl_FragColor = vec4(fog + vec3(0.16, 0.3, 0.75) * pool * 0.12, 1.0);
       #else
         m += uPoolCol * pool;
         gl_FragColor = vec4(m, 1.0);
@@ -429,11 +548,15 @@ function bandRingGeometry(r0, r1, seg = 128) {
   return g;
 }
 
-function rainGeometry(seed, R, n = 700) {
+// Rain: sparse over the storm floor (so the strike stays clean), denser in a
+// curtain round the perimeter and beyond it.
+function rainGeometry(seed, R, n = 420) {
   const rng = new RNG(seed);
   const pos = [], aEnd = [], aSeed = [];
   for (let i = 0; i < n; i++) {
-    const a = rng.range(0, Math.PI * 2), r = Math.sqrt(rng.next()) * R, s = rng.next();
+    const inner = i < n * 0.15;
+    const a = rng.range(0, Math.PI * 2), s = rng.next();
+    const r = inner ? Math.sqrt(rng.next()) * R * 0.8 : R * (0.8 + Math.sqrt(rng.next()) * 0.75);
     const x = Math.cos(a) * r, z = Math.sin(a) * r;
     pos.push(x, 0, z, x, 0, z);
     aEnd.push(0, 1);
@@ -457,7 +580,7 @@ const rainMat = () => new THREE.ShaderMaterial({
       gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
     }`,
   fragmentShader: `uniform float uK; uniform float uFlash; varying float vA;
-    void main(){ gl_FragColor = vec4(vec3(0.55, 0.65, 0.85) * (0.22 + uFlash * 0.5) * vA * uK, 1.0); }`,
+    void main(){ gl_FragColor = vec4(vec3(0.5, 0.6, 0.8) * (0.1 + uFlash * 0.22) * vA * uK, 1.0); }`,
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
 });
 
@@ -484,14 +607,14 @@ export class BoltRenderer {
     }
     // One shadow-casting spot hangs low over the freshest strike, pointing
     // down: units and walls round the impact throw hard shadows outward.
-    this.spot = new THREE.SpotLight(0xcfe0ff, 0, 16, 1.3, 0.45, 2);
+    this.spot = new THREE.SpotLight(0xcfe0ff, 0, 18, 1.4, 0.55, 2);
     this.spot.castShadow = true;
     this.spot.shadow.mapSize.set(1024, 1024);
     this.spot.shadow.bias = -0.0006;
     this.spot.shadow.normalBias = 0.03;
     this.spot.shadow.radius = 1;
     this.spot.shadow.camera.near = 0.3;
-    this.spot.shadow.camera.far = 16;
+    this.spot.shadow.camera.far = 18;
     this.spot.visible = false;
     this.group.add(this.spot, this.spot.target);
     // full-frame storm grade + strike light pools
@@ -630,20 +753,25 @@ export class BoltRenderer {
         flash = Math.max(flash, env);
         // impact: small white-hot flash + a wider, dim blue corona (capped so
         // the struck units stay readable through it)
-        v.hot.material.uniforms.uO.value = Math.min(0.85, env * 0.7);
-        v.hot.scale.setScalar(1.3 + 0.8 * (1 - k));
-        v.glow.material.uniforms.uO.value = Math.min(0.16, env * 0.14);
-        v.glow.scale.setScalar(5 + 2.5 * (1 - k));
+        // impact: a tight, brief white-hot pinpoint and a dim blue corona
+        // (clamped so the struck units stay readable; the light itself is
+        // carried by the real lights below, which shade and shadow them)
+        const pin = age < 0.08 ? 1 : Math.max(0, 1 - (age - 0.08) / 0.25);
+        v.hot.material.uniforms.uO.value = Math.min(0.55, env * 0.45) * pin;
+        v.hot.scale.setScalar(0.9 + 0.5 * pin);
+        v.glow.material.uniforms.uO.value = Math.min(0.09, env * 0.08);
+        v.glow.scale.setScalar(3.6 + 1.5 * (1 - k));
         const sk = Math.min(1, age / 0.42);
         v.shock.scale.setScalar(0.5 + Math.sqrt(sk) * 4.6);
         v.shock.material.uniforms.uA.value = Math.pow(1 - sk, 1.6) * 1.5;
-        pools.push({ x: b.x, z: b.z, i: Math.min(0.9, env * 0.75), r: 3.2 + 0.8 * (1 - k) });
+        pools.push({ x: b.x, z: b.z, i: Math.min(0.6, env * 0.5), r: 3.4 + 0.8 * (1 - k) });
         if (!spotB || env > spotEnv) { spotB = b; spotEnv = env; }
         if (li < this.lights.length) {
           const l = this.lights[li++];
           l.color.setHex(0xa8c4ff);
-          l.position.set(b.x, b.y + 2.2, b.z);
-          l.intensity = 16 * env;
+          l.position.set(b.x, b.y + 4.5, b.z);
+          l.distance = 22;
+          l.intensity = 60 * env;
         }
       } else flash = Math.max(flash, env * 0.5);
     }
@@ -656,10 +784,12 @@ export class BoltRenderer {
     // hard-shadow spot over the brightest strike
     if (spotB) {
       this.spot.visible = true;
-      this.spot.position.set(spotB.x + 0.15, spotB.y + 3.4, spotB.z + 0.1);
+      // hung low over the impact so the units round it throw hard shadows
+      // radially outward across the lit ground
+      this.spot.position.set(spotB.x + 0.1, spotB.y + 2.6, spotB.z + 0.1);
       this.spot.target.position.set(spotB.x, spotB.y, spotB.z);
       this.spot.target.updateMatrixWorld();
-      this.spot.intensity = 45 * Math.min(1.3, spotEnv);
+      this.spot.intensity = 34 * Math.min(1.3, spotEnv);
     } else {
       this.spot.visible = false;
       this.spot.intensity = 0;
@@ -755,6 +885,17 @@ export class BoltRenderer {
         }
       }
     }
+    // burning meteor craters: a flickering warm light under the flames
+    for (const f of state.fires || []) {
+      if (li >= this.lights.length) break;
+      const age = now - f.t0, fk = Math.max(0, 1 - age / f.dur);
+      const fl = Math.floor(now * 14);
+      const l = this.lights[li++];
+      l.color.setHex(0xff7a2a);
+      l.position.set(f.x + (hash2(fl, 1) - 0.5) * 0.6, f.y + 2.4, f.z + (hash2(fl, 2) - 0.5) * 0.6);
+      l.distance = 16;
+      l.intensity = 38 * fk * (0.8 + 0.4 * hash2(fl, 3));
+    }
     for (; li < this.lights.length; li++) this.lights[li].intensity = 0;
 
     // ---- zaps on struck units
@@ -795,10 +936,11 @@ export class BoltRenderer {
       const k = Math.min(1, age / 1.0) * Math.min(1, Math.max(0, (st.t0 + st.duration - now) / 1.5));
       const fl = Math.min(1.5, flash);
       if (k >= gradeK) { gradeK = k; gst = st; }
-      v.ring.position.set(st.x, y + 0.15, st.z);
-      v.ring.material.uniforms.uK.value = k * 0.75;
-      v.ring.material.uniforms.uTime.value = now;
-      v.ring.material.uniforms.uFlash.value = fl;
+      for (const m of [v.ring, v.curtain]) {
+        m.material.uniforms.uK.value = k;
+        m.material.uniforms.uTime.value = now;
+        m.material.uniforms.uFlash.value = fl;
+      }
       v.rain.position.set(st.x, y, st.z);
       v.rain.material.uniforms.uK.value = k;
       v.rain.material.uniforms.uTime.value = now;
@@ -806,16 +948,27 @@ export class BoltRenderer {
     }
     for (const [st, v] of this.stormVisuals) {
       if (aliveStorms.has(st)) continue;
-      this.group.remove(v.ring, v.rain);
+      this.group.remove(v.ring, v.rain, v.curtain);
       v.ring.geometry.dispose(); v.ring.material.dispose();
+      v.curtain.geometry.dispose(); v.curtain.material.dispose();
       v.rain.geometry.dispose(); v.rain.material.dispose();
       this.stormVisuals.delete(st);
+    }
+
+    // ---- storm light: the cloud deck dims the sun and sky light (the grade
+    // below shapes it locally), so the strike lights really carry the scene;
+    // health bars are hidden while the storm plays so the strike reads clean
+    this.stormLight(gradeK);
+    const bars = game.combat?.overlays?.bars;
+    if (bars) {
+      if (gradeK > 0) { bars.visible = false; this._barsHidden = true; }
+      else if (this._barsHidden) { bars.visible = true; this._barsHidden = false; }
     }
 
     // ---- storm grade + light pools (one full-frame pass)
     const U = this.grade.material.uniforms;
     this.grade.visible = gradeK > 0 || pools.length > 0;
-    this.poolAdd.visible = pools.length > 0;
+    this.poolAdd.visible = this.grade.visible;
     if (this.grade.visible) {
       const cam = game.camera;
       cam.updateMatrixWorld();
@@ -833,6 +986,17 @@ export class BoltRenderer {
     }
   }
 
+  stormLight(k) {
+    const L = this.game.lighting;
+    if (!L) return;
+    for (const [light, dim] of [[L.sun, 0.78], [L.hemi, 0.45], [L.fill, 0.2]]) {
+      if (!light) continue;
+      const st = light.userData.gp || (light.userData.gp = { base: light.intensity, set: light.intensity });
+      if (light.intensity !== st.set) st.base = light.intensity; // someone else changed it
+      st.set = light.intensity = st.base * (1 - dim * k);
+    }
+  }
+
   renderSparks(list, now) {
     const g = this.sparkMesh.geometry;
     const P = g.attributes.position.array, T = g.attributes.aTan.array, I = g.attributes.aI.array;
@@ -847,7 +1011,7 @@ export class BoltRenderer {
       P[o] = P[o + 3] = p.x; P[o + 1] = P[o + 4] = p.y; P[o + 2] = P[o + 5] = p.z;
       P[o + 6] = P[o + 9] = p.x - tx; P[o + 7] = P[o + 10] = p.y - ty; P[o + 8] = P[o + 11] = p.z - tz;
       for (let j = 0; j < 4; j++) { T[o + j * 3] = tx; T[o + j * 3 + 1] = ty + 1e-4; T[o + j * 3 + 2] = tz; }
-      const a = Math.pow(1 - k, 1.5) * 1.3;
+      const a = Math.pow(1 - k, 1.5) * 1.3 * (p.dim ?? 1);
       I[n * 4] = I[n * 4 + 1] = a; I[n * 4 + 2] = I[n * 4 + 3] = a * 0.25;
       n++;
     }
@@ -889,9 +1053,13 @@ export class BoltRenderer {
 
   makeStorm(st) {
     const R = st.radius;
-    const ring = this.addMesh(new THREE.Mesh(bandRingGeometry(R - 0.9, R + 0.9, 192), ringMat(0)), 44);
-    const rain = this.addMesh(new THREE.LineSegments(rainGeometry(st.t0 * 1000 | 0, R * 1.25), rainMat()), 46);
-    const v = { ring, rain };
+    const heightAt = (x, z) => this.game.map.heightAt(x, z);
+    const ring = this.addMesh(new THREE.Mesh(perimGeometry(st.x, st.z, R, R - 3.2, R + 0.9, heightAt), perimMat()), 44);
+    ring.position.set(st.x, 0, st.z);
+    const curtain = this.addMesh(new THREE.Mesh(curtainGeometry(st.x, st.z, R, 2.6, heightAt), curtainMat()), 45);
+    curtain.position.set(st.x, 0, st.z);
+    const rain = this.addMesh(new THREE.LineSegments(rainGeometry(st.t0 * 1000 | 0, R), rainMat()), 46);
+    const v = { ring, rain, curtain };
     this.stormVisuals.set(st, v);
     return v;
   }

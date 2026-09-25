@@ -85,6 +85,8 @@ export class GodPowers {
   zap(o) {
     const game = this.game;
     const h = game.units?.heightOf ? game.units.heightOf(o) : 1.2;
+    // rim flash on the struck unit itself (units' hit-flash emissive)
+    o.flashT = Math.max(o.flashT || 0, 0.16);
     this.zaps.push({ u: o, x: o.x, y: game.map.heightAt(o.x, o.z), z: o.z, h: (h || 1.8) * 0.8, t0: game.time, life: 0.7, seed: (game.tickCount * 131 + o.id * 17) >>> 0 });
   }
 
@@ -131,11 +133,11 @@ export class GodPowers {
   }
 
   // White-hot sparks flung out of the impact (drawn as velocity streaks).
-  throwSparks(x, y, z, n, seed) {
+  throwSparks(x, y, z, n, seed, power = 1, dim = 1) {
     const vr = new RNG(seed ^ 0x5bd1e995), now = this.game.time;
     for (let i = 0; i < n; i++) {
-      const a = vr.range(0, Math.PI * 2), sp = vr.range(4, 11);
-      this.sparks.push({ x, y: y + 0.25, z, vx: Math.cos(a) * sp, vy: vr.range(3, 10), vz: Math.sin(a) * sp, t0: now, life: vr.range(0.35, 0.8) });
+      const a = vr.range(0, Math.PI * 2), sp = vr.range(4, 11) * power;
+      this.sparks.push({ x, y: y + 0.25, z, vx: Math.cos(a) * sp, vy: vr.range(3, 10) * power, vz: Math.sin(a) * sp, t0: now, life: vr.range(0.35, 0.8) * (0.6 + 0.4 * power), dim });
     }
     if (this.sparks.length > 240) this.sparks.splice(0, this.sparks.length - 240);
   }
@@ -229,7 +231,11 @@ export class GodPowers {
       // static crawling along the storm perimeter
       for (let k = 0; k < 2; k++) {
         if (!vr.chance(0.55)) continue;
-        this.bolts.push({ kind: 'rim', x: s.x, z: s.z, r: s.radius, a0: vr.range(0, Math.PI * 2), span: vr.range(0.18, 0.5) * (vr.chance(0.5) ? 1 : -1), t0: game.time, life: vr.range(0.12, 0.3), seed: (vr.next() * 1e9) >>> 0 });
+        const a0 = vr.range(0, Math.PI * 2), span = vr.range(0.18, 0.5) * (vr.chance(0.5) ? 1 : -1);
+        this.bolts.push({ kind: 'rim', x: s.x, z: s.z, r: s.radius, a0, span, t0: game.time, life: vr.range(0.12, 0.3), seed: (vr.next() * 1e9) >>> 0 });
+        // sparks spit where the arc earths itself on the perimeter
+        const ea = a0 + span * vr.range(0.2, 0.8), ex = s.x + Math.cos(ea) * s.radius, ez = s.z + Math.sin(ea) * s.radius;
+        this.throwSparks(ex, game.map.heightAt(ex, ez) - 0.15, ez, 3, (vr.next() * 1e9) >>> 0, 0.35, 0.3);
       }
       // cosmetic cloud-to-cloud lightning
       s.sky -= dt;
@@ -253,10 +259,15 @@ export class GodPowers {
       const age = game.time - f.t0;
       if (age > f.dur) { f.done = true; continue; }
       const k = 1 - age / f.dur;
-      const a = vr.range(0, Math.PI * 2), r = Math.sqrt(vr.next()) * f.r;
-      const fx = f.x + Math.cos(a) * r, fz = f.z + Math.sin(a) * r, fy = game.map.heightAt(fx, fz);
-      game.fx.emit({ x: fx, y: fy + 0.3, z: fz, count: Math.ceil(3 * k), color: 0xff7a20, size: 0.7, life: 0.7, speed: 0.3, up: 2.2, gravity: 2, additive: true, grow: -0.6, spread: 0.3 });
-      if (vr.chance(0.3 * k)) game.fx.emit({ x: fx, y: fy + 1, z: fz, count: 1, color: 0x2e2a28, size: 1.1, life: 2.2, speed: 0.3, up: 1.6, gravity: 0.5, grow: 2 });
+      // tongues of flame licking up out of the crater and the wreck, a hot
+      // yellow heart, and a thick column of black smoke
+      for (let j = 0; j < 4; j++) {
+        const a = vr.range(0, Math.PI * 2), r = Math.sqrt(vr.next()) * f.r;
+        const fx = f.x + Math.cos(a) * r, fz = f.z + Math.sin(a) * r, fy = game.map.heightAt(fx, fz);
+        game.fx.emit({ x: fx, y: fy + 0.3 + vr.range(0, 2.2) * (1 - r / f.r), z: fz, count: Math.ceil(4 * k), color: j & 1 ? 0xff7a20 : 0xff5a10, size: 1.1, life: 0.85, speed: 0.35, up: 3.4, gravity: 2.2, additive: true, grow: -0.55, spread: 0.45 });
+      }
+      game.fx.emit({ x: f.x + vr.range(-1, 1), y: f.y + 0.4, z: f.z + vr.range(-1, 1), count: Math.ceil(2 * k), color: 0xffc050, size: 0.8, life: 0.6, speed: 0.3, up: 3.8, gravity: 2, additive: true, grow: -0.6, spread: 0.6 });
+      if (vr.chance(0.7 * k)) game.fx.emit({ x: f.x + vr.range(-1.5, 1.5), y: f.y + 2.2, z: f.z + vr.range(-1.5, 1.5), count: 1, color: vr.chance(0.5) ? 0x1e1b1a : 0x2e2a28, size: 1.6, life: 3.2, speed: 0.3, up: 2.4, gravity: 0.5, grow: 2.4 });
     }
     // lightning craters smoke: a dark column that thins out over a few seconds
     for (const s of this.scorches) {

@@ -64,6 +64,7 @@ registerScene('godpower', {
     const blue = spawnBlock(game, 'hoplite', PLAYER, 9, cx + 10, cz + 10, { cols: 3, spacing: 1.0, rot: Math.PI + Math.PI / 4 });
     for (const u of red) game.commands.order(u, { type: 'move', x: u.x + 3, z: u.z + 3 });
     game.players[PLAYER].res.favor = 100;
+    game.godpowers.cast(PLAYER, 'meteor', cx - 9, cz - 3);
     game.fastForward(0.5);
     game.godpowers.cast(PLAYER, 'lightning_storm', cx, cz);
     game.fastForward(2.4);
