@@ -100,7 +100,8 @@ export class Combat {
     if (target.kind === 'building') dmg *= attacker?.def?.class === 'myth' ? 1.2 : 0.35;
     dmg *= 1 - (target.def?.armor ?? 0);
     target.hp -= dmg;
-    target.flashT = target.def?.myth || target.kind === 'building' ? 0.04 : 0.06;
+    // a white hit flash long enough to read at RTS distance (units piece fades it)
+    target.flashT = target.kind === 'building' ? 0.04 : target.def?.myth ? 0.14 : kind === 'arrow' || attacker?.def?.attack?.projectile ? 0.12 : 0.22;
     target.combat_hitT = game.time;
     // melee blows shove the man struck back a step and make him reel; a
     // minotaur's blow sends him sprawling further

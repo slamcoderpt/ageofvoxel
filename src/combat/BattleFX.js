@@ -305,26 +305,31 @@ export class BattleFX {
     const y = gy + h * (0.45 + 0.3 * this.rng.next());
     const r = this.rng;
     if (kind === 'melee') {
-      // Readability over noise: a landed blow is ONE warm, fat flash at the
-      // point of contact (it catches the bloom and reads from RTS height),
-      // with a few heavy embers. Glancing blows (most of them) show nothing
-      // but a scuff of dirt, so the seam shows a handful of clear hits, not a
-      // carpet of white specks.
+      // Every blow reads from RTS height: the man struck flashes white (units
+      // piece, flashT), a burst of voxel chips (bronze off the shield rim,
+      // splinters of the shaft, a fleck of his dyed kit) flies off the point
+      // of contact, dust kicks up round the feet, and most blows add a hot
+      // spark that catches the bloom.
       const big = attacker?.def?.myth || attacker?.def?.hero || target.def?.myth || target.def?.hero;
-      const landed = big || r.next() < 0.45;
+      const landed = big || r.next() < 0.7;
       if (landed) {
-        const s = big ? 2.6 : 1.7;
-        this.spark(px, y, pz, { count: 1, color: 0xffa040, bright: big ? 2.0 : 1.5, size: s * r.range(0.9, 1.1), life: big ? 0.6 : 0.45, speed: 0, up: 0, gravity: 0 });
-        this.spark(px, y, pz, { count: big ? 5 : r.int(2, 3), color: r.chance(0.5) ? 0xff7a18 : 0xffa838, bright: 1.9, size: big ? 0.7 : 0.55, life: 0.55, speed: r.range(2.5, 4), up: 2.2 });
-        if (r.chance(0.35)) {
-          // a wound: a short dark spray and blood on the ground
-          game.fx.emit({ x: px, y: y - 0.1, z: pz, count: r.int(4, 6), color: 0x6a0c08, colorVar: 0.2, size: 0.17, life: 0.55, speed: 2.0, up: 2.0, gravity: -12, spread: 0.1 });
-          this.scar(x + r.range(-0.3, 0.3), z + r.range(-0.3, 0.3), 0.35, 0.1, 0.5);
-        }
+        const s = big ? 2.4 : 1.35;
+        this.spark(px, y, pz, { count: 1, color: 0xffb050, bright: big ? 2.0 : 1.6, size: s * r.range(0.9, 1.1), life: big ? 0.6 : 0.5, speed: 0, up: 0, gravity: 0 });
+        this.spark(px, y, pz, { count: big ? 6 : r.int(3, 4), color: r.chance(0.5) ? 0xff8a20 : 0xffc048, bright: 2.0, size: big ? 0.7 : 0.5, life: 0.6, speed: r.range(3, 4.5), up: 2.6 });
       }
-      // feet scrabbling: a low puff of dark earth at the feet, a clod or two
-      if (r.chance(0.5)) this.puff(px + r.range(-0.3, 0.3), pz + r.range(-0.3, 0.3), { count: 1, size: r.range(0.9, 1.3), life: 1.6, alpha: 0.3, speed: 0.5, up: 0.04, y: 0.05, spread: 0.3, color: OCHRE[r.int(0, OCHRE.length - 1)] });
-      if (r.chance(0.4)) game.fx.emit({ x: px, y: gy + 0.15, z: pz, count: r.int(2, 4), color: 0x4e3620, colorVar: 0.2, size: 0.16, life: 0.5, speed: 2.0, up: 2.6, gravity: -13, spread: 0.25 });
+      // voxel chips: chunky solid cubes that tumble out and drop
+      const team = game.players?.[target.owner]?.color ?? 0x888888;
+      game.fx.emit({ x: px, y, z: pz, count: big ? 7 : 4, color: 0xc08a3e, colorVar: 0.25, size: 0.13, life: 0.75, speed: 2.8, up: 3.2, gravity: -16, spread: 0.12 });
+      game.fx.emit({ x: px, y: y - 0.1, z: pz, count: 2, color: team, colorVar: 0.15, size: 0.12, life: 0.75, speed: 2.4, up: 2.8, gravity: -16, spread: 0.1 });
+      game.fx.emit({ x: px, y, z: pz, count: 2, color: 0x7a5534, colorVar: 0.2, size: 0.1, life: 0.7, speed: 2.2, up: 3.0, gravity: -16, spread: 0.1 });
+      if (r.chance(0.4)) {
+        // a wound: a short dark spray and blood on the ground
+        game.fx.emit({ x: px, y: y - 0.1, z: pz, count: r.int(4, 6), color: 0x7a0e08, colorVar: 0.2, size: 0.15, life: 0.55, speed: 2.0, up: 2.0, gravity: -12, spread: 0.1 });
+        this.scar(x + r.range(-0.3, 0.3), z + r.range(-0.3, 0.3), 0.35, 0.1, 0.5);
+      }
+      // feet scrabbling: a puff of dust at the feet and a clod or two of earth
+      this.puff(px + r.range(-0.3, 0.3), pz + r.range(-0.3, 0.3), { count: big ? 3 : 1, size: r.range(1.0, 1.4) * (big ? 1.4 : 1), life: 1.7, alpha: 0.34, speed: 0.6, up: 0.08, y: 0.1, spread: 0.3, color: OCHRE[r.int(0, OCHRE.length - 1)] });
+      game.fx.emit({ x: px, y: gy + 0.15, z: pz, count: r.int(2, 4), color: 0x4e3620, colorVar: 0.2, size: 0.15, life: 0.55, speed: 2.0, up: 2.8, gravity: -14, spread: 0.25 });
       this.scar(px, pz, 0.5, 0.3, 0.0);
     } else if (kind === 'arrow') {
       if (r.chance(0.5)) game.fx.emit({ x, y, z, count: 3, color: 0x7a0c08, size: 0.08, life: 0.4, speed: 1.2, up: 1.2, gravity: -12, spread: 0.05 });

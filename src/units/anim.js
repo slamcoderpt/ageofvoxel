@@ -24,8 +24,12 @@ const recoilOf = (u) => smooth((u.flashT || 0) / 0.15);
 // Archer upper body (toxotes, centaur, medusa): torso, head, arms, bow, arrow.
 function archerUpper(u, st, t, set, v) {
   if (st === 'attack') {
-    const { a } = attackPhase(u);
-    const draw = a < 0.45 ? 0 : smooth((a - 0.45) / 0.6);
+    const { a, cd } = attackPhase(u);
+    // the draw spans the whole reload (not a quick pull then a long frozen
+    // hold), so a volley line shows every stage at once: follow-through,
+    // nocking, half drawn, full draw
+    const span = Math.max(0.35, cd * (0.75 + uhash(u, 57) * 0.25) - 0.45);
+    const draw = a < 0.45 ? 0 : smooth((a - 0.45) / span);
     const high = v === 1 ? -0.25 : 0;                 // some loft their shots
     set('torso', 0.02 + high * 0.3, 0.55, 0);
     set('head', high * 0.4, -0.45);
@@ -261,7 +265,7 @@ export function pose(kind, u, out) {
       set('armL', -0.15, 0.1, 0.12); set('torso', 0.06, 0.2 + S(t * 0.37) * 0.1, -0.04);
       set('legL', -0.15, 0, 0.1); set('legR', 0.12, 0, -0.02);
     } else if (hoplite) { set('armL', -0.45, 0.2, 0.32); set('armR', -0.3, 0, -0.3); set('weapon', 0.2, 0, 0.18); }
-    if (hoplite && u.order?.type === 'attack' && !hero) {
+    if (hoplite && (u.order?.type === 'attack' || u.combat_line) && !hero) {
       // waiting behind the fighting rank: each man picks a guard for a few
       // seconds at a time (own clock), so the rear of a melee is a mix of
       // raised shields, levelled spears and men stepping back, not a
@@ -269,7 +273,25 @@ export function pose(kind, u, out) {
       const rv = Math.floor(uhash(u, 60 + Math.floor(t / 2.7 + uhash(u, 61) * 5)) * 3);
       const sw = S(t * 2.3) * 0.05;
       bob = 0;
-      if (rv === 0) {
+      // A wall holding its ground (on a battle line, not fighting): shields
+      // up in front, spears mostly carried upright, so the wall reads as a
+      // row of shields under a spear forest instead of a thicket of shafts
+      // across the open ground in front of it.
+      const holding = u.combat_line && u.order?.type !== 'attack';
+      const hv = holding ? Math.floor(uhash(u, 66 + Math.floor(t / 3.1 + uhash(u, 67) * 5)) * 4) : -1;
+      if (hv === 0 || hv === 1) {
+        // shield up, spear upright at the shoulder, weight on the lead foot
+        set('armL', -1.2 + sw, 0.45, 0.2); set('armR', -0.55, 0, -0.28); set('weapon', 0.7 - hv * 0.25, 0, 0.12);
+        set('torso', 0.12 + hv * 0.1, -0.15); set('head', -0.05, (uhash(u, 68) - 0.5) * 0.6);
+        set('legL', -0.4); set('shinL', 0.3); set('legR', 0.3); set('shinR', 0.3);
+        bob = -0.8 - hv * 0.6;
+      } else if (hv === 2) {
+        // braced low behind the shield, spear butt grounded and slanted forward
+        set('armL', -1.35 + sw, 0.5, 0.25); set('armR', -0.75, 0.1, -0.3); set('weapon', 1.15, 0, 0.1);
+        set('torso', 0.32, -0.2); set('head', -0.2);
+        set('legL', -0.8); set('shinL', 0.8); set('legR', 0.55); set('shinR', 0.7);
+        bob = -2.2;
+      } else if (rv === 0) {
         // shield up high against arrows, spear cocked overhand
         set('armL', -1.75 + sw, 0.45, 0.35); set('armR', -2.35, 0.15, -0.3); set('weapon', 1.57 + 0.2 + 2.35);
         set('torso', 0.2, -0.25); set('head', -0.15);

@@ -406,9 +406,9 @@ export class Units {
         this._c.setHex(pc);
         // the dead lose their colour: team dye fades to grey-brown, the body darkens
         const dk = u.dead ? Math.min(1, u.anim.dieT / 0.8) * 0.5 : 0;
-        if (dk) this._c.lerp(DEAD_TEAM, dk * 2);
+        if (dk) this._c.lerp(DEAD_TEAM, dk * 0.9); // the dead keep a dusty trace of their army's dye
         const tr = this._c.r, tg = this._c.g, tb = this._c.b;
-        const flash = Math.min(1, u.flashT * 4) * 0.8;
+        const flash = u.dead ? 0 : Math.min(1, u.flashT / 0.1) * 0.14;
         const fade = u.dead ? 1 - Math.min(1, Math.max(0, (u.anim.dieT - FADE_START) / (CORPSE_TIME - 0.3 - FADE_START))) : 1;
         for (let pi = 0; pi < rig.parts.length; pi++) {
           const p = rig.parts[pi];
@@ -425,7 +425,7 @@ export class Units {
           p.mesh.userData.flash.setX(i, flash);
           p.mesh.userData.fade.setX(i, fade);
           if (p.coat) p.mesh.setColorAt(i, this._c.setRGB(coat[0] * (1 - dk), coat[1] * (1 - dk), coat[2] * (1 - dk)));
-          else p.mesh.setColorAt(i, this._c.setRGB(1 - dk, 1 - dk * 1.04, 1 - dk * 1.08));
+          else p.mesh.setColorAt(i, this._c.setRGB(1 - dk * 0.6, 1 - dk * 0.64, 1 - dk * 0.68));
         }
       }
       for (const p of rig.parts) {

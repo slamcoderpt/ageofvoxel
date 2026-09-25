@@ -10,8 +10,12 @@ import { fieldHeroesAndMyth, engageHeroesAndMyth } from '../units/battleHost.js'
 // sweeping round the flank to ride down the enemy archers.
 
 const S = Math.SQRT1_2;
-// half the gap between the two front ranks (centre to centre), in tiles
-const SEAM = 1.6;
+// half the gap between the two shield walls (centre to centre), in tiles:
+// the walls hold well back and leave a strip of churned no-man's-land
+const SEAM = 2.7;
+// Single combats fought out in the open strip, staggered along the front:
+// [a along the front, depth shift of the pair towards blue (+) or red (-)].
+const DUELS = [[-8.3, 0.35], [-5.8, -0.3], [-3.5, 0.15], [3.6, -0.35], [6.0, 0.3], [8.5, -0.1]];
 // a: along the front (screen right is +a); d: depth (towards the camera is +d)
 const P = (cx, cz, a, d) => [cx + (a + d) * S, cz + (d - a) * S];
 
@@ -21,8 +25,6 @@ function place(game, type, owner, x, z, rot) {
   return game.units.spawn(type, owner, x, z, { rot });
 }
 
-// Lateral coordinate along the battle front (see P).
-const lat = (u, cx, cz) => ((u.x - cx) - (u.z - cz)) * S;
 
 function army(game, owner, side, cx, cz) {
   const rng = game.rng;
@@ -50,32 +52,42 @@ function army(game, owner, side, cx, cz) {
       // an open ring at the centre of the line where the two heroes duel:
       // the one place in the frame the eye goes first
       if (Math.abs(a) < [2.6, 1.9, 1.0][r]) continue;
+      // the man who stepped out of the wall to fight leaves his slot open
+      if (r === 0 && DUELS.some(([da]) => Math.abs(da * side - a) < 0.75)) continue;
       if (r < 2 && rng.chance(r === 0 ? 0.08 : 0.05)) { units.gaps.push([a, 1.3 + r * 1.45]); continue; }
       const loose = r === 0 ? 1 : r === 1 ? 0.5 : 0;
-      const d = 1.3 + r * 1.45 + loose * (rng.chance(0.2) ? rng.range(0.3, 0.6) : rng.range(-0.15, 0.2)) + J() * 0.4;
-      const u = at('hoplite', a + loose * rng.range(-0.25, 0.25), Math.max(SEAM + 0.05, d + 0.15));
-      u.combat_leash = r === 0 ? 3.4 : 1.6;
-      u.combat_reach = 1.55;
-      // nobody crosses the seam: the fronts stay a pace and a half apart
+      const d = SEAM + 0.1 + r * 1.45 + loose * (rng.chance(0.2) ? rng.range(0.3, 0.6) : rng.range(0, 0.25)) + J() * 0.4;
+      const u = at('hoplite', a + loose * rng.range(-0.25, 0.25), Math.max(SEAM + 0.05, d));
+      // the walls hold: shields up, spears levelled, watching the duels
+      // (the units piece gives idle men on a line a guard stance)
+      u.combat_leash = 1.2;
       u.combat_line = { cx, cz, nx: S * side, nz: S * side, d0: SEAM + r * 1.1 };
       (r === 0 ? units.front : units.rear).push(u);
     }
-  // archer screen: two loose ranks well behind the phalanx
+  // archer screen: a loose, ragged skirmish line behind the phalanx (men
+  // step up to shoot, others hang back; a few slots empty), in bow range
   for (let r = 0; r < 2; r++)
-    for (let i = 0; i < 8; i++) at('toxotes', (i - 3.5) * 1.8 + J() + r * 0.9 - 1.0, 9.0 + r * 1.5 + J());
+    for (let i = 0; i < 8; i++) {
+      if (rng.chance(0.12)) continue;
+      const u = at('toxotes', (i - 3.5) * 1.8 + r * 0.9 - 1.0 + rng.range(-0.45, 0.45), 7.6 + r * 1.4 + rng.range(-0.5, 0.5));
+      u.rot += rng.range(-0.25, 0.25);
+    }
   // both cavalry wings on the same (screen-right) flank, riding at each
   // other past the end of the infantry line: a second clash that never
   // crosses the phalanx seam
   for (let r = 0; r < 2; r++)
     for (let i = 0; i < 3 - r; i++) {
       const u = at('hippikon', side * (14.5 + i * 2.1 + r * 1.0 + J()), 2.2 + r * 2.2 + J());
-      u.combat_line = { cx, cz, nx: S * side, nz: S * side, d0: SEAM - 0.3 + rng.range(0, 0.9) };
+      u.combat_line = { cx, cz, nx: S * side, nz: S * side, d0: 0.55 + rng.range(0, 0.5) };
       u.combat_leash = 4;
     }
   // a minotaur anchoring the left end of the line
-  at('minotaur', -10.8, 1.3).combat_leash = 2;
-  // the front rank arrives bloodied; the ranks behind are still fresh
-  for (const u of units.front) u.hp = u.maxHp * rng.range(0.6, 0.97);
+  at('minotaur', -10.8, 1.2).combat_leash = 2;
+  // The walls must still stand when the frame is taken: the whole volley of
+  // both archer screens falls on them for the full fast-forward, so the
+  // scene makes them hardier (scene-only). Bars appear once a man is hurt.
+  for (const u of units.hoplite) { u.maxHp *= 3; u.hp = u.maxHp; }
+  for (const u of units.front) u.hp = u.maxHp * rng.range(0.9, 1);
   // blows fall out of step, not in one synchronised wave
   for (const list of [units.hoplite, units.minotaur, units.toxotes]) for (const u of list) u.attackCd = rng.range(0, u.def.attack.cooldown);
   for (const u of units.rear) if (rng.chance(0.3)) u.hp = u.maxHp * rng.range(0.6, 0.95);
@@ -83,9 +95,10 @@ function army(game, owner, side, cx, cz) {
   return units;
 }
 
-// The dead of the first clash: bodies in the strip between the fronts and in
-// the empty slots of the ranks, with their shields and spears dropped round
-// them, plus spears snapped off or stuck in the turf.
+// The dead of the first clash, in the open strip between the walls where the
+// duels are fought: men of both armies lying where they fell (rolled on their
+// side, shields and spears dropped beside them), plus the bodies in the empty
+// slots of the ranks and loose gear in the churned earth.
 function fallen(game, units, owner, side, cx, cz) {
   const rng = game.rng, fx = game.combat.fx;
   const body = (type, a, d) => {
@@ -95,44 +108,75 @@ function fallen(game, units, owner, side, cx, cz) {
     u.anim.dieT = 2;
     return u;
   };
-  // the dead of the first clash lie in heaps where the fighting was hottest,
-  // two or three men across one another in the strip between the fronts
-  for (let h = 0; h < 3; h++) {
-    const ha = (rng.chance(0.5) ? 1 : -1) * rng.range(3, 9.5), hd = rng.range(0.25, 0.9);
-    const n = 2;
-    for (let i = 0; i < n; i++) body('hoplite', ha + rng.range(-0.45, 0.45), hd + rng.range(-0.3, 0.3));
-    const [x, z] = P(cx, cz, ha * side, hd * side);
-    fx.scar(x, z, 1.1, 0.6, 0.8);
+  // in the strip, between the duels (never under a pair still fighting)
+  const free = (a) => Math.abs(a) > 2.4 && DUELS.every(([da]) => Math.abs(da * side - a) > 1.1) && Math.abs(a) < 10.2;
+  let n = 0;
+  for (let k = 0; k < 40 && n < 6; k++) {
+    const a = rng.range(-10, 10);
+    if (!free(a)) continue;
+    // mostly on the enemy's half: they fell pressing forward
+    body('hoplite', a, rng.range(-1.6, 0.9));
+    n++;
   }
-  for (let i = 0; i < 2; i++) body('hoplite', (rng.chance(0.5) ? 1 : -1) * rng.range(3, 9.5), rng.range(0.2, 0.9));
   for (const [a, d] of units.gaps) body('hoplite', a + rng.range(-0.2, 0.2), d + rng.range(-0.2, 0.3));
-  // riders and archers cut down where the cavalry wing hit the archer screen
-  for (let i = 0; i < 1; i++) body('hippikon', side * rng.range(16, 18), rng.range(3, 5));
+  // a rider cut down where the cavalry wings met
+  body('hippikon', side * rng.range(16, 18), rng.range(3, 5));
   // loose gear in the strip between the lines
-  for (let i = 0; i < 6; i++) {
-    const [x, z] = P(cx, cz, (rng.chance(0.5) ? 1 : -1) * rng.range(2.6, 10) * side, rng.range(-0.2, 0.9) * side);
+  for (let i = 0; i < 10; i++) {
+    const [x, z] = P(cx, cz, (rng.chance(0.5) ? 1 : -1) * rng.range(2.4, 10.5) * side, rng.range(-1.8, 1.8) * side);
     const k = rng.next();
-    if (k < 0.35) fx.debris.drop('shield', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(-0.1, 0.3), roll: rng.range(-0.1, 0.1), life: 60 });
-    else if (k < 0.6) fx.debris.drop('stub', x, z, { rot: rng.range(0, 6.28), owner, life: 60 });
-    else if (k < 0.8) fx.debris.drop('spear', x, z, { rot: rng.range(0, 6.28), owner, life: 60 });
+    if (k < 0.45) fx.debris.drop('shield', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(-0.1, 0.3), roll: rng.range(-0.1, 0.1), life: 60 });
+    else if (k < 0.65) fx.debris.drop('stub', x, z, { rot: rng.range(0, 6.28), owner, life: 60 });
+    else if (k < 0.8) fx.debris.drop('helmet', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(-0.5, 0.5), roll: rng.range(1.2, 1.7), lift: 0.12, life: 60 });
     else fx.debris.drop('spear', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(0.9, 1.2), lift: 0.45, life: 60 });
   }
 }
 
-// Trampled ground: the turf between and under the fronts is churned to dark
-// earth, heaviest along the seam, ragged at the edges, blood where men fell.
+// Single combats in the open strip: one man from each wall squares up to the
+// man opposite, staggered forward and back along the front, blows falling out
+// of step, so every pair reads as its own fight (lunge, block, reel).
+function duels(game, cx, cz) {
+  const rng = game.rng;
+  for (const [a, o] of DUELS) {
+    const pair = [];
+    for (const side of [1, -1]) {
+      const owner = side > 0 ? PLAYER : ENEMY;
+      const lat = a + rng.range(-0.15, 0.15);
+      const [x, z] = P(cx, cz, lat, o + side * 0.72);
+      const u = place(game, 'hoplite', owner, x, z, side > 0 ? -3 * Math.PI / 4 : Math.PI / 4);
+      // champions: they must still be on their feet, trading blows, when the
+      // frame is taken (a scene-only hardiness, shown as a part-full bar)
+      u.maxHp *= 4;
+      u.hp = u.maxHp * rng.range(0.4, 0.8);
+      u.combat_leash = 1.4;
+      u.combat_reach = 0.3;
+      // each man holds his own half of the pair's ground
+      u.combat_line = { cx, cz, nx: S * side, nz: S * side, d0: side * o + 0.5 };
+      u.attackCd = rng.range(0, u.def.attack.cooldown);
+      pair.push(u);
+    }
+    game.commands.order(pair[0], { type: 'attack', targetId: pair[1].id, auto: true });
+    game.commands.order(pair[1], { type: 'attack', targetId: pair[0].id, auto: true });
+  }
+}
+
+// No-man's-land: the turf between the two walls is trampled to bare, dark
+// earth, heaviest in the middle, ragged at the edges, blood where men fell;
+// lighter scuffing under the ranks.
 function churn(game, cx, cz) {
   const rng = game.rng, fx = game.combat.fx;
-  for (let a = -10; a <= 10; a += 0.5) {
-    for (const d of [-0.7, 0.7]) {
-      if (rng.chance(0.3)) continue;
-      const [x, z] = P(cx, cz, a + rng.range(-0.25, 0.25), d + rng.range(-0.5, 0.5));
-      fx.scar(x, z, rng.range(0.7, 1.3), d === 0 ? rng.range(0.7, 1.0) : rng.range(0.35, 0.7), rng.chance(0.15) ? rng.range(0.3, 0.7) : 0);
+  for (let a = -11; a <= 11; a += 0.45) {
+    for (let d = -SEAM + 0.2; d <= SEAM - 0.2; d += 0.55) {
+      const edge = Math.abs(d) / SEAM; // 0 mid-strip .. 1 at the walls
+      const end = Math.max(0, (Math.abs(a) - 9) / 2); // ragged ends
+      if (rng.chance(0.08 + edge * 0.35 + end * 0.6)) continue;
+      const [x, z] = P(cx, cz, a + rng.range(-0.25, 0.25), d + rng.range(-0.3, 0.3));
+      fx.scar(x, z, rng.range(0.6, 1.0), rng.range(0.75, 1.0) * (1 - 0.35 * edge), rng.chance(0.07) ? rng.range(0.3, 0.6) : 0);
     }
   }
   for (let i = 0; i < 25; i++) {
-    const [x, z] = P(cx, cz, rng.range(-11, 11), (rng.chance(0.5) ? 1 : -1) * rng.range(1, 4.2));
-    fx.scar(x, z, rng.range(0.4, 1.0), rng.range(0.2, 0.5), 0);
+    const [x, z] = P(cx, cz, rng.range(-11, 11), (rng.chance(0.5) ? 1 : -1) * rng.range(SEAM, SEAM + 3.5));
+    fx.scar(x, z, rng.range(0.4, 0.9), rng.range(0.2, 0.45), 0);
   }
 }
 
@@ -156,19 +200,21 @@ export const battleScene = {
         u.combat_line = { cx, cz, nx: S * side, nz: S * side, d0 };
       };
       if (u.type === 'hero') { hold(0.25, 1.3, 1.0); u.combat_leash = 2.5; u.combat_reach = 0.9; }
-      else if (u.type === 'cyclops') { hold(10.8, 1.9, SEAM + 0.2); u.combat_leash = 3; }
+      else if (u.type === 'cyclops') { hold(10.8, 1.9, 1.2); u.combat_leash = 5; }
     }
     const charge = (own, foe) => {
       // each rider squares up to an enemy rider across the flank
-      own.hippikon.forEach((u, i) => game.commands.order(u, { type: 'attack', targetId: foe.hippikon[i % foe.hippikon.length].id, auto: true }));
-      // each front-ranker squares up to the man opposite; ranks behind hold
-      const foeFront = foe.front.map((f) => [lat(f, cx, cz), f]);
-      for (const u of own.front) {
-        const l = lat(u, cx, cz);
+
+      // the walls hold; the fighting in the strip is done by the duellists.
+      // The archers shoot over the duels into the enemy wall, each at his
+      // own man, so the volleys spread instead of converging on one body.
+      const near = (u, list) => {
         let best = null, bd = Infinity;
-        for (const [fl, f] of foeFront) if (Math.abs(fl - l) < bd) { bd = Math.abs(fl - l); best = f; }
-        if (best) game.commands.order(u, { type: 'attack', targetId: best.id, auto: true });
-      }
+        for (const o of list) { const d = Math.hypot(o.x - u.x, o.z - u.z) + game.rng.range(0, 1.5); if (d < bd) { bd = d; best = o; } }
+        return best;
+      };
+      for (const u of own.hippikon) { const t = near(u, foe.hippikon); if (t) game.commands.order(u, { type: 'attack', targetId: t.id, auto: true }); }
+      for (const u of own.toxotes) { const t = near(u, foe.hoplite); if (t) game.commands.order(u, { type: 'attack', targetId: t.id, auto: true }); }
       for (const u of own.minotaur) {
         const t = game.combat.findEnemyNear(u, 8, (o) => o.def.myth);
         if (t) game.commands.order(u, { type: 'attack', targetId: t.id, auto: true });
@@ -185,8 +231,33 @@ export const battleScene = {
     fallen(game, blue, PLAYER, 1, cx, cz);
     fallen(game, red, ENEMY, -1, cx, cz);
     churn(game, cx, cz);
+    duels(game, cx, cz);
     engageHeroesAndMyth(game, myth);
+    // the big fights, set explicitly: hero against hero at the centre, and at
+    // each end of the line the minotaur against the cyclops opposite it
+    const heroes = myth.filter((u) => u.type === 'hero');
+    const cyc = myth.filter((u) => u.type === 'cyclops');
+    for (const h of heroes) { h.combat_line.d0 = 0.75; h.combat_leash = 3; }
+    if (heroes.length === 2) {
+      game.commands.order(heroes[0], { type: 'attack', targetId: heroes[1].id, auto: true });
+      game.commands.order(heroes[1], { type: 'attack', targetId: heroes[0].id, auto: true });
+    }
+    for (const m of [...blue.minotaur, ...red.minotaur]) {
+      const c = cyc.find((o) => o.owner !== m.owner);
+      if (c) { game.commands.order(m, { type: 'attack', targetId: c.id, auto: true }); game.commands.order(c, { type: 'attack', targetId: m.id, auto: true }); m.combat_leash = 5; }
+    }
     return { focus: { x: cx, z: cz } };
+  },
+  // Capture on a beat, not between blows: step the (deterministic) sim a tick
+  // at a time, up to a second and a half, until several duellists are
+  // mid-hit (white flash, chips and sparks in the air).
+  after(game) {
+    const hot = () => {
+      let n = 0;
+      for (const u of game.entities.units()) if (!u.dead && u.flashT > 0.1 && u.def.class === 'infantry') n++;
+      return n;
+    };
+    for (let i = 0; i < 45 && hot() < 3; i++) game.fastForward(1 / 30);
   },
   camera: { x: 64.2, z: 63.4, distance: 41, pitch: 54 },
 };
