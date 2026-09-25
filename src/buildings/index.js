@@ -8,6 +8,7 @@ import { hash3 } from '../core/rng.js';
 import { Placement } from './placement.js';
 import { Props } from './props.js';
 import { withExtras } from './shapes.js';
+import { layoutTown } from './town.js';
 
 // Buildings piece: spawning, construction ('build' order), destruction,
 // rendering and the placement flow.
@@ -17,6 +18,7 @@ import { withExtras } from './shapes.js';
 //   buildings.placement.begin(type, builders)   (UI)
 //   buildings.destroy(b)
 //   buildings.geometry(type)                     (for portraits / ghosts)
+//   buildings.layoutTown(owner, start)           (scenes: a planned Greek town)
 export class Buildings {
   constructor(game) {
     this.game = game;
@@ -66,6 +68,10 @@ export class Buildings {
     }
     return this.geos.get(k);
   }
+
+  // A planned town (agora, streets, house rows, temenos) round a start
+  // position; see town.js.
+  layoutTown(owner, start) { return layoutTown(this.game, owner, start); }
 
   // Visual variant, fixed per building. Starts from a tile hash, then steps
   // away from the variants of same-type neighbours so a street of houses
@@ -232,20 +238,24 @@ export class Buildings {
     return true;
   }
 
-  spawn(type, owner, tx, tz, { built = true } = {}) {
+  // `site: false` skips the automatic ground dressing (plaza, yard, street
+  // to the Town Center, roads) for callers that lay the ground out
+  // themselves (the planned town in town.js).
+  spawn(type, owner, tx, tz, { built = true, site = true } = {}) {
     const def = BUILDING_DEFS[type];
     if (!def) throw new Error(`Unknown building ${type}`);
     const game = this.game, map = game.map;
     game.terrain.clearRect(tx, tz, def.w, def.h);
     map.flattenTiles(tx, tz, def.w, def.h, null, def.farm ? GROUND.FARM : type === 'town_center' || type === 'temple' ? GROUND.PAVED : GROUND.DIRT);
-    if (type === 'town_center') this.pavePlaza(tx, tz, def.w, def.h, 5.5);
+    if (!site) { /* ground laid out by the caller */ }
+    else if (type === 'town_center') this.pavePlaza(tx, tz, def.w, def.h, 5.5);
     else if (type === 'temple') this.pavePlaza(tx, tz, def.w, def.h, 3);
     // houses and storehouses sit on their own worn-earth lot (no paving),
     // so the paved streets between them read as streets, not one slab
     const lot = type === 'house' || type === 'storehouse';
-    if (!def.farm) this.yard(tx, tz, def.w, def.h, type === 'town_center' ? 0 : type === 'temple' ? 2 : lot ? 1 : 1.6);
+    if (site && !def.farm) this.yard(tx, tz, def.w, def.h, type === 'town_center' ? 0 : type === 'temple' ? 2 : lot ? 1 : 1.6);
     // houses and storehouses: a paved forecourt across the front (+z)
-    if (lot) {
+    if (site && lot) {
       for (let x = tx; x < tx + def.w; x++) {
         if (!map.isWalkable(x, tz + def.h) || this.inFootprint(x, tz + def.h)) continue;
         const g = this.groundAt(x, tz + def.h);
@@ -263,8 +273,8 @@ export class Buildings {
       radius: Math.max(def.w, def.h) / 2,
     });
     if (!def.walkable) map.block(tx, tz, def.w, def.h, b.id);
-    if (!def.farm && type !== 'town_center') this.paveStreet(b);
-    if (type === 'town_center') this.paveRoads(b);
+    if (site && !def.farm && type !== 'town_center') this.paveStreet(b);
+    if (site && type === 'town_center') this.paveRoads(b);
     // nudge any units standing inside the footprint out of it
     for (const u of game.entities.units()) {
       if (u.x >= tx && u.x < tx + def.w && u.z >= tz && u.z < tz + def.h && !def.walkable) {

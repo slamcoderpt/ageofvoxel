@@ -78,26 +78,11 @@ export function standardStart(game, owner, start, villagers = 5) {
 // A developed Greek town around a start position.
 export function buildTown(game, owner, start, { villagers = 24, soldiers = 6 } = {}) {
   const sx = start.tx, sz = start.tz;
-  const tc = game.buildings.spawn('town_center', owner, sx - 3, sz - 3, { built: true });
+  // planned layout (agora, streets, house rows, temenos): src/buildings/town.js
+  const { tc, store, store2, houses, temple, barracks, farms, house2 } = game.buildings.layoutTown(owner, start);
   const wood = nearestResource(game, 'wood', sx, sz);
   const gold = nearestResource(game, 'gold', sx, sz);
   const berry = nearestResource(game, 'food', sx, sz);
-  const toward = (r, k) => (r ? [sx + (r.x - sx) * k, sz + (r.z - sz) * k] : [sx + 8, sz + 8]);
-  const store = placeNear(game, 'storehouse', owner, ...toward(wood, 0.72), { maxR: 5 });
-  const store2 = placeNear(game, 'storehouse', owner, ...toward(gold, 0.7), { maxR: 5, gap: 2 });
-  const houses = [];
-  for (const [dx, dz] of [[-6, -11], [4, -11], [-11, -6], [-11, 4], [-17, -6], [15, 4], [10, -13]]) {
-    const h = placeNear(game, 'house', owner, sx + dx, sz + dz, { maxR: 4, gap: 3 });
-    if (h) houses.push(h);
-  }
-  const temple = placeNear(game, 'temple', owner, sx + 11, sz - 5, { maxR: 5, gap: 2 });
-  const barracks = placeNear(game, 'barracks', owner, sx - 4, sz + 10, { maxR: 5, gap: 2 });
-  const farms = [];
-  for (const [dx, dz] of [[6, 7], [11, 7], [6, 12]]) {
-    const f = placeNear(game, 'farm', owner, sx + dx, sz + dz, { maxR: 3, gap: 0 });
-    if (f) farms.push(f);
-  }
-  const house2 = placeNear(game, 'house', owner, sx + 3, sz + 11, { built: false, progress: 0.55, maxR: 4 });
 
   const vs = spawnBlock(game, 'villager', owner, villagers, tc.x, tc.tz + tc.h + 2, { spacing: 1.2 });
   let i = 0;

@@ -804,7 +804,7 @@ export function templeModel(variant = 0, m = new VoxelModel()) {
   for (let x = 1; x < 19; x += 2) { m.set(x, t - 1, 1, SOFFIT); m.set(x, t - 1, 22, SOFFIT); }   // mutules
   for (let z = 1; z < 23; z += 2) { m.set(1, t - 1, z, SOFFIT); m.set(18, t - 1, z, SOFFIT); }
   t += 1;
-  const R = gableRoof(m, { wx0: 1, wx1: 19, wz0: 1, wz1: 23, top: t, axis: 'z', pitch: 0.48, ov: 0.5, ovG: 1.2, ends: 'pediment', tiles: TILES.marble, tymp: 0x2f5596, rakeH: 0.8, sima: 0xa8372a, geisonPaint: 0x2d4b82, seed: 71, ornate: true });
+  const R = gableRoof(m, { wx0: 1, wx1: 19, wz0: 1, wz1: 23, top: t, axis: 'z', pitch: 0.48, ov: 0.5, ovG: 1.2, ends: 'pediment', tiles: TILES.brick, tymp: 0x2f5596, rakeH: 0.8, sima: 0xa8372a, geisonPaint: 0x2d4b82, seed: 71, ornate: true });
   pedimentRelief(m, R, 23);
   pedimentRelief(m, R, 0, -1);
 

@@ -126,6 +126,28 @@ const PROPS = {
       }
     },
   },
+  // a house's walled side court (1 x 3 tiles on the house's +x side): a low
+  // whitewashed wall down the outer edge and across the front with a gate,
+  // packed earth, an olive or a cypress, storage jars and a bench
+  court_a: { w: 1, h: 3, build: (m) => court(m, 0) },
+  court_b: { w: 1, h: 3, build: (m) => court(m, 1) },
+  // altar before a temple: stepped marble base, red-painted die, fire
+  altar: {
+    w: 1, h: 1,
+    build(m) {
+      // 8 voxels wide, centred on the tile (spills half a tile each side)
+      m.box(-2, 0, 0, 8, 1, 4, MARBLE_SHADE);
+      m.box(-1, 1, 0, 6, 2, 3, MARBLE);
+      m.box(-1, 2, 0, 6, 1, 3, 0xa8372a);
+      m.box(-2, 3, 0, 8, 1, 3, MARBLE);
+      m.box(1, 4, 1, 2, 1, 1, FIRE, { glow: 0.5 });
+      m.set(1, 5, 1, 0xffd27a, { glow: 0.5 }).set(2, 4, 1, 0xffb347, { glow: 0.5 });
+      m.set(-2, 4, 1, MARBLE).set(5, 4, 1, MARBLE);          // horns of the altar
+    },
+  },
+  // temenos boundary wall (sits on paving, unlike garden walls)
+  twall_x: { w: 3, h: 1, build: (m) => peribolos(m, 12, 'x') },
+  twall_z: { w: 1, h: 3, build: (m) => peribolos(m, 12, 'z') },
   planter: {
     w: 1, h: 1,
     build(m) {
@@ -147,6 +169,40 @@ function fence(m, len, axis, ox = 0, oz = 0) {
     const wash = hash3(a >> 1, 1, ox + oz, 84) < 0.5 ? 0xf1ede4 : 0xe8e2d6;
     put(a, 0, 0xb3ab9a); put(a, 1, 0xa8452f); put(a, 2, wash);
     if (pier) { put(a, 3, wash); put(a, 4, 0xdcd5c4); } else put(a, 3, (a & 1) ? 0xdcd5c4 : 0xd2cbb9);
+  }
+}
+
+function court(m, kind) {
+  for (let z = 0; z < 12; z++) for (let x = 0; x < 3; x++) m.set(x, 0, z, hash3(x, 0, z, 85) < 0.5 ? 0x9a7d5a : 0x8f7352);
+  // outer wall down the +x edge
+  for (let z = 0; z < 12; z++) {
+    const wash = hash3(z >> 1, 2, kind, 86) < 0.5 ? 0xf1ede4 : 0xe8e2d6;
+    m.set(3, 0, z, 0xb3ab9a); m.set(3, 1, z, 0xa8452f); m.set(3, 2, z, wash); m.set(3, 3, z, wash);
+    m.set(3, 4, z, z % 4 === 0 ? 0xcf6a3c : 0xdcd5c4);
+  }
+  // front wall with a gate between two piers
+  for (let x = 0; x < 3; x++) {
+    if (x === 1) continue;
+    m.set(x, 0, 11, 0xb3ab9a); m.set(x, 1, 11, 0xa8452f); m.set(x, 2, 11, 0xefe9de); m.set(x, 3, 11, 0xefe9de); m.set(x, 4, 11, 0xdcd5c4);
+  }
+  if (kind === 0) {
+    olive(m, 1, 1, 4);
+    pithos(m, 0, 1, 8, 0xb8683e); amphora(m, 2, 1, 9, 0xc47440);
+  } else {
+    cypress(m, 1, 1, 2, 14);
+    m.box(0, 1, 6, 1, 1, 3, 0xcfc7b4);                           // stone bench
+    amphora(m, 2, 1, 8, 0xa65a34); amphora(m, 2, 1, 6, 0xc47440);
+  }
+}
+
+// temenos boundary: a low marble kerb with square piers and a coping,
+// running along the platform edge
+function peribolos(m, len, axis) {
+  const put = (a, y, c) => (axis === 'x' ? m.set(a, y, 1, c) : m.set(1, y, a, c));
+  for (let a = 0; a < len; a++) {
+    const pier = a % 4 === 0;
+    put(a, 0, 0xcfc6b2); put(a, 1, (a & 1) ? 0xe9e3d6 : 0xe2dccd);
+    if (pier) { put(a, 2, 0xece6da); put(a, 3, 0xd8d0bf); } else put(a, 2, 0xd8d0bf);
   }
 }
 
@@ -201,34 +257,29 @@ function stall(m, kind) {
 function anchorsFor(b) {
   const w = b.w, h = b.h, v = Math.floor(hash3(b.tx, 5, b.tz, 71) * 4);
   switch (b.type) {
+    // the agora: a market row on the front-left, the well front-right, a
+    // statue on the open north-east corner; everything else stays clear
     case 'town_center': return [
       ['pillar', [[-1, h], [-1, h + 1]]], ['pillar', [[w, h], [w, h + 1]]],
-      // the market sits out on the plaza, two tiles clear of the walls
-      ['stall_food', [[-5, h + 2], [-4, h + 3], [w + 3, -2]]],
-      ['stall_pots', [[-2, h + 3], [-5, h + 4], [w + 3, 0]]],
-      ['stall_cloth', [[-5, -3], [w + 3, 2], [-6, 2]]],
-      ['well', [[w + 3, h + 2], [w + 2, h + 3], [-4, -1]]],
-      ['statue', [[-4, 1], [-4, 3], [w + 2, -4]]],
-      ['pithoi', [[-3, h + 1], [w + 1, h + 1]]],
-      ['kore', [[1, h + 1]]], ['kore', [[w - 2, h + 1]]],
-      ['flowers', [[2, h + 2]]], ['flowers', [[w + 1, -2], [-3, -2]]],
-      ['cypress', [[-2, -2], [-1, -2]]], ['cypress', [[w + 1, -2], [w, -2]]],
-      ['hoplite', [[w + 3, h + 4], [w + 1, h + 4]]],
+      ['stall_food', [[-3, h], [-4, h]]], ['stall_pots', [[-3, h + 2], [-4, h + 2]]], ['stall_cloth', [[-1, h + 2]]],
+      ['well', [[w + 1, h], [w + 1, h + 1]]],
+      ['statue', [[w + 1, -3], [w + 1, -2]]],
+      ['cypress', [[-2, -2], [-1, -2]]], ['cypress', [[w + 1, 0], [w, -2]]],
     ];
-    case 'house': {
-      const side = v & 1 ? [w + 1, 0] : [-3, 0];
-      return [
-        ...(v & 1 ? [['garden', [side, [0, -3]]]] : []),
-        ['wall_x', [[0, -1]]],
-        [['flowers', 'amphorae', 'planter', 'flowers'][v], [[0, h], [1, h]]],
-        [v & 1 ? 'cypress' : 'olive', [[-1, 0], [w, 1], [w, -1]]],
-      ];
-    }
+    // each house keeps its dressing inside its own walled side court; the
+    // front onto the street stays clear
+    case 'house': return [
+      [v & 1 ? 'court_b' : 'court_a', [[w, 0]]],
+      ['wall_x', [[0, -1]]],
+      ...(v & 2 ? [['cypress', [[-1, 0]]]] : []),
+    ];
+    // storehouse goods stay inside a fenced work yard beside and behind it
     case 'storehouse': return [
-      ['crates', [[w, 1], [-1, 1], [1, h]]], ['pithoi', [[w, 2], [-2, 2], [0, h]]],
-      ['fence_z', [[w + 1, -1], [-2, -1]]], ['amphorae', [[w, 0], [-1, 0]]],
+      ['fence_z', [[w + 1, -1]]], ['fence_z', [[-2, -1]]],
+      ['crates', [[w, 0], [-1, 0]]], ['pithoi', [[-1, -1], [w - 1, -1]]],
     ];
-    case 'temple': return [
+    case 'temple': if (b.bld_temenos) return temenosAnchors(b);
+      return [
       ['kore', [[-1, h]]], ['kore', [[w, h]]],
       ['pillar', [[-1, h - 2]]], ['pillar', [[w, h - 2]]],
       ['cypress', [[-1, 0], [-1, 1]]], ['cypress', [[w, 0], [w, 1]]],
@@ -242,6 +293,28 @@ function anchorsFor(b) {
     ];
     default: return [];
   }
+}
+
+// A temple on a planned temenos: an open forecourt before the steps with the
+// altar on the axis, fire pillars and statues flanking the approach, rows of
+// cypresses down the sides, and a low boundary wall with a gate on the axis.
+function temenosAnchors(b) {
+  const w = b.w, h = b.h;
+  const [ex, ez, ew, eh] = b.bld_temenos;
+  const out = [
+    ['altar', [[Math.floor(w / 2), h + 2]]],
+    ['pillar', [[-1, h]]], ['pillar', [[w, h]]],
+    ['statue', [[-3, h + 1]]], ['statue', [[w + 1, h + 1]]],
+  ];
+  for (const z of [0, 2, 4]) out.push(['cypress', [[-2, z]]], ['cypress', [[w + 1, z]]]);
+  // boundary: back and sides in 3-tile runs, the front split by the gate
+  const x0 = ex - b.tx, z0 = ez - b.tz, x1 = x0 + ew - 1, z1 = z0 + eh - 1;
+  for (let x = x0; x + 2 <= x1; x += 3) out.push(['twall_x', [[x, z0]]]);
+  for (let z = z0 + 1; z + 2 <= z1; z += 3) out.push(['twall_z', [[x0, z]]], ['twall_z', [[x1, z]]]);
+  const gate0 = Math.floor(w / 2) - 2, gate1 = Math.floor(w / 2) + 2;   // 3-tile gate on the axis
+  for (let x = x0; x + 2 < gate0 + 1; x += 3) out.push(['twall_x', [[x, z1]]]);
+  for (let x = x1 - 2; x > gate1 - 1; x -= 3) out.push(['twall_x', [[x, z1]]]);
+  return out;
 }
 
 export class Props {
