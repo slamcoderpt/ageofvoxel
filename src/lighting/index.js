@@ -38,8 +38,8 @@ import { fowUniforms } from '../core/FogOfWar.js';
 				// fraction of the wide-ring occluders that are far from the receiver
 				float farFrac = clamp( ( 1.0 - shF ) / max( 1.0 - shW, 1e-3 ), 0.0, 1.0 );
 				float soft = smoothstep( 0.15, 0.9, farFrac ) * step( 1e-3, 1.0 - min( shW, shN ) );
-				shadow = mix( shN, 0.5 * shN + 0.5 * shW, 0.35 ) ;
-				shadow = mix( shadow, 0.3 * shN + 0.7 * shW, soft );` + src.slice(b + ') * 0.2;'.length);
+				shadow = mix( shN, 0.5 * shN + 0.5 * shW, 0.15 ) ;
+				shadow = mix( shadow, 0.45 * shN + 0.55 * shW, soft );` + src.slice(b + ') * 0.2;'.length);
   }
 }
 
@@ -69,21 +69,21 @@ export class Lighting {
     // crowns shade the crowns beside them.
     this.sunDir = new THREE.Vector3(-0.6, 0.55, 0.4).normalize();
     // The sun carries all of the frame's warmth (the grade adds none).
-    this.sun = new THREE.DirectionalLight(0xffdc98, 4.6);
+    this.sun = new THREE.DirectionalLight(0xffd890, 5.0);
     this.sun.castShadow = true;
     const sm = post === 'high' ? 4096 : 2048;
     this.sun.shadow.mapSize.set(sm, sm);
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.035;
-    this.sun.shadow.radius = 2.5;
+    this.sun.shadow.radius = 1.8;
     this.shadowExtent = 60;
     scene.add(this.sun, this.sun.target);
 
     // Sky light is a soft cool blue and the ground bounce warm-brown: shadows
     // read as clean cool shade against the warm sunlit stone and roofs.
-    this.hemi = new THREE.HemisphereLight(0xa4b6d0, 0x80644a, 1.1);
+    this.hemi = new THREE.HemisphereLight(0xa2b2c4, 0x86684a, 0.86);
     scene.add(this.hemi);
-    this.fill = new THREE.DirectionalLight(0xa8b8d0, 0.42); // soft cool bounce from the opposite side
+    this.fill = new THREE.DirectionalLight(0xb0bcc8, 0.3); // soft cool bounce from the opposite side
     this.fill.position.set(0.6, 0.5, -0.5);
     scene.add(this.fill);
 
@@ -94,7 +94,7 @@ export class Lighting {
     // slowly, so the forest at the top of an RTS frame recedes and loses
     // contrast while the town in the middle stays clean.
     this.hazeColor = new THREE.Color(0xbfc9d2); // cool, low-contrast air
-    this.hazeNear = 0.75; this.hazeFar = 2.5; // x camera distance
+    this.hazeNear = 1.15; this.hazeFar = 3.3; // x camera distance
     scene.fog = new THREE.Fog(this.hazeColor, 80, 400);
     scene.background = this.hazeColor.clone();
 

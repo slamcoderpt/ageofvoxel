@@ -26,13 +26,17 @@ const GradeShader = {
   uniforms: {
     tDiffuse: { value: null },
     uExposure: { value: 1.0 },
-    uChromaLimit: { value: 0.5 },
-    uSaturation: { value: 0.96 },
-    uGreenShift: { value: 0.42 },
-    uGreenDesat: { value: 0.42 },
-    uContrast: { value: 1.12 },
-    uShadowTint: { value: new THREE.Vector3(0.92, 0.97, 1.08) }, // mild: shade on roads stays warm-grey (ground bounce), not blue
-    uBlackFloor: { value: new THREE.Vector3(0.04, 0.05, 0.068) },
+    uChromaLimit: { value: 0.42 },
+    uSaturation: { value: 0.98 },
+    uGreenShift: { value: 0.5 },
+    uGreenDesat: { value: 0.34 },
+    uContrast: { value: 1.14 },
+    // mid S-curve: lit ground and roofs lift, shade drops (no milky mid-grey)
+    uMidContrast: { value: 0.4 },
+    // shade keeps its colour: chroma boost in the darks instead of a grey veil
+    uShadowSat: { value: 0.18 },
+    uShadowTint: { value: new THREE.Vector3(0.99, 0.97, 0.98) }, // near neutral: shade reads warm-olive (ground bounce), never lavender
+    uBlackFloor: { value: new THREE.Vector3(0.03, 0.034, 0.032) },
     uVignette: { value: 0.0 },
     uToeLift: { value: 0.0 },
     uKnee: { value: 0.72 },
@@ -40,12 +44,13 @@ const GradeShader = {
     // Top-edge aerial haze: in the RTS view the top of the frame is always
     // the far distance, so it loses contrast and saturation and lifts toward
     // a cool grey-blue (the far forest and shoreline recede).
-    uTopHaze: { value: 0.16 },
+    uTopHaze: { value: 0.2 },
     uTopHazeColor: { value: new THREE.Vector3(0.66, 0.72, 0.78) },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
     uniform sampler2D tDiffuse; uniform float uTopHaze; uniform vec3 uTopHazeColor;
+    uniform float uMidContrast, uShadowSat;
     uniform float uKnee, uShoulder, uToeLift, uChromaLimit, uExposure, uSaturation, uGreenShift, uGreenDesat, uContrast, uVignette;
     uniform vec3 uShadowTint, uBlackFloor; varying vec2 vUv;
     const vec3 LW = vec3(0.2126, 0.7152, 0.0722);
@@ -57,7 +62,7 @@ const GradeShader = {
       g = smoothstep(0.05, 0.7, g);
       // push hue from green to yellow-olive (raise red towards green), drop the blue floor
       c.r = mix(c.r, max(c.r, c.g * 0.86), g * uGreenShift);
-      c.b = mix(c.b, c.b * 0.9 + c.g * 0.12, g * uGreenShift);
+      c.b = mix(c.b, c.b * 0.8, g * uGreenShift); // no mint: foliage leans yellow-green
       float l = dot(c, LW);
       c = mix(c, vec3(l), g * uGreenDesat);
       // --- chroma limiter for warm/foliage hues (blue is the weakest channel)
@@ -73,7 +78,12 @@ const GradeShader = {
       l = dot(c, LW);
       const float P = 0.42;
       float ls = l < P ? P * pow(max(l, 0.0) / P, uContrast) : l;
+      // mids: cubic S around the pivot (lit stone up, shade down)
+      ls = clamp(ls + uMidContrast * (ls - 0.4) * ls * (1.0 - ls) * 2.0, 0.0, 2.0);
       c *= ls / max(l, 1e-4);
+      // shade keeps colour: saturate the darks (warm olive shade, not grey)
+      l = dot(c, LW);
+      c = max(mix(vec3(l), c, 1.0 + uShadowSat * (1.0 - smoothstep(0.08, 0.45, l)) * smoothstep(0.0, 0.05, l)), 0.0);
       // optional toe lift (0 by default; scenes may ease it)
       c = c + uToeLift * (1.0 - c) * (1.0 - smoothstep(0.0, 0.35, c));
       // --- cool shadows: multiplicative, fades out towards sunlit values
@@ -85,7 +95,7 @@ const GradeShader = {
       // --- deep shade floor: the darkest gaps sit just above black, faintly cool
       c += uBlackFloor * pow(1.0 - clamp(l, 0.0, 1.0), 12.0);
       // --- top-edge haze: lower contrast and saturation, cool lift
-      float th = smoothstep(0.5, 1.0, vUv.y); th *= th * uTopHaze;
+      float th = smoothstep(0.62, 1.0, vUv.y); th *= th * uTopHaze;
       l = dot(c, LW);
       c = mix(c, vec3(l), th * 1.2);
       c = mix(c, uTopHazeColor, th);
@@ -106,7 +116,7 @@ export class PostFX {
     this.composer.addPass(new RenderPass(scene, camera));
     if (quality === 'high') {
       this.gtao = new GTAOPass(scene, camera, size.x, size.y);
-      this.gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.6, thickness: 2.5, scale: 1.7, samples: 12, distanceFallOff: 1.0 });
+      this.gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.6, thickness: 2.5, scale: 2.1, samples: 12, distanceFallOff: 1.0 });
       this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
       this.gtao.blendIntensity = 1.0;
       // Let pieces opt objects out of the AO g-buffer with object.userData.noAO

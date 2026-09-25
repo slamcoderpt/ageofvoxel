@@ -335,8 +335,8 @@ vec2 atmCobble(vec2 p) {
       // so walls and plinths sit in the road instead of floating on it)
       float halo = smoothstep(0.02, 0.62, cOcc) * uContactAO * uHalo;
       float core = smoothstep(0.3, 0.8, cOcc) * uContactAO * uHalo;
-      reflectedLight.indirectDiffuse *= clamp(1.0 - 0.66 * halo - 0.24 * core, 0.0, 1.0);
-      reflectedLight.directDiffuse *= clamp(1.0 - 0.42 * halo - 0.3 * core, 0.0, 1.0);
+      reflectedLight.indirectDiffuse *= clamp(1.0 - 0.7 * halo - 0.28 * core, 0.0, 1.0);
+      reflectedLight.directDiffuse *= clamp(1.0 - 0.45 * halo - 0.36 * core, 0.0, 1.0);
     }`);
 }
 
