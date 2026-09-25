@@ -616,7 +616,7 @@ export function houseModel(variant = 0, m = new VoxelModel()) {
     m.box(1, 1, 1, 10, 12, 7, PL); m.box(1, 1, 1, 10, 2, 7, BASE_STONE);
     m.box(1, 7, 7, 10, 1, 1, MARBLE); m.box(10, 7, 1, 1, 1, 7, MARBLE);
     m.box(1, 12, 7, 10, 1, 1, MARBLE_SHADE); m.box(10, 12, 1, 1, 1, 7, MARBLE_SHADE);
-    shedRoof(m, { wx0: 1, wx1: 11, wz0: 1, wz1: 8, top: 13, dir: '+z', pitch: 0.32, ov: 0.8, ovS: 0.5, tiles: TILES.rose, fill, seed: 21 });
+    shedRoof(m, { wx0: 1, wx1: 11, wz0: 1, wz1: 8, top: 13, dir: '+z', pitch: 0.32, ov: 0.8, ovS: 0.5, tiles: TILES.slate, fill, seed: 21 });
     m.box(5, 2, 7, 2, 4, 1, DOOR); m.box(2, 3, 7, 2, 2, 1, DARK); m.box(8, 3, 7, 2, 2, 1, DARK);
     m.box(10, 3, 3, 1, 2, 2, DARK);
     m.box(5, 8, 7, 2, 4, 1, DARK); m.box(2, 9, 7, 2, 2, 1, DARK); m.box(8, 9, 7, 2, 2, 1, DARK);
@@ -682,7 +682,7 @@ export function storehouseModel(variant = 0, m = new VoxelModel()) {
   m.box(10, 1, 1, 1, 7, 6, ASHLAR);
   for (const x of [4.5, 7.5]) cylinder(m, x, 1, 6.3, 0.5, 7, 0x7a5230, { segs: 8 });
   m.box(1, 7, 6, 10, 1, 1, DARKWOOD);
-  gableRoof(m, { wx0: 1, wx1: 11, wz0: 1, wz1: 7, top: 8, axis: 'x', pitch: 0.42, ov: 0.8, ovG: 0.5, tiles: TILES.terra, fill: FILL_ASHLAR, seed: 51 });
+  gableRoof(m, { wx0: 1, wx1: 11, wz0: 1, wz1: 7, top: 8, axis: 'x', pitch: 0.42, ov: 0.8, ovG: 0.5, tiles: TILES.slate, fill: FILL_ASHLAR, seed: 51 });
   // goods under the shed
   m.box(3, 2, 3, 2, 2, 2, 0x9b7040).box(3, 4, 3, 2, 1, 2, 0x8a6236);
   m.box(5, 2, 3, 2, 2, 2, 0xa27a48);

@@ -75,9 +75,9 @@ export const shadeHex = (c, f) => mix(0, c, Math.min(1, f)) | 0;
 // Muted roof tile palettes (2-3 fired hues each; the butt line of every
 // course is a darker line, the eave fascia darker still).
 export const TILES = {
-  terra: { tones: [0xc27a5b, 0xb46c50, 0xcd8a6a], butt: 0x8c4f3a, fascia: 0x7b4634, ridge: 0x9e5a41, soffit: 0x4a3a30 },
-  rose: { tones: [0xc98c72, 0xbd7f66, 0xd49a80], butt: 0x946050, fascia: 0x80523f, ridge: 0xa86d58, soffit: 0x4a3a30 },
-  umber: { tones: [0xae6e55, 0xa0634c, 0xba7b60], butt: 0x7c4a38, fascia: 0x6c4232, ridge: 0x8e5540, soffit: 0x45362c },
+  terra: { tones: [0xc27a5b, 0xb97254, 0xca8565], butt: 0x8c4f3a, fascia: 0x7b4634, ridge: 0x9e5a41, soffit: 0x4a3a30 },
+  rose: { tones: [0xcb8e74, 0xc2856b, 0xd3987e], butt: 0x946050, fascia: 0x80523f, ridge: 0xa86d58, soffit: 0x4a3a30 },
+  umber: { tones: [0xae6e55, 0xa66850, 0xb7765c], butt: 0x7c4a38, fascia: 0x6c4232, ridge: 0x8e5540, soffit: 0x45362c },
   slate: { tones: [0xbcc7b1, 0xafbba4, 0xc9d1be], butt: 0x86927c, fascia: 0x75806c, ridge: 0x95a28c, soffit: 0x4a4540 },
 };
 
@@ -87,7 +87,7 @@ export const TILES = {
 // the rows; tiles within a course take one of the palette hues, offset by
 // half a tile every other course. A fascia drops from the eave and the
 // underside is closed with a dark soffit.
-export function tiledPlane(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.1, tileW = 1.4, lip = 0.2, fascia = 0.6, seed = 1, up = [0, 1, 0], closeUnder = true, eaveFascia = true } = {}) {
+export function tiledPlane(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.1, tileW = 1.4, lip = 0.24, fascia = 0.6, seed = 1, up = [0, 1, 0], closeUnder = true, eaveFascia = true } = {}) {
   const n = normal3(e0, e1, r0[0] === r1[0] && r0[1] === r1[1] && r0[2] === r1[2] ? r0 : r1, up);
   const slope = len3(sub3(lerp3(r0, r1, 0.5), lerp3(e0, e1, 0.5)));
   const N = Math.max(1, Math.round(slope / course));
