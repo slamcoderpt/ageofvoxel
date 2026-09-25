@@ -20,26 +20,36 @@ export class Overlays {
     g.setAttribute('aInfo', this.aInfo);
     g.setAttribute('aCol', this.aCol);
     g.instanceCount = 0;
+    // Bars are sized in world units along their length but a fixed number of
+    // pixels tall, with a crisp 1px dark outline, so they stay legible over
+    // the busy tops of a packed melee at any zoom.
     const mat = new THREE.ShaderMaterial({
+      uniforms: { uResY: { value: 900 }, uBarPx: { value: 5 } },
       vertexShader: `
         attribute vec3 aPos; attribute vec4 aInfo; attribute vec3 aCol;
-        varying vec2 vUv; varying float vFill; varying vec3 vCol;
+        uniform float uResY; uniform float uBarPx;
+        varying vec2 vUv; varying float vFill; varying vec3 vCol; varying vec2 vPx;
         void main(){
           vUv = uv; vFill = aInfo.x; vCol = aCol;
           vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
           vec3 up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
-          float w = aInfo.y;
-          vec3 p = aPos + right * position.x * w + up * position.y * 0.1;
+          vec4 mv = viewMatrix * vec4(aPos, 1.0);
+          float wpp = -mv.z / (projectionMatrix[1][1] * uResY * 0.5); // world units per pixel
+          float w = max(aInfo.y, wpp * 14.0);
+          float h = wpp * uBarPx;
+          vPx = vec2(w / wpp, uBarPx);
+          vec3 p = aPos + right * position.x * w + up * position.y * h;
           gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
         }`,
       fragmentShader: `
-        varying vec2 vUv; varying float vFill; varying vec3 vCol;
+        varying vec2 vUv; varying float vFill; varying vec3 vCol; varying vec2 vPx;
         void main(){
-          vec2 px = vUv;
-          float border = step(px.y, 0.18) + step(0.82, px.y);
-          vec3 c = px.x < vFill ? vCol : vec3(0.12, 0.1, 0.08);
-          if (px.x < vFill) c *= 0.85 + 0.3 * px.y;
-          c = mix(c, vec3(0.04), clamp(border, 0.0, 1.0) * 0.8);
+          vec2 px = vUv * vPx;
+          float edge = min(min(px.x, vPx.x - px.x), min(px.y, vPx.y - px.y));
+          if (edge < 1.0) { gl_FragColor = vec4(0.03, 0.025, 0.02, 0.95); return; }
+          // fill measured inside the outline
+          float f = (px.x - 1.0) / (vPx.x - 2.0);
+          vec3 c = f < vFill ? vCol * (0.8 + 0.45 * vUv.y) : vec3(0.07, 0.03, 0.025);
           gl_FragColor = vec4(c, 1.0);
         }`,
       depthTest: false,
@@ -66,6 +76,12 @@ export class Overlays {
     this._c = new THREE.Color();
   }
 
+  resize(w, h) {
+    const u = this.bars.material.uniforms;
+    u.uResY.value = h;
+    u.uBarPx.value = Math.round(Math.min(7, Math.max(4, h / 1080 * 6)));
+  }
+
   render(alpha) {
     const game = this.game;
     const sel = game.selection || new Set();
@@ -76,9 +92,10 @@ export class Overlays {
       this.aPos.setXYZ(n, x, y, z);
       this.aInfo.setXYZW(n, Math.max(0, e.hp / e.maxHp), w, 0, 0);
       const f = e.hp / e.maxHp;
-      if (e.owner === game.localPlayer) this._c.setRGB(0.25, 0.9, 0.3);
-      else this._c.setHex(game.players[e.owner]?.color ?? 0xffffff);
-      if (f < 0.35 && e.owner === game.localPlayer) this._c.setRGB(0.95, 0.75, 0.2);
+      if (e.owner === game.localPlayer) this._c.setRGB(0.0, 0.75, 0.3);
+      else if (e.owner === 0) this._c.setRGB(0.9, 0.85, 0.6);
+      else this._c.setRGB(0.85, 0.0, 0.0);
+      if (f < 0.35 && e.owner === game.localPlayer) this._c.setRGB(0.95, 0.6, 0.0);
       this.aCol.setXYZ(n, this._c.r, this._c.g, this._c.b);
       n++;
     };
@@ -99,11 +116,10 @@ export class Overlays {
       const x = u.prevX + (u.x - u.prevX) * alpha, z = u.prevZ + (u.z - u.prevZ) * alpha;
       const selected = sel.has(u.id);
       if (selected || hover === u.id) addRing(u, x, z, u.radius * 1.5 + 0.1);
-      // In a big fight bars over every scratched unit bury the action: show
-      // them for selected/hovered units, and briefly for units just hit.
-      const recent = u.combat_hitT !== undefined && game.time - u.combat_hitT < 1.6;
-      if (selected || hover === u.id || (recent && u.hp < u.maxHp))
-        addBar(u, x, game.map.heightAt(x, z) + game.units.heightOf(u) + 0.3, z, u.def.myth ? 1.2 : selected || hover === u.id ? 0.9 : 0.6);
+      // bars only on damaged (or selected/hovered) units, so in a big fight
+      // they mark the fighters at the contact line and read who is losing
+      if (selected || hover === u.id || u.hp < u.maxHp)
+        addBar(u, x, game.map.heightAt(x, z) + game.units.heightOf(u) + 0.35, z, u.def.myth ? 1.5 : u.def.class === 'cavalry' ? 1.0 : 0.8);
     }
     for (const b of game.entities.buildings()) {
       if (b.owner !== game.localPlayer && !game.fog.isExplored(b.x, b.z)) continue;

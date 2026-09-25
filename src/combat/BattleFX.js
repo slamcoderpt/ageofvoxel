@@ -14,6 +14,7 @@ import { applyFogOfWar } from '../core/FogOfWar.js';
 
 const MAX_CELLS = 12000;
 const MAX_DUST = 3000;
+const MAX_SPARK = 2000;
 
 export class BattleFX {
   constructor(game) {
@@ -21,6 +22,101 @@ export class BattleFX {
     this.rng = new RNG(9173);
     this._initScars();
     this._initDust();
+    this._initSparks();
+  }
+
+  // ------------------------------------------------------------------ sparks
+  // Hot hit sparks: HDR-bright additive points (they catch the bloom pass),
+  // drawn over the figures so a blow landing inside a packed line still shows.
+  _initSparks() {
+    const N = MAX_SPARK;
+    this.sN = 0;
+    this.sPos = new Float32Array(N * 3); this.sVel = new Float32Array(N * 3); this.sCol = new Float32Array(N * 3);
+    this.sSize = new Float32Array(N); this.sBase = new Float32Array(N); this.sAlpha = new Float32Array(N);
+    this.sLife = new Float32Array(N); this.sMax = new Float32Array(N); this.sGrav = new Float32Array(N);
+    const geo = new THREE.BufferGeometry();
+    this.gsPos = new THREE.BufferAttribute(this.sPos, 3).setUsage(THREE.DynamicDrawUsage);
+    this.gsCol = new THREE.BufferAttribute(this.sCol, 3).setUsage(THREE.DynamicDrawUsage);
+    this.gsSize = new THREE.BufferAttribute(this.sSize, 1).setUsage(THREE.DynamicDrawUsage);
+    this.gsAlpha = new THREE.BufferAttribute(this.sAlpha, 1).setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('position', this.gsPos);
+    geo.setAttribute('color', this.gsCol);
+    geo.setAttribute('psize', this.gsSize);
+    geo.setAttribute('palpha', this.gsAlpha);
+    geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { uScale: { value: 900 } },
+      vertexShader: `
+        attribute float psize; attribute float palpha; varying vec3 vCol; varying float vA;
+        uniform float uScale;
+        void main(){
+          vCol = color; vA = palpha;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = max(2.0, psize * uScale / -mv.z);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        varying vec3 vCol; varying float vA;
+        void main(){
+          vec2 p = gl_PointCoord - 0.5;
+          float d = length(p) * 2.0;
+          float core = 1.0 - smoothstep(0.0, 0.45, d);
+          float halo = 1.0 - smoothstep(0.3, 1.0, d);
+          float a = vA * (core + 0.45 * halo * halo);
+          if (a < 0.01) discard;
+          gl_FragColor = vec4(mix(vCol, vec3(3.0), core * 0.5) * a, a);
+        }`,
+      vertexColors: true,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+      blending: THREE.AdditiveBlending,
+    });
+    this.sparks = new THREE.Points(geo, mat);
+    this.sparks.frustumCulled = false;
+    this.sparks.renderOrder = 30;
+    this.sparks.userData.noAO = true;
+    this.game.scene.add(this.sparks);
+  }
+
+  spark(x, y, z, { count = 6, color = 0xffa030, bright = 2.2, size = 0.25, life = 0.35, speed = 4, up = 2.5, gravity = -12 } = {}) {
+    const r = this.rng;
+    this._dc.set(color);
+    for (let n = 0; n < count; n++) {
+      if (this.sN >= MAX_SPARK) return;
+      const i = this.sN++, k = i * 3;
+      const a = r.range(0, Math.PI * 2), sp = speed * r.range(0.3, 1);
+      this.sPos[k] = x + r.range(-0.06, 0.06); this.sPos[k + 1] = y + r.range(-0.06, 0.06); this.sPos[k + 2] = z + r.range(-0.06, 0.06);
+      this.sVel[k] = Math.cos(a) * sp; this.sVel[k + 1] = up * r.range(0.4, 1.3); this.sVel[k + 2] = Math.sin(a) * sp;
+      this.sCol[k] = this._dc.r * bright; this.sCol[k + 1] = this._dc.g * bright; this.sCol[k + 2] = this._dc.b * bright;
+      this.sBase[i] = this.sSize[i] = size * r.range(0.7, 1.3);
+      this.sAlpha[i] = 1;
+      this.sLife[i] = this.sMax[i] = life * r.range(0.6, 1.3);
+      this.sGrav[i] = gravity;
+    }
+  }
+
+  _updateSparks(dt) {
+    let i = 0;
+    while (i < this.sN) {
+      this.sLife[i] -= dt;
+      if (this.sLife[i] <= 0) {
+        const j = --this.sN;
+        if (i !== j) {
+          for (const arr of [this.sPos, this.sVel, this.sCol]) { arr[i * 3] = arr[j * 3]; arr[i * 3 + 1] = arr[j * 3 + 1]; arr[i * 3 + 2] = arr[j * 3 + 2]; }
+          for (const arr of [this.sSize, this.sBase, this.sAlpha, this.sLife, this.sMax, this.sGrav]) arr[i] = arr[j];
+        }
+        continue;
+      }
+      const k = i * 3, dr = Math.max(0, 1 - 3 * dt);
+      this.sVel[k] *= dr; this.sVel[k + 2] *= dr;
+      this.sVel[k + 1] = this.sVel[k + 1] * dr + this.sGrav[i] * dt;
+      this.sPos[k] += this.sVel[k] * dt; this.sPos[k + 1] += this.sVel[k + 1] * dt; this.sPos[k + 2] += this.sVel[k + 2] * dt;
+      const t = 1 - this.sLife[i] / this.sMax[i];
+      this.sAlpha[i] = Math.min(1, (1 - t) * 1.8);
+      this.sSize[i] = this.sBase[i] * (1 - 0.5 * t);
+      i++;
+    }
   }
 
   // ------------------------------------------------------------------ scars
@@ -48,13 +144,15 @@ export class BattleFX {
       injectFragment(shader, '#include <color_fragment>', `
         {
           vec2 tx = floor(vScarXZ * 8.0);
-          float h1 = scarHash(tx), h2 = scarHash(tx + 17.3), h3 = scarHash(tx + 41.9);
-          // neighbourhood-smoothed coverage so stains read as blobs, not noise
-          float cover = vScar.x * (0.75 + 0.5 * scarHash(floor(vScarXZ * 4.0)));
-          float blood = vScar.y * (0.7 + 0.6 * scarHash(floor(vScarXZ * 4.0) + 5.1));
+          vec2 tc = floor(vScarXZ * 4.0);
+          float h3 = scarHash(tx + 41.9);
+          // coarse coverage: stains read as solid trodden patches, not sprinkled noise
+          float hc = scarHash(tc), hb = scarHash(tc + 5.1);
+          float cover = vScar.x - 0.25 * hc;
+          float blood = vScar.y - 0.3 * hb;
           vec3 c;
-          if (h2 < blood) c = mix(vec3(0.09, 0.008, 0.006), vec3(0.16, 0.014, 0.01), h3);
-          else if (h1 < cover) c = h3 < 0.33 ? vec3(0.13, 0.075, 0.035) : (h3 < 0.7 ? vec3(0.19, 0.115, 0.055) : vec3(0.09, 0.055, 0.03));
+          if (blood > 0.25) c = mix(vec3(0.09, 0.008, 0.006), vec3(0.16, 0.014, 0.01), h3);
+          else if (cover > 0.2) c = mix(vec3(0.2, 0.13, 0.065), vec3(0.12, 0.075, 0.035), clamp(cover, 0.0, 1.0)) * (0.9 + 0.2 * h3);
           else discard;
           diffuseColor.rgb = c;
         }`);
@@ -199,10 +297,15 @@ export class BattleFX {
     }
     const y = gy + h * 0.6;
     if (kind === 'melee') {
-      game.fx.emit({ x: px, y, z: pz, count: 5, color: 0xffd27a, size: 0.09, life: 0.28, speed: 4.5, up: 2.2, gravity: -14, spread: 0.08, additive: true, drag: 3 });
-      game.fx.emit({ x: px, y: y + 0.1, z: pz, count: 1, color: 0xfff0c0, size: 0.55, life: 0.12, speed: 0, up: 0, gravity: 0, spread: 0.02, additive: true });
+      // bronze on bronze: a hot white flash, a spray of orange and white sparks
+      this.spark(px, y + 0.1, pz, { count: 1, color: 0xffd890, bright: 1.8, size: 2.2, life: 0.3, speed: 0, up: 0, gravity: 0 });
+      this.spark(px, y, pz, { count: 7, color: 0xff9a30, bright: 2.6, size: 0.5, life: 0.5, speed: 4, up: 2.6 });
+      this.spark(px, y, pz, { count: 3, color: 0xffffff, bright: 2.2, size: 0.4, life: 0.32, speed: 5, up: 1.8 });
+      // feet scrabbling at the seam: dirt clods and a low burst of dust
+      game.fx.emit({ x: px, y: gy + 0.12, z: pz, count: 6, color: 0x6b4a2a, size: 0.13, life: 0.6, speed: 2.4, up: 2.8, gravity: -13, spread: 0.25 });
+      this.puff(px, pz, { count: 2, size: 0.9, life: 1.3, alpha: 0.55, speed: 0.9, up: 0.5, y: 0.15, spread: 0.3, color: 0xc9ad84 });
+      this.scar(px, pz, 0.55, 0.35, 0.0);
     }
-    game.fx.emit({ x: px, y: y - 0.1, z: pz, count: kind === 'arrow' ? 3 : 4, color: 0x8e1414, size: 0.1, life: 0.55, speed: 1.6, up: 1.8, gravity: -11, spread: 0.12 });
     if (this.rng.next() < 0.3) this.scar(x, z, 0.45, 0.0, 0.35);
   }
 
@@ -225,19 +328,23 @@ export class BattleFX {
   }
 
   // Called every combat scan for a unit swinging in melee / galloping.
-  scuff(u, charging) {
+  scuff(u, charging, t) {
     if (charging) {
       const b = -Math.sin(u.rot) * 0.9, c = -Math.cos(u.rot) * 0.9;
       this.puff(u.x + b * 0.4, u.z + c * 0.4, { count: 1, size: 1.4, life: 1.8, alpha: 0.45, speed: 0.3, dx: b, dz: c });
       this.scar(u.x, u.z, 0.5, 0.18);
       return;
     }
-    this.scar(u.x + this.rng.range(-0.3, 0.3), u.z + this.rng.range(-0.3, 0.3), 0.7, 0.26);
-    if (this.rng.next() < 0.4) this.puff(u.x, u.z, { count: 1, size: 2.0, life: 3.0, alpha: 0.34, speed: 0.35, up: 0.3, y: 0.7, spread: 0.5 });
+    // churn the ground and raise dust along the contact line, not round the fighter
+    const mx = t ? (u.x + t.x) / 2 : u.x, mz = t ? (u.z + t.z) / 2 : u.z;
+    this.scar(mx + this.rng.range(-0.2, 0.2), mz + this.rng.range(-0.2, 0.2), 0.75, 0.3);
+    this.puff(mx, mz, { count: 1, size: 1.6, life: 2.4, alpha: 0.42, speed: 0.4, up: 0.35, y: 0.3, spread: 0.3, color: 0xd4bc94 });
+    if (this.rng.next() < 0.5) this.game.fx.emit({ x: mx, y: this.game.map.heightAt(mx, mz) + 0.1, z: mz, count: 3, color: 0x5e4126, size: 0.12, life: 0.5, speed: 1.8, up: 2.4, gravity: -13, spread: 0.3 });
   }
 
   // ------------------------------------------------------------------ tick
   update(dt) {
+    this._updateSparks(dt);
     let i = 0;
     while (i < this.dN) {
       this.dLife[i] -= dt;
@@ -289,6 +396,8 @@ export class BattleFX {
   }
 
   render() {
+    this.sparks.geometry.setDrawRange(0, this.sN);
+    this.gsPos.needsUpdate = this.gsCol.needsUpdate = this.gsSize.needsUpdate = this.gsAlpha.needsUpdate = true;
     this.dust.geometry.setDrawRange(0, this.dN);
     this.gdPos.needsUpdate = this.gdCol.needsUpdate = this.gdSize.needsUpdate = this.gdAlpha.needsUpdate = true;
     if (this.scarDirty) {
@@ -298,5 +407,5 @@ export class BattleFX {
     }
   }
 
-  resize(w, h) { this.dust.material.uniforms.uScale.value = h * 0.9; }
+  resize(w, h) { this.dust.material.uniforms.uScale.value = h * 0.9; this.sparks.material.uniforms.uScale.value = h * 0.9; }
 }

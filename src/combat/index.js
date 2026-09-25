@@ -31,7 +31,9 @@ export class Combat {
     });
   }
 
-  rangeOf(u) { return u.def.attack?.range ?? 0.5; }
+  // combat_reach: extra reach for spearmen holding a line (BattleScene), which
+  // keeps a visible seam of open ground between the two fronts.
+  rangeOf(u) { return (u.def.attack?.range ?? 0.5) + (u.combat_reach || 0); }
 
   approach(u, t) {
     const range = this.rangeOf(u);
@@ -93,14 +95,16 @@ export class Combat {
     if (target.kind === 'building') dmg *= attacker?.def?.class === 'myth' ? 1.2 : 0.35;
     dmg *= 1 - (target.def?.armor ?? 0);
     target.hp -= dmg;
-    target.flashT = 0.18;
+    target.flashT = 0.15;
     target.combat_hitT = game.time;
     this.fx.hit(target, attacker, kind || (attacker?.kind === 'unit' && attacker.def?.attack && !attacker.def.attack.projectile ? 'melee' : 'arrow'));
     game.events.emit('unit:damaged', { target, attacker, amount: dmg });
     // retaliate
     if (target.kind === 'unit' && attacker && attacker.id && !attacker.dead && target.def.attack) {
       const ot = target.order?.type;
-      if (ot === 'idle' || (ot === 'move' && target.owner === ENEMY)) game.commands.order(target, { type: 'attack', targetId: attacker.id, auto: true });
+      const leashed = target.combat_leash && Math.hypot(attacker.x - target.x, attacker.z - target.z) > target.combat_leash + 1;
+      if (leashed) { /* holding the line: ignore distant attackers */ }
+      else if (ot === 'idle' || (ot === 'move' && target.owner === ENEMY)) game.commands.order(target, { type: 'attack', targetId: attacker.id, auto: true });
       else if (target.def.gatherer && ot !== 'attack' && target.owner === ENEMY && game.rng.chance(0.3)) game.commands.order(target, { type: 'attack', targetId: attacker.id, auto: true });
     }
     if (target.hp <= 0) this.kill(target, attacker);
@@ -140,7 +144,7 @@ export class Combat {
       const ot = u.order?.type;
       // auto-acquire for idle soldiers
       if (ot === 'idle' && scan && !u.def.gatherer) {
-        const e = this.pickTarget(u, u.sight);
+        const e = this.pickTarget(u, u.combat_leash || u.sight);
         if (e) game.commands.order(u, { type: 'attack', targetId: e.id, auto: true });
         continue;
       }
@@ -152,7 +156,7 @@ export class Combat {
         if (e) { u.order.targetId = e.id; t = e; }
       }
       if (!t || t.dead || t.removed) {
-        const e = !u.def.gatherer ? this.pickTarget(u, u.sight) : null;
+        const e = !u.def.gatherer ? this.pickTarget(u, u.combat_leash || u.sight) : null;
         if (e) { u.order.targetId = e.id; this.approach(u, e); }
         else if (u.order.thenBuildings) {
           const b = this.findEnemyBuildingNear(u, 200);
@@ -171,10 +175,10 @@ export class Combat {
       if (u.moving) game.movement.stop(u);
       u.rot = Math.atan2(t.x - u.x, t.z - u.z);
       u.anim.want = 'attack';
-      if (scan && !u.def.attack.projectile) this.fx.scuff(u, false);
+      if (scan && !u.def.attack.projectile) this.fx.scuff(u, false, t);
       if (u.attackCd <= 0) {
         const a = u.def.attack;
-        u.attackCd = a.cooldown;
+        u.attackCd = a.cooldown * (0.85 + 0.3 * game.rng.next());
         u.anim.attackT = 0;
         if (a.projectile) this.projectiles.fire(u, t, a.damage, { fromY: 1.3 });
         else {
@@ -208,5 +212,5 @@ export class Combat {
     this.overlays.render(alpha);
   }
 
-  resize(w, h) { this.fx.resize(w, h); }
+  resize(w, h) { this.fx.resize(w, h); this.overlays.resize(w, h); }
 }
