@@ -119,7 +119,7 @@ export class GodPowers {
     const now = this.game.time;
     for (let i = 0; i < n; i++) {
       const a = vr.range(0, Math.PI * 2), sp = vr.range(1.5, 5.5) * power;
-      const ember = i < Math.ceil(n * (blue ? 0.15 : 0.4));
+      const ember = i < Math.ceil(n * (blue ? 0.4 : 0.4));
       this.debris.push({
         x: x + Math.cos(a) * 0.3, y: y + 0.2, z: z + Math.sin(a) * 0.3,
         vx: Math.cos(a) * sp, vy: vr.range(4, 10) * power, vz: Math.sin(a) * sp,
@@ -139,7 +139,7 @@ export class GodPowers {
       const a = vr.range(0, Math.PI * 2), sp = vr.range(5, 13) * power;
       // each spark starts a few ms into its flight (the discharge is already
       // throwing them as the first stroke lands), so the burst reads at once
-      const vx = Math.cos(a) * sp, vz = Math.sin(a) * sp, vy = vr.range(3, 10) * power, t = vr.range(0.03, 0.2);
+      const vx = Math.cos(a) * sp, vz = Math.sin(a) * sp, vy = vr.range(5, 14) * power, t = vr.range(0.03, 0.2);
       this.sparks.push({ x: x + vx * t, y: y + 0.25 + vy * t - 10 * t * t, z: z + vz * t, vx, vy: vy - 20 * t, vz, t0: now, life: vr.range(0.35, 0.8) * (0.6 + 0.4 * power), dim, warm: warm && i % 5 < 2 });
     }
     if (this.sparks.length > 400) this.sparks.splice(0, this.sparks.length - 400);
@@ -177,13 +177,13 @@ export class GodPowers {
       for (const o of game.movement.hash.near(x, z, splash, (o) => !o.dead && o !== target && game.isEnemy(owner, o.owner))) hit(o, damage * 0.4);
     }
     for (const o of thrown) this.knock(o, x, z, o === target ? 1.1 : 0.8);
-    this.throwDebris(x, y, z, 22, 1, seed, true);
+    this.throwDebris(x, y, z, 30, 1.1, seed, true);
     this.charRim(x, y, z, seed);
-    this.throwSparks(x, y, z, 34, seed);
+    this.throwSparks(x, y, z, 54, seed, 1.15);
     // white-hot sparks, blue electric motes, earth and smoke
     game.fx.emit({ x, y: y + 0.3, z, count: 14, color: 0xcfe2ff, size: 0.14, life: 0.45, speed: 9, up: 6, gravity: -16, additive: true, drag: 0.5 });
     game.fx.emit({ x, y: y + 0.6, z, count: 6, color: 0x3d6cdf, size: 0.3, life: 0.6, speed: 3.5, up: 2.5, gravity: -2, additive: true, spread: 0.6 });
-    game.fx.emit({ x, y: y + 0.2, z, count: 16, color: 0x5a5550, size: 0.5, life: 1.4, speed: 3.2, up: 1.2, gravity: 0.6, grow: 1.8, spread: 0.4 });
+    game.fx.emit({ x, y: y + 0.2, z, count: 10, color: 0x2a2622, size: 0.5, life: 1.2, speed: 3.2, up: 1.2, gravity: 0.6, grow: 1.8, spread: 0.4 });
     game.fx.emit({ x, y: y + 0.2, z, count: 14, color: 0x5d4a33, size: 0.2, life: 1.0, speed: 4.5, up: 6, gravity: -16 });
   }
 
@@ -270,7 +270,7 @@ export class GodPowers {
       const age = game.time - s.t0;
       if (s.blast || s.size || age > 5) continue;
       const k = 1 - age / 5;
-      if (vr.chance(0.25 + 0.6 * k)) game.fx.emit({ x: s.x + vr.range(-0.4, 0.4), y: s.y + 0.3, z: s.z + vr.range(-0.4, 0.4), count: 1, color: vr.chance(0.5) ? 0x2a2826 : 0x3d3a38, size: 0.55 + 0.35 * k, life: 2.2, speed: 0.25, up: 1.6, gravity: 0.9, grow: 1.8, spread: 0.3 });
+      if (vr.chance(0.15 + 0.4 * k)) game.fx.emit({ x: s.x + vr.range(-0.4, 0.4), y: s.y + 0.3, z: s.z + vr.range(-0.4, 0.4), count: 1, color: vr.chance(0.5) ? 0x141312 : 0x1f1d1b, size: 0.5 + 0.3 * k, life: 2.2, speed: 0.25, up: 1.6, gravity: 0.9, grow: 1.8, spread: 0.3 });
     }
     this.updateDebris(dt);
     for (const p of this.sparks) {

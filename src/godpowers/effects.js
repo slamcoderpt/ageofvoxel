@@ -425,7 +425,7 @@ const perimMat = () => new THREE.ShaderMaterial({
       // inner glow: a gradient falloff toward the storm centre, streaked by
       // noise that swirls round the ring; a thin lip spills outward
       float swirl = vn1(vA * 28.6479 - uTime * 2.2 + vD * 1.6) * 0.55 + vn1(vA * 9.5493 + uTime * 0.9 - vD * 0.8) * 0.45;
-      float fall = vD < 0.0 ? exp(vD * 0.75) : exp(-vD * 3.5);
+      float fall = vD < 0.0 ? exp(vD * 1.5) : exp(-vD * 3.5);
       float band = fall * (0.35 + 0.65 * swirl) * (0.7 + 0.3 * surge);
       float hot = hotAt(vA);
       // the wall is alive: the whole ring flickers with the storm, dead
@@ -439,7 +439,9 @@ const perimMat = () => new THREE.ShaderMaterial({
       vec3 col = vec3(0.7, 0.88, 1.2) * core * 0.6 * lvl
                + vec3(0.9, 0.95, 1.2) * exp(-d * d / (w * w * 0.25)) * lead * 0.5 * gfl
                + vec3(0.2, 0.5, 1.1) * sheath * 0.3 * (0.35 + 1.1 * hot + 0.6 * lead) * (0.5 + 0.5 * liveK)
-               + mix(vec3(0.16, 0.08, 0.65), vec3(0.12, 0.32, 1.0), fall) * band * 0.1 * (0.4 + 1.0 * hot + 0.5 * lead);
+               + mix(vec3(0.16, 0.08, 0.65), vec3(0.12, 0.32, 1.0), fall) * band * 0.12 * (0.6 + 0.5 * hot + 0.4 * lead)
+               // soft pool of light where the wall meets the ground
+               + vec3(0.3, 0.26, 1.0) * exp(-d * d * 1.4) * 0.12 * (0.6 + 0.4 * surge) * (0.7 + 0.6 * hot + 0.5 * lead);
       gl_FragColor = vec4(col * uK, 1.0);
     }`,
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
@@ -471,7 +473,11 @@ const curtainMat = () => new THREE.ShaderMaterial({
       float liveK = mix(0.1, 1.0, smoothstep(0.1, 0.6, S.x * S.z + 0.25 * vn1(vA * 4.0 - uTime * 1.3)));
       float a = liveK * (0.08 + streak * 0.9 * (0.4 + S.x) + (sp1 * 0.8 + sp2 * 0.55) * n * (0.6 + lead) + foot * (1.4 + 2.5 * lead) * (0.4 + 0.6 * S.x)) * fall * (0.25 + 1.6 * hotAt(vA) + 0.8 * lead) * gfl;
       vec3 c = mix(vec3(0.35, 0.25, 1.0), vec3(0.4, 0.7, 1.2), 1.0 - vH);
-      gl_FragColor = vec4(c * a * 0.32 * uK, 1.0);
+      // a soft sheet of light rising off the whole ring and fading upward
+      // (the vortex column of launch_013), brightest by the latest strike
+      float sheet = pow(1.0 - vH, 2.6) * (0.55 + 0.45 * vn1(vA * 12.0 - uTime * 1.7)) * (0.8 + 0.6 * hotAt(vA) + 0.5 * lead);
+      vec3 sc = mix(vec3(0.3, 0.12, 0.9), vec3(0.45, 0.6, 1.3), pow(1.0 - vH, 3.0));
+      gl_FragColor = vec4((c * a * 0.34 + sc * sheet * 0.075) * uK, 1.0);
     }`,
   transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false,
 });
@@ -531,7 +537,7 @@ const stormGradeMat = (add = false) => new THREE.ShaderMaterial({
     uInvVP: { value: new THREE.Matrix4() }, uPlaneY: { value: 0 }, uCenter: { value: new THREE.Vector2() },
     uR: { value: 10 }, uK: { value: 0 }, uFlash: { value: 0 }, uTime: { value: 0 },
     uPools: { value: Array.from({ length: MAX_POOLS }, () => new THREE.Vector4()) },
-    uPoolCol: { value: new THREE.Color(0.12, 0.34, 1.35) },
+    uPoolCol: { value: new THREE.Color(0.9, 1.4, 3.0) },
   },
   vertexShader: `varying vec2 vNdc; void main(){ vNdc = position.xy; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
   fragmentShader: `uniform mat4 uInvVP; uniform float uPlaneY, uR, uK, uFlash, uTime; uniform vec2 uCenter;
@@ -555,9 +561,11 @@ const stormGradeMat = (add = false) => new THREE.ShaderMaterial({
       // is a radial vignette - clearer over the struck army at the centre,
       // darker toward the wall - so the strike-lit units read against it;
       // beyond the ring the land sits in the cloud shadow.
-      vec3 inC = mix(vec3(0.7, 0.76, 1.0), vec3(0.4, 0.45, 0.78), smoothstep(0.15, 1.0, r)) * (0.85 + 0.25 * shade);
-      vec3 midC = vec3(0.4, 0.44, 0.66) * (0.8 + 0.35 * shade);
-      vec3 m = mix(vec3(0.55, 0.59, 0.76), midC, near);
+      // (the ring is a lit stage: the storm floor stays near full light with a
+      // cool cast, and the world past the wall drops into storm dark)
+      vec3 inC = mix(vec3(0.86, 0.9, 1.1), vec3(0.62, 0.64, 0.98), smoothstep(0.2, 1.0, r)) * (0.88 + 0.2 * shade);
+      vec3 midC = vec3(0.3, 0.33, 0.52) * (0.75 + 0.35 * shade);
+      vec3 m = mix(vec3(0.34, 0.37, 0.52), midC, near);
       m = mix(m, inC, inside);
       m += vec3(0.04, 0.07, 0.16) * uFlash * (0.3 + 0.7 * inside);
       // screen vignette: the frame edges fall off into storm dark
@@ -569,14 +577,15 @@ const stormGradeMat = (add = false) => new THREE.ShaderMaterial({
         vec4 P = uPools[i];
         if (P.z <= 0.0) continue;
         float dd = length(g - P.xy) / P.w;
-        pool += P.z * (exp(-dd * dd * 3.0) * 0.9 + exp(-dd * dd * 0.8) * 0.08);
+        pool += P.z * (exp(-dd * dd * 2.2) * 0.85 + exp(-dd * dd * 0.6) * 0.15);
       }
       #ifdef ADD_POOL
         // additive part: blue-grey rain haze over the storm floor (lifts and
         // desaturates the darkened ground) + cool strike light on dark ground
         // (a faint deep-blue lift only: a grey haze turned the army to mush)
-        vec3 fog = vec3(0.002, 0.006, 0.022) * (inside * 0.8 + near * 0.4) * uK;
-        gl_FragColor = vec4(fog + vec3(0.16, 0.34, 0.9) * pool * 0.16, 1.0);
+        // (only a faint cool lift under the strike: the relight of the albedo
+        // in the multiply pass carries the flash, so nothing turns to haze)
+        gl_FragColor = vec4(vec3(0.05, 0.09, 0.22) * pool * 0.4, 1.0);
       #else
         m += uPoolCol * pool;
         gl_FragColor = vec4(m, 1.0);
@@ -838,7 +847,7 @@ export class BoltRenderer {
         v.pin.scale.setScalar(1.1);
         v.gflash.material.uniforms.uO.value = Math.min(0.85, e * 0.75) * (0.2 + 0.8 * pin);
         v.gflash.scale.setScalar(2.4 + 0.8 * pin);
-        v.glow.material.uniforms.uO.value = Math.min(0.14, e * 0.11) * (0.3 + 0.7 * pin);
+        v.glow.material.uniforms.uO.value = Math.min(0.07, e * 0.05) * (0.3 + 0.7 * pin);
         v.glow.scale.setScalar(4.5 + 2.5 * pin);
         v.flare.material.uniforms.uO.value = Math.min(0.45, e * 0.35) * pin;
         v.flare.scale.set(6 * pin + 1, 0.25 * pin + 0.08, 1);
@@ -849,7 +858,11 @@ export class BoltRenderer {
         const sk = Math.min(1, age / 0.42);
         v.shock.scale.setScalar(0.5 + Math.sqrt(sk) * 4.2);
         v.shock.material.uniforms.uA.value = Math.pow(1 - sk, 1.6) * 0.7;
-        pools.push({ x: b.x, z: b.z, i: Math.min(0.3, e * 0.22) * (0.45 + 0.55 * pin), r: 3.4 + 0.8 * (1 - k) });
+        // the strike relights the land and the men round it: a white-blue
+        // pool ~5 tiles across (150-200 px) that multiplies the albedo up to
+        // ~3x for the first few frames, then dies with the channel
+        const snap = age < 0.1 ? 1 : Math.exp(-(age - 0.1) / 0.12);
+        pools.push({ x: b.x, z: b.z, i: Math.min(1.3, e) * (0.12 + 0.88 * snap), r: 4.4 + 0.6 * snap });
         for (const st of storms) {
           const dx = b.x - st.x, dz = b.z - st.z, d = Math.hypot(dx, dz);
           const w = Math.min(1.2, env) * (0.45 + 0.55 * Math.min(1, d / st.radius)) * Math.pow(1 - k, 0.7);
@@ -860,10 +873,11 @@ export class BoltRenderer {
           const l = this.lights[li++];
           // low and blue, reaching ~1/3 of the ring: bright blue rim light
           // on the units and walls round the strike
-          l.color.setHex(0x4f86ff);
-          l.position.set(b.x, b.y + 4.2, b.z);
-          l.distance = 9;
-          l.intensity = 12 * Math.min(1.2, e) * (0.4 + 0.6 * pin);
+          l.color.setHex(0x7aa6ff);
+          l.position.set(b.x, b.y + 2.6, b.z);
+          l.distance = 12;
+          const snapL = age < 0.1 ? 1 : Math.exp(-(age - 0.1) / 0.12);
+          l.intensity = 80 * Math.min(1.2, e) * (0.1 + 0.9 * snapL);
         }
       } else flash = Math.max(flash, env * 0.5);
     }
@@ -882,7 +896,7 @@ export class BoltRenderer {
       this.spot.position.set(spotB.x + 0.1, spotB.y + 2.6, spotB.z + 0.1);
       this.spot.target.position.set(spotB.x, spotB.y, spotB.z);
       this.spot.target.updateMatrixWorld();
-      this.spot.intensity = 3 * Math.min(1.1, spotEnv);
+      this.spot.intensity = 9 * Math.min(1.1, spotEnv);
     } else {
       this.spot.visible = false;
       this.spot.intensity = 0;
@@ -967,8 +981,8 @@ export class BoltRenderer {
       else {
         // lightning-fused cracks: blue-white hot for a moment (blooms), then
         // cooling through orange to a dull red glow
-        const w = Math.max(0, 1 - age / 0.4);
-        const q = Math.exp(-age / 0.9) * (sc.size ? 0.7 : 1);
+        const w = Math.max(0, 1 - age / 0.7);
+        const q = Math.exp(-age / 2.2) * (sc.size ? 0.7 : 1.2);
         this._c.setRGB(0.35 * q, 0.55 * q, 1.6 * q).lerp(this._hotC, w * 0.8);
         v.e.material.color.copy(this._c);
       }
@@ -1117,6 +1131,35 @@ export class BoltRenderer {
       if (light.intensity !== st.set) st.base = light.intensity; // someone else changed it
       st.set = light.intensity = st.base * (1 - dim * k);
     }
+    // the storm crushes the milky toe lift and the pale aerial haze of the
+    // fair-weather grade: blacks go black, the far land sinks into a dark
+    // storm blue and bloom opens up, so the bolts and the wall glow against a
+    // dark world instead of sitting on a grey wash (bloom is left alone:
+    // opened up, it smeared the strike into a white fog)
+    const post = L.post, fog = this.game.scene.fog;
+    const ease = (obj, key, target) => {
+      if (!obj) return;
+      const S = this._postBase || (this._postBase = new Map());
+      let st = S.get(obj);
+      if (!st) S.set(obj, st = {});
+      const cur = obj[key];
+      if (st[key] === undefined || (typeof cur === 'number' && cur !== st[key].set)) st[key] = { base: cur, set: cur };
+      const b = st[key].base;
+      st[key].set = obj[key] = b + (target - b) * k;
+    };
+    const G = post?.grade?.uniforms;
+    if (G) {
+      ease(G.uToeLift, 'value', 0.0);
+      ease(G.uContrast, 'value', 1.22);
+      ease(G.uVignette, 'value', 0.55);
+      ease(G.uSaturation, 'value', 1.08);
+    }
+    if (fog?.color) {
+      if (!this._fogBase) this._fogBase = fog.color.clone();
+      if (k > 0) fog.color.copy(this._fogBase).lerp(this._stormFog || (this._stormFog = new THREE.Color(0x141a2c)), k);
+      else if (this._fogTouched) fog.color.copy(this._fogBase);
+      this._fogTouched = k > 0;
+    }
   }
 
   // Orbiting energy bands of the storm wall, rebuilt each frame.
@@ -1133,7 +1176,7 @@ export class BoltRenderer {
       // strike surges brighter, so brightness varies round the circumference
       const da = Math.abs(((head - hotA) % TAU + TAU * 1.5) % TAU - Math.PI);
       const pulse = 0.25 + 0.75 * Math.pow(0.5 + 0.5 * Math.sin(now * b.pf + b.ph), 1.5);
-      const i = b.i * k * pulse * (0.75 + 0.9 * hotW * Math.exp(-da * da * 1.5) + 0.25 * Math.min(1, flash));
+      const i = b.i * k * pulse * (0.75 + 0.5 * hotW * Math.exp(-da * da * 1.5) + 0.15 * Math.min(1, flash));
       if (i < 0.02) continue;
       const pts = [], n = 36;
       for (let s = 0; s <= n; s++) {
@@ -1145,9 +1188,9 @@ export class BoltRenderer {
           z: st.z + Math.sin(a) * r,
         });
       }
-      lines.push({ pts, w: b.w, i: 0.9 * i, taper: 0.92, fade: 1 });
-      lines.push({ pts, w: b.w * 3.2, i: 0.42 * i, taper: 0.85, fade: 0.95, halo: true });
-      lines.push({ pts, w: b.w * 13, i: 0.17 * i, taper: 0.7, fade: 0.9, halo: true });
+      lines.push({ pts, w: b.w, i: 0.7 * i, taper: 0.92, fade: 1 });
+      lines.push({ pts, w: b.w * 3.2, i: 0.3 * i, taper: 0.85, fade: 0.95, halo: true });
+      lines.push({ pts, w: b.w * 9, i: 0.12 * i, taper: 0.7, fade: 0.9, halo: true });
     }
     if (v.bands.geometry !== this._emptyGeo) v.bands.geometry.dispose();
     v.bands.geometry = lines.length ? ribbonGeometry(lines) : this._emptyGeo;
@@ -1165,7 +1208,7 @@ export class BoltRenderer {
       if (k < 0 || k >= 1) continue;
       const L = 0.075; // streak length = velocity * L seconds
       const a = Math.pow(1 - k, 1.5) * 1.3 * (p.dim ?? 1);
-      lines.push({ pts: [{ x: p.x, y: p.y, z: p.z }, { x: p.x - p.vx * L, y: p.y - p.vy * L, z: p.z - p.vz * L }], w: 0.065, i: a, taper: 0.7, fade: 0.8 });
+      lines.push({ pts: [{ x: p.x, y: p.y, z: p.z }, { x: p.x - p.vx * L, y: p.y - p.vy * L, z: p.z - p.vz * L }], w: 0.08, i: a, taper: 0.7, fade: 0.8 });
     }
     if (mesh.geometry !== this._emptyGeo) mesh.geometry.dispose();
     mesh.geometry = lines.length ? ribbonGeometry(lines) : this._emptyGeo;
@@ -1207,7 +1250,7 @@ export class BoltRenderer {
     const heightAt = (x, z) => this.game.map.heightAt(x, z);
     const ring = this.addMesh(new THREE.Mesh(perimGeometry(st.x, st.z, R, R - 4.8, R + 1.0, heightAt, 10), perimMat()), 44);
     ring.position.set(st.x, 0, st.z);
-    const curtain = this.addMesh(new THREE.Mesh(curtainGeometry(st.x, st.z, R, 4.6, heightAt), curtainMat()), 45);
+    const curtain = this.addMesh(new THREE.Mesh(curtainGeometry(st.x, st.z, R, 6.5, heightAt), curtainMat()), 45);
     curtain.position.set(st.x, 0, st.z);
     const rain = this.addMesh(new THREE.LineSegments(rainGeometry(st.t0 * 1000 | 0, R), rainMat()), 46);
     // the energy wall: comet-like bands of light orbiting the perimeter at
@@ -1226,11 +1269,11 @@ export class BoltRenderer {
     }
     const rng = new RNG((st.t0 * 1000 | 0) ^ 0x9e3779b9);
     const bandDefs = [];
-    for (let j = 0; j < 12; j++) {
+    for (let j = 0; j < 9; j++) {
       bandDefs.push({
-        a0: (j / 12) * Math.PI * 2 + rng.range(-0.3, 0.3), sp: rng.range(1.3, 2.4), span: rng.range(0.8, 1.8),
+        a0: (j / 9) * Math.PI * 2 + rng.range(-0.3, 0.3), sp: rng.range(1.3, 2.4), span: rng.range(0.8, 1.8),
         r: R + rng.range(-0.35, 0.2), y0: j % 3 === 0 ? rng.range(0.2, 0.6) : rng.range(0.8, 4.2), ya: rng.range(0.4, 1.3),
-        yf: rng.int(1, 3), ph: rng.range(0, 6.28), w: rng.range(0.07, 0.13), i: rng.range(0.7, 1.1), pf: rng.range(1.5, 3.5),
+        yf: rng.int(1, 3), ph: rng.range(0, 6.28), w: j % 4 === 1 ? rng.range(0.16, 0.24) : rng.range(0.05, 0.12), i: rng.range(0.7, 1.1), pf: rng.range(1.5, 3.5),
       });
     }
     const bands = this.addMesh(new THREE.Mesh(new THREE.BufferGeometry(), makeRibbonMaterial(new THREE.Color(0x5a78ff), new THREE.Color(0xeee8ff), 1.7, new THREE.Color(0x8a30ff))), 48);
