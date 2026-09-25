@@ -13,7 +13,7 @@ import { Debris } from './Debris.js';
 // Everything is simulated in the fixed tick (deterministic captures); the
 // visual RNG is private so gameplay randomness is untouched.
 
-const MAX_CELLS = 12000;
+const MAX_CELLS = 24000;
 const MAX_DUST = 4000;
 const MAX_SPARK = 3000;
 // brown-ochre dust of trampled dry earth
@@ -181,15 +181,15 @@ export class BattleFX {
     g.index = plane.index;
     for (const k of ['position', 'normal', 'uv']) g.setAttribute(k, plane.attributes[k]);
     this.aCellPos = new THREE.InstancedBufferAttribute(new Float32Array(MAX_CELLS * 3), 3).setUsage(THREE.DynamicDrawUsage);
-    this.aCell = new THREE.InstancedBufferAttribute(new Float32Array(MAX_CELLS * 2), 2).setUsage(THREE.DynamicDrawUsage); // dirt, blood
+    this.aCell = new THREE.InstancedBufferAttribute(new Float32Array(MAX_CELLS * 3), 3).setUsage(THREE.DynamicDrawUsage); // dirt, blood, wash
     g.setAttribute('aCellPos', this.aCellPos);
     g.setAttribute('aCell', this.aCell);
     g.instanceCount = 0;
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     addShaderPatch(mat, 'scar', (shader) => {
-      prependVertex(shader, 'attribute vec3 aCellPos; attribute vec2 aCell; varying vec2 vScarXZ; varying vec2 vScar;');
+      prependVertex(shader, 'attribute vec3 aCellPos; attribute vec3 aCell; varying vec2 vScarXZ; varying vec3 vScar;');
       injectVertex(shader, '#include <begin_vertex>', 'transformed += aCellPos; vScarXZ = transformed.xz; vScar = aCell;');
-      prependFragment(shader, `varying vec2 vScarXZ; varying vec2 vScar;
+      prependFragment(shader, `varying vec2 vScarXZ; varying vec3 vScar;
         float scarHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }`);
       injectFragment(shader, '#include <color_fragment>', `
         {
@@ -203,6 +203,11 @@ export class BattleFX {
           vec3 c;
           if (blood > 0.25) c = mix(vec3(0.09, 0.008, 0.006), vec3(0.16, 0.014, 0.01), h3);
           else if (cover > 0.2) c = mix(vec3(0.2, 0.13, 0.065), vec3(0.12, 0.075, 0.035), clamp(cover, 0.0, 1.0)) * (0.9 + 0.2 * h3);
+          // (r14) the trampled battle ground: a quiet, low-saturation dusty
+          // earth (and a muted olive fringe) laid over the busy grass and
+          // orange dirt, a value step below the men, so they pop
+          else if (vScar.z > 0.75 - 0.12 * hc) c = vec3(0.30, 0.255, 0.185) * (0.95 + 0.07 * hc + 0.04 * h3);
+          else if (vScar.z > 0.3 - 0.1 * hc) c = vec3(0.215, 0.215, 0.12) * (0.93 + 0.1 * hc + 0.05 * h3);
           else discard;
           diffuseColor.rgb = c;
         }`);
@@ -237,11 +242,30 @@ export class BattleFX {
           this.cells.set(key, i);
           this.cellKey[i] = key;
           this.aCellPos.setXYZ(i, (cx + 0.5) * VOXEL, map.level(cx, cz) * VOXEL + 0.012, (cz + 0.5) * VOXEL);
-          this.aCell.setXY(i, 0, 0);
+          this.aCell.setXYZ(i, 0, 0, 0);
         }
         this.aCell.setX(i, Math.min(0.92, this.aCell.getX(i) + dirt * f));
         this.aCell.setY(i, Math.min(0.8, this.aCell.getY(i) + blood * f));
       }
+    this.scarDirty = true;
+  }
+
+  // Trampled battle ground under one terrain column (visual only, does not
+  // weather): kind 1 = quiet dusty earth, 0.5 = muted olive fringe.
+  wash(cx, cz, kind) {
+    const map = this.game.map;
+    if (cx < 0 || cz < 0 || cx >= map.cols || cz >= map.cols || map.isWaterCol(cx, cz)) return;
+    const key = cz * map.cols + cx;
+    let i = this.cells.get(key);
+    if (i === undefined) {
+      if (this.cellN >= MAX_CELLS) return;
+      i = this.cellN++;
+      this.cells.set(key, i);
+      this.cellKey[i] = key;
+      this.aCellPos.setXYZ(i, (cx + 0.5) * VOXEL, map.level(cx, cz) * VOXEL + 0.012, (cz + 0.5) * VOXEL);
+      this.aCell.setXYZ(i, 0, 0, 0);
+    }
+    this.aCell.setZ(i, Math.max(this.aCell.getZ(i), kind));
     this.scarDirty = true;
   }
 
@@ -521,14 +545,14 @@ export class BattleFX {
       // compact fully faded cells
       let j = 0;
       while (j < this.cellN) {
-        if (this.aCell.getX(j) <= 0 && this.aCell.getY(j) <= 0) {
+        if (this.aCell.getX(j) <= 0 && this.aCell.getY(j) <= 0 && this.aCell.getZ(j) <= 0) {
           const last = --this.cellN;
           this.cells.delete(this.cellKey[j]);
           if (j !== last) {
             this.cellKey[j] = this.cellKey[last];
             this.cells.set(this.cellKey[j], j);
             this.aCellPos.setXYZ(j, this.aCellPos.getX(last), this.aCellPos.getY(last), this.aCellPos.getZ(last));
-            this.aCell.setXY(j, this.aCell.getX(last), this.aCell.getY(last));
+            this.aCell.setXYZ(j, this.aCell.getX(last), this.aCell.getY(last), this.aCell.getZ(last));
           }
           continue;
         }

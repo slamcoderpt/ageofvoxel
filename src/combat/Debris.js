@@ -26,7 +26,7 @@ function models() {
   const helmet = new VoxelModel();
   helmet.box(-2, 0, -2, 4, 3, 4, BRONZE);
   helmet.box(-2, 3, -1, 4, 1, 3, BRONZE);
-  helmet.box(-1, 4, -3, 2, 2, 6, TEAM); // crest
+  helmet.box(-1, 4, -3, 2, 2, 6, 0x3b2a1e); // dark horsehair crest (helmets stay neutral)
   helmet.carve(-1, 0, 1, 2, 2, 1);
   const arrows = new VoxelModel(); // a spent arrow snapped in the grass
   arrows.box(0, 0, -4, 1, 1, 8, WOOD_L);

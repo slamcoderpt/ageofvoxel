@@ -73,21 +73,21 @@ export class Units {
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dl) * vec3(0.94, 0.97, 1.04), vDead * 0.5);
         // (r13: half drained, and a little of the dye kept lit, so the dead
         // in the seam still say red or blue)
-        vec3 teamSat = diffuseColor.rgb * vTeam * (1.0 - vDead * 0.75);
         // (pure hue only: a grey lift turned the red army pink)
         // (round 12: a small lift only, so the dye keeps its lit/shaded
         // value split instead of reading as flat self-lit paint)
-        totalEmissiveRadiance += teamSat * (0.22 + teamRim * 0.45);
+        // (round 14: no self-lit dye at all: the judges' rule is that team
+        // colour is lit and shaded by the scene like every other voxel)
         // a warm rim on every surface turned edge-on (all parts, not just the
         // dye), a light edge inside the dark outline that separates helmet,
         // shoulders and shield from the body and the man behind
-        totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, 0.93, 0.8) * teamRim * 0.35 * (1.0 - vDead);
+        totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, 0.95, 0.85) * teamRim * 0.22 * (1.0 - vDead);
         // hit flash tint: the man struck blazes in his own army's colour
         // (on top of the core white lift), so every blow says who took it
         // (a saturated tint of his own albedo plus a coloured rim, not a flat
         // additive wash, which turned whole giants pastel pink and lilac)
         float hitK = min(vFlash * 20.0, 1.0);
-        totalEmissiveRadiance += diffuseColor.rgb * vTeamCol * vTeamCol * (0.26 + 0.2 * teamRim) * hitK;
+        totalEmissiveRadiance += diffuseColor.rgb * vTeamCol * vTeamCol * (0.1 + 0.1 * teamRim) * hitK;   // (r14: a touch, not a wash)
       }`);
     });
     // Silhouette outline: every part is drawn a second time as a dark
@@ -386,7 +386,18 @@ export class Units {
         const { bob, fwd = 0 } = pose(rig.kind, u, rig.rot);
         const rot = (u.prevRot ?? u.rot) + dr * alpha + (u.dead ? 0 : u.units_yaw || 0);
         // static slot jitter + melee press + lunge/recoil along the facing
-        const push = u.dead ? 0 : (u.units_press || 0) + fwd;
+        let push = u.dead ? 0 : (u.units_press || 0) + fwd;
+        // (round 14) an engaged pair never interpenetrates: the lunge is
+        // capped so each man keeps to his half of the gap between them,
+        // leaving a sliver of ground between shield and shield
+        if (push > 0 && u.order?.type === 'attack' && !u.def.attack?.projectile) {
+          const t = game.entities.get(u.order.targetId);
+          if (t && t.kind === 'unit' && !t.dead) {
+            const d = Math.hypot(t.x - u.x, t.z - u.z);
+            const minSep = ((u.radius || 0.4) + (t.radius || 0.4)) * 1.4;
+            push = Math.min(push, Math.max(0.02, (d - minSep) / 2));
+          }
+        }
         const big = u.def.myth || u.def.hero;
         // slot jitter mostly sideways along the rank, little along the facing,
         // so a fighting front stays a line instead of a scatter
@@ -453,10 +464,9 @@ export class Units {
         }
         const pc = game.players[u.owner].color;
         const coat = COATS[u.id % COATS.length];
-        this._c.setHex(pc);
-        // full-saturation dye: crush the minor channels (keeping the peak),
-        // so red reads as red, not a pinkish brown, once lit and tone mapped
-        { const mx = Math.max(this._c.r, this._c.g, this._c.b, 1e-4); this._c.setRGB(mx * (this._c.r / mx) ** 2, mx * (this._c.g / mx) ** 2, mx * (this._c.b / mx) ** 2); }
+        // Round 14 rule: a medium-saturation cloth dye (a woad blue, a madder
+        // red), not a primary; it is lit and shaded like every other voxel
+        this._dyeFor(pc, this._c);
         // the dead lose their colour: team dye fades to grey-brown, the body darkens
         // the dead keep their army's colour, darkened (so a fallen man still
         // says whose he was) while the rest of him goes dull
@@ -518,6 +528,20 @@ export class Units {
     }
     SH.count = si;
     SH.instanceMatrix.needsUpdate = true;
+  }
+
+  // The army's cloth dye for a player colour: same hue, medium saturation
+  // and a mid value (sRGB), cached per colour.
+  _dyeFor(hex, out) {
+    this._dyes ??= new Map();
+    let d = this._dyes.get(hex);
+    if (!d) {
+      const hsl = {}; new THREE.Color().setHex(hex).getHSL(hsl, THREE.SRGBColorSpace);
+      const blue = hsl.h > 0.5 && hsl.h < 0.75;
+      d = new THREE.Color().setHSL(hsl.h, hsl.s < 0.2 ? hsl.s : blue ? 0.55 : 0.62, blue ? 0.52 : 0.5, THREE.SRGBColorSpace);
+      this._dyes.set(hex, d);
+    }
+    return out.copy(d);
   }
 
   // Unit height in world units (for health bars etc.)

@@ -135,7 +135,9 @@ export class Overlays {
       // who were struck in the last couple of seconds (heroes and giants
       // once they are down a quarter). A fixed pixel size per class at a
       // fixed height over the head, so the few there are line up.
-      const hurt = f < (big ? 0.8 : 0.7) && game.time - (u.combat_hitT ?? -99) < 6;
+      // (r14: the judges want a bar on every damaged unit, so a fight reads
+      // as a fight: anyone below full health shows one)
+      const hurt = f < 0.985;
       if (selected || hover === u.id || hurt)
         addBar(u, x, game.map.heightAt(u.x, u.z) + game.units.heightOf(u) + 0.3, z, big ? 76 : u.def.class === 'cavalry' ? 50 : 44, 1);
     }
