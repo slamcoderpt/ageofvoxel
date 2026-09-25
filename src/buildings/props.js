@@ -219,9 +219,11 @@ function court(m, kind) {
     // straw bee skeps on a plank stand, a fig tree
     m.box(0, 1, 1, 3, 1, 5, 0x7a5230);
     for (const z of [1, 3]) { m.box(0, 2, z, 2, 2, 2, 0xc9a55a); m.set(0, 4, z, 0xb89448); m.set(0, 2, z + 1, 0x3a2e22); }
-    // a row of potted herbs and flowers along the wall, a stone bench
-    for (const z of [6, 8, 10]) potPlant(m, 2, 1, z, z);
-    m.box(0, 1, 7, 1, 1, 3, 0xcfc7b4);
+    // a washing line between two posts with cloths drying, a stone bench
+    m.box(1, 1, 6, 1, 5, 1, 0x6a462a); m.box(1, 1, 10, 1, 5, 1, 0x6a462a);
+    m.box(1, 5, 7, 1, 1, 3, 0xcdb98a);
+    m.box(1, 3, 7, 1, 2, 1, 0xefe8d6); m.box(1, 4, 9, 1, 1, 1, 0x3f6aa6); m.set(1, 3, 9, 0x3f6aa6);
+    m.box(0, 1, 8, 1, 1, 2, 0xcfc7b4);
   } else {
     // hen coop: a low timber hutch under a thatch lean-to, hay, hens
     m.box(0, 1, 1, 3, 2, 3, 0x8a6a40); m.box(1, 1, 3, 1, 1, 1, 0x2a211b);

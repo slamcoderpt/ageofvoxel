@@ -89,12 +89,14 @@ export class Buildings {
         if (o === b || o.type !== b.type || o.bld_variant === undefined) continue;
         const d = Math.hypot(o.x - b.x, o.z - b.z);
         if (d >= 30) continue;
-        // same variant counts fully, same plan in the other finish
-        // counts most of the way
         const wgt = 1 + (30 - d) / 30;
         for (let c = 0; c < n; c++) {
-          if (c === o.bld_variant) score[c] += wgt;
-          else if (b.type === 'house' && c % HOUSE_PLANS === o.bld_variant % HOUSE_PLANS) score[c] += 0.7 * wgt;
+          if (c === o.bld_variant) { score[c] += 2 * wgt; continue; }
+          if (b.type !== 'house') continue;
+          // same plan in another tint counts most of the way, a roof of
+          // the same tint a little, so plans and tints both spread
+          if (c % HOUSE_PLANS === o.bld_variant % HOUSE_PLANS) score[c] += 0.7 * wgt;
+          if (Math.floor(c / HOUSE_PLANS) === Math.floor(o.bld_variant / HOUSE_PLANS)) score[c] += 0.35 * wgt;
         }
       }
       const start = Math.floor(hash3(b.tx, 7, b.tz, 31) * n) % n;
@@ -108,13 +110,24 @@ export class Buildings {
     return v;
   }
 
-  // Houses stand square to the street grid, fronts to +z: a planned town's
-  // plots line up, and the variety comes from the plans themselves (their
-  // footprints, heights and ridge directions differ). Turning them made the
-  // rotated corners overlap the side courts and neighbours into one heap.
+  // Houses turn on their square plots in quarter turns (a gable end or a
+  // side yard to the street instead of every front in a row) with a few
+  // degrees of slack, so the lots do not line up like a kit; the rotated
+  // footprint is still the same 3x3 square, so nothing reaches a neighbour.
   houseYaw(b) {
-    if (b.bld_yaw === undefined) b.bld_yaw = 0;
+    if (b.bld_yaw === undefined) {
+      const h = hash3(b.tx, 17, b.tz, 91);
+      const q = h < 0.5 ? 0 : h < 0.72 ? 1 : h < 0.92 ? -1 : 2;
+      b.bld_yaw = q * Math.PI / 2 + (hash3(b.tx, 18, b.tz, 92) - 0.5) * 0.09;
+    }
     return b.bld_yaw;
+  }
+
+  // How far a house stands back from its street front, in tiles (visual
+  // only; kept small so the plot never reaches the alley's far side).
+  houseSetback(b) {
+    if (b.bld_setback === undefined) b.bld_setback = Math.floor(hash3(b.tx, 19, b.tz, 93) * 3) * 0.2;
+    return b.bld_setback;
   }
 
   // Paint a paved plaza (irregular disc) around a building, skipping tiles
@@ -364,7 +377,7 @@ export class Buildings {
       }
       const y = game.map.heightAt(b.x, b.z);
       m.position.set(b.x, y, b.z);
-      if (b.type === 'house') m.rotation.y = this.houseYaw(b);
+      if (b.type === 'house') { m.rotation.y = this.houseYaw(b); m.position.z -= this.houseSetback(b); }
       const visible = b.owner === game.localPlayer || game.fog.isExplored(b.x, b.z);
       m.visible = visible;
       const mesh = m.userData.mesh;

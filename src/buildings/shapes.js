@@ -96,6 +96,14 @@ export const TILES = {
     plane: { ribGap: 1.5, ribW: 0.34, ribH: 0.42, bandEvery: 0, weather: 0.25, lip: 0.2, antefixH: 0.3 } },
   warmRed: { tones: [0xdc6438, 0xd45d35, 0xe36d40, 0xd8613a], butt: 0x8e3a22, fascia: 0xf0ebe0, ridge: 0xa84027, soffit: 0x643f33, antefix: 0xf4efe4,
     plane: { ribGap: 1.5, ribW: 0.34, ribH: 0.42, bandEvery: 0, weather: 0.25, lip: 0.2, antefixH: 0.3 } },
+  // the house roof range, darkest to palest: old dark-brick tiles, sun-faded
+  // pale orange tiles and lichen-weathered grey-brown tiles
+  darkBrick: { tones: [0x7e3226, 0x742d22, 0x88392b, 0x6f2a20], butt: 0x4c2018, fascia: 0xe8e1d2, ridge: 0x5e271c, soffit: 0x3a2a24, antefix: 0xe8e1d2,
+    plane: { ribGap: 1.5, ribW: 0.34, ribH: 0.42, bandEvery: 0, weather: 0.3, lip: 0.2, antefixH: 0.3 } },
+  faded: { tones: [0xe8a878, 0xe09e6e, 0xefb385, 0xdc9a6b], butt: 0xa86840, fascia: 0xf1ece2, ridge: 0xc07a4c, soffit: 0x6a4a3a, antefix: 0xf4efe4,
+    plane: { ribGap: 1.5, ribW: 0.34, ribH: 0.42, bandEvery: 0, weather: 0.35, lip: 0.2, antefixH: 0.3 } },
+  weathered: { tones: [0xa88a72, 0x9d806a, 0xb3967e, 0x927762], butt: 0x5e4a3c, fascia: 0xe6e0d2, ridge: 0x6e5646, soffit: 0x3e342c, antefix: 0xe6e0d2,
+    plane: { ribGap: 1.5, ribW: 0.34, ribH: 0.42, bandEvery: 0, weather: 0.5, lip: 0.2, antefixH: 0.3 } },
 };
 
 // A tiled roof plane: eave edge e0-e1 (low), top edge r0-r1 (r0 above e0;
