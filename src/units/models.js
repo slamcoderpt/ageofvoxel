@@ -25,6 +25,7 @@ const EYE_WHITE = 0xf0e8dc;
 const LEATHER = 0x6e4526;
 const LEATHER_DK = 0x4c2e18;
 const BELT = 0x55361e;
+const BELT_DK = 0x2a1a0e;  // near-black leather: the value break at every waist
 const SANDAL = 0x5e3b20;
 const WOOD = 0x7d5431;
 const WOOD_DK = 0x5b3c22;
@@ -50,6 +51,7 @@ function tbox(m, x, y, z, w, h, d, base) {
   return m;
 }
 const TEAM_SHADE = 0xb2b2b2;
+const CLOAK_FOLD = 0x7c7c7c;  // cloak folds a full value step darker than the dye
 
 // ---- humans (voxel 0.075, ~22 voxels tall) ---------------------------------
 // Root: legs hang from the hips at y=10, shins from the knees. The torso sits
@@ -106,25 +108,23 @@ function torsoModel(style, cloak = true) {
     // muscle cuirass (bronze; gold for the hero) with pectoral and abdominal lines
     const MET = style === 'hero' ? GOLD : BRONZE, MET_DK = style === 'hero' ? GOLD_DK : BRONZE_DK;
     if (style === 'hoplite' || style === 'rider') {
-      // Bronze muscle cuirass over a pale linen chiton: the man himself is
-      // neutral metal and cloth with a lit/shaded split (bright pecs and
-      // shoulders, dark side seams and back channel). His army's colour is
-      // trim only: a tunic panel down the front and back under the belt,
-      // the crest and the shield face.
-      // Round 6: the army's colour is the whole tunic. A dyed linothorax
-      // wraps the torso (chest, flanks, back and shoulders, shaded flanks),
-      // with only a bronze breastplate on the chest: from the RTS camera
-      // every man is a block of red or blue with a bronze heart.
-      m.box(0, 2, -1, 8, 7, 6, TEAM);                                             // dyed linothorax
-      tbox(m, 0, 2, -1, 1, 6, 6, TEAM_SHADE); tbox(m, 7, 2, -1, 1, 6, 6, TEAM_SHADE); // shaded flanks
-      tbox(m, 3, 2, -1, 2, 6, 1, TEAM_SHADE);                                      // back seam
-      m.box(2, 4, 5, 4, 4, 1, MET);                                                // bronze breastplate
+      // Round 12: the dyed-all-over linothorax read as a flat blob of team
+      // paint at RTS zoom (helmet, torso, shield and legs merged). Now the
+      // man is bronze and skin with a near-black belt; his army's colour sits
+      // on the shoulder flaps, sleeves, skirt strips, crest and shield, so
+      // each figure has value breaks: bright crest / bronze chest / dark
+      // belt / dyed skirt / skin legs.
+      m.box(0, 2, -1, 8, 7, 6, BRONZE);                                           // cuirass, front and back
+      m.box(0, 2, -1, 1, 6, 6, BRONZE_DK).box(7, 2, -1, 1, 6, 6, BRONZE_DK);      // shaded side seams
+      m.box(3, 2, -1, 2, 6, 1, BRONZE_DK);                                         // back channel
+      m.box(2, 4, 5, 4, 4, 1, MET);                                                // breastplate relief
       m.set(2, 7, 5, 0xf6d98a).set(5, 7, 5, 0xf6d98a);                            // polished pecs
-      m.set(3, 5, 5, MET_DK).set(4, 5, 5, MET_DK);
-      m.box(0, 9, 0, 8, 1, 4, TEAM).box(2, 9, 0, 4, 1, 4, TEAM_TRIM).box(3, 9, 1, 2, 1, 2, SKIN); // dyed shoulder yoke, pale neckline
-      m.box(-1, 6, 0, 1, 3, 4, TEAM).box(8, 6, 0, 1, 3, 4, TEAM);                 // shoulder flaps
-      m.box(-1, 6, 0, 1, 1, 4, TEAM_TRIM).box(8, 6, 0, 1, 1, 4, TEAM_TRIM);
-      m.box(0, 1, -1, 8, 1, 6, BRONZE_DK).carve(1, 1, 1, 6, 1, 2);                // girdle
+      m.set(3, 5, 5, MET_DK).set(4, 5, 5, MET_DK).set(3, 3, 5, MET_DK).set(4, 3, 5, MET_DK);
+      m.box(0, 9, 0, 8, 1, 4, TEAM).box(3, 9, 1, 2, 1, 2, SKIN);                  // dyed shoulder yoke, bare neck
+      m.box(-1, 6, 0, 1, 3, 4, TEAM).box(8, 6, 0, 1, 3, 4, TEAM);                 // dyed shoulder flaps
+      m.box(-1, 5, 0, 1, 1, 4, BELT_DK).box(8, 5, 0, 1, 1, 4, BELT_DK);           // dark flap hems
+      m.box(0, 0, -1, 8, 2, 6, BELT_DK);                                            // broad dark belt band
+      m.set(3, 1, 5, BRONZE(3, 1, 5)).set(4, 1, 5, BRONZE(4, 1, 5));               // buckle
     } else {
       m.box(0, 2, 0, 8, 6, 4, MET);
       m.box(1, 1, 0, 6, 1, 4, MET);
@@ -139,10 +139,10 @@ function torsoModel(style, cloak = true) {
     // down the middle front and back (and a team hem under the strips)
     // dyed skirt all round (alternate strips a shade darker) over a pale hem
     const dyed = style === 'hoplite' || style === 'rider';
-    const strip = (m2, x, y, z, i) => { if (!dyed && i % 2 === 1) m2.box(x, y, z, 1, 4, 1, LEATHER); else if (i % 2) tbox(m2, x, y, z, 1, 4, 1, TEAM_SHADE); else m2.box(x, y, z, 1, 4, 1, TEAM); m2.set(x, y - 1, z, dyed ? TEAM_TRIM : TEAM); };
+    const strip = (m2, x, y, z, i) => { if (i % 2 === 1) m2.box(x, y, z, 1, 4, 1, dyed ? LEATHER_DK : LEATHER); else m2.box(x, y, z, 1, 4, 1, TEAM); m2.set(x, y - 1, z, dyed ? TEAM_TRIM : TEAM); };
     for (let x = 0; x < 8; x++) for (const z of [-1, 4]) strip(m, x, -4, z, x);
     for (let z = 0; z < 4; z++) { strip(m, -1, -4, z, z + 1); strip(m, 8, -4, z, z); }
-    m.box(0, 0, 0, 8, 1, 4, BRONZE_DK);
+    if (!dyed) m.box(0, 0, 0, 8, 1, 4, BRONZE_DK);
     if (style === 'rider') {
       // short chlamys knotted at the right shoulder, a narrow fold down the back
       m.box(1, 5, -1, 6, 3, 1, TEAM).box(2, 3, -2, 4, 2, 1, TEAM);
@@ -173,7 +173,11 @@ function torsoModel(style, cloak = true) {
     // his army's colour from the RTS camera, not as tan jerkins
     m.box(0, 2, -1, 8, 6, 6, TEAM); m.box(1, 8, 0, 6, 1, 4, TEAM);
     tbox(m, 0, 2, -1, 1, 5, 6, TEAM_SHADE); tbox(m, 7, 2, -1, 1, 5, 6, TEAM_SHADE);   // shaded flanks
-    m.box(0, 1, -1, 8, 2, 6, LEATHER);
+    // (round 12) a tan leather jerkin over the lower chest and a near-black
+    // belt: the dyed tunic shows at the shoulders, sleeves and yoke, so the
+    // figure has a light/dark/light stack instead of one flat block of dye
+    m.box(0, 2, -1, 8, 3, 6, (x, y, z) => (hash3(x, y, z, 41) < 0.5 ? 0xa57a4a : 0x946b3f));
+    m.box(0, 1, -1, 8, 1, 6, BELT_DK);
     m.box(1, 4, 5, 1, 4, 1, LEATHER_DK).box(6, 4, 5, 1, 4, 1, LEATHER_DK);
     m.box(-1, 6, 0, 1, 2, 4, TEAM).box(8, 6, 0, 1, 2, 4, TEAM);    // sleeves at the shoulder
     m.line(4, 7, 5, 4, 3, 5, LEATHER_DK);                           // lacing
@@ -213,7 +217,7 @@ function cloakModel(kind) {
     m.box(1, 1, -1, 6, 7, 1, TEAM);
     for (let x = 0; x <= 7; x++) {
       const deep = x % 2 === 0;
-      if (deep) m.box(x, -2, -2, 1, 4, 1, TEAM); else tbox(m, x, -2, -3, 1, 4, 1, TEAM_SHADE);
+      if (deep) m.box(x, -2, -2, 1, 4, 1, TEAM); else tbox(m, x, -2, -3, 1, 4, 1, CLOAK_FOLD);
       m.set(x, -3, deep ? -2 : -3, TEAM_TRIM);
     }
   } else {
@@ -224,7 +228,7 @@ function cloakModel(kind) {
     m.box(0, 8, -1, 6, 1, 3, TEAM);
     for (let x = 0; x <= 7; x++) {
       const bot = 3 + Math.round(x * 0.45);
-      for (let y = bot; y < 8; y++) { if (x % 2) tbox(m, x, y, -2, 1, 1, 1, TEAM_SHADE); else m.set(x, y, -1, TEAM); }
+      for (let y = bot; y < 8; y++) { if (x % 2) tbox(m, x, y, -2, 1, 1, 1, CLOAK_FOLD); else m.set(x, y, -1, TEAM); }
       m.set(x, bot - 1, x % 2 ? -2 : -1, TEAM_TRIM);
     }
     m.set(7, 8, 3, BRONZE(7, 8, 3)).set(7, 8, 4, BRONZE(7, 8, 4)); // brooch

@@ -47,9 +47,9 @@ export class Units {
     // Per-instance fade (1 = solid, 0 = gone) as an ordered-dither discard, so
     // corpses dissolve without sorting transparent instanced meshes.
     addShaderPatch(this.material, 'unitFade', (shader) => {
-      prependVertex(shader, 'attribute float instFade;\nvarying float vFade;');
-      injectVertex(shader, '#include <color_vertex>', 'vFade = instFade;');
-      prependFragment(shader, 'varying float vFade;');
+      prependVertex(shader, 'attribute float instFade;\nattribute float instDead;\nvarying float vFade;\nvarying float vDead;');
+      injectVertex(shader, '#include <color_vertex>', 'vFade = instFade; vDead = instDead;');
+      prependFragment(shader, 'varying float vFade;\nvarying float vDead;');
       injectFragment(shader, '#include <clipping_planes_fragment>', `if (vFade < 0.999) {
         vec2 q = mod(floor(gl_FragCoord.xy), 4.0);
         vec2 lo = mod(q, 2.0), hi = floor(q * 0.5);
@@ -66,15 +66,26 @@ export class Units {
       // dye, so each figure's team colour has a lit edge against the ground
       injectFragment(shader, '#include <emissivemap_fragment>', `{
         float teamRim = pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 1.6);
-        vec3 teamSat = diffuseColor.rgb * vTeam;
+        // the dead drain to a cool, pale-ish grey (albedo desaturated before
+        // lighting), so a body reads as a fallen man, not as a brown clod
+        // of ground clutter nor as a live man in his army's colour
+        float dl = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dl) * vec3(0.94, 0.97, 1.04), vDead * 0.82);
+        vec3 teamSat = diffuseColor.rgb * vTeam * (1.0 - vDead);
         // (pure hue only: a grey lift turned the red army pink)
-        totalEmissiveRadiance += teamSat * (0.7 + teamRim * 1.0);
+        // (round 12: a small lift only, so the dye keeps its lit/shaded
+        // value split instead of reading as flat self-lit paint)
+        totalEmissiveRadiance += teamSat * (0.22 + teamRim * 0.45);
+        // a warm rim on every surface turned edge-on (all parts, not just the
+        // dye), a light edge inside the dark outline that separates helmet,
+        // shoulders and shield from the body and the man behind
+        totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, 0.93, 0.8) * teamRim * 0.35 * (1.0 - vDead);
         // hit flash tint: the man struck blazes in his own army's colour
         // (on top of the core white lift), so every blow says who took it
         // (a saturated tint of his own albedo plus a coloured rim, not a flat
         // additive wash, which turned whole giants pastel pink and lilac)
         float hitK = min(vFlash * 20.0, 1.0);
-        totalEmissiveRadiance += diffuseColor.rgb * vTeamCol * (0.3 + 0.2 * teamRim) * hitK;
+        totalEmissiveRadiance += diffuseColor.rgb * vTeamCol * vTeamCol * (0.26 + 0.2 * teamRim) * hitK;
       }`);
     });
     // Silhouette outline: every part is drawn a second time as a dark
@@ -174,6 +185,9 @@ export class Units {
     const team = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
     const flash = new THREE.InstancedBufferAttribute(new Float32Array(cap), 1);
     const fade = new THREE.InstancedBufferAttribute(new Float32Array(cap).fill(1), 1);
+    const dead = new THREE.InstancedBufferAttribute(new Float32Array(cap), 1);
+    dead.setUsage(THREE.DynamicDrawUsage);
+    mesh.userData.dead = dead;
     team.setUsage(THREE.DynamicDrawUsage); flash.setUsage(THREE.DynamicDrawUsage); fade.setUsage(THREE.DynamicDrawUsage);
     mesh.userData.team = team; mesh.userData.flash = flash; mesh.userData.fade = fade;
     mesh.castShadow = true;
@@ -190,6 +204,7 @@ export class Units {
     g.setAttribute('instTeam', team);
     g.setAttribute('instFlash', flash);
     g.setAttribute('instFade', fade);
+    g.setAttribute('instDead', dead);
     mesh.geometry = g;
     part.mesh = mesh;
     part.cap = cap;
@@ -450,8 +465,11 @@ export class Units {
           // corpse never reads as a live man in his army's colour
           // (and dark: a body lies a full value step below the living, so
           // it reads as part of the ground, not as another man)
-          const m = dk * 0.9;
-          this._c.setRGB(this._c.r + (0.46 - this._c.r) * m, this._c.g + (0.39 - this._c.g) * m, this._c.b + (0.31 - this._c.b) * m).multiplyScalar(1 - dk * 0.4);
+          // (round 12: the shader desaturates the whole body via instDead;
+          // the dye just fades toward a mid grey, and the body is not
+          // darkened into a brown lump)
+          const m = dk * 0.85;
+          this._c.setRGB(this._c.r + (0.62 - this._c.r) * m, this._c.g + (0.62 - this._c.g) * m, this._c.b + (0.64 - this._c.b) * m);
         }
         const ck = 1 - (u.gp_char || 0); // god power char (lightning-struck)
         const tr = this._c.r * ck, tg = this._c.g * ck, tb = this._c.b * ck;
@@ -482,8 +500,9 @@ export class Units {
           p.mesh.userData.team.setXYZ(i, tr, tg, tb);
           p.mesh.userData.flash.setX(i, flash);
           p.mesh.userData.fade.setX(i, fade);
-          if (p.coat) p.mesh.setColorAt(i, this._c.setRGB((coat[0] * (1 - dk) + 0.3 * dk) * ck, (coat[1] * (1 - dk) + 0.27 * dk) * ck, (coat[2] * (1 - dk) + 0.24 * dk) * ck));
-          else p.mesh.setColorAt(i, this._c.setRGB((1 - dk * 0.6) * ck, (1 - dk * 0.63) * ck, (1 - dk * 0.66) * ck));
+          p.mesh.userData.dead.setX(i, dk);
+          if (p.coat) p.mesh.setColorAt(i, this._c.setRGB((coat[0] * (1 - dk) + 0.7 * dk) * ck, (coat[1] * (1 - dk) + 0.7 * dk) * ck, (coat[2] * (1 - dk) + 0.72 * dk) * ck));
+          else p.mesh.setColorAt(i, this._c.setRGB((1 - dk * 0.22) * ck, (1 - dk * 0.22) * ck, (1 - dk * 0.2) * ck));
         }
       }
       for (const p of rig.parts) {
@@ -491,6 +510,7 @@ export class Units {
         p.mesh.userData.team.needsUpdate = true;
         p.mesh.userData.flash.needsUpdate = true;
         p.mesh.userData.fade.needsUpdate = true;
+        p.mesh.userData.dead.needsUpdate = true;
         if (p.mesh.instanceColor) p.mesh.instanceColor.needsUpdate = true;
       }
     }

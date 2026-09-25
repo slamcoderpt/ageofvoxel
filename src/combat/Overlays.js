@@ -85,9 +85,9 @@ export class Overlays {
   resize(w, h) {
     const u = this.bars.material.uniforms;
     u.uResY.value = h;
-    // 6px at 1080p: a 1px dark frame round a 4px fill, thick enough to read
-    // over a packed melee from RTS height
-    u.uBarPx.value = Math.round(Math.min(10, Math.max(5, h / 1080 * 6)));
+    // 7px at 1080p: a 1px near-black frame round a 5px fill, thick enough
+    // to survive the post filters over a packed melee from RTS height
+    u.uBarPx.value = Math.round(Math.min(12, Math.max(6, h / 1080 * 7)));
   }
 
   render(alpha) {
@@ -137,7 +137,7 @@ export class Overlays {
       // fixed height over the head, so the few there are line up.
       const hurt = f < (big ? 0.8 : 0.7) && game.time - (u.combat_hitT ?? -99) < 6;
       if (selected || hover === u.id || hurt)
-        addBar(u, x, game.map.heightAt(u.x, u.z) + game.units.heightOf(u) + 0.3, z, big ? 70 : u.def.class === 'cavalry' ? 46 : 40, 1);
+        addBar(u, x, game.map.heightAt(u.x, u.z) + game.units.heightOf(u) + 0.3, z, big ? 76 : u.def.class === 'cavalry' ? 50 : 44, 1);
     }
     for (const b of game.entities.buildings()) {
       if (b.owner !== game.localPlayer && !game.fog.isExplored(b.x, b.z)) continue;

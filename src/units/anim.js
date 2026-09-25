@@ -465,7 +465,7 @@ export function gearOf(u) {
   return (u.units_gear = {
     kit,
     helm: kit === 1 ? 2 : h < 0.42 ? 0 : h < 0.84 ? 1 : 3,
-    cloak: c < 0.18 ? 1 : c < 0.55 ? 2 : 0,
+    cloak: c < 0.12 ? 1 : c < 0.42 ? 2 : 0,
     shield: s < 0.25 ? 0 : s < 0.45 ? 1 : s < 0.8 ? 2 : 3,
     hat: h < 0.4 ? 0 : h < 0.72 ? 1 : 2,
     pennant: uhash(u, 23) < 0.22 ? 1 : 0,
