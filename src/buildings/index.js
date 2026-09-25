@@ -62,13 +62,11 @@ export class Buildings {
     return this.geos.get(k);
   }
 
-  // Where a house mesh stands: detached plans (not the row plots, which
-  // join wall to wall) sit a little off the plot grid and a few degrees off
-  // square, so a street does not read as a stamped row.
+  // Where a house mesh stands: a little off the plot grid and a degree or
+  // two off square, so a street does not read as a stamped row.
   housePose(b) {
-    const row = [2, 3].includes(this.variantOf(b) % HOUSE_PLANS);
-    const j = row ? 0 : hash3(b.tx, 29, b.tz, 95) - 0.5, k = row ? 0 : hash3(b.tx, 31, b.tz, 96) - 0.5;
-    return { x: b.x + k * 0.45, z: b.z - this.houseSetback(b), yaw: this.houseYaw(b) + j * 0.14 };
+    const j = hash3(b.tx, 29, b.tz, 95) - 0.5, k = hash3(b.tx, 31, b.tz, 96) - 0.5;
+    return { x: b.x + k * 0.45, z: b.z - this.houseSetback(b), yaw: this.houseYaw(b) + j * 0.06 };
   }
 
   // Hearth smoke: finished houses breathe soft, semi-transparent puffs

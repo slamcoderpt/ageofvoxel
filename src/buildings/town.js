@@ -40,19 +40,16 @@ const S = {
   barracks: [-14, 10],
   store: [18, -5],                         // wood yard at the eastern forest edge
   store2: [13, -5],                        // by the gold mine
-  // [dx, dz, plan, yaw]: plans (models.js houseModel) 0 courtyard L,
-  // 1 two-storey with balcony, 2 row pair, 3 row house with roof terrace,
-  // 4 U-plan courtyard, 5 tower house, 6 flat-roofed court house (white
-  // terrace roofs round an open court), 7 one-room hut in a kitchen
-  // garden, 8 flat-roofed block with a gabled annex. Every row mixes flat
-  // white terraces, gables with ridges both ways, hips and small huts, and
-  // turns some plots a quarter so no two neighbours show the same roof.
+  // [dx, dz, plan, yaw]: plans (models.js houseModel) 0 courtyard house
+  // (back range + street wing round a walled court), 1 gable-fronted hall
+  // behind a walled yard, 2 hipped block with a walled side court. Rows
+  // alternate plans; most houses front their street, a few turn a side.
   houses: [
-    [-11, -5, 6, 0], [-14, -5, 2, 0], [-18, -6, 7, -Math.PI / 2], [-23, -5, 8, 0],           // row A
-    [-12, -12, 4, Math.PI / 2], [-16, -13, 6, Math.PI], [-20, -12, 5, 0], [-23, -12, 7, Math.PI / 2], // row B
-    [-11, 3, 8, Math.PI / 2], [-15, 3, 0, 0], [-18, 3, 3, 0], [-23, 4, 6, -Math.PI / 2],     // row C
-    [-20, 10, 1, Math.PI / 2],             // row D, beside the academy
-    [-6, 15, 5, Math.PI / 2], [3, 13, 8, 0],   // along the south street
+    [-11, -5, 0, 0], [-14, -5, 1, 0], [-18, -6, 2, 0], [-23, -5, 0, 0],                       // row A
+    [-12, -12, 1, 0], [-16, -13, 2, 0], [-20, -12, 0, 0], [-23, -12, 1, Math.PI / 2],        // row B
+    [-11, 3, 2, 0], [-15, 3, 0, 0], [-18, 3, 1, 0], [-23, 4, 2, -Math.PI / 2],               // row C
+    [-20, 10, 0, Math.PI / 2],             // row D, beside the academy
+    [-6, 15, 1, 0], [3, 13, 0, 0],         // along the south street
   ],
   house2: [-6, 10],                        // being built, on the south street corner
   farms: [[9, 3], [14, 3], [9, 9]],
