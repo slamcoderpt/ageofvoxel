@@ -375,7 +375,16 @@ export class Buildings {
       }
       const y = game.map.heightAt(b.x, b.z);
       m.position.set(b.x, y, b.z);
-      if (b.type === 'house') { m.rotation.y = this.houseYaw(b); m.position.z -= this.houseSetback(b); }
+      if (b.type === 'house') {
+        // detached plans (not the row plots, which join wall to wall) sit a
+        // little off the plot grid and a few degrees off square, so a street
+        // does not read as a stamped row
+        const row = [2, 3].includes(this.variantOf(b) % HOUSE_PLANS);
+        const j = row ? 0 : hash3(b.tx, 29, b.tz, 95) - 0.5, k = row ? 0 : hash3(b.tx, 31, b.tz, 96) - 0.5;
+        m.rotation.y = this.houseYaw(b) + j * 0.14;
+        m.position.z -= this.houseSetback(b);
+        m.position.x += k * 0.45;
+      }
       const visible = b.owner === game.localPlayer || game.fog.isExplored(b.x, b.z);
       m.visible = visible;
       const mesh = m.userData.mesh;

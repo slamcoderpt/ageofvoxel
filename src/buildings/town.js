@@ -46,10 +46,10 @@ const S = {
   // wall into short terraces; the rest stand a tile or two apart, stepped
   // back and forth off the street line, some turned to a cross street.
   houses: [
-    [-11, -5, 2, 0], [-14, -5, 3, 0], [-18, -6, 0, 0], [-23, -5, 1, 0],        // row A
-    [-12, -12, 1, Math.PI / 2], [-16, -13, 4, 0], [-20, -12, 3, 0], [-23, -12, 2, 0],   // row B
-    [-11, 3, 0, Math.PI / 2], [-15, 3, 2, 0], [-18, 3, 3, 0], [-23, 4, 4, 0],  // row C
-    [-20, 10, 1, 0],                       // row D, beside the academy
+    [-11, -5, 2, 0], [-14, -5, 3, 0], [-18, -6, 0, -Math.PI / 2], [-23, -5, 1, 0],        // row A
+    [-12, -12, 4, Math.PI / 2], [-16, -13, 1, 0], [-20, -12, 3, 0], [-23, -12, 2, 0],   // row B
+    [-11, 3, 0, Math.PI / 2], [-15, 3, 2, 0], [-18, 3, 3, 0], [-23, 4, 4, -Math.PI / 2],  // row C
+    [-20, 10, 1, Math.PI / 2],             // row D, beside the academy
     [-6, 15, 0, Math.PI / 2], [3, 13, 4, 0],   // along the south street
   ],
   house2: [-6, 10],                        // being built, on the south street corner
