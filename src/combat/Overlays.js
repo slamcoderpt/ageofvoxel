@@ -72,6 +72,59 @@ export class Overlays {
     this.rings.renderOrder = 6;
     this.rings.userData.noAO = true;
     game.scene.add(this.rings);
+    // --- team ground marks: a soft disc of saturated team colour with a
+    // brighter rim under every soldier who is fighting. Packed ranks merge
+    // into one red and one blue carpet, so from RTS height the two blocks and
+    // the seam between them read at a glance. Heroes get a gold rim.
+    const disc = new THREE.PlaneGeometry(2, 2);
+    disc.rotateX(-Math.PI / 2);
+    const dg = new THREE.InstancedBufferGeometry();
+    dg.index = disc.index;
+    dg.setAttribute('position', disc.attributes.position);
+    dg.setAttribute('uv', disc.attributes.uv);
+    this.aMark = new THREE.InstancedBufferAttribute(new Float32Array(MAX * 4), 4).setUsage(THREE.DynamicDrawUsage); // x, y, z, radius
+    this.aMarkCol = new THREE.InstancedBufferAttribute(new Float32Array(MAX * 4), 4).setUsage(THREE.DynamicDrawUsage); // rgb, rim kind
+    dg.setAttribute('aMark', this.aMark);
+    dg.setAttribute('aMarkCol', this.aMarkCol);
+    dg.instanceCount = 0;
+    this.marks = new THREE.Mesh(dg, new THREE.ShaderMaterial({
+      vertexShader: `
+        attribute vec4 aMark; attribute vec4 aMarkCol; varying vec2 vUv; varying vec4 vCol;
+        void main(){
+          vUv = uv * 2.0 - 1.0; vCol = aMarkCol;
+          vec3 p = aMark.xyz + position * vec3(aMark.w, 1.0, aMark.w);
+          gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
+        }`,
+      fragmentShader: `
+        varying vec2 vUv; varying vec4 vCol;
+        void main(){
+          float d = length(vUv);
+          if (d > 1.0) discard;
+          if (vCol.a > 0.5) {
+            // hero: a bright gold ring round a warm pool of light, the
+            // focal point of a melee
+            float ring = smoothstep(0.58, 0.66, d) * (1.0 - smoothstep(0.72, 0.8, d));
+            float pool = 0.45 * (1.0 - smoothstep(0.0, 0.62, d));
+            float halo = 0.35 * (1.0 - smoothstep(0.78, 1.0, d)) * smoothstep(0.7, 0.8, d);
+            vec3 gold = vec3(1.6, 1.05, 0.35);
+            float a = max(max(ring, pool), halo);
+            gl_FragColor = vec4(mix(mix(vCol.rgb, gold, 0.55), gold, ring), a);
+            return;
+          }
+          float fill = 0.30 * (1.0 - smoothstep(0.55, 0.9, d));
+          float rim = smoothstep(0.66, 0.8, d) * (1.0 - smoothstep(0.88, 1.0, d));
+          float a = max(fill, rim * 0.6);
+          gl_FragColor = vec4(vCol.rgb, a);
+        }`,
+      transparent: true,
+      depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3,
+    }));
+    this.marks.frustumCulled = false;
+    this.marks.renderOrder = 4;
+    this.marks.userData.noAO = true;
+    game.scene.add(this.marks);
+
     this._m = new THREE.Matrix4();
     this._c = new THREE.Color();
   }
@@ -86,7 +139,7 @@ export class Overlays {
     const game = this.game;
     const sel = game.selection || new Set();
     const hover = game.hoverId;
-    let n = 0, r = 0;
+    let n = 0, r = 0, mk = 0;
     const addBar = (e, x, y, z, w) => {
       if (n >= MAX) return;
       this.aPos.setXYZ(n, x, y, z);
@@ -116,6 +169,13 @@ export class Overlays {
       const x = u.prevX + (u.x - u.prevX) * alpha, z = u.prevZ + (u.z - u.prevZ) * alpha;
       const selected = sel.has(u.id);
       if (selected || hover === u.id) addRing(u, x, z, u.radius * 1.5 + 0.1);
+      else if (mk < MAX && u.owner !== 0 && u.def.class !== 'villager' && (u.order?.type === 'attack' || u.combat_line)) {
+        const hero = u.def.hero;
+        this.aMark.setXYZW(mk, x, game.map.heightAt(x, z) + 0.05, z, u.radius * (hero ? 3.4 : 1.25) + 0.05);
+        this._c.setHex(game.players[u.owner]?.color ?? 0xffffff);
+        this.aMarkCol.setXYZW(mk, this._c.r, this._c.g, this._c.b, hero ? 1 : 0);
+        mk++;
+      }
       // In a big fight a bar over every scratched man is noise (a mostly empty
       // bar reads as a dark dash over the crowd). As in AoM, rank-and-file show
       // bars only when selected or hovered; heroes and myth units once hurt.
@@ -134,6 +194,8 @@ export class Overlays {
     for (const e of game.entities.resources()) {
       if (sel.has(e.id) || hover === e.id) addRing(e, e.x, e.z, Math.max(e.w, e.h) * 0.7);
     }
+    this.marks.geometry.instanceCount = mk;
+    this.aMark.needsUpdate = this.aMarkCol.needsUpdate = true;
     this.bars.geometry.instanceCount = n;
     this.aPos.needsUpdate = this.aInfo.needsUpdate = this.aCol.needsUpdate = true;
     this.rings.count = r;

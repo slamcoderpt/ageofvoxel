@@ -42,11 +42,12 @@ export class Projectiles {
           vec3 p = mix(aTail, aHead, along);
           vec3 dir = aHead - aTail;
           vec3 side = normalize(cross(dir + vec3(1e-4), cameraPosition - p));
-          p += side * position.y * mix(0.03, 0.16, along * along);
+          p += side * position.y * mix(0.02, 0.09, along * along);
           vUv = vec2(along, position.y * 2.0);
           gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
         }`,
-      // a bright streak: hot white-gold at the head (it catches the bloom)
+      // a thin warm streak, gold at the head (kept dim so volleys over the
+      // melee do not read as a rain of white noise)
       // fading through amber to nothing along the trail
       fragmentShader: `
         varying vec2 vUv;
@@ -54,7 +55,7 @@ export class Projectiles {
           float k = vUv.x;
           float core = 1.0 - smoothstep(0.0, 1.0, abs(vUv.y));
           float a = pow(k, 1.3) * core;
-          vec3 c = mix(vec3(1.0, 0.55, 0.18), vec3(1.0, 0.95, 0.8), k * k) * (0.6 + 2.2 * k * k * k);
+          vec3 c = mix(vec3(0.9, 0.5, 0.18), vec3(1.0, 0.85, 0.55), k * k) * (0.25 + 0.9 * k * k * k);
           gl_FragColor = vec4(c * a, a);
         }`,
       transparent: true,

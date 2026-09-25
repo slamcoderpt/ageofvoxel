@@ -17,7 +17,7 @@ const MAX_CELLS = 12000;
 const MAX_DUST = 4000;
 const MAX_SPARK = 3000;
 // brown-ochre dust of trampled dry earth
-const OCHRE = [0xd2b184, 0xc8a574, 0xdcc298, 0xbf9c6c];
+const OCHRE = [0x7a5c3e, 0x6e5236, 0x846548, 0x654a31];
 
 export class BattleFX {
   constructor(game) {
@@ -230,6 +230,9 @@ export class BattleFX {
           vCol = color; vA = palpha; vSeed = fract(position.x * 3.17 + position.z * 1.91);
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           gl_PointSize = min(psize * uScale / -mv.z, 512.0);
+          // depth-test the sprite a little behind its centre: it lies on the
+          // ground as a low layer and the men standing in it stay in front
+          mv.z -= 0.45;
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: `
@@ -257,7 +260,7 @@ export class BattleFX {
   }
 
   // Soft dust puffs. dir (dx, dz) biases the drift (e.g. away from a charge).
-  puff(x, z, { count = 2, size = 1.0, life = 1.8, alpha = 0.5, speed = 0.6, up = 0.35, color = 0xe2d2ae, spread = 0.35, y = 0.35, dx = 0, dz = 0 } = {}) {
+  puff(x, z, { count = 2, size = 1.0, life = 1.8, alpha = 0.35, speed = 0.6, up = 0.05, color = 0x6e5236, spread = 0.35, y = 0.08, dx = 0, dz = 0 } = {}) {
     const r = this.rng;
     const gy = this.game.map.heightAt(x, z);
     this._dc.set(color);
@@ -302,29 +305,26 @@ export class BattleFX {
     const y = gy + h * (0.45 + 0.3 * this.rng.next());
     const r = this.rng;
     if (kind === 'melee') {
-      // Each blow reads differently: bronze on bronze (a small spray of hot
-      // orange sparks), spear into a shield (wood splinters and a dull chip),
-      // or a wound (a dark spray of blood). Always a little dirt at the feet.
-      const roll = r.next();
-      const shielded = target.def?.class === 'infantry' || target.def?.class === 'cavalry';
-      // every blow opens with a short white-orange flash at the point of contact
-      this.spark(px, y, pz, { count: 1, color: 0xffe2b0, bright: 1.6, size: r.range(1.0, 1.5), life: 0.4, speed: 0, up: 0, gravity: 0 });
-      if (roll < 0.4) {
-        this.spark(px, y, pz, { count: r.int(8, 13), color: r.chance(0.5) ? 0xff8a20 : 0xffb050, bright: 2.2, size: 0.5, life: 0.65, speed: r.range(3.5, 6), up: 2.8 });
-        this.spark(px, y, pz, { count: 3, color: 0xfff0d0, bright: 1.8, size: 0.3, life: 0.3, speed: 7, up: 1.6 });
-      } else if (roll < 0.72 && shielded) {
-        game.fx.emit({ x: px, y, z: pz, count: r.int(8, 12), color: r.chance(0.5) ? 0xb88450 : 0xe0bc80, colorVar: 0.2, size: 0.17, life: 0.7, speed: 3.2, up: 3, gravity: -14, spread: 0.08 });
-        this.spark(px, y, pz, { count: r.int(4, 6), color: 0xffa040, bright: 2.0, size: 0.42, life: 0.4, speed: 4, up: 2 });
-      } else {
-        game.fx.emit({ x: px, y: y - 0.1, z: pz, count: r.int(8, 12), color: 0x8a0e0a, colorVar: 0.25, size: 0.17, life: 0.6, speed: 2.4, up: 2.2, gravity: -12, spread: 0.1 });
-        this.spark(px, y, pz, { count: 3, color: 0xff9030, bright: 1.8, size: 0.38, life: 0.35, speed: 4, up: 2 });
-        this.scar(x + r.range(-0.3, 0.3), z + r.range(-0.3, 0.3), 0.35, 0.1, 0.5);
+      // Readability over noise: a landed blow is ONE warm, fat flash at the
+      // point of contact (it catches the bloom and reads from RTS height),
+      // with a few heavy embers. Glancing blows (most of them) show nothing
+      // but a scuff of dirt, so the seam shows a handful of clear hits, not a
+      // carpet of white specks.
+      const big = attacker?.def?.myth || attacker?.def?.hero || target.def?.myth || target.def?.hero;
+      const landed = big || r.next() < 0.45;
+      if (landed) {
+        const s = big ? 2.6 : 1.7;
+        this.spark(px, y, pz, { count: 1, color: 0xffa040, bright: big ? 2.0 : 1.5, size: s * r.range(0.9, 1.1), life: big ? 0.6 : 0.45, speed: 0, up: 0, gravity: 0 });
+        this.spark(px, y, pz, { count: big ? 5 : r.int(2, 3), color: r.chance(0.5) ? 0xff7a18 : 0xffa838, bright: 1.9, size: big ? 0.7 : 0.55, life: 0.55, speed: r.range(2.5, 4), up: 2.2 });
+        if (r.chance(0.35)) {
+          // a wound: a short dark spray and blood on the ground
+          game.fx.emit({ x: px, y: y - 0.1, z: pz, count: r.int(4, 6), color: 0x6a0c08, colorVar: 0.2, size: 0.17, life: 0.55, speed: 2.0, up: 2.0, gravity: -12, spread: 0.1 });
+          this.scar(x + r.range(-0.3, 0.3), z + r.range(-0.3, 0.3), 0.35, 0.1, 0.5);
+        }
       }
-      // feet scrabbling: brown dust at ground level, clods of earth
-      this.puff(px + r.range(-0.3, 0.3), pz + r.range(-0.3, 0.3), { count: r.int(1, 2), size: r.range(1.1, 1.7), life: 1.8, alpha: 0.45, speed: 0.7, up: 0.3, y: 0.25, spread: 0.35, color: OCHRE[r.int(0, OCHRE.length - 1)] });
-      // voxel chunks: clods of turf and bits of bronze and wood
-      game.fx.emit({ x: px, y: gy + 0.15, z: pz, count: r.int(4, 7), color: 0x4e3620, colorVar: 0.2, size: 0.16, life: 0.6, speed: 2.4, up: 3, gravity: -13, spread: 0.25 });
-      if (r.chance(0.5)) game.fx.emit({ x: px, y, z: pz, count: r.int(2, 4), color: r.chance(0.5) ? 0xc89a50 : 0x9aa0a4, colorVar: 0.15, size: 0.12, life: 0.55, speed: 3, up: 2.5, gravity: -14, spread: 0.1 });
+      // feet scrabbling: a low puff of dark earth at the feet, a clod or two
+      if (r.chance(0.5)) this.puff(px + r.range(-0.3, 0.3), pz + r.range(-0.3, 0.3), { count: 1, size: r.range(0.9, 1.3), life: 1.6, alpha: 0.3, speed: 0.5, up: 0.04, y: 0.05, spread: 0.3, color: OCHRE[r.int(0, OCHRE.length - 1)] });
+      if (r.chance(0.4)) game.fx.emit({ x: px, y: gy + 0.15, z: pz, count: r.int(2, 4), color: 0x4e3620, colorVar: 0.2, size: 0.16, life: 0.5, speed: 2.0, up: 2.6, gravity: -13, spread: 0.25 });
       this.scar(px, pz, 0.5, 0.3, 0.0);
     } else if (kind === 'arrow') {
       if (r.chance(0.5)) game.fx.emit({ x, y, z, count: 3, color: 0x7a0c08, size: 0.08, life: 0.4, speed: 1.2, up: 1.2, gravity: -12, spread: 0.05 });
@@ -337,7 +337,7 @@ export class BattleFX {
     const x = e.x, z = e.z;
     const big = e.def?.myth ? 1.8 : e.def?.class === 'cavalry' ? 1.4 : 1;
     this.scar(x, z, 0.9 * big, 0.7, 0.75);
-    this.puff(x, z, { count: Math.round(3 * big), size: 1.1 * big, life: 2.2, alpha: 0.4, speed: 0.9 });
+    this.puff(x, z, { count: Math.round(2 * big), size: 1.0 * big, life: 2.0, alpha: 0.3, speed: 0.7 });
     this.game.fx.emit({ x, y: this.game.map.heightAt(x, z) + 0.3, z, count: 6, color: 0x8a6e4e, size: 0.22, life: 0.8, speed: 1.8, up: 1.2, gravity: -6 });
     this.dropGear(e);
   }
@@ -368,7 +368,7 @@ export class BattleFX {
     this.scar(x, z, radius * 0.9, 0.8, 0.1);
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2;
-      this.puff(x + Math.cos(a) * radius * 0.6, z + Math.sin(a) * radius * 0.6, { count: 1, size: 1.3, life: 1.6, alpha: 0.45, speed: 0.3, dx: Math.cos(a) * 1.6, dz: Math.sin(a) * 1.6 });
+      this.puff(x + Math.cos(a) * radius * 0.6, z + Math.sin(a) * radius * 0.6, { count: 1, size: 1.3, life: 1.6, alpha: 0.35, speed: 0.3, dx: Math.cos(a) * 1.6, dz: Math.sin(a) * 1.6 });
     }
     this.game.fx.emit({ x, y: this.game.map.heightAt(x, z) + 0.1, z, count: 14, color: 0x7d6a4e, size: 0.2, life: 0.8, speed: 4, up: 3, gravity: -14 });
   }
@@ -377,7 +377,7 @@ export class BattleFX {
   scuff(u, charging, t) {
     if (charging) {
       const b = -Math.sin(u.rot) * 0.9, c = -Math.cos(u.rot) * 0.9;
-      this.puff(u.x + b * 0.4, u.z + c * 0.4, { count: 1, size: 1.4, life: 1.8, alpha: 0.45, speed: 0.3, dx: b, dz: c });
+      this.puff(u.x + b * 0.4, u.z + c * 0.4, { count: 1, size: 1.2, life: 1.6, alpha: 0.3, speed: 0.3, dx: b, dz: c });
       this.scar(u.x, u.z, 0.5, 0.18);
       return;
     }
@@ -385,8 +385,9 @@ export class BattleFX {
     const mx = t ? (u.x + t.x) / 2 : u.x, mz = t ? (u.z + t.z) / 2 : u.z;
     const r = this.rng;
     this.scar(mx + r.range(-0.2, 0.2), mz + r.range(-0.2, 0.2), 0.75, 0.3);
-    // a standing bank of ochre dust along the seam, drifting over the feet
-    this.puff(mx, mz, { count: 1, size: r.range(1.8, 2.8), life: 3.4, alpha: r.range(0.32, 0.48), speed: 0.35, up: 0.1, y: 0.2, spread: 0.6, color: OCHRE[r.int(0, OCHRE.length - 1)], dx: r.range(-0.3, 0.3), dz: r.range(-0.3, 0.3) });
+    // a low layer of dark trampled earth along the seam, hugging the feet:
+    // it marks the front without veiling the helmets and shields above it
+    if (r.chance(0.5)) this.puff(mx, mz, { count: 1, size: r.range(1.1, 1.6), life: 2.6, alpha: r.range(0.22, 0.32), speed: 0.3, up: 0.02, y: 0.04, spread: 0.6, color: OCHRE[r.int(0, OCHRE.length - 1)], dx: r.range(-0.3, 0.3), dz: r.range(-0.3, 0.3) });
     if (this.rng.next() < 0.5) this.game.fx.emit({ x: mx, y: this.game.map.heightAt(mx, mz) + 0.1, z: mz, count: 3, color: 0x5e4126, size: 0.12, life: 0.5, speed: 1.8, up: 2.4, gravity: -13, spread: 0.3 });
   }
 
@@ -404,7 +405,7 @@ export class BattleFX {
       this.dPos[k] += this.dVel[k] * dt; this.dPos[k + 1] += this.dVel[k + 1] * dt; this.dPos[k + 2] += this.dVel[k + 2] * dt;
       const t = 1 - this.dLife[i] / this.dMax[i];
       this.dAlpha[i] = this.dA0[i] * Math.min(1, t * 4) * (1 - t * t);
-      this.dSize[i] = this.dBase[i] * (1 + 1.6 * Math.sqrt(t));
+      this.dSize[i] = this.dBase[i] * (1 + 0.7 * Math.sqrt(t));
       i++;
     }
     // scars slowly weather away
