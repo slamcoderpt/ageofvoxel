@@ -3,6 +3,7 @@ import { RNG } from '../core/rng.js';
 import { VOXEL } from '../core/constants.js';
 import { addShaderPatch, injectVertex, injectFragment, prependVertex, prependFragment } from '../core/shaderPatch.js';
 import { applyFogOfWar } from '../core/FogOfWar.js';
+import { Debris } from './Debris.js';
 
 // Battle feedback that makes a large fight readable:
 //  - ground scars: churned earth and blood stamped onto the voxel columns where
@@ -23,6 +24,7 @@ export class BattleFX {
     this._initScars();
     this._initDust();
     this._initSparks();
+    this.debris = new Debris(game);
   }
 
   // ------------------------------------------------------------------ sparks
@@ -295,18 +297,34 @@ export class BattleFX {
       const dx = attacker.x - x, dz = attacker.z - z, d = Math.hypot(dx, dz) || 1;
       px += (dx / d) * target.radius * 0.8; pz += (dz / d) * target.radius * 0.8;
     }
-    const y = gy + h * 0.6;
+    const y = gy + h * (0.45 + 0.3 * this.rng.next());
+    const r = this.rng;
     if (kind === 'melee') {
-      // bronze on bronze: a hot white flash, a spray of orange and white sparks
-      this.spark(px, y + 0.1, pz, { count: 1, color: 0xffd890, bright: 1.8, size: 2.2, life: 0.3, speed: 0, up: 0, gravity: 0 });
-      this.spark(px, y, pz, { count: 7, color: 0xff9a30, bright: 2.6, size: 0.5, life: 0.5, speed: 4, up: 2.6 });
-      this.spark(px, y, pz, { count: 3, color: 0xffffff, bright: 2.2, size: 0.4, life: 0.32, speed: 5, up: 1.8 });
-      // feet scrabbling at the seam: dirt clods and a low burst of dust
-      game.fx.emit({ x: px, y: gy + 0.12, z: pz, count: 6, color: 0x6b4a2a, size: 0.13, life: 0.6, speed: 2.4, up: 2.8, gravity: -13, spread: 0.25 });
-      this.puff(px, pz, { count: 2, size: 0.9, life: 1.3, alpha: 0.55, speed: 0.9, up: 0.5, y: 0.15, spread: 0.3, color: 0xc9ad84 });
-      this.scar(px, pz, 0.55, 0.35, 0.0);
+      // Each blow reads differently: bronze on bronze (a small spray of hot
+      // orange sparks), spear into a shield (wood splinters and a dull chip),
+      // or a wound (a dark spray of blood). Always a little dirt at the feet.
+      const roll = r.next();
+      const shielded = target.def?.class === 'infantry' || target.def?.class === 'cavalry';
+      if (roll < 0.36) {
+        this.spark(px, y, pz, { count: 1, color: 0xffd8a0, bright: 1.3, size: r.range(0.45, 0.8), life: 0.12, speed: 0, up: 0, gravity: 0 });
+        this.spark(px, y, pz, { count: r.int(5, 9), color: r.chance(0.5) ? 0xff8a20 : 0xffb050, bright: 1.9, size: 0.26, life: 0.55, speed: r.range(3, 5.5), up: 2.4 });
+        if (r.chance(0.5)) this.spark(px, y, pz, { count: 2, color: 0xfff0d0, bright: 1.5, size: 0.12, life: 0.18, speed: 6, up: 1.4 });
+      } else if (roll < 0.7 && shielded) {
+        game.fx.emit({ x: px, y, z: pz, count: r.int(6, 10), color: r.chance(0.5) ? 0xb88450 : 0xe0bc80, colorVar: 0.2, size: 0.13, life: 0.6, speed: 3, up: 2.8, gravity: -14, spread: 0.08 });
+        this.spark(px, y, pz, { count: 2, color: 0xffc070, bright: 1.1, size: 0.12, life: 0.16, speed: 3, up: 1.5 });
+      } else {
+        game.fx.emit({ x: px, y: y - 0.1, z: pz, count: r.int(5, 9), color: 0x8a0e0a, colorVar: 0.25, size: 0.13, life: 0.55, speed: 2, up: 2, gravity: -12, spread: 0.1 });
+        this.scar(x + r.range(-0.3, 0.3), z + r.range(-0.3, 0.3), 0.35, 0.1, 0.5);
+      }
+      // feet scrabbling: brown dust at ground level, clods of earth
+      if (r.chance(0.7)) this.puff(x + r.range(-0.3, 0.3), z + r.range(-0.3, 0.3), { count: r.int(1, 2), size: r.range(0.8, 1.4), life: 1.4, alpha: 0.6, speed: 0.8, up: 0.45, y: 0.35, spread: 0.3, color: r.chance(0.5) ? 0xb39068 : 0xcdb088 });
+      if (r.chance(0.5)) game.fx.emit({ x: px, y: gy + 0.1, z: pz, count: r.int(2, 5), color: 0x5a3e22, size: 0.11, life: 0.5, speed: 2, up: 2.4, gravity: -13, spread: 0.25 });
+      this.scar(px, pz, 0.5, 0.3, 0.0);
+    } else if (kind === 'arrow') {
+      if (r.chance(0.5)) game.fx.emit({ x, y, z, count: 3, color: 0x7a0c08, size: 0.08, life: 0.4, speed: 1.2, up: 1.2, gravity: -12, spread: 0.05 });
+      else game.fx.emit({ x, y, z, count: 3, color: 0xb08850, size: 0.07, life: 0.4, speed: 1.6, up: 1.6, gravity: -12, spread: 0.05 });
     }
-    if (this.rng.next() < 0.3) this.scar(x, z, 0.45, 0.0, 0.35);
+    if (r.next() < 0.25) this.scar(x, z, 0.45, 0.0, 0.3);
   }
 
   death(e) {
@@ -314,7 +332,29 @@ export class BattleFX {
     const big = e.def?.myth ? 1.8 : e.def?.class === 'cavalry' ? 1.4 : 1;
     this.scar(x, z, 0.9 * big, 0.7, 0.75);
     this.puff(x, z, { count: Math.round(3 * big), size: 1.1 * big, life: 2.2, alpha: 0.4, speed: 0.9 });
-    this.game.fx.emit({ x, y: this.game.map.heightAt(x, z) + 0.3, z, count: 6, color: 0xa89878, size: 0.22, life: 0.8, speed: 1.8, up: 1.2, gravity: -6 });
+    this.game.fx.emit({ x, y: this.game.map.heightAt(x, z) + 0.3, z, count: 6, color: 0x8a6e4e, size: 0.22, life: 0.8, speed: 1.8, up: 1.2, gravity: -6 });
+    this.dropGear(e);
+  }
+
+  // A fallen man's shield and spear land beside him (hoplites, riders).
+  dropGear(e, { life = 40 } = {}) {
+    const r = this.rng, cls = e.def?.class;
+    if (cls !== 'infantry' && cls !== 'cavalry' && cls !== 'archer') return;
+    const side = e.id % 2 ? 1 : -1;
+    const c = Math.cos(e.rot || 0), s = Math.sin(e.rot || 0);
+    const at = (lat, fwd) => [e.x + c * lat * side + s * fwd, e.z - s * lat * side + c * fwd];
+    if (cls === 'infantry' && r.chance(0.6)) {
+      const [x, z] = at(r.range(-0.7, -0.3), r.range(-0.3, 0.4));
+      this.debris.drop('shield', x, z, { rot: r.range(0, 6.28), owner: e.owner, tilt: r.chance(0.3) ? r.range(0.2, 0.5) : r.range(-0.08, 0.08), roll: r.range(-0.1, 0.1), life });
+    }
+    if (cls !== 'archer' && r.chance(0.65)) {
+      const [x, z] = at(r.range(0.3, 0.8), r.range(-0.4, 0.5));
+      this.debris.drop(r.chance(0.3) ? 'stub' : 'spear', x, z, { rot: (e.rot || 0) + r.range(-1.2, 1.2), owner: e.owner, tilt: r.range(-0.05, 0.05), life });
+    }
+    if (r.chance(0.25)) {
+      const [x, z] = at(r.range(-0.5, 0.5), r.range(0.4, 0.8));
+      this.debris.drop('helmet', x, z, { rot: r.range(0, 6.28), owner: e.owner, tilt: r.range(-0.5, 0.5), roll: r.range(1.2, 1.7), lift: 0.12, life });
+    }
   }
 
   // Heavy ground impact (minotaur splash).
@@ -338,13 +378,14 @@ export class BattleFX {
     // churn the ground and raise dust along the contact line, not round the fighter
     const mx = t ? (u.x + t.x) / 2 : u.x, mz = t ? (u.z + t.z) / 2 : u.z;
     this.scar(mx + this.rng.range(-0.2, 0.2), mz + this.rng.range(-0.2, 0.2), 0.75, 0.3);
-    this.puff(mx, mz, { count: 1, size: 1.6, life: 2.4, alpha: 0.42, speed: 0.4, up: 0.35, y: 0.3, spread: 0.3, color: 0xd4bc94 });
+    if (this.rng.chance(0.55)) this.puff(mx, mz, { count: 1, size: this.rng.range(1.0, 1.7), life: 2.4, alpha: 0.4, speed: 0.4, up: 0.35, y: 0.6, spread: 0.45, color: this.rng.chance(0.5) ? 0xbfa27c : 0xd6c09c });
     if (this.rng.next() < 0.5) this.game.fx.emit({ x: mx, y: this.game.map.heightAt(mx, mz) + 0.1, z: mz, count: 3, color: 0x5e4126, size: 0.12, life: 0.5, speed: 1.8, up: 2.4, gravity: -13, spread: 0.3 });
   }
 
   // ------------------------------------------------------------------ tick
   update(dt) {
     this._updateSparks(dt);
+    this.debris.update(dt);
     let i = 0;
     while (i < this.dN) {
       this.dLife[i] -= dt;
@@ -396,6 +437,7 @@ export class BattleFX {
   }
 
   render() {
+    this.debris.render();
     this.sparks.geometry.setDrawRange(0, this.sN);
     this.gsPos.needsUpdate = this.gsCol.needsUpdate = this.gsSize.needsUpdate = this.gsAlpha.needsUpdate = true;
     this.dust.geometry.setDrawRange(0, this.dN);

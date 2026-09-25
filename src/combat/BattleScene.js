@@ -35,10 +35,17 @@ function army(game, owner, side, cx, cz) {
   // phalanx: three ranks in step. The front ranks start a couple of paces
   // apart and close to spear reach; the fronts then hold, leaving a clear seam
   // between red and blue where the blows land.
+  // The front two ranks are ragged: men step up, give ground, turn to the
+  // man beside them, and a few slots are already empty (see fallen()).
   const W = 22;
+  units.gaps = [];
   for (let r = 0; r < 3; r++)
     for (let i = 0; i < W; i++) {
-      const u = at('hoplite', (i - (W - 1) / 2) * 1.12 + J() + (r % 2) * 0.3, 1.3 + r * 1.2 + J() * 0.4);
+      const a = (i - (W - 1) / 2) * 1.12 + J() + (r % 2) * 0.3;
+      if (r < 2 && rng.chance(r === 0 ? 0.14 : 0.1)) { units.gaps.push([a, 1.3 + r * 1.2]); continue; }
+      const loose = r === 0 ? 1 : r === 1 ? 0.5 : 0;
+      const d = 1.3 + r * 1.2 + loose * (rng.chance(0.2) ? rng.range(0.3, 0.6) : rng.range(-0.15, 0.2)) + J() * 0.4;
+      const u = at('hoplite', a + loose * rng.range(-0.25, 0.25), d);
       u.combat_leash = r === 0 ? 2.9 : 1.6;
       u.combat_reach = 1.05;
       (r === 0 ? units.front : units.rear).push(u);
@@ -58,6 +65,49 @@ function army(game, owner, side, cx, cz) {
   for (const u of units.rear) if (rng.chance(0.3)) u.hp = u.maxHp * rng.range(0.6, 0.95);
   for (const u of units.minotaur) u.hp = u.maxHp * rng.range(0.6, 0.9);
   return units;
+}
+
+// The dead of the first clash: bodies in the strip between the fronts and in
+// the empty slots of the ranks, with their shields and spears dropped round
+// them, plus spears snapped off or stuck in the turf.
+function fallen(game, units, owner, side, cx, cz) {
+  const rng = game.rng, fx = game.combat.fx;
+  const body = (type, a, d) => {
+    const [x, z] = P(cx, cz, a * side, d * side);
+    const u = place(game, type, owner, x, z, rng.range(0, Math.PI * 2));
+    game.combat.kill(u);
+    u.anim.dieT = 2;
+    return u;
+  };
+  for (let i = 0; i < 9; i++) body('hoplite', rng.range(-12, 12), rng.range(0.05, 0.75));
+  for (const [a, d] of units.gaps) body('hoplite', a + rng.range(-0.2, 0.2), d + rng.range(-0.2, 0.3));
+  // riders and archers cut down where the cavalry wing hit the archer screen
+  for (let i = 0; i < 2; i++) body('hippikon', rng.range(10, 17), rng.range(5.5, 9.5));
+  for (let i = 0; i < 4; i++) body('toxotes', rng.range(-14, -6), -rng.range(8.5, 10.5));
+  // loose gear in the strip between the lines
+  for (let i = 0; i < 14; i++) {
+    const [x, z] = P(cx, cz, rng.range(-13, 13) * side, rng.range(-0.2, 0.9) * side);
+    const k = rng.next();
+    if (k < 0.35) fx.debris.drop('shield', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(-0.1, 0.3), roll: rng.range(-0.1, 0.1), life: 60 });
+    else if (k < 0.6) fx.debris.drop('stub', x, z, { rot: rng.range(0, 6.28), owner, life: 60 });
+    else if (k < 0.8) fx.debris.drop('spear', x, z, { rot: rng.range(0, 6.28), owner, life: 60 });
+    else fx.debris.drop('spear', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(0.9, 1.2), lift: 0.45, life: 60 });
+  }
+}
+
+// Trampled ground: the turf between and under the fronts is churned to dark
+// earth, heaviest along the seam, ragged at the edges, blood where men fell.
+function churn(game, cx, cz) {
+  const rng = game.rng, fx = game.combat.fx;
+  for (let a = -14.5; a <= 14.5; a += 0.45) {
+    if (rng.chance(0.12)) continue;
+    const [x, z] = P(cx, cz, a + rng.range(-0.2, 0.2), rng.range(-0.9, 0.9));
+    fx.scar(x, z, rng.range(0.7, 1.4), rng.range(0.45, 0.9), rng.chance(0.18) ? rng.range(0.3, 0.7) : 0);
+  }
+  for (let i = 0; i < 70; i++) {
+    const [x, z] = P(cx, cz, rng.range(-14, 14), (rng.chance(0.5) ? 1 : -1) * rng.range(1, 4.2));
+    fx.scar(x, z, rng.range(0.4, 1.0), rng.range(0.2, 0.5), 0);
+  }
 }
 
 export const battleScene = {
@@ -93,6 +143,9 @@ export const battleScene = {
     bp('temple', 19, -17.5);
     charge(blue, red);
     charge(red, blue);
+    fallen(game, blue, PLAYER, 1, cx, cz);
+    fallen(game, red, ENEMY, -1, cx, cz);
+    churn(game, cx, cz);
     return { focus: { x: cx, z: cz } };
   },
   camera: { x: 64.2, z: 63.0, distance: 45, pitch: 54 },

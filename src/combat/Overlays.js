@@ -118,7 +118,9 @@ export class Overlays {
       if (selected || hover === u.id) addRing(u, x, z, u.radius * 1.5 + 0.1);
       // bars only on damaged (or selected/hovered) units, so in a big fight
       // they mark the fighters at the contact line and read who is losing
-      if (selected || hover === u.id || u.hp < u.maxHp)
+      // only the wounded show a bar: those just struck, or badly hurt
+      const f = u.hp / u.maxHp;
+      if (selected || hover === u.id || (f < 1 && (f < 0.45 || game.time - (u.combat_hitT ?? -99) < 2.2)))
         addBar(u, x, game.map.heightAt(x, z) + game.units.heightOf(u) + 0.35, z, u.def.myth ? 1.5 : u.def.class === 'cavalry' ? 1.0 : 0.8);
     }
     for (const b of game.entities.buildings()) {

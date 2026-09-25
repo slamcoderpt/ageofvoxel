@@ -4,6 +4,11 @@ import { EnemyAI } from './EnemyAI.js';
 import { BattleFX } from './BattleFX.js';
 import { ENEMY } from '../core/constants.js';
 
+// Bodies stay on the field this long before the units piece lets them fade
+// (it removes corpses a few seconds after dieT passes its corpse time).
+const CORPSE_HOLD = 30;
+const STAGGER = 0.5; // seconds a hit man reels back
+
 // Combat piece: 'attack' orders, auto-targeting, melee & ranged damage,
 // projectiles, death, hit feedback, health bars, selection rings, enemy AI.
 // Public API:
@@ -95,8 +100,18 @@ export class Combat {
     if (target.kind === 'building') dmg *= attacker?.def?.class === 'myth' ? 1.2 : 0.35;
     dmg *= 1 - (target.def?.armor ?? 0);
     target.hp -= dmg;
-    target.flashT = 0.15;
+    target.flashT = target.def?.myth || target.kind === 'building' ? 0.04 : 0.06;
     target.combat_hitT = game.time;
+    // melee blows shove the man struck back a step and make him reel; a
+    // minotaur's blow sends him sprawling further
+    if (target.kind === 'unit' && attacker?.x !== undefined && kind !== 'arrow' && !target.def?.myth && !attacker.def?.attack?.projectile) {
+      const dx = target.x - attacker.x, dz = target.z - attacker.z, d = Math.hypot(dx, dz) || 1;
+      const push = (attacker.def?.myth ? 0.45 : 0.05 + 0.12 * game.rng.next()) * (target.def?.class === 'cavalry' ? 0.4 : 1);
+      const nx = target.x + (dx / d) * push, nz = target.z + (dz / d) * push;
+      if (game.map.isWalkable(Math.floor(nx), Math.floor(nz))) { target.x = nx; target.z = nz; }
+      target.combat_stagT = game.time;
+      target.combat_stagK = attacker.def?.myth ? 1.5 : 0.6 + 0.5 * game.rng.next();
+    }
     this.fx.hit(target, attacker, kind || (attacker?.kind === 'unit' && attacker.def?.attack && !attacker.def.attack.projectile ? 'melee' : 'arrow'));
     game.events.emit('unit:damaged', { target, attacker, amount: dmg });
     // retaliate
@@ -116,6 +131,7 @@ export class Combat {
     e.hp = 0;
     if (e.kind === 'unit') {
       e.dead = true;
+      e.combat_diedAt = game.time;
       e.order = { type: 'idle' };
       game.movement.stop(e);
       e.anim.dieT = 0;
@@ -139,7 +155,14 @@ export class Combat {
         if (!u.dead && u.order?.type === 'attack') this.attackers.set(u.order.targetId, (this.attackers.get(u.order.targetId) || 0) + 1);
     }
     for (const u of game.entities.units()) {
-      if (u.dead || !u.def.attack) continue;
+      if (u.dead) {
+        // keep the fallen on the field (lying pose) for a while
+        if (u.combat_diedAt !== undefined && game.time - u.combat_diedAt < CORPSE_HOLD) u.anim.dieT = Math.min(u.anim.dieT, 2);
+        if (u.combat_lean) { u.combat_lean = false; if (!(u.gp_air && !u.gp_air.done)) { u.airY = 0; u.airRx = 0; u.airRz = 0; } }
+        continue;
+      }
+      this.lean(u);
+      if (!u.def.attack) continue;
       u.attackCd = Math.max(0, u.attackCd - dt);
       const ot = u.order?.type;
       // auto-acquire for idle soldiers
@@ -204,6 +227,20 @@ export class Combat {
     this.projectiles.update(dt);
     this.fx.update(dt);
     this.ai.update(dt);
+  }
+
+  // Body language in the melee: a man struck reels back from the blow (the
+  // units piece already lunges the striker forward). Uses the units piece's tumble fields (airY /
+  // airRx, see src/godpowers) with a negligible lift; never while a god power
+  // has the unit airborne.
+  lean(u) {
+    if (u.gp_air && !u.gp_air.done) return;
+    const t = this.game.time;
+    let rx = 0;
+    const s = t - (u.combat_stagT ?? -99);
+    if (s < STAGGER) rx -= 0.22 * (u.combat_stagK || 1) * Math.sin(Math.PI * Math.min(1, s / STAGGER) ** 0.7);
+    if (rx !== 0) { u.airY = 0.0005; u.airRx = rx; u.airRz = 0; u.combat_lean = true; }
+    else if (u.combat_lean) { u.airY = 0; u.airRx = 0; u.combat_lean = false; }
   }
 
   render(dt, alpha) {
