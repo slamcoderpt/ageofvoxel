@@ -131,10 +131,24 @@ export function pose(kind, u, out) {
       set('legL', -0.3); set('legR', 0.25);
     }
   } else if (st === 'die') {
-    const k = smooth(an.dieT / 0.6);
-    set('armL', -2.4 * k, 0, 0.6 * k); set('armR', -2.2 * k, 0, -0.7 * k);
-    set('legL', -0.5 * k); set('shinL', 0.6 * k); set('legR', 0.2 * k); set('shinR', 0.3 * k);
-    set('head', -0.4 * k);
+    // crumple: recoil, knees buckle and the torso folds (0..0.3 s), then the
+    // body rolls onto its side (root, in index.js) and curls up: hips and
+    // knees drawn in, arms slack, head lolling; weapon arm flung out.
+    const dT = an.dieT;
+    const hit = smooth(dT / 0.1) * (1 - smooth((dT - 0.1) / 0.2));
+    const buckle = smooth(dT / 0.32);
+    const curl = smooth((dT - 0.3) / 0.6);
+    const side = u.id % 2 ? 1 : -1;
+    set('legL', -0.95 * buckle - 0.45 * curl, 0, 0.1 * curl); set('shinL', 1.55 * buckle + 0.35 * curl);
+    set('legR', -0.6 * buckle - 0.8 * curl, 0, -0.1 * curl); set('shinR', 1.35 * buckle + 0.5 * curl);
+    set('torso', -0.35 * hit + 0.45 * buckle + 0.25 * curl, 0.15 * side * curl, 0);
+    set('head', -0.3 * hit + 0.5 * buckle - 0.2 * curl, 0.35 * side * curl, -0.25 * side * curl);
+    set('armL', -0.9 * buckle - 0.5 * curl, 0, 0.25 + 0.5 * hit + 0.35 * curl);
+    set('armR', -0.4 * buckle - 1.4 * curl, 0, -0.3 - 0.6 * hit - 0.2 * curl);
+    set('weapon', 0.3 + 0.6 * curl);
+    set('shield', 0.4 * curl);
+    set('arrow', 0);
+    bob = beast ? -7 * buckle : -4.2 * buckle;
   } else {
     // idle: breathing, weight shift, glances
     const b = S(t * 1.7);

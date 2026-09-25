@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { buildVoxelGeometry, makeVoxelMaterial, voxelMaterialFor } from '../core/voxel.js';
+import { addShaderPatch, prependVertex, injectVertex, prependFragment, injectFragment } from '../core/shaderPatch.js';
 import { UNIT_DEFS } from './defs.js';
 import { RIGS } from './models.js';
 import { pose } from './anim.js';
@@ -14,6 +15,12 @@ import { pose } from './anim.js';
 // are derived automatically. Combat sets u.anim.attackT (seconds since the
 // last strike) and u.flashT (hit flash).
 const CORPSE_TIME = 6;
+const FADE_START = 3.4;   // corpses dither out between FADE_START and CORPSE_TIME
+// Local avoidance for units standing their ground (fighting, idle soldiers):
+// keep about half a body-width of air between neighbours so a melee line
+// reads as separate figures rather than one interpenetrating blob.
+const SPREAD_GAP = 0.8;   // extra spacing, in multiples of the smaller radius
+const SPREAD_SPEED = 1.6; // max drift, tiles/second
 // Per-unit horse coat tints (multiplied into the dappled grey base):
 // grey, near-white, dun, bay, dark bay.
 const COATS = [[1, 1, 1], [1.06, 1.06, 1.05], [0.95, 0.86, 0.7], [0.72, 0.5, 0.34], [0.5, 0.36, 0.27], [1, 0.98, 0.95]];
@@ -26,6 +33,19 @@ export class Units {
     this.group.name = 'units';
     game.scene.add(this.group);
     this.material = makeVoxelMaterial({ instanced: true });
+    // Per-instance fade (1 = solid, 0 = gone) as an ordered-dither discard, so
+    // corpses dissolve without sorting transparent instanced meshes.
+    addShaderPatch(this.material, 'unitFade', (shader) => {
+      prependVertex(shader, 'attribute float instFade;\nvarying float vFade;');
+      injectVertex(shader, '#include <color_vertex>', 'vFade = instFade;');
+      prependFragment(shader, 'varying float vFade;');
+      injectFragment(shader, '#include <clipping_planes_fragment>', `if (vFade < 0.999) {
+        vec2 q = mod(floor(gl_FragCoord.xy), 4.0);
+        vec2 lo = mod(q, 2.0), hi = floor(q * 0.5);
+        float b = (4.0 * mod(2.0 * lo.x + 3.0 * lo.y, 4.0) + mod(2.0 * hi.x + 3.0 * hi.y, 4.0) + 0.5) / 16.0;
+        if (b > vFade) discard;
+      }`);
+    });
     this.rigs = new Map(); // type -> { parts: [{name, geo, joint, parent, mesh, cap}], kind, voxel }
     for (const type of Object.keys(RIGS)) this._buildRig(type);
     this._m = new THREE.Matrix4();
@@ -42,7 +62,7 @@ export class Units {
     const R = RIGS[type];
     const parts = R.build().map((p) => ({
       name: p.name, joint: p.joint, parent: p.parent, show: p.show || null, coat: !!p.coat, portrait: p.portrait !== false && !p.show,
-      geo: buildVoxelGeometry(p.model, { size: R.voxel, pivot: p.pivot, jitter: 0.05 }),
+      geo: buildVoxelGeometry(p.model, { size: R.voxel * (p.scale || 1), pivot: p.pivot, jitter: 0.05 }),
       mesh: null, cap: 0,
     }));
     const rig = { type, parts, kind: R.anim, voxel: R.voxel, rot: {}, world: parts.map(() => new THREE.Matrix4()) };
@@ -60,8 +80,9 @@ export class Units {
     const mesh = new THREE.InstancedMesh(part.geo, this.material, cap);
     const team = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
     const flash = new THREE.InstancedBufferAttribute(new Float32Array(cap), 1);
-    team.setUsage(THREE.DynamicDrawUsage); flash.setUsage(THREE.DynamicDrawUsage);
-    mesh.userData.team = team; mesh.userData.flash = flash;
+    const fade = new THREE.InstancedBufferAttribute(new Float32Array(cap).fill(1), 1);
+    team.setUsage(THREE.DynamicDrawUsage); flash.setUsage(THREE.DynamicDrawUsage); fade.setUsage(THREE.DynamicDrawUsage);
+    mesh.userData.team = team; mesh.userData.flash = flash; mesh.userData.fade = fade;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.frustumCulled = false;
@@ -75,6 +96,7 @@ export class Units {
     g.boundingSphere = part.geo.boundingSphere;
     g.setAttribute('instTeam', team);
     g.setAttribute('instFlash', flash);
+    g.setAttribute('instFade', fade);
     mesh.geometry = g;
     part.mesh = mesh;
     part.cap = cap;
@@ -112,6 +134,44 @@ export class Units {
       a.state = u.moving ? 'walk' : a.want || 'idle';
       a.want = null;
     }
+    this._spread(dt);
+  }
+
+  // Local avoidance for units that are not path-following. Movement's own
+  // separation only resolves overlap (radius + radius); here units that stand
+  // still drift apart until there is roughly half a body-width between them.
+  // Gatherers at work are left alone so they keep their spot on the resource.
+  _spread(dt) {
+    const game = this.game, hash = game.movement?.hash, map = game.map;
+    if (!hash) return;
+    const maxStep = SPREAD_SPEED * dt;
+    for (const u of game.entities.units()) {
+      if (u.dead || u.moving) continue;
+      const ot = u.order?.type;
+      if (u.def.gatherer && ot !== 'idle' && ot !== 'attack') continue;
+      const r = u.radius || 0.3;
+      let sx = 0, sz = 0;
+      hash.forEachNear(u.x, u.z, r + 2, (o) => {
+        if (o === u || o.dead) return;
+        const ro = o.radius || 0.3;
+        const want = r + ro + SPREAD_GAP * Math.min(r, ro);
+        const dx = u.x - o.x, dz = u.z - o.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 >= want * want) return;
+        const d = Math.sqrt(d2);
+        // moving units steer themselves; big units shove small ones
+        const w = (o.moving ? 0.4 : 1) * Math.min(2, ro / r);
+        const k = ((want - d) / want) * w;
+        if (d < 1e-4) { sx += (u.id % 2 ? 1 : -1) * k; sz += (u.id % 3 ? 1 : -1) * k; }
+        else { sx += (dx / d) * k; sz += (dz / d) * k; }
+      });
+      if (sx === 0 && sz === 0) continue;
+      let vx = sx * 5 * dt, vz = sz * 5 * dt;
+      const m = Math.hypot(vx, vz);
+      if (m > maxStep) { vx *= maxStep / m; vz *= maxStep / m; }
+      const nx = u.x + vx, nz = u.z + vz;
+      if (map.isWalkable(Math.floor(nx), Math.floor(nz))) { u.x = nx; u.z = nz; }
+    }
   }
 
   // ---- rendering --------------------------------------------------------
@@ -148,6 +208,10 @@ export class Units {
         // root transform (with death topple + sink)
         this._q.setFromEuler(this._e.set(0, rot, 0));
         this._root.compose(this._v.set(x, y + bob * V, z), this._q, this._s.set(1, 1, 1));
+        if (u.airY) { // thrown by a god power (src/godpowers): lift + tumble about the waist
+          this._root.premultiply(this._tmp.makeTranslation(0, u.airY, 0)).multiply(this._tmp.makeTranslation(0, 0.7, 0));
+          this._root.multiply(this._tmp.makeRotationFromEuler(this._e.set(u.airRx || 0, 0, u.airRz || 0))).multiply(this._tmp.makeTranslation(0, -0.7, 0));
+        }
         if (u.dead) {
           const dt0 = u.anim.dieT;
           const sink = Math.max(0, dt0 - CORPSE_TIME + 2) * 0.5;
@@ -159,13 +223,16 @@ export class Units {
             this._root.multiply(this._tmp.makeTranslation(0, f * 0.3, 0));
             this._root.multiply(this._tmp.makeRotationZ(side * f * Math.PI / 2 * 0.92));
           } else {
-            // stagger back, then topple; a small bounce when hitting the ground
-            const k = Math.min(1, dt0 / 0.6);
-            const f = k * k;
-            const bounce = dt0 > 0.6 && dt0 < 0.8 ? Math.sin((dt0 - 0.6) / 0.2 * Math.PI) * 0.06 : 0;
-            this._root.multiply(this._tmp.makeTranslation(0, 0.12 * f, -0.25 * Math.min(1, dt0 / 0.4)));
-            this._tmp.makeRotationX(-(f * Math.PI / 2 * 0.95 - bounce));
-            this._root.multiply(this._tmp);
+            // crumple: knees buckle (pose), then the body rolls onto its side
+            // and settles curled up, so a corpse keeps a 3D figure silhouette
+            const k = Math.min(1, Math.max(0, (dt0 - 0.22) / 0.5));
+            const f = k * k * (3 - 2 * k);
+            const side = u.id % 2 ? 1 : -1;
+            const bounce = dt0 > 0.72 && dt0 < 0.92 ? Math.sin((dt0 - 0.72) / 0.2 * Math.PI) * 0.05 : 0;
+            const lift = (rig.kind === 'beast' ? 0.45 : 0.24) * f;
+            this._root.multiply(this._tmp.makeTranslation(side * 0.1 * f, lift, 0.12 * f));
+            this._root.multiply(this._tmp.makeRotationZ(side * (f * 1.42 - bounce)));
+            this._root.multiply(this._tmp.makeRotationX(0.3 * f));
           }
           this._root.premultiply(this._tmp.makeTranslation(0, -sink, 0));
         }
@@ -173,6 +240,7 @@ export class Units {
         const coat = COATS[u.id % COATS.length];
         this._c.setHex(pc);
         const flash = Math.min(1, u.flashT * 4) * 0.8;
+        const fade = u.dead ? 1 - Math.min(1, Math.max(0, (u.anim.dieT - FADE_START) / (CORPSE_TIME - 0.3 - FADE_START))) : 1;
         for (let pi = 0; pi < rig.parts.length; pi++) {
           const p = rig.parts[pi];
           const parent = p.parentIdx >= 0 ? world[p.parentIdx] : this._root;
@@ -184,6 +252,7 @@ export class Units {
           p.mesh.setMatrixAt(i, m);
           p.mesh.userData.team.setXYZ(i, this._c.r, this._c.g, this._c.b);
           p.mesh.userData.flash.setX(i, flash);
+          p.mesh.userData.fade.setX(i, fade);
           if (p.coat) {
             p.mesh.setColorAt(i, this._c.setRGB(coat[0], coat[1], coat[2]));
             this._c.setHex(pc);
@@ -194,6 +263,7 @@ export class Units {
         p.mesh.instanceMatrix.needsUpdate = true;
         p.mesh.userData.team.needsUpdate = true;
         p.mesh.userData.flash.needsUpdate = true;
+        p.mesh.userData.fade.needsUpdate = true;
         if (p.mesh.instanceColor) p.mesh.instanceColor.needsUpdate = true;
       }
     }

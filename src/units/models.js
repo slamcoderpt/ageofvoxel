@@ -13,8 +13,10 @@ import { hash3 } from '../core/rng.js';
 //   portrait  -> false keeps the part out of HUD portraits
 
 // ---- palette ---------------------------------------------------------------
-const SKIN = (x, y, z) => (hash3(x, y, z, 3) < 0.5 ? 0xe2ac80 : 0xd9a176);
-const SKIN_SHADE = 0xbf8a62;
+// sun-tanned skin, kept warmer/redder than the bronze so arms and faces
+// separate from the armour at RTS zoom
+const SKIN = (x, y, z) => (hash3(x, y, z, 3) < 0.5 ? 0xd4916a : 0xc98763);
+const SKIN_SHADE = 0xa9704f;
 const HAIR = 0x3a2517;
 const BEARD = 0x4a2f1c;
 const DARK = 0x1c1410;
@@ -25,12 +27,13 @@ const BELT = 0x55361e;
 const SANDAL = 0x5e3b20;
 const WOOD = 0x7d5431;
 const WOOD_DK = 0x5b3c22;
-const BRONZE = (x, y, z) => { const h = hash3(x, y, z, 2); return h < 0.45 ? 0xd4a44a : h < 0.8 ? 0xc0913a : 0xe2b75e; };
-const BRONZE_DK = 0x8f6a2a;
+const BRONZE = (x, y, z) => { const h = hash3(x, y, z, 2); return h < 0.45 ? 0xcf9f3a : h < 0.8 ? 0xb58a2e : 0xe6bd55; };
+const BRONZE_DK = 0x7e5a20;
 const STEEL = (x, y, z) => (hash3(x, y, z, 5) < 0.5 ? 0xc9ced3 : 0xb4bac0);
 const LINEN = (x, y, z) => (hash3(x, y, z, 6) < 0.6 ? 0xece2c8 : 0xe0d4b6);
 const STRAW = (x, y, z) => (hash3(x, y, z, 8) < 0.5 ? 0xdcbb6a : 0xc9a655);
 const TEAM_TRIM = 0xeee6cc;
+const SHIELD_FACE = (x, y, z) => (hash3(x, y, z, 15) < 0.6 ? 0xe9dfc6 : 0xddd1b4);
 
 const part = (name, model, pivot, joint, parent = null, extra = {}) => ({ name, model, pivot, joint, parent, ...extra });
 
@@ -72,10 +75,13 @@ function legs(style) {
 // Torso model: x 0..7 (8 wide), z 0..3, hips at y=0, shoulders at y=8.
 function torsoModel(style) {
   const m = new VoxelModel();
+  // Team colour is kept to the skirt, trim and small accents so the figure
+  // (face, shoulders, weapon arm) reads in silhouette, not as a team block.
+  const CLOTH = style === 'villager' ? TEAM : LINEN;
   // chest + waist silhouette (broad shoulders, narrow waist)
-  m.box(1, 0, 0, 6, 3, 4, TEAM);
-  m.box(0, 3, 0, 8, 5, 4, TEAM);
-  m.box(1, 8, 1, 6, 1, 2, TEAM);               // trapezius
+  m.box(1, 0, 0, 6, 3, 4, CLOTH);
+  m.box(0, 3, 0, 8, 5, 4, CLOTH);
+  m.box(1, 8, 1, 6, 1, 2, CLOTH);              // trapezius
   m.box(3, 8, 1, 2, 1, 2, SKIN);               // neck
   m.box(3, 9, 1, 2, 1, 2, SKIN);
   // skirt flaring over the thighs
@@ -88,23 +94,26 @@ function torsoModel(style) {
     m.box(1, 1, 0, 6, 1, 4, BRONZE);
     m.box(1, 5, 4, 2, 2, 1, BRONZE).box(5, 5, 4, 2, 2, 1, BRONZE);  // pecs
     m.set(3, 4, 4, BRONZE_DK).set(4, 4, 4, BRONZE_DK).set(3, 2, 4, BRONZE_DK).set(4, 2, 4, BRONZE_DK);
-    m.box(0, 7, 0, 2, 1, 4, TEAM).box(6, 7, 0, 2, 1, 4, TEAM); // shoulder guards
+    m.box(0, 7, 0, 2, 1, 4, LEATHER).box(6, 7, 0, 2, 1, 4, LEATHER); // linothorax shoulder flaps
+    m.box(0, 7, 4, 2, 1, 1, LINEN).box(6, 7, 4, 2, 1, 1, LINEN);
     // pteryges: leather strips alternating with team linen
-    for (let x = 0; x < 8; x++) for (const z of [-1, 4]) m.box(x, -3, z, 1, 3, 1, x % 2 ? TEAM : LINEN);
-    for (let z = 0; z < 4; z++) { m.box(-1, -3, z, 1, 3, 1, z % 2 ? LINEN : TEAM); m.box(8, -3, z, 1, 3, 1, z % 2 ? LINEN : TEAM); }
+    // team chiton skirt showing under leather pteryges strips
+    for (let x = 0; x < 8; x++) for (const z of [-1, 4]) m.box(x, -4, z, 1, 4, 1, x % 3 === 1 ? LEATHER : TEAM);
+    for (let z = 0; z < 4; z++) { m.box(-1, -4, z, 1, 4, 1, z % 3 === 1 ? LEATHER : TEAM); m.box(8, -4, z, 1, 4, 1, z % 3 === 1 ? LEATHER : TEAM); }
     m.box(0, 0, 0, 8, 1, 4, BRONZE_DK);
     if (style === 'rider') {
-      // short chlamys pinned at the shoulders, streaming back
-      m.box(0, 4, -1, 8, 4, 1, TEAM).box(1, 2, -2, 6, 4, 1, TEAM).box(2, 1, -3, 4, 2, 1, TEAM);
-      m.set(0, 7, 4, BRONZE(0, 7, 4)).set(7, 7, 4, BRONZE(7, 7, 4));
+      // short chlamys knotted at the right shoulder, a narrow fold down the back
+      m.box(1, 5, -1, 6, 3, 1, TEAM).box(2, 3, -2, 4, 2, 1, TEAM);
+      m.set(1, 7, 4, BRONZE(1, 7, 4));
     } else {
-      // team cloak down the back, bronze pins at the shoulders
-      m.box(0, -1, -1, 8, 9, 1, TEAM).box(1, -3, -1, 6, 2, 1, TEAM);
-      m.set(0, 7, 4, BRONZE(0, 7, 4)).set(7, 7, 4, BRONZE(7, 7, 4));
+      // back plate seam and a bronze belt buckle
+      m.box(3, 2, -1, 2, 6, 1, BRONZE_DK);
+      m.set(3, 0, 4, BRONZE(3, 0, 4)).set(4, 0, 4, BRONZE(4, 0, 4));
     }
   } else if (style === 'archer') {
     m.box(0, 3, 0, 8, 4, 4, LEATHER);
     m.box(2, 3, 4, 4, 4, 1, LEATHER);
+    m.box(0, -3, -1, 8, 1, 6, LINEN).box(1, -1, 0, 6, 1, 4, LINEN); // chiton hem under the team skirt band
     m.line(7, 7, 4, 1, 1, 4, LEATHER_DK);           // baldric
     m.line(7, 7, -1, 1, 1, -1, LEATHER_DK);
     // quiver on the back, arrows showing over the right shoulder
@@ -134,25 +143,26 @@ function headModel(style) {
   m.set(2, 2, 5, SKIN).set(2, 1, 5, SKIN_SHADE);    // nose
   m.set(0, 2, 2, SKIN_SHADE).set(4, 2, 2, SKIN_SHADE); // ears
   if (style === 'hoplite') {
-    // Corinthian helmet: bronze shell with a T-shaped face opening
-    m.box(-1, 0, -1, 7, 6, 7, BRONZE);
-    m.box(-1, 5, -1, 7, 1, 7, BRONZE);
-    m.carve(1, 0, 5, 3, 3, 1);                    // face opening
-    m.carve(2, -1, 5, 1, 2, 1);
-    m.set(1, 2, 5, DARK).set(3, 2, 5, DARK).set(2, 2, 5, BRONZE).set(2, 1, 5, BRONZE_DK);
-    m.set(1, 0, 5, BEARD).set(3, 0, 5, BEARD).set(2, 0, 5, BEARD);
-    m.box(-1, -1, -1, 7, 1, 3, BRONZE);           // neck guard
-    m.box(0, 3, 5, 5, 1, 1, BRONZE_DK);           // brow ridge
-    for (const x of [-1, 5]) m.box(x, 0, 3, 1, 3, 1, BRONZE_DK).box(x, 3, 1, 1, 1, 3, BRONZE_DK); // cheek-guard seams
-    // tall horsehair crest in team colour, trailing down the back
-    m.box(1, 6, 0, 3, 2, 6, TEAM).box(2, 8, 0, 1, 1, 6, TEAM);
-    m.box(1, 6, -1, 3, 1, 1, TEAM).box(1, 3, -2, 3, 4, 1, TEAM).box(2, 1, -2, 1, 2, 1, TEAM);
-    m.box(1, 6, 6, 3, 1, 1, TEAM);
-    m.set(2, 6, -1, BRONZE_DK);
+    // Chalcidian helmet: bronze bowl and cheek guards, the face left open
+    m.box(-1, 3, -1, 7, 3, 7, BRONZE);             // bowl
+    m.box(0, 6, 0, 5, 1, 5, BRONZE);               // rounded crown
+    m.box(-1, -1, -1, 7, 4, 3, BRONZE);            // back and neck guard
+    m.box(-1, 0, 2, 1, 3, 3, BRONZE).box(5, 0, 2, 1, 3, 3, BRONZE); // cheek guards
+    m.set(-1, 0, 4, BRONZE_DK).set(5, 0, 4, BRONZE_DK);
+    m.carve(0, 3, 5, 5, 1, 2);
+    m.box(0, 4, 5, 5, 1, 1, BRONZE_DK);            // brow ridge over the eyes
+    m.set(2, 3, 5, BRONZE_DK);                     // nasal
+    m.box(-1, 3, -1, 7, 1, 1, BRONZE_DK);          // rim line
+    m.box(1, 0, 5, 3, 1, 1, BEARD).box(0, -1, 3, 5, 1, 3, BEARD).set(2, -1, 6, BEARD); // beard
+    // narrow horsehair crest in team colour: a brush front to back on a bronze holder
+    m.box(2, 7, 0, 1, 1, 5, BRONZE_DK);
+    m.box(1, 8, -1, 3, 1, 7, TEAM).box(1, 9, 0, 3, 1, 5, TEAM).box(2, 10, 0, 1, 1, 4, TEAM).box(2, 9, -1, 1, 1, 1, TEAM);
+    m.box(2, 5, -2, 1, 3, 1, TEAM).box(2, 3, -3, 1, 2, 1, TEAM);  // tail falling down the back
   } else if (style === 'archer') {
-    // leather Phrygian cap with team band, beard
-    m.box(-1, 3, -1, 7, 3, 7, TEAM).box(0, 6, 0, 5, 1, 5, TEAM).box(1, 7, 2, 3, 1, 3, TEAM).box(2, 7, 4, 1, 1, 2, TEAM).set(2, 8, 5, TEAM);
-    m.box(-1, 3, -1, 7, 1, 7, LEATHER).carve(0, 3, 5, 5, 1, 1).box(1, 3, 5, 3, 1, 1, LEATHER);
+    // felt Phrygian cap with a team band and team tip, beard
+    const FELT = (x, y, z) => (hash3(x, y, z, 14) < 0.5 ? 0xb89a6c : 0xa88a5e);
+    m.box(-1, 4, -1, 7, 2, 7, FELT).box(0, 6, 0, 5, 1, 5, FELT).box(1, 7, 2, 3, 1, 3, FELT).box(2, 7, 4, 1, 1, 2, TEAM).set(2, 8, 5, TEAM);
+    m.box(-1, 3, -1, 7, 1, 7, TEAM).carve(0, 3, 5, 5, 1, 1).box(1, 3, 5, 3, 1, 1, TEAM);
     m.box(-1, 0, -1, 1, 3, 3, LEATHER).box(5, 0, -1, 1, 3, 3, LEATHER); // ear flaps
     m.box(1, 0, 5, 3, 1, 1, BEARD).box(0, -1, 3, 5, 1, 2, BEARD).set(2, -1, 5, BEARD);
     m.box(0, 0, 0, 5, 3, 1, HAIR);
@@ -173,7 +183,9 @@ function headModel(style) {
 }
 
 function head(style, joint = [0, 10, 0.2], parent = 'torso') {
-  return part('head', headModel(style), [2.5, 0, 2.5], joint, parent);
+  // Heads use 80% voxels: a smaller head reads as an adult figure, not a
+  // big-headed block, and gives the helmet and face finer detail.
+  return part('head', headModel(style), [2.5, 0, 2.5], joint, parent, { scale: 0.8 });
 }
 
 // Arm model: x 0..1, y 0..6 (hand at the bottom), pivot at the shoulder.
@@ -181,7 +193,8 @@ function armModel(style, side) {
   const m = new VoxelModel();
   m.box(0, 0, 0, 2, 2, 2, SKIN);                    // hand
   m.box(0, 2, 0, 2, 3, 2, SKIN);                    // forearm
-  m.box(0, 5, 0, 2, 2, 2, style === 'villager' && side === 'R' ? SKIN : TEAM);
+  m.box(0, 5, 0, 2, 2, 2, style === 'villager' ? (side === 'R' ? SKIN : TEAM) : SKIN);
+  if (style !== 'villager') m.box(0, 6, 0, 2, 1, 2, LINEN);   // chiton sleeve
   if (style === 'hoplite') m.box(0, 2, 0, 2, 2, 2, LEATHER);   // bracer
   if (style === 'archer') m.box(0, 2, 0, 2, 2, 2, side === 'L' ? LEATHER : SKIN);
   m.set(side === 'L' ? 0 : 1, 1, 2, SKIN_SHADE);    // thumb
@@ -190,8 +203,8 @@ function armModel(style, side) {
 
 function arms(style, y = 8) {
   return [
-    part('armL', armModel(style, 'L'), [1, 7, 1], [5, y, 0], 'torso'),
-    part('armR', armModel(style, 'R'), [1, 7, 1], [-5, y, 0], 'torso'),
+    part('armL', armModel(style, 'L'), [1, 7, 1], [5.5, y, 0], 'torso'),
+    part('armR', armModel(style, 'R'), [1, 7, 1], [-5.5, y, 0], 'torso'),
   ];
 }
 const HAND = [0, -6, 0];
@@ -215,10 +228,11 @@ function aspis(r = 6) {
       const d = Math.sqrt(x * x + y * y);
       if (d > r + 0.3) continue;
       const rim = d > r - 1.2;
-      let c = rim ? BRONZE(x, y, 0) : TEAM;
-      // emblem: a bronze Greek lambda-like chevron with a centre boss
+      let c = rim ? BRONZE(x, y, 0) : SHIELD_FACE(x, y, 1);
+      // emblem: a team-coloured lambda chevron and inner ring round a bronze boss
       if (!rim && d < 1.3) c = BRONZE(x, y, 1);
-      else if (!rim && y <= 2 && y >= -4 && Math.abs(Math.abs(x) - (2 - y) * 0.6) < 0.55) c = TEAM_TRIM;
+      else if (!rim && d > r - 2.1) c = TEAM;
+      else if (!rim && y <= 2 && y >= -4 && Math.abs(Math.abs(x) - (2 - y) * 0.6) < 0.6) c = TEAM;
       m.set(x, y, 1, c);
       if (!rim) m.set(x, y, 0, WOOD);
       if (rim) m.set(x, y, 0, BRONZE_DK);
@@ -324,7 +338,7 @@ export function hopliteRig() {
   return [
     ...legs('hoplite'), torso('hoplite'), head('hoplite'), ...arms('hoplite'),
     part('weapon', spearModel(32), [0, 0, 0], HAND, 'armR'),
-    part('shield', aspis(6), [0, 0, 0], [1.5, -4, 2.5], 'armL'),
+    part('shield', aspis(5), [0, 0, 0], [1.5, -4, 2.5], 'armL'),
   ];
 }
 
