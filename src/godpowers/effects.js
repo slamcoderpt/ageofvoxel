@@ -164,14 +164,16 @@ export function boltLines(seed, x, groundY, z, heightAt, height = 21) {
   // wide and a soft electric-blue/violet glow ~12x as wide that fades out.
   // Forks leave the leader at its local width and taper to nothing, their
   // sub-forks thinner again: a trunk-and-branches read, not one line reused.
-  const W0 = 0.045, W1 = 0.15;
+  // (round 10: a real glowing trunk - ~6 px of white-hot core in the cloud
+  // swelling to ~18 px where it earths - not a 1-2 px strand)
+  const W0 = 0.085, W1 = 0.25;
   const wAt = (f) => W0 + (W1 - W0) * f; // leader core width at fraction f
   const tap = 1 - W1 / W0;
-  lines.push({ pts: main, w: W0, i: 0.75, taper: tap, fade: -0.6 });
+  lines.push({ pts: main, w: W0, i: 0.8, taper: tap, fade: -0.5 });
   // (the outer glow does not swell at the ground and dims there, so the
   // struck men under it keep their silhouettes)
-  lines.push({ pts: main, w: W0 * 3, i: 0.42, taper: tap * 0.8, fade: -0.4, halo: true });
-  lines.push({ pts: main, w: W0 * 10, i: 0.2, taper: tap * 0.4, fade: 0.45, halo: true });
+  lines.push({ pts: main, w: W0 * 2.4, i: 0.5, taper: tap * 0.45, fade: -0.2, halo: true });
+  lines.push({ pts: main, w: W0 * 7, i: 0.2, taper: 0.45, fade: 0.5, halo: true });
   const nf = rng.int(2, 4);
   for (let f = 0; f < nf; f++) {
     const i = rng.int(Math.floor(main.length * (0.3 + f * 0.14)), Math.floor(main.length * (0.44 + f * 0.14)));
@@ -179,7 +181,8 @@ export function boltLines(seed, x, groundY, z, heightAt, height = 21) {
     const drop = p.y - groundY;
     const len = rng.range(0.35, 0.6) * drop + 2;
     const a = ta + Math.PI + (f % 2 ? 1 : -1) * rng.range(0.6, 1.9);
-    const end = { x: p.x + Math.cos(a) * len * 0.75, y: p.y - len * rng.range(0.8, 1.3), z: p.z + Math.sin(a) * len * 0.75 };
+    // (forks stay close to the trunk so every strike earths inside the ring)
+    const end = { x: p.x + Math.cos(a) * len * 0.4, y: p.y - len * rng.range(0.8, 1.3), z: p.z + Math.sin(a) * len * 0.4 };
     const gy = heightAt(end.x, end.z) + 0.05;
     const grounded = end.y <= gy + 0.3;
     end.y = Math.max(end.y, gy);
@@ -403,109 +406,55 @@ const PERIM_GLSL = `
       float da = abs(mod(a - uHotA + 3.14159265, 6.2831853) - 3.14159265);
       return uHotW * (exp(-da * da * 6.0) + 0.3 * exp(-da * da * 0.9));
     }`;
-const perimMat = () => new THREE.ShaderMaterial({
-  uniforms: { uTime: { value: 0 }, uK: { value: 0 }, uFlash: { value: 0 }, uHotA: { value: 0 }, uHotW: { value: 0 } },
-  vertexShader: `attribute float aD; attribute float aA; varying float vD; varying float vA;
-    void main(){ vD = aD; vA = aA; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: `uniform float uTime, uK, uFlash; varying float vD; varying float vA;
+// The storm wall: a volumetric sheet of energy standing on the perimeter,
+// following the terrain at its foot. Brightest in a soft band where it meets
+// the ground, fading upward; soft fresnel falloff (the stretches seen edge-on
+// at the sides glow, the faces seen square-on front and back are a thin
+// veil), torn by two layers of turbulent streaks spiralling up it in opposite
+// senses, and surging where the latest bolt fell.
+const wallMat = () => new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uK: { value: 0 }, uFlash: { value: 0 }, uHotA: { value: 0 }, uHotW: { value: 0 }, uH: { value: 7 } },
+  vertexShader: `attribute float aH; attribute float aA; varying float vH; varying float vA; varying vec3 vW; varying vec3 vN;
+    void main(){ vH = aH; vA = aA; vN = normalize(vec3(position.x, 0.0, position.z));
+      vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz;
+      gl_Position = projectionMatrix * viewMatrix * w; }`,
+  fragmentShader: `uniform float uTime, uK, uFlash, uH; varying float vH; varying float vA; varying vec3 vW; varying vec3 vN;
     ${PERIM_GLSL}
+    float hs2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float vn2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hs2(i), hs2(i + vec2(1.0, 0.0)), f.x), mix(hs2(i + vec2(0.0, 1.0)), hs2(i + vec2(1.0, 1.0)), f.x), f.y); }
+    float fbm(vec2 p){ return vn2(p) * 0.55 + vn2(p * 2.13 + 5.2) * 0.3 + vn2(p * 4.7 + 1.7) * 0.15; }
     void main(){
-      vec4 S = seg(vA, uTime);
-      float ft = floor(uTime * 24.0);
-      // one continuous channel that wanders off the circle a little
-      float wob = (vn1(vA * 9.5493 + uTime * 0.8) - 0.5) * 0.5 + (vn1(vA * 95.493 + ft * 3.7) - 0.5) * 0.12;
-      float d = vD - wob;
-      // brightness runs along the band as travelling surges (never dark),
-      // with crackling hot stretches where the static segments are live
-      float surge = 0.55 + 0.45 * vn1(vA * 19.0986 - uTime * 5.0) * vn1(vA * 7.0 + uTime * 2.3 + 4.0);
-      float hotSeg = S.x * S.z;
-      float w = 0.07 + 0.05 * vn1(vA * 31.83 + uTime * 3.0) + 0.04 * hotSeg;
-      float core = exp(-d * d / (w * w)) * (surge + 0.8 * hotSeg);
-      float sheath = exp(-d * d / (w * w * 14.0)) * (0.6 + 0.4 * surge);
-      // inner glow: a gradient falloff toward the storm centre, streaked by
-      // noise that swirls round the ring; a thin lip spills outward
-      float swirl = vn1(vA * 28.6479 - uTime * 2.2 + vD * 1.6) * 0.55 + vn1(vA * 9.5493 + uTime * 0.9 - vD * 0.8) * 0.45;
-      float fall = vD < 0.0 ? exp(vD * 1.5) : exp(-vD * 3.5);
-      float band = fall * (0.35 + 0.65 * swirl) * (0.7 + 0.3 * surge);
+      float h = vH, y = h * uH, x = vA * 17.5;           // x: arc length-ish round the ring
+      vec3 v = normalize(cameraPosition - vW);
+      vec2 vh = normalize(v.xz + 1e-5);
+      float ndv = abs(dot(vN.xz, vh));
+      float fres = pow(1.0 - ndv, 1.4);                  // 1 edge-on .. 0 face-on
+      float body = mix(0.035, 1.0, fres * fres * (3.0 - 2.0 * fres));
+      // two turbulent layers swirling up the wall in opposite senses
+      float t1 = fbm(vec2(x * 0.55 + y * 0.9 - uTime * 2.6, y * 0.45 - uTime * 1.3));
+      float t2 = fbm(vec2(x * 0.8 - y * 1.3 + uTime * 1.9 + 9.0, y * 0.7 - uTime * 2.1));
+      float s1 = smoothstep(0.52, 0.8, t1), s2 = smoothstep(0.58, 0.85, t2);
+      // thin bright filaments on the crests of the first layer
+      float fil = pow(1.0 - abs(t1 - 0.62) / 0.05, 3.0) * step(abs(t1 - 0.62), 0.05);
       float hot = hotAt(vA);
-      // the wall is alive: the whole ring flickers with the storm, dead
-      // stretches drop almost dark, and two surge heads race round it, each a
-      // white-hot leading edge with a fading blue wake behind it
-      float gfl = 0.55 + 0.45 * h1(ft * 1.7 + 3.0) + 0.5 * uFlash;
-      float liveK = mix(0.12, 1.0, smoothstep(0.1, 0.6, S.x * S.z + 0.25 * vn1(vA * 4.0 - uTime * 1.3)));
-      float p1 = fract((vA - uTime * 1.9) / 6.2831853), p2 = fract((vA + uTime * 1.3 + 2.4) / 6.2831853);
-      float lead = pow(p1, 14.0) * 2.2 + pow(p1, 3.0) * 0.5 + pow(p2, 16.0) * 1.6 + pow(p2, 3.0) * 0.35;
-      float lvl = (0.22 + 1.6 * hot + lead) * liveK * gfl;
-      vec3 col = vec3(0.7, 0.88, 1.2) * core * 0.6 * lvl
-               + vec3(0.9, 0.95, 1.2) * exp(-d * d / (w * w * 0.25)) * lead * 0.5 * gfl
-               + vec3(0.2, 0.5, 1.1) * sheath * 0.3 * (0.35 + 1.1 * hot + 0.6 * lead) * (0.5 + 0.5 * liveK)
-               + mix(vec3(0.16, 0.08, 0.65), vec3(0.12, 0.32, 1.0), fall) * band * 0.12 * (0.6 + 0.5 * hot + 0.4 * lead)
-               // soft pool of light where the wall meets the ground
-               + vec3(0.3, 0.26, 1.0) * exp(-d * d * 1.4) * 0.12 * (0.6 + 0.4 * surge) * (0.7 + 0.6 * hot + 0.5 * lead);
-      gl_FragColor = vec4(col * uK, 1.0);
-    }`,
-  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
-  polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
-});
-// A low curtain of rising static on the perimeter, lit where segments are live.
-const curtainMat = () => new THREE.ShaderMaterial({
-  uniforms: { uTime: { value: 0 }, uK: { value: 0 }, uFlash: { value: 0 }, uHotA: { value: 0 }, uHotW: { value: 0 } },
-  vertexShader: `attribute float aH; attribute float aA; varying float vH; varying float vA;
-    void main(){ vH = aH; vA = aA; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: `uniform float uTime, uK, uFlash; varying float vH; varying float vA;
-    ${PERIM_GLSL}
-    void main(){
-      vec4 S = seg(vA, uTime);
-      // rising streaks of static + two sets of bands spiralling round the
-      // wall (the vortex look), all fading upward from a bright foot
-      float streak = pow(vn1(vA * 159.155 + floor(vH * 3.0 - uTime * 4.0) * 17.0), 4.0);
-      float sp1 = pow(0.5 + 0.5 * sin(vA * 18.0 + vH * 5.0 - uTime * 7.0), 10.0);
-      float sp2 = pow(0.5 + 0.5 * sin(vA * 11.0 - vH * 3.5 - uTime * 4.3 + 1.7), 14.0);
-      float n = 0.6 + 0.4 * vn1(vA * 25.0 - uTime * 3.0);
-      float fall = pow(1.0 - vH, 1.8);
-      float foot = exp(-vH * 9.0);
-      float ft = floor(uTime * 24.0);
-      float p1 = fract((vA - uTime * 1.9) / 6.2831853), p2 = fract((vA + uTime * 1.3 + 2.4) / 6.2831853);
-      float lead = pow(p1, 10.0) * 1.8 + pow(p2, 12.0) * 1.3;
-      float gfl = 0.5 + 0.5 * h1(ft * 1.7 + 3.0) + 0.5 * uFlash;
-      // the foot where the wall meets the ground is the brightest line, and it
-      // flares where the surge heads pass
-      float liveK = mix(0.1, 1.0, smoothstep(0.1, 0.6, S.x * S.z + 0.25 * vn1(vA * 4.0 - uTime * 1.3)));
-      float a = liveK * (0.08 + streak * 0.9 * (0.4 + S.x) + (sp1 * 0.8 + sp2 * 0.55) * n * (0.6 + lead) + foot * (1.4 + 2.5 * lead) * (0.4 + 0.6 * S.x)) * fall * (0.25 + 1.6 * hotAt(vA) + 0.8 * lead) * gfl;
-      vec3 c = mix(vec3(0.35, 0.25, 1.0), vec3(0.4, 0.7, 1.2), 1.0 - vH);
-      // a soft sheet of light rising off the whole ring and fading upward
-      // (the vortex column of launch_013), brightest by the latest strike
-      float sheet = pow(1.0 - vH, 2.6) * (0.55 + 0.45 * vn1(vA * 12.0 - uTime * 1.7)) * (0.8 + 0.6 * hotAt(vA) + 0.5 * lead);
-      vec3 sc = mix(vec3(0.3, 0.12, 0.9), vec3(0.45, 0.6, 1.3), pow(1.0 - vH, 3.0));
-      gl_FragColor = vec4((c * a * 0.34 + sc * sheet * 0.075) * uK, 1.0);
+      float gfl = 0.85 + 0.15 * h1(floor(uTime * 20.0) * 1.7) + 0.35 * uFlash;
+      // vertical profile: a soft bright foot, the sheet thinning upward,
+      // tattered at the top by the turbulence
+      float foot = exp(-y / 0.32) * smoothstep(0.0, 0.06, y);
+      float top = smoothstep(1.0, 0.35 + 0.35 * t2, h);
+      float sheet = pow(1.0 - h, 1.7) * top;
+      vec3 cFoot = mix(vec3(0.75, 0.4, 1.7), vec3(1.2, 1.1, 1.8), fres);
+      vec3 cLow = vec3(0.5, 0.3, 1.5), cHigh = vec3(0.36, 0.08, 0.95);
+      vec3 cBody = mix(cLow, cHigh, smoothstep(0.0, 0.7, h));
+      vec3 col = cFoot * foot * (0.7 + 0.3 * t1) * (1.0 + 0.4 * fres) * (0.8 + 1.2 * hot)
+               + cBody * sheet * body * (0.045 + 0.55 * s1 + 0.32 * s2) * (0.85 + 1.2 * hot)
+               + vec3(0.8, 0.75, 1.5) * fil * sheet * (0.25 + 0.75 * fres) * 0.9;
+      gl_FragColor = vec4(col * gfl * uK, 1.0);
     }`,
   transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false,
 });
 
-// Terrain-conforming annulus (local to the storm centre) with per-vertex signed
-// distance from the radius and angle.
-function perimGeometry(cx, cz, R, rIn, rOut, heightAt, rows = 7, seg = 256) {
-  const pos = [], aD = [], aA = [], idx = [];
-  for (let i = 0; i <= seg; i++) {
-    const a = (i / seg) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
-    for (let j = 0; j < rows; j++) {
-      const r = rIn + (rOut - rIn) * (j / (rows - 1));
-      const x = c * r, z = s * r;
-      pos.push(x, heightAt(cx + x, cz + z) + 0.07, z);
-      aD.push(r - R); aA.push(a);
-      if (i > 0 && j > 0) {
-        const p = (i - 1) * rows + j - 1, q = i * rows + j - 1;
-        idx.push(p, q, p + 1, p + 1, q, q + 1);
-      }
-    }
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('aD', new THREE.Float32BufferAttribute(aD, 1));
-  g.setAttribute('aA', new THREE.Float32BufferAttribute(aA, 1));
-  g.setIndex(idx);
-  return g;
-}
 function curtainGeometry(cx, cz, R, H, heightAt, seg = 256) {
   const pos = [], aH = [], aA = [], idx = [];
   for (let i = 0; i <= seg; i++) {
@@ -537,7 +486,7 @@ const stormGradeMat = (add = false) => new THREE.ShaderMaterial({
     uInvVP: { value: new THREE.Matrix4() }, uPlaneY: { value: 0 }, uCenter: { value: new THREE.Vector2() },
     uR: { value: 10 }, uK: { value: 0 }, uFlash: { value: 0 }, uTime: { value: 0 },
     uPools: { value: Array.from({ length: MAX_POOLS }, () => new THREE.Vector4()) },
-    uPoolCol: { value: new THREE.Color(0.9, 1.4, 3.0) },
+    uPoolCol: { value: new THREE.Color(1.8, 1.85, 2.7) },
   },
   vertexShader: `varying vec2 vNdc; void main(){ vNdc = position.xy; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
   fragmentShader: `uniform mat4 uInvVP; uniform float uPlaneY, uR, uK, uFlash, uTime; uniform vec2 uCenter;
@@ -579,15 +528,23 @@ const stormGradeMat = (add = false) => new THREE.ShaderMaterial({
         float dd = length(g - P.xy) / P.w;
         pool += P.z * (exp(-dd * dd * 2.2) * 0.85 + exp(-dd * dd * 0.6) * 0.15);
       }
+      // the storm wall lights the land, the grass and the men at its foot
+      // (a soft violet spill that reaches ~2 tiles in, less outside), so the
+      // wall reads as a light source standing on the ground, not a decal
+      float dr = (r - 1.0) * uR;
+      float ang = atan(g.y - uCenter.y, g.x - uCenter.x);
+      float rn = 0.6 + 0.4 * vn(vec2(ang * 9.0 - uTime * 2.0, uTime * 0.7));
+      float spill = (dr < 0.0 ? exp(dr / 0.9) : exp(-dr / 0.5)) * rn * uK;
       #ifdef ADD_POOL
         // additive part: blue-grey rain haze over the storm floor (lifts and
         // desaturates the darkened ground) + cool strike light on dark ground
         // (a faint deep-blue lift only: a grey haze turned the army to mush)
         // (only a faint cool lift under the strike: the relight of the albedo
         // in the multiply pass carries the flash, so nothing turns to haze)
-        gl_FragColor = vec4(vec3(0.05, 0.09, 0.22) * pool * 0.4, 1.0);
+        gl_FragColor = vec4(vec3(0.05, 0.09, 0.22) * pool * 0.4 + vec3(0.05, 0.02, 0.13) * spill * 0.35
+          + vec3(0.012, 0.006, 0.03) * inside * uK, 1.0);
       #else
-        m += uPoolCol * pool;
+        m += uPoolCol * pool + vec3(0.32, 0.1, 1.05) * spill * 0.6;
         gl_FragColor = vec4(m, 1.0);
       #endif
     }`,
@@ -646,8 +603,43 @@ const rainMat = () => new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
 });
 
+// ---------------------------------------------------------------- sparks
+// Hot sparks: motion-blurred streaks (head -> tail along the velocity over
+// ~1/20 s) with a soft cross-section, additive and HDR so they bloom, each
+// cooling on its own from blue-white through yellow and orange to a dull red.
+const sparkMat = () => new THREE.ShaderMaterial({
+  vertexShader: `attribute vec3 aTan; attribute float aSide; attribute float aW; attribute vec3 aCol; attribute float aT;
+    varying float vSide; varying vec3 vCol; varying float vT;
+    void main(){
+      vec3 wp = position;
+      vec3 v = normalize(cameraPosition - wp);
+      vec3 s = cross(normalize(aTan), v);
+      float l = length(s);
+      s = l > 1e-4 ? s / l : vec3(1.0, 0.0, 0.0);
+      wp += s * aSide * aW * clamp(distance(cameraPosition, wp) / 36.0, 0.3, 3.0);
+      vSide = aSide; vCol = aCol; vT = aT;
+      gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+    }`,
+  fragmentShader: `varying float vSide; varying vec3 vCol; varying float vT;
+    void main(){
+      float g = exp(-vSide * vSide * 3.5);
+      float tail = pow(1.0 - vT, 1.6);
+      gl_FragColor = vec4(vCol * g * tail, 1.0);
+    }`,
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+});
+// spark temperature (1 hot .. 0 cold) -> HDR colour
+function sparkColor(T, out) {
+  if (T > 0.8) return out.setRGB(2.6, 2.7, 3.2).lerp(_sc.setRGB(3.0, 2.4, 1.2), (1 - T) / 0.2);
+  if (T > 0.55) return out.setRGB(3.0, 2.4, 1.2).lerp(_sc.setRGB(2.8, 1.2, 0.25), (0.8 - T) / 0.25);
+  if (T > 0.25) return out.setRGB(2.8, 1.2, 0.25).lerp(_sc.setRGB(1.2, 0.22, 0.04), (0.55 - T) / 0.3);
+  return out.setRGB(1.2, 0.22, 0.04).multiplyScalar(Math.max(0, T / 0.25));
+}
+const _sc = new THREE.Color();
+
 // ---------------------------------------------------------------- renderer
 const DEBRIS_MAX = 480;
+const stormK = (st, now) => Math.min(1, (now - st.t0) / 1.0) * Math.min(1, Math.max(0, (st.t0 + st.duration - now) / 1.5));
 const EMBER_MAX = 96;
 const SPARK_MAX = 256;
 
@@ -735,8 +727,7 @@ export class BoltRenderer {
     // spark streaks: one preallocated ribbon quad per spark; blue-white
     // electric sparks and molten gold ones (which read against the blue glare)
     this._emptyGeo = new THREE.BufferGeometry();
-    this.sparkMesh = this.addMesh(new THREE.Mesh(new THREE.BufferGeometry(), makeRibbonMaterial(new THREE.Color(0x8fc8ff), new THREE.Color(0xf4f8ff), 2.4)), 55);
-    this.sparkMeshWarm = this.addMesh(new THREE.Mesh(new THREE.BufferGeometry(), makeRibbonMaterial(new THREE.Color(0xff8a20), new THREE.Color(0xffe6a0), 2.6)), 55);
+    this.sparkMesh = this.addMesh(new THREE.Mesh(new THREE.BufferGeometry(), sparkMat()), 55);
     this.stormVisuals = new Map();
     this.meteorVisuals = new Map();
     this.zapMeshes = new Map();
@@ -798,28 +789,17 @@ export class BoltRenderer {
           // thin channels need a hotter core colour to read white against the halo
           mesh.material.uniforms.uGain.value = 1.9;
           mesh.material.uniforms.uCore.value.setRGB(0.8, 0.9, 1.15);
-          v.glow = this.glowSprite(0x2a5cff);
-          v.glow.position.set(b.x, b.y + 0.5, b.z);
-          v.hot = this.glowSprite(0xcfe0ff, 62, 2);
-          v.hot.position.set(b.x, b.y + 0.45, b.z);
-          v.pin = this.glowSprite(0xffffff, 64, 1);
-          v.pin.position.set(b.x, b.y + 0.3, b.z);
+          // one flash per strike: a white-hot bloom ball at the contact that
+          // snaps down within ~0.15 s, over a lit patch of ground (the point
+          // light, the shadow spot and the grade's light pool carry the spill
+          // onto the land, the buildings and the army)
+          v.hot = this.glowSprite(0xdfe9ff, 62, 2);
+          v.hot.position.set(b.x, b.y + 0.55, b.z);
           v.gflash = this.addMesh(new THREE.Mesh(this.decalGeo, this.groundFlashMat.clone()), 24);
           v.gflash.position.set(b.x, b.y + 0.08, b.z);
           v.gflash.rotation.y = (b.seed % 628) / 100;
-          // brightness varies from bolt to bolt
-          v.gain = 0.6 + 0.55 * hash2(b.seed & 0xffff, 91);
-          v.flare = this.glowSprite(0x8fbcff, 63, 1);
-          v.flare.position.set(b.x, b.y + 0.35, b.z);
-          v.shock = this.addMesh(new THREE.Mesh(this.shockGeo, this.shockMat.clone()), 45);
-          v.shock.position.set(b.x, b.y + 0.15, b.z);
-          // where the forks earth themselves: a pin-point flash each
-          for (const e of lines.ends || []) {
-            const s = this.glowSprite(0xdde9ff, 61, 1);
-            s.position.set(e.x, e.y + 0.2, e.z);
-            s.userData.w = e.w;
-            v.extra.push(s);
-          }
+          // brightness varies a little from bolt to bolt
+          v.gain = 0.8 + 0.35 * hash2(b.seed & 0xffff, 91);
         }
         this.meshes.set(b, v);
       }
@@ -838,31 +818,18 @@ export class BoltRenderer {
         // a white-hot flash ~1.5 tiles wide that snaps down within ~0.35 s to
         // a pin-sharp core, a ground flash under it, a wide blue corona and a
         // horizontal flare; per-bolt gain so no two strikes look alike
-        const pin = age < 0.08 ? 1 : Math.max(0, 1 - (age - 0.08) / 0.3);
+        const pin = age < 0.06 ? 1 : Math.exp(-(age - 0.06) / 0.07);
         const g = v.gain ?? 1, e = Math.min(1.5, env) * g;
         v.mesh.material.uniforms.uAlpha.value = Math.min(1.1, env) * g;
-        v.hot.material.uniforms.uO.value = Math.min(0.75, e * 0.55) * pin;
-        v.hot.scale.setScalar(0.8 + 0.9 * pin);
-        v.pin.material.uniforms.uO.value = Math.min(1.3, e) * (0.3 + 0.7 * pin);
-        v.pin.scale.setScalar(1.1);
-        v.gflash.material.uniforms.uO.value = Math.min(0.85, e * 0.75) * (0.2 + 0.8 * pin);
-        v.gflash.scale.setScalar(2.4 + 0.8 * pin);
-        v.glow.material.uniforms.uO.value = Math.min(0.07, e * 0.05) * (0.3 + 0.7 * pin);
-        v.glow.scale.setScalar(4.5 + 2.5 * pin);
-        v.flare.material.uniforms.uO.value = Math.min(0.45, e * 0.35) * pin;
-        v.flare.scale.set(6 * pin + 1, 0.25 * pin + 0.08, 1);
-        for (const s of v.extra) {
-          s.material.uniforms.uO.value = Math.min(1.2, env * 0.9) * s.userData.w * (0.3 + 0.7 * pin);
-          s.scale.setScalar(0.55 + 0.3 * pin);
-        }
-        const sk = Math.min(1, age / 0.42);
-        v.shock.scale.setScalar(0.5 + Math.sqrt(sk) * 4.2);
-        v.shock.material.uniforms.uA.value = Math.pow(1 - sk, 1.6) * 0.7;
+        v.hot.material.uniforms.uO.value = 1.5 * g * pin;
+        v.hot.scale.setScalar(0.7 + 1.3 * pin);
+        v.gflash.material.uniforms.uO.value = Math.min(0.9, e * 0.7) * (0.15 + 0.85 * pin);
+        v.gflash.scale.setScalar(2.0 + 1.0 * pin);
         // the strike relights the land and the men round it: a white-blue
         // pool ~5 tiles across (150-200 px) that multiplies the albedo up to
         // ~3x for the first few frames, then dies with the channel
         const snap = age < 0.1 ? 1 : Math.exp(-(age - 0.1) / 0.12);
-        pools.push({ x: b.x, z: b.z, i: Math.min(1.3, e) * (0.12 + 0.88 * snap), r: 4.4 + 0.6 * snap });
+        pools.push({ x: b.x, z: b.z, i: Math.min(0.85, e * 0.75) * (0.1 + 0.9 * snap), r: 3.6 + 1.2 * snap });
         for (const st of storms) {
           const dx = b.x - st.x, dz = b.z - st.z, d = Math.hypot(dx, dz);
           const w = Math.min(1.2, env) * (0.45 + 0.55 * Math.min(1, d / st.radius)) * Math.pow(1 - k, 0.7);
@@ -873,18 +840,20 @@ export class BoltRenderer {
           const l = this.lights[li++];
           // low and blue, reaching ~1/3 of the ring: bright blue rim light
           // on the units and walls round the strike
-          l.color.setHex(0x7aa6ff);
-          l.position.set(b.x, b.y + 2.6, b.z);
-          l.distance = 12;
+          // (a short, strong flash that reaches the walls of the buildings
+          // and the men all round the contact)
+          l.color.setHex(0x9cbcff);
+          l.position.set(b.x, b.y + 2.4, b.z);
+          l.distance = 10;
           const snapL = age < 0.1 ? 1 : Math.exp(-(age - 0.1) / 0.12);
-          l.intensity = 80 * Math.min(1.2, e) * (0.1 + 0.9 * snapL);
+          l.intensity = 28 * Math.min(1.2, e) * (0.06 + 0.94 * snapL);
         }
       } else flash = Math.max(flash, env * 0.5);
     }
     for (const [b, v] of this.meshes) {
       if (alive.has(b)) continue;
       this.group.remove(v.mesh); v.mesh.geometry.dispose(); v.mesh.material.dispose();
-      if (v.glow) { this.group.remove(v.glow, v.shock, v.hot, v.flare, v.pin, v.gflash); for (const o of [v.glow, v.shock, v.hot, v.flare, v.pin, v.gflash]) o.material.dispose(); }
+      if (v.hot) { this.group.remove(v.hot, v.gflash); for (const o of [v.hot, v.gflash]) o.material.dispose(); }
       for (const s of v.extra || []) { this.group.remove(s); s.material.dispose(); }
       this.meshes.delete(b);
     }
@@ -896,7 +865,7 @@ export class BoltRenderer {
       this.spot.position.set(spotB.x + 0.1, spotB.y + 2.6, spotB.z + 0.1);
       this.spot.target.position.set(spotB.x, spotB.y, spotB.z);
       this.spot.target.updateMatrixWorld();
-      this.spot.intensity = 9 * Math.min(1.1, spotEnv);
+      this.spot.intensity = 12 * Math.min(1.1, spotEnv);
     } else {
       this.spot.visible = false;
       this.spot.intensity = 0;
@@ -951,7 +920,7 @@ export class BoltRenderer {
       const e = this.addMesh(new THREE.Mesh(this.decalGeo, this.emberMat.clone()), 25);
       const size = sc.size ?? 5.2;
       s.scale.setScalar(size);
-      e.scale.setScalar(size * (sc.blast ? 0.5 : 0.72));
+      e.scale.setScalar(size * (sc.blast ? 0.5 : 0.5));
       s.position.set(sc.x, sc.y + 0.04, sc.z);
       e.position.set(sc.x, sc.y + 0.06, sc.z);
       s.rotation.y = (sc.seed % 628) / 100;
@@ -981,9 +950,9 @@ export class BoltRenderer {
       else {
         // lightning-fused cracks: blue-white hot for a moment (blooms), then
         // cooling through orange to a dull red glow
-        const w = Math.max(0, 1 - age / 0.7);
-        const q = Math.exp(-age / 2.2) * (sc.size ? 0.7 : 1.2);
-        this._c.setRGB(0.35 * q, 0.55 * q, 1.6 * q).lerp(this._hotC, w * 0.8);
+        const w = Math.max(0, 1 - age / 0.3);
+        const q = Math.exp(-age / 1.2) * (sc.size ? 0.22 : 0.38);
+        this._c.setRGB(2.2 * q, 0.6 * q * q, 0.12 * q).lerp(this._hotC, w * 0.8);
         v.e.material.color.copy(this._c);
       }
       if (v.glow) {
@@ -1048,9 +1017,13 @@ export class BoltRenderer {
     }
 
     // ---- thrown debris + spark streaks
-    this.renderDebris(state.debris || [], now);
-    this.renderSparks(this.sparkMesh, state.sparks || [], now, false);
-    this.renderSparks(this.sparkMeshWarm, state.sparks || [], now, true);
+    const pulled = [];
+    for (const st of storms) {
+      const sv = this.stormVisuals.get(st);
+      if (sv) this.pulledDebris(st, sv, now, stormK(st, now), pulled);
+    }
+    this.renderDebris(state.debris || [], now, pulled);
+    this.renderSparks(this.sparkMesh, state.sparks || [], now);
 
     // ---- storms
     const aliveStorms = new Set();
@@ -1061,13 +1034,13 @@ export class BoltRenderer {
       if (!v) v = this.makeStorm(st);
       const y = heightAt(st.x, st.z);
       const age = now - st.t0;
-      const k = Math.min(1, age / 1.0) * Math.min(1, Math.max(0, (st.t0 + st.duration - now) / 1.5));
+      const k = stormK(st, now);
       const fl = Math.min(1.5, flash);
       if (k >= gradeK) { gradeK = k; gst = st; }
       // hotspot eases off once its strike fades (held briefly between bolts)
       const hw = st._hotT === now ? st._hotW : 0;
       if (hw >= (v.hotW ?? 0) * 0.8 && hw > 0) { v.hotW = hw; v.hotA = st._hotA; } else v.hotW = (v.hotW ?? 0) * 0.9;
-      for (const m of [v.ring, v.curtain]) {
+      for (const m of [v.curtain]) {
         m.material.uniforms.uK.value = k;
         m.material.uniforms.uTime.value = now;
         m.material.uniforms.uFlash.value = fl;
@@ -1082,10 +1055,8 @@ export class BoltRenderer {
     }
     for (const [st, v] of this.stormVisuals) {
       if (aliveStorms.has(st)) continue;
-      this.group.remove(v.ring, v.rain, v.curtain, v.bands);
-      if (v.bands.geometry !== this._emptyGeo) v.bands.geometry.dispose();
-      v.bands.material.dispose();
-      v.ring.geometry.dispose(); v.ring.material.dispose();
+      this.group.remove(v.rain, v.curtain, v.bands, v.bands2);
+      for (const bm of [v.bands, v.bands2]) { if (bm.geometry !== this._emptyGeo) bm.geometry.dispose(); bm.material.dispose(); }
       v.curtain.geometry.dispose(); v.curtain.material.dispose();
       v.rain.geometry.dispose(); v.rain.material.dispose();
       this.stormVisuals.delete(st);
@@ -1162,60 +1133,104 @@ export class BoltRenderer {
     }
   }
 
-  // Orbiting energy bands of the storm wall, rebuilt each frame.
+  // Spiralling energy ribbons of the storm wall, rebuilt each frame.
   renderBands(st, v, now, k, flash) {
-    const lines = [], NA = v.gh.length, TAU = Math.PI * 2;
+    const layers = [[], []], NA = v.gh.length, TAU = Math.PI * 2;
     const ghAt = (a) => {
       const f = ((a % TAU) + TAU) % TAU / TAU * NA, i = Math.floor(f), t = f - i;
       return v.gh[i % NA] * (1 - t) + v.gh[(i + 1) % NA] * t;
     };
     const hotA = v.hotA ?? 0, hotW = v.hotW ?? 0;
     for (const b of v.bandDefs) {
-      const head = b.a0 + b.sp * now;
-      // each band breathes on its own beat; the stretch facing the latest
-      // strike surges brighter, so brightness varies round the circumference
+      const head = b.a0 + b.sp * now, dir = Math.sign(b.sp);
       const da = Math.abs(((head - hotA) % TAU + TAU * 1.5) % TAU - Math.PI);
-      const pulse = 0.25 + 0.75 * Math.pow(0.5 + 0.5 * Math.sin(now * b.pf + b.ph), 1.5);
-      const i = b.i * k * pulse * (0.75 + 0.5 * hotW * Math.exp(-da * da * 1.5) + 0.15 * Math.min(1, flash));
+      const pulse = 0.4 + 0.6 * Math.pow(0.5 + 0.5 * Math.sin(now * b.pf + b.ph), 1.5);
+      const i = b.i * k * pulse * (0.8 + 0.7 * hotW * Math.exp(-da * da * 1.5) + 0.15 * Math.min(1, flash));
       if (i < 0.02) continue;
-      const pts = [], n = 36;
+      // the ribbon's climb cycles, so each one rises up the wall and dies at
+      // the top, then is born again at the foot
+      const cyc = (now * 0.35 + b.ph / 6.28) % 1;
+      const lift = cyc * b.climb * 1.4;
+      const pts = [], n = 40;
       for (let s = 0; s <= n; s++) {
-        const a = head - b.span * (s / n);
-        const r = b.r + 0.12 * Math.sin(a * 5 + now * 3 + b.ph);
+        const f = s / n, a = head - dir * b.span * f;
+        const r = b.r + 0.35 * Math.sin(a * 3 + now * 2.1 + b.ph) + 0.15 * Math.sin(a * 11 - now * 5 + b.ph * 2);
         pts.push({
           x: st.x + Math.cos(a) * r,
-          y: ghAt(a) + b.y0 + b.ya * Math.sin(a * b.yf + now * 1.3 + b.ph) * (0.5 + 0.5 * s / n),
+          y: ghAt(a) + b.y0 + lift + b.climb * (1 - f) + b.ya * Math.sin(a * b.yf + now * 2.3 + b.ph) * f,
           z: st.z + Math.sin(a) * r,
         });
       }
-      lines.push({ pts, w: b.w, i: 0.7 * i, taper: 0.92, fade: 1 });
-      lines.push({ pts, w: b.w * 3.2, i: 0.3 * i, taper: 0.85, fade: 0.95, halo: true });
-      lines.push({ pts, w: b.w * 9, i: 0.12 * i, taper: 0.7, fade: 0.9, halo: true });
+      const top = Math.max(0, 1 - Math.max(0, b.y0 + lift + b.climb - 5.5) / 3);
+      const ii = i * top * Math.min(1, cyc * 6);
+      if (ii < 0.02) continue;
+      const L = layers[b.layer];
+      L.push({ pts, w: b.w, i: 0.75 * ii, taper: 0.92, fade: 1 });
+      L.push({ pts, w: b.w * 3.5, i: 0.34 * ii, taper: 0.85, fade: 0.95, halo: true });
+      L.push({ pts, w: b.w * 11, i: 0.14 * ii, taper: 0.7, fade: 0.9, halo: true });
     }
-    if (v.bands.geometry !== this._emptyGeo) v.bands.geometry.dispose();
-    v.bands.geometry = lines.length ? ribbonGeometry(lines) : this._emptyGeo;
-    v.bands.visible = lines.length > 0;
+    [v.bands, v.bands2].forEach((m, j) => {
+      if (m.geometry !== this._emptyGeo) m.geometry.dispose();
+      m.geometry = layers[j].length ? ribbonGeometry(layers[j]) : this._emptyGeo;
+      m.visible = layers[j].length > 0;
+    });
   }
 
-  // Spark streaks, rebuilt each frame as ribbons (the same path the bolts
-  // take): a bright head tapering to a faint tail along the velocity.
-  renderSparks(mesh, list, now, warm) {
-    const lines = [];
+  // Debris pulled into the storm wall (visual only, a function of time).
+  pulledDebris(st, v, now, k, out) {
+    if (k <= 0.05) return;
+    const TAU = Math.PI * 2, NA = v.gh.length;
+    for (const d of v.pull) {
+      const u = (now * d.rate + d.ph) % 1;
+      const a = d.a + d.w * now + u * 1.6 * Math.sign(d.w);
+      const r = st.radius + d.dr * Math.pow(1 - u, 2);
+      const gi = Math.floor((((a % TAU) + TAU) % TAU) / TAU * NA) % NA;
+      out.push({ x: st.x + Math.cos(a) * r, y: v.gh[gi] + 0.1 + Math.pow(u, 1.25) * 7, z: st.z + Math.sin(a) * r,
+        rx: d.rx * now, ry: a, rz: d.rz * now, s: d.s * (1 - u * 0.5) * Math.min(1, k * 1.5) * Math.min(1, (1 - u) * 5), color: d.color ?? d.col, glow: d.glow, u });
+    }
+  }
+
+  // Spark streaks, rebuilt each frame: one soft quad per spark from its head
+  // back along its velocity (motion blur), coloured by its temperature.
+  renderSparks(mesh, list, now) {
+    const pos = [], tan = [], side = [], w = [], col = [], tt = [], idx = [];
+    const c = this._c;
+    let n = 0;
     for (const p of list) {
-      if (lines.length >= SPARK_MAX) break;
-      if (!!p.warm !== warm) continue;
+      if (n >= SPARK_MAX) break;
       const k = (now - p.t0) / p.life;
       if (k < 0 || k >= 1) continue;
-      const L = 0.075; // streak length = velocity * L seconds
-      const a = Math.pow(1 - k, 1.5) * 1.3 * (p.dim ?? 1);
-      lines.push({ pts: [{ x: p.x, y: p.y, z: p.z }, { x: p.x - p.vx * L, y: p.y - p.vy * L, z: p.z - p.vz * L }], w: 0.08, i: a, taper: 0.7, fade: 0.8 });
+      const T = (p.heat ?? 1) * Math.pow(1 - k, 0.8) * (p.dim ?? 1);
+      sparkColor(T, c);
+      const sp = Math.hypot(p.vx, p.vy, p.vz), L = Math.max(0.12, Math.min(1.1, sp * 0.05)) / Math.max(1e-3, sp);
+      const tx = -p.vx * L, ty = -p.vy * L, tz = -p.vz * L;
+      const ww = 0.065 * (0.6 + 0.6 * (1 - k));
+      const base = n * 4;
+      for (let e = 0; e < 2; e++) {
+        const px = p.x + tx * e, py = p.y + ty * e, pz = p.z + tz * e;
+        for (const sd of [-1, 1]) {
+          pos.push(px, py, pz); tan.push(tx, ty, tz); side.push(sd); w.push(ww * (1 - e * 0.5));
+          col.push(c.r, c.g, c.b); tt.push(e);
+        }
+      }
+      idx.push(base, base + 1, base + 3, base, base + 3, base + 2);
+      n++;
     }
     if (mesh.geometry !== this._emptyGeo) mesh.geometry.dispose();
-    mesh.geometry = lines.length ? ribbonGeometry(lines) : this._emptyGeo;
-    mesh.visible = lines.length > 0;
+    if (!n) { mesh.geometry = this._emptyGeo; mesh.visible = false; return; }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('aTan', new THREE.Float32BufferAttribute(tan, 3));
+    g.setAttribute('aSide', new THREE.Float32BufferAttribute(side, 1));
+    g.setAttribute('aW', new THREE.Float32BufferAttribute(w, 1));
+    g.setAttribute('aCol', new THREE.Float32BufferAttribute(col, 3));
+    g.setAttribute('aT', new THREE.Float32BufferAttribute(tt, 1));
+    g.setIndex(idx);
+    mesh.geometry = g;
+    mesh.visible = true;
   }
 
-  renderDebris(list, now) {
+  renderDebris(list, now, pulled = []) {
     const o = this._o, c = this._c;
     let n = 0, ne = 0;
     for (const d of list) {
@@ -1237,6 +1252,22 @@ export class BoltRenderer {
         n++;
       }
     }
+    for (const d of pulled) {
+      if (d.s <= 0.01) continue;
+      o.position.set(d.x, d.y, d.z);
+      o.rotation.set(d.rx, d.ry, d.rz);
+      o.scale.setScalar(d.s);
+      o.updateMatrix();
+      if (d.glow && ne < EMBER_MAX) {
+        this.embers.setMatrixAt(ne, o.matrix);
+        this.embers.setColorAt(ne, c.setRGB(1.6, 0.9, 3.2));
+        ne++;
+      } else if (!d.glow && n < DEBRIS_MAX) {
+        this.debris.setMatrixAt(n, o.matrix);
+        this.debris.setColorAt(n, c.setHex(d.color));
+        n++;
+      }
+    }
     this.debris.count = n;
     this.embers.count = ne;
     this.debris.instanceMatrix.needsUpdate = true;
@@ -1248,9 +1279,9 @@ export class BoltRenderer {
   makeStorm(st) {
     const R = st.radius;
     const heightAt = (x, z) => this.game.map.heightAt(x, z);
-    const ring = this.addMesh(new THREE.Mesh(perimGeometry(st.x, st.z, R, R - 4.8, R + 1.0, heightAt, 10), perimMat()), 44);
-    ring.position.set(st.x, 0, st.z);
-    const curtain = this.addMesh(new THREE.Mesh(curtainGeometry(st.x, st.z, R, 6.5, heightAt), curtainMat()), 45);
+    const WALL_H = 6.2;
+    const curtain = this.addMesh(new THREE.Mesh(curtainGeometry(st.x, st.z, R, WALL_H, heightAt), wallMat()), 45);
+    curtain.material.uniforms.uH.value = WALL_H;
     curtain.position.set(st.x, 0, st.z);
     const rain = this.addMesh(new THREE.LineSegments(rainGeometry(st.t0 * 1000 | 0, R), rainMat()), 46);
     // the energy wall: comet-like bands of light orbiting the perimeter at
@@ -1268,16 +1299,32 @@ export class BoltRenderer {
       gh[i] = Math.max(sum / 13, m - 0.35);
     }
     const rng = new RNG((st.t0 * 1000 | 0) ^ 0x9e3779b9);
+    // layered energy ribbons spiralling up the wall (the Retold vortex):
+    // each a white-hot head tapering into a violet or blue tail that climbs
+    // as it orbits, at its own radius, pitch, speed and turbulence
     const bandDefs = [];
-    for (let j = 0; j < 9; j++) {
+    const NB = 30;
+    for (let j = 0; j < NB; j++) {
+      const thick = j % 3 === 0;
       bandDefs.push({
-        a0: (j / 9) * Math.PI * 2 + rng.range(-0.3, 0.3), sp: rng.range(1.3, 2.4), span: rng.range(0.8, 1.8),
-        r: R + rng.range(-0.35, 0.2), y0: j % 3 === 0 ? rng.range(0.2, 0.6) : rng.range(0.8, 4.2), ya: rng.range(0.4, 1.3),
-        yf: rng.int(1, 3), ph: rng.range(0, 6.28), w: j % 4 === 1 ? rng.range(0.16, 0.24) : rng.range(0.05, 0.12), i: rng.range(0.7, 1.1), pf: rng.range(1.5, 3.5),
+        layer: j % 3 === 2 ? 1 : 0,
+        a0: (j / NB) * Math.PI * 2 + rng.range(-0.25, 0.25), sp: (j % 5 === 3 ? -1 : 1) * rng.range(1.1, 2.1), span: rng.range(0.7, 1.5),
+        r: R + rng.range(-0.55, 0.35), y0: rng.range(0.0, 1.2), climb: rng.range(2.0, 4.2), ya: rng.range(0.2, 0.7),
+        yf: rng.int(2, 5), ph: rng.range(0, 6.28), w: thick ? rng.range(0.2, 0.3) : rng.range(0.07, 0.14), i: rng.range(0.75, 1.1), pf: rng.range(1.2, 3),
       });
     }
-    const bands = this.addMesh(new THREE.Mesh(new THREE.BufferGeometry(), makeRibbonMaterial(new THREE.Color(0x5a78ff), new THREE.Color(0xeee8ff), 1.7, new THREE.Color(0x8a30ff))), 48);
-    const v = { ring, rain, curtain, bands, bandDefs, gh };
+    const bands = this.addMesh(new THREE.Mesh(new THREE.BufferGeometry(), makeRibbonMaterial(new THREE.Color(0x7a50ff), new THREE.Color(0xf2eaff), 1.9, new THREE.Color(0x9a28ff))), 48);
+    const bands2 = this.addMesh(new THREE.Mesh(new THREE.BufferGeometry(), makeRibbonMaterial(new THREE.Color(0x4f8cff), new THREE.Color(0xeef6ff), 1.9, new THREE.Color(0x5a3dff))), 48);
+    // debris torn up and pulled into the wall: earth, turf and stones
+    // spiralling up it (dark against the glow), a few glowing motes
+    const pull = [];
+    // (lit violet by the wall they are caught in, not black dice)
+    const PCOL = [0x6a5670, 0x5a4a66, 0x7a6478, 0x4e5a3a, 0x8a7a88, 0x514263];
+    for (let j = 0; j < 40; j++) {
+      pull.push({ a: rng.range(0, Math.PI * 2), w: rng.range(0.25, 0.6) * (rng.chance(0.85) ? 1 : -1), rate: rng.range(0.22, 0.45), ph: rng.next(),
+        dr: rng.range(-0.6, 0.9), s: rng.range(0.05, 0.12), col: rng.pick(PCOL), glow: j % 3 === 0, rx: rng.range(-9, 9), rz: rng.range(-9, 9) });
+    }
+    const v = { curtain, rain, bands, bands2, bandDefs, gh, pull };
     this.stormVisuals.set(st, v);
     return v;
   }

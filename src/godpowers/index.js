@@ -40,6 +40,7 @@ export class GodPowers {
     this.debris = [];
     this.sparks = [];
     this.airborne = [];
+    this.struck = []; // units in a lightning hit state (u.gp_hit white flash -> u.gp_char)
     this.cooldowns = {}; // `${owner}:${id}` -> time ready
     this.vrng = new RNG(8675309); // visual-only randomness (never touches game.rng)
     this.fx = new BoltRenderer(game);
@@ -87,7 +88,9 @@ export class GodPowers {
     const h = game.units?.heightOf ? game.units.heightOf(o) : 1.2;
     // (the struck unit's own hit flash comes from combat.damage; the blue
     // strike light does the rest)
-    this.zaps.push({ u: o, x: o.x, y: game.map.heightAt(o.x, o.z), z: o.z, h: (h || 1.8) * 0.8, t0: game.time, life: 0.7, seed: (game.tickCount * 131 + o.id * 17) >>> 0 });
+    this.zaps.push({ u: o, x: o.x, y: game.map.heightAt(o.x, o.z), z: o.z, h: (h || 1.8) * 0.8, t0: game.time, life: 0.4, seed: (game.tickCount * 131 + o.id * 17) >>> 0 });
+    // hit state: a white-hot flash for a few frames, then the man is charred
+    if (o.kind === 'unit') { o.gp_hitT = game.time; if (!this.struck.includes(o)) this.struck.push(o); }
   }
 
   // Throw a unit away from (x, z). Deterministic (hash of id + tick).
@@ -119,14 +122,14 @@ export class GodPowers {
     const now = this.game.time;
     for (let i = 0; i < n; i++) {
       const a = vr.range(0, Math.PI * 2), sp = vr.range(1.5, 5.5) * power;
-      const ember = i < Math.ceil(n * (blue ? 0.4 : 0.4));
+      const ember = i < Math.ceil(n * (blue ? 0.2 : 0.4));
       this.debris.push({
         x: x + Math.cos(a) * 0.3, y: y + 0.2, z: z + Math.sin(a) * 0.3,
         vx: Math.cos(a) * sp, vy: vr.range(4, 10) * power, vz: Math.sin(a) * sp,
         rx: vr.range(0, 6), ry: vr.range(0, 6), rz: vr.range(0, 6),
         wx: vr.range(-12, 12), wy: vr.range(-8, 8), wz: vr.range(-12, 12),
         s: ember ? vr.range(0.1, 0.18) : vr.range(0.12, 0.34), color: vr.pick(COLS),
-        ember, blue, cool: blue ? vr.range(0.4, 0.9) : vr.range(1.2, 2.6), t0: now, settled: false, die: now + vr.range(7, 11),
+        ember, blue, cool: blue ? vr.range(0.3, 0.6) : vr.range(1.2, 2.6), t0: now, settled: false, die: now + (blue ? vr.range(3, 5) : vr.range(7, 11)),
       });
     }
     if (this.debris.length > 460) this.debris.splice(0, this.debris.length - 460);
@@ -136,11 +139,12 @@ export class GodPowers {
   throwSparks(x, y, z, n, seed, power = 1, dim = 1, warm = false) {
     const vr = new RNG(seed ^ 0x5bd1e995), now = this.game.time;
     for (let i = 0; i < n; i++) {
-      const a = vr.range(0, Math.PI * 2), sp = vr.range(5, 13) * power;
+      // mostly a tight fountain over the crater, a few flung wide
+      const a = vr.range(0, Math.PI * 2), wide = vr.chance(0.25), sp = (wide ? vr.range(6, 11) : vr.range(1.5, 5)) * power;
       // each spark starts a few ms into its flight (the discharge is already
       // throwing them as the first stroke lands), so the burst reads at once
-      const vx = Math.cos(a) * sp, vz = Math.sin(a) * sp, vy = vr.range(5, 14) * power, t = vr.range(0.03, 0.2);
-      this.sparks.push({ x: x + vx * t, y: y + 0.25 + vy * t - 10 * t * t, z: z + vz * t, vx, vy: vy - 20 * t, vz, t0: now, life: vr.range(0.35, 0.8) * (0.6 + 0.4 * power), dim, warm: warm && i % 5 < 2 });
+      const vx = Math.cos(a) * sp, vz = Math.sin(a) * sp, vy = vr.range(6, 13) * power, t = vr.range(0.02, 0.12);
+      this.sparks.push({ x: x + vx * t, y: y + 0.25 + vy * t - 10 * t * t, z: z + vz * t, vx, vy: vy - 20 * t, vz, t0: now - t, life: vr.range(0.45, 0.9) * (0.6 + 0.4 * power), dim, warm: warm && i % 5 < 2, heat: vr.range(0.75, 1.1) });
     }
     if (this.sparks.length > 400) this.sparks.splice(0, this.sparks.length - 400);
   }
@@ -177,14 +181,12 @@ export class GodPowers {
       for (const o of game.movement.hash.near(x, z, splash, (o) => !o.dead && o !== target && game.isEnemy(owner, o.owner))) hit(o, damage * 0.4);
     }
     for (const o of thrown) this.knock(o, x, z, o === target ? 1.1 : 0.8);
-    this.throwDebris(x, y, z, 30, 1.1, seed, true);
+    // voxel chunks of earth blown up out of the crater (lit by the strike),
+    // a ring of charred clods, one fountain of hot sparks and a smoke puff
+    this.throwDebris(x, y, z, 18, 1.1, seed, true);
     this.charRim(x, y, z, seed);
-    this.throwSparks(x, y, z, 54, seed, 1.15);
-    // white-hot sparks, blue electric motes, earth and smoke
-    game.fx.emit({ x, y: y + 0.3, z, count: 14, color: 0xcfe2ff, size: 0.14, life: 0.45, speed: 9, up: 6, gravity: -16, additive: true, drag: 0.5 });
-    game.fx.emit({ x, y: y + 0.6, z, count: 6, color: 0x3d6cdf, size: 0.3, life: 0.6, speed: 3.5, up: 2.5, gravity: -2, additive: true, spread: 0.6 });
-    game.fx.emit({ x, y: y + 0.2, z, count: 10, color: 0x2a2622, size: 0.5, life: 1.2, speed: 3.2, up: 1.2, gravity: 0.6, grow: 1.8, spread: 0.4 });
-    game.fx.emit({ x, y: y + 0.2, z, count: 14, color: 0x5d4a33, size: 0.2, life: 1.0, speed: 4.5, up: 6, gravity: -16 });
+    this.throwSparks(x, y, z, 24, seed, 1.0);
+    game.fx.emit({ x, y: y + 0.2, z, count: 5, color: 0x2a2622, size: 0.42, life: 1.0, speed: 2.0, up: 1.2, gravity: 0.6, grow: 1.5, spread: 0.35 });
   }
 
   impactMeteor(m) {
@@ -219,19 +221,12 @@ export class GodPowers {
       s.next -= dt;
       if (s.next <= 0) {
         s.next = s.def.interval * (0.6 + game.rng.next() * 0.8);
-        const t = this.findTarget(s.owner, s.x, s.z, s.radius, true);
+        const t = this.findTarget(s.owner, s.x, s.z, s.radius * 0.78, true);
         if (t) this.strike(s.owner, t.x, t.z, s.def.damage, s.def.splash, t);
         else {
-          const a = game.rng.range(0, Math.PI * 2), r = Math.sqrt(game.rng.next()) * s.radius;
+          const a = game.rng.range(0, Math.PI * 2), r = Math.sqrt(game.rng.next()) * s.radius * 0.7;
           this.strike(s.owner, s.x + Math.cos(a) * r, s.z + Math.sin(a) * r, 0, s.def.splash, null);
         }
-      }
-      // sparks spitting off the foot of the perimeter wall (the wall itself
-      // is drawn by the renderer as orbiting energy bands, see effects.js)
-      for (let k = 0; k < 2; k++) {
-        if (!vr.chance(0.45)) continue;
-        const ea = vr.range(0, Math.PI * 2), ex = s.x + Math.cos(ea) * s.radius, ez = s.z + Math.sin(ea) * s.radius;
-        this.throwSparks(ex, game.map.heightAt(ex, ez) - 0.15, ez, 3, (vr.next() * 1e9) >>> 0, 0.35, 0.3);
       }
       // cosmetic cloud-to-cloud lightning
       s.sky -= dt;
@@ -270,7 +265,7 @@ export class GodPowers {
       const age = game.time - s.t0;
       if (s.blast || s.size || age > 5) continue;
       const k = 1 - age / 5;
-      if (vr.chance(0.15 + 0.4 * k)) game.fx.emit({ x: s.x + vr.range(-0.4, 0.4), y: s.y + 0.3, z: s.z + vr.range(-0.4, 0.4), count: 1, color: vr.chance(0.5) ? 0x141312 : 0x1f1d1b, size: 0.5 + 0.3 * k, life: 2.2, speed: 0.25, up: 1.6, gravity: 0.9, grow: 1.8, spread: 0.3 });
+      if (vr.chance(0.04 + 0.12 * k)) game.fx.emit({ x: s.x + vr.range(-0.4, 0.4), y: s.y + 0.3, z: s.z + vr.range(-0.4, 0.4), count: 1, color: vr.chance(0.5) ? 0x2a2826 : 0x34302d, size: 0.4 + 0.25 * k, life: 1.6, speed: 0.25, up: 1.3, gravity: 0.9, grow: 1.5, spread: 0.3 });
     }
     this.updateDebris(dt);
     for (const p of this.sparks) {
@@ -282,6 +277,7 @@ export class GodPowers {
     }
     this.sparks = this.sparks.filter((p) => game.time - p.t0 < p.life);
     this.updateAirborne(dt);
+    this.updateStruck();
     this.storms = this.storms.filter((s) => !s.done);
     this.meteors = this.meteors.filter((m) => !m.done);
     this.fires = this.fires.filter((f) => !f.done);
@@ -305,6 +301,22 @@ export class GodPowers {
       }
     }
     this.debris = this.debris.filter((d) => now < d.die);
+  }
+
+  // Lightning hit state on struck units (read by the units renderer):
+  // u.gp_hit is an emissive white-hot flash for the first ~0.15 s, u.gp_char
+  // a dark charred tint that follows it (the living recover after a few s).
+  updateStruck() {
+    const now = this.game.time;
+    for (const u of this.struck) {
+      const age = now - u.gp_hitT;
+      u.gp_hit = age < 0.06 ? 1.4 : Math.max(0, 1.4 * (1 - (age - 0.06) / 0.14));
+      const on = Math.min(1, Math.max(0, (age - 0.05) / 0.25));
+      const off = u.dead ? 1 : 1 - Math.min(1, Math.max(0, (age - 4) / 3));
+      u.gp_char = 0.5 * on * off;
+      if (age > 7.5 && !u.dead || age > 30 || !this.game.entities.get(u.id)) { u.gp_hit = 0; u.gp_char = 0; u.gp_done = true; }
+    }
+    this.struck = this.struck.filter((u) => !u.gp_done || (u.gp_done = false));
   }
 
   updateAirborne(dt) {
