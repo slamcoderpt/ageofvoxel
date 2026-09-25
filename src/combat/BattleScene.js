@@ -186,13 +186,8 @@ export const battleScene = {
     // saturated and bright, and the melee does not read milky. Only this
     // scene's uniforms change; ?post=off is unaffected.
     const gu = game.lighting?.post?.grade?.uniforms;
-    if (gu) {
-      gu.uToeLift.value = 0.05;
-      gu.uKnee.value = 0.72;
-      gu.uShoulder.value = 1.3;
-      gu.uSaturation.value = 1.06;
-      gu.uContrast.value = 1.14;
-    }
+    const grade = { uToeLift: 0.05, uKnee: 0.72, uShoulder: 1.3, uSaturation: 1.06, uContrast: 1.14 };
+    if (gu) for (const k in grade) if (gu[k]) gu[k].value = grade[k];
     const blue = army(game, PLAYER, 1, cx, cz);
     const red = army(game, ENEMY, -1, cx, cz);
     const myth = [...fieldHeroesAndMyth(game, PLAYER, 1, (a, d) => P(cx, cz, a, d), -3 * Math.PI / 4), ...fieldHeroesAndMyth(game, ENEMY, -1, (a, d) => P(cx, cz, a, d), Math.PI / 4)];
