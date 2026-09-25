@@ -501,7 +501,13 @@ export function townCenterModel(variant = 0, m = new VoxelModel()) {
   for (let i = 0; i < 4; i++) roundColumn(m, 9.5 + i * 3, Y, 25, 0.72, CH);
   // entablature over hall and porch: architrave, painted frieze, cornice
   const t = Y + CH;
-  const FRIEZE = (x, yy, z) => (yy === t + 2 && (x + z) % 6 === 0 ? GILT : yy === t + 3 && (x + z) % 2 === 0 ? PAINT_BLUE_D : PAINT_BLUE);
+  // Doric rhythm: grooved blue triglyphs two voxels wide between red
+  // metopes three wide, each metope with a small marble relief
+  const FRIEZE = (x, yy, z) => {
+    const p = (x + z) % 5;
+    if (p < 2) return (x + z) & 1 ? TRI_B : TRI_A;
+    return p === 3 && yy === t + 2 ? MARBLE : METOPE;
+  };
   for (const [x0, z0, w, d] of [[1, 1, 26, 20], [8, 20, 12, 7]]) {
     m.box(x0, t, z0, w, 1, d, MARBLE_SHADE);
     m.box(x0, t + 1, z0, w, 1, d, MARBLE);
@@ -514,13 +520,10 @@ export function townCenterModel(variant = 0, m = new VoxelModel()) {
   for (let z = 0; z < 22; z += 2) { m.set(0, t + 4, z, SOFFIT); m.set(27, t + 4, z, SOFFIT); }
   // roofs: the hall's ridge runs along the stoa, the porch's front to back
   const top = t + 6;
-  const R = gableRoof(m, { wx0: 0.5, wx1: 27.5, wz0: 0.5, wz1: 21.5, top, axis: 'x', pitch: 0.3, ov: 0.6, ovG: 0.5, ends: 'pediment', tiles: TILES.sage, tymp: 0x2f5596, rakeH: 0.8, sima: 0xa8372a, geisonPaint: 0x2d4b82, seed: 41 });
+  const R = gableRoof(m, { wx0: 0.5, wx1: 27.5, wz0: 0.5, wz1: 21.5, top, axis: 'x', pitch: 0.34, ov: 0.6, ovG: 0.5, ends: 'pediment', tiles: TILES.sage, tymp: 0x2f5596, rakeH: 0.8, sima: 0xa8372a, geisonPaint: 0x2d4b82, seed: 41, ornate: true });
   pedimentRelief(m, R, 27);
-  const P = gableRoof(m, { wx0: 7.5, wx1: 20.5, wz0: 13, wz1: 27, top, axis: 'z', pitch: 0.34, ov: 0.5, ovG: 0.8, ends: 'pediment', tiles: TILES.sage, tymp: 0x2f5596, rakeH: 0.8, sima: 0xa8372a, geisonPaint: 0x2d4b82, seed: 43 });
+  const P = gableRoof(m, { wx0: 7.5, wx1: 20.5, wz0: 13, wz1: 27, top, axis: 'z', pitch: 0.46, ov: 0.5, ovG: 0.8, ends: 'pediment', tiles: TILES.sage, tymp: 0x2f5596, rakeH: 0.8, sima: 0xa8372a, geisonPaint: 0x2d4b82, seed: 43, ornate: true });
   pedimentRelief(m, P, 27);
-  // acroteria on the porch pediment
-  const ay = Math.floor(P.ridgeY) + 1;
-  m.set(13, ay, 27, MARBLE); m.set(14, ay, 27, MARBLE); m.set(13, ay + 1, 27, GILT); m.set(14, ay + 1, 27, GILT);
   // team cloths: hung off the antae and the east end wall
   wallBanner(m, 27, Y + 2, 8, '+x', 7);
   wallBanner(m, 27, Y + 2, 16, '+x', 7);
@@ -776,16 +779,9 @@ export function templeModel(variant = 0, m = new VoxelModel()) {
   for (let x = 1; x < 19; x += 2) { m.set(x, t - 1, 1, SOFFIT); m.set(x, t - 1, 22, SOFFIT); }   // mutules
   for (let z = 1; z < 23; z += 2) { m.set(1, t - 1, z, SOFFIT); m.set(18, t - 1, z, SOFFIT); }
   t += 1;
-  const R = gableRoof(m, { wx0: 1, wx1: 19, wz0: 1, wz1: 23, top: t, axis: 'z', pitch: 0.36, ov: 0.5, ovG: 1.2, ends: 'pediment', tiles: TILES.marble, tymp: 0x2f5596, rakeH: 0.8, sima: 0xa8372a, geisonPaint: 0x2d4b82, seed: 71 });
+  const R = gableRoof(m, { wx0: 1, wx1: 19, wz0: 1, wz1: 23, top: t, axis: 'z', pitch: 0.48, ov: 0.5, ovG: 1.2, ends: 'pediment', tiles: TILES.marble, tymp: 0x2f5596, rakeH: 0.8, sima: 0xa8372a, geisonPaint: 0x2d4b82, seed: 71, ornate: true });
   pedimentRelief(m, R, 23);
   pedimentRelief(m, R, 0, -1);
-  // acroteria: a marble palmette with a gilt tip on the apex, small marble
-  // scrolls on the corners
-  for (const vz of [0, 23]) {
-    const ay = Math.floor(R.ridgeY) + 1;
-    m.set(9, ay, vz, MARBLE); m.set(10, ay, vz, MARBLE); m.set(9, ay + 1, vz, GILT); m.set(10, ay + 1, vz, GILT);
-    for (const x of [0, 19]) m.set(x, t, vz, MARBLE);
-  }
 
   return m;
 }
@@ -810,9 +806,9 @@ function pedimentRelief(m, R, vz, dir = 1) {
   const span = half - rakeH / pitch, rise = ridgeY - rakeH - top;
   const inner = (u) => top + rise * (1 - Math.abs(u - um) / span);
   const y0 = Math.ceil(top);
-  const ROBES = [0xa8372a, 0xf1ece2, 0xd2a847, 0xf1ece2, 0xb5542e];
+  const ROBES = [0xf1ece2, 0xa8372a, 0xf1ece2, 0xd2a847, 0xf1ece2];
   const SKIN = 0xe8d6bd;
-  // figures two voxels wide, one voxel apart: a gilt Zeus in the middle,
+  // slim figures standing three voxels apart on the blue ground, a gilt Zeus in the middle,
   // painted robes to the sides, reclining figures in the low corners
   for (let x = Math.floor(um - span) + 1; x < um + span - 1; x++) {
     const lim = Math.min(inner(x), inner(x + 1)) - 0.2;
@@ -820,7 +816,7 @@ function pedimentRelief(m, R, vz, dir = 1) {
     if (hgt < 1) continue;
     const d = x + 0.5 - um, ad = Math.abs(d);
     const slot = Math.floor((ad + 1) / 3), pos = Math.floor(ad + 1) % 3;   // 3-voxel slots out from the centre
-    if (ad > 1 && pos === 0) continue;                                       // gap between figures
+    if (ad > 1 && pos !== 1) continue;                                       // blue ground between figures
     const centre = ad < 1.1;
     const robe = centre ? GOLD : ROBES[slot % ROBES.length];
     const hh = centre ? hgt : hgt >= 4 ? hgt - 1 : hgt;

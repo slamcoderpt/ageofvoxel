@@ -82,7 +82,7 @@ export const TILES = {
   // weathered pale sage glaze (civic halls, as in Retold's towns)
   sage: { tones: [0xa3b89c, 0x96ad90, 0xadc1a6, 0x8fa689], butt: 0x62785f, fascia: 0x6b7f69, ridge: 0x72876f, soffit: 0x3f4640, antefix: 0xf1eee4 },
   // Parian marble tiles (the temple)
-  marble: { tones: [0xd9d8d0, 0xcccbc2, 0xe3e2da, 0xc3c3b9], butt: 0x8f8d84, fascia: 0xa3a197, ridge: 0xb9b7ad, soffit: 0x57524c, antefix: 0xf7f4ec },
+  marble: { tones: [0xb9c4bd, 0xaab6af, 0xc4cec7, 0xa3afa8], butt: 0x6b756f, fascia: 0x9a9e97, ridge: 0xb3b7af, soffit: 0x57524c, antefix: 0xf7f4ec },
   // deep red fired tiles and pale ochre tiles (house roofs vary)
   brick: { tones: [0xa9543d, 0x9c4a35, 0xb65e44, 0xa3503a], butt: 0x5e2b20, fascia: 0x5c2d23, ridge: 0x6f3427, soffit: 0x3e2e28, antefix: 0xe6ddcb },
   ochre: { tones: [0xd8a267, 0xcb955b, 0xe2af76, 0xd29c62], butt: 0x86592f, fascia: 0x7f5632, ridge: 0x93633a, soffit: 0x4a3a30, antefix: 0xefe8d8 },
@@ -94,7 +94,7 @@ export const TILES = {
 // the rows; tiles within a course take one of the palette hues, offset by
 // half a tile every other course. A fascia drops from the eave and the
 // underside is closed with a dark soffit.
-export function tiledPlane(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.1, tileW = 1.4, lip = 0.24, fascia = 0.6, seed = 1, up = [0, 1, 0], closeUnder = true, eaveFascia = true, ribGap = 2.6, ribW = 0.46, ribH = 0.5, antefix = tiles.antefix ?? null } = {}) {
+export function tiledPlane(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.1, tileW = 1.4, lip = 0.24, fascia = 0.6, seed = 1, up = [0, 1, 0], closeUnder = true, eaveFascia = true, ribGap = 2.6, ribW = 0.46, ribH = 0.5, antefix = tiles.antefix ?? null, antefixH = 0.35, antefixPaint = null, bandEvery = 4, weather = 1 } = {}) {
   const n = normal3(e0, e1, r0[0] === r1[0] && r0[1] === r1[1] && r0[2] === r1[2] ? r0 : r1, up);
   const slope = len3(sub3(lerp3(r0, r1, 0.5), lerp3(e0, e1, 0.5)));
   const N = Math.max(1, Math.round(slope / course));
@@ -110,7 +110,17 @@ export function tiledPlane(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.
     cuts.push(1);
     for (let j = 0; j + 1 < cuts.length; j++) {
       const a = cuts[j], b = cuts[j + 1];
-      const c = T[Math.floor(hash3(i, j, seed, 57) * T.length) % T.length];
+      let c = T[Math.floor(hash3(i, j, seed, 57) * T.length) % T.length];
+      // a slightly darker course every few rows breaks the slope into bands
+      if (bandEvery > 0 && i % bandEvery === bandEvery - 1) c = shadeHex(c, 0.82);
+      if (weather > 0) {
+        // weathering: lichen / soot patches a few tiles across, and rain
+        // run-off streaks that darken the lower courses under some ribs
+        const sw = ((a + b) / 2) * wmid;
+        if (hash3(Math.floor(sw / 3.2), Math.floor(i / 3), seed, 61) < 0.2 * weather) c = mix(c, 0x6f7058, 0.22);
+        else if (hash3(Math.floor(sw / 1.6), 0, seed, 62) < 0.16 * weather && i < N * 0.55) c = shadeHex(c, 0.9);
+        else if (hash3(i, j, seed, 63) < 0.05 * weather) c = mix(c, 0xffffff, 0.12);
+      }
       const p0 = add3(lerp3(L0, R0, a), n, lip), p1 = add3(lerp3(L0, R0, b), n, lip);
       const p2 = lerp3(L1, R1, b), p3 = lerp3(L1, R1, a);
       // the lower courses read a touch darker (weathering toward the eave)
@@ -146,7 +156,22 @@ export function tiledPlane(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.
         const dn = sub3(e0, r0), dl = len3(dn) || 1;
         const outv = dn.map((q) => q / dl);
         const P0 = add3(A1, outv, 0.05), P1 = add3(A2, outv, 0.05);
-        poly(m, [P0, P1, add3(add3(P1, [0, 1, 0], ribH + 0.35), outv, 0.05), add3(add3(P0, [0, 1, 0], ribH + 0.35), outv, 0.05)], antefix, { out: outv });
+        const ah = ribH + antefixH;
+        const Q0 = add3(P0, [0, 1, 0], ah), Q1 = add3(P1, [0, 1, 0], ah);
+        poly(m, [P0, P1, Q1, Q0], antefix, { out: outv });
+        if (antefixH > 0.5) {
+          // palmette: a pointed crown over the upright tile, a painted
+          // centre, and a back face so it reads from behind the eave too
+          const tip = add3(lerp3(Q0, Q1, 0.5), [0, 1, 0], 0.55);
+          poly(m, [Q0, Q1, tip], antefix, { out: outv });
+          poly(m, [P0, P1, Q1, Q0], shadeHex(antefix, 0.8), { out: outv.map((q) => -q) });
+          poly(m, [Q0, Q1, tip], shadeHex(antefix, 0.8), { out: outv.map((q) => -q) });
+          if (antefixPaint !== null) {
+            const cM = add3(lerp3(P0, P1, 0.5), [0, 1, 0], ah * 0.55), o = add3(cM, outv, 0.03);
+            const dw = sub3(P1, P0).map((q) => q * 0.26);
+            poly(m, [add3(o, [0, 1, 0], -0.3), add3(o, dw, 1), add3(o, [0, 1, 0], 0.42), add3(o, dw, -1)], antefixPaint, { out: outv });
+          }
+        }
       }
     }
   }
@@ -191,7 +216,7 @@ export function ridgeCap(m, a, b, side, w, h, color, { lap = 2.2 } = {}) {
 // ends: 'wall' fills the gable triangles with `fill`; 'pediment' builds a
 // temple pediment (recessed tympanum inside a raking cornice); 'none'.
 // Returns { ridgeY, eaveY, point(u, v) } in voxel space.
-export function gableRoof(m, { wx0, wx1, wz0, wz1, top, axis = 'x', pitch = 0.38, ov = 1, ovG = 0.6, tiles = TILES.terra, ends = 'wall', fill = 0xeae4d6, rake = 0xf1ece2, rakeShade = 0xd6cfbf, tymp = 0x2f4570, seed = 1, course = 1.1, tileW = 1.4, pedDepth = 1, rakeH = 0.9, sima = null, geisonPaint = null }) {
+export function gableRoof(m, { wx0, wx1, wz0, wz1, top, axis = 'x', pitch = 0.38, ov = 1, ovG = 0.6, tiles = TILES.terra, ends = 'wall', fill = 0xeae4d6, rake = 0xf1ece2, rakeShade = 0xd6cfbf, tymp = 0x2f4570, seed = 1, course = 1.1, tileW = 1.4, pedDepth = 1, rakeH = 0.9, sima = null, geisonPaint = null, ornate = false, acro = ornate }) {
   // local frame: u across the ridge, v along it
   const alongX = axis === 'x';
   const u0 = alongX ? wz0 : wx0, u1 = alongX ? wz1 : wx1;
@@ -203,10 +228,18 @@ export function gableRoof(m, { wx0, wx1, wz0, wz1, top, axis = 'x', pitch = 0.38
   const va = v0 - ovG, vb = v1 + ovG;
   const upA = alongX ? [0, 1, -1] : [-1, 1, 0], upB = alongX ? [0, 1, 1] : [1, 1, 0];
   // the two slopes
-  tiledPlane(m, P(u1 + ov, eaveY, va), P(u1 + ov, eaveY, vb), P(um, ridgeY, va), P(um, ridgeY, vb), { tiles, seed, up: upB, course, tileW });
-  tiledPlane(m, P(u0 - ov, eaveY, vb), P(u0 - ov, eaveY, va), P(um, ridgeY, vb), P(um, ridgeY, va), { tiles, seed: seed + 5, up: upA, course, tileW });
+  // ornate (civic) roofs: bigger palmette antefixes with a painted centre
+  // along both eaves, stronger cover-tile ribs
+  const tp = ornate ? { antefixH: 1.0, antefixPaint: 0x2d4b82, ribGap: 2.2, ribW: 0.5, ribH: 0.6 } : {};
+  tiledPlane(m, P(u1 + ov, eaveY, va), P(u1 + ov, eaveY, vb), P(um, ridgeY, va), P(um, ridgeY, vb), { tiles, seed, up: upB, course, tileW, ...tp });
+  tiledPlane(m, P(u0 - ov, eaveY, vb), P(u0 - ov, eaveY, va), P(um, ridgeY, vb), P(um, ridgeY, va), { tiles, seed: seed + 5, up: upA, course, tileW, ...tp });
   const lipY = 0.2 * Math.cos(Math.atan(pitch));
-  ridgeCap(m, P(um, ridgeY + lipY * 0.5, va - 0.1), P(um, ridgeY + lipY * 0.5, vb + 0.1), alongX ? [0, 0, 1] : [1, 0, 0], 0.7, 0.62, tiles.ridge);
+  const side = alongX ? [0, 0, 1] : [1, 0, 0];
+  if (ornate) {
+    // raised ridge beam: a marble saddle course under a fat lapped ridge
+    ridgeCap(m, P(um, ridgeY - 0.3, va - 0.15), P(um, ridgeY - 0.3, vb + 0.15), side, 1.35, 1.2, shadeHex(tiles.ridge, 0.82), { lap: 0 });
+    ridgeCap(m, P(um, ridgeY + 0.35, va - 0.1), P(um, ridgeY + 0.35, vb + 0.1), side, 0.95, 1.05, mix(tiles.antefix ?? 0xf1ece2, tiles.ridge, 0.3), { lap: 1.8 });
+  } else ridgeCap(m, P(um, ridgeY + lipY * 0.5, va - 0.1), P(um, ridgeY + lipY * 0.5, vb + 0.1), side, 0.7, 0.62, tiles.ridge);
   const dirV = (s) => (alongX ? [s, 0, 0] : [0, 0, s]);
   for (const [vw, vEnd, s] of [[v0, va, -1], [v1, vb, 1]]) {
     if (ends === 'wall') {
@@ -256,6 +289,13 @@ export function gableRoof(m, { wx0, wx1, wz0, wz1, top, axis = 'x', pitch = 0.38
       poly(m, [P(u0 - ov, top - gy, vf), P(u1 + ov, top - gy, vf), P(u1 + ov, top - gy, vt), P(u0 - ov, top - gy, vt)], 0x9a9384, { out: [0, -1, 0] });
       for (const ue of [u0 - ov, u1 + ov])
         poly(m, [P(ue, top, vf), P(ue, top, vt), P(ue, top - gy, vt), P(ue, top - gy, vf)], rakeShade, { out: alongX ? [0, 0, ue < um ? -1 : 1] : [ue < um ? -1 : 1, 0, 0] });
+      if (acro) {
+        // acroteria: a tall palmette on the apex, smaller ones on the
+        // corners, each on a little plinth set into the cornice
+        const across = alongX ? [0, 0, 1] : [1, 0, 0];
+        acroterion(m, P(um, ridgeY + 0.35, vf - s * 0.5), dirV(s), across, 1.25, { tip: 0xd2a847 });
+        for (const uo of [u0 - ov * 0.5, u1 + ov * 0.5]) acroterion(m, P(uo, top + 0.05, vf - s * 0.5), dirV(s), across, 0.8);
+      }
     }
   }
   return { ridgeY, eaveY, P, um, half, pitch, top, rakeH };
@@ -405,15 +445,56 @@ export function sbox(m, x0, y0, z0, x1, y1, z1, color, { bottom = false } = {}) 
   if (bottom) poly(m, [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], shadeHex(color, 0.7), { out: [0, -1, 0] });
 }
 
+// Acroterion: a marble palmette fan standing on a small plinth at `base`
+// (voxel space), its face turned to `out` (a horizontal axis vector) and
+// spread along `across`; `k` scales it. Two scrolls curl out at the foot and
+// the centre leaf can carry a gilt tip.
+export function acroterion(m, base, out, across, k = 1, { color = 0xf3efe6, shade = 0xd6cfbf, tip = null } = {}) {
+  const at = (a, up, o = 0) => [base[0] + across[0] * a + out[0] * o, base[1] + up, base[2] + across[2] * a + out[2] * o];
+  const T = 0.32 * k;       // half thickness
+  const box = (a0, a1, y0, y1, c) => {
+    const p = (a, yy, o) => at(a, yy, o);
+    poly(m, [p(a0, y1, -T), p(a1, y1, -T), p(a1, y1, T), p(a0, y1, T)], c, { out: [0, 1, 0] });
+    for (const o of [T, -T]) poly(m, [p(a0, y0, o), p(a1, y0, o), p(a1, y1, o), p(a0, y1, o)], o > 0 ? c : shadeHex(c, 0.8), { out: out.map((q) => q * Math.sign(o)) });
+    for (const a of [a0, a1]) poly(m, [p(a, y0, -T), p(a, y0, T), p(a, y1, T), p(a, y1, -T)], shadeHex(c, 0.9), { out: across.map((q) => q * Math.sign(a - (a0 + a1) / 2)) });
+  };
+  box(-0.8 * k, 0.8 * k, 0, 0.45 * k, shade);                 // plinth
+  box(-0.3 * k, 0.3 * k, 0.45 * k, 0.9 * k, color);           // stem
+  for (const sg of [-1, 1]) box(sg * 0.25 * k, sg * 0.85 * k, 0.45 * k, 0.8 * k, color);   // foot scrolls
+  box(-0.85 * k, -0.55 * k, 0.8 * k, 1.05 * k, shade);        // curled scroll ends
+  box(0.55 * k, 0.85 * k, 0.8 * k, 1.05 * k, shade);
+  // the fan: five leaves radiating from the top of the stem
+  const cy = 0.9 * k;
+  for (let i = -2; i <= 2; i++) {
+    const ang = i * 0.42, L = (i === 0 ? 1.9 : Math.abs(i) === 1 ? 1.55 : 1.1) * k, w = 0.3 * k;
+    const dx = Math.sin(ang), dy = Math.cos(ang);
+    const c = i === 0 && tip !== null ? tip : color;
+    for (const o of [T * 0.8, -T * 0.8]) {
+      const q0 = at(-w * dy, cy + w * dx * 0.3, o), q1 = at(w * dy, cy - w * dx * 0.3, o);
+      const q2 = at(dx * L + w * 0.6 * dy, cy + dy * L - w * 0.6 * dx, o), q3 = at(dx * L - w * 0.6 * dy, cy + dy * L + w * 0.6 * dx, o);
+      poly(m, [q0, q1, q2, q3], o > 0 ? (Math.abs(i) & 1 ? shadeHex(c, 0.93) : c) : shadeHex(c, 0.78), { out: out.map((q) => q * Math.sign(o)) });
+      const tp = at(dx * (L + 0.35 * k), cy + dy * (L + 0.35 * k), o);
+      poly(m, [q3, q2, tp], o > 0 ? c : shadeHex(c, 0.78), { out: out.map((q) => q * Math.sign(o)) });
+    }
+  }
+}
+
 // Round column centred at (cx, cz): torus base, fluted shaft (alternating
 // facets a shade darker), dark necking ring, echinus and square abacus.
 export function roundColumn(m, cx, y, cz, r, h, { shaft = 0xf1ece2, flute = 0xe2dccf, base = 0xd6cfbf, neck = 0xbdb5a3 } = {}) {
-  cylinder(m, cx, y, cz, r + 0.45, 0.5, base, { segs: 12 });
-  cylinder(m, cx, y + 0.5, cz, r + 0.25, 0.35, shaft, { segs: 12 });
-  cylinder(m, cx, y + 0.85, cz, r, h - 2.2, shaft, { segs: 16, flutes: 1, flute, cap: false });
-  cylinder(m, cx, y + h - 1.35, cz, r * 0.96, 0.3, neck, { segs: 16, cap: false });
-  cylinder(m, cx, y + h - 1.05, cz, r + 0.3, 0.45, shaft, { segs: 16 });
-  sbox(m, cx - r - 0.5, y + h - 0.6, cz - r - 0.5, cx + r + 0.5, y + h, cz + r + 0.5, base, { bottom: true });
+  // square plinth one voxel wider than the shaft, then a torus
+  sbox(m, cx - r - 0.9, y, cz - r - 0.9, cx + r + 0.9, y + 0.45, cz + r + 0.9, base);
+  cylinder(m, cx, y + 0.45, cz, r + 0.55, 0.45, shaft, { segs: 14 });
+  cylinder(m, cx, y + 0.9, cz, r + 0.3, 0.25, neck, { segs: 14, cap: false });
+  // the shaft tapers a little toward the top
+  const hs = h - 2.55;
+  cylinder(m, cx, y + 1.15, cz, r, hs * 0.55, shaft, { segs: 16, flutes: 1, flute, cap: false });
+  cylinder(m, cx, y + 1.15 + hs * 0.55, cz, r * 0.92, hs * 0.45, shaft, { segs: 16, flutes: 1, flute, cap: false });
+  cylinder(m, cx, y + h - 1.4, cz, r * 0.9, 0.3, neck, { segs: 16, cap: false });
+  // echinus flaring out to a square abacus a voxel wider than the shaft
+  cylinder(m, cx, y + h - 1.1, cz, r + 0.35, 0.25, shaft, { segs: 16 });
+  cylinder(m, cx, y + h - 0.85, cz, r + 0.65, 0.25, shaft, { segs: 16 });
+  sbox(m, cx - r - 0.95, y + h - 0.6, cz - r - 0.95, cx + r + 0.95, y + h, cz + r + 0.95, base, { bottom: true });
 }
 
 // Tiled conical ring roof from radius r0 at y0 up to radius r1 at y1.
