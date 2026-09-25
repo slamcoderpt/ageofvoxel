@@ -3,9 +3,10 @@ import { VoxelModel, TEAM, buildVoxelGeometry, voxelMaterialFor } from '../core/
 import { hash3 } from '../core/rng.js';
 import { BUILDING_VOXEL } from './defs.js';
 import { GROUND } from '../core/GameMap.js';
+import { withExtras, shedRoof, roundColumn, TILES } from './shapes.js';
 import {
   WOOD, DARKWOOD, STONE, MARBLE, MARBLE_SHADE, BRONZE, GOLD, FIRE, LEAF,
-  amphora, pithos, cypress, olive, statue, hopliteStatue, roofTile, shade,
+  amphora, pithos, potPlant, cypress, olive, statue, hopliteStatue, roofTile, shade,
 } from './models.js';
 
 // Town dressing: visual-only props (well, market stalls, statues on plinths,
@@ -40,6 +41,14 @@ const PROPS = {
   stall_food: { w: 2, h: 1, build: (m) => stall(m, 'food') },
   stall_pots: { w: 2, h: 1, build: (m) => stall(m, 'pots') },
   stall_cloth: { w: 2, h: 1, build: (m) => stall(m, 'cloth') },
+  // stoa: a long open colonnade on the agora's edge, facing +x: two-step
+  // stylobate, a plastered back wall with shop doors and a red dado, five
+  // round columns under a painted architrave and a tiled lean-to roof;
+  // benches, jars and a hung team cloth inside
+  stoa: { w: 2, h: 5, build: (m) => stoa(m) },
+  // potter's workshop yard: a domed clay kiln with a glowing stoke hole, a
+  // wheel under a small shed, rows of drying pots, a fence round it
+  kiln: { w: 2, h: 2, build: (m) => kiln(m) },
   statue: { w: 2, h: 2, build(m) { m.box(0, 0, 0, 8, 1, 8, MARBLE_SHADE); statue(m, 2, 1, 2, { bolt: true }); } },
   hoplite: { w: 1, h: 1, build(m) { hopliteStatue(m, 0, 0, 0); } },
   pillar: {
@@ -210,11 +219,9 @@ function court(m, kind) {
     // straw bee skeps on a plank stand, a fig tree
     m.box(0, 1, 1, 3, 1, 5, 0x7a5230);
     for (const z of [1, 3]) { m.box(0, 2, z, 2, 2, 2, 0xc9a55a); m.set(0, 4, z, 0xb89448); m.set(0, 2, z + 1, 0x3a2e22); }
-    m.box(1, 1, 8, 1, 3, 1, 0x6a5238);
-    for (let x = -1; x < 4; x++) for (let z = 6; z < 11; z++) for (let y = 4; y < 7; y++) {
-      const d = Math.hypot(x - 1, (z - 8) * 1.1, (y - 5) * 1.4);
-      if (d < 2.3 && hash3(x, y, z, 89) < 0.8) m.set(x, y, z, hash3(x, y, z, 90) < 0.5 ? 0x587f35 : 0x4a7030);
-    }
+    // a row of potted herbs and flowers along the wall, a stone bench
+    for (const z of [6, 8, 10]) potPlant(m, 2, 1, z, z);
+    m.box(0, 1, 7, 1, 1, 3, 0xcfc7b4);
   } else {
     // hen coop: a low timber hutch under a thatch lean-to, hay, hens
     m.box(0, 1, 1, 3, 2, 3, 0x8a6a40); m.box(1, 1, 3, 1, 1, 1, 0x2a211b);
@@ -224,6 +231,53 @@ function court(m, kind) {
     m.set(2, 1, 7, 0x9b6a3c).set(2, 2, 7, 0x9b6a3c);
     pithos(m, 0, 1, 9, 0xb8683e);
   }
+}
+
+function stoa(m) {
+  const L = 20;
+  const WASH = (x, y, z) => (hash3(x >> 1, y >> 1, z >> 1, 110) < 0.55 ? 0xf1ede4 : 0xe8e2d6);
+  m.box(0, 0, 0, 8, 1, L, (x, y, z) => (hash3(x >> 1, 0, z >> 1, 111) < 0.5 ? 0x8f887a : 0x857e70));
+  m.box(0, 1, 0, 7, 1, L, (x, y, z) => ((x + z) & 1 ? 0xd6cfbf : 0xcfc7b4));
+  // back wall and end walls
+  m.box(0, 2, 0, 2, 9, L, WASH);
+  m.box(0, 2, 0, 2, 2, L, 0x9a3b2c);
+  for (const z of [0, L - 1]) { m.box(0, 2, z, 6, 9, 1, WASH); m.box(0, 2, z, 6, 2, 1, 0x9a3b2c); }
+  // shop doors in the back wall, recessed, with pale frames
+  for (const z0 of [3, 9, 15]) {
+    m.box(1, 2, z0, 1, 5, 2, 0x16110d);
+    m.box(2, 7, z0 - 1, 1, 1, 4, 0xd6cfbf); m.box(2, 2, z0 - 1, 1, 5, 1, 0xd6cfbf); m.box(2, 2, z0 + 2, 1, 5, 1, 0xd6cfbf);
+  }
+  // colonnade and architrave
+  for (let i = 0; i < 5; i++) roundColumn(m, 6.5, 2, 2 + i * 4, 0.5, 8);
+  m.box(5, 10, 0, 3, 1, L, 0xece6da);
+  m.box(5, 11, 0, 3, 1, L, (x, y, z) => (z % 4 === 0 ? 0xd2a847 : 0x34528a));
+  m.box(0, 11, 0, 5, 1, L, WASH);
+  shedRoof(m, { wx0: 0, wx1: 8, wz0: 0, wz1: L, top: 12, dir: '+x', pitch: 0.3, ov: 1, ovS: 0.6, tiles: TILES.warm, seed: 17, fill: 0xece6da });
+  // inside: benches, jars, a hanging team cloth
+  m.box(2, 2, 6, 1, 1, 2, 0xcfc7b4); m.box(2, 2, 12, 1, 1, 2, 0xcfc7b4);
+  pithos(m, 2, 2, 1, 0xb8683e); amphora(m, 3, 2, 17, 0xa65a34); amphora(m, 2, 2, 18, 0xc47440);
+  for (let y = 6; y < 10; y++) for (let z = 7; z < 11; z++) if (z !== 9) m.set(2, y, z, TEAM);
+}
+
+function kiln(m) {
+  for (let x = 0; x < 8; x++) for (let z = 0; z < 8; z++) m.set(x, 0, z, hash3(x, 0, z, 112) < 0.5 ? 0x9a7d5a : 0x8f7352);
+  // beehive kiln of mud brick with a dark stoke hole and fire
+  for (let y = 1; y < 7; y++) {
+    const r = y < 4 ? 2.4 : y === 4 ? 2.1 : y === 5 ? 1.6 : 0.9;
+    for (let x = 0; x < 6; x++) for (let z = 0; z < 6; z++) if (Math.hypot(x - 2, z - 2) <= r)
+      m.set(x, y, z, hash3(x, y, z, 113) < 0.5 ? 0xb07a52 : 0xa06c46);
+  }
+  m.set(2, 7, 2, 0x3a3430);
+  m.box(2, 1, 4, 1, 2, 1, 0xff9a3a, { glow: 0.6 });
+  m.box(1, 1, 5, 3, 1, 1, 0x7a5a40);
+  // potter's wheel under a small plank shade
+  for (const [x, z] of [[5, 0], [7, 0], [5, 3], [7, 3]]) m.box(x, 1, z, 1, 4, 1, WOOD);
+  m.box(4, 5, 0, 5, 1, 4, 0x8a6a40);
+  m.box(6, 1, 1, 1, 1, 1, 0x5a3e26); m.box(6, 2, 1, 1, 1, 1, 0xb07a52);
+  // drying pots on a board
+  m.box(4, 1, 6, 4, 1, 1, 0x7a5230);
+  for (let x = 4; x < 8; x++) amphora(m, x, 2, 6, x & 1 ? 0xc98c5e : 0xb8683e);
+  m.set(0, 1, 7, 0x6a462a).set(0, 2, 7, 0x6a462a).set(1, 1, 7, 0x6a462a);   // fuel stack
 }
 
 // temenos boundary: a low marble kerb with square piers and a coping,
@@ -291,8 +345,9 @@ function anchorsFor(b) {
     // the agora: a market row on the front-left, the well front-right, a
     // statue on the open north-east corner; everything else stays clear
     case 'town_center': return [
+      ['stoa', [[-3, 5], [-4, 5]]], ['stoa', [[-3, -3], [-3, -4]]],
       ['pillar', [[-1, h], [-1, h + 1]]], ['pillar', [[w, h], [w, h + 1]]],
-      ['stall_food', [[-3, h], [-4, h]]], ['stall_pots', [[-3, h + 2], [-4, h + 2]]], ['stall_cloth', [[-1, h + 2]]],
+      ['stall_food', [[0, h], [-1, h + 1]]], ['stall_pots', [[0, h + 2], [-1, h + 2]]], ['stall_cloth', [[w - 2, h + 2], [w - 1, h + 2]]],
       ['well', [[w + 1, h], [w + 1, h + 1]]],
       ['statue', [[w + 1, -3], [w + 1, -2]]],
       ['cypress', [[-2, -2], [-1, -2]]], ['cypress', [[w + 1, 0], [w, -2]]],
@@ -308,6 +363,7 @@ function anchorsFor(b) {
     case 'storehouse': return [
       ['fence_z', [[w + 1, -1]]], ['fence_z', [[-2, -1]]],
       ['crates', [[w, 0], [-1, 0]]], ['pithoi', [[-1, -1], [w - 1, -1]]],
+      ['kiln', [[-4, 0], [w + 2, 0], [-4, 2]]],
     ];
     case 'temple': if (b.bld_temenos) return temenosAnchors(b);
       return [
@@ -368,7 +424,8 @@ export class Props {
       const p = PROPS[kind];
       const m = new VoxelModel();
       p.build(m);
-      this.geos.set(kind, buildVoxelGeometry(m, { size: BUILDING_VOXEL, pivot: [p.w * V / 2, 0, p.h * V / 2], jitter: 0.06 }));
+      const pivot = [p.w * V / 2, 0, p.h * V / 2];
+      this.geos.set(kind, withExtras(buildVoxelGeometry(m, { size: BUILDING_VOXEL, pivot, jitter: 0.06 }), m, BUILDING_VOXEL, pivot));
     }
     return this.geos.get(kind);
   }

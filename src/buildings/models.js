@@ -554,7 +554,7 @@ export function townCenterModel(variant = 0, m = new VoxelModel()) {
 const HOUSE_PLASTER = [WHITEWASH, (x, y, z) => { const h = hash3(x >> 1, y >> 1, z >> 1, 74); return h < 0.55 ? 0xf3ead8 : h < 0.88 ? 0xebe1cc : 0xe4d9c2; }];
 const HOUSE_FILL = [0xf1ede4, 0xefe6d3];
 const HOUSE_BAND = [0xa8452f, 0xa87a3e];
-const HOUSE_SOCLE = (x, y, z) => (hash3(x >> 1, y, z >> 1, 75) < 0.5 ? 0xb8b0a0 : 0xaba392);
+const HOUSE_SOCLE = (x, y, z) => { const h = hash3(x >> 1, y, z >> 1, 75); return h < 0.4 ? 0x8a8375 : h < 0.8 ? 0x7d7669 : 0x958d7e; };
 const HOUSE_LOT = (x, y, z) => { const h = hash3(x >> 1, 0, z >> 1, 76); let c = h < 0.4 ? 0xd9d1bf : h < 0.8 ? 0xcfc6b2 : 0xe2dbcb; if (((x >> 1) + (z >> 1)) % 2 === 0) c = shade(c, 0.96); return c; };
 const DOOR_PAINT = [(x, y, z) => ((x + z) % 2 ? 0x6b4a2e : 0x5f4028), (x, y, z) => ((x + z) % 2 ? 0x35577f : 0x2e4d72), (x, y, z) => ((x + z) % 2 ? 0x4f6b3c : 0x465f35)];
 const EARTH = (x, y, z) => pick(hash3(x, 0, z, 77), [0x9c8160, 0x927757, 0xa58a68, 0x8b7152]);
@@ -562,23 +562,41 @@ const VINE = (x, y, z) => { const h = hash3(x, y, z, 97); return h < 0.3 ? 0x4f7
 const CLOTH = [0xefe8d6, 0xb8402f, 0x3f6aa6, 0xd9a441, 0xe9e1cf, 0x8a4a7a, 0xc9763a];
 const LOGS = (x, y, z) => (hash3(x, y, z, 98) < 0.5 ? 0x7a5230 : 0x6a462a);
 const LOG_END = 0xc9a574;
+// painted board shutters (two tones: boards and the batten between them)
+const SHUTTERS = [
+  (y) => (y & 1 ? 0x3f6e4a : 0x355f3f),
+  (y) => (y & 1 ? 0x3b5f8c : 0x31527a),
+  (y) => (y & 1 ? 0x7b4a2c : 0x6a3f25),
+  (y) => (y & 1 ? 0x4c7a7a : 0x416a6a),
+];
 
-// timber pergola over [x, x+w) x [z, z+d), posts from y0 up to y0+h, with a
-// vine grown over the joists and trailing down one post
+// timber pergola over [x, x+w) x [z, z+d), posts from y0 up to y0+h: two
+// dark beams, pale rafters every other voxel with square ends, and a vine
+// trained neatly along the rafter tops (a single line of leaf on each, with
+// a few hanging grape bunches) rather than a heap of foliage. Terracotta
+// pots with clipped shrubs stand at the foot of the front posts.
 function pergola(m, x, y0, z, w, d, h, seed = 0) {
   for (const [px, pz] of [[x, z], [x + w - 1, z], [x, z + d - 1], [x + w - 1, z + d - 1]]) m.box(px, y0, pz, 1, h, 1, WOOD);
   const t = y0 + h;
-  m.box(x, t, z, w, 1, 1, DARKWOOD); m.box(x, t, z + d - 1, w, 1, 1, DARKWOOD);
-  for (let xx = x; xx < x + w; xx += 2) m.box(xx, t + 1, z, 1, 1, d, WOOD);
-  for (let zz = z; zz < z + d; zz++) for (let xx = x - 1; xx <= x + w; xx++) {
-    const hv = hash3(xx, seed, zz, 99);
-    // leaf clumps over the joists (not a solid mat), a few grape bunches
-    const clump = hash3(xx >> 1, seed, zz >> 1, 104) < 0.55;
-    if (clump && hv < 0.75) m.set(xx, t + 2, zz, VINE);
-    else if (!clump && hv < 0.12) m.set(xx, t + 1, zz, VINE);
-    if ((zz === z || zz === z + d - 1 || xx === x - 1 || xx === x + w) && hash3(xx, seed + 1, zz, 100) < 0.35) m.set(xx, t, zz, VINE);
+  m.box(x - 1, t, z, w + 2, 1, 1, DARKWOOD); m.box(x - 1, t, z + d - 1, w + 2, 1, 1, DARKWOOD);
+  for (let xx = x; xx < x + w; xx += 2) {
+    m.box(xx, t + 1, z - 1, 1, 1, d + 2, 0xa07a4c);
+    for (let zz = z; zz < z + d; zz++) if (hash3(xx, seed, zz, 99) < 0.6) m.set(xx, t + 2, zz, (zz + xx) & 1 ? 0x3f6a2c : 0x4a7630);
+    if (hash3(xx, seed, 5, 100) < 0.5) m.set(xx + 1, t, z + (d >> 1), 0x5b2f5e);
   }
-  for (let y = y0; y < t; y++) if (hash3(x, y, z, 101) < 0.7) m.set(x + 1 > x + w - 1 ? x : x, y, z + 1 < z + d ? z + 1 : z, VINE);
+  // the vine's stem climbing the front-left post
+  for (let y = y0 + 1; y < t; y += 2) m.set(x, y, z + d - 1, 0x4f7d34);
+  potPlant(m, x + 1, y0, z + d - 1, seed);
+  if (w > 3) potPlant(m, x + w - 2, y0, z + d - 1, seed + 1);
+}
+
+// a terracotta pot with a clipped round shrub or a flowering plant, 1x1
+function potPlant(m, x, y, z, seed = 0) {
+  const h = hash3(x, seed, z, 105);
+  m.set(x, y, z, 0xa65a34).set(x, y + 1, z, 0xb8683e);
+  m.set(x, y + 2, z, h < 0.5 ? 0x4a7b36 : 0x55863b);
+  if (h < 0.35) m.set(x, y + 3, z, 0x4a7b36);
+  else if (h < 0.7) m.set(x, y + 3, z, h < 0.5 ? 0xd9467a : 0xf2ede2);
 }
 
 // warp-weighted loom leaning on a wall, 4 wide along x, facing +z
@@ -619,14 +637,49 @@ export function houseModel(variant = 0, m = new VoxelModel()) {
   // course under the eaves; upper storeys (y0 > 0) have no socle
   const block = (x, z, w, d, h, y0 = 0) => {
     m.box(x, y0, z, w, h, d, PL);
-    if (y0 === 0) { m.box(x, 0, z, w, 2, d, HOUSE_SOCLE); m.box(x, 2, z, w, 1, d, BAND); }
+    if (y0 === 0) {
+      // dark rubble plinth with a footing course stepping out one voxel
+      m.box(x, 0, z, w, 2, d, HOUSE_SOCLE); m.box(x, 2, z, w, 1, d, BAND);
+      for (let xx = x - 1; xx <= x + w; xx++) for (let zz = z - 1; zz <= z + d; zz++) if (!m.has(xx, 0, zz)) m.set(xx, 0, zz, HOUSE_SOCLE);
+    }
+    // pale cornice course under the eaves, one voxel proud of the wall
     m.box(x, y0 + h - 1, z, w, 1, d, MARBLE_SHADE);
+    for (let xx = x - 1; xx <= x + w; xx++) for (let zz = z - 1; zz <= z + d; zz++) if (!m.has(xx, y0 + h - 1, zz)) m.set(xx, y0 + h - 1, zz, MARBLE_SHADE);
     return y0 + h;
   };
+  // A door or window in a wall face. The opening is recessed one voxel into
+  // the wall (a dark reveal the sun cannot reach), framed by a pale stone
+  // surround standing one voxel proud: a lintel over it running past each
+  // jamb, and for windows a projecting sill and a pair of painted timber
+  // shutters folded back against the wall; doors get stone jambs and a
+  // threshold step. The face is the side of the wall that is open air.
+  const SHUT = SHUTTERS[(plan + fin) % SHUTTERS.length];
   const opening = (x, y, z, w, h, d, c = DARK) => {
-    m.box(x, y, z, w, h, d, c);
-    if (d === 1) { m.box(x - 1, y + h, z, w + 2, 1, 1, MARBLE_SHADE); if (c === DARK) m.box(x, y - 1, z, w, 1, 1, MARBLE_SHADE); }
-    else { m.box(x, y + h, z - 1, 1, 1, d + 2, MARBLE_SHADE); if (c === DARK) m.box(x, y - 1, z, 1, 1, d, MARBLE_SHADE); }
+    const alongX = d === 1;
+    const n = alongX ? w : d;
+    const P = (a, yy, o, col) => (alongX ? m.set(x + a, yy, z + o, col) : m.set(x + o, yy, z + a, col));
+    const H = (a, yy, o) => (alongX ? m.has(x + a, yy, z + o) : m.has(x + o, yy, z + a));
+    const R = (a, yy, o) => (alongX ? m.remove(x + a, yy, z + o) : m.remove(x + o, yy, z + a));
+    const mid = n >> 1, my = y + (h >> 1);
+    let out = !H(mid, my, 1) ? 1 : !H(mid, my, -1) ? -1 : 0;
+    const door = c !== DARK;
+    if (!out) {   // no clear face (inner wall): paint it flush
+      for (let a = 0; a < n; a++) for (let yy = y; yy < y + h; yy++) P(a, yy, 0, door ? c : DARK);
+      return;
+    }
+    const thick = H(mid, my, -out);
+    for (let a = 0; a < n; a++) for (let yy = y; yy < y + h; yy++) {
+      if (thick) { R(a, yy, 0); P(a, yy, -out, door ? c : 0x16110d); }
+      else P(a, yy, 0, door ? c : 0x16110d);
+    }
+    for (let a = -1; a <= n; a++) P(a, y + h, out, MARBLE_SHADE);          // lintel
+    if (door) {
+      for (let yy = y; yy < y + h; yy++) { P(-1, yy, out, MARBLE_SHADE); P(n, yy, out, MARBLE_SHADE); }
+      if (y > 0 && !H(0, y - 1, out)) for (let a = -1; a <= n; a++) P(a, y - 1, out, MARBLE_DARK);
+    } else {
+      for (let a = -1; a <= n; a++) P(a, y - 1, out, MARBLE_SHADE);          // sill
+      for (let yy = y; yy < y + h; yy++) { P(-1, yy, out, SHUT(yy)); P(n, yy, out, SHUT(yy + 1)); }
+    }
   };
   const chimney = (x, y, z) => { m.box(x, y, z, 1, 3, 1, PL); m.set(x, y + 3, z, 0x3a3430); };
   const courtWall = (x, z, w, d, h = 4) => {
@@ -640,7 +693,7 @@ export function houseModel(variant = 0, m = new VoxelModel()) {
   if (plan === 0) {
     // back range across the lot, gable ridge along x
     const top = block(0, 0, 12, 4, 6);
-    gableRoof(m, { wx0: 0, wx1: 12, wz0: 0, wz1: 4, top, axis: 'x', pitch: 0.32, ov: 0.6, ovG: 0.4, tiles, fill, seed: 11 });
+    gableRoof(m, { wx0: 0, wx1: 12, wz0: 0, wz1: 4, top, axis: 'x', pitch: 0.32, ov: 1, ovG: 0.7, tiles, fill, seed: 11 });
     // west range under a lean-to falling into the court
     const t2 = block(0, 4, 4, 7, 5);
     shedRoof(m, { wx0: 0, wx1: 4, wz0: 4, wz1: 11, top: t2, dir: '+x', pitch: 0.4, ov: 0.6, ovS: 0.3, tiles, fill, seed: 12 });
@@ -658,6 +711,7 @@ export function houseModel(variant = 0, m = new VoxelModel()) {
     opening(5, 1, 3, 2, 4, 1, DOORC); opening(1, 1, 10, 2, 4, 1, DOORC); opening(3, 3, 6, 1, 2, 2);
     opening(9, 3, 3, 1, 2, 1); opening(2, 3, 3, 1, 2, 1);
     opening(0, 3, 1, 1, 2, 2); opening(11, 3, 1, 1, 2, 2);
+    opening(2, 3, 0, 1, 2, 1); opening(6, 3, 0, 1, 2, 1); opening(9, 3, 0, 1, 2, 1); opening(0, 2, 7, 1, 2, 1);
     chimney(2, 8, 1);
     return m;
   }
@@ -665,7 +719,7 @@ export function houseModel(variant = 0, m = new VoxelModel()) {
     // tall two-storey block, ridge across the lot
     const top = block(0, 0, 6, 8, 12);
     m.box(0, 6, 0, 6, 1, 8, BAND);
-    gableRoof(m, { wx0: 0, wx1: 6, wz0: 0, wz1: 8, top, axis: 'x', pitch: 0.42, ov: 0.6, ovG: 0.5, tiles, fill, seed: 14 });
+    gableRoof(m, { wx0: 0, wx1: 6, wz0: 0, wz1: 8, top, axis: 'x', pitch: 0.42, ov: 1, ovG: 0.7, tiles, fill, seed: 14 });
     // timber balcony on the front at the upper floor
     m.box(0, 6, 8, 6, 1, 2, WOOD);
     for (let x = 0; x < 6; x++) { if (x % 2 === 0) m.set(x, 7, 9, DARKWOOD); m.set(x, 8, 9, DARKWOOD); }
@@ -674,11 +728,11 @@ export function houseModel(variant = 0, m = new VoxelModel()) {
     for (const x of [0, 5]) m.box(x, 0, 9, 1, 6, 1, WOOD);
     opening(2, 7, 7, 2, 3, 1, DOORC); opening(2, 1, 7, 2, 4, 1, DOORC);
     opening(5, 8, 2, 1, 2, 2); opening(5, 3, 3, 1, 2, 1);
-    opening(0, 8, 3, 1, 2, 2);
+    opening(0, 8, 3, 1, 2, 2); opening(0, 3, 5, 1, 2, 1); opening(2, 3, 0, 1, 2, 1); opening(2, 8, 0, 1, 2, 1);
     // low wing, its gable facing the street
     const t2 = block(6, 0, 6, 5, 6);
-    gableRoof(m, { wx0: 6, wx1: 12, wz0: 0, wz1: 5, top: t2, axis: 'z', pitch: 0.36, ov: 0.5, ovG: 0.4, tiles, fill, seed: 15 });
-    opening(8, 1, 4, 2, 4, 1, DOORC); opening(11, 3, 2, 1, 2, 1);
+    gableRoof(m, { wx0: 6, wx1: 12, wz0: 0, wz1: 5, top: t2, axis: 'z', pitch: 0.36, ov: 1, ovG: 0.7, tiles, fill, seed: 15 });
+    opening(8, 1, 4, 2, 4, 1, DOORC); opening(11, 3, 2, 1, 2, 1); opening(9, 3, 0, 1, 2, 1);
     // inner-corner yard under a vine pergola
     yard(6, 5, 6, 6);
     pergola(m, 6, 1, 6, 5, 5, 5, variant);
@@ -693,10 +747,11 @@ export function houseModel(variant = 0, m = new VoxelModel()) {
   if (plan === 2) {
     // long hall, steep gable ridge running front to back
     const top = block(3, 0, 6, 11, 8);
-    gableRoof(m, { wx0: 3, wx1: 9, wz0: 0, wz1: 11, top, axis: 'z', pitch: 0.5, ov: 0.6, ovG: 0.5, tiles, fill, seed: 21 });
+    gableRoof(m, { wx0: 3, wx1: 9, wz0: 0, wz1: 11, top, axis: 'z', pitch: 0.5, ov: 1, ovG: 0.7, tiles, fill, seed: 21 });
     opening(5, 1, 10, 2, 5, 1, DOORC); threshold(5, 11, 2);
     opening(5, 7, 10, 2, 1, 1);                                // attic vent in the gable
     opening(8, 4, 2, 1, 2, 2); opening(8, 4, 7, 1, 2, 1); opening(3, 4, 3, 1, 2, 2); opening(3, 4, 7, 1, 2, 1);
+    opening(5, 4, 0, 2, 2, 1);
     // timber lean-to woodshed down the east side
     yard(9, 1, 3, 10);
     for (const pz of [1, 5, 9]) m.box(11, 1, pz, 1, 4, 1, WOOD);
@@ -716,7 +771,7 @@ export function houseModel(variant = 0, m = new VoxelModel()) {
     const top = block(0, 0, 5, 5, 16);
     m.box(0, 13, 0, 5, 1, 5, BAND);
     m.box(0, 6, 0, 5, 1, 5, MARBLE_SHADE);
-    gableRoof(m, { wx0: 0, wx1: 5, wz0: 0, wz1: 5, top, axis: 'x', pitch: 0.5, ov: 0.6, ovG: 0.5, tiles, fill, seed: 31 });
+    gableRoof(m, { wx0: 0, wx1: 5, wz0: 0, wz1: 5, top, axis: 'x', pitch: 0.5, ov: 1, ovG: 0.7, tiles, fill, seed: 31 });
     opening(1, 1, 4, 2, 4, 1, DOORC); opening(2, 8, 4, 1, 2, 1); opening(4, 8, 2, 1, 2, 1);
     opening(1, 11, 4, 1, 1, 1); opening(3, 11, 4, 1, 1, 1); opening(4, 11, 1, 1, 1, 2); opening(0, 8, 2, 1, 2, 1);
     // flat-roofed wing with a roof terrace and a pergola on it
@@ -725,7 +780,9 @@ export function houseModel(variant = 0, m = new VoxelModel()) {
     m.box(5, t2 + 1, 0, 7, 1, 1, PL); m.box(11, t2 + 1, 0, 1, 1, 6, PL); m.box(5, t2 + 1, 5, 7, 1, 1, PL);
     pergola(m, 7, t2 + 1, 1, 5, 4, 3, variant + 7);
     pithos(m, 5, t2 + 1, 1, 0xb8683e);
+    potPlant(m, 6, t2 + 1, 4, variant); potPlant(m, 5, t2 + 1, 3, variant + 2);
     opening(7, 1, 5, 2, 4, 1, DOORC); opening(10, 3, 5, 1, 2, 1); opening(11, 3, 2, 1, 2, 2);
+    opening(8, 3, 0, 1, 2, 1); opening(2, 8, 0, 1, 2, 1);
     // walled yard at the front
     yard(0, 6, 12, 6);
     courtWall(0, 11, 12, 1, 3); courtWall(11, 6, 1, 5, 3);
@@ -741,13 +798,15 @@ export function houseModel(variant = 0, m = new VoxelModel()) {
   m.box(0, top + 1, 0, 10, 1, 1, PL); m.box(0, top + 1, 6, 10, 1, 1, PL); m.box(9, top + 1, 0, 1, 1, 7, PL);
   // small upper room with its own low gable, ridge along z
   const t2 = block(0, 0, 5, 5, 5, top + 1);
-  gableRoof(m, { wx0: 0, wx1: 5, wz0: 0, wz1: 5, top: t2, axis: 'z', pitch: 0.35, ov: 0.5, ovG: 0.4, tiles, fill, seed: 41 });
+  gableRoof(m, { wx0: 0, wx1: 5, wz0: 0, wz1: 5, top: t2, axis: 'z', pitch: 0.35, ov: 1, ovG: 0.7, tiles, fill, seed: 41 });
   opening(2, top + 2, 4, 1, 3, 1, DOORC); opening(4, top + 3, 2, 1, 2, 1);
   pergola(m, 5, top + 1, 1, 4, 5, 3, variant + 3);
+  potPlant(m, 8, top + 1, 1, variant); potPlant(m, 1, top + 1, 5, variant + 4);
   // outside stair up the east face to the terrace
   for (let i = 0; i < 7; i++) m.box(10, 0, 6 - i, 2, i + 1, 1, PL);
   opening(2, 1, 6, 2, 4, 1, DOORC); opening(6, 3, 6, 1, 2, 1); opening(8, 3, 6, 1, 2, 1);
   opening(9, 3, 2, 1, 2, 2); opening(0, 3, 2, 1, 2, 2);
+  opening(3, 3, 0, 1, 2, 1); opening(7, 3, 0, 1, 2, 1);
   // front yard: loom against the wall, jars, a bench
   yard(0, 7, 12, 5);
   courtWall(0, 11, 5, 1, 3); courtWall(8, 11, 4, 1, 3);
@@ -1072,5 +1131,5 @@ export const BUILDING_VARIANTS = { house: 10 };
 
 export {
   WOOD, DARKWOOD, STONE, MARBLE, MARBLE_SHADE, MARBLE_DARK, ASHLAR, PAVE, TERRACOTTA, BRONZE, GOLD, FIRE, LEAF,
-  amphora, pithos, cypress, olive, statue, hopliteStatue, brazier, roofTile, shade, gable,
+  amphora, pithos, potPlant, cypress, olive, statue, hopliteStatue, brazier, roofTile, shade, gable,
 };
