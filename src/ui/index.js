@@ -95,6 +95,14 @@ export class UI {
     this.els.idle.addEventListener('click', () => this.selection.cycleIdle());
     this.els.army.addEventListener('click', () => this.selectIdleArmy());
     root.querySelector('.rbtn.home').addEventListener('click', () => this.selection.gotoTownCenter());
+    root.querySelector('.mbtn.obj').addEventListener('click', () => this.message('Objective: destroy the enemy Town Center'));
+    // the hotkey card stays open on click until clicked again
+    root.querySelector('.mbtn.menu').addEventListener('click', (e) => {
+      const el = e.currentTarget;
+      this.tipPinned = this.tipPinned === el ? null : el;
+      el.classList.toggle('on', this.tipPinned === el);
+      if (this.tipPinned) this.tooltip({ currentTarget: el }, el.dataset.tip, true); else this.tooltip(null, null, true);
+    });
     root.querySelector('.rbtn.flare').addEventListener('click', () => this.message('Right-click the minimap to send units'));
     root.querySelector('.rbtn.terrain').addEventListener('click', (e) => { this.minimap.showTerrain = !this.minimap.showTerrain; this.minimap.timer = 0; e.currentTarget.classList.toggle('off', !this.minimap.showTerrain); });
     root.querySelector('.rbtn.score').addEventListener('click', (e) => { const off = this.els.scores.classList.toggle('hidden'); e.currentTarget.classList.toggle('off', off); });
@@ -109,7 +117,8 @@ export class UI {
       this.message(game.timeScale > 1 ? 'Fast speed' : 'Normal speed');
     });
     // event feed (top-left), like Retold's "Dojo built." notices
-    const mine = (e) => e && e.owner === game.localPlayer;
+    // (not for the starting Town Center spawned before the clock runs)
+    const mine = (e) => e && e.owner === game.localPlayer && game.time > 0;
     game.events.on('building:completed', (b) => { if (mine(b)) this.feed(`${b.def.name} built.`); });
     game.events.on('unit:trained', (u) => { if (mine(u)) this.feed(`${u.def.name} trained.`); });
     game.events.on('age:advanced', (a) => { if (a.owner === game.localPlayer) this.feed(`You reached the ${AGES[a.age]} Age!`, 'gold'); });
@@ -126,6 +135,7 @@ export class UI {
   }
 
   setVisible(v) { this.visible = v; this.root.classList.toggle('hidden', !v); }
+
 
   buildPowers() {
     const game = this.game;
@@ -222,7 +232,8 @@ export class UI {
     this.msgT = 2.2;
   }
 
-  tooltip(e, html) {
+  tooltip(e, html, force = false) {
+    if (this.tipPinned && !force) return;
     if (!e) { this.tip.style.display = 'none'; return; }
     this.tip.innerHTML = html;
     this.tip.style.display = 'block';
