@@ -28,15 +28,18 @@ const BELT = 0x55361e;
 const SANDAL = 0x5e3b20;
 const WOOD = 0x7d5431;
 const WOOD_DK = 0x5b3c22;
-const BRONZE = (x, y, z) => { const h = hash3(x, y, z, 2); return h < 0.45 ? 0xcf9f3a : h < 0.8 ? 0xb58a2e : 0xe6bd55; };
+const BRONZE = (x, y, z) => { const h = hash3(x, y, z, 2); return h < 0.45 ? 0xdba445 : h < 0.8 ? 0xc48d36 : 0xf0c866; };
 const BRONZE_DK = 0x7e5a20;
 const STEEL = (x, y, z) => (hash3(x, y, z, 5) < 0.5 ? 0xc9ced3 : 0xb4bac0);
 const LINEN = (x, y, z) => (hash3(x, y, z, 6) < 0.6 ? 0xece2c8 : 0xe0d4b6);
 const STRAW = (x, y, z) => (hash3(x, y, z, 8) < 0.5 ? 0xdcbb6a : 0xc9a655);
 const TEAM_TRIM = 0xeee6cc;
+const JERKIN = (x, y, z) => (hash3(x, y, z, 18) < 0.55 ? 0xc49a62 : 0xb58b55);
+const WOOL = (x, y, z) => { const h = hash3(x, y, z, 17); return h < 0.5 ? 0xd8c7a2 : h < 0.85 ? 0xcbb892 : 0xe2d3b0; };
 const GOLD = (x, y, z) => { const h = hash3(x, y, z, 31); return h < 0.45 ? 0xf2c648 : h < 0.8 ? 0xe0ae30 : 0xffdc70; };
 const GOLD_DK = 0x9c6e1c;
 const SHIELD_FACE = (x, y, z) => (hash3(x, y, z, 15) < 0.6 ? 0xe9dfc6 : 0xddd1b4);
+
 
 const part = (name, model, pivot, joint, parent = null, extra = {}) => ({ name, model, pivot, joint, parent, ...extra });
 
@@ -98,7 +101,7 @@ function torsoModel(style, cloak = true) {
     m.box(1, 1, 0, 6, 1, 4, MET);
     m.box(1, 5, 4, 2, 2, 1, MET).box(5, 5, 4, 2, 2, 1, MET);  // pecs
     m.set(3, 4, 4, MET_DK).set(4, 4, 4, MET_DK).set(3, 2, 4, MET_DK).set(4, 2, 4, MET_DK);
-    m.box(0, 7, 0, 2, 1, 4, LEATHER).box(6, 7, 0, 2, 1, 4, LEATHER); // linothorax shoulder flaps
+    m.box(0, 7, -1, 2, 2, 6, LINEN).box(6, 7, -1, 2, 2, 6, LINEN); // white linothorax shoulder flaps
     m.box(0, 7, 4, 2, 1, 1, LINEN).box(6, 7, 4, 2, 1, 1, LINEN);
     // pteryges: leather strips alternating with team linen
     // team chiton skirt showing under leather pteryges strips
@@ -127,16 +130,19 @@ function torsoModel(style, cloak = true) {
       m.set(3, 0, 4, MET(3, 0, 4)).set(4, 0, 4, MET(4, 0, 4));
     }
   } else if (style === 'archer') {
-    // team chiton over the whole chest, a leather shoulder cape over it
-    m.box(0, 0, 0, 8, 8, 4, TEAM).box(1, 8, 1, 6, 1, 2, TEAM);
-    m.box(-1, 6, -1, 10, 2, 6, TEAM).box(0, 8, 0, 8, 1, 4, TEAM);
+    // team chiton (skirt and sleeves) under a laced leather jerkin, so the
+    // archer reads as a man in kit, not a team block
+    m.box(0, 0, 0, 8, 8, 4, TEAM).box(1, 8, 1, 6, 1, 2, LINEN);
+    m.box(0, 2, -1, 8, 6, 6, JERKIN).box(1, 8, 0, 6, 1, 4, JERKIN);
+    m.box(-1, 6, 0, 1, 2, 4, TEAM).box(8, 6, 0, 1, 2, 4, TEAM);    // sleeves at the shoulder
+    m.line(4, 7, 5, 4, 3, 5, LEATHER_DK);                           // lacing
     m.box(1, 0, 0, 6, 1, 4, BELT);
     m.box(0, -3, -1, 8, 1, 6, LINEN).box(1, -1, 0, 6, 1, 4, LINEN); // chiton hem under the team skirt band
     m.line(7, 7, 4, 1, 1, 4, LEATHER_DK);           // baldric
     m.line(7, 7, -1, 1, 1, -1, LEATHER_DK);
     // quiver on the back, arrows showing over the right shoulder
-    m.box(0, 1, -2, 3, 8, 2, LEATHER_DK).box(0, 2, -2, 3, 1, 2, TEAM).box(0, 7, -2, 3, 1, 2, TEAM);
-    for (let i = 0; i < 3; i++) { m.set(i, 9, -2 + (i % 2), WOOD); m.set(i, 10, -2 + (i % 2), 0xf4f0e8); m.set(i, 11, -2 + (i % 2), i === 1 ? TEAM : 0xf4f0e8); }
+    m.box(0, 1, -3, 3, 8, 2, LEATHER_DK).box(0, 2, -3, 3, 1, 2, TEAM).box(0, 7, -3, 3, 1, 1, BRONZE_DK);
+    for (let i = 0; i < 3; i++) { m.set(i, 9, -3 + (i % 2), WOOD); m.set(i, 10, -3 + (i % 2), 0xf4f0e8); m.set(i, 11, -3 + (i % 2), i === 1 ? TEAM : 0xf4f0e8); }
   } else {
     // villager: exomis leaving the right shoulder bare, rope belt
     m.box(0, 5, 0, 3, 3, 4, SKIN);
@@ -157,12 +163,14 @@ function torso(style, cloak = true) {
 function cloakModel(kind) {
   const m = new VoxelModel();
   if (kind === 'long') {
-    m.box(0, 8, -1, 8, 1, 3, TEAM);
-    m.box(1, 1, -1, 6, 7, 1, TEAM);
+    // an undyed campaign cloak in weathered wool with a team border at the
+    // hem: the man's back stays a figure, not a block of team paint
+    m.box(0, 8, -1, 8, 1, 3, WOOL);
+    m.box(1, 1, -1, 6, 7, 1, WOOL);
     for (let x = 0; x <= 7; x++) {
       const deep = x % 2 === 0;
-      m.box(x, -4, deep ? -2 : -3, 1, 6, 1, TEAM);
-      m.set(x, -5, deep ? -2 : -3, TEAM_TRIM);
+      m.box(x, -3, deep ? -2 : -3, 1, 5, 1, WOOL);
+      m.set(x, -4, deep ? -2 : -3, TEAM);
     }
   } else {
     // short cape swept off the left shoulder, hem slanting across the back
@@ -200,8 +208,10 @@ function headModel(style) {
     m.box(1, 0, 5, 3, 1, 1, BEARD).box(0, -1, 3, 5, 1, 3, BEARD).set(2, -1, 6, BEARD); // beard
     // narrow horsehair crest in team colour: a brush front to back on a bronze holder
     m.box(2, 7, 0, 1, 1, 5, BRONZE_DK);
-    m.box(1, 8, -2, 3, 2, 9, TEAM).box(1, 10, -1, 3, 1, 7, TEAM).box(2, 11, 0, 1, 1, 5, TEAM).box(2, 12, 1, 1, 1, 3, TEAM);
-    m.box(1, 4, -3, 3, 4, 1, TEAM);                                   // short tail at the nape
+    // a slim fin, not a slab: from above it is a stripe down a bronze bowl
+    m.box(1, 8, 0, 3, 1, 5, BRONZE_DK);
+    m.box(2, 8, -2, 1, 3, 9, TEAM).box(2, 11, -1, 1, 1, 7, TEAM).box(2, 12, 1, 1, 1, 3, TEAM);
+    m.box(2, 5, -3, 1, 3, 1, TEAM);                                   // short tail at the nape
   } else if (style === 'hopCor') {
     // Corinthian: a closed bronze shell with a T-shaped face opening and a
     // tall front-to-back crest, team with a pale ridge
@@ -212,8 +222,9 @@ function headModel(style) {
     m.box(-1, 3, 5, 7, 1, 1, BRONZE_DK);                             // brow ridge
     m.box(1, -2, 4, 3, 1, 2, BEARD);
     m.box(2, 7, 0, 1, 1, 5, BRONZE_DK);
-    m.box(1, 8, -2, 3, 3, 8, TEAM).box(1, 11, -1, 3, 1, 6, TEAM).box(2, 12, 0, 1, 1, 4, TEAM_TRIM);
-    m.box(1, 5, -3, 3, 4, 1, TEAM);
+    m.box(1, 8, 0, 3, 1, 5, BRONZE_DK);
+    m.box(2, 8, -2, 1, 4, 8, TEAM).box(2, 12, 0, 1, 1, 4, TEAM_TRIM);
+    m.box(2, 6, -3, 1, 3, 1, TEAM);
   } else if (style === 'hopAttic') {
     // Attic: open face, hinged cheek guards and a transverse crest from ear
     // to ear (a bar across the head from above)
@@ -223,8 +234,8 @@ function headModel(style) {
     m.box(0, 4, 5, 5, 1, 1, BRONZE_DK).set(2, 5, 6, BRONZE_DK);       // peaked brow
     m.box(1, 0, 5, 3, 1, 1, BEARD).box(0, -1, 3, 5, 1, 3, BEARD);
     m.box(0, 7, 2, 5, 1, 1, BRONZE_DK);
-    m.box(-3, 8, 1, 11, 2, 2, TEAM).box(-2, 10, 1, 9, 1, 2, TEAM).box(0, 11, 1, 5, 1, 2, TEAM);
-    m.box(-3, 7, 1, 1, 1, 2, TEAM).box(7, 7, 1, 1, 1, 2, TEAM);
+    m.box(-2, 8, 2, 9, 2, 1, TEAM).box(0, 10, 2, 5, 1, 1, TEAM);
+    m.box(-2, 7, 2, 1, 1, 1, TEAM).box(6, 7, 2, 1, 1, 1, TEAM);
   } else if (style === 'hopPilos') {
     // pilos: a plain conical bronze cap with a team horsehair tassel at the tip
     m.box(-1, 3, -1, 7, 2, 7, BRONZE).box(-1, 3, -1, 7, 1, 7, BRONZE_DK);
@@ -258,13 +269,25 @@ function headModel(style) {
       m.set(1, 2, 5, 0xd8ff60, { glow: 0.9 }).set(3, 2, 5, 0xd8ff60, { glow: 0.9 });
     }
   } else if (style === 'archer') {
-    // felt Phrygian cap in team colour, beard
-    const FELT = TEAM;
-    m.box(-1, 4, -1, 7, 2, 7, FELT).box(0, 6, 0, 5, 1, 5, FELT).box(1, 7, 2, 3, 1, 3, FELT).box(2, 7, 4, 1, 1, 2, TEAM).set(2, 8, 5, TEAM);
-    m.box(-1, 3, -1, 7, 1, 7, TEAM).carve(0, 3, 5, 5, 1, 1).box(1, 3, 5, 3, 1, 1, TEAM);
+    // felt Phrygian cap (undyed) with a team band, beard
+    const FELT = (x, y, z) => (hash3(x, y, z, 19) < 0.5 ? 0xb89a6c : 0xa88a5e);
+    m.box(-1, 4, -1, 7, 2, 7, FELT).box(0, 6, 0, 5, 1, 5, FELT).box(1, 7, 2, 3, 1, 3, FELT).box(2, 7, 4, 1, 1, 2, FELT).set(2, 8, 5, TEAM);
+    m.box(-1, 3, -1, 7, 1, 7, TEAM).carve(0, 3, 5, 5, 1, 1);
     m.box(-1, 0, -1, 1, 3, 3, LEATHER).box(5, 0, -1, 1, 3, 3, LEATHER); // ear flaps
     m.box(1, 0, 5, 3, 1, 1, BEARD).box(0, -1, 3, 5, 1, 2, BEARD).set(2, -1, 5, BEARD);
     m.box(0, 0, 0, 5, 3, 1, HAIR);
+  } else if (style === 'archerHat') {
+    // leather petasos with a narrow brim and a team cord
+    m.box(0, 3, 0, 5, 2, 5, HAIR).box(0, 1, 0, 5, 2, 1, HAIR);
+    m.box(1, 0, 5, 3, 1, 1, BEARD).box(0, -1, 3, 5, 1, 2, BEARD);
+    for (let z = -2; z <= 6; z++) for (let x = -2; x <= 6; x++) { const dx = x - 2, dz = z - 2; if (dx * dx + dz * dz <= 12) m.set(x, 5, z, LEATHER); }
+    m.box(0, 6, 0, 5, 1, 5, LEATHER).box(1, 7, 1, 3, 1, 3, LEATHER_DK);
+    m.box(0, 6, 0, 5, 1, 1, TEAM).box(0, 6, 4, 5, 1, 1, TEAM);
+  } else if (style === 'archerBare') {
+    // bareheaded: dark curls bound with a team fillet
+    m.box(-1, 3, -1, 7, 3, 7, HAIR).box(0, 6, 0, 5, 1, 5, HAIR).box(-1, 0, -1, 7, 3, 2, HAIR);
+    m.box(-1, 4, -1, 7, 1, 7, TEAM).carve(0, 4, 5, 5, 1, 1).carve(0, 3, 5, 5, 1, 1);
+    m.box(1, 0, 5, 3, 1, 1, BEARD).box(0, -1, 3, 5, 1, 3, BEARD).set(2, -1, 6, BEARD);
   } else {
     // villager: dark hair, short beard, wide straw petasos
     m.box(0, 3, 0, 5, 2, 5, HAIR).box(0, 1, 0, 5, 2, 1, HAIR).box(0, 1, 0, 1, 2, 3, HAIR).box(4, 1, 0, 1, 2, 3, HAIR);
@@ -329,17 +352,20 @@ function aspis(r = 6, RIM = BRONZE, device = 0) {
       const d = Math.sqrt(x * x + y * y);
       if (d > r + 0.3) continue;
       const rim = d > r - 1.2;
-      // team-coloured face (the biggest flat area on a hoplite), a pale
-      // lambda chevron and a bronze boss
-      let c = rim ? RIM(x, y, 0) : TEAM;
-      if (!rim && d < 1.3) c = RIM(x, y, 1);
-      else if (rim) { /* rim */ }
-      else if (device === 1) { if (Math.abs(d - (r - 3.2)) < 0.55) c = SHIELD_FACE(x, y, 1); }            // pale ring
-      else if (device === 2) { if (d < r - 3) c = BRONZE(x, y, 3); else if (d < r - 2.4) c = BRONZE_DK; } // bronze face, team band
-      else if (device === 3) { if (x > 0.5 && Math.abs(y) < d * 0.9) c = SHIELD_FACE(x, y, 1); }         // half-and-half
-      else if (y <= 2 && y >= -4 && Math.abs(Math.abs(x) - (2 - y) * 0.6) < 0.6) c = SHIELD_FACE(x, y, 1);
+      // Team colour is an accent (device and boss), not the whole face: a
+      // carpet of team discs from above hides the men holding them.
+      //   0 bronze face, team lambda   1 pale face, team ring
+      //   2 team face, bronze band and boss   3 bronze face, team star
+      const inner = d < 1.6;
+      let c = rim ? RIM(x, y, 0) : device === 1 ? SHIELD_FACE(x, y, 1) : device === 2 ? TEAM : RIM === GOLD ? GOLD(x, y, 5) : BRONZE(x, y, 3);
+      if (rim) { /* rim */ }
+      else if (inner) c = device === 0 || device === 2 ? RIM(x, y, 1) : TEAM;                                            // boss
+      else if (device === 1) { if (Math.abs(d - (r - 2.2)) < 0.75) c = TEAM; }                             // team ring
+      else if (device === 2) { if (Math.abs(d - (r - 2.1)) < 0.45) c = RIM(x, y, 2); }                       // bronze band
+      else if (device === 3) { if ((x === 0 || y === 0 || Math.abs(x) === Math.abs(y)) && d < r - 1.5) c = TEAM; } // star
+      else if (y <= 2 && y >= -3 && Math.abs(Math.abs(x) - (1.6 - y) * 0.6) < 0.55) c = TEAM;               // lambda
       m.set(x, y, 1, c);
-      if (!rim) m.set(x, y, 0, WOOD);
+      if (!rim) m.set(x, y, 0, (x + y) % 4 === 0 ? LEATHER : 0xa8804e);   // pale wood back, leather straps
       if (rim) m.set(x, y, 0, RIM === GOLD ? GOLD_DK : BRONZE_DK);
     }
   m.set(0, 0, 2, RIM(0, 0, 2));
@@ -452,13 +478,14 @@ export function hopliteRig() {
     part('cloakLong', cloakModel('long'), [4, 0, 2], [0, 0, 0], 'torso', { show: gearIs('cloak', 1), portrait: true }),
     part('cloakShort', cloakModel('short'), [4, 0, 2], [0, 0, 0], 'torso', { show: gearIs('cloak', 2) }),
     part('weapon', spearModel(40), [0, 0, 0], HAND, 'armR'),
-    ...[0, 1, 2, 3].map((v) => part(v ? `shield${v}` : 'shield', aspis(7, BRONZE, v), [0, 0, 0], [1.5, -4, 3], 'armL', { anim: 'shield', show: gearIs('shield', v), portrait: !v })),
+    ...[0, 1, 2, 3].map((v) => part(v ? `shield${v}` : 'shield', aspis(5, BRONZE, v), [0, 0, 0], [1.5, -4, 2.5], 'armL', { anim: 'shield', show: gearIs('shield', v), portrait: !v })),
   ];
 }
 
 export function toxotesRig() {
   return [
-    ...legs('archer'), torso('archer'), head('archer'), ...arms('archer'),
+    ...legs('archer'), torso('archer'), ...arms('archer'),
+    ...[['archer', 0], ['archerHat', 1], ['archerBare', 2]].map(([st, v]) => ({ ...head(st), name: v ? `head${v}` : 'head', anim: 'head', show: gearIs('hat', v), portrait: !v })),
     part('weapon', bowModel(), [0, 0, 0], HAND, 'armL'),
     part('arrow', arrowModel(), [0, 0, 0], HAND, 'armR', { show: (u) => u.anim.state === 'attack' && u.anim.attackT > 0.45, portrait: false }),
   ];
@@ -689,7 +716,7 @@ export function heroRig() {
   return [
     ...legs('hoplite'), torso('hero'), head('hero'), ...arms('hoplite'),
     part('weapon', spearModel(38), [0, 0, 0], HAND, 'armR'),
-    part('shield', aspis(7, GOLD), [0, 0, 0], [1.5, -4, 3], 'armL'),
+    part('shield', aspis(6, GOLD), [0, 0, 0], [1.5, -4, 2.5], 'armL'),
   ];
 }
 

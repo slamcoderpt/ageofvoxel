@@ -19,8 +19,8 @@ const FADE_START = 3.4;   // corpses dither out between FADE_START and CORPSE_TI
 // Local avoidance for units standing their ground (fighting, idle soldiers):
 // keep about half a body-width of air between neighbours so a melee line
 // reads as separate figures rather than one interpenetrating blob.
-const SPREAD_GAP = 0.8;   // extra spacing, in multiples of the smaller radius
-const SPREAD_SPEED = 1.6; // max drift, tiles/second
+const SPREAD_GAP = 1.1;   // extra spacing, in multiples of the smaller radius
+const SPREAD_SPEED = 2.0; // max drift, tiles/second
 // Per-unit horse coat tints (multiplied into the dappled grey base):
 // grey, near-white, dun, bay, dark bay.
 // Crowd variety (visual only, never fed back into the sim): each soldier
@@ -28,7 +28,6 @@ const SPREAD_SPEED = 1.6; // max drift, tiles/second
 // little taller or shorter, and in melee presses in towards its foe so the
 // contact line interlocks instead of holding a clean seam.
 const JITTER = 0.3;        // tiles, static per unit
-const YAW_JITTER = 0.26;   // radians, eased in while standing / fighting
 const PRESS_RATE = 3;      // per second
 const COATS = [[1, 1, 1], [1.06, 1.06, 1.05], [0.95, 0.86, 0.7], [0.72, 0.5, 0.34], [0.5, 0.36, 0.27], [1, 0.98, 0.95]];
 
@@ -63,6 +62,45 @@ export class Units {
     this._v = new THREE.Vector3();
     this._s = new THREE.Vector3();
     this._c = new THREE.Color();
+    this._initContactShadows();
+  }
+
+  // A dark, soft-edged disc on the ground under every unit, so each man in a
+  // crowd sits on his own patch of earth and reads as separate from the mass.
+  _initContactShadows() {
+    const N = 64, px = new Uint8Array(N * N * 4);
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const dx = (i + 0.5) / N * 2 - 1, dz = (j + 0.5) / N * 2 - 1;
+      const d = Math.sqrt(dx * dx + dz * dz);
+      // solid core under the feet, fading out to the rim
+      const a = d >= 1 ? 0 : d < 0.45 ? 1 : Math.pow(1 - (d - 0.45) / 0.55, 1.6);
+      const k = (j * N + i) * 4;
+      px[k] = px[k + 1] = px[k + 2] = Math.round(a * 255); px[k + 3] = 255;
+    }
+    const tex = new THREE.DataTexture(px, N, N, THREE.RGBAFormat);
+    tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter; tex.needsUpdate = true;
+    const geo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+    this.shadowMat = new THREE.MeshBasicMaterial({
+      color: 0x0c0804, alphaMap: tex, transparent: true, opacity: 0.42, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    });
+    this.shadowMat.fog = false;
+    this.shadowCap = 0;
+    this.shadowMesh = null;
+  }
+
+  _ensureShadowCapacity(n) {
+    if (this.shadowMesh && this.shadowCap >= n) return;
+    const cap = Math.max(256, this.shadowCap * 2, n);
+    if (this.shadowMesh) { this.group.remove(this.shadowMesh); this.shadowMesh.dispose(); }
+    const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), this.shadowMat, cap);
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 1;
+    mesh.userData.noAO = true;
+    mesh.name = 'unitContactShadows';
+    this.shadowMesh = mesh; this.shadowCap = cap;
+    this.group.add(mesh);
   }
 
   _buildRig(type) {
@@ -156,7 +194,8 @@ export class Units {
           press = Math.max(0, Math.min(want, (d - (u.radius + t.radius) * 0.95) / 2 - 0.22));
         }
       }
-      const yaw = u.moving ? 0 : (uhash(u, 4) - 0.5) * YAW_JITTER * (a.state === 'attack' ? 0.8 : 1.6);
+      // every man stands 5-15 degrees off true, to his own side
+      const yaw = u.moving ? 0 : (uhash(u, 8) < 0.5 ? -1 : 1) * (0.087 + uhash(u, 4) * 0.175) * (a.state === 'attack' ? 0.85 : 1.15);
       const k = Math.min(1, dt * PRESS_RATE);
       u.units_press = (u.units_press || 0) + (press - (u.units_press || 0)) * k;
       u.units_yaw = (u.units_yaw || 0) + (yaw - (u.units_yaw || 0)) * k;
@@ -213,6 +252,11 @@ export class Units {
       if (!b) buckets.set(u.type, (b = []));
       b.push(u);
     }
+    let total = 0;
+    for (const b of buckets.values()) total += b.length;
+    this._ensureShadowCapacity(total);
+    let si = 0;
+    const SH = this.shadowMesh;
     for (const [type, rig] of this.rigs) {
       const list = buckets.get(type) || [];
       for (const p of rig.parts) {
@@ -241,6 +285,18 @@ export class Units {
         const px = x + Math.cos(rot) * jl + Math.sin(rot) * (push + jf), pz = z - Math.sin(rot) * jl + Math.cos(rot) * (push + jf);
         const y = game.map.heightAt(px, pz);
         const sc = big ? 1 : 0.93 + uhash(u, 7) * 0.13;
+        {
+          // contact shadow: stretched along the body for riders and beasts,
+          // shrinking while a corpse fades or a unit is flung into the air
+          const r = (u.radius || 0.4) * (rig.kind === 'horse' || rig.kind === 'centaur' ? 1.25 : big ? 1.25 : 1.3) * sc;
+          const long = rig.kind === 'horse' || rig.kind === 'centaur' ? 1.7 : 1;
+          const k = u.dead ? Math.max(0, 1 - u.anim.dieT / 4) : 1 / (1 + (u.airY || 0) * 0.6);
+          this._q.setFromEuler(this._e.set(0, rot, 0));
+          const hm = game.map, o = r * 0.6;
+          const gy = Math.max(y, hm.heightAt(px + o, pz), hm.heightAt(px - o, pz), hm.heightAt(px, pz + o), hm.heightAt(px, pz - o));
+          this._m.compose(this._v.set(px, gy + 0.02, pz), this._q, this._s.set(r * 2 * k, 1, r * 2 * long * k));
+          SH.setMatrixAt(si++, this._m);
+        }
         // root transform (with death topple + sink)
         this._q.setFromEuler(this._e.set(0, rot, 0));
         this._root.compose(this._v.set(px, y + bob * V * sc, pz), this._q, this._s.set(sc, sc, sc));
@@ -303,6 +359,8 @@ export class Units {
         if (p.mesh.instanceColor) p.mesh.instanceColor.needsUpdate = true;
       }
     }
+    SH.count = si;
+    SH.instanceMatrix.needsUpdate = true;
   }
 
   // Unit height in world units (for health bars etc.)

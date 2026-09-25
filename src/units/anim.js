@@ -49,7 +49,7 @@ function archerUpper(u, st, t, set, v) {
 // Attack timeline from attackT (seconds since the strike) and the cooldown:
 //   strike 0..0.12 (extend), recover 0.12..0.45, then guard -> wind-up.
 function attackPhase(u) {
-  const a = u.anim.attackT ?? 1;
+  const a = (u.anim.attackT ?? 1) * (0.9 + uhash(u, 41) * 0.2);
   const cd = u.def?.attack?.cooldown ?? 1.2;
   const extend = a < 0.1 ? smooth(a / 0.1) : 1 - smooth((a - 0.1) / 0.35);
   const wind = smooth((a - 0.45) / Math.max(0.2, cd - 0.55));
@@ -59,7 +59,8 @@ function attackPhase(u) {
 export function pose(kind, u, out) {
   const an = u.anim;
   const st = an.state;
-  const t = an.t + phaseOf(u) * 0.3;
+  // each soldier breathes, fidgets and swings at his own tempo (+-15%)
+  const t = an.t * (0.85 + uhash(u, 40) * 0.3) + phaseOf(u) * 0.5;
   for (const k in out) { const r = out[k]; r[0] = r[1] = r[2] = 0; }
   const set = (name, x, y = 0, z = 0) => { const r = out[name]; if (r) { r[0] = x; r[1] = y; r[2] = z; } };
   const add = (name, x, y = 0, z = 0) => { const r = out[name]; if (r) { r[0] += x; r[1] += y; r[2] += z; } };
@@ -307,9 +308,38 @@ export function pose(kind, u, out) {
 
   // ---- per-soldier kit angles: no two spears or shields held quite alike ----
   if (u.type === 'hoplite' && st !== 'die') {
-    add('weapon', (uhash(u, 11) - 0.5) * 0.45, 0, (uhash(u, 12) - 0.5) * 0.4);
-    add('shield', (uhash(u, 13) - 0.5) * 0.4, (uhash(u, 14) - 0.5) * 0.7, (uhash(u, 15) - 0.5) * 0.5);
+    add('weapon', (uhash(u, 11) - 0.5) * 0.3, 0, (uhash(u, 12) - 0.5) * 0.16);
+    add('shield', (uhash(u, 13) - 0.5) * 0.25, (uhash(u, 14) - 0.5) * 0.5, (uhash(u, 15) - 0.5) * 0.3);
     add('head', (uhash(u, 17) - 0.5) * 0.2, (uhash(u, 16) - 0.5) * 0.5, (uhash(u, 18) - 0.5) * 0.2);
+  }
+  // idle fidgets: every few seconds (own period per man) a soldier shifts
+  // his weight, turns to the man beside him and re-grips his weapon, so a
+  // waiting rank is never a frozen stamp
+  if (st === 'idle' && !beast) {
+    const g = smooth((S(t * (0.3 + uhash(u, 42) * 0.25) + uhash(u, 43) * 6.28) - 0.55) * 3);
+    const sd = uhash(u, 44) < 0.5 ? 1 : -1;
+    add('torso', 0.04 * g, 0.35 * sd * g, 0.05 * sd * g); add('head', 0, 0.4 * sd * g);
+    add('legL', -0.2 * g); add('shinL', 0.15 * g); add('legR', 0.1 * g, 0, -0.08 * g);
+    add('armR', -0.25 * g); add('weapon', 0.2 * g);
+    bob -= 0.4 * g;
+  }
+  // Shields face the enemy, not the sky: the shield channel cancels the
+  // arm's and torso's forward pitch, leaving the face leant back about 20
+  // degrees so it still catches the sky light instead of going black.
+  if (hoplite && st !== 'die' && out.shield) {
+    out.shield[0] -= (out.armL ? out.armL[0] : 0) + (out.torso ? out.torso[0] : 0) + 0.35;
+  }
+  // archers: each man stands, cants his bow and turns his shoulders a little
+  // differently, so a volley line is not one repeated figure
+  if (archer && st !== 'die') {
+    add('torso', (uhash(u, 50) - 0.5) * 0.12, (uhash(u, 51) - 0.5) * 0.35, 0);
+    add('weapon', 0, (uhash(u, 52) - 0.5) * 0.3, (uhash(u, 53) - 0.5) * 0.4);
+    add('head', (uhash(u, 54) - 0.5) * 0.25, (uhash(u, 55) - 0.5) * 0.4);
+    if (st === 'attack') {
+      const wide = uhash(u, 56);
+      add('legL', -0.25 * wide, 0, 0.1 * wide); add('legR', 0.2 * wide, 0, -0.12 * wide); add('shinR', 0.2 * wide);
+      bob -= wide * 0.5;
+    }
   }
   return { bob, lean: 0, fwd };
 }
@@ -335,7 +365,8 @@ export function gearOf(u) {
   return (u.units_gear = {
     helm: h < 0.3 ? 0 : h < 0.58 ? 1 : h < 0.8 ? 2 : 3,
     cloak: c < 0.38 ? 1 : c < 0.7 ? 2 : 0,
-    shield: s < 0.34 ? 0 : s < 0.56 ? 1 : s < 0.78 ? 2 : 3,
+    shield: s < 0.25 ? 0 : s < 0.45 ? 1 : s < 0.8 ? 2 : 3,
+    hat: h < 0.4 ? 0 : h < 0.72 ? 1 : 2,
   });
 }
 
