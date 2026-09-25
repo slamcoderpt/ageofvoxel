@@ -146,7 +146,7 @@ export class GodPowers {
       const a = vr.range(0, Math.PI * 2), wide = vr.chance(0.25), sp = (wide ? vr.range(6, 11) : vr.range(1.5, 5)) * power;
       // each spark starts a few ms into its flight (the discharge is already
       // throwing them as the first stroke lands), so the burst reads at once
-      const vx = Math.cos(a) * sp, vz = Math.sin(a) * sp, vy = vr.range(6, 13) * power, t = vr.range(0.02, 0.12);
+      const vx = Math.cos(a) * sp, vz = Math.sin(a) * sp, vy = vr.range(6, 13) * power, t = vr.range(0.04, 0.17);
       this.sparks.push({ x: x + vx * t, y: y + 0.25 + vy * t - 10 * t * t, z: z + vz * t, vx, vy: vy - 20 * t, vz, t0: now - t, life: vr.range(0.45, 0.9) * (0.6 + 0.4 * power), dim, warm: warm && i % 5 < 2, heat: vr.range(0.75, 1.1) });
     }
     if (this.sparks.length > 400) this.sparks.splice(0, this.sparks.length - 400);
@@ -188,7 +188,7 @@ export class GodPowers {
     // a ring of charred clods, one fountain of hot sparks and a smoke puff
     this.throwDebris(x, y, z, 28, 1.15, seed, true);
     this.charRim(x, y, z, seed);
-    this.throwSparks(x, y, z, 24, seed, 1.0);
+    this.throwSparks(x, y, z, 44, seed, 1.0);
     game.fx.emit({ x, y: y + 0.2, z, count: 5, color: 0x2a2622, size: 0.42, life: 1.0, speed: 2.0, up: 1.2, gravity: 0.6, grow: 1.5, spread: 0.35 });
   }
 
