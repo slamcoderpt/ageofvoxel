@@ -75,10 +75,10 @@ export const shadeHex = (c, f) => mix(0, c, Math.min(1, f)) | 0;
 // Muted roof tile palettes (2-3 fired hues each; the butt line of every
 // course is a darker line, the eave fascia darker still).
 export const TILES = {
-  terra: { tones: [0xc27a5b, 0xb97254, 0xca8565], butt: 0x8c4f3a, fascia: 0x7b4634, ridge: 0x9e5a41, soffit: 0x4a3a30 },
-  rose: { tones: [0xcb8e74, 0xc2856b, 0xd3987e], butt: 0x946050, fascia: 0x80523f, ridge: 0xa86d58, soffit: 0x4a3a30 },
-  umber: { tones: [0xae6e55, 0xa66850, 0xb7765c], butt: 0x7c4a38, fascia: 0x6c4232, ridge: 0x8e5540, soffit: 0x45362c },
-  slate: { tones: [0xbcc7b1, 0xafbba4, 0xc9d1be], butt: 0x86927c, fascia: 0x75806c, ridge: 0x95a28c, soffit: 0x4a4540 },
+  terra: { tones: [0xc27a5b, 0xb46b4e, 0xcf8b69, 0xbb7556], butt: 0x7e4433, fascia: 0x7b4634, ridge: 0x8e4d37, soffit: 0x4a3a30, antefix: 0xe9e2d2 },
+  rose: { tones: [0xcb8e74, 0xbe8066, 0xd69c80, 0xc58870], butt: 0x86533f, fascia: 0x80523f, ridge: 0x94583f, soffit: 0x4a3a30, antefix: 0xece6d8 },
+  umber: { tones: [0xae6e55, 0xa1634b, 0xbb7a5f, 0xa86b52], butt: 0x6e3f30, fascia: 0x6c4232, ridge: 0x7a4634, soffit: 0x45362c, antefix: 0xe2dac8 },
+  slate: { tones: [0xbcc7b1, 0xabb7a0, 0xcad3bf, 0xb4c0aa], butt: 0x7a8670, fascia: 0x75806c, ridge: 0x7f8c76, soffit: 0x4a4540, antefix: 0xeeeae0 },
 };
 
 // A tiled roof plane: eave edge e0-e1 (low), top edge r0-r1 (r0 above e0;
@@ -87,7 +87,7 @@ export const TILES = {
 // the rows; tiles within a course take one of the palette hues, offset by
 // half a tile every other course. A fascia drops from the eave and the
 // underside is closed with a dark soffit.
-export function tiledPlane(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.1, tileW = 1.4, lip = 0.24, fascia = 0.6, seed = 1, up = [0, 1, 0], closeUnder = true, eaveFascia = true } = {}) {
+export function tiledPlane(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.1, tileW = 1.4, lip = 0.24, fascia = 0.6, seed = 1, up = [0, 1, 0], closeUnder = true, eaveFascia = true, ribGap = 2.6, ribW = 0.46, ribH = 0.5, antefix = tiles.antefix ?? null } = {}) {
   const n = normal3(e0, e1, r0[0] === r1[0] && r0[1] === r1[1] && r0[2] === r1[2] ? r0 : r1, up);
   const slope = len3(sub3(lerp3(r0, r1, 0.5), lerp3(e0, e1, 0.5)));
   const N = Math.max(1, Math.round(slope / course));
@@ -110,7 +110,38 @@ export function tiledPlane(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.
       poly(m, [p0, p1, p2, p3], c, { out: n, shade: [0.94, 0.94, 1, 1] });
     }
     // butt face of this course (its lifted lower edge)
-    if (i > 0) poly(m, [L0, R0, add3(R0, n, lip), add3(L0, n, lip)], tiles.butt, { out: sub3(e0, r0) });
+    if (i > 0) poly(m, [L0, R0, add3(R0, n, lip), add3(L0, n, lip)], tiles.butt, { out: sub3(e0, r0), shade: [0.85, 0.85, 0.85, 0.85] });
+  }
+  // cover-tile ribs (imbrices) running from eave to ridge every `ribGap`
+  // voxels: raised triangular strips that catch the sun on one flank and
+  // shade on the other, so the roof reads as tile rows from any distance.
+  // Each rib ends at the eave in an upright antefix.
+  if (ribGap > 0) {
+    const span = len3(sub3(e1, e0));
+    const K = Math.max(2, Math.round(span / ribGap));
+    const tE = sub3(e1, e0).map((q) => q / (span || 1));
+    const tri = r0[0] === r1[0] && r0[1] === r1[1] && r0[2] === r1[2];
+    const topLen = len3(sub3(r1, r0));
+    const tR = tri ? tE : sub3(r1, r0).map((q) => q / (topLen || 1));
+    const hw = ribW, hr = ribH;
+    for (let k = 0; k < K; k++) {
+      const s = (k + 0.5) / K;
+      const A = add3(lerp3(e0, e1, s), n, lip * 0.6);
+      let B = add3(lerp3(r0, r1, s), n, lip * 0.6);
+      if (tri) B = lerp3(A, B, 0.86);
+      const c = shadeHex(T[Math.floor(hash3(k, 77, seed, 58) * T.length) % T.length], 0.97 + hash3(k, 3, seed, 59) * 0.08);
+      const At = add3(A, n, hr), Bt = add3(B, n, hr);
+      const A1 = add3(A, tE, hw), A2 = add3(A, tE, -hw), B1 = add3(B, tR, hw), B2 = add3(B, tR, -hw);
+      poly(m, [A1, B1, Bt, At], c, { out: add3(n, tE, 1), shade: [0.95, 1, 1.04, 1.04] });
+      poly(m, [A2, B2, Bt, At], shadeHex(c, 0.72), { out: add3(n, tE, -1), shade: [0.95, 1, 1, 1] });
+      // antefix: a small upright palmette tile closing the rib at the eave
+      if (antefix !== null) {
+        const dn = sub3(e0, r0), dl = len3(dn) || 1;
+        const outv = dn.map((q) => q / dl);
+        const P0 = add3(A1, outv, 0.05), P1 = add3(A2, outv, 0.05);
+        poly(m, [P0, P1, add3(add3(P1, [0, 1, 0], ribH + 0.35), outv, 0.05), add3(add3(P0, [0, 1, 0], ribH + 0.35), outv, 0.05)], antefix, { out: outv });
+      }
+    }
   }
   if (eaveFascia) {
     const d = [0, -fascia, 0];
@@ -127,7 +158,7 @@ export function tiledPlane(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.
 }
 
 // Triangular prism ridge cap along a-b (horizontal), half-width w, height h.
-export function ridgeCap(m, a, b, side, w, h, color) {
+export function ridgeCap(m, a, b, side, w, h, color, { lap = 2.2 } = {}) {
   const A1 = add3(a, side, w), A2 = add3(a, side, -w), B1 = add3(b, side, w), B2 = add3(b, side, -w);
   const At = [a[0], a[1] + h, a[2]], Bt = [b[0], b[1] + h, b[2]];
   poly(m, [A1, B1, Bt, At], color, { out: [side[0], 1, side[2]] });
@@ -135,6 +166,16 @@ export function ridgeCap(m, a, b, side, w, h, color) {
   const ax = sub3(a, b);
   poly(m, [A1, A2, At], shadeHex(color, 0.9), { out: ax });
   poly(m, [B1, B2, Bt], shadeHex(color, 0.9), { out: [-ax[0], -ax[1], -ax[2]] });
+  // lapped ridge tiles: a slightly fatter collar every `lap` voxels
+  const L = len3(ax);
+  if (lap > 0 && L > lap * 1.5) {
+    const n = Math.floor(L / lap);
+    for (let i = 1; i < n; i++) {
+      const t = i / n, c = lerp3(a, b, t), d = ax.map((q) => (q / L) * 0.22);
+      const p0 = add3(c, d, 1), p1 = add3(c, d, -1);
+      ridgeCap(m, p0, p1, side, w * 1.18, h * 1.12, mix(color, 0xffffff, 0.08), { lap: 0 });
+    }
+  }
 }
 
 // Gable roof on a rectangular wall block [wx0, wx1) x [wz0, wz1) whose
@@ -143,7 +184,7 @@ export function ridgeCap(m, a, b, side, w, h, color) {
 // ends: 'wall' fills the gable triangles with `fill`; 'pediment' builds a
 // temple pediment (recessed tympanum inside a raking cornice); 'none'.
 // Returns { ridgeY, eaveY, point(u, v) } in voxel space.
-export function gableRoof(m, { wx0, wx1, wz0, wz1, top, axis = 'x', pitch = 0.38, ov = 1, ovG = 0.6, tiles = TILES.terra, ends = 'wall', fill = 0xeae4d6, rake = 0xf1ece2, rakeShade = 0xd6cfbf, tymp = 0x2f4570, seed = 1, course = 1.1, tileW = 1.4, pedDepth = 1, rakeH = 0.9 }) {
+export function gableRoof(m, { wx0, wx1, wz0, wz1, top, axis = 'x', pitch = 0.38, ov = 1, ovG = 0.6, tiles = TILES.terra, ends = 'wall', fill = 0xeae4d6, rake = 0xf1ece2, rakeShade = 0xd6cfbf, tymp = 0x2f4570, seed = 1, course = 1.1, tileW = 1.4, pedDepth = 1, rakeH = 0.9, sima = null, geisonPaint = null }) {
   // local frame: u across the ridge, v along it
   const alongX = axis === 'x';
   const u0 = alongX ? wz0 : wx0, u1 = alongX ? wz1 : wx1;
@@ -158,7 +199,7 @@ export function gableRoof(m, { wx0, wx1, wz0, wz1, top, axis = 'x', pitch = 0.38
   tiledPlane(m, P(u1 + ov, eaveY, va), P(u1 + ov, eaveY, vb), P(um, ridgeY, va), P(um, ridgeY, vb), { tiles, seed, up: upB, course, tileW });
   tiledPlane(m, P(u0 - ov, eaveY, vb), P(u0 - ov, eaveY, va), P(um, ridgeY, vb), P(um, ridgeY, va), { tiles, seed: seed + 5, up: upA, course, tileW });
   const lipY = 0.2 * Math.cos(Math.atan(pitch));
-  ridgeCap(m, P(um, ridgeY + lipY * 0.5, va - 0.1), P(um, ridgeY + lipY * 0.5, vb + 0.1), alongX ? [0, 0, 1] : [1, 0, 0], 0.55, 0.45, tiles.ridge);
+  ridgeCap(m, P(um, ridgeY + lipY * 0.5, va - 0.1), P(um, ridgeY + lipY * 0.5, vb + 0.1), alongX ? [0, 0, 1] : [1, 0, 0], 0.7, 0.62, tiles.ridge);
   const dirV = (s) => (alongX ? [s, 0, 0] : [0, 0, s]);
   for (const [vw, vEnd, s] of [[v0, va, -1], [v1, vb, 1]]) {
     if (ends === 'wall') {
@@ -183,9 +224,27 @@ export function gableRoof(m, { wx0, wx1, wz0, wz1, top, axis = 'x', pitch = 0.38
         poly(m, [P(uo, top, vf), P(um, ridgeY + 0.2, vf), P(um, yIn, vf), P(ui, top, vf)], rake, { out: dirV(s) });
         poly(m, [P(ui, top, vf), P(um, yIn, vf), P(um, yIn, vt), P(ui, top, vt)], rakeShade, { out: [0, -1, 0] });
       }
+      // painted sima: a red band with a gilt edge along the top of each
+      // raking cornice, standing a hair proud of it
+      if (sima !== null) {
+        const vs = vf + s * 0.04, sh = Math.min(0.42, H * 0.5);
+        for (const uo of [u0, u1]) {
+          const du = um - uo, dd = Math.sign(du);
+          poly(m, [P(uo, top + 0.02, vs), P(um, ridgeY + 0.2, vs), P(um, ridgeY + 0.2 - sh, vs), P(uo + dd * sh / pitch, top + 0.02, vs)], sima, { out: dirV(s) });
+          const g = 0.12;
+          poly(m, [P(uo, top + 0.02, vs + s * 0.01), P(um, ridgeY + 0.2, vs + s * 0.01), P(um, ridgeY + 0.2 - g, vs + s * 0.01), P(uo + dd * g / pitch, top + 0.02, vs + s * 0.01)], 0xd2a847, { out: dirV(s) });
+        }
+      }
       // geison: front face, flat top ledge and underside
       const gy = 1.1;
       poly(m, [P(u0 - ov, top, vf), P(u1 + ov, top, vf), P(u1 + ov, top - gy, vf), P(u0 - ov, top - gy, vf)], rake, { out: dirV(s) });
+      if (geisonPaint !== null) {
+        // painted band (with a gilt egg-and-dart dot every other voxel) on the geison face
+        const vg = vf + s * 0.03;
+        poly(m, [P(u0 - ov, top - 0.25, vg), P(u1 + ov, top - 0.25, vg), P(u1 + ov, top - 0.7, vg), P(u0 - ov, top - 0.7, vg)], geisonPaint, { out: dirV(s) });
+        for (let uu = Math.ceil(u0 - ov) + 0.3; uu < u1 + ov - 0.5; uu += 1.5)
+          poly(m, [P(uu, top - 0.34, vg + s * 0.01), P(uu + 0.5, top - 0.34, vg + s * 0.01), P(uu + 0.5, top - 0.62, vg + s * 0.01), P(uu, top - 0.62, vg + s * 0.01)], 0xd2a847, { out: dirV(s) });
+      }
       poly(m, [P(u0 - ov, top, vf), P(u1 + ov, top, vf), P(u1 + ov, top, vt), P(u0 - ov, top, vt)], rakeShade, { out: [0, 1, 0] });
       poly(m, [P(u0 - ov, top - gy, vf), P(u1 + ov, top - gy, vf), P(u1 + ov, top - gy, vt), P(u0 - ov, top - gy, vt)], 0x9a9384, { out: [0, -1, 0] });
       for (const ue of [u0 - ov, u1 + ov])
@@ -210,7 +269,12 @@ export function hipRoof(m, { wx0, wx1, wz0, wz1, top, pitch = 0.45, ov = 1, tile
   tiledPlane(m, [x1, eaveY, z0], [x0, eaveY, z0], alongX ? R1 : R0, R0, { ...o, seed: seed + 1, up: [0, 1, -1] });
   tiledPlane(m, [x1, eaveY, z1], [x1, eaveY, z0], R1, alongX ? R1 : R0, { ...o, seed: seed + 2, up: [1, 1, 0] });
   tiledPlane(m, [x0, eaveY, z0], [x0, eaveY, z1], R0, alongX ? R0 : R1, { ...o, seed: seed + 3, up: [-1, 1, 0] });
-  if (Math.abs(hw - hd) > 0.01) ridgeCap(m, [R0[0], ridgeY + 0.1, R0[2]], [R1[0], ridgeY + 0.1, R1[2]], alongX ? [0, 0, 1] : [1, 0, 0], 0.5, 0.4, tiles.ridge);
+  if (Math.abs(hw - hd) > 0.01) ridgeCap(m, [R0[0], ridgeY + 0.1, R0[2]], [R1[0], ridgeY + 0.1, R1[2]], alongX ? [0, 0, 1] : [1, 0, 0], 0.66, 0.56, tiles.ridge);
+  // hip ridges: capped tile lines from each eave corner up to the ridge
+  for (const [c0, R] of [[[x0, eaveY, z0], R0], [[x0, eaveY, z1], alongX ? R0 : R1], [[x1, eaveY, z0], alongX ? R1 : R0], [[x1, eaveY, z1], R1]]) {
+    const dx = R[0] - c0[0], dz = R[2] - c0[2], l = Math.hypot(dx, dz) || 1;
+    ridgeCap(m, [c0[0], c0[1] + 0.2, c0[2]], [R[0], R[1] + 0.1, R[2]], [-dz / l, 0, dx / l], 0.5, 0.45, tiles.ridge, { lap: 0 });
+  }
   if (finial !== null) cylinder(m, cx, ridgeY, cz, 0.6, 1.2, finial, { segs: 8 });
   return { ridgeY, cx, cz };
 }

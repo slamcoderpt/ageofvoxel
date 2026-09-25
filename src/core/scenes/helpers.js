@@ -84,14 +84,14 @@ export function buildTown(game, owner, start, { villagers = 24, soldiers = 6 } =
   const berry = nearestResource(game, 'food', sx, sz);
   const toward = (r, k) => (r ? [sx + (r.x - sx) * k, sz + (r.z - sz) * k] : [sx + 8, sz + 8]);
   const store = placeNear(game, 'storehouse', owner, ...toward(wood, 0.72), { maxR: 5 });
-  const store2 = placeNear(game, 'storehouse', owner, ...toward(gold, 0.7), { maxR: 5 });
+  const store2 = placeNear(game, 'storehouse', owner, ...toward(gold, 0.7), { maxR: 5, gap: 2 });
   const houses = [];
   for (const [dx, dz] of [[-6, -11], [4, -11], [-11, -6], [-11, 4], [-17, -6], [15, 4], [10, -13]]) {
     const h = placeNear(game, 'house', owner, sx + dx, sz + dz, { maxR: 4, gap: 3 });
     if (h) houses.push(h);
   }
-  const temple = placeNear(game, 'temple', owner, sx + 9, sz - 6, { maxR: 5 });
-  const barracks = placeNear(game, 'barracks', owner, sx - 4, sz + 10, { maxR: 5 });
+  const temple = placeNear(game, 'temple', owner, sx + 11, sz - 5, { maxR: 5, gap: 2 });
+  const barracks = placeNear(game, 'barracks', owner, sx - 4, sz + 10, { maxR: 5, gap: 2 });
   const farms = [];
   for (const [dx, dz] of [[6, 7], [11, 7], [6, 12]]) {
     const f = placeNear(game, 'farm', owner, sx + dx, sz + dz, { maxR: 3, gap: 0 });
