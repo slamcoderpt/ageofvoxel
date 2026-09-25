@@ -6,6 +6,7 @@ import { BUILDING_MODELS, BUILDING_VARIANTS } from './models.js';
 import { constructionModel, CONSTRUCTION_STAGES } from './construction.js';
 import { hash3 } from '../core/rng.js';
 import { Placement } from './placement.js';
+import { Props } from './props.js';
 
 // Buildings piece: spawning, construction ('build' order), destruction,
 // rendering and the placement flow.
@@ -25,6 +26,7 @@ export class Buildings {
     this.geos = new Map();
     this.meshes = new Map(); // entity id -> Object3D
     this.placement = new Placement(game, this);
+    this.props = new Props(game);
 
     game.commands.register('build', {
       start: (u, o) => {
@@ -62,9 +64,21 @@ export class Buildings {
     return this.geos.get(k);
   }
 
+  // Visual variant, fixed per building. Starts from a tile hash, then steps
+  // away from the variants of same-type neighbours so a street of houses
+  // never repeats one silhouette side by side.
   variantOf(b) {
+    if (b.bld_variant !== undefined) return b.bld_variant;
     const n = BUILDING_VARIANTS[b.type] || 1;
-    return n > 1 ? Math.floor(hash3(b.tx, 7, b.tz, 31) * n) % n : 0;
+    let v = n > 1 ? Math.floor(hash3(b.tx, 7, b.tz, 31) * n) % n : 0;
+    if (n > 1) {
+      const near = new Set();
+      for (const o of this.game.entities.buildings())
+        if (o !== b && o.type === b.type && o.bld_variant !== undefined && Math.hypot(o.x - b.x, o.z - b.z) < 8) near.add(o.bld_variant);
+      for (let i = 0; i < n && near.has(v); i++) v = (v + 1) % n;
+    }
+    b.bld_variant = v;
+    return v;
   }
 
   // Paint a paved plaza (irregular disc) around a building, skipping tiles
@@ -105,8 +119,9 @@ export class Buildings {
     const game = this.game, map = game.map;
     game.terrain.clearRect(tx, tz, def.w, def.h);
     map.flattenTiles(tx, tz, def.w, def.h, null, def.farm ? GROUND.FARM : type === 'town_center' || type === 'temple' ? GROUND.PAVED : GROUND.DIRT);
-    if (type === 'town_center') this.pavePlaza(tx, tz, def.w, def.h, 3.5);
-    else if (type === 'temple') this.pavePlaza(tx, tz, def.w, def.h, 1.5);
+    if (type === 'town_center') this.pavePlaza(tx, tz, def.w, def.h, 5);
+    else if (type === 'temple') this.pavePlaza(tx, tz, def.w, def.h, 2.5);
+    else if (!def.farm) this.pavePlaza(tx, tz, def.w, def.h, 1.2);
     const b = game.entities.add({
       kind: 'building', type, owner, def,
       tx, tz, w: def.w, h: def.h,
@@ -205,6 +220,7 @@ export class Buildings {
         : this.stageGeometry(b.type, v, Math.min(CONSTRUCTION_STAGES - 1, Math.floor(b.progress * CONSTRUCTION_STAGES)));
       if (mesh.geometry !== geo) mesh.geometry = geo;
     }
+    this.props.render();
     this.placement.render();
   }
 }
