@@ -368,24 +368,7 @@ function headModel(style) {
     m.box(0, 6, 0, 5, 1, 5, STRAW).box(1, 7, 1, 3, 1, 3, STRAW);
     m.box(0, 6, 0, 5, 1, 1, 0x8a6a3a).box(0, 6, 4, 5, 1, 1, 0x8a6a3a).box(0, 6, 0, 1, 1, 5, 0x8a6a3a).box(4, 6, 0, 1, 1, 5, 0x8a6a3a);
   }
-  neutralHead(m, style);
   return m;
-}
-
-// Round 14 team-colour rule: helmets, crests, caps and headbands stay neutral
-// (horsehair, felt, leather) and are never self-lit; the army's colour lives
-// only on tunic and shield face. Every TEAM or glowing voxel on a head is
-// repainted in the natural material it stands for.
-function neutralHead(m, style) {
-  const hair = style === 'hero' ? [0xf2ead8, 0xe2d8c0, 0xfaf4e6]            // white plume
-    : style.startsWith('hop') ? [0x2e2119, 0x3b2a1e, 0x4a3524]              // dark horsehair
-    : style === 'archer' ? [0xb89a6c, 0xa88a5e, 0x9c7f55]                  // undyed felt
-    : [0x6b4a2c, 0x5a3d24, 0x7a5634];                                      // leather cord/band
-  let i = 0;
-  for (const v of m.vox.values()) {
-    if (v.team) { v.team = 0; v.c = hair[(i++ * 7) % 3]; }
-    if (style !== 'medusa') v.glow = 0;   // (the gorgon's eyes keep their glow)
-  }
 }
 
 function head(style, joint = [0, 10, 0.2], parent = 'torso') {
@@ -934,7 +917,7 @@ export function cyclopsRig() {
   headM.set(2, 1, 8, 0xf2ead4).set(6, 1, 8, 0xf2ead4);           // tusks
   headM.box(-1, 4, 3, 1, 3, 2, CY_SKIN).box(8, 4, 3, 1, 3, 2, CY_SKIN).set(-2, 5, 3, CY_SHADE).set(9, 5, 3, CY_SHADE); // ears
   headM.box(1, 1, -0, 7, 5, 1, HAIR).box(0, 3, 1, 1, 3, 3, HAIR).box(8, 3, 1, 1, 3, 3, HAIR);      // fringe at the back
-  headM.box(3, 10, 2, 3, 2, 3, HAIR).box(3, 12, 2, 3, 1, 3, LEATHER).box(4, 13, 2, 1, 2, 2, HAIR).set(4, 15, 1, HAIR); // topknot bound in team
+  headM.box(3, 10, 2, 3, 2, 3, HAIR).box(3, 12, 2, 3, 1, 3, TEAM).box(4, 13, 2, 1, 2, 2, HAIR).set(4, 15, 1, HAIR); // topknot bound in team
   headM.box(1, 8, 6, 1, 1, 1, CY_SHADE).box(2, 9, 6, 1, 1, 1, CY_SHADE);  // scar
   const upperArm = new VoxelModel();
   upperArm.ellipsoid(2, 8, 2, 2.9, 2.6, 2.9, CY_SKIN);            // shoulder ball

@@ -3,7 +3,7 @@ import { VoxelModel, TEAM, buildVoxelGeometry, voxelMaterialFor } from '../core/
 import { hash3 } from '../core/rng.js';
 import { BUILDING_VOXEL } from './defs.js';
 import { GROUND } from '../core/GameMap.js';
-import { withExtras, gableRoof, TILES } from './shapes.js';
+import { withExtras, shedRoof, roundColumn, TILES } from './shapes.js';
 import {
   WOOD, DARKWOOD, STONE, MARBLE, MARBLE_SHADE, BRONZE, GOLD, FIRE, LEAF,
   amphora, pithos, potPlant, cypress, olive, statue, hopliteStatue, roofTile, shade,
@@ -41,10 +41,11 @@ const PROPS = {
   stall_food: { w: 2, h: 1, build: (m) => stall(m, 'food') },
   stall_pots: { w: 2, h: 1, build: (m) => stall(m, 'pots') },
   stall_cloth: { w: 2, h: 1, build: (m) => stall(m, 'cloth') },
-  // market hall: an open timber frame on a paved floor, no tiled roof -
-  // posts on stone bases, tie beams, a ridge beam and open slatted rafters
-  // with striped cloths thrown over some bays, counters with goods beneath
-  market: { w: 3, h: 2, build: (m) => market(m) },
+  // stoa: a long open colonnade on the agora's edge, facing +x: two-step
+  // stylobate, a plastered back wall with shop doors and a red dado, five
+  // round columns under a painted architrave and a tiled lean-to roof;
+  // benches, jars and a hung team cloth inside
+  stoa: { w: 2, h: 5, build: (m) => stoa(m) },
   // potter's workshop yard: a domed clay kiln with a glowing stoke hole, a
   // wheel under a small shed, rows of drying pots, a fence round it
   kiln: { w: 2, h: 2, build: (m) => kiln(m) },
@@ -54,7 +55,7 @@ const PROPS = {
     w: 1, h: 1,
     build(m) {
       m.box(0, 0, 0, 4, 1, 4, MARBLE_SHADE);
-      m.box(1, 1, 1, 2, 7, 2, MARBLE); m.box(1, 7, 1, 2, 1, 2, MARBLE_SHADE);
+      m.box(1, 1, 1, 2, 7, 2, MARBLE); m.box(1, 3, 1, 2, 1, 2, 0xa8372a); m.box(1, 4, 1, 2, 1, 2, 0xd2a847);
       m.box(0, 8, 0, 4, 1, 4, BRONZE);
       m.box(1, 9, 1, 2, 1, 2, FIRE, { glow: 0.4 });
       m.set(1, 10, 2, 0xffd27a, { glow: 0.4 });
@@ -158,10 +159,6 @@ const PROPS = {
   // temenos boundary wall (sits on paving, unlike garden walls)
   twall_x: { w: 3, h: 1, build: (m) => peribolos(m, 12, 'x') },
   twall_z: { w: 1, h: 3, build: (m) => peribolos(m, 12, 'z') },
-  // temenos colonnade (sides and back): a stepped stylobate, square-set
-  // marble columns with capitals, an architrave and a painted frieze
-  tcol_x: { w: 3, h: 1, build: (m) => colonnade(m, 12, 'x') },
-  tcol_z: { w: 1, h: 3, build: (m) => colonnade(m, 12, 'z') },
   planter: {
     w: 1, h: 1,
     build(m) {
@@ -238,29 +235,30 @@ function court(m, kind) {
   }
 }
 
-function market(m) {
-  // an open market hall: a paved stone floor, white square piers under a
-  // marble beam, one solid terracotta gable roof with a white fascia and a
-  // thin team-coloured valance along the front eave; counters and goods in
-  // the shade underneath
-  const L = 12, D = 8;
-  m.box(0, 0, 0, L, 1, D, (x, y, z) => ((x + z) & 1 ? 0xd6cfbf : 0xcbc3b0));
-  m.box(0, 1, 0, L, 1, D, 0xe2dccf);
-  for (const x of [0, 4, 7, 11]) for (const z of [0, D - 1]) {
-    m.box(x, 2, z, 1, 7, 1, 0xf1ece2);
-    m.set(x, 2, z, 0xd6cfbf);
+function stoa(m) {
+  const L = 20;
+  const WASH = (x, y, z) => (hash3(x >> 1, y >> 1, z >> 1, 110) < 0.55 ? 0xf1ede4 : 0xe8e2d6);
+  m.box(0, 0, 0, 8, 1, L, (x, y, z) => (hash3(x >> 1, 0, z >> 1, 111) < 0.5 ? 0x8f887a : 0x857e70));
+  m.box(0, 1, 0, 7, 1, L, (x, y, z) => ((x + z) & 1 ? 0xd6cfbf : 0xcfc7b4));
+  // back wall and end walls
+  m.box(0, 2, 0, 2, 9, L, WASH);
+  m.box(0, 2, 0, 2, 2, L, 0x9a3b2c);
+  for (const z of [0, L - 1]) { m.box(0, 2, z, 6, 9, 1, WASH); m.box(0, 2, z, 6, 2, 1, 0x9a3b2c); }
+  // shop doors in the back wall, recessed, with pale frames
+  for (const z0 of [3, 9, 15]) {
+    m.box(1, 2, z0, 1, 5, 2, 0x16110d);
+    m.box(2, 7, z0 - 1, 1, 1, 4, 0xd6cfbf); m.box(2, 2, z0 - 1, 1, 5, 1, 0xd6cfbf); m.box(2, 2, z0 + 2, 1, 5, 1, 0xd6cfbf);
   }
-  m.box(0, 9, 0, L, 1, D, 0xe7e1d4);
-  m.box(0, 9, D - 1, L, 1, 1, 0x34528a);
-  for (let x = 1; x < L - 1; x++) if (x !== 4 && x !== 7) m.set(x, 8, D - 1, x & 1 ? TEAM : 0xf2ede2);
-  gableRoof(m, { wx0: 0, wx1: L, wz0: 0, wz1: D, top: 10, axis: 'x', pitch: 0.5, ov: 1.1, ovG: 0.7, tiles: TILES.warm, fill: 0xf1ece2, seed: 71 });
-  // counters and goods
-  m.box(1, 2, 5, 3, 2, 1, 0x7a5230); m.box(1, 4, 5, 3, 1, 1, 0x9b7040);
-  const goods = [0xc0392b, 0x6f9a36, 0xe0b93a, 0x6b3a6e, 0xd35400];
-  for (let x = 1; x < 4; x++) m.set(x, 5, 5, goods[x % goods.length]);
-  m.box(8, 2, 2, 3, 2, 1, 0x7a5230); m.box(8, 4, 2, 3, 1, 1, 0x9b7040);
-  for (let x = 8; x < 11; x += 2) amphora(m, x, 5, 2, x & 2 ? 0xa65a34 : 0xc47440);
-  pithos(m, 9, 2, 5, 0xb8683e); amphora(m, 2, 2, 2, 0xc47440);
+  // colonnade and architrave
+  for (let i = 0; i < 5; i++) roundColumn(m, 6.5, 2, 2 + i * 4, 0.5, 8);
+  m.box(5, 10, 0, 3, 1, L, 0xece6da);
+  m.box(5, 11, 0, 3, 1, L, (x, y, z) => (z % 4 === 0 ? 0xd2a847 : 0x34528a));
+  m.box(0, 11, 0, 5, 1, L, WASH);
+  shedRoof(m, { wx0: 0, wx1: 8, wz0: 0, wz1: L, top: 12, dir: '+x', pitch: 0.3, ov: 1, ovS: 0.6, tiles: TILES.warm, seed: 17, fill: 0xece6da });
+  // inside: benches, jars, a hanging team cloth
+  m.box(2, 2, 6, 1, 1, 2, 0xcfc7b4); m.box(2, 2, 12, 1, 1, 2, 0xcfc7b4);
+  pithos(m, 2, 2, 1, 0xb8683e); amphora(m, 3, 2, 17, 0xa65a34); amphora(m, 2, 2, 18, 0xc47440);
+  for (let y = 6; y < 10; y++) for (let z = 7; z < 11; z++) if (z !== 9) m.set(2, y, z, TEAM);
 }
 
 function kiln(m) {
@@ -295,26 +293,6 @@ function peribolos(m, len, axis) {
   }
 }
 
-function colonnade(m, len, axis) {
-  const put = (a, y, k, c) => (axis === 'x' ? m.set(a, y, k, c) : m.set(k, y, a, c));
-  for (let a = 0; a < len; a++) {
-    for (let k = 0; k < 4; k++) put(a, 0, k, hash3(a >> 1, 0, k, 114) < 0.5 ? 0x8d8676 : 0x9a9382);
-    for (let k = 0; k < 4; k++) put(a, 1, k, (a + k) & 1 ? 0xd8d0bf : 0xcfc7b4);
-    for (let k = 0; k < 4; k++) {
-      put(a, 10, k, k === 0 || k === 3 ? 0xe2dccd : 0xece6da);
-      put(a, 11, k, k === 0 || k === 3 ? ((a & 3) === 1 ? 0xd2a847 : (a & 1) ? 0x2d4b82 : 0x34528a) : 0xe2dccd);
-      put(a, 12, k, (a + k) & 1 ? 0xd6cfbf : 0xcdc5b3);
-    }
-    // columns: 2x2 shafts every 4 voxels with a base and a spreading capital
-    const c = a % 4;
-    if (c === 1 || c === 2) for (const k of [1, 2]) {
-      put(a, 2, k, 0xd6cfbf);
-      for (let y = 3; y < 9; y++) put(a, y, k, (a + k + y) & 1 ? 0xf2ede3 : 0xe9e3d6);
-    }
-    if (c === 1 || c === 2) for (let k = 0; k < 4; k++) put(a, 9, k, 0xe2dccd);
-  }
-}
-
 function lowWall(m, len, axis) {
   const put = (a, y, k, c) => (axis === 'x' ? m.set(a, y, 1 + k, c) : m.set(1 + k, y, a, c));
   for (let a = 0; a < len; a++) for (let k = 0; k < 2; k++) {
@@ -338,12 +316,12 @@ function stall(m, kind) {
   for (const [x, z] of [[0, 0], [7, 0], [0, 3], [7, 3]]) m.box(x, 0, z, 1, 6, 1, WOOD);
   m.box(0, 2, 2, 8, 1, 2, 0x9b7040);                 // counter
   m.box(1, 0, 3, 6, 2, 1, 0x7a5230);
-  // plain canvas awning sloping down to the front; only the cloth seller
-  // hangs a thin valance in the owner's colour
-  const CANVAS = (x, y, z) => (hash3(x, y, z, 86) < 0.5 ? 0xefe9dc : 0xe8e1d2);
+  // striped awning sloping down to the front
+  // awning stripes: only the cloth seller flies the owner's colour
+  const stripe = kind === 'food' ? 0xa8372a : kind === 'pots' ? 0xc98a2e : TEAM;
   for (let x = -1; x < 9; x++) {
-    m.set(x, 7, 0, CANVAS).set(x, 7, 1, CANVAS).set(x, 6, 2, CANVAS).set(x, 6, 3, CANVAS);
-    m.set(x, 5, 4, kind === 'cloth' ? TEAM : CANVAS);
+    const c = (x & 1) ? stripe : 0xf2ede2;
+    m.set(x, 7, 0, c).set(x, 7, 1, c).set(x, 6, 2, c).set(x, 6, 3, c).set(x, 5, 4, c);
   }
   if (kind === 'food') {
     const goods = [0xc0392b, 0x6f9a36, 0xe0b93a, 0x6b3a6e, 0xd35400];
@@ -366,20 +344,22 @@ function stall(m, kind) {
 function anchorsFor(b) {
   const w = b.w, h = b.h, v = Math.floor(hash3(b.tx, 5, b.tz, 71) * 4);
   switch (b.type) {
-    // the agora: an open timber market hall on the front-left corner, a
-    // tile clear of the Town Center, with its stalls in a row on the lane
-    // below it; the well front-right, a statue on the north-east corner;
-    // the front and sides of the Town Center stay open paving
+    // the agora: a market row on the front-left, the well front-right, a
+    // statue on the open north-east corner; everything else stays clear
     case 'town_center': return [
-      ['market', [[-3, h + 1], [-3, h]]],
-      ['stall_food', [[-3, h + 4], [-3, h + 3]]], ['stall_cloth', [[0, h + 4], [0, h + 3]]],
-      ['well', [[w + 1, h], [w + 1, h - 1]]],
+      ['stoa', [[-3, 5], [-4, 5]]], ['stoa', [[-3, -3], [-3, -4]]],
+      ['pillar', [[-1, h], [-1, h + 1]]], ['pillar', [[w, h], [w, h + 1]]],
+      ['stall_food', [[0, h], [-1, h + 1]]], ['stall_pots', [[0, h + 2], [-1, h + 2]]], ['stall_cloth', [[w - 2, h + 2], [w - 1, h + 2]]],
+      ['well', [[w + 1, h], [w + 1, h + 1]]],
       ['statue', [[w + 1, -3], [w + 1, -2]]],
       ['cypress', [[-2, -2], [-1, -2]]], ['cypress', [[w + 1, 0], [w, -2]]],
     ];
-    // houses stand clear on open ground; now and then a cypress beside one
+    // each house keeps its dressing inside its own walled side court; the
+    // front onto the street stays clear
     case 'house': return [
-      ...(v & 2 ? [['cypress', [[w, 0]]]] : []),
+      [['court_a', 'court_b', 'court_c', 'court_d'][(v + (b.bld_variant | 0)) & 3], [[w, 0]]],
+      ['wall_x', [[0, -1]]],
+      ...(v & 2 ? [['cypress', [[-1, 0]]]] : []),
     ];
     // storehouse goods stay inside a fenced work yard beside and behind it
     case 'storehouse': return [
@@ -418,8 +398,7 @@ function temenosAnchors(b) {
   for (const z of [0, 2, 4]) out.push(['cypress', [[-2, z]]], ['cypress', [[w + 1, z]]]);
   // boundary: back and sides in 3-tile runs, the front split by the gate
   const x0 = ex - b.tx, z0 = ez - b.tz, x1 = x0 + ew - 1, z1 = z0 + eh - 1;
-  for (let x = x0; x + 2 <= x1; x += 3) out.push(['tcol_x', [[x, z0]]]);
-  for (let z = z0 + 1; z + 2 <= z1 - 3; z += 3) out.push(['tcol_z', [[x0, z]]], ['tcol_z', [[x1, z]]]);
+  for (let x = x0; x + 2 <= x1; x += 3) out.push(['twall_x', [[x, z0]]]);
   for (let z = z0 + 1; z + 2 <= z1; z += 3) out.push(['twall_z', [[x0, z]]], ['twall_z', [[x1, z]]]);
   const gate0 = Math.floor(w / 2) - 2, gate1 = Math.floor(w / 2) + 2;   // 3-tile gate on the axis
   for (let x = x0; x + 2 < gate0 + 1; x += 3) out.push(['twall_x', [[x, z1]]]);

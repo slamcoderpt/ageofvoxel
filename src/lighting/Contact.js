@@ -136,8 +136,8 @@ export class ContactMap {
         cov[z * N + x] = s / n;
       }
     };
-    blur(1);
-    blur(1);
+    blur(2);
+    blur(2);
     // RGBA8: R = occupancy, G = ground height * HSCALE (0.125 unit steps)
     const data = this.data;
     for (let i = 0, n = N * N; i < n; i++) data[i * 4] = Math.min(255, cov[i] * 255 + 0.5);

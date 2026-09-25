@@ -1,6 +1,5 @@
 import { GROUND } from '../core/GameMap.js';
 import { hash3 } from '../core/rng.js';
-import { HOUSE_PLANS, HOUSE_TINTS } from './models.js';
 
 // A planned Greek town (Hippodamian grid) round a start position, used by the
 // town / coast / hud scenes through buildings.layoutTown(owner, start).
@@ -40,16 +39,12 @@ const S = {
   barracks: [-14, 10],
   store: [18, -5],                         // wood yard at the eastern forest edge
   store2: [13, -5],                        // by the gold mine
-  // [dx, dz, plan, yaw]: plans (models.js houseModel) 0 courtyard house
-  // (back range + street wing round a walled court), 1 gable-fronted hall
-  // behind a walled yard, 2 hipped block with a walled side court. Rows
-  // alternate plans; most houses front their street, a few turn a side.
   houses: [
-    [-11, -5, 0, 0], [-14, -5, 1, 0], [-18, -6, 2, 0], [-23, -5, 0, 0],                       // row A
-    [-12, -12, 1, 0], [-16, -13, 2, 0], [-20, -12, 0, 0], [-23, -12, 1, Math.PI / 2],        // row B
-    [-11, 3, 2, 0], [-15, 3, 0, 0], [-18, 3, 1, 0], [-23, 4, 2, -Math.PI / 2],               // row C
-    [-20, 10, 0, Math.PI / 2],             // row D, beside the academy
-    [-6, 15, 1, 0], [3, 13, 0, 0],         // along the south street
+    [-12, -5], [-17, -5], [-22, -5],       // row A, north side of the main street
+    [-12, -12], [-17, -12], [-22, -12],    // row B
+    [-12, 3], [-17, 3], [-22, 3],          // row C, south side
+    [-20, 10],                             // row D, beside the academy
+    [-6, 15], [3, 13],                     // along the south street
   ],
   house2: [-6, 10],                        // being built, on the south street corner
   farms: [[9, 3], [14, 3], [9, 9]],
@@ -108,14 +103,7 @@ export function layoutTown(game, owner, start) {
   const store = spiral('storehouse', ...S.store);
   const barracks = spiral('barracks', ...S.barracks);
   const houses = [];
-  S.houses.forEach(([dx, dz, plan, yaw], i) => {
-    const h = tryAt('house', dx, dz);
-    if (!h) return;
-    // each house its own roof tint, never the same as the one before it
-    h.bld_variant = plan + HOUSE_PLANS * ((i * 3) % HOUSE_TINTS);
-    h.bld_yaw = yaw;
-    houses.push(h);
-  });
+  for (const [dx, dz] of S.houses) { const h = tryAt('house', dx, dz); if (h) houses.push(h); }
   const farms = [];
   for (const [dx, dz] of S.farms) { const f = tryAt('farm', dx, dz); if (f) farms.push(f); }
   const house2 = tryAt('house', ...S.house2, { built: false });

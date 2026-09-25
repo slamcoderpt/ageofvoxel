@@ -26,11 +26,11 @@ import { ContactMap, contactUniforms } from './Contact.js';
 
 export const atmosUniforms = {
   uSunDirView: { value: new THREE.Vector3(0, 1, 0) },
-  uFoliageSky: { value: new THREE.Color(0.18, 0.28, 0.24) },
+  uFoliageSky: { value: new THREE.Color(0.34, 0.46, 0.24) },
   uFoliageSun: { value: new THREE.Color(0.34, 0.27, 0.035) },
   uGlowScale: { value: 2.5 },
-  uDeepShade: { value: new THREE.Color(0.4, 0.48, 0.46) }, // indirect multiplier at full canopy occlusion (cool blue-green)
-  uCanopyAO: { value: 0.85 },
+  uDeepShade: { value: new THREE.Color(0.58, 0.66, 0.5) }, // indirect multiplier at full canopy occlusion (cool blue-green)
+  uCanopyAO: { value: 0.5 },
   uUnderstory: { value: 1.0 },
   uPale: { value: 0.8 },      // albedo scale for pale neutral stone/marble (keeps whites off the clip)
   // Sunlit sandstone: pale neutral stone is re-tinted toward a warm
@@ -39,16 +39,16 @@ export const atmosUniforms = {
   uSand: { value: new THREE.Vector3(1.0, 0.85, 0.61) },
   uSandAmt: { value: 0.9 },
   uSandWall: { value: 0.5 },
-  uContactAO: { value: 1.0 }, // strength of the wall-base band and ground halos
+  uContactAO: { value: 0.65 }, // strength of the wall-base band and ground halos
   // Leaf shadow balance: foliage in the sun's shadow (cast by the crowns next
   // to it) loses this much of its sky/fill light and turns cool, so crown-on-
   // crown and crown-on-floor shadows read as deep blue-green, not mid olive.
-  uLeafShadowAmb: { value: 0.5 },
-  uShadeCool: { value: new THREE.Vector3(0.86, 0.98, 1.08) },
-  uLeafSun: { value: 1.3 },   // direct sun on foliage (lit crown tops glow warm)
+  uLeafShadowAmb: { value: 0.22 },
+  uShadeCool: { value: new THREE.Vector3(0.93, 1.0, 0.86) },
+  uLeafSun: { value: 1.45 },   // direct sun on foliage (lit crown tops glow warm)
   uLeafShadowSoft: { value: 3.0 }, // shadow filter width on foliage (x the sun's radius)
   uLeafAmb: { value: 1.05 },   // sky/hemisphere light on foliage (lower = more sun-vs-shade contrast)
-  uFloorShade: { value: 0.3 }, // extra darkening of shadowed forest floor
+  uFloorShade: { value: 0.08 }, // extra darkening of shadowed forest floor
   uCrownRound: { value: 1.0 },  // tree crowns shaded as rounded masses
   // Paving (terrain): Retold's roads and plazas are worn cobbles, never a flat
   // cream slab. uPave scales the procedural stone/mortar breakup, uPaveAlb the
@@ -58,12 +58,8 @@ export const atmosUniforms = {
   uPaveAlb: { value: 0.5 },
   uPaveScale: { value: 4.2 },  // cobbles per world unit
   uPaveJoint: { value: 0.3 },  // joint darkening
-  uGroundBounce: { value: new THREE.Color(0.08, 0.06, 0.04) },
-  uHalo: { value: 0.9 },
-  // shade on open ground: a faint cool sky lift (kept low so cast shadows stay
-  // dense) and a warm bounce from sunlit walls just outside a building's base
-  uShadeSky: { value: new THREE.Color(0.006, 0.016, 0.042) },
-  uWallBounce: { value: new THREE.Color(0.15, 0.09, 0.035) },
+  uGroundBounce: { value: new THREE.Color(0.11, 0.085, 0.055) },
+  uHalo: { value: 0.6 },
   // Crown value range: the shaded half of every crown (faces turned from the
   // sun, undersides, crevices) is desaturated toward a cool dark green by
   // uLeafShadeDesat; uLeafRim is the warm highlight on the sun-facing
@@ -71,13 +67,6 @@ export const atmosUniforms = {
   uLeafShadeDesat: { value: -0.3 },
   uLeafAlb: { value: 0.8 },   // foliage albedo scale (deep olive crowns, not lime)
   uLeafRim: { value: new THREE.Color(0.55, 0.38, 0.08) },
-  // Crown sky visibility (see patchVoxel): strength, and the indirect-light
-  // multiplier at a fully occluded crown skirt (cool deep green).
-  uCrownSky: { value: 1.0 },
-  uCrownDeep: { value: new THREE.Color(0.28, 0.4, 0.44) },
-  // Leaf albedo noise: the 3-tone voxel leaf palette is pulled this far
-  // toward one value per tree, so structure comes from light, not speckle.
-  uLeafFlat: { value: 0.35 },
 };
 
 const VOXEL_KEYS = ['voxelTeam', 'voxelTeamInst'];
@@ -108,8 +97,7 @@ function patchCommon(shader) {
 uniform sampler2D uCanopy;\nuniform float uCanopyInvSize, uCanopyOn;
 uniform vec3 uSunDirView, uFoliageSky, uFoliageSun, uDeepShade;\nuniform float uGlowScale, uCanopyAO, uUnderstory, uPale, uContactAO, uLeafShadowAmb, uLeafSun, uFloorShade;
 uniform vec3 uShadeCool, uSand, uLeafRim;
-uniform float uLeafShadeDesat, uLeafAmb, uLeafAlb, uLeafShadowSoft, uCrownSky, uLeafFlat;
-uniform vec3 uCrownDeep;
+uniform float uLeafShadeDesat, uLeafAmb, uLeafAlb, uLeafShadowSoft;
 uniform float uSandAmt, uSandWall;
 uniform sampler2D uContact;\nuniform vec2 uContactOrigin;\nuniform float uContactInvSize, uContactOn;
 // contact map: occ = footprint occupancy near here, hG = height above the ground
@@ -135,31 +123,6 @@ vec3 atmPale(vec3 a, float sandAmt) {
   vec3 sand = l * uSand / dot(uSand, vec3(0.2126, 0.7152, 0.0722));
   a = mix(a, sand, warmable * sandAmt);
   return a * mix(vec3(1.0), uPale * vec3(1.02, 1.0, 0.96), pale);
-}
-uniform sampler2D uCanopyTop;
-// Sky occlusion by the forest canopy: a horizon search over the canopy
-// envelope (see Canopy.js) in 5 directions at 2 radii. Returns 0 (open sky)
-// .. 1 (buried under / walled in by neighbouring crowns). Faces turned toward
-// a direction weigh that direction more; upward faces see a bit more sky.
-float atmSkyOcc(vec3 wN) {
-  if (uCanopyOn < 0.5) return 0.0;
-  vec2 p = vAtmWorld.xz;
-  float y = vAtmWorld.y - 0.03, occ = 0.0, ws = 0.0;
-  for (int i = 0; i < 5; i++) {
-    float a = float(i) * 1.2566 + 0.3;
-    vec2 d = vec2(cos(a), sin(a));
-    float h = 0.0;
-    h = max(h, (texture2D(uCanopyTop, (p + d * 0.4) * uCanopyInvSize).r - y) / 0.4);
-    h = max(h, (texture2D(uCanopyTop, (p + d * 1.1) * uCanopyInvSize).r - y) / 1.1);
-    float w = max(0.25, 1.0 + 0.9 * dot(wN.xz, d));
-    occ += w * h * inversesqrt(1.0 + h * h);
-    ws += w;
-  }
-  occ /= ws;
-  // straight overhead: an overhang (crown underside, floor under a crown)
-  float over = texture2D(uCanopyTop, p * uCanopyInvSize).r - y;
-  occ = max(occ, smoothstep(0.25, 1.0, over) * (0.85 - 0.4 * max(wN.y, 0.0)));
-  return clamp(occ * (1.0 - 0.25 * max(wN.y, 0.0)), 0.0, 1.0);
 }
 // dens: forest density here; depth: 1 at the forest floor .. 0 at crown tops
 void atmCanopy(out float dens, out float hA) {
@@ -207,13 +170,7 @@ function patchVoxel(shader) {
         // warm olive / neutral / cool deep green families, +-18% brightness
         vec3 tint = s < 0.3 ? vec3(1.12, 1.02, 0.74) : (s < 0.62 ? vec3(0.97, 1.0, 0.95) : vec3(0.78, 0.92, 1.02));
         float br = 0.72 + 0.34 * s2;
-        // calm the per-clump speckle: compress leaf albedo luminance toward
-        // a common value (log space), keep hue
-        // blue-green pine needles lose their teal cast (deep green, not mint)
-        a.b = mix(a.b, min(a.b, a.r * 0.85), 0.75);
-        float la = max(dot(a, vec3(0.2126, 0.7152, 0.0722)), 1e-4);
-        a *= mix(1.0, pow(0.16 / la, uLeafFlat), atmLeaf);
-        diffuseColor.rgb = mix(diffuseColor.rgb, a * tint * br * uLeafAlb * vec3(1.0, 0.96, 0.9), atmLeaf);
+        diffuseColor.rgb = mix(a, a * tint * br * uLeafAlb * vec3(1.0, 0.96, 0.9), atmLeaf);
       }
     }
     // Bent leaf normals: light foliage with a normal bent halfway toward the
@@ -256,16 +213,7 @@ function patchVoxel(shader) {
       // inner blocks: faces low in the crown (well below the canopy top) sit
       // in the crown's own shade, even at the forest edge
       float inner = (1.0 - smoothstep(2.4, 4.6, hA)) * smoothstep(0.6, 1.6, hA) * (1.0 - 0.6 * max(wN.y, 0.0));
-      float occL = clamp(occ * uCanopyAO + down * 0.45 + inner * 0.35, 0.0, 1.0) * leaf;
-      // Crown sky visibility: each tree crown is treated as a dome inside a
-      // field of neighbouring domes. Faces low in their own crown and out on
-      // its lower rim (where it meets the next crown) see little sky, so every
-      // crown gets a lit cap and a dark skirt and the forest breaks into
-      // separate masses with dark gaps between them (not an even carpet).
-      float atmCrownOcc = 0.0;
-      if (leaf > 0.0 || dens > 0.06) atmCrownOcc = smoothstep(0.03, 0.45, atmSkyOcc(wN)) * uCrownSky;
-      float atmLeafCrown = atmCrownOcc * leaf;
-      occL = max(occL, atmLeafCrown);
+      float occL = clamp(occ * uCanopyAO + down * 0.3 + inner * 0.18, 0.0, 1.0) * leaf;
       // understory: anything low under/near the canopy that is not foliage
       float under = smoothstep(0.1, 0.8, dens) * (1.0 - smoothstep(0.3, 2.6, hA)) * (1.0 - leaf) * uUnderstory;
       float o = max(occL, under);
@@ -318,17 +266,10 @@ function patchVoxel(shader) {
         // warm rim on the sun-facing upper shell (outer crown, sun reaching it)
         float rim = faceLit * smoothstep(0.25, 0.85, ndl) * smoothstep(0.1, 0.75, dot(atmRoundN, uSunDirView)) * (0.4 + 0.6 * max(wN.y, 0.0)) * (1.0 - occL);
         reflectedLight.directDiffuse += alb * uLeafRim * rim * leaf;
-        // crown skirts and the gaps between crowns: everything that reached
-        // them (sun, sky, fill, translucency) drops toward a cool deep green
-        reflectedLight.indirectDiffuse *= mix(vec3(1.0), uCrownDeep, atmCrownOcc);
-        reflectedLight.directDiffuse *= 1.0 - 0.6 * atmCrownOcc;
       } else {
         // grass tufts, rocks, trunks on the forest floor in crown shadow
         float fl = inShadow * smoothstep(0.1, 0.6, dens) * (1.0 - smoothstep(0.5, 2.5, hA));
         reflectedLight.indirectDiffuse *= mix(vec3(1.0), uShadeCool * (1.0 - uFloorShade), fl);
-        // tufts, trunks and props walled in by crowns see little sky
-        reflectedLight.indirectDiffuse *= mix(vec3(1.0), uCrownDeep, 0.85 * atmCrownOcc);
-        reflectedLight.directDiffuse *= 1.0 - 0.3 * atmCrownOcc;
       }
     }`);
 }
@@ -337,7 +278,7 @@ function patchVoxel(shader) {
 // ground bounce in shade and the contact halo round everything standing here.
 function patchGround(shader) {
   patchCommon(shader);
-  prependFragment(shader, `uniform float uPave, uPaveAlb, uHalo, uPaveScale, uPaveJoint;\nuniform vec3 uGroundBounce, uWallBounce, uShadeSky;
+  prependFragment(shader, `uniform float uPave, uPaveAlb, uHalo, uPaveScale, uPaveJoint;\nuniform vec3 uGroundBounce;
 float atmH2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 vec2 atmH22(vec2 p) { return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453); }
 float atmVN(vec2 p) {
@@ -395,19 +336,13 @@ vec2 atmCobble(vec2 p) {
       float sh = atmSunShadow();
       // forest floor in the crowns' sun shadow: deep, cool green-black gaps
       float fl = dens > 0.1 ? (1.0 - sh) * smoothstep(0.1, 0.6, dens) : 0.0;
-      // ground between and under crowns: sky hidden by the neighbouring crowns
-      if (dens > 0.06) {
-        float so = smoothstep(0.03, 0.45, atmSkyOcc(vec3(0.0, 1.0, 0.0))) * uCrownSky;
-        reflectedLight.indirectDiffuse *= mix(vec3(1.0), uCrownDeep, so);
-        reflectedLight.directDiffuse *= 1.0 - 0.35 * so;
-      }
       reflectedLight.indirectDiffuse *= mix(vec3(1.0), uShadeCool * (1.0 - uFloorShade), fl);
       // warm bounce: open ground in shade is lit by the sunlit stone and earth
       // around it, so cast shadows on roads read as warm shade, not blue decals
-      reflectedLight.indirectDiffuse += diffuseColor.rgb * uGroundBounce * (1.0 - under);
+      reflectedLight.indirectDiffuse += diffuseColor.rgb * uGroundBounce * (0.35 + 0.65 * (1.0 - sh)) * (1.0 - under);
       // open ground in cast shadow: a faint cool-blue sky lift, so shade on
       // roads and grass reads as clear walkable shade, not a grey-brown slab
-      reflectedLight.indirectDiffuse += diffuseColor.rgb * uShadeSky * (1.0 - sh) * (1.0 - under);
+      reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(0.06, 0.08, 0.13) * (1.0 - sh) * (1.0 - under);
       // contact halo round every building, prop and unit standing here
       float cOcc, hG; atmContact(cOcc, hG);
       // (a soft skirt ~1 unit wide plus a tight dark core right at the base,
@@ -416,10 +351,6 @@ vec2 atmCobble(vec2 p) {
       float core = smoothstep(0.3, 0.8, cOcc) * uContactAO * uHalo;
       reflectedLight.indirectDiffuse *= clamp(1.0 - 0.7 * halo - 0.28 * core, 0.0, 1.0);
       reflectedLight.directDiffuse *= clamp(1.0 - 0.45 * halo - 0.36 * core, 0.0, 1.0);
-      // warm bounce near walls: shade a little way out from a building picks
-      // up the sunlit stone around it (warm), but not in the tight core
-      float nearWall = smoothstep(0.04, 0.4, cOcc) * (1.0 - smoothstep(0.45, 0.85, cOcc));
-      reflectedLight.indirectDiffuse += diffuseColor.rgb * uWallBounce * nearWall * (1.0 - sh) * (1.0 - under);
     }`);
 }
 

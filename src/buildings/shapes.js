@@ -102,13 +102,6 @@ export const TILES = {
     plane: { ribGap: 1.5, ribW: 0.34, ribH: 0.42, bandEvery: 0, weather: 0.3, lip: 0.2, antefixH: 0.3 } },
   faded: { tones: [0xe8a878, 0xe09e6e, 0xefb385, 0xdc9a6b], butt: 0xa86840, fascia: 0xf1ece2, ridge: 0xc07a4c, soffit: 0x6a4a3a, antefix: 0xf4efe4,
     plane: { ribGap: 1.5, ribW: 0.34, ribH: 0.42, bandEvery: 0, weather: 0.35, lip: 0.2, antefixH: 0.3 } },
-  // dark blue-grey slate for the military buildings, with bronze-painted
-  // antefixes and a darker ridge (reads apart from every tiled roof)
-  darkSlate: { tones: [0x434c59, 0x3b4350, 0x4b5562, 0x363e4a], butt: 0x22282f, fascia: 0x3a414a, ridge: 0x8a6a3a, soffit: 0x262a30, antefix: 0xb88a42,
-    plane: { ribGap: 0, bandEvery: 0, weather: 0.3, lip: 0.26, tileW: 1.2 } },
-  // split-timber shingles (storehouses, sheds): grey-brown weathered wood
-  shingle: { tones: [0x8a7458, 0x7e6a50, 0x97805f, 0x746249], butt: 0x4e4030, fascia: 0x5a4632, ridge: 0x5e4a34, soffit: 0x3a2e24, antefix: null,
-    plane: { ribGap: 3.2, ribW: 0.3, ribH: 0.3, bandEvery: 0, weather: 0.6, lip: 0.28 } },
   weathered: { tones: [0xa88a72, 0x9d806a, 0xb3967e, 0x927762], butt: 0x5e4a3c, fascia: 0xe6e0d2, ridge: 0x6e5646, soffit: 0x3e342c, antefix: 0xe6e0d2,
     plane: { ribGap: 1.5, ribW: 0.34, ribH: 0.42, bandEvery: 0, weather: 0.5, lip: 0.2, antefixH: 0.3 } },
 };
@@ -124,7 +117,7 @@ export const TILES = {
 export function tiledPlane(m, e0, e1, r0, r1, opts = {}) {
   return tiledPlane0(m, e0, e1, r0, r1, opts.tiles?.plane ? { ...opts.tiles.plane, ...opts } : opts);
 }
-function tiledPlane0(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.1, tileW = 1.4, lip = 0.24, fascia = 0.6, seed = 1, up = [0, 1, 0], closeUnder = true, eaveFascia = true, ribGap = 2.6, ribW = 0.46, ribH = 0.5, antefix = tiles.antefix ?? null, antefixH = 0.35, antefixPaint = null, bandEvery = 4, weather = 1, missing = 0 } = {}) {
+function tiledPlane0(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.1, tileW = 1.4, lip = 0.24, fascia = 0.6, seed = 1, up = [0, 1, 0], closeUnder = true, eaveFascia = true, ribGap = 2.6, ribW = 0.46, ribH = 0.5, antefix = tiles.antefix ?? null, antefixH = 0.35, antefixPaint = null, bandEvery = 4, weather = 1 } = {}) {
   const n = normal3(e0, e1, r0[0] === r1[0] && r0[1] === r1[1] && r0[2] === r1[2] ? r0 : r1, up);
   const slope = len3(sub3(lerp3(r0, r1, 0.5), lerp3(e0, e1, 0.5)));
   const N = Math.max(1, Math.round(slope / course));
@@ -153,18 +146,6 @@ function tiledPlane0(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.1, til
       }
       const p0 = add3(lerp3(L0, R0, a), n, lip), p1 = add3(lerp3(L0, R0, b), n, lip);
       const p2 = lerp3(L1, R1, b), p3 = lerp3(L1, R1, a);
-      if (missing > 0 && i > 0 && i < N - 1 && b - a > 0.3 / K) {
-        const hm = hash3(i, j, seed, 64);
-        if (hm < missing) {
-          // a slipped / missing tile: the dark batten and underlay show
-          // through a hole sunk below the course
-          const q = (p) => add3(p, n, -0.28);
-          poly(m, [q(lerp3(L0, R0, a)), q(lerp3(L0, R0, b)), q(p2), q(p3)], 0x33241c, { out: n });
-          continue;
-        }
-        // an odd replacement tile, fresher and brighter than its neighbours
-        if (hm < missing * 2.2) c = mix(c, 0xe98a4c, 0.45);
-      }
       // the lower courses read a touch darker (weathering toward the eave)
       poly(m, [p0, p1, p2, p3], c, { out: n, shade: [0.94, 0.94, 1, 1] });
     }
@@ -179,24 +160,15 @@ function tiledPlane0(m, e0, e1, r0, r1, { tiles = TILES.terra, course = 1.1, til
     const span = len3(sub3(e1, e0));
     const K = Math.max(2, Math.round(span / ribGap));
     const tE = sub3(e1, e0).map((q) => q / (span || 1));
-    // Ribs run straight up the slope, square to the eave (on a hip or a
-    // triangle too, where each one stops at the hip line instead of
-    // fanning to the apex like a parasol).
-    const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-    const D = sub3(lerp3(r0, r1, 0.5), lerp3(e0, e1, 0.5));
-    const Dp = add3(D, tE, -dot(D, tE));
-    const pL = dot(sub3(r0, e0), tE), pR = dot(sub3(r1, e1), tE);
-    const tR = tE;
+    const tri = r0[0] === r1[0] && r0[1] === r1[1] && r0[2] === r1[2];
+    const topLen = len3(sub3(r1, r0));
+    const tR = tri ? tE : sub3(r1, r0).map((q) => q / (topLen || 1));
     const hw = ribW, hr = ribH;
     for (let k = 0; k < K; k++) {
-      const s = (k + 0.5) / K, a = s * span;
-      let tm = 1;
-      if (pL > 1e-6) tm = Math.min(tm, a / pL);
-      if (pR < -1e-6) tm = Math.min(tm, (span - a) / -pR);
-      if (tm < 0.12) continue;
-      if (tm < 1) tm -= Math.min(0.08, (hw * 1.2) / (len3(Dp) || 1));
+      const s = (k + 0.5) / K;
       const A = add3(lerp3(e0, e1, s), n, lip * 0.6);
-      const B = add3(A, Dp, tm);
+      let B = add3(lerp3(r0, r1, s), n, lip * 0.6);
+      if (tri) B = lerp3(A, B, 0.86);
       const c = shadeHex(T[Math.floor(hash3(k, 77, seed, 58) * T.length) % T.length], 0.97 + hash3(k, 3, seed, 59) * 0.08);
       const At = add3(A, n, hr), Bt = add3(B, n, hr);
       const A1 = add3(A, tE, hw), A2 = add3(A, tE, -hw), B1 = add3(B, tR, hw), B2 = add3(B, tR, -hw);

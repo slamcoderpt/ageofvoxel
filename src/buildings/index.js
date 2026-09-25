@@ -9,7 +9,6 @@ import { Placement } from './placement.js';
 import { Props } from './props.js';
 import { withExtras } from './shapes.js';
 import { layoutTown } from './town.js';
-import { Smoke } from './smoke.js';
 
 // Buildings piece: spawning, construction ('build' order), destruction,
 // rendering and the placement flow.
@@ -31,7 +30,6 @@ export class Buildings {
     this.meshes = new Map(); // entity id -> Object3D
     this.placement = new Placement(game, this);
     this.props = new Props(game);
-    this.smoke = new Smoke(game.scene);
 
     game.commands.register('build', {
       start: (u, o) => {
@@ -54,47 +52,9 @@ export class Buildings {
       const def = BUILDING_DEFS[type];
       const model = BUILDING_MODELS[type](variant);
       const pivot = [def.w * 2, 0, def.h * 2];
-      const geo = withExtras(buildVoxelGeometry(model, { size: BUILDING_VOXEL, pivot, jitter: 0.06 }), model, BUILDING_VOXEL, pivot);
-      // chimney flue (voxel coords) for the smoke, relative to the pivot
-      if (model.chimney) geo.userData.chimney = model.chimney.map((c, i) => (c - pivot[i]) * BUILDING_VOXEL);
-      this.geos.set(k, geo);
+      this.geos.set(k, withExtras(buildVoxelGeometry(model, { size: BUILDING_VOXEL, pivot, jitter: 0.06 }), model, BUILDING_VOXEL, pivot));
     }
     return this.geos.get(k);
-  }
-
-  // Where a house mesh stands: a little off the plot grid and a degree or
-  // two off square, so a street does not read as a stamped row.
-  housePose(b) {
-    const j = hash3(b.tx, 29, b.tz, 95) - 0.5, k = hash3(b.tx, 31, b.tz, 96) - 0.5;
-    return { x: b.x + k * 0.45, z: b.z - this.houseSetback(b), yaw: this.houseYaw(b) + j * 0.06 };
-  }
-
-  // Hearth smoke: finished houses breathe soft, semi-transparent puffs
-  // (smoke.js) on their own irregular rhythm; about a third of the hearths
-  // are cold at any time. Simulated in the fixed tick so paused captures
-  // show it.
-  chimneySmoke(dt) {
-    this.smoke.update(dt);
-    const game = this.game;
-    this.smokeT = (this.smokeT || 0) + dt;
-    if (this.smokeT < 0.1) return;
-    this.smokeT -= 0.1;
-    this.smokeN = (this.smokeN || 0) + 1;
-    for (const b of game.entities.buildings()) {
-      if (b.type !== 'house' || !b.built || b.dead) continue;
-      if (b.owner !== game.localPlayer && !game.fog.isExplored(b.x, b.z)) continue;
-      const c = this.geometry('house', this.variantOf(b)).userData.chimney;
-      if (!c) continue;
-      // each hearth puffs at its own rhythm, some cold for a while
-      if (hash3(b.tx, this.smokeN >> 8, b.tz, 97) < 0.38) continue;
-      const beat = 0.5 + 0.5 * Math.sin(this.smokeN * 0.13 + hash3(b.tx, 1, b.tz, 98) * 6.28);
-      if (hash3(b.tx + this.smokeN, 2, b.tz, 99) > 0.08 + 0.2 * beat) continue;
-      const p = this.housePose(b);
-      const cs = Math.cos(p.yaw), sn = Math.sin(p.yaw);
-      const x = p.x + c[0] * cs + c[2] * sn, z = p.z - c[0] * sn + c[2] * cs;
-      const y = game.map.heightAt(b.x, b.z) + c[1];
-      this.smoke.puff(x, y, z, b.tx * 131 + b.tz);
-    }
   }
 
   // Geometry of a construction stage (0..CONSTRUCTION_STAGES-1).
@@ -150,13 +110,15 @@ export class Buildings {
     return v;
   }
 
-  // Houses stand square to the street grid; the planned town sets each
-  // house's facing (bld_yaw), elsewhere it comes from a tile hash.
+  // Houses turn on their square plots in quarter turns (a gable end or a
+  // side yard to the street instead of every front in a row) with a few
+  // degrees of slack, so the lots do not line up like a kit; the rotated
+  // footprint is still the same 3x3 square, so nothing reaches a neighbour.
   houseYaw(b) {
     if (b.bld_yaw === undefined) {
-      // most houses front their street square on; some turn a side to it
-      const h = hash3(b.tx, 23, b.tz, 94);
-      b.bld_yaw = h < 0.6 ? 0 : h < 0.82 ? Math.PI / 2 : -Math.PI / 2;
+      const h = hash3(b.tx, 17, b.tz, 91);
+      const q = h < 0.5 ? 0 : h < 0.72 ? 1 : h < 0.92 ? -1 : 2;
+      b.bld_yaw = q * Math.PI / 2 + (hash3(b.tx, 18, b.tz, 92) - 0.5) * 0.09;
     }
     return b.bld_yaw;
   }
@@ -381,7 +343,6 @@ export class Buildings {
       b.hp = Math.min(b.maxHp, b.hp + (b.progress - before) * b.maxHp * 0.9);
       if (b.progress >= 1) this.complete(b);
     }
-    this.chimneySmoke(dt);
   }
 
   complete(b) {
@@ -416,15 +377,7 @@ export class Buildings {
       }
       const y = game.map.heightAt(b.x, b.z);
       m.position.set(b.x, y, b.z);
-      if (b.type === 'house') {
-        // detached plans (not the row plots, which join wall to wall) sit a
-        // little off the plot grid and a few degrees off square, so a street
-        // does not read as a stamped row
-        const p = this.housePose(b);
-        m.rotation.y = p.yaw;
-        m.position.x = p.x;
-        m.position.z = p.z;
-      }
+      if (b.type === 'house') { m.rotation.y = this.houseYaw(b); m.position.z -= this.houseSetback(b); }
       const visible = b.owner === game.localPlayer || game.fog.isExplored(b.x, b.z);
       m.visible = visible;
       const mesh = m.userData.mesh;
@@ -436,8 +389,6 @@ export class Buildings {
     this.props.render();
     this.placement.render();
   }
-
-  resize(w, h) { this.smoke.resize(h); }
 }
 
 export { BUILDING_DEFS };

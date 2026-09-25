@@ -29,10 +29,10 @@ const COL = 3.0;
 // between them: each duellist stands a shield's width from the seam, so the
 // two men of a pair press shield to shield, and the seam itself wanders a
 // little from pair to pair so the lines interpenetrate)
-const FRONT = 0.68;   // (r14: pairs a small gap apart, never interpenetrating)
-const SECOND = 2.0;   // depth of the second rank (shouldered up behind)
-const THIRD = 3.8;    // depth of the reserve
-const HERO_RING = (a, d) => Math.abs(a) < 2.7 && Math.abs(d) < 1.3;
+const FRONT = 0.42;   // depth of each duellist from the seam (pair touching)
+const SECOND = 1.85;  // depth of the second rank (shouldered up behind)
+const THIRD = 3.7;    // depth of the reserve
+const HERO_RING = (a, d) => Math.abs(a) < 2.0 && Math.abs(d) < 1.0;
 // the duel line runs +-END along the front; the giants (minotaur vs cyclops)
 // fight their own battles out on the two flanks, well clear of it (GIANT),
 // with open ground between them and the nearest pair of men
@@ -157,7 +157,7 @@ function duels(game, cx, cz, slots) {
       // spear's length: they fight across the seam without closing into
       // one another, and never step past their own side of it
       u.combat_reach = 0.3;
-      u.combat_line = { cx, cz, nx: S * side, nz: S * side, d0: side * o + FRONT - 0.04 };
+      u.combat_line = { cx, cz, nx: S * side, nz: S * side, d0: side * o + FRONT - 0.12 };
       u.attackCd = rng.range(0, u.def.attack.cooldown);
       pair.push(u);
     }
@@ -195,22 +195,22 @@ function fallen(game, cx, cz, taken) {
     body(rng.chance(0.12) ? 'toxotes' : 'hoplite', owner, a, d);
     n++;
   }
-  for (let k = 0; k < 400 && n < 10; k++) {
-    const a = rng.range(-END + 1, END - 1), d = (rng.chance(0.5) ? 1 : -1) * rng.range(1.15, 1.5);
+  for (let k = 0; k < 400 && n < 8; k++) {
+    const a = rng.range(-END + 1, END - 1), d = (rng.chance(0.5) ? 1 : -1) * rng.range(1.0, 1.4);
     if (HERO_RING(a, d) || !clear(a, d, 1.1)) continue;
     body('hoplite', d > 0 ? PLAYER : ENEMY, a, d);
     n++;
   }
   // loose gear in the trampled ground behind both fronts: shields, helmets,
   // spears and broken shafts dropped as the ranks pushed over them
-  for (let i = 0, got = 0; i < 300 && got < 9; i++) {
+  for (let i = 0, got = 0; i < 120 && got < 2; i++) {
     const a = rng.range(-END + 1, END - 1), d = (rng.chance(0.5) ? 1 : -1) * rng.range(0.9, 2.6);
     if (!clear(a, d, 0.75)) continue;
     got++;
     const [x, z] = P(cx, cz, a, d);
     const owner = d > 0 ? PLAYER : ENEMY;
     const k = rng.next();
-    if (k < 0.6) fx.debris.drop('shield', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(-0.1, 0.3), roll: rng.range(-0.1, 0.1), life: 60 });
+    if (k < 0.5) fx.debris.drop('shield', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(-0.1, 0.3), roll: rng.range(-0.1, 0.1), life: 60 });
     else if (k < 0.8) fx.debris.drop('helmet', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(-0.5, 0.5), roll: rng.range(1.2, 1.7), lift: 0.12, life: 60 });
     else fx.debris.drop(k < 0.9 ? 'spear' : 'stub', x, z, { rot: rng.range(0, 6.28), owner, tilt: rng.range(-0.05, 0.05), life: 60 });
   }
@@ -238,7 +238,7 @@ function churn(game, cx, cz, spots) {
 // it) inside a fringe of trodden dry grass. The figures stand on a light,
 // quiet ground instead of dark, busy tufts, so every silhouette separates.
 function trample(game, cx, cz) {
-  const map = game.map, V = map.worldSize / map.cols, fx = game.combat.fx;
+  const map = game.map, V = map.worldSize / map.cols;
   const soft = (x, z, f, s) => {
     // cheap smooth value noise from the hash lattice
     const X = x * f, Z = z * f, x0 = Math.floor(X), z0 = Math.floor(Z), ax = X - x0, az = Z - z0;
@@ -259,9 +259,8 @@ function trample(game, cx, cz) {
     const ea = Math.max(0, Math.abs(a) - (GIANT + 1.5));
     const w = 3.4 + n * 2.4 + n2 * 0.8 - ea * 0.9;
     const ad = Math.abs(d - 0.2);
-    if (ad < w && !(n2 > 0.36 && ad > 1.8)) { map.ground[k] = GROUND.DIRT; fx.wash(i, j, 1); }
-    else if (ad < w + 1.6 + n2 * 1.2 && g === GROUND.GRASS) { map.ground[k] = GROUND.DRYGRASS; fx.wash(i, j, 0.5); }
-    else if (ad < w + 4.2 + n * 2) fx.wash(i, j, 0.5);
+    if (ad < w && !(n2 > 0.36 && ad > 1.8)) map.ground[k] = GROUND.DIRT;
+    else if (ad < w + 1.6 + n2 * 1.2 && g === GROUND.GRASS) map.ground[k] = GROUND.DRYGRASS;
   }
   map.markDirty(c0x - 1, c0z - 1, c1x + 1, c1z + 1);
 }
@@ -293,7 +292,7 @@ export const battleScene = {
         u.x = u.prevX = x; u.z = u.prevZ = z;
         u.combat_line = { cx, cz, nx: S * side, nz: S * side, d0 };
       };
-      if (u.type === 'hero') { hold(0.25, 1.05, 0.95); u.combat_leash = 2.5; u.combat_reach = 1.7; }
+      if (u.type === 'hero') { hold(0.25, 0.6, 0.45); u.combat_leash = 2.5; u.combat_reach = 1.7; }
       else if (u.type === 'cyclops') { hold(GIANT, 2.0, 1.8); u.combat_leash = 5; u.combat_reach = 1.6; }
     }
     const near = (u, list) => {
@@ -322,7 +321,7 @@ export const battleScene = {
     engageHeroesAndMyth(game, myth);
     const heroes = myth.filter((u) => u.type === 'hero');
     const cyc = myth.filter((u) => u.type === 'cyclops');
-    for (const h of heroes) { h.combat_line.d0 = 0.95; h.combat_leash = 3; }
+    for (const h of heroes) { h.combat_line.d0 = 0.45; h.combat_leash = 3; }
     if (heroes.length === 2) {
       game.commands.order(heroes[0], { type: 'attack', targetId: heroes[1].id, auto: true });
       game.commands.order(heroes[1], { type: 'attack', targetId: heroes[0].id, auto: true });

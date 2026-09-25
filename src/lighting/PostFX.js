@@ -44,7 +44,7 @@ const GradeShader = {
     // Top-edge aerial haze: in the RTS view the top of the frame is always
     // the far distance, so it loses contrast and saturation and lifts toward
     // a cool grey-blue (the far forest and shoreline recede).
-    uTopHaze: { value: 0.14 },
+    uTopHaze: { value: 0.26 },
     // Measured tonal targets (scripts/lumstats.py vs Retold ss_02): foliage
     // luminance is compressed into ~0.19..0.53 by a linear remap
     // (l' = uLeafLum.x + uLeafLum.y * l, soft-capped at uLeafLum.z) on pixels
@@ -52,15 +52,13 @@ const GradeShader = {
     // to black in shade nor bleach to mint on sunlit tops; uLeafChroma adds
     // back a little saturation. Everything else gets a soft value floor
     // (l' = sqrt(l^2 + uFloor^2)) so the darkest non-foliage shade sits ~0.2.
-    uLeafLum: { value: new THREE.Vector3(0.12, 0.8, 0.52) },
-    uLeafChroma: { value: 0.24 },
-    uFloor: { value: 0.045 },
+    uLeafLum: { value: new THREE.Vector3(0.09, 0.68, 0.57) },
+    uLeafChroma: { value: 0.16 },
+    uFloor: { value: 0.1 },
     uTopHazeColor: { value: new THREE.Vector3(0.7, 0.78, 0.85) },
     // Cool sky-fill tint applied to the shade (multiplicative, luminance
     // preserved): canopy undersides and cast shadows read blue-green.
-    uSplitCool: { value: new THREE.Vector3(0.9, 0.99, 1.13) },
-    // sunlit foliage loses this much saturation (bright crown caps stop reading lime)
-    uLeafTopDesat: { value: 0.25 },
+    uSplitCool: { value: new THREE.Vector3(0.88, 1.0, 1.16) },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
@@ -68,7 +66,7 @@ const GradeShader = {
     uniform float uMidContrast, uShadowSat, uLeafChroma, uFloor; uniform vec3 uLeafLum;
     uniform float uKnee, uShoulder, uToeLift, uChromaLimit, uExposure, uSaturation, uGreenShift, uGreenDesat, uContrast, uVignette;
     uniform vec3 uShadowTint, uBlackFloor; varying vec2 vUv;
-    uniform vec3 uSplitCool; uniform float uLeafTopDesat;
+    uniform vec3 uSplitCool;
     const vec3 LW = vec3(0.2126, 0.7152, 0.0722);
     void main(){
       vec4 t = texture2D(tDiffuse, vUv);
@@ -134,7 +132,7 @@ const GradeShader = {
         float shd = 1.0 - smoothstep(0.1, 0.42, lt);
         c *= mix(vec3(1.0), uSplitCool, shd) / mix(1.0, dot(uSplitCool, LW), shd);
         c *= lt / max(l0, 1e-4);
-        c = max(mix(vec3(lt), c, 1.0 + uLeafChroma * wf - uLeafTopDesat * wf * smoothstep(0.3, 0.5, lt)), 0.0);
+        c = max(mix(vec3(lt), c, 1.0 + uLeafChroma * wf), 0.0);
       }
       // --- top-edge haze: lower contrast and saturation, cool lift
       float th = smoothstep(0.42, 1.0, vUv.y); th *= th * uTopHaze;
@@ -158,9 +156,9 @@ export class PostFX {
     this.composer.addPass(new RenderPass(scene, camera));
     if (quality === 'high') {
       this.gtao = new GTAOPass(scene, camera, size.x, size.y);
-      this.gtao.updateGtaoMaterial({ radius: 1.1, distanceExponent: 1.6, thickness: 2.5, scale: 1.6, samples: 12, distanceFallOff: 1.0 });
+      this.gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.6, thickness: 2.5, scale: 1.6, samples: 12, distanceFallOff: 1.0 });
       this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
-      this.gtao.blendIntensity = 0.95;
+      this.gtao.blendIntensity = 0.6;
       // Let pieces opt objects out of the AO g-buffer with object.userData.noAO
       // (water, overlays, effects).
       const orig = this.gtao._overrideVisibility.bind(this.gtao);
