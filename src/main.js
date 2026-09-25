@@ -29,6 +29,7 @@ async function boot() {
   window.__game = game;
   game.init();
   game.combat.ai.enabled = !!scene.ai;
+  game.victory.enabled = !!scene.victory;
   const ctx = scene.setup(game) || {};
   game.fog.setRevealAll(!bool('fog', !scene.revealAll));
   game.ui.setVisible(bool('hud', !!scene.hud));

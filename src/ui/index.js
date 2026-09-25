@@ -107,6 +107,7 @@ export class UI {
     root.querySelector('.rbtn.terrain').addEventListener('click', (e) => { this.minimap.showTerrain = !this.minimap.showTerrain; this.minimap.timer = 0; e.currentTarget.classList.toggle('off', !this.minimap.showTerrain); });
     root.querySelector('.rbtn.score').addEventListener('click', (e) => { const off = this.els.scores.classList.toggle('hidden'); e.currentTarget.classList.toggle('off', off); });
     this.els.pause.addEventListener('click', () => {
+      if (game.victory?.result) return;
       game.paused = !game.paused;
       this.els.pause.innerHTML = game.paused ? ICONS.play : ICONS.pause;
       this.message(game.paused ? 'Game paused' : 'Game resumed');
@@ -123,6 +124,7 @@ export class UI {
     game.events.on('unit:trained', (u) => { if (mine(u)) this.feed(`${u.def.name} trained.`); });
     game.events.on('age:advanced', (a) => { if (a.owner === game.localPlayer) this.feed(`You reached the ${AGES[a.age]} Age!`, 'gold'); });
     game.events.on('godpower:cast', (g) => { if (g.owner === game.localPlayer) this.feed(`You use the ${game.godpowers.powers[g.power]?.name || 'god'} God Power!`, 'gold'); });
+    game.events.on('game:over', (r) => this.showResult(r));
     this.els.medal.addEventListener('mouseenter', (e) => {
       const p = game.players[game.localPlayer];
       this.tooltip(e, `<b>${AGES[p.age]} Age</b><br>Worshipping ${p.god}${AGES[p.age + 1] ? `<br>Advance at the Town Center (A)` : ''}`);
@@ -136,6 +138,31 @@ export class UI {
 
   setVisible(v) { this.visible = v; this.root.classList.toggle('hidden', !v); }
 
+  // Victory / defeat card over the frozen battlefield, with a restart button
+  // (reloads the page, so the match restarts with the same URL settings).
+  showResult({ winner, time }) {
+    if (this.resultEl) return;
+    const game = this.game, me = game.localPlayer, won = winner === me;
+    const p = game.players[me];
+    const s = Math.floor(time);
+    const clock = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+    this.tooltip(null);
+    game.buildings.placement.cancel();
+    this.selection.setMode(null);
+    const el = document.createElement('div');
+    el.className = `gameover ${won ? 'victory' : 'defeat'}`;
+    el.innerHTML = `<div class="gild card">
+        <div class="kicker">${p.god} &middot; ${AGES[p.age]} Age &middot; ${clock}</div>
+        <h1>${won ? 'Victory' : 'Defeat'}</h1>
+        <p>${won ? 'The enemy Town Center has fallen.' : 'Your last Town Center has fallen.'}</p>
+        <div class="btn restart">Play Again</div>
+      </div>`;
+    el.querySelector('.restart').addEventListener('click', () => location.reload());
+    el.addEventListener('mousedown', (e) => e.stopPropagation());
+    document.body.appendChild(el);
+    this.resultEl = el;
+    this.els.pause.innerHTML = ICONS.play;
+  }
 
   buildPowers() {
     const game = this.game;

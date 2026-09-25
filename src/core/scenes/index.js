@@ -13,7 +13,8 @@ import { standardStart, buildTown, spawnBlock, placeNear, nearestResource, assig
 // have rendered, sets window.__sceneReady = true.
 //
 // Fields: preset, seed, mapSize, hud (bool), revealAll (bool), ai (bool),
-//         live (bool), fastForward (s), camera {x,z,distance,pitch,yaw} or
+//         live (bool), victory (bool: the match ends when a side loses its
+//         last Town Center), fastForward (s), camera {x,z,distance,pitch,yaw} or
 //         camera(game) -> that object, setup(game) -> any.
 export const SCENES = new Map();
 export function registerScene(name, def) { SCENES.set(name, { name, ...def }); }
@@ -21,7 +22,7 @@ export function registerScene(name, def) { SCENES.set(name, { name, ...def }); }
 // ---------------------------------------------------------------------------
 registerScene('skirmish', {
   description: 'Default playable match: you vs. the AI.',
-  preset: 'skirmish', seed: 3, hud: true, revealAll: false, ai: true, live: true, fastForward: 0,
+  preset: 'skirmish', seed: 3, hud: true, revealAll: false, ai: true, live: true, victory: true, fastForward: 0,
   setup(game) {
     const [p, e] = game.starts;
     const me = standardStart(game, PLAYER, p, 5);

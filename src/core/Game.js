@@ -12,6 +12,7 @@ import { Input } from './Input.js';
 import { CameraController } from './CameraController.js';
 import { FogOfWar } from './FogOfWar.js';
 import { Particles } from './fx/Particles.js';
+import { Victory } from './Victory.js';
 import { pickGround, worldToScreen } from './picking.js';
 
 import { Lighting } from '../lighting/index.js';
@@ -75,6 +76,7 @@ export class Game {
     // simulation core
     this.movement = new Movement(this);
     this.commands = new Commands(this);
+    this.victory = new Victory(this);
 
     // pieces
     this.terrain = new Terrain(this);
@@ -87,7 +89,7 @@ export class Game {
 
     for (const r of gen.resources) this.terrain.spawnResource(r.type, r.tx, r.tz, r);
 
-    this.simOrder = [this.economy, this.buildings, this.combat, this.godpowers, this.units, this.movement, this.fx, this.fog];
+    this.simOrder = [this.economy, this.buildings, this.combat, this.godpowers, this.units, this.movement, this.fx, this.fog, this.victory];
     this.renderOrder = [this.lighting, this.terrain, this.buildings, this.units, this.economy, this.combat, this.godpowers, this.ui];
 
     addEventListener('resize', () => this.resize());
@@ -169,6 +171,7 @@ export class Game {
       units: units.length,
       buildings: this.entities.count('building'),
       resources: this.entities.count('resource'),
+      over: this.victory.result,
       unitPositions: units.map((u) => [u.id, +u.x.toFixed(2), +u.z.toFixed(2)]),
       errors: this.errors.slice(),
     };

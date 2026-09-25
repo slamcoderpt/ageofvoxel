@@ -240,3 +240,14 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-f
 
 .selbox { position: fixed; border: 1px solid #b8ffb0; background: rgba(140, 255, 140, .12); pointer-events: none; z-index: 20; display: none; }
 .cursor-target { cursor: crosshair; }
+
+/* ---- match result: victory / defeat card ---------------------------------- */
+.gameover { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 45%, rgba(4,17,22,.25), rgba(4,17,22,.72)); }
+.gameover .card { position: relative; min-width: 380px; padding: 20px 40px 24px; text-align: center; }
+.gameover .kicker { font-size: 14px; font-weight: 800; letter-spacing: .6px; color: var(--muted); }
+.gameover h1 { margin: 4px 0 2px; font-family: var(--title); font-weight: 900; font-size: 48px; letter-spacing: 5px; text-transform: uppercase; color: var(--gold); text-shadow: 0 2px 3px #000, 0 0 14px rgba(233,200,120,.35); }
+.gameover.defeat h1 { color: var(--ink); text-shadow: 0 2px 3px #000; }
+.gameover p { margin: 0; font-size: 17px; font-weight: 800; color: var(--ink); text-shadow: 0 1px 2px #000; }
+.gameover .btn { display: inline-block; margin-top: 18px; padding: 8px 24px 9px; cursor: pointer; font-family: var(--title); font-weight: 800; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; color: #fff4dc; text-shadow: 0 1px 2px #000;
+  background: radial-gradient(circle at 50% 35%, #1e5363, #0a232b 70%, #051216); border: 2px solid transparent; border-image: var(--metal) 1; box-shadow: inset 0 0 0 1px #040b0e, 0 0 0 1px #040b0e, 0 3px 8px rgba(0,0,0,.55); }
+.gameover .btn:hover { background: radial-gradient(circle at 50% 35%, #2d7489, #0e303a 70%); box-shadow: inset 0 0 0 1px var(--gold-hi), 0 0 10px rgba(233,200,120,.55); }
