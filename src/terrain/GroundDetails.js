@@ -83,7 +83,13 @@ export class GroundDetails {
           } else if (h < p) {
             pick = g === GROUND.DRYGRASS && h2 < 0.5 ? 3 + Math.floor(h2 * 8) % 2 : Math.floor(h2 * 3);
           } else if (h > 0.996) pick = TUFTS + FLOWERS + Math.floor(h2 * PEBBLES);
-        } else if (g === GROUND.DIRT || g === GROUND.ROCK || g === GROUND.SAND) {
+        } else if (g === GROUND.ROCK) {
+          // wiry tufts in the soil pockets, stones everywhere
+          const tn = this.tm.noise;
+          const soil = Math.max(tn.fbm(cx * 0.07 + 140, cz * 0.07 + 40, 3) - 0.5, tn.fbm(cx * 0.16 + 400, cz * 0.16 + 120, 2) - 0.52);
+          if (soil > 0 && h < 0.1 + soil * 1.5) pick = h2 < 0.6 ? 3 + Math.floor(h2 * 3.3) % 2 : Math.floor(h2 * 3);
+          else if (h > 0.93) pick = TUFTS + FLOWERS + Math.floor(h2 * PEBBLES);
+        } else if (g === GROUND.DIRT || g === GROUND.SAND) {
           if (h < (g === GROUND.SAND ? 0.012 : 0.035)) pick = TUFTS + FLOWERS + Math.floor(h2 * PEBBLES);
           else if (g === GROUND.DIRT && h > 0.94) pick = 3 + Math.floor(h2 * 2);
         }
@@ -107,7 +113,7 @@ export class GroundDetails {
         q.setFromAxisAngle(up, a * Math.PI * 2);
         const sc = 0.75 + b * 0.6;
         s.set(sc, sc * (0.85 + c * 0.4), sc);
-        p.set((cx + 0.3 + a * 0.4) * VOXEL, l * VOXEL, (cz + 0.3 + c * 0.4) * VOXEL);
+        p.set((cx + 0.3 + a * 0.4) * VOXEL, this.tm.isShore(cx, cz) ? this.tm.surfaceY(cx, cz) : l * VOXEL, (cz + 0.3 + c * 0.4) * VOXEL);
         m4.compose(p, q, s);
         mesh.setMatrixAt(j, m4);
         const t = 0.88 + b * 0.22;

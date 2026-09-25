@@ -8,7 +8,7 @@ export const GROUND_COLORS = {
   [GROUND.DRYGRASS]: [0x7f913c, 0xa19f50],
   [GROUND.DIRT]: [0x9a7447, 0xb58b58],
   [GROUND.SAND]: [0xd9c48c, 0xe8d7a3],
-  [GROUND.ROCK]: [0x857b6c, 0xa39985],
+  [GROUND.ROCK]: [0x807b6b, 0xa29c86],
   [GROUND.PAVED]: [0xc9bea3, 0xd9d0b8],
   [GROUND.FARM]: [0x6d4a2c, 0x80593a],
 };
@@ -55,18 +55,42 @@ export function topColor(ground, cx, cz, level, noise) {
       r += (0.6 - r) * k; g += (0.5 - g) * k; b += (0.31 - b) * k;
     }
   } else if (ground === GROUND.ROCK) {
-    // weathered stone: strong grain, lichen and moss in the hollows
-    const g2 = (hash2(cx * 3, cz * 5, 19) - 0.5) * 0.18;
+    // weathered limestone in irregular slabs (noise-warped 3x3 cells) with
+    // dark joints, warm dirt pockets, moss and patches of wiry grass
+    const wx = cx + noise.noise(cx * 0.19 + 11, cz * 0.19) * 2.4;
+    const wz = cz + noise.noise(cx * 0.19 + 77, cz * 0.19 + 5) * 2.4;
+    const sx = Math.floor(wx / 3), sz = Math.floor(wz / 3);
+    const slab = hash2(sx, sz, 19);
+    const k = 0.84 + slab * 0.28;
+    r *= k; g *= k; b *= k;
+    const fx = wx / 3 - sx, fz = wz / 3 - sz;
+    if (fx < 0.2 || fz < 0.2) { r *= 0.8; g *= 0.79; b *= 0.78; } // joints
+    const g2 = (hash2(cx * 3, cz * 5, 19) - 0.5) * 0.08;
     r *= 1 + g2; g *= 1 + g2; b *= 1 + g2;
+    const soil = noise.fbm(cx * 0.07 + 140, cz * 0.07 + 40, 3);
+    if (soil > 0.4) {
+      // dirt pockets fading into dry grass
+      const kd = Math.min(1, (soil - 0.4) * 5);
+      const grassy = Math.min(1, Math.max(0, (soil - 0.47) * 5));
+      const tr = 0.56 + (0.4 - 0.56) * grassy, tg = 0.44 + (0.52 - 0.44) * grassy, tb = 0.29 + (0.19 - 0.29) * grassy;
+      const kk = kd * (0.75 + hash2(cx, cz, 23) * 0.25);
+      r += (tr - r) * kk; g += (tg - g) * kk; b += (tb - b) * kk;
+    }
+    // wiry grass reclaiming the plateau in drifts
+    const drift = noise.fbm(cx * 0.16 + 400, cz * 0.16 + 120, 2);
+    if (drift > 0.52) {
+      const kg = Math.min(1, (drift - 0.52) * 6) * (0.7 + hash2(cx, cz, 29) * 0.3);
+      r += (0.46 - r) * kg; g += (0.54 - g) * kg; b += (0.22 - b) * kg;
+    }
     const moss = noise.fbm(cx * 0.12 + 70, cz * 0.12 + 5, 2);
-    if (moss > 0.58) { const k = Math.min(1, (moss - 0.58) * 4) * 0.45; r += (0.38 - r) * k; g += (0.48 - g) * k; b += (0.24 - b) * k; }
+    if (moss > 0.6) { const km = Math.min(1, (moss - 0.6) * 4) * 0.4; r += (0.36 - r) * km; g += (0.45 - g) * km; b += (0.22 - b) * km; }
   } else if (ground === GROUND.SAND) {
     // ripples
     const rip = Math.sin(cx * 0.9 + noise.noise(cx * 0.1, cz * 0.1) * 6) * 0.025;
     r += rip; g += rip; b += rip;
   }
   // higher ground slightly lighter for readability
-  const lift = 1 + Math.min(0.08, Math.max(-0.06, (level - 4) * 0.012));
+  const lift = 1 + Math.min(ground === GROUND.ROCK ? 0.02 : 0.08, Math.max(-0.06, (level - 4) * 0.012));
   return [clamp01((r + j * r) * lift), clamp01((g + j * g) * lift), clamp01((b + j * b) * lift)];
 }
 
@@ -117,4 +141,59 @@ export function sideColor(ground, depth, cx, cy, cz) {
   }
   const [r, g, b] = lerpHex(pair[0], pair[1], hash2(cx, cz + cy * 13, 3));
   return [r * strata * (1 + j), g * strata * (1 + j), b * strata * (1 + j)];
+}
+
+// Cliff wall colour for one voxel of a side face.
+//   ground: ground type of the column on top; depth: rows below the lip (0 =
+//   the lip row); drop: height of the wall in levels; u: horizontal voxel
+//   coordinate along the face; k: absolute voxel level (for strata).
+// Tall walls get a grass lip, a root-laced topsoil row, then horizontal strata
+// of sandstone / grey limestone / ochre earth / dark shale broken into
+// irregular blocks with dark joints. Short 1-level steps stay grass + earth.
+const STRATA_LIGHT = [0xbfa67e, 0xa99f8e, 0xc7b08a];
+const STRATA_DARK = [0x8c6a47, 0x6f665c, 0x7d5d42];
+const EARTH = 0x6b4c31, ROOT = 0x4a3524, MOSS = 0x55702e;
+export function cliffColor(ground, depth, drop, u, k, cx, cz, noise) {
+  const grassy = ground === GROUND.GRASS || ground === GROUND.DRYGRASS;
+  const j = 1 + (hash2(u * 7 + k, cx * 3 + cz - k, 31) - 0.5) * 0.1;
+  if (depth === 0 && (grassy || (ground === GROUND.ROCK && hash2(u, k, 5) > 0.6))) {
+    const c = GROUND_COLORS[grassy ? ground : GROUND.GRASS][0];
+    const [r, g, b] = lerpHex(c, c, 0);
+    return [r * 0.95 * j, g * 0.95 * j, b * 0.95 * j];
+  }
+  if (ground === GROUND.SAND) {
+    const [r, g, b] = lerpHex(UNDERWATER[0], UNDERWATER[1], hash2(cx, cz + k * 13, 3));
+    const s = (k % 2 === 0 ? 0.93 : 1.0) * j;
+    return [r * s, g * s, b * s];
+  }
+  if (drop <= 2 && ground !== GROUND.ROCK) {
+    // short step: topsoil
+    const [r, g, b] = lerpHex(SIDE_DIRT[0], SIDE_DIRT[1], hash2(u, k * 13, 3));
+    const s = (depth === 1 ? 0.88 : 1.0) * j;
+    return [r * s, g * s, b * s];
+  }
+  if (depth === 1 && grassy) {
+    // topsoil with roots and moss drips from the lip
+    const h = hash2(u, k, 61);
+    const hex = h < 0.28 ? MOSS : h < 0.5 ? ROOT : EARTH;
+    const [r, g, b] = lerpHex(hex, hex, 0);
+    return [r * j, g * j, b * j];
+  }
+  // strata: bands follow absolute height, gently undulating along the wall
+  const wob = noise ? noise.noise(cx * 0.045 + 3, cz * 0.045 + 9) * 2.2 : 0;
+  const band = Math.floor((k + wob) / 2 + 100);
+  const set = band % 2 === 0 ? STRATA_LIGHT : STRATA_DARK;
+  const tone = set[Math.floor(hash2(band, 3, 91) * 3) % 3];
+  // blocks of 2-4 voxels per band with staggered joints
+  const bw = 2 + Math.floor(hash2(band, 7, 93) * 3);
+  const uu = u + Math.floor(hash2(band, 11, 95) * 4);
+  const blk = Math.floor(uu / bw);
+  let s = 0.9 + hash2(blk, band, 97) * 0.16;
+  if (uu - blk * bw === 0 && hash2(blk, band, 99) > 0.5) s *= 0.78; // vertical joint
+  if ((k + wob) / 2 + 100 - band < 0.26) s *= 0.8; // bedding plane
+  if (hash2(u * 5 + k, cz + cx, 43) > 0.93) s *= 0.7; // pits
+  let [r, g, b] = lerpHex(tone, tone, 0);
+  // moss creeping down from the top on grassy cliffs
+  if (grassy && depth <= 3 && hash2(u, k, 67) < 0.35 - depth * 0.1) { r += (0.34 - r) * 0.55; g += (0.44 - g) * 0.55; b += (0.2 - b) * 0.55; }
+  return [r * s * j, g * s * j, b * s * j];
 }
