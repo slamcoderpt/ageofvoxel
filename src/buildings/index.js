@@ -303,7 +303,7 @@ export class Buildings {
       let m = this.meshes.get(b.id);
       if (!m) {
         m = new THREE.Group();
-        const mesh = new THREE.Mesh(this.geometry(b.type, this.variantOf(b)), voxelMaterialFor(game.players[b.owner].color));
+        const mesh = new THREE.Mesh(this.geometry(b.type, this.variantOf(b)), voxelMaterialFor(game.players[b.owner].color, { roughness: 0.93 }));
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         m.add(mesh);
