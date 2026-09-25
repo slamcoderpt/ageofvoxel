@@ -101,7 +101,7 @@ export class CommandPanel {
     this.cmdEl.innerHTML = '';
     slots.forEach((c) => {
       const d = document.createElement('div');
-      if (!c) { d.style.visibility = 'hidden'; d.className = 'cmd'; this.cmdEl.appendChild(d); return; }
+      if (!c) { d.className = 'cmd empty'; this.cmdEl.appendChild(d); return; }
       d.className = 'cmd';
       d.innerHTML = `${c.img ? `<img src="${c.img}">` : c.svg}<span class="hk">${c.key || ''}</span>`;
       d.addEventListener('click', () => { if (c.enabled) c.run(); else this.ui.message('Cannot do that yet'); });
@@ -112,13 +112,23 @@ export class CommandPanel {
     });
     // --- info
     const el = this.infoEl;
-    el.innerHTML = '';
-    if (!sel.length) return;
+    const me = game.localPlayer;
+    const god = game.players[me].god;
+    const emblem = `<div class="emblem">${ICONS[god.toLowerCase()] || ICONS.zeus}</div>`;
+    if (!sel.length) { el.innerHTML = `${emblem}<div class="none">${god} &middot; ${AGES[game.players[me].age]} Age</div>`; return; }
+    const ownerTag = (owner) => {
+      const pl = game.players[owner];
+      const col = '#' + pl.color.toString(16).padStart(6, '0');
+      return `<i style="background:${col}">${owner}</i>${owner === me ? 'You' : pl.name}`;
+    };
     if (sel.length > 1) {
+      const counts = {};
+      for (const e of sel) counts[e.def?.name || e.type] = (counts[e.def?.name || e.type] || 0) + 1;
+      const title = Object.keys(counts).length === 1 ? `${sel.length} ${Object.keys(counts)[0]}s` : `${sel.length} Selected`;
+      el.innerHTML = `${emblem}<div class="ihead"><h2>${title}</h2></div><div class="owner">${ownerTag(sel[0].owner)}</div>`;
       const multi = document.createElement('div');
       multi.className = 'multi';
-      multi.style.gridColumn = '1 / 3';
-      for (const e of sel.slice(0, 40)) {
+      for (const e of sel.slice(0, 24)) {
         const m = document.createElement('div');
         m.className = 'mi';
         m.innerHTML = `<img src="${e.kind === 'unit' ? this.portraitUnit(e.type, e.owner) : this.portraitBuilding(e.type, e.owner)}"><div class="hp"></div>`;
@@ -131,14 +141,14 @@ export class CommandPanel {
     }
     const e = sel[0];
     const img = e.kind === 'unit' ? this.portraitUnit(e.type, e.owner) : e.kind === 'building' ? this.portraitBuilding(e.type, e.owner) : null;
-    el.innerHTML = `
-      <div class="portrait">${img ? `<img src="${img}">` : `<div style="font-size:42px">${e.type === 'gold' ? ICONS.gold : e.type === 'berry' ? ICONS.food : ICONS.wood}</div>`}</div>
-      <div class="details">
-        <h2>${e.def?.name || e.type}</h2>
-        <div class="sub">${e.kind === 'resource' ? 'Gaia' : game.players[e.owner].name}${e.def?.class ? ` &middot; ${e.def.class}` : ''}</div>
-        ${e.kind !== 'resource' ? '<div class="hpbar"><div></div></div>' : ''}
-        <div class="stats"></div>
-        <div class="queue"></div>
+    const resIcon = e.type === 'gold' ? ICONS.gold : e.type === 'berry' ? ICONS.food : ICONS.wood;
+    el.innerHTML = `${emblem}
+      <div class="ihead"><h2>${e.def?.name || e.type}</h2></div>
+      <div class="owner">${e.kind === 'resource' ? '<span class="cls">Gaia</span>' : ownerTag(e.owner)}${e.def?.class ? ` <span class="cls">&middot; ${e.def.class}</span>` : ''}</div>
+      ${e.kind !== 'resource' ? `<div class="hpline">${ICONS.heart}<span class="hpv"></span><div class="hpbar"><div></div></div></div>` : ''}
+      <div class="ibody">
+        <div class="portrait">${img ? `<img src="${img}">` : `<div class="ico">${resIcon}</div>`}</div>
+        <div class="details"><div class="stats"></div><div class="queue"></div></div>
       </div>`;
   }
 
@@ -161,17 +171,31 @@ export class CommandPanel {
     if (!e) return;
     const hp = this.infoEl.querySelector('.hpbar > div');
     if (hp) hp.style.width = `${Math.max(0, (e.hp / e.maxHp) * 100)}%`;
+    const hpv = this.infoEl.querySelector('.hpv');
+    if (hpv) hpv.textContent = `${Math.ceil(e.hp)}/${e.maxHp}`;
     const st = this.infoEl.querySelector('.stats');
     if (st) {
+      const I = (icon, v, label) => `<span>${ICONS[icon]}${v}${label ? ` <em>${label}</em>` : ''}</span>`;
       const parts = [];
-      if (e.kind !== 'resource') parts.push(`<span>HP <b>${Math.ceil(e.hp)}/${e.maxHp}</b></span>`);
-      if (e.kind === 'resource') parts.push(`<span>${e.resType} <b>${Math.ceil(e.amount)}</b></span>`);
-      if (e.kind === 'unit' && e.def.attack) parts.push(`<span>Attack <b>${e.def.attack.damage}</b></span>`, `<span>Armor <b>${Math.round((e.def.armor || 0) * 100)}%</b></span>`);
-      if (e.kind === 'unit' && e.carry?.amount > 0) parts.push(`<span>Carrying <b>${Math.floor(e.carry.amount)} ${e.carry.type}</b></span>`);
-      if (e.kind === 'building' && !e.built) parts.push(`<span>Building <b>${Math.floor(e.progress * 100)}%</b></span>`);
-      if (e.kind === 'building' && e.def.ageUp && p.advancing && e.owner === game.localPlayer) parts.push(`<span>Advancing <b>${Math.floor((p.advancing.t / p.advancing.total) * 100)}%</b></span>`);
-      if (e.kind === 'unit' && e.order) parts.push(`<span>${e.order.type}</span>`);
-      st.innerHTML = parts.join('');
+      if (e.kind === 'resource') parts.push(I(e.resType === 'gold' ? 'gold' : e.resType === 'food' ? 'food' : 'wood', Math.ceil(e.amount), e.resType));
+      if (e.kind === 'unit') {
+        const d = e.def;
+        if (d.attack) parts.push(I('sword', d.attack.damage, d.attack.projectile ? 'ranged' : 'hack'));
+        parts.push(I('shield', `${Math.round((d.armor || 0) * 100)}%`, 'armor'));
+        if (d.speed) parts.push(I('speed', d.speed.toFixed(1), 'speed'));
+        if (d.sight) parts.push(I('eye', d.sight, 'LOS'));
+        if (e.carry?.amount > 0) parts.push(I(e.carry.type in ICONS ? e.carry.type : 'bag', Math.floor(e.carry.amount), `/ ${d.carryCap || 10}`));
+        if (e.order && e.order.type !== 'idle') parts.push(`<span class="task">${{ gather: 'Gathering', dropoff: 'Returning', build: 'Building', worship: 'Worshipping', attack: 'Attacking', move: 'Moving' }[e.order.type] || e.order.type}${e.econ?.resType && (e.order.type === 'gather' || e.order.type === 'dropoff') ? ` ${e.econ.resType}` : ''}</span>`);
+        else if (e.order?.type === 'idle') parts.push('<span class="task">Idle</span>');
+      }
+      if (e.kind === 'building') {
+        if (!e.built) parts.push(`<span class="task">Under construction &middot; ${Math.floor(e.progress * 100)}%</span>`);
+        if (e.def.ageUp && p.advancing && e.owner === game.localPlayer) parts.push(`<span class="task">Advancing &middot; ${Math.floor((p.advancing.t / p.advancing.total) * 100)}%</span>`);
+        if (e.def.dropoff) parts.push(`<span>${e.def.dropoff.map((k) => ICONS[k]).join('')} <em>drop-off</em></span>`);
+        if (e.def.popCap || e.def.pop) parts.push(I('house', `+${e.def.popCap || e.def.pop}`, 'pop'));
+      }
+      const html = parts.join('');
+      if (st._h !== html) { st._h = html; st.innerHTML = html; }
     }
     const q = this.infoEl.querySelector('.queue');
     if (q && e.kind === 'building') {

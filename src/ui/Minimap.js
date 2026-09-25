@@ -12,9 +12,13 @@ export class Minimap {
   constructor(game, parent) {
     this.game = game;
     const N = game.map.size;
+    this.parent = parent;
+    this.S = 2; // canvas pixels per tile (smooth terrain, crisp unit dots)
     this.canvas = document.createElement('canvas');
-    this.canvas.width = this.canvas.height = N;
+    this.canvas.width = this.canvas.height = N * this.S;
     parent.appendChild(this.canvas);
+    this.fogCanvas = document.createElement('canvas');
+    this.fogCanvas.width = this.fogCanvas.height = N;
     this.ctx = this.canvas.getContext('2d');
     this.base = document.createElement('canvas');
     this.base.width = this.base.height = N;
@@ -56,12 +60,14 @@ export class Minimap {
         let rgb;
         if (l < map.waterLevel) rgb = l < map.waterLevel - 2 ? [34, 90, 150] : [60, 150, 170];
         else rgb = GROUND_RGB[map.groundAt(cx, cz)] || GROUND_RGB[0];
-        const k = 0.8 + Math.min(0.35, Math.max(-0.2, (l - 4) * 0.035));
+        const lw = tx > 0 && tz > 0 ? map.level(cx - map.cps, cz - map.cps) : l;
+        const shade = Math.max(-0.22, Math.min(0.22, (l - lw) * 0.09));
+        const k = (0.84 + Math.min(0.25, Math.max(-0.2, (l - 4) * 0.03))) * (1 + shade);
         const i = (tz * N + tx) * 4;
         img.data[i] = rgb[0] * k; img.data[i + 1] = rgb[1] * k; img.data[i + 2] = rgb[2] * k; img.data[i + 3] = 255;
       }
     for (const r of this.game.entities.resources()) {
-      const col = r.type === 'tree' ? [36, 82, 30] : r.type === 'gold' ? [250, 210, 60] : [210, 60, 60];
+      const col = r.type === 'tree' ? [30, 70, 26] : r.type === 'gold' ? [255, 214, 70] : [214, 70, 88];
       for (let z = r.tz; z < r.tz + r.h; z++)
         for (let x = r.tx; x < r.tx + r.w; x++) {
           const i = (z * N + x) * 4;
@@ -76,44 +82,64 @@ export class Minimap {
     this.timer -= dt;
     if (this.timer > 0) return;
     this.timer = 0.2;
-    const game = this.game, N = game.map.size, ctx = this.ctx;
+    const game = this.game, N = game.map.size, ctx = this.ctx, S = this.S;
     if (this.dirty) this.drawBase();
-    this.canvas.style.setProperty('--mm-rot', `${(game.cameraCtl.yaw * 180) / Math.PI}deg`);
-    ctx.drawImage(this.base, 0, 0);
-    // fog of war
+    const rot = `${(game.cameraCtl.yaw * 180) / Math.PI}deg`;
+    if (rot !== this._rot) { this._rot = rot; this.parent.style.setProperty('--mm-rot', rot); }
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(this.base, 0, 0, N * S, N * S);
+    // fog of war: a tile-res alpha mask, smoothed when scaled up
     const fog = game.fog;
     if (!fog.revealAll) {
-      const img = ctx.getImageData(0, 0, N, N);
+      const fctx = this.fogCanvas.getContext('2d');
+      let img = this._fogImg;
+      if (!img) {
+        img = this._fogImg = fctx.createImageData(N, N);
+        for (let i = 0; i < N * N; i++) { img.data[i * 4] = 6; img.data[i * 4 + 1] = 8; img.data[i * 4 + 2] = 14; }
+      }
+      // unexplored land stays faintly readable (like Retold's dimmed map), explored-but-unseen is half dark
       for (let i = 0; i < N * N; i++) {
         const s = fog.state[i];
-        if (s === 2) continue;
-        const k = s === 1 ? 0.5 : 0;
-        img.data[i * 4] *= k; img.data[i * 4 + 1] *= k; img.data[i * 4 + 2] *= k;
+        img.data[i * 4 + 3] = s === 2 ? 0 : s === 1 ? 95 : 175;
       }
-      ctx.putImageData(img, 0, 0);
+      fctx.putImageData(img, 0, 0);
+      ctx.drawImage(this.fogCanvas, 0, 0, N * S, N * S);
     }
+    ctx.save();
+    ctx.scale(S, S);
+    const hex = (c) => '#' + c.toString(16).padStart(6, '0');
     for (const b of game.entities.buildings()) {
       if (b.owner !== game.localPlayer && !fog.isExplored(b.x, b.z)) continue;
-      ctx.fillStyle = '#' + game.players[b.owner].color.toString(16).padStart(6, '0');
+      ctx.fillStyle = 'rgba(0,0,0,.75)';
+      ctx.fillRect(b.tx - 0.5, b.tz - 0.5, b.w + 1, b.h + 1);
+      ctx.fillStyle = hex(game.players[b.owner].color);
       ctx.fillRect(b.tx, b.tz, b.w, b.h);
-      ctx.strokeStyle = 'rgba(0,0,0,.6)';
-      ctx.strokeRect(b.tx + 0.5, b.tz + 0.5, b.w - 1, b.h - 1);
     }
     for (const u of game.entities.units()) {
       if (u.dead || (u.owner !== game.localPlayer && !fog.isVisible(u.x, u.z))) continue;
-      ctx.fillStyle = u.owner === game.localPlayer ? '#5fa0ff' : '#ff4a3a';
-      ctx.fillRect(Math.floor(u.x) - 1, Math.floor(u.z) - 1, 2, 2);
+      const r = u.def.myth ? 1.6 : 1.1;
+      ctx.fillStyle = 'rgba(0,0,0,.8)';
+      ctx.fillRect(u.x - r - 0.5, u.z - r - 0.5, 2 * r + 1, 2 * r + 1);
+      ctx.fillStyle = u.owner === game.localPlayer ? '#6fb0ff' : hex(game.players[u.owner].color);
+      if (game.selection.has(u.id)) ctx.fillStyle = '#ffffff';
+      ctx.fillRect(u.x - r, u.z - r, 2 * r, 2 * r);
     }
     // camera view trapezoid
     const w = innerWidth, h = innerHeight;
-    const corners = [[0, 40], [w, 40], [w, h - 196], [0, h - 196]].map(([x, y]) => game.pickGround(x, y));
+    const pick = (x, y, dy) => { for (let i = 0; i < 4; i++) { const g = game.pickGround(x, y + dy * i); if (g) return g; } return null; };
+    const corners = [pick(0, 0, h * 0.08), pick(w, 0, h * 0.08), pick(w, h - 1, -h * 0.08), pick(0, h - 1, -h * 0.08)];
     if (corners.every(Boolean)) {
-      ctx.strokeStyle = 'rgba(255,255,255,.9)';
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1.4;
+      ctx.lineJoin = 'round';
       ctx.beginPath();
       corners.forEach((c, i) => (i ? ctx.lineTo(c.x, c.z) : ctx.moveTo(c.x, c.z)));
       ctx.closePath();
+      ctx.strokeStyle = 'rgba(0,0,0,.55)';
+      ctx.stroke();
+      ctx.lineWidth = 0.8;
+      ctx.strokeStyle = 'rgba(255,255,255,.95)';
       ctx.stroke();
     }
+    ctx.restore();
   }
 }

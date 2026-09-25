@@ -207,23 +207,26 @@ export class SelectionController {
       this.lastGroupTap = { key: k, t: now };
       return;
     }
-    if (e.code === 'KeyH') {
-      const tc = [...game.entities.buildings()].find((b) => b.owner === game.localPlayer && b.type === 'town_center');
-      if (tc) { this.set([tc.id]); game.cameraCtl.lookAt(tc.x, tc.z); }
-      return;
-    }
-    if (e.code === 'Period') {
-      const idle = [...game.entities.units()].filter((u) => u.owner === game.localPlayer && u.def.gatherer && !u.dead && u.order?.type === 'idle');
-      if (idle.length) {
-        const i = (this._idleIdx = ((this._idleIdx ?? -1) + 1) % idle.length);
-        this.set([idle[i].id]);
-        game.cameraCtl.lookAt(idle[i].x, idle[i].z);
-      }
-      return;
-    }
+    if (e.code === 'KeyH') { this.gotoTownCenter(); return; }
+    if (e.code === 'Period') { this.cycleIdle(); return; }
     if (e.code === 'Delete') return;
     // command hotkeys
     if (!e.ctrlKey && !e.metaKey) this.ui.panel.hotkey(e.key.toUpperCase());
+  }
+
+  gotoTownCenter() {
+    const game = this.game;
+    const tc = [...game.entities.buildings()].find((b) => b.owner === game.localPlayer && b.type === 'town_center');
+    if (tc) { this.set([tc.id]); game.cameraCtl.lookAt(tc.x, tc.z); }
+  }
+
+  cycleIdle() {
+    const game = this.game;
+    const idle = [...game.entities.units()].filter((u) => u.owner === game.localPlayer && u.def.gatherer && !u.dead && u.order?.type === 'idle');
+    if (!idle.length) { this.ui.message('No idle villagers'); return; }
+    const i = (this._idleIdx = ((this._idleIdx ?? -1) + 1) % idle.length);
+    this.set([idle[i].id]);
+    game.cameraCtl.lookAt(idle[i].x, idle[i].z);
   }
 
   centerOn(ids) {
