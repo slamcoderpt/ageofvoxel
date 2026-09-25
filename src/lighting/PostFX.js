@@ -6,36 +6,42 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 
-// Final colour grade in display space, tuned towards Retold's warm, cohesive
-// "golden afternoon" look:
-//  - foliage greens are pulled towards olive/yellow-green and desaturated
-//    (Retold's grass is warm, never lime),
-//  - overall saturation is gently reduced and luminance-weighted so darks stay
-//    rich while highlights stay clean,
-//  - split toning: desaturated violet-grey in the shadows, warm gold in the highlights,
-//  - a filmic S-curve with lifted, coloured blacks (no crushed pure greens),
-//  - highlight shoulder so pale stone keeps detail; bloom is kept minimal and
-//    the vignette is off, so the frame reads sunlit rather than hazy.
+// Final colour grade in display space. The renderer tone-maps with Khronos
+// PBR Neutral (index.js), which keeps hue and saturation up to the highlights,
+// so sunlit sandstone stays warm instead of bleaching to grey-white as it did
+// under ACES; all exposure happens before tone mapping, so nothing is pushed
+// past white here. The grade then:
+//  - pulls foliage greens towards olive/yellow-green and limits warm/foliage
+//    chroma (Retold's grass is warm, never lime); team blues are untouched,
+//  - sets a true black point: no grey lift. The darkest canopy gaps sit just
+//    above black with a faint cool bias (uBlackFloor, only below ~10%),
+//  - deepens the shadows with a luminance-only contrast curve below a mid pivot
+//    (no hue shift), and tints them cool blue multiplicatively, so the tint
+//    fades out in sunlight and black stays black,
+//  - rolls sunlit stone off towards ~93% so it keeps its texture,
+//  - adds no warmth of its own: warmth comes only from the sun light.
+// uToeLift, uVignette (both 0 by default), uKnee/uShoulder, uContrast and
+// uSaturation keep their names and meaning for scenes and effects that ease them.
 const GradeShader = {
   uniforms: {
     tDiffuse: { value: null },
-    uExposure: { value: 1.4 },
+    uExposure: { value: 1.0 },
     uChromaLimit: { value: 0.5 },
     uSaturation: { value: 0.96 },
     uGreenShift: { value: 0.42 },
     uGreenDesat: { value: 0.42 },
-    uContrast: { value: 1.08 },
-    uShadowTint: { value: new THREE.Vector3(0.042, 0.042, 0.054) },
-    uHighTint: { value: new THREE.Vector3(1.05, 1.0, 0.93) },
+    uContrast: { value: 1.12 },
+    uShadowTint: { value: new THREE.Vector3(0.88, 0.96, 1.14) },
+    uBlackFloor: { value: new THREE.Vector3(0.04, 0.05, 0.068) },
     uVignette: { value: 0.0 },
-    uToeLift: { value: 0.14 },
-    uKnee: { value: 0.56 },
-    uShoulder: { value: 2.2 },
+    uToeLift: { value: 0.0 },
+    uKnee: { value: 0.72 },
+    uShoulder: { value: 4.3 }, // highlights approach uKnee + 1 / uShoulder (~0.95)
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
     uniform sampler2D tDiffuse; uniform float uKnee, uShoulder, uToeLift, uChromaLimit, uExposure, uSaturation, uGreenShift, uGreenDesat, uContrast, uVignette;
-    uniform vec3 uShadowTint, uHighTint; varying vec2 vUv;
+    uniform vec3 uShadowTint, uBlackFloor; varying vec2 vUv;
     const vec3 LW = vec3(0.2126, 0.7152, 0.0722);
     void main(){
       vec4 t = texture2D(tDiffuse, vUv);
@@ -48,8 +54,7 @@ const GradeShader = {
       c.b = mix(c.b, c.b * 0.9 + c.g * 0.12, g * uGreenShift);
       float l = dot(c, LW);
       c = mix(c, vec3(l), g * uGreenDesat);
-      // --- chroma limiter for warm/foliage hues (blue is the weakest channel):
-      // sunlit yellow-green grass must not go neon; team blues are untouched.
+      // --- chroma limiter for warm/foliage hues (blue is the weakest channel)
       float mx = max(c.r, c.g), ch = (mx - c.b) / max(mx, 1e-3);
       float over = smoothstep(0.35, 0.85, ch) * step(c.b, min(c.r, c.g) + 0.02);
       l = dot(c, LW);
@@ -57,23 +62,23 @@ const GradeShader = {
       // --- global saturation
       l = dot(c, LW);
       c = mix(vec3(l), c, uSaturation);
-      // --- filmic S-curve: contrast in the mids/highlights only; the toe is
-      // protected (and gently lifted) so shaded foliage keeps its value.
-      c = clamp(c, 0.0, 1.2);
-      vec3 s = c * c * (3.0 - 2.0 * c);
-      vec3 k = smoothstep(0.18, 0.55, c);
-      c = mix(c, s, (uContrast - 1.0 + 0.25) * k * (1.0 - 0.6 * g));
+      // --- contrast: luminance-only power curve below a mid pivot; mids and
+      // highlights are left to the tone mapper and the shoulder
+      l = dot(c, LW);
+      const float P = 0.42;
+      float ls = l < P ? P * pow(max(l, 0.0) / P, uContrast) : l;
+      c *= ls / max(l, 1e-4);
+      // optional toe lift (0 by default; scenes may ease it)
       c = c + uToeLift * (1.0 - c) * (1.0 - smoothstep(0.0, 0.35, c));
-      // --- highlight shoulder: pale stone and white marble roll off instead of
-      // clipping, so plaza and roofs keep their texture next to the forest
+      // --- cool shadows: multiplicative, fades out towards sunlit values
+      l = dot(c, LW);
+      c *= mix(vec3(1.0), uShadowTint, 1.0 - smoothstep(0.04, 0.42, l));
+      // --- highlight shoulder: sunlit stone rolls off below white
       l = dot(c, LW);
       if (l > uKnee) { float e = l - uKnee; c *= (uKnee + e / (1.0 + e * uShoulder)) / l; }
-      // --- split tone: cool blue-green shadows, warm highlights
-      l = dot(c, LW);
-      float hi = smoothstep(0.25, 0.9, l);
-      c *= mix(vec3(1.0), uHighTint, hi);
-      c += uShadowTint * (1.0 - smoothstep(0.0, 0.45, l));
-      // --- optional warm vignette (off by default)
+      // --- deep shade floor: the darkest gaps sit just above black, faintly cool
+      c += uBlackFloor * pow(1.0 - clamp(l, 0.0, 1.0), 12.0);
+      // --- optional vignette (off by default; god powers ease it in)
       vec2 d = vUv - 0.5;
       float v = smoothstep(0.35, 0.85, length(d * vec2(1.25, 1.0)));
       c *= 1.0 - v * uVignette * vec3(0.85, 1.0, 1.15);

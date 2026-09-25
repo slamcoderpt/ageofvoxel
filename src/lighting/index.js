@@ -36,8 +36,11 @@ export class Lighting {
     renderer.setSize(innerWidth, innerHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap; // PCF with a Vogel-disk radius (soft)
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    // PBR Neutral keeps hue and saturation into the highlights (ACES bleached
+    // sunlit sandstone to grey-white); all exposure is applied here, before
+    // tone mapping, so the grade never has to push values past white.
+    renderer.toneMapping = THREE.NeutralToneMapping;
+    renderer.toneMappingExposure = 2.15;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer = renderer;
     const scene = game.scene;
@@ -46,7 +49,8 @@ export class Lighting {
     // trees throw long, readable shadows like Retold's town shots, and tree
     // crowns shade the crowns beside them.
     this.sunDir = new THREE.Vector3(-0.6, 0.55, 0.4).normalize();
-    this.sun = new THREE.DirectionalLight(0xffd6a0, 3.9);
+    // The sun carries all of the frame's warmth (the grade adds none).
+    this.sun = new THREE.DirectionalLight(0xffdc98, 4.6);
     this.sun.castShadow = true;
     const sm = post === 'high' ? 4096 : 2048;
     this.sun.shadow.mapSize.set(sm, sm);
@@ -56,12 +60,11 @@ export class Lighting {
     this.shadowExtent = 60;
     scene.add(this.sun, this.sun.target);
 
-    // Sky light is a soft violet-grey (not cyan) and the ground bounce
-    // warm-brown: shadows on pale stone read as desaturated lavender-grey
-    // that sits with the warm roofs and the shade under the trees.
-    this.hemi = new THREE.HemisphereLight(0xacb0c8, 0x80644a, 1.25);
+    // Sky light is a soft cool blue and the ground bounce warm-brown: shadows
+    // read as clean cool shade against the warm sunlit stone and roofs.
+    this.hemi = new THREE.HemisphereLight(0xa4b6d0, 0x80644a, 1.1);
     scene.add(this.hemi);
-    this.fill = new THREE.DirectionalLight(0xb4b0c8, 0.42); // soft violet-grey bounce from the opposite side
+    this.fill = new THREE.DirectionalLight(0xa8b8d0, 0.42); // soft cool bounce from the opposite side
     this.fill.position.set(0.6, 0.5, -0.5);
     scene.add(this.fill);
 
