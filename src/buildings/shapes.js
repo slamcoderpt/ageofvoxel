@@ -81,6 +81,9 @@ export const TILES = {
   slate: { tones: [0xbcc7b1, 0xabb7a0, 0xcad3bf, 0xb4c0aa], butt: 0x7a8670, fascia: 0x75806c, ridge: 0x7f8c76, soffit: 0x4a4540, antefix: 0xeeeae0 },
   // weathered pale sage glaze (civic halls, as in Retold's towns)
   sage: { tones: [0x94ab8d, 0x87a081, 0x9eb597, 0x81997b], butt: 0x5a7057, fascia: 0x6b7f69, ridge: 0x72876f, soffit: 0x3f4640, antefix: 0xf1eee4 },
+  // fired-clay civic tiles (the Town Center): a deeper, browner terracotta
+  // than the houses' bright orange, with dark butt lines
+  civic: { tones: [0xbf6640, 0xb35c3a, 0xc9714a, 0xb8603d, 0xa9553a], butt: 0x6a2e20, fascia: 0x6b3526, ridge: 0x7a3a28, soffit: 0x3e2e28, antefix: 0xf3eee2 },
   // Parian marble tiles (the temple)
   marble: { tones: [0xb9c4bd, 0xaab6af, 0xc4cec7, 0xa3afa8], butt: 0x6b756f, fascia: 0x9a9e97, ridge: 0xb3b7af, soffit: 0x57524c, antefix: 0xf7f4ec },
   // deep red fired tiles and pale ochre tiles (house roofs vary)
@@ -228,7 +231,7 @@ export function ridgeCap(m, a, b, side, w, h, color, { lap = 2.2 } = {}) {
 // ends: 'wall' fills the gable triangles with `fill`; 'pediment' builds a
 // temple pediment (recessed tympanum inside a raking cornice); 'none'.
 // Returns { ridgeY, eaveY, point(u, v) } in voxel space.
-export function gableRoof(m, { wx0, wx1, wz0, wz1, top, axis = 'x', pitch = 0.38, ov = 1, ovG = 0.6, tiles = TILES.terra, ends = 'wall', fill = 0xeae4d6, rake = 0xf1ece2, rakeShade = 0xd6cfbf, tymp = 0x2f4570, seed = 1, course = 1.1, tileW = 1.4, pedDepth = 1, rakeH = 0.9, sima = null, geisonPaint = null, ornate = false, acro = ornate }) {
+export function gableRoof(m, { wx0, wx1, wz0, wz1, top, axis = 'x', pitch = 0.38, ov = 1, ovG = 0.6, tiles = TILES.terra, ends = 'wall', fill = 0xeae4d6, rake = 0xf1ece2, rakeShade = 0xd6cfbf, tymp = 0x2f4570, seed = 1, course = 1.1, tileW = 1.4, pedDepth = 1, rakeH = 0.9, sima = null, geisonPaint = null, ornate = false, acro = ornate, acroK = 1.25 }) {
   // local frame: u across the ridge, v along it
   const alongX = axis === 'x';
   const u0 = alongX ? wz0 : wx0, u1 = alongX ? wz1 : wx1;
@@ -305,8 +308,8 @@ export function gableRoof(m, { wx0, wx1, wz0, wz1, top, axis = 'x', pitch = 0.38
         // acroteria: a tall palmette on the apex, smaller ones on the
         // corners, each on a little plinth set into the cornice
         const across = alongX ? [0, 0, 1] : [1, 0, 0];
-        acroterion(m, P(um, ridgeY + 0.35, vf - s * 0.5), dirV(s), across, 1.25, { tip: 0xd2a847 });
-        for (const uo of [u0 - ov * 0.5, u1 + ov * 0.5]) acroterion(m, P(uo, top + 0.05, vf - s * 0.5), dirV(s), across, 0.8);
+        acroterion(m, P(um, ridgeY + 0.35, vf - s * 0.5), dirV(s), across, acroK, { tip: 0xd2a847 });
+        for (const uo of [u0 - ov * 0.5, u1 + ov * 0.5]) acroterion(m, P(uo, top + 0.05, vf - s * 0.5), dirV(s), across, acroK * 0.64, acroK > 1.3 ? { tip: 0xd2a847 } : {});
       }
     }
   }

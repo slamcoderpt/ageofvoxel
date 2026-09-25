@@ -131,6 +131,8 @@ const PROPS = {
   // packed earth, an olive or a cypress, storage jars and a bench
   court_a: { w: 1, h: 3, build: (m) => court(m, 0) },
   court_b: { w: 1, h: 3, build: (m) => court(m, 1) },
+  court_c: { w: 1, h: 3, build: (m) => court(m, 2) },
+  court_d: { w: 1, h: 3, build: (m) => court(m, 3) },
   // altar before a temple: stepped marble base, red-painted die, fire
   altar: {
     w: 1, h: 1,
@@ -174,24 +176,53 @@ function fence(m, len, axis, ox = 0, oz = 0) {
 
 function court(m, kind) {
   for (let z = 0; z < 12; z++) for (let x = 0; x < 3; x++) m.set(x, 0, z, hash3(x, 0, z, 85) < 0.5 ? 0x9a7d5a : 0x8f7352);
-  // outer wall down the +x edge
+  // outer edge: a whitewashed wall (kinds 0-2) or a wattle fence (kind 3)
   for (let z = 0; z < 12; z++) {
+    if (kind === 3) {
+      m.set(3, 0, z, 0x7a5230); m.set(3, 1, z, (z & 1) ? 0x9b7a4c : 0x8a6a40); m.set(3, 2, z, (z & 1) ? 0x8a6a40 : 0x9b7a4c);
+      if (z % 3 === 0) m.set(3, 3, z, 0x6a462a);
+      continue;
+    }
     const wash = hash3(z >> 1, 2, kind, 86) < 0.5 ? 0xf1ede4 : 0xe8e2d6;
-    m.set(3, 0, z, 0xb3ab9a); m.set(3, 1, z, 0xa8452f); m.set(3, 2, z, wash); m.set(3, 3, z, wash);
-    m.set(3, 4, z, z % 4 === 0 ? 0xcf6a3c : 0xdcd5c4);
+    const h = kind === 2 ? 2 : 3;
+    m.set(3, 0, z, 0xb3ab9a); m.set(3, 1, z, 0xa8452f);
+    for (let y = 2; y <= h; y++) m.set(3, y, z, hash3(z, y, kind, 87) < 0.2 ? 0xd5c9ae : wash);
+    m.set(3, h + 1, z, z % 4 === 0 ? 0xcf6a3c : 0xdcd5c4);
   }
-  // front wall with a gate between two piers
-  for (let x = 0; x < 3; x++) {
+  // front: a gate between two piers, only on the walled kinds
+  if (kind < 2) for (let x = 0; x < 3; x++) {
     if (x === 1) continue;
     m.set(x, 0, 11, 0xb3ab9a); m.set(x, 1, 11, 0xa8452f); m.set(x, 2, 11, 0xefe9de); m.set(x, 3, 11, 0xefe9de); m.set(x, 4, 11, 0xdcd5c4);
   }
   if (kind === 0) {
-    olive(m, 1, 1, 4);
-    pithos(m, 0, 1, 8, 0xb8683e); amphora(m, 2, 1, 9, 0xc47440);
-  } else {
+    // kitchen garden: rows of greens and onions in dark soil, a bench
+    for (let z = 1; z < 8; z++) for (let x = 0; x < 3; x++) {
+      m.set(x, 0, z, 0x5b4630);
+      if (z & 1) m.set(x, 1, z, hash3(x, 1, z, 88) < 0.5 ? 0x5e8c3a : 0x6e9a42);
+    }
+    m.box(0, 1, 9, 1, 1, 2, 0xcfc7b4);
+    amphora(m, 2, 1, 9, 0xc47440);
+  } else if (kind === 1) {
     cypress(m, 1, 1, 2, 14);
     m.box(0, 1, 6, 1, 1, 3, 0xcfc7b4);                           // stone bench
     amphora(m, 2, 1, 8, 0xa65a34); amphora(m, 2, 1, 6, 0xc47440);
+  } else if (kind === 2) {
+    // straw bee skeps on a plank stand, a fig tree
+    m.box(0, 1, 1, 3, 1, 5, 0x7a5230);
+    for (const z of [1, 3]) { m.box(0, 2, z, 2, 2, 2, 0xc9a55a); m.set(0, 4, z, 0xb89448); m.set(0, 2, z + 1, 0x3a2e22); }
+    m.box(1, 1, 8, 1, 3, 1, 0x6a5238);
+    for (let x = -1; x < 4; x++) for (let z = 6; z < 11; z++) for (let y = 4; y < 7; y++) {
+      const d = Math.hypot(x - 1, (z - 8) * 1.1, (y - 5) * 1.4);
+      if (d < 2.3 && hash3(x, y, z, 89) < 0.8) m.set(x, y, z, hash3(x, y, z, 90) < 0.5 ? 0x587f35 : 0x4a7030);
+    }
+  } else {
+    // hen coop: a low timber hutch under a thatch lean-to, hay, hens
+    m.box(0, 1, 1, 3, 2, 3, 0x8a6a40); m.box(1, 1, 3, 1, 1, 1, 0x2a211b);
+    m.box(0, 3, 0, 3, 1, 5, 0xc9a55a);
+    m.box(0, 1, 6, 2, 1, 2, 0xd9bf6a); m.set(0, 2, 6, 0xd9bf6a);
+    m.set(1, 1, 9, 0xf2ede2).set(1, 2, 9, 0xf2ede2).set(1, 2, 10, 0xc0392b);
+    m.set(2, 1, 7, 0x9b6a3c).set(2, 2, 7, 0x9b6a3c);
+    pithos(m, 0, 1, 9, 0xb8683e);
   }
 }
 
@@ -269,7 +300,7 @@ function anchorsFor(b) {
     // each house keeps its dressing inside its own walled side court; the
     // front onto the street stays clear
     case 'house': return [
-      [v & 1 ? 'court_b' : 'court_a', [[w, 0]]],
+      [['court_a', 'court_b', 'court_c', 'court_d'][(v + (b.bld_variant | 0)) & 3], [[w, 0]]],
       ['wall_x', [[0, -1]]],
       ...(v & 2 ? [['cypress', [[-1, 0]]]] : []),
     ];

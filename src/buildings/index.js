@@ -108,6 +108,19 @@ export class Buildings {
     return v;
   }
 
+  // Houses are not all squared to the grid: each turns a quarter turn one
+  // way or the other (or right round) and then a few degrees off square, so
+  // a street's rooflines vary in direction and the rows read as grown, not
+  // stamped. Visual only; the footprint stays the same square.
+  houseYaw(b) {
+    if (b.bld_yaw !== undefined) return b.bld_yaw;
+    const h = hash3(b.tx, 9, b.tz, 33);
+    const q = h < 0.34 ? 0 : h < 0.6 ? 1 : h < 0.86 ? 3 : 2;
+    const j = (hash3(b.tx, 10, b.tz, 34) - 0.5) * 0.24;
+    b.bld_yaw = q * Math.PI / 2 + j;
+    return b.bld_yaw;
+  }
+
   // Paint a paved plaza (irregular disc) around a building, skipping tiles
   // that are blocked, water or other buildings' footprints.
   pavePlaza(tx, tz, w, h, r) {
@@ -355,6 +368,7 @@ export class Buildings {
       }
       const y = game.map.heightAt(b.x, b.z);
       m.position.set(b.x, y, b.z);
+      if (b.type === 'house') m.rotation.y = this.houseYaw(b);
       const visible = b.owner === game.localPlayer || game.fog.isExplored(b.x, b.z);
       m.visible = visible;
       const mesh = m.userData.mesh;
