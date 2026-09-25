@@ -146,6 +146,8 @@ export class UI {
     const p = game.players[me];
     const s = Math.floor(time);
     const clock = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+    this.tipPinned?.classList.remove('on');
+    this.tipPinned = null;
     this.tooltip(null);
     game.buildings.placement.cancel();
     this.selection.setMode(null);
