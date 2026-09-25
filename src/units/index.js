@@ -15,11 +15,12 @@ import { pose, uhash } from './anim.js';
 // are derived automatically. Combat sets u.anim.attackT (seconds since the
 // last strike) and u.flashT (hit flash).
 const CORPSE_TIME = 6;
+const DEAD_TEAM = new THREE.Color(0x4a4640); // corpse dye: the dead carry no team colour
 const FADE_START = 3.4;   // corpses dither out between FADE_START and CORPSE_TIME
 // Local avoidance for units standing their ground (fighting, idle soldiers):
 // keep about half a body-width of air between neighbours so a melee line
 // reads as separate figures rather than one interpenetrating blob.
-const SPREAD_GAP = 1.1;   // extra spacing, in multiples of the smaller radius
+const SPREAD_GAP = 1.35;   // extra spacing, in multiples of the smaller radius
 const SPREAD_SPEED = 2.0; // max drift, tiles/second
 // Per-unit horse coat tints (multiplied into the dappled grey base):
 // grey, near-white, dun, bay, dark bay.
@@ -29,6 +30,8 @@ const SPREAD_SPEED = 2.0; // max drift, tiles/second
 // contact line interlocks instead of holding a clean seam.
 const JITTER = 0.3;        // tiles, static per unit
 const PRESS_RATE = 3;      // per second
+const OUTLINE = 0.045;     // outline width, world units (~1 px at the RTS zoom)
+const CORPSE_CLEAR = 0.5;  // corpses slide out from under the living, tiles/second
 const COATS = [[1, 1, 1], [1.06, 1.06, 1.05], [0.95, 0.86, 0.7], [0.72, 0.5, 0.34], [0.5, 0.36, 0.27], [1, 0.98, 0.95]];
 
 export class Units {
@@ -52,6 +55,35 @@ export class Units {
         if (b > vFade) discard;
       }`);
     });
+    // Team colour holds its saturation in shade: a small self-lit share of
+    // the tinted albedo, so an army lit from behind still reads red or blue
+    // instead of brown.
+    addShaderPatch(this.material, 'unitTeamLift', (shader) => {
+      injectFragment(shader, '#include <emissivemap_fragment>', 'totalEmissiveRadiance += diffuseColor.rgb * vTeam * 0.42;');
+    });
+    // Silhouette outline: every part is drawn a second time as a dark
+    // inverted hull (back faces pushed out along their normals), so each
+    // soldier is ringed by a thin dark line against the ground and against
+    // the man behind him.
+    this.outlineMat = new THREE.MeshBasicMaterial({ color: 0x140d08, side: THREE.BackSide });
+    this.outlineMat.fog = false;
+    this.outlineMat.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute float instFade;\nvarying float vFade;')
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+        vFade = instFade;
+        transformed += normal * ${OUTLINE.toFixed(4)};`);
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying float vFade;')
+        .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+        if (vFade < 0.999) {
+          vec2 q = mod(floor(gl_FragCoord.xy), 4.0);
+          vec2 lo = mod(q, 2.0), hi = floor(q * 0.5);
+          float b = (4.0 * mod(2.0 * lo.x + 3.0 * lo.y, 4.0) + mod(2.0 * hi.x + 3.0 * hi.y, 4.0) + 0.5) / 16.0;
+          if (b > vFade) discard;
+        }`);
+    };
+    this.outlineMat.customProgramCacheKey = () => 'unitOutline';
     this.rigs = new Map(); // type -> { parts: [{name, geo, joint, parent, mesh, cap}], kind, voxel }
     for (const type of Object.keys(RIGS)) this._buildRig(type);
     this._m = new THREE.Matrix4();
@@ -108,7 +140,7 @@ export class Units {
     const parts = R.build().map((p) => ({
       name: p.name, anim: p.anim || p.name, joint: p.joint, parent: p.parent, show: p.show || null, coat: !!p.coat, portrait: p.portrait ?? !p.show,
       geo: buildVoxelGeometry(p.model, { size: R.voxel * (p.scale || 1), pivot: p.pivot, jitter: 0.05 }),
-      mesh: null, cap: 0,
+      mesh: null, outline: null, cap: 0,
     }));
     const rig = { type, parts, kind: R.anim, voxel: R.voxel, rot: {}, world: parts.map(() => new THREE.Matrix4()) };
     for (const p of parts) {
@@ -146,6 +178,15 @@ export class Units {
     part.mesh = mesh;
     part.cap = cap;
     this.group.add(mesh);
+    if (part.outline) { this.group.remove(part.outline); part.outline.dispose(); }
+    const ol = new THREE.InstancedMesh(g, this.outlineMat, cap);
+    ol.instanceMatrix = mesh.instanceMatrix;   // shares transforms with the part
+    ol.frustumCulled = false;
+    ol.castShadow = false; ol.receiveShadow = false;
+    ol.userData.noAO = true;
+    ol.name = 'unitOutline';
+    part.outline = ol;
+    this.group.add(ol);
   }
 
   spawn(type, owner, x, z, { rot = 0 } = {}) {
@@ -212,7 +253,8 @@ export class Units {
     if (!hash) return;
     const maxStep = SPREAD_SPEED * dt;
     for (const u of game.entities.units()) {
-      if (u.dead || u.moving) continue;
+      if (u.dead) { this._clearCorpse(u, dt); continue; }
+      if (u.moving) continue;
       const ot = u.order?.type;
       if (u.def.gatherer && ot !== 'idle' && ot !== 'attack') continue;
       const r = u.radius || 0.3;
@@ -240,6 +282,29 @@ export class Units {
     }
   }
 
+  // A corpse lying under a man still fighting is pushed out to open ground,
+  // so the dead never merge with the living into one heap of limbs. Only the
+  // body moves; the living ignore corpses.
+  _clearCorpse(u, dt) {
+    const game = this.game, hash = game.movement.hash;
+    const r = (u.radius || 0.3) * 1.4;
+    let sx = 0, sz = 0;
+    hash.forEachNear(u.x, u.z, r + 1.5, (o) => {
+      if (o === u || o.dead) return;
+      const want = r + (o.radius || 0.3) * 1.2;
+      const dx = u.x - o.x, dz = u.z - o.z;
+      const d = Math.hypot(dx, dz);
+      if (d >= want) return;
+      const k = (want - d) / want;
+      if (d < 1e-4) { sx += (u.id % 2 ? 1 : -1) * k; sz += (u.id % 3 ? 1 : -1) * k; }
+      else { sx += (dx / d) * k; sz += (dz / d) * k; }
+    });
+    if (sx === 0 && sz === 0) return;
+    const m = Math.hypot(sx, sz), step = Math.min(m, 1) * CORPSE_CLEAR * dt;
+    const nx = u.x + (sx / m) * step, nz = u.z + (sz / m) * step;
+    if (game.map.isWalkable(Math.floor(nx), Math.floor(nz))) { u.prevX = u.x = nx; u.prevZ = u.z = nz; }
+  }
+
   // ---- rendering --------------------------------------------------------
   render(dt, alpha) {
     const game = this.game;
@@ -262,6 +327,7 @@ export class Units {
       for (const p of rig.parts) {
         this._ensureCapacity(p, list.length);
         p.mesh.count = list.length;
+        p.outline.count = list.length;
       }
       if (!list.length) continue;
       const V = rig.voxel;
@@ -331,6 +397,10 @@ export class Units {
         const pc = game.players[u.owner].color;
         const coat = COATS[u.id % COATS.length];
         this._c.setHex(pc);
+        // the dead lose their colour: team dye fades to grey-brown, the body darkens
+        const dk = u.dead ? Math.min(1, u.anim.dieT / 0.8) * 0.5 : 0;
+        if (dk) this._c.lerp(DEAD_TEAM, dk * 2);
+        const tr = this._c.r, tg = this._c.g, tb = this._c.b;
         const flash = Math.min(1, u.flashT * 4) * 0.8;
         const fade = u.dead ? 1 - Math.min(1, Math.max(0, (u.anim.dieT - FADE_START) / (CORPSE_TIME - 0.3 - FADE_START))) : 1;
         for (let pi = 0; pi < rig.parts.length; pi++) {
@@ -342,13 +412,11 @@ export class Units {
           this._m.compose(this._v.set(p.joint[0] * V, p.joint[1] * V, p.joint[2] * V), this._q, this._s.set(sc, sc, sc));
           const m = world[pi].multiplyMatrices(parent, this._m);
           p.mesh.setMatrixAt(i, m);
-          p.mesh.userData.team.setXYZ(i, this._c.r, this._c.g, this._c.b);
+          p.mesh.userData.team.setXYZ(i, tr, tg, tb);
           p.mesh.userData.flash.setX(i, flash);
           p.mesh.userData.fade.setX(i, fade);
-          if (p.coat) {
-            p.mesh.setColorAt(i, this._c.setRGB(coat[0], coat[1], coat[2]));
-            this._c.setHex(pc);
-          }
+          if (p.coat) p.mesh.setColorAt(i, this._c.setRGB(coat[0] * (1 - dk), coat[1] * (1 - dk), coat[2] * (1 - dk)));
+          else p.mesh.setColorAt(i, this._c.setRGB(1 - dk, 1 - dk * 1.04, 1 - dk * 1.08));
         }
       }
       for (const p of rig.parts) {

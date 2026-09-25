@@ -43,6 +43,15 @@ const SHIELD_FACE = (x, y, z) => (hash3(x, y, z, 15) < 0.6 ? 0xe9dfc6 : 0xddd1b4
 
 const part = (name, model, pivot, joint, parent = null, extra = {}) => ({ name, model, pivot, joint, parent, ...extra });
 
+// Team-tinted voxels on a darker base (the tint multiplies the base), for
+// folds and shaded panels that still read as the owner's colour.
+function tbox(m, x, y, z, w, h, d, base) {
+  m.box(x, y, z, w, h, d, TEAM);
+  for (let k = z; k < z + d; k++) for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) m.get(i, j, k).c = base;
+  return m;
+}
+const TEAM_SHADE = 0xb2b2b2;
+
 // ---- humans (voxel 0.075, ~22 voxels tall) ---------------------------------
 // Root: legs hang from the hips at y=10, shins from the knees. The torso sits
 // on the hips; head and arms hang from the torso so leaning carries them.
@@ -81,8 +90,8 @@ function legs(style) {
 // Torso model: x 0..7 (8 wide), z 0..3, hips at y=0, shoulders at y=8.
 function torsoModel(style, cloak = true) {
   const m = new VoxelModel();
-  // Team colour is kept to the skirt, trim and small accents so the figure
-  // (face, shoulders, weapon arm) reads in silhouette, not as a team block.
+  // Soldiers wear their army's colour on the whole tunic (chest, back,
+  // shoulders, skirt); bronze, skin and leather frame it so the figure reads.
   const CLOTH = style === 'villager' ? TEAM : LINEN;
   // chest + waist silhouette (broad shoulders, narrow waist)
   m.box(1, 0, 0, 6, 3, 4, CLOTH);
@@ -97,12 +106,24 @@ function torsoModel(style, cloak = true) {
   if (style === 'hoplite' || style === 'rider' || style === 'hero') {
     // muscle cuirass (bronze; gold for the hero) with pectoral and abdominal lines
     const MET = style === 'hero' ? GOLD : BRONZE, MET_DK = style === 'hero' ? GOLD_DK : BRONZE_DK;
-    m.box(0, 2, 0, 8, 6, 4, MET);
-    m.box(1, 1, 0, 6, 1, 4, MET);
-    m.box(1, 5, 4, 2, 2, 1, MET).box(5, 5, 4, 2, 2, 1, MET);  // pecs
-    m.set(3, 4, 4, MET_DK).set(4, 4, 4, MET_DK).set(3, 2, 4, MET_DK).set(4, 2, 4, MET_DK);
-    m.box(0, 7, -1, 2, 2, 6, LINEN).box(6, 7, -1, 2, 2, 6, LINEN); // white linothorax shoulder flaps
-    m.box(0, 7, 4, 2, 1, 1, LINEN).box(6, 7, 4, 2, 1, 1, LINEN);
+    if (style === 'hoplite' || style === 'rider') {
+      // Team-dyed linothorax over the whole chest and back, with shoulder
+      // flaps in a deeper fold of the same colour: seen from any side (or
+      // from above) the man is a block of his army's colour, and the bronze
+      // of helmet, gorget, belt and greaves frames it.
+      m.box(0, 2, 0, 8, 6, 4, TEAM).box(1, 1, 0, 6, 1, 4, TEAM);
+      tbox(m, 0, 7, -1, 2, 2, 6, TEAM_SHADE); tbox(m, 6, 7, -1, 2, 2, 6, TEAM_SHADE);  // shoulder flaps
+      m.box(0, 7, 4, 2, 1, 1, TEAM_TRIM).box(6, 7, 4, 2, 1, 1, TEAM_TRIM);
+      m.box(2, 6, 4, 4, 2, 1, MET).set(3, 5, 4, MET(3, 5, 4)).set(4, 5, 4, MET(4, 5, 4)); // bronze gorget plate
+      m.box(0, 1, -1, 8, 1, 6, BRONZE_DK).carve(1, 1, 1, 6, 1, 2);                     // bronze girdle
+    } else {
+      m.box(0, 2, 0, 8, 6, 4, MET);
+      m.box(1, 1, 0, 6, 1, 4, MET);
+      m.box(1, 5, 4, 2, 2, 1, MET).box(5, 5, 4, 2, 2, 1, MET);  // pecs
+      m.set(3, 4, 4, MET_DK).set(4, 4, 4, MET_DK).set(3, 2, 4, MET_DK).set(4, 2, 4, MET_DK);
+      m.box(0, 7, -1, 2, 2, 6, LINEN).box(6, 7, -1, 2, 2, 6, LINEN); // white linothorax shoulder flaps
+      m.box(0, 7, 4, 2, 1, 1, LINEN).box(6, 7, 4, 2, 1, 1, LINEN);
+    }
     // pteryges: leather strips alternating with team linen
     // team chiton skirt showing under leather pteryges strips
     for (let x = 0; x < 8; x++) for (const z of [-1, 4]) m.box(x, -4, z, 1, 4, 1, x % 3 === 1 ? LEATHER : TEAM);
@@ -130,10 +151,13 @@ function torsoModel(style, cloak = true) {
       m.set(3, 0, 4, MET(3, 0, 4)).set(4, 0, 4, MET(4, 0, 4));
     }
   } else if (style === 'archer') {
-    // team chiton (skirt and sleeves) under a laced leather jerkin, so the
-    // archer reads as a man in kit, not a team block
+    // team chiton with sleeves
     m.box(0, 0, 0, 8, 8, 4, TEAM).box(1, 8, 1, 6, 1, 2, LINEN);
-    m.box(0, 2, -1, 8, 6, 6, JERKIN).box(1, 8, 0, 6, 1, 4, JERKIN);
+    // team chiton over chest and back, a leather corslet only at the waist
+    // and a pair of straps: the archer is his army's colour from any side
+    m.box(0, 2, -1, 8, 6, 6, TEAM); tbox(m, 1, 8, 0, 6, 1, 4, TEAM_SHADE);
+    m.box(0, 1, -1, 8, 3, 6, JERKIN);
+    m.box(1, 4, 5, 1, 4, 1, LEATHER_DK).box(6, 4, 5, 1, 4, 1, LEATHER_DK);
     m.box(-1, 6, 0, 1, 2, 4, TEAM).box(8, 6, 0, 1, 2, 4, TEAM);    // sleeves at the shoulder
     m.line(4, 7, 5, 4, 3, 5, LEATHER_DK);                           // lacing
     m.box(1, 0, 0, 6, 1, 4, BELT);
@@ -165,12 +189,14 @@ function cloakModel(kind) {
   if (kind === 'long') {
     // an undyed campaign cloak in weathered wool with a team border at the
     // hem: the man's back stays a figure, not a block of team paint
-    m.box(0, 8, -1, 8, 1, 3, WOOL);
-    m.box(1, 1, -1, 6, 7, 1, WOOL);
+    // team cloak in deep folds (alternate folds a shade darker) with a pale
+    // hem: the near army shows its back, and that back is its colour
+    tbox(m, 0, 8, -1, 8, 1, 3, 0xd8d8d8);
+    m.box(1, 1, -1, 6, 7, 1, TEAM);
     for (let x = 0; x <= 7; x++) {
       const deep = x % 2 === 0;
-      m.box(x, -3, deep ? -2 : -3, 1, 5, 1, WOOL);
-      m.set(x, -4, deep ? -2 : -3, TEAM);
+      if (deep) m.box(x, -3, -2, 1, 5, 1, TEAM); else tbox(m, x, -3, -3, 1, 5, 1, TEAM_SHADE);
+      m.set(x, -4, deep ? -2 : -3, TEAM_TRIM);
     }
   } else {
     // short cape swept off the left shoulder, hem slanting across the back
@@ -351,21 +377,23 @@ function aspis(r = 6, RIM = BRONZE, device = 0) {
     for (let x = -r; x <= r; x++) {
       const d = Math.sqrt(x * x + y * y);
       if (d > r + 0.3) continue;
-      const rim = d > r - 1.2;
-      // Team colour is an accent (device and boss), not the whole face: a
-      // carpet of team discs from above hides the men holding them.
-      //   0 bronze face, team lambda   1 pale face, team ring
-      //   2 team face, bronze band and boss   3 bronze face, team star
-      const inner = d < 1.6;
-      let c = rim ? RIM(x, y, 0) : device === 1 ? SHIELD_FACE(x, y, 1) : device === 2 ? TEAM : RIM === GOLD ? GOLD(x, y, 5) : BRONZE(x, y, 3);
+      // a thin bronze rim: the painted face is most of the disc
+      const rim = d > r - 0.6;
+      // Team-painted face inside a bronze rim, with a small device, so every
+      // shield in the line says whose it is:
+      //   0 pale lambda   1 thin pale ring   2 bronze boss   3 dark star
+      const inner = d < 1.1;
+      let c = rim ? RIM(x, y, 0) : TEAM;
       if (rim) { /* rim */ }
-      else if (inner) c = device === 0 || device === 2 ? RIM(x, y, 1) : TEAM;                                            // boss
-      else if (device === 1) { if (Math.abs(d - (r - 2.2)) < 0.75) c = TEAM; }                             // team ring
-      else if (device === 2) { if (Math.abs(d - (r - 2.1)) < 0.45) c = RIM(x, y, 2); }                       // bronze band
-      else if (device === 3) { if ((x === 0 || y === 0 || Math.abs(x) === Math.abs(y)) && d < r - 1.5) c = TEAM; } // star
-      else if (y <= 2 && y >= -3 && Math.abs(Math.abs(x) - (1.6 - y) * 0.6) < 0.55) c = TEAM;               // lambda
+      else if (inner) c = device === 1 ? TEAM : RIM(x, y, 1);                                               // boss
+      else if (device === 1) { if (Math.abs(d - (r - 1.9)) < 0.35) c = SHIELD_FACE(x, y, 1); }             // pale ring
+      else if (device === 2) { if (d < 1.9) c = RIM(x, y, 2); }                                            // broad boss
+      else if (device === 3) { if ((x === 0 || y === 0) && d < r - 1.5) c = RIM === GOLD ? GOLD_DK : BRONZE_DK; } // cross-star
+      else if (y <= 2 && y >= -3 && Math.abs(Math.abs(x) - (1.6 - y) * 0.6) < 0.55) c = SHIELD_FACE(x, y, 2); // lambda
       m.set(x, y, 1, c);
-      if (!rim) m.set(x, y, 0, (x + y) % 4 === 0 ? LEATHER : 0xa8804e);   // pale wood back, leather straps
+      // the back is team-painted too (with leather straps): from behind the
+      // near army and in front of the far one, the camera sees shield backs
+      if (!rim) { if ((x + y) % 4 === 0 && Math.abs(y) < r - 2) m.set(x, y, 0, LEATHER); else tbox(m, x, y, 0, 1, 1, 1, TEAM_SHADE); }
       if (rim) m.set(x, y, 0, RIM === GOLD ? GOLD_DK : BRONZE_DK);
     }
   m.set(0, 0, 2, RIM(0, 0, 2));
@@ -477,7 +505,7 @@ export function hopliteRig() {
     helm('hoplite', 0), helm('hopCor', 1), helm('hopAttic', 2), helm('hopPilos', 3),
     part('cloakLong', cloakModel('long'), [4, 0, 2], [0, 0, 0], 'torso', { show: gearIs('cloak', 1), portrait: true }),
     part('cloakShort', cloakModel('short'), [4, 0, 2], [0, 0, 0], 'torso', { show: gearIs('cloak', 2) }),
-    part('weapon', spearModel(40), [0, 0, 0], HAND, 'armR'),
+    part('weapon', spearModel(34), [0, 0, 0], HAND, 'armR'),
     ...[0, 1, 2, 3].map((v) => part(v ? `shield${v}` : 'shield', aspis(5, BRONZE, v), [0, 0, 0], [1.5, -4, 2.5], 'armL', { anim: 'shield', show: gearIs('shield', v), portrait: !v })),
   ];
 }
