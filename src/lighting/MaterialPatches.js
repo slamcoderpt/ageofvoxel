@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { addShaderPatch, prependFragment, prependVertex, injectFragment, injectVertex } from '../core/shaderPatch.js';
 import { CanopyMap, canopyUniforms } from './Canopy.js';
+import { ContactMap, contactUniforms } from './Contact.js';
 
 // Lighting-owned shader patches layered on top of every voxel material
 // (anything carrying core's 'voxelTeam' / 'voxelTeamInst' patch):
@@ -25,12 +26,14 @@ import { CanopyMap, canopyUniforms } from './Canopy.js';
 
 export const atmosUniforms = {
   uSunDirView: { value: new THREE.Vector3(0, 1, 0) },
-  uFoliageSky: { value: new THREE.Color(0.36, 0.47, 0.50) },
-  uFoliageSun: { value: new THREE.Color(0.26, 0.25, 0.05) },
+  uFoliageSky: { value: new THREE.Color(0.27, 0.37, 0.41) },
+  uFoliageSun: { value: new THREE.Color(0.24, 0.22, 0.04) },
   uGlowScale: { value: 2.5 },
-  uDeepShade: { value: new THREE.Color(0.46, 0.58, 0.62) }, // indirect multiplier at full canopy occlusion (cool blue-green)
-  uCanopyAO: { value: 0.62 },
+  uDeepShade: { value: new THREE.Color(0.34, 0.45, 0.51) }, // indirect multiplier at full canopy occlusion (cool blue-green)
+  uCanopyAO: { value: 0.8 },
   uUnderstory: { value: 1.0 },
+  uPale: { value: 0.8 },      // albedo scale for pale neutral stone/marble (keeps whites off the clip)
+  uContactAO: { value: 1.0 }, // strength of the wall-base band and ground halos
 };
 
 const VOXEL_KEYS = ['voxelTeam', 'voxelTeamInst'];
@@ -38,7 +41,7 @@ const VOXEL_KEYS = ['voxelTeam', 'voxelTeamInst'];
 // Shared by both variants: world position, a per-instance seed (one value per
 // tree/tuft, from the instance's map position) and the canopy occlusion terms.
 function patchCommon(shader) {
-  Object.assign(shader.uniforms, atmosUniforms, canopyUniforms);
+  Object.assign(shader.uniforms, atmosUniforms, canopyUniforms, contactUniforms);
   prependVertex(shader, 'varying vec3 vAtmWorld;\nvarying float vAtmSeed;');
   injectVertex(shader, '#include <project_vertex>', `
     {
@@ -54,7 +57,27 @@ function patchCommon(shader) {
     }`);
   prependFragment(shader, `varying vec3 vAtmWorld;\nvarying float vAtmSeed;
 uniform sampler2D uCanopy;\nuniform float uCanopyInvSize, uCanopyOn;
-uniform vec3 uSunDirView, uFoliageSky, uFoliageSun, uDeepShade;\nuniform float uGlowScale, uCanopyAO, uUnderstory;
+uniform vec3 uSunDirView, uFoliageSky, uFoliageSun, uDeepShade;\nuniform float uGlowScale, uCanopyAO, uUnderstory, uPale, uContactAO;
+uniform sampler2D uContact;\nuniform vec2 uContactOrigin;\nuniform float uContactInvSize, uContactOn;
+// contact map: occ = footprint occupancy near here, hG = height above the ground
+void atmContact(out float occ, out float hG) {
+  occ = 0.0; hG = 10.0;
+  if (uContactOn > 0.5) {
+    vec2 uv = (vAtmWorld.xz - uContactOrigin) * uContactInvSize;
+    if (uv.x > 0.0 && uv.y > 0.0 && uv.x < 1.0 && uv.y < 1.0) {
+      vec4 c = texture2D(uContact, uv);
+      occ = c.r; hG = vAtmWorld.y - c.g * 31.875; // G = height * 8 / 255
+    }
+  }
+}
+// pale neutral albedo (white marble, grey plaza stone) is pulled down so it
+// keeps detail under the sun instead of reading as a milky slab
+vec3 atmPale(vec3 a) {
+  float mx = max(a.r, max(a.g, a.b)), mn = min(a.r, min(a.g, a.b));
+  float sat = (mx - mn) / max(mx, 1e-3);
+  float pale = smoothstep(0.42, 0.75, mx) * (1.0 - smoothstep(0.12, 0.3, sat));
+  return a * mix(vec3(1.0), uPale * vec3(1.03, 1.0, 0.93), pale);
+}
 // dens: forest density here; depth: 1 at the forest floor .. 0 at crown tops
 void atmCanopy(out float dens, out float hA) {
   dens = 0.0; hA = 10.0;
@@ -74,6 +97,7 @@ function patchVoxel(shader) {
   // per-tree tint and brightness (before the material's diffuse is fixed)
   shader.fragmentShader = shader.fragmentShader.replace('#include <lights_physical_fragment>', `
     float atmLeaf;
+    diffuseColor.rgb = atmPale(diffuseColor.rgb);
     {
       vec3 a = diffuseColor.rgb;
       atmLeaf = smoothstep(0.08, 0.35, (a.g - max(a.r, a.b)) / max(a.g, 1e-3));
@@ -81,7 +105,7 @@ function patchVoxel(shader) {
         float s = vAtmSeed, s2 = fract(s * 7.31 + 0.17);
         // warm olive / neutral / cool deep green families, +-18% brightness
         vec3 tint = s < 0.3 ? vec3(1.12, 1.02, 0.74) : (s < 0.62 ? vec3(0.97, 1.0, 0.95) : vec3(0.78, 0.92, 1.02));
-        float br = 0.80 + 0.34 * s2;
+        float br = 0.72 + 0.34 * s2;
         diffuseColor.rgb = mix(a, a * tint * br, atmLeaf);
       }
     }
@@ -107,12 +131,23 @@ function patchVoxel(shader) {
       float densL = mix(dens, mix(0.5, 1.0, dens), atmLeaf);
       float occ = clamp(densL * depth * (1.2 - 0.5 * wN.y), 0.0, 1.0);
       float down = smoothstep(0.2, 0.9, -wN.y);
-      float occL = clamp(occ * uCanopyAO + down * 0.3, 0.0, 1.0) * leaf;
+      // inner blocks: faces low in the crown (well below the canopy top) sit
+      // in the crown's own shade, even at the forest edge
+      float inner = (1.0 - smoothstep(2.4, 4.6, hA)) * smoothstep(0.6, 1.6, hA) * (1.0 - 0.6 * max(wN.y, 0.0));
+      float occL = clamp(occ * uCanopyAO + down * 0.45 + inner * 0.35, 0.0, 1.0) * leaf;
       // understory: anything low under/near the canopy that is not foliage
       float under = smoothstep(0.1, 0.8, dens) * (1.0 - smoothstep(0.3, 2.6, hA)) * (1.0 - leaf) * uUnderstory;
       float o = max(occL, under);
       reflectedLight.indirectDiffuse *= mix(vec3(1.0), uDeepShade, o);
-      reflectedLight.directDiffuse *= 1.0 - (0.45 + 0.1 * leaf) * o;
+      reflectedLight.directDiffuse *= 1.0 - (0.45 + 0.15 * leaf) * o;
+      // contact band: a dark, slightly warm band a few voxels high where walls,
+      // plinths, props and unit feet meet the ground; stronger in footprints'
+      // crowded corners, weaker on upward faces (steps, treads)
+      float cOcc, hG; atmContact(cOcc, hG);
+      float band = (1.0 - smoothstep(0.02, 0.75, hG)) * (1.0 - 0.55 * max(wN.y, 0.0));
+      band *= mix(0.55, 1.0, smoothstep(0.2, 0.8, cOcc)) * (1.0 - 0.5 * leaf) * uContactAO;
+      reflectedLight.indirectDiffuse *= 1.0 - 0.72 * band;
+      reflectedLight.directDiffuse *= 1.0 - 0.5 * band;
       if (leaf > 0.0) {
         float ndl = dot(wn, uSunDirView);
         // sky fill: strongest on faces the sun does not reach; fades out in the canopy interior
@@ -132,12 +167,20 @@ function patchVoxel(shader) {
 // Terrain: only the understory darkening under the canopy edge.
 function patchGround(shader) {
   patchCommon(shader);
+  shader.fragmentShader = shader.fragmentShader.replace('#include <lights_physical_fragment>', `
+    diffuseColor.rgb = atmPale(diffuseColor.rgb);
+    #include <lights_physical_fragment>`);
   injectFragment(shader, '#include <lights_fragment_end>', `
     {
       float dens, hA; atmCanopy(dens, hA);
       float under = smoothstep(0.1, 0.8, dens) * (1.0 - smoothstep(0.3, 2.6, hA)) * uUnderstory;
       reflectedLight.indirectDiffuse *= mix(vec3(1.0), uDeepShade, under);
       reflectedLight.directDiffuse *= 1.0 - 0.55 * under;
+      // contact halo round every building, prop and unit standing here
+      float cOcc, hG; atmContact(cOcc, hG);
+      float halo = smoothstep(0.02, 0.75, cOcc) * uContactAO;
+      reflectedLight.indirectDiffuse *= 1.0 - 0.7 * halo;
+      reflectedLight.directDiffuse *= 1.0 - 0.38 * halo;
     }`);
 }
 
@@ -146,6 +189,7 @@ export class MaterialPatcher {
     this.game = game;
     this.scene = game.scene;
     this.canopy = new CanopyMap(game);
+    this.contact = new ContactMap(game);
     this.seen = new WeakSet();
     this.frame = 0;
   }
@@ -174,6 +218,7 @@ export class MaterialPatcher {
   // Per-frame uniforms: sun direction in view space and daylight glow scale.
   update(sunDir, camera) {
     this.canopy.update();
+    this.contact.update();
     atmosUniforms.uSunDirView.value.copy(sunDir).transformDirection(camera.matrixWorldInverse);
     // sun elevation in degrees; full glow below ~5 deg, soft ember above ~20 deg
     const elev = THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(sunDir.y, -1, 1)));

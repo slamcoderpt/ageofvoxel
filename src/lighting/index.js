@@ -37,9 +37,9 @@ export class Lighting {
 
     // Sky light is cool and the ground bounce warm-brown: shadowed faces go
     // blue-grey instead of saturated dark green, sunlit ones stay golden.
-    this.hemi = new THREE.HemisphereLight(0x9ab8e6, 0x7a5f3e, 1.35);
+    this.hemi = new THREE.HemisphereLight(0x9ab8e6, 0x7a5f3e, 1.25);
     scene.add(this.hemi);
-    this.fill = new THREE.DirectionalLight(0x9db8ee, 0.55); // cool bounce from the opposite side
+    this.fill = new THREE.DirectionalLight(0x9db8ee, 0.42); // cool bounce from the opposite side
     this.fill.position.set(0.6, 0.5, -0.5);
     scene.add(this.fill);
 
@@ -74,8 +74,8 @@ export class Lighting {
     const f = this.game.scene.fog;
     // aerial perspective: starts just past the view centre so the top third of
     // an RTS frame lifts and desaturates while the focal area stays clean
-    f.near = ctl.distance * 0.9;
-    f.far = ctl.distance * 2.8 + 20;
+    f.near = ctl.distance * 1.25;
+    f.far = ctl.distance * 3.6 + 30;
     this.sky.follow(this.game.camera);
     // with fog of war on, everything beyond the explored map reads as black (AoM style)
     const fow = fowUniforms.fowStrength.value > 0;

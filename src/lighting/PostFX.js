@@ -14,11 +14,12 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 //    rich while highlights stay clean,
 //  - split toning: cool blue-teal in the shadows, warm gold in the highlights,
 //  - a filmic S-curve with lifted, coloured blacks (no crushed pure greens),
-//  - a barely noticeable warm vignette (~12% at the corners).
+//  - highlight shoulder so pale stone keeps detail; bloom is kept minimal and
+//    the vignette is off, so the frame reads sunlit rather than hazy.
 const GradeShader = {
   uniforms: {
     tDiffuse: { value: null },
-    uExposure: { value: 1.12 },
+    uExposure: { value: 1.1 },
     uChromaLimit: { value: 0.5 },
     uSaturation: { value: 0.96 },
     uGreenShift: { value: 0.42 },
@@ -26,10 +27,10 @@ const GradeShader = {
     uContrast: { value: 1.08 },
     uShadowTint: { value: new THREE.Vector3(0.035, 0.055, 0.065) },
     uHighTint: { value: new THREE.Vector3(1.05, 1.0, 0.93) },
-    uVignette: { value: 0.05 },
-    uToeLift: { value: 0.06 },
-    uKnee: { value: 0.62 },
-    uShoulder: { value: 1.5 },
+    uVignette: { value: 0.0 },
+    uToeLift: { value: 0.05 },
+    uKnee: { value: 0.56 },
+    uShoulder: { value: 2.2 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
@@ -72,7 +73,7 @@ const GradeShader = {
       float hi = smoothstep(0.25, 0.9, l);
       c *= mix(vec3(1.0), uHighTint, hi);
       c += uShadowTint * (1.0 - smoothstep(0.0, 0.45, l));
-      // --- barely-there warm vignette (~12% at the far corners)
+      // --- optional warm vignette (off by default)
       vec2 d = vUv - 0.5;
       float v = smoothstep(0.35, 0.85, length(d * vec2(1.25, 1.0)));
       c *= 1.0 - v * uVignette * vec3(0.85, 1.0, 1.15);
@@ -89,7 +90,7 @@ export class PostFX {
     this.composer.addPass(new RenderPass(scene, camera));
     if (quality === 'high') {
       this.gtao = new GTAOPass(scene, camera, size.x, size.y);
-      this.gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.6, thickness: 2.5, scale: 1.25, samples: 12, distanceFallOff: 1.0 });
+      this.gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.6, thickness: 2.5, scale: 1.7, samples: 12, distanceFallOff: 1.0 });
       this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
       this.gtao.blendIntensity = 1.0;
       // Let pieces opt objects out of the AO g-buffer with object.userData.noAO
@@ -102,7 +103,7 @@ export class PostFX {
       };
       this.composer.addPass(this.gtao);
     }
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.32, 0.45, 0.92);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.1, 0.25, 0.97);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
     this.grade = new ShaderPass(GradeShader);
