@@ -152,14 +152,17 @@ export function boltLines(seed, x, groundY, z, heightAt, height = 21) {
   const lines = [];
   lines.ends = [];
   const away = Math.atan2(-1, -1); // away from the default (yaw 45) camera
-  // never straight behind the target (that projects to a plain vertical)
-  const ta = away + (seed & 1 ? 1 : -1) * rng.range(0.75, 1.45), off = rng.range(10, 15);
-  const top = { x: x + Math.cos(ta) * off, y: groundY + height + rng.range(-2, 3), z: z + Math.sin(ta) * off };
-  const main = fractalPath(rng, top, { x, y: groundY + 0.05, z }, 7, 0.085);
-  // leader: thin hot core (a few px), tight sheath, soft wide halo
-  lines.push({ pts: main, w: 0.05, i: 1.5, taper: -0.4 });
-  lines.push({ pts: main, w: 0.14, i: 0.3, taper: -0.2, halo: true });
-  lines.push({ pts: main, w: 0.7, i: 0.06, taper: 0.1, halo: true });
+  // the channel drops from almost straight overhead with a modest lean (the
+  // cloud root sits a few tiles off, never a long diagonal from the frame
+  // corner), so several strikes read as separate stabs, not a V
+  const ta = away + (seed & 1 ? 1 : -1) * rng.range(0.5, 1.6), off = rng.range(2.5, 6);
+  const top = { x: x + Math.cos(ta) * off, y: groundY + height * rng.range(0.8, 0.95), z: z + Math.sin(ta) * off };
+  const main = fractalPath(rng, top, { x, y: groundY + 0.05, z }, 7, 0.07);
+  // leader tapers the other way from a brush stroke: hair-thin and dim in the
+  // cloud, thick and white-hot where it earths (width x5, intensity x3)
+  lines.push({ pts: main, w: 0.03, i: 0.5, taper: -4.2, fade: -1.9 });
+  lines.push({ pts: main, w: 0.09, i: 0.12, taper: -3.0, fade: -2.2, halo: true });
+  lines.push({ pts: main, w: 0.45, i: 0.03, taper: -1.8, fade: -2.5, halo: true });
   const nf = rng.int(2, 4);
   for (let f = 0; f < nf; f++) {
     const i = rng.int(Math.floor(main.length * (0.3 + f * 0.14)), Math.floor(main.length * (0.44 + f * 0.14)));
@@ -253,11 +256,11 @@ function rimLines(seed, cx, cz, R, a0, span, heightAt) {
     const a = a0 + span * (s / n);
     const r = R + rng.range(-0.45, 0.45);
     const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-    const lift = Math.sin((s / n) * Math.PI) * rng.range(0.3, 1.1);
+    const lift = Math.sin((s / n) * Math.PI) * rng.range(0.5, 2.0);
     pts.push({ x, y: heightAt(x, z) + 0.2 + lift, z });
   }
   const lines = [];
-  channel(lines, pts, 0.085, 0.9, 0.3, 0, 5, 0.4);
+  channel(lines, pts, 0.07, 1.0, 0.3, 0, 5, 0.4);
   // a leg or two stabbing down to the ground
   for (let k = 0; k < 2; k++) {
     const p = pts[rng.int(3, n - 3)];
@@ -432,10 +435,18 @@ const perimMat = () => new THREE.ShaderMaterial({
       float fall = vD < 0.0 ? exp(vD * 0.75) : exp(-vD * 3.5);
       float band = fall * (0.35 + 0.65 * swirl) * (0.7 + 0.3 * surge);
       float hot = hotAt(vA);
-      float lvl = 0.3 + 1.6 * hot;
+      // the wall is alive: the whole ring flickers with the storm, dead
+      // stretches drop almost dark, and two surge heads race round it, each a
+      // white-hot leading edge with a fading blue wake behind it
+      float gfl = 0.55 + 0.45 * h1(ft * 1.7 + 3.0) + 0.5 * uFlash;
+      float liveK = mix(0.12, 1.0, smoothstep(0.1, 0.6, S.x * S.z + 0.25 * vn1(vA * 4.0 - uTime * 1.3)));
+      float p1 = fract((vA - uTime * 1.9) / 6.2831853), p2 = fract((vA + uTime * 1.3 + 2.4) / 6.2831853);
+      float lead = pow(p1, 14.0) * 2.2 + pow(p1, 3.0) * 0.5 + pow(p2, 16.0) * 1.6 + pow(p2, 3.0) * 0.35;
+      float lvl = (0.22 + 1.6 * hot + lead) * liveK * gfl;
       vec3 col = vec3(0.7, 0.88, 1.2) * core * 0.6 * lvl
-               + vec3(0.2, 0.5, 1.1) * sheath * 0.3 * (0.45 + 1.1 * hot)
-               + mix(vec3(0.16, 0.08, 0.65), vec3(0.12, 0.32, 1.0), fall) * band * 0.2 * (0.5 + 1.0 * hot);
+               + vec3(0.9, 0.95, 1.2) * exp(-d * d / (w * w * 0.25)) * lead * 0.5 * gfl
+               + vec3(0.2, 0.5, 1.1) * sheath * 0.3 * (0.35 + 1.1 * hot + 0.6 * lead) * (0.5 + 0.5 * liveK)
+               + mix(vec3(0.16, 0.08, 0.65), vec3(0.12, 0.32, 1.0), fall) * band * 0.1 * (0.4 + 1.0 * hot + 0.5 * lead);
       gl_FragColor = vec4(col * uK, 1.0);
     }`,
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
@@ -458,7 +469,14 @@ const curtainMat = () => new THREE.ShaderMaterial({
       float n = 0.6 + 0.4 * vn1(vA * 25.0 - uTime * 3.0);
       float fall = pow(1.0 - vH, 1.8);
       float foot = exp(-vH * 9.0);
-      float a = (0.22 + streak * 0.7 * (0.4 + S.x) + (sp1 * 0.8 + sp2 * 0.55) * n + foot * 0.9) * fall * (0.3 + 1.6 * hotAt(vA));
+      float ft = floor(uTime * 24.0);
+      float p1 = fract((vA - uTime * 1.9) / 6.2831853), p2 = fract((vA + uTime * 1.3 + 2.4) / 6.2831853);
+      float lead = pow(p1, 10.0) * 1.8 + pow(p2, 12.0) * 1.3;
+      float gfl = 0.5 + 0.5 * h1(ft * 1.7 + 3.0) + 0.5 * uFlash;
+      // the foot where the wall meets the ground is the brightest line, and it
+      // flares where the surge heads pass
+      float liveK = mix(0.1, 1.0, smoothstep(0.1, 0.6, S.x * S.z + 0.25 * vn1(vA * 4.0 - uTime * 1.3)));
+      float a = liveK * (0.08 + streak * 0.9 * (0.4 + S.x) + (sp1 * 0.8 + sp2 * 0.55) * n * (0.6 + lead) + foot * (1.4 + 2.5 * lead) * (0.4 + 0.6 * S.x)) * fall * (0.25 + 1.6 * hotAt(vA) + 0.8 * lead) * gfl;
       vec3 c = mix(vec3(0.35, 0.25, 1.0), vec3(0.4, 0.7, 1.2), 1.0 - vH);
       gl_FragColor = vec4(c * a * 0.32 * uK, 1.0);
     }`,
@@ -520,7 +538,7 @@ const stormGradeMat = (add = false) => new THREE.ShaderMaterial({
     uInvVP: { value: new THREE.Matrix4() }, uPlaneY: { value: 0 }, uCenter: { value: new THREE.Vector2() },
     uR: { value: 10 }, uK: { value: 0 }, uFlash: { value: 0 }, uTime: { value: 0 },
     uPools: { value: Array.from({ length: MAX_POOLS }, () => new THREE.Vector4()) },
-    uPoolCol: { value: new THREE.Color(0.28, 0.5, 1.35) },
+    uPoolCol: { value: new THREE.Color(0.12, 0.34, 1.35) },
   },
   vertexShader: `varying vec2 vNdc; void main(){ vNdc = position.xy; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
   fragmentShader: `uniform mat4 uInvVP; uniform float uPlaneY, uR, uK, uFlash, uTime; uniform vec2 uCenter;
@@ -558,7 +576,7 @@ const stormGradeMat = (add = false) => new THREE.ShaderMaterial({
         vec4 P = uPools[i];
         if (P.z <= 0.0) continue;
         float dd = length(g - P.xy) / P.w;
-        pool += P.z * (exp(-dd * dd * 3.5) * 0.9 + exp(-dd * dd * 0.6) * 0.22);
+        pool += P.z * (exp(-dd * dd * 3.0) * 0.9 + exp(-dd * dd * 0.8) * 0.08);
       }
       #ifdef ADD_POOL
         // additive part: blue-grey rain haze over the storm floor (lifts and
@@ -686,6 +704,24 @@ export class BoltRenderer {
     this.scorchMat = new THREE.MeshBasicMaterial({ map: makeScorchTexture(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
     this.emberMat = new THREE.MeshBasicMaterial({ map: makeEmberTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6, color: 0xff7a2a, fog: false });
     this.decalGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+    // strike flash laid on the ground: a white-hot patch about a tile and a
+    // half across fading through electric blue (depth-tested, so the units
+    // standing in it keep their silhouettes and their feet are lit)
+    this.groundFlashMat = new THREE.ShaderMaterial({
+      uniforms: { uO: { value: 1 } },
+      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: `uniform float uO; varying vec2 vUv;
+        void main(){ vec2 p = (vUv - 0.5) * 2.0; float d = length(p);
+          float an = atan(p.y, p.x);
+          float rays = 0.65 + 0.35 * pow(abs(sin(an * 5.0 + 1.3) * sin(an * 3.0 + 0.4)), 0.5);
+          vec3 c = vec3(1.0, 1.0, 1.05) * exp(-pow(d * 3.2, 2.5)) * 1.3
+                 + vec3(0.35, 0.6, 1.4) * exp(-d * d * 5.0) * 0.8 * rays
+                 + vec3(0.2, 0.3, 1.0) * exp(-d * d * 1.6) * 0.25;
+          c *= 1.0 - smoothstep(0.8, 1.0, d);
+          gl_FragColor = vec4(c * uO, 1.0); }`,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+      polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8,
+    });
     this.scorchMeshes = new Map();
     this.shockGeo = bandRingGeometry(0.75, 1.0, 48);
     this.shockMat = new THREE.ShaderMaterial({
@@ -726,7 +762,8 @@ export class BoltRenderer {
         gl_Position = projectionMatrix * mv; }`,
       fragmentShader: `uniform vec3 uColor; uniform float uO; uniform float uTight; varying vec2 vUv;
         void main(){ float d = length(vUv - 0.5) * 2.0;
-          float a = mix(exp(-d * d * 5.0) * 0.8 + exp(-d * d * 40.0) * 1.2, exp(-d * d * 90.0) * 1.4 + exp(-d * d * 9.0) * 0.18, uTight);
+          float a = uTight > 1.5 ? exp(-pow(d * 2.6, 3.0)) * 1.1 + exp(-d * d * 7.0) * 0.35
+            : mix(exp(-d * d * 5.0) * 0.8 + exp(-d * d * 40.0) * 1.2, exp(-d * d * 90.0) * 1.4 + exp(-d * d * 9.0) * 0.18, uTight);
           a *= 1.0 - smoothstep(0.85, 1.0, d);
           gl_FragColor = vec4(uColor * a * uO, 1.0); }`,
       transparent: true, depthWrite: false, depthTest: depth, blending: THREE.AdditiveBlending, fog: false,
@@ -766,11 +803,19 @@ export class BoltRenderer {
         v = { mesh, extra: [] };
         if (kind === 'ground') {
           // thin channels need a hotter core colour to read white against the halo
-          mesh.material.uniforms.uGain.value = 2.6;
+          mesh.material.uniforms.uGain.value = 1.9;
+          mesh.material.uniforms.uCore.value.setRGB(0.8, 0.9, 1.15);
           v.glow = this.glowSprite(0x2a5cff);
           v.glow.position.set(b.x, b.y + 0.5, b.z);
-          v.hot = this.glowSprite(0xf2f7ff, 62, 1);
-          v.hot.position.set(b.x, b.y + 0.35, b.z);
+          v.hot = this.glowSprite(0xcfe0ff, 62, 2);
+          v.hot.position.set(b.x, b.y + 0.45, b.z);
+          v.pin = this.glowSprite(0xffffff, 64, 1);
+          v.pin.position.set(b.x, b.y + 0.3, b.z);
+          v.gflash = this.addMesh(new THREE.Mesh(this.decalGeo, this.groundFlashMat.clone()), 24);
+          v.gflash.position.set(b.x, b.y + 0.08, b.z);
+          v.gflash.rotation.y = (b.seed % 628) / 100;
+          // brightness varies from bolt to bolt
+          v.gain = 0.6 + 0.55 * hash2(b.seed & 0xffff, 91);
           v.flare = this.glowSprite(0x8fbcff, 63, 1);
           v.flare.position.set(b.x, b.y + 0.35, b.z);
           v.shock = this.addMesh(new THREE.Mesh(this.shockGeo, this.shockMat.clone()), 45);
@@ -789,7 +834,7 @@ export class BoltRenderer {
       if (kind === 'rim') {
         // perimeter arcs flicker on and off, always well below the bolts
         const f = Math.floor(now * 30);
-        v.mesh.material.uniforms.uAlpha.value = (1 - k) * (hash2(f, b.seed & 0xffff, 5) > 0.35 ? 0.55 : 0.12) * (0.75 + 0.9 * Math.min(1.2, strikeFlash));
+        v.mesh.material.uniforms.uAlpha.value = (1 - k * 0.7) * (hash2(f, b.seed & 0xffff, 5) > 0.3 ? 0.95 : 0.2) * (0.8 + 0.7 * Math.min(1.2, strikeFlash));
         continue;
       }
       // return strokes: a couple of re-brightenings, then a fast decay
@@ -803,13 +848,22 @@ export class BoltRenderer {
         // through as the flash dies. The real lights below carry the spill.
         // capped, not clipped: a white core only a few pixels across, a
         // short blue falloff, and the units round it stay readable
-        const pin = age < 0.1 ? 1 : Math.max(0, 1 - (age - 0.1) / 0.35);
-        v.hot.material.uniforms.uO.value = Math.min(1.8, env * 1.4) * (0.4 + 0.6 * pin);
-        v.hot.scale.setScalar(0.9 + 0.4 * pin);
-        v.glow.material.uniforms.uO.value = Math.min(0.16, env * 0.12) * (0.4 + 0.6 * pin);
-        v.glow.scale.setScalar(3.2 + 1.2 * pin);
-        v.flare.material.uniforms.uO.value = Math.min(0.7, env * 0.5) * pin;
-        v.flare.scale.set(4.5 * pin + 1, 0.22 * pin + 0.08, 1);
+        // a white-hot flash ~1.5 tiles wide that snaps down within ~0.35 s to
+        // a pin-sharp core, a ground flash under it, a wide blue corona and a
+        // horizontal flare; per-bolt gain so no two strikes look alike
+        const pin = age < 0.08 ? 1 : Math.max(0, 1 - (age - 0.08) / 0.3);
+        const g = v.gain ?? 1, e = Math.min(1.5, env) * g;
+        v.mesh.material.uniforms.uAlpha.value = Math.min(1.25, env) * g;
+        v.hot.material.uniforms.uO.value = Math.min(1.1, e * 0.8) * pin;
+        v.hot.scale.setScalar(1.0 + 1.1 * pin);
+        v.pin.material.uniforms.uO.value = Math.min(1.8, e * 1.3) * (0.35 + 0.65 * pin);
+        v.pin.scale.setScalar(1.1);
+        v.gflash.material.uniforms.uO.value = Math.min(1.3, e) * (0.25 + 0.75 * pin);
+        v.gflash.scale.setScalar(2.8 + 1.0 * pin);
+        v.glow.material.uniforms.uO.value = Math.min(0.2, e * 0.15) * (0.3 + 0.7 * pin);
+        v.glow.scale.setScalar(4.5 + 2.5 * pin);
+        v.flare.material.uniforms.uO.value = Math.min(0.8, e * 0.6) * pin;
+        v.flare.scale.set(6 * pin + 1, 0.25 * pin + 0.08, 1);
         for (const s of v.extra) {
           s.material.uniforms.uO.value = Math.min(1.2, env * 0.9) * s.userData.w * (0.3 + 0.7 * pin);
           s.scale.setScalar(0.55 + 0.3 * pin);
@@ -817,7 +871,7 @@ export class BoltRenderer {
         const sk = Math.min(1, age / 0.42);
         v.shock.scale.setScalar(0.5 + Math.sqrt(sk) * 4.2);
         v.shock.material.uniforms.uA.value = Math.pow(1 - sk, 1.6) * 0.7;
-        pools.push({ x: b.x, z: b.z, i: Math.min(0.32, env * 0.24), r: 3.4 + 0.6 * (1 - k) });
+        pools.push({ x: b.x, z: b.z, i: Math.min(0.6, e * 0.42) * (0.45 + 0.55 * pin), r: 3.8 + 1.0 * (1 - k) });
         for (const st of storms) {
           const dx = b.x - st.x, dz = b.z - st.z, d = Math.hypot(dx, dz);
           const w = Math.min(1.2, env) * (0.45 + 0.55 * Math.min(1, d / st.radius)) * Math.pow(1 - k, 0.7);
@@ -828,17 +882,17 @@ export class BoltRenderer {
           const l = this.lights[li++];
           // low and blue, reaching ~1/3 of the ring: bright blue rim light
           // on the units and walls round the strike
-          l.color.setHex(0x6a98ff);
-          l.position.set(b.x, b.y + 2.3, b.z);
-          l.distance = 7.5;
-          l.intensity = 20 * Math.min(1.2, env);
+          l.color.setHex(0x4f86ff);
+          l.position.set(b.x, b.y + 3.0, b.z);
+          l.distance = 9.5;
+          l.intensity = 42 * Math.min(1.3, e) * (0.4 + 0.6 * pin);
         }
       } else flash = Math.max(flash, env * 0.5);
     }
     for (const [b, v] of this.meshes) {
       if (alive.has(b)) continue;
       this.group.remove(v.mesh); v.mesh.geometry.dispose(); v.mesh.material.dispose();
-      if (v.glow) { this.group.remove(v.glow, v.shock, v.hot, v.flare); v.glow.material.dispose(); v.shock.material.dispose(); v.hot.material.dispose(); v.flare.material.dispose(); }
+      if (v.glow) { this.group.remove(v.glow, v.shock, v.hot, v.flare, v.pin, v.gflash); for (const o of [v.glow, v.shock, v.hot, v.flare, v.pin, v.gflash]) o.material.dispose(); }
       for (const s of v.extra || []) { this.group.remove(s); s.material.dispose(); }
       this.meshes.delete(b);
     }
@@ -850,7 +904,7 @@ export class BoltRenderer {
       this.spot.position.set(spotB.x + 0.1, spotB.y + 2.6, spotB.z + 0.1);
       this.spot.target.position.set(spotB.x, spotB.y, spotB.z);
       this.spot.target.updateMatrixWorld();
-      this.spot.intensity = 9 * Math.min(1.2, spotEnv);
+      this.spot.intensity = 16 * Math.min(1.2, spotEnv);
     } else {
       this.spot.visible = false;
       this.spot.intensity = 0;
@@ -977,7 +1031,7 @@ export class BoltRenderer {
         // blue-white back light: a depth-tested glow set just behind the unit
         // (from the camera), so the unit masks its centre and reads as a dark
         // silhouette with an electric rim - the struck man stands out of the crowd
-        const rim = this.glowSprite(0x9cc4ff, 53, 0, true);
+        const rim = this.glowSprite(0x5f9cff, 53, 0, true);
         zv = { m, rim };
         this.zapMeshes.set(z, zv);
       }
@@ -992,8 +1046,8 @@ export class BoltRenderer {
       const cam = game.camera.position;
       this._v.set(m.position.x - cam.x, 0, m.position.z - cam.z).normalize().multiplyScalar(0.55);
       rim.position.set(m.position.x + this._v.x, m.position.y + z.h * 0.55, m.position.z + this._v.z);
-      rim.scale.setScalar(z.h * 1.9);
-      rim.material.uniforms.uO.value = Math.pow(1 - k, 1.3) * 0.95;
+      rim.scale.setScalar(z.h * 1.4);
+      rim.material.uniforms.uO.value = Math.pow(1 - k, 1.3) * 0.4;
     }
     for (const [z, zv] of this.zapMeshes) {
       if (aliveZ.has(z)) continue;
@@ -1093,9 +1147,9 @@ export class BoltRenderer {
       if (!!p.warm !== warm) continue;
       const k = (now - p.t0) / p.life;
       if (k < 0 || k >= 1) continue;
-      const L = 0.06; // streak length = velocity * L seconds
+      const L = 0.075; // streak length = velocity * L seconds
       const a = Math.pow(1 - k, 1.5) * 1.3 * (p.dim ?? 1);
-      lines.push({ pts: [{ x: p.x, y: p.y, z: p.z }, { x: p.x - p.vx * L, y: p.y - p.vy * L, z: p.z - p.vz * L }], w: 0.045, i: a, taper: 0.7, fade: 0.8 });
+      lines.push({ pts: [{ x: p.x, y: p.y, z: p.z }, { x: p.x - p.vx * L, y: p.y - p.vy * L, z: p.z - p.vz * L }], w: 0.065, i: a, taper: 0.7, fade: 0.8 });
     }
     if (mesh.geometry !== this._emptyGeo) mesh.geometry.dispose();
     mesh.geometry = lines.length ? ribbonGeometry(lines) : this._emptyGeo;
@@ -1137,7 +1191,7 @@ export class BoltRenderer {
     const heightAt = (x, z) => this.game.map.heightAt(x, z);
     const ring = this.addMesh(new THREE.Mesh(perimGeometry(st.x, st.z, R, R - 4.8, R + 1.0, heightAt, 10), perimMat()), 44);
     ring.position.set(st.x, 0, st.z);
-    const curtain = this.addMesh(new THREE.Mesh(curtainGeometry(st.x, st.z, R, 3.4, heightAt), curtainMat()), 45);
+    const curtain = this.addMesh(new THREE.Mesh(curtainGeometry(st.x, st.z, R, 4.6, heightAt), curtainMat()), 45);
     curtain.position.set(st.x, 0, st.z);
     const rain = this.addMesh(new THREE.LineSegments(rainGeometry(st.t0 * 1000 | 0, R), rainMat()), 46);
     const v = { ring, rain, curtain };

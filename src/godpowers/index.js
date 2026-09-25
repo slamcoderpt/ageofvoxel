@@ -178,7 +178,7 @@ export class GodPowers {
     for (const o of thrown) this.knock(o, x, z, o === target ? 1.1 : 0.8);
     this.throwDebris(x, y, z, 22, 1, seed, true);
     this.charRim(x, y, z, seed);
-    this.throwSparks(x, y, z, 16, seed);
+    this.throwSparks(x, y, z, 34, seed);
     // the storm perimeter answers each strike: arcs flare on the side it hit
     for (const s of this.storms) {
       const d = Math.hypot(x - s.x, z - s.z);
@@ -191,7 +191,7 @@ export class GodPowers {
     // white-hot sparks, blue electric motes, earth and smoke
     game.fx.emit({ x, y: y + 0.3, z, count: 14, color: 0xcfe2ff, size: 0.14, life: 0.45, speed: 9, up: 6, gravity: -16, additive: true, drag: 0.5 });
     game.fx.emit({ x, y: y + 0.6, z, count: 6, color: 0x3d6cdf, size: 0.3, life: 0.6, speed: 3.5, up: 2.5, gravity: -2, additive: true, spread: 0.6 });
-    game.fx.emit({ x, y: y + 0.2, z, count: 8, color: 0x5a5550, size: 0.45, life: 1.4, speed: 1.6, up: 1.5, gravity: 0.6, grow: 1.6 });
+    game.fx.emit({ x, y: y + 0.2, z, count: 16, color: 0x5a5550, size: 0.5, life: 1.4, speed: 3.2, up: 1.2, gravity: 0.6, grow: 1.8, spread: 0.4 });
     game.fx.emit({ x, y: y + 0.2, z, count: 14, color: 0x5d4a33, size: 0.2, life: 1.0, speed: 4.5, up: 6, gravity: -16 });
   }
 
@@ -235,8 +235,8 @@ export class GodPowers {
         }
       }
       // static crawling along the storm perimeter
-      for (let k = 0; k < 1; k++) {
-        if (!vr.chance(0.35)) continue;
+      for (let k = 0; k < 2; k++) {
+        if (!vr.chance(0.45)) continue;
         const a0 = vr.range(0, Math.PI * 2), span = vr.range(0.18, 0.5) * (vr.chance(0.5) ? 1 : -1);
         this.bolts.push({ kind: 'rim', x: s.x, z: s.z, r: s.radius, a0, span, t0: game.time, life: vr.range(0.12, 0.3), seed: (vr.next() * 1e9) >>> 0 });
         // sparks spit where the arc earths itself on the perimeter
