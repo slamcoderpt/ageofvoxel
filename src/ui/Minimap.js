@@ -24,6 +24,7 @@ export class Minimap {
     this.base.width = this.base.height = N;
     this.dirty = true;
     this.timer = 0;
+    this.showTerrain = true; // toggled from the minimap button ring
     game.events.on('entity:removed', (e) => { if (e.kind === 'resource') this.dirty = true; });
     game.events.on('building:placed', () => { this.dirty = true; });
     const toWorld = (ev) => {
@@ -87,7 +88,8 @@ export class Minimap {
     const rot = `${(game.cameraCtl.yaw * 180) / Math.PI}deg`;
     if (rot !== this._rot) { this._rot = rot; this.parent.style.setProperty('--mm-rot', rot); }
     ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(this.base, 0, 0, N * S, N * S);
+    if (this.showTerrain) ctx.drawImage(this.base, 0, 0, N * S, N * S);
+    else { ctx.fillStyle = '#0c2129'; ctx.fillRect(0, 0, N * S, N * S); }
     // fog of war: a tile-res alpha mask, smoothed when scaled up
     const fog = game.fog;
     if (!fog.revealAll) {

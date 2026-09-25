@@ -16,25 +16,30 @@ export class UI {
     const root = document.createElement('div');
     root.className = 'hud';
     const resCell = (k, icon) => `<div class="res ${k}"><span class="n">0</span>${icon}<span class="v">0</span></div>`;
+    const ring = (cls, icon, tip) => `<div class="rbtn ${cls}" data-tip="${tip}">${icon}<span class="badge" style="display:none">0</span></div>`;
     root.innerHTML = `
+      <div class="groups"></div>
+      <div class="feed"></div>
       <div class="topbar">
         <div class="resrow">
           ${resCell('food', ICONS.food)}${resCell('wood', ICONS.wood)}${resCell('gold', ICONS.gold)}${resCell('favor', ICONS.favor)}
           <div class="res pop">${ICONS.house}<span class="v">0/0</span></div>
         </div>
         <div class="agehub">
-          <div class="wing l">${ICONS.wing}</div><div class="wing r">${ICONS.wing}</div>
           <div class="plate l powers-l"></div>
-          <div class="medal"><div class="ring"></div><b>I</b></div>
+          <div class="medal"><div class="ring"></div><div class="face"><b>I</b></div></div>
           <div class="plate r powers-r"></div>
         </div>
       </div>
       <div class="topright">
+        <div class="menubar">
+          <div class="mbtn speed" data-tip="<b>Game Speed</b><br>Toggle normal / fast">${ICONS.fast}</div>
+          <div class="mbtn pause" data-tip="<b>Pause</b><br>Pause or resume the game">${ICONS.pause}</div>
+          <div class="mbtn obj" data-tip="<b>Objectives</b><br>Destroy the enemy Town Center">${ICONS.scroll}</div>
+          <div class="mbtn menu" data-tip="<b>Hotkeys</b><br>. idle villager &middot; H Town Center<br>Ctrl+1..9 assign group &middot; 1..9 recall<br>Q/E/F/S/R/B build &middot; X stop">${ICONS.gear}</div>
+        </div>
         <div class="clock"><b>00:00</b> <span>(Archaic Age)</span></div>
         <div class="scores"></div>
-      </div>
-      <div class="sidebtns">
-        <div class="sbtn idle" data-tip="<b>Idle Villager</b><br>Select the next idle villager (.)">${ICONS.villager}<span class="badge" style="display:none">0</span></div>
       </div>
       <div class="bl">
         <div class="gild commands"></div>
@@ -42,12 +47,14 @@ export class UI {
       </div>
       <div class="mm">
         <div class="tray"></div>
-        <div class="trayrim"><svg viewBox="0 0 330 132" preserveAspectRatio="none"><path d="M1 132V92.4L46.2 29 105.6 1h118.8l59.4 28L329 92.4V132" fill="none" stroke="#0b0806" stroke-width="5"/><path d="M1 132V92.4L46.2 29 105.6 1h118.8l59.4 28L329 92.4V132" fill="none" stroke="#9a7640" stroke-width="2"/></svg></div>
+        <div class="trayrim"><svg viewBox="0 0 364 150" preserveAspectRatio="none"><path d="M1 150V26L27 1h310l26 25v124" fill="none" stroke="#050d10" stroke-width="5"/><path d="M1 150V26L27 1h310l26 25v124" fill="none" stroke="#b08a4c" stroke-width="2"/><path d="M7 150V29L30 7h304l23 22v121" fill="none" stroke="#5b4422" stroke-width="1"/></svg></div>
         <div class="dia"><i class="inner"></i><i class="gem c0"></i><i class="gem c1"></i><i class="gem c2"></i><i class="gem c3"></i></div>
-        <div class="btns">
-          <div class="sbtn home" data-tip="<b>Town Center</b><br>Select and centre on your Town Center (H)">${ICONS.house}</div>
-          <div class="sbtn flare" data-tip="<b>Signal</b><br>Right-click the minimap to send selected units there">${ICONS.flare}</div>
-        </div>
+        ${ring('b0 idle', ICONS.villager, '<b>Idle Villager</b><br>Select the next idle villager (.)')}
+        ${ring('b1 army', ICONS.military, '<b>Idle Military</b><br>Select all idle soldiers')}
+        ${ring('b2 home', ICONS.house, '<b>Town Center</b><br>Select and centre on your Town Center (H)')}
+        ${ring('b3 flare', ICONS.flare, '<b>Signal</b><br>Right-click the minimap to send selected units there')}
+        ${ring('b4 terrain', ICONS.terrain, '<b>Terrain</b><br>Show or hide terrain on the minimap')}
+        ${ring('b5 score', ICONS.laurel, '<b>Scores</b><br>Show or hide the score list')}
       </div>`;
     document.body.appendChild(root);
     this.root = root;
@@ -60,8 +67,12 @@ export class UI {
       medal: root.querySelector('.medal'), medalTxt: root.querySelector('.medal b'), medalRing: root.querySelector('.medal .ring'),
       clock: root.querySelector('.clock b'), clockAge: root.querySelector('.clock span'), scores: root.querySelector('.scores'),
       powersL: root.querySelector('.powers-l'), powersR: root.querySelector('.powers-r'),
-      idle: root.querySelector('.sbtn.idle'), idleBadge: root.querySelector('.sbtn.idle .badge'),
+      idle: root.querySelector('.rbtn.idle'), idleBadge: root.querySelector('.rbtn.idle .badge'),
+      army: root.querySelector('.rbtn.army'), armyBadge: root.querySelector('.rbtn.army .badge'),
+      groups: root.querySelector('.groups'), feed: root.querySelector('.feed'),
+      pause: root.querySelector('.mbtn.pause'), speed: root.querySelector('.mbtn.speed'),
     };
+    this.feedItems = [];
     this.statTimer = 0;
     this.tip = document.createElement('div');
     this.tip.className = 'tooltip';
@@ -76,14 +87,33 @@ export class UI {
     this.panel = new CommandPanel(game, this, root.querySelector('.info'), root.querySelector('.commands'));
     this.buildPowers();
     // stop clicks on the HUD from reaching the world
-    for (const el of root.querySelectorAll('.topbar, .topright, .sidebtns, .bl, .mm')) el.addEventListener('mousedown', (e) => e.stopPropagation());
+    for (const el of root.querySelectorAll('.topbar, .topright, .groups, .bl, .mm')) el.addEventListener('mousedown', (e) => e.stopPropagation());
     for (const el of root.querySelectorAll('[data-tip]')) {
       el.addEventListener('mouseenter', (e) => this.tooltip(e, el.dataset.tip));
       el.addEventListener('mouseleave', () => this.tooltip(null));
     }
     this.els.idle.addEventListener('click', () => this.selection.cycleIdle());
-    root.querySelector('.sbtn.home').addEventListener('click', () => this.selection.gotoTownCenter());
-    root.querySelector('.sbtn.flare').addEventListener('click', () => this.message('Right-click the minimap to send units'));
+    this.els.army.addEventListener('click', () => this.selectIdleArmy());
+    root.querySelector('.rbtn.home').addEventListener('click', () => this.selection.gotoTownCenter());
+    root.querySelector('.rbtn.flare').addEventListener('click', () => this.message('Right-click the minimap to send units'));
+    root.querySelector('.rbtn.terrain').addEventListener('click', (e) => { this.minimap.showTerrain = !this.minimap.showTerrain; this.minimap.timer = 0; e.currentTarget.classList.toggle('off', !this.minimap.showTerrain); });
+    root.querySelector('.rbtn.score').addEventListener('click', (e) => { const off = this.els.scores.classList.toggle('hidden'); e.currentTarget.classList.toggle('off', off); });
+    this.els.pause.addEventListener('click', () => {
+      game.paused = !game.paused;
+      this.els.pause.innerHTML = game.paused ? ICONS.play : ICONS.pause;
+      this.message(game.paused ? 'Game paused' : 'Game resumed');
+    });
+    this.els.speed.addEventListener('click', () => {
+      game.timeScale = game.timeScale > 1 ? 1 : 1.5;
+      this.els.speed.classList.toggle('on', game.timeScale > 1);
+      this.message(game.timeScale > 1 ? 'Fast speed' : 'Normal speed');
+    });
+    // event feed (top-left), like Retold's "Dojo built." notices
+    const mine = (e) => e && e.owner === game.localPlayer;
+    game.events.on('building:completed', (b) => { if (mine(b)) this.feed(`${b.def.name} built.`); });
+    game.events.on('unit:trained', (u) => { if (mine(u)) this.feed(`${u.def.name} trained.`); });
+    game.events.on('age:advanced', (a) => { if (a.owner === game.localPlayer) this.feed(`You reached the ${AGES[a.age]} Age!`, 'gold'); });
+    game.events.on('godpower:cast', (g) => { if (g.owner === game.localPlayer) this.feed(`You use the ${game.godpowers.powers[g.power]?.name || 'god'} God Power!`, 'gold'); });
     this.els.medal.addEventListener('mouseenter', (e) => {
       const p = game.players[game.localPlayer];
       this.tooltip(e, `<b>${AGES[p.age]} Age</b><br>Worshipping ${p.god}${AGES[p.age + 1] ? `<br>Advance at the Town Center (A)` : ''}`);
@@ -142,6 +172,49 @@ export class UI {
     return new THREE.Mesh(this.game.buildings.geometry(type), voxelMaterialFor(this.game.players[owner].color, { fog: false }));
   }
 
+  feed(text, cls = '') {
+    const d = document.createElement('div');
+    d.className = `note ${cls}`;
+    d.textContent = text;
+    this.els.feed.appendChild(d);
+    this.feedItems.push({ el: d, t: this.game.time });
+    while (this.feedItems.length > 4) this.feedItems.shift().el.remove();
+  }
+
+  selectIdleArmy() {
+    const game = this.game;
+    const ids = [...game.entities.units()].filter((u) => u.owner === game.localPlayer && !u.dead && !u.def.gatherer && u.def.attack && (!u.order || u.order.type === 'idle')).map((u) => u.id);
+    if (!ids.length) { this.message('No idle military'); return; }
+    this.selection.set(ids);
+    this.selection.centerOn(ids);
+  }
+
+  // Control-group cards (top-left): portrait of the group's most common type, count, key.
+  refreshGroups() {
+    const game = this.game, groups = this.selection.groups;
+    let html = '';
+    const keys = [];
+    for (const k of ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']) {
+      const es = (groups[k] || []).map((id) => game.entities.get(id)).filter((e) => e && !e.dead);
+      if (!es.length) continue;
+      const tally = {};
+      for (const e of es) tally[e.kind + ':' + e.type] = (tally[e.kind + ':' + e.type] || 0) + 1;
+      const [kind, type] = Object.entries(tally).sort((a, b) => b[1] - a[1])[0][0].split(':');
+      const img = kind === 'unit' ? this.panel.portraitUnit(type, es[0].owner) : this.panel.portraitBuilding(type, es[0].owner);
+      html += `<div class="grp" data-k="${k}"><img src="${img}"><span class="cnt">${es.length}</span><span class="key">${k}</span></div>`;
+      keys.push(k);
+    }
+    if (this.lastText.groups === html) return;
+    this.lastText.groups = html;
+    this.els.groups.innerHTML = html;
+    for (const d of this.els.groups.querySelectorAll('.grp')) {
+      d.addEventListener('click', () => {
+        const ids = (groups[d.dataset.k] || []).filter((id) => { const x = game.entities.get(id); return x && !x.dead; });
+        if (ids.length) { this.selection.set(ids); this.selection.centerOn(ids); }
+      });
+    }
+  }
+
   message(text) {
     if (!text) return;
     this.msg.textContent = text;
@@ -187,9 +260,21 @@ export class UI {
     for (const k in n) this.setText(`n${k}`, this.els[`n${k}`], n[k]);
     this.setText('idle', this.els.idleBadge, idle);
     this.els.idleBadge.style.display = idle ? '' : 'none';
+    let army = 0;
+    for (const u of game.entities.units()) if (u.owner === me && !u.dead && !u.def.gatherer && u.def.attack && (!u.order || u.order.type === 'idle')) army++;
+    this.setText('army', this.els.armyBadge, army);
+    this.els.armyBadge.style.display = army ? '' : 'none';
+    this.refreshGroups();
+    // feed notices fade after ~14 s of game time
+    this.feedItems = this.feedItems.filter((f) => {
+      const age = game.time - f.t;
+      if (age > 14) { f.el.remove(); return false; }
+      f.el.style.opacity = age > 11 ? String(Math.max(0, (14 - age) / 3)) : '';
+      return true;
+    });
     const rows = Object.values(game.players).filter((pl) => pl && pl.id !== 0).map((pl) => {
       const col = '#' + pl.color.toString(16).padStart(6, '0');
-      return `<div><span>${pl.id === me ? 'You' : pl.name} <em style="color:var(--muted);font-style:normal;font-weight:500">(${pl.god})</em></span><i style="background:${col}">${pl.id}</i><span class="s">${(score[pl.id] || 0) + pl.age * 100}</span></div>`;
+      return `<div><span>${pl.id === me ? 'You' : pl.name} <em>(${pl.god})</em>:</span><i style="background:${col}">${pl.id}</i><span class="ag">${['I', 'II', 'III', 'IV'][pl.age] || ''}</span><span class="s">${(score[pl.id] || 0) + pl.age * 100}</span></div>`;
     }).join('');
     if (this.lastText.scores !== rows) { this.lastText.scores = rows; this.els.scores.innerHTML = rows; }
     const p = game.players[me];

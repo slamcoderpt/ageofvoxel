@@ -5,7 +5,7 @@ export const ICONS = {
   gold: `<svg viewBox="0 0 24 24"><path d="M3 18l4-7h6l-4 7z" fill="#e0a526"/><path d="M11 18l4-7h6l-4 7z" fill="#f2c14e"/><path d="M7 11l3-5h5l-3 5z" fill="#ffd970"/><path d="M8 11l2-3" stroke="#fff4c0" stroke-width="1"/></svg>`,
   favor: `<svg viewBox="0 0 24 24"><path d="M13 2L5 14h6l-2 8 10-13h-6l3-7z" fill="#8fd0ff" stroke="#e8f6ff" stroke-width="1"/></svg>`,
   pop: `<svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="4" fill="#e9dcc0"/><path d="M4 22c0-6 3.5-9 8-9s8 3 8 9z" fill="#e9dcc0"/></svg>`,
-  stop: `<svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2" fill="#d6423a" stroke="#fff" stroke-width="1.5"/></svg>`,
+  stop: `<svg viewBox="0 0 24 24"><path d="M5 3l7 7 7-7 2 2-7 7 7 7-2 2-7-7-7 7-2-2 7-7-7-7z" fill="#d8352c" stroke="#3a0806" stroke-width="1"/><path d="M5 4.4l7 7" stroke="#ff9a86" stroke-width="1"/></svg>`,
   age: `<svg viewBox="0 0 24 24"><path d="M12 2l3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z" fill="#f2c14e" stroke="#fff3c4" stroke-width="1"/></svg>`,
   storm: `<svg viewBox="0 0 24 24"><ellipse cx="12" cy="7" rx="9" ry="4.5" fill="#566078"/><path d="M11 10l-4 7h4l-2 6 7-9h-4l2-4z" fill="#bfe3ff"/></svg>`,
   bolt: `<svg viewBox="0 0 24 24"><path d="M14 1L6 13h5l-3 10 10-14h-5l3-8z" fill="#ffe27a" stroke="#fff" stroke-width="1"/></svg>`,
@@ -27,3 +27,15 @@ Object.assign(ICONS, {
   wing: `<svg viewBox="0 0 120 40"><defs><linearGradient id="wg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6dc9a"/><stop offset=".5" stop-color="#c79a4c"/><stop offset="1" stop-color="#6a4a22"/></linearGradient></defs><path d="M118 6C90 4 55 6 18 14 34 14 46 13 58 13 40 17 24 22 6 30c22-3 38-6 54-8-14 5-26 10-36 16 26-5 50-12 70-20 10-4 18-9 24-18z" fill="url(#wg)" stroke="#2a1a0c" stroke-width="1.4"/><path d="M110 10C84 12 64 15 40 20M104 16C84 20 66 24 46 30" stroke="#5a3c18" stroke-width="1" fill="none" opacity=".7"/></svg>`,
 });
 ICONS.meteor = `<svg viewBox="0 0 24 24"><path d="M3 3l9 6M6 2l8 8M2 7l9 5" stroke="#ffb347" stroke-width="2" stroke-linecap="round" opacity=".85"/><circle cx="15.5" cy="15.5" r="6" fill="#8a3a1a"/><circle cx="15.5" cy="15.5" r="4.2" fill="#e5601e"/><circle cx="14" cy="14" r="1.8" fill="#ffd27a"/></svg>`;
+
+// Minimap button ring / top-right menu glyphs (drawn in the bronze-on-teal style).
+Object.assign(ICONS, {
+  military: `<svg viewBox="0 0 24 24"><path d="M5 3l11 11-2 2L3 5V3z" fill="#e6ecef" stroke="#6d7c86" stroke-width=".8"/><path d="M19 3L8 14l2 2L21 5V3z" fill="#e6ecef" stroke="#6d7c86" stroke-width=".8"/><path d="M6 15l3 3-3 3-3-3zM18 15l-3 3 3 3 3-3z" fill="#c9a24c" stroke="#3a2a10" stroke-width=".6"/></svg>`,
+  terrain: `<svg viewBox="0 0 24 24"><path d="M1 20l7-12 4 6 3-4 8 10z" fill="#7fae5a" stroke="#e9f2d0" stroke-width="1"/><path d="M8 8l2 3.4-2-.8-2 .8z" fill="#fff"/></svg>`,
+  laurel: `<svg viewBox="0 0 24 24"><path d="M12 21c-5-1-8-5-8-11" stroke="#e9c878" stroke-width="1.6" fill="none"/><path d="M12 21c5-1 8-5 8-11" stroke="#e9c878" stroke-width="1.6" fill="none"/><g fill="#e9c878"><ellipse cx="4.5" cy="9" rx="1.4" ry="2.6"/><ellipse cx="5.4" cy="13.5" rx="1.4" ry="2.6" transform="rotate(-30 5.4 13.5)"/><ellipse cx="8" cy="17.4" rx="1.4" ry="2.6" transform="rotate(-55 8 17.4)"/><ellipse cx="19.5" cy="9" rx="1.4" ry="2.6"/><ellipse cx="18.6" cy="13.5" rx="1.4" ry="2.6" transform="rotate(30 18.6 13.5)"/><ellipse cx="16" cy="17.4" rx="1.4" ry="2.6" transform="rotate(55 16 17.4)"/></g><path d="M12 5l1.5 3 3.3.4-2.4 2.3.6 3.3L12 12.4 9 14l.6-3.3-2.4-2.3 3.3-.4z" fill="#fff0c0"/></svg>`,
+  pause: `<svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" fill="#f3e3b8"/><rect x="14" y="5" width="4" height="14" rx="1" fill="#f3e3b8"/></svg>`,
+  play: `<svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="#f3e3b8"/></svg>`,
+  fast: `<svg viewBox="0 0 24 24"><path d="M2 5l9 7-9 7zM12 5l9 7-9 7z" fill="#f3e3b8"/></svg>`,
+  scroll: `<svg viewBox="0 0 24 24"><path d="M6 3h11a3 3 0 0 1 0 6h-1v10a2 2 0 0 1-2 2H5a3 3 0 0 1 0-6h1z" fill="#e9dcc0" stroke="#7a5a2c" stroke-width="1"/><path d="M9 8h5M9 11h5M9 14h4" stroke="#7a5a2c" stroke-width="1.2"/></svg>`,
+  gear: `<svg viewBox="0 0 24 24"><path d="M10.3 2h3.4l.5 2.6 2 .9 2.2-1.5 2.4 2.4-1.5 2.2.9 2 2.6.5v3.4l-2.6.5-.9 2 1.5 2.2-2.4 2.4-2.2-1.5-2 .9-.5 2.6h-3.4l-.5-2.6-2-.9-2.2 1.5-2.4-2.4 1.5-2.2-.9-2L2 13.7v-3.4l2.6-.5.9-2L4 5.6 6.4 3.2l2.2 1.5 2-.9z" fill="#d8c08a" stroke="#4a3514" stroke-width=".8"/><circle cx="12" cy="12" r="3.4" fill="#16323a" stroke="#4a3514"/></svg>`,
+});

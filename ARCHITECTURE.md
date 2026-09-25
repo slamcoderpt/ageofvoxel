@@ -66,7 +66,7 @@ URL params select a reproducible setup (registered in `src/core/scenes/index.js`
 | `godpower` | Zeus's Lightning Storm hitting an enemy army mid-cast |
 | `coast` | seaside town, beach, cliffs, animated water |
 | `economy` | busy economy: fenced block of farms round a granary, hunters on a deer herd, fishing boats, wood/gold/berries, building, training (used by the smoke test) |
-| `hud` | town with the full HUD visible and a villager selected, fog on |
+| `hud` | town with the full HUD visible, a villager selected and control groups set (map revealed) |
 
 Params: `scene`, `seed`, `live=1` (keep simulating; scenes are paused by default), `hud=0|1`,
 `post=high|low|off`, `fog=0|1`, `timescale=N`, `cam=x,z[,distance[,pitch[,yaw]]]` (camera override for close-ups).

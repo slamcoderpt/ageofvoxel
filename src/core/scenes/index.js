@@ -99,7 +99,7 @@ registerScene('economy', economyScene);
 
 registerScene('hud', {
   description: 'The town with the full HUD visible and a villager selected.',
-  preset: 'skirmish', seed: 7, hud: true, revealAll: false, ai: false, fastForward: 30,
+  preset: 'skirmish', seed: 7, hud: true, revealAll: true, ai: false, fastForward: 30,
   setup(game) {
     const [p, e] = game.starts;
     const t = buildTown(game, PLAYER, p, { villagers: 20, soldiers: 5 });
@@ -108,9 +108,10 @@ registerScene('hud', {
     Object.assign(pl.res, { food: 845, wood: 612, gold: 430, favor: 37 });
     game.economy.train(t.tc, 'villager');
     game.economy.train(t.tc, 'villager');
-    return { focus: t.tc, select: t.villagers.slice(0, 1) };
+    return { focus: t.tc, select: t.villagers.slice(0, 1), groups: { 1: t.army, 2: t.villagers.slice(0, 6), 3: [t.tc] } };
   },
   after(game, ctx) {
+    for (const [k, es] of Object.entries(ctx.groups)) game.ui.selection.groups[k] = es.map((e) => e.id);
     game.ui.selection.set(ctx.select.map((u) => u.id));
   },
   camera: (game, ctx) => ({ x: ctx.focus.x + 2, z: ctx.focus.z + 5, distance: 44 }),
