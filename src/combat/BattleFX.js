@@ -392,16 +392,16 @@ export class BattleFX {
     const side = e.id % 2 ? 1 : -1;
     const c = Math.cos(e.rot || 0), s = Math.sin(e.rot || 0);
     const at = (lat, fwd) => [e.x + c * lat * side + s * fwd, e.z - s * lat * side + c * fwd];
-    if (cls === 'infantry' && r.chance(0.6)) {
+    if (cls === 'infantry' && r.chance(0.85)) {
       const [x, z] = at(r.range(-0.7, -0.3), r.range(-0.3, 0.4));
       this.debris.drop('shield', x, z, { rot: r.range(0, 6.28), owner: e.owner, tilt: r.chance(0.3) ? r.range(0.2, 0.5) : r.range(-0.08, 0.08), roll: r.range(-0.1, 0.1), life });
     }
     // (a loose spear is rare: a field of sticks reads as clutter, not bodies)
-    if (cls !== 'archer' && r.chance(0.08)) {
+    if (cls !== 'archer' && r.chance(0.45)) {
       const [x, z] = at(r.range(0.3, 0.8), r.range(-0.4, 0.5));
       this.debris.drop(r.chance(0.3) ? 'stub' : 'spear', x, z, { rot: (e.rot || 0) + r.range(-1.2, 1.2), owner: e.owner, tilt: r.range(-0.05, 0.05), life });
     }
-    if (r.chance(0.25)) {
+    if (r.chance(0.45)) {
       const [x, z] = at(r.range(-0.5, 0.5), r.range(0.4, 0.8));
       this.debris.drop('helmet', x, z, { rot: r.range(0, 6.28), owner: e.owner, tilt: r.range(-0.5, 0.5), roll: r.range(1.2, 1.7), lift: 0.12, life });
     }
@@ -432,6 +432,9 @@ export class BattleFX {
     // a low layer of dark trampled earth along the seam, hugging the feet:
     // it marks the front without veiling the helmets and shields above it
     if (r.chance(0.5)) this.puff(mx, mz, { count: 1, size: r.range(1.1, 1.6), life: 2.6, alpha: r.range(0.22, 0.32), speed: 0.3, up: 0.02, y: 0.04, spread: 0.6, color: OCHRE[r.int(0, OCHRE.length - 1)], dx: r.range(-0.3, 0.3), dz: r.range(-0.3, 0.3) });
+    // and pale dust kicked up by the stamping feet, hanging knee-high all
+    // along the front so the whole line is fighting, not a few spots
+    this.puff(mx, mz, { count: 1, size: r.range(1.5, 2.2), life: 2.2, alpha: r.range(0.32, 0.46), speed: 0.35, up: 0.1, y: 0.35, spread: 0.5, color: [0xd2bf98, 0xc9b58e, 0xdccba6][r.int(0, 2)], dx: r.range(-0.25, 0.25), dz: r.range(-0.25, 0.25) });
     if (this.rng.next() < 0.5) this.game.fx.emit({ x: mx, y: this.game.map.heightAt(mx, mz) + 0.1, z: mz, count: 3, color: 0x5e4126, size: 0.12, life: 0.5, speed: 1.8, up: 2.4, gravity: -13, spread: 0.3 });
   }
 

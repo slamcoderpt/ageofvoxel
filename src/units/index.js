@@ -281,7 +281,9 @@ export class Units {
       hash.forEachNear(u.x, u.z, r + 2, (o) => {
         if (o === u || o.dead) return;
         const ro = o.radius || 0.3;
-        const want = r + ro + SPREAD_GAP * Math.min(r, ro);
+        // men of a battle line (BattleScene) stand shoulder to shoulder and
+        // face to face with their foe, not at arm's length
+        const want = r + ro + (u.combat_line && o.combat_line ? 0.35 : SPREAD_GAP) * Math.min(r, ro);
         const dx = u.x - o.x, dz = u.z - o.z;
         const d2 = dx * dx + dz * dz;
         if (d2 >= want * want) return;
@@ -436,8 +438,8 @@ export class Units {
         const dk = u.dead ? Math.min(1, u.anim.dieT / 0.8) * 0.72 : 0;
         if (dk) {
           // and half its saturation: a dull, dusty version of the dye
-          const l = this._c.r * 0.3 + this._c.g * 0.59 + this._c.b * 0.11, m = dk * 1.1;
-          this._c.setRGB(this._c.r + (l - this._c.r) * m, this._c.g + (l - this._c.g) * m, this._c.b + (l - this._c.b) * m).multiplyScalar(1 - dk * 0.9);
+          const l = this._c.r * 0.3 + this._c.g * 0.59 + this._c.b * 0.11, m = dk * 0.2;
+          this._c.setRGB(this._c.r + (l - this._c.r) * m, this._c.g + (l - this._c.g) * m, this._c.b + (l - this._c.b) * m).multiplyScalar(1 - dk * 0.35);
         }
         const ck = 1 - (u.gp_char || 0); // god power char (lightning-struck)
         const tr = this._c.r * ck, tg = this._c.g * ck, tb = this._c.b * ck;
@@ -461,7 +463,7 @@ export class Units {
           p.mesh.userData.flash.setX(i, flash);
           p.mesh.userData.fade.setX(i, fade);
           if (p.coat) p.mesh.setColorAt(i, this._c.setRGB(coat[0] * (1 - dk) * ck, coat[1] * (1 - dk) * ck, coat[2] * (1 - dk) * ck));
-          else p.mesh.setColorAt(i, this._c.setRGB((1 - dk * 0.6) * ck, (1 - dk * 0.64) * ck, (1 - dk * 0.68) * ck));
+          else p.mesh.setColorAt(i, this._c.setRGB((1 - dk * 0.3) * ck, (1 - dk * 0.34) * ck, (1 - dk * 0.38) * ck));
         }
       }
       for (const p of rig.parts) {

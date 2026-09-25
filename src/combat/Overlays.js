@@ -85,7 +85,7 @@ export class Overlays {
     const u = this.bars.material.uniforms;
     u.uResY.value = h;
     // 10px at 1080p: a 2px dark frame round a 6px fill
-    u.uBarPx.value = Math.round(Math.min(14, Math.max(8, h / 1080 * 10)));
+    u.uBarPx.value = Math.round(Math.min(16, Math.max(9, h / 1080 * 12)));
   }
 
   render(alpha) {
@@ -139,9 +139,9 @@ export class Overlays {
       // Bars are short (about a third of a man's width on screen at the
       // battle zoom) and sit at one fixed height per unit type above the
       // ground under the man, so a row of fighters gets a level row of bars.
-      const struck = game.time - (u.combat_hitT ?? -99) < 2.5;
-      if (selected || hover === u.id || (struck && f < (big ? 0.9 : 0.7)))
-        addBar(u, x, game.map.heightAt(u.x, u.z) + game.units.heightOf(u) + 0.25, z, big ? 56 : u.def.class === 'cavalry' ? 38 : 32, 1);
+      const struck = game.time - (u.combat_hitT ?? -99) < 1.6;
+      if (selected || hover === u.id || (struck && f < (big ? 0.95 : 0.6)))
+        addBar(u, x, game.map.heightAt(u.x, u.z) + game.units.heightOf(u) + 0.25, z, big ? 72 : u.def.class === 'cavalry' ? 54 : 46, 1);
     }
     for (const b of game.entities.buildings()) {
       if (b.owner !== game.localPlayer && !game.fog.isExplored(b.x, b.z)) continue;

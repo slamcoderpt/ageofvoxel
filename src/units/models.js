@@ -241,7 +241,7 @@ function crest(m, z0, z1, y0, H) {
     const k = Math.sqrt(Math.max(0, 1 - ((z - mid) / half) ** 2));
     const top = y0 + Math.max(1, Math.round(H * k));
     // a full three-voxel brush: a bold stroke from above, not a hairline
-    m.box(1, y0, z, 3, top - y0 + 1, 1, TEAM);
+    m.box(1, y0, z, 3, top - y0 + 1, 1, TEAM, { glow: 0.2 });
     m.set(0, top - 1, z, TEAM).set(4, top - 1, z, TEAM);   // brush spreads at the top
   }
 }
@@ -404,7 +404,10 @@ function spearModel(len = 30) {
   const t = len - 9;
   // a slim blade with no cross-guard, so a raised spear does not read as a
   // cross from above
-  m.box(0, t, 0, 1, 5, 1, STEEL).set(0, t + 5, 0, 0x8d9398);
+  // a broad leaf blade (three voxels across at the swell) that reads as
+  // a spearhead from the RTS camera
+  m.box(0, t, 0, 1, 7, 1, STEEL).set(0, t + 7, 0, 0x8d9398);
+  m.box(-1, t + 1, 0, 3, 3, 1, STEEL).box(0, t + 1, -1, 1, 3, 3, STEEL);
   m.box(0, -11, 0, 1, 2, 1, BRONZE).set(0, -1, 0, LEATHER).set(0, 0, 0, LEATHER).set(0, 1, 0, LEATHER);
   return m;
 }
@@ -557,9 +560,9 @@ export function hopliteRig() {
     helm('hoplite', 0), helm('hopCor', 1), helm('hopAttic', 2), helm('hopPilos', 3),
     part('cloakLong', cloakModel('long'), [4, 0, 2], [0, 0, 0], 'torso', { show: gearIs('cloak', 1), portrait: true }),
     part('cloakShort', cloakModel('short'), [4, 0, 2], [0, 0, 0], 'torso', { show: gearIs('cloak', 2) }),
-    part('weapon', spearModel(28), [0, 0, 0], HAND, 'armR'),
-    part('pennant', pennantModel(28), [0, 0, 0], HAND, 'armR', { anim: 'weapon', show: gearIs('pennant', 1), portrait: false }),
-    ...[0, 1, 2, 3].map((v) => part(v ? `shield${v}` : 'shield', aspis(5, BRONZE, v), [0, 0, 0], [1.5, -4, 2.8], 'armL', { anim: 'shield', show: gearIs('shield', v), portrait: !v })),
+    part('weapon', spearModel(32), [0, 0, 0], HAND, 'armR'),
+    part('pennant', pennantModel(32), [0, 0, 0], HAND, 'armR', { anim: 'weapon', show: gearIs('pennant', 1), portrait: false }),
+    ...[0, 1, 2, 3].map((v) => part(v ? `shield${v}` : 'shield', aspis(6, BRONZE, v), [0, 0, 0], [1.5, -4, 3.2], 'armL', { anim: 'shield', show: gearIs('shield', v), portrait: !v })),
   ];
 }
 

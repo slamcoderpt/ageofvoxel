@@ -56,7 +56,9 @@ function attackPhase(u) {
   const a = (u.anim.attackT ?? 1) * (0.9 + uhash(u, 41) * 0.2);
   const cd = u.def?.attack?.cooldown ?? 1.2;
   const extend = a < 0.1 ? smooth(a / 0.1) : 1 - smooth((a - 0.1) / 0.35);
-  const wind = smooth((a - 0.45) / Math.max(0.2, cd - 0.55));
+  // the weapon comes up fast after the recovery and is held cocked high
+  // for the rest of the reload, so a melee shows men poised to strike
+  const wind = smooth((a - 0.45) / Math.max(0.2, (cd - 0.55) * 0.45));
   return { a, cd, extend: a < 0.45 ? extend : 0, wind: a < 0.45 ? 0 : wind };
 }
 
