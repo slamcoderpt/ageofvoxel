@@ -58,7 +58,7 @@ export const atmosUniforms = {
   uPaveAlb: { value: 0.58 },
   uPaveScale: { value: 4.2 },  // cobbles per world unit
   uPaveJoint: { value: 0.3 },  // joint darkening
-  uGroundBounce: { value: new THREE.Color(0.16, 0.12, 0.08) },
+  uGroundBounce: { value: new THREE.Color(0.11, 0.085, 0.055) },
   uHalo: { value: 1.0 },
   // Crown value range: the shaded half of every crown (faces turned from the
   // sun, undersides, crevices) is desaturated toward a cool dark green by

@@ -59,17 +59,17 @@ export class Lighting {
     // sunlit sandstone to grey-white); all exposure is applied here, before
     // tone mapping, so the grade never has to push values past white.
     renderer.toneMapping = THREE.NeutralToneMapping;
-    renderer.toneMappingExposure = 2.08;
+    renderer.toneMappingExposure = 2.45;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer = renderer;
     const scene = game.scene;
 
-    // Sun: golden late-afternoon light (~37 deg elevation) so buildings and
+    // Sun: golden late-afternoon light (~31 deg elevation, ~5000K) so buildings and
     // trees throw long, readable shadows like Retold's town shots, and tree
     // crowns shade the crowns beside them.
-    this.sunDir = new THREE.Vector3(-0.6, 0.55, 0.4).normalize();
+    this.sunDir = new THREE.Vector3(-0.6, 0.47, 0.4).normalize();
     // The sun carries all of the frame's warmth (the grade adds none).
-    this.sun = new THREE.DirectionalLight(0xffd890, 5.0);
+    this.sun = new THREE.DirectionalLight(0xffcf82, 5.4);
     this.sun.castShadow = true;
     const sm = post === 'high' ? 4096 : 2048;
     this.sun.shadow.mapSize.set(sm, sm);
@@ -78,15 +78,15 @@ export class Lighting {
     this.sun.shadow.radius = 1.8;
     // cast shadows are not opaque slabs: ~35% of the sun still reaches them
     // (Retold's plaza shade stays light and walkable, cobbles readable)
-    this.sun.shadow.intensity = 0.65;
+    this.sun.shadow.intensity = 0.88;
     this.shadowExtent = 60;
     scene.add(this.sun, this.sun.target);
 
     // Sky light is a soft cool blue and the ground bounce warm-brown: shadows
     // read as clean cool shade against the warm sunlit stone and roofs.
-    this.hemi = new THREE.HemisphereLight(0xa8b8c8, 0x8a7050, 1.0);
+    this.hemi = new THREE.HemisphereLight(0x98b0d0, 0x7a6448, 0.7);
     scene.add(this.hemi);
-    this.fill = new THREE.DirectionalLight(0xb0bcc8, 0.3); // soft cool bounce from the opposite side
+    this.fill = new THREE.DirectionalLight(0xa0b4d0, 0.2); // soft cool bounce from the opposite side
     this.fill.position.set(0.6, 0.5, -0.5);
     scene.add(this.fill);
 
@@ -97,7 +97,7 @@ export class Lighting {
     // slowly, so the forest at the top of an RTS frame recedes and loses
     // contrast while the town in the middle stays clean.
     this.hazeColor = new THREE.Color(0xc6ced3); // cool, low-contrast air
-    this.hazeNear = 1.0; this.hazeFar = 3.4; // x camera distance
+    this.hazeNear = 0.9; this.hazeFar = 2.6; // x camera distance
     scene.fog = new THREE.Fog(this.hazeColor, 80, 400);
     scene.background = this.hazeColor.clone();
 
