@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Sky } from './Sky.js';
 import { PostFX } from './PostFX.js';
+import { MaterialPatcher } from './MaterialPatches.js';
 import { fowUniforms } from '../core/FogOfWar.js';
 
 // Owns the renderer, sun/sky/hemisphere lights, shadows, atmospheric fog and
@@ -48,6 +49,8 @@ export class Lighting {
     scene.fog = new THREE.Fog(this.hazeColor, 80, 400);
     scene.background = this.hazeColor.clone();
 
+    this.patcher = new MaterialPatcher(scene);
+
     this.post = post === 'off' ? null : new PostFX(renderer, scene, game.camera, post);
   }
 
@@ -79,6 +82,8 @@ export class Lighting {
   }
 
   draw() {
+    this.patcher.scan();
+    this.patcher.update(this.sunDir, this.game.camera);
     if (this.post) this.post.render();
     else this.renderer.render(this.game.scene, this.game.camera);
   }

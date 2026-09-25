@@ -14,7 +14,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 //    rich while highlights stay clean,
 //  - split toning: cool blue-teal in the shadows, warm gold in the highlights,
 //  - a filmic S-curve with lifted, coloured blacks (no crushed pure greens),
-//  - a warm, soft vignette to hold the eye in the middle of the frame.
+//  - a barely noticeable warm vignette (~12% at the corners).
 const GradeShader = {
   uniforms: {
     tDiffuse: { value: null },
@@ -24,13 +24,14 @@ const GradeShader = {
     uGreenShift: { value: 0.42 },
     uGreenDesat: { value: 0.42 },
     uContrast: { value: 1.08 },
-    uShadowTint: { value: new THREE.Vector3(0.05, 0.06, 0.075) },
+    uShadowTint: { value: new THREE.Vector3(0.035, 0.055, 0.065) },
     uHighTint: { value: new THREE.Vector3(1.05, 1.0, 0.93) },
-    uVignette: { value: 0.2 },
+    uVignette: { value: 0.12 },
+    uToeLift: { value: 0.06 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uChromaLimit, uExposure, uSaturation, uGreenShift, uGreenDesat, uContrast, uVignette;
+    uniform sampler2D tDiffuse; uniform float uToeLift, uChromaLimit, uExposure, uSaturation, uGreenShift, uGreenDesat, uContrast, uVignette;
     uniform vec3 uShadowTint, uHighTint; varying vec2 vUv;
     const vec3 LW = vec3(0.2126, 0.7152, 0.0722);
     void main(){
@@ -53,19 +54,22 @@ const GradeShader = {
       // --- global saturation
       l = dot(c, LW);
       c = mix(vec3(l), c, uSaturation);
-      // --- filmic S-curve around mid grey
+      // --- filmic S-curve: contrast in the mids/highlights only; the toe is
+      // protected (and gently lifted) so shaded foliage keeps its value.
       c = clamp(c, 0.0, 1.2);
       vec3 s = c * c * (3.0 - 2.0 * c);
-      c = mix(c, s, uContrast - 1.0 + 0.25);
-      // --- split tone: cool shadows, warm highlights
+      vec3 k = smoothstep(0.18, 0.55, c);
+      c = mix(c, s, (uContrast - 1.0 + 0.25) * k);
+      c = c + uToeLift * (1.0 - c) * (1.0 - smoothstep(0.0, 0.35, c));
+      // --- split tone: cool blue-green shadows, warm highlights
       l = dot(c, LW);
       float hi = smoothstep(0.25, 0.9, l);
       c *= mix(vec3(1.0), uHighTint, hi);
       c += uShadowTint * (1.0 - smoothstep(0.0, 0.45, l));
-      // --- warm vignette
+      // --- barely-there warm vignette (~12% at the far corners)
       vec2 d = vUv - 0.5;
-      float v = smoothstep(0.3, 0.9, length(d * vec2(1.25, 1.0)));
-      c *= mix(vec3(1.0), vec3(0.78, 0.72, 0.66), v * uVignette / 0.28);
+      float v = smoothstep(0.35, 0.85, length(d * vec2(1.25, 1.0)));
+      c *= 1.0 - v * uVignette * vec3(0.85, 1.0, 1.15);
       gl_FragColor = vec4(clamp(c, 0.0, 1.0), t.a);
     }`,
 };
@@ -81,7 +85,7 @@ export class PostFX {
       this.gtao = new GTAOPass(scene, camera, size.x, size.y);
       this.gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.6, thickness: 2.5, scale: 1.25, samples: 12, distanceFallOff: 1.0 });
       this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
-      this.gtao.blendIntensity = 0.95;
+      this.gtao.blendIntensity = 0.75;
       // Let pieces opt objects out of the AO g-buffer with object.userData.noAO
       // (water, overlays, effects).
       const orig = this.gtao._overrideVisibility.bind(this.gtao);
