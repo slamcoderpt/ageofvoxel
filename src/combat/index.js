@@ -224,9 +224,27 @@ export class Combat {
       const e = this.findEnemyNear(b, a.range + b.w / 2);
       if (e) { b.attackCd = a.cooldown; this.projectiles.fire(b, e, a.damage, { fromY: 4 }); }
     }
+    this.holdLines();
     this.projectiles.update(dt);
     this.fx.update(dt);
     this.ai.update(dt);
+  }
+
+  // Phalanx discipline (set up by BattleScene): a man with combat_line never
+  // steps past his army's side of the seam, so however hard the ranks press
+  // and jostle, a strip of open ground stays between the two fronts.
+  //   combat_line = { cx, cz, nx, nz, d0 }: (nx, nz) unit normal pointing
+  //   from the seam towards this army; d0 = closest allowed depth.
+  holdLines() {
+    const map = this.game.map;
+    for (const u of this.game.entities.units()) {
+      const L = u.combat_line;
+      if (!L || u.dead) continue;
+      const d = (u.x - L.cx) * L.nx + (u.z - L.cz) * L.nz;
+      if (d >= L.d0) continue;
+      const nx = u.x + (L.d0 - d) * L.nx, nz = u.z + (L.d0 - d) * L.nz;
+      if (map.isWalkable(Math.floor(nx), Math.floor(nz))) { u.x = nx; u.z = nz; }
+    }
   }
 
   // Body language in the melee: a man struck reels back from the blow (the

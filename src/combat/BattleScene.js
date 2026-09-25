@@ -10,6 +10,8 @@ import { fieldHeroesAndMyth, engageHeroesAndMyth } from '../units/battleHost.js'
 // sweeping round the flank to ride down the enemy archers.
 
 const S = Math.SQRT1_2;
+// half the gap between the two front ranks (centre to centre), in tiles
+const SEAM = 1.45;
 // a: along the front (screen right is +a); d: depth (towards the camera is +d)
 const P = (cx, cz, a, d) => [cx + (a + d) * S, cz + (d - a) * S];
 
@@ -46,9 +48,11 @@ function army(game, owner, side, cx, cz) {
       if (r < 2 && rng.chance(r === 0 ? 0.14 : 0.1)) { units.gaps.push([a, 1.3 + r * 1.2]); continue; }
       const loose = r === 0 ? 1 : r === 1 ? 0.5 : 0;
       const d = 1.3 + r * 1.2 + loose * (rng.chance(0.2) ? rng.range(0.3, 0.6) : rng.range(-0.15, 0.2)) + J() * 0.4;
-      const u = at('hoplite', a + loose * rng.range(-0.25, 0.25), d);
-      u.combat_leash = r === 0 ? 2.9 : 1.6;
-      u.combat_reach = 1.05;
+      const u = at('hoplite', a + loose * rng.range(-0.25, 0.25), Math.max(SEAM + 0.05, d + 0.15));
+      u.combat_leash = r === 0 ? 3.4 : 1.6;
+      u.combat_reach = 1.55;
+      // nobody crosses the seam: the fronts stay a pace and a half apart
+      u.combat_line = { cx, cz, nx: S * side, nz: S * side, d0: SEAM + r * 0.9 };
       (r === 0 ? units.front : units.rear).push(u);
     }
   // archer screen: two loose ranks well behind the phalanx
@@ -80,7 +84,16 @@ function fallen(game, units, owner, side, cx, cz) {
     u.anim.dieT = 2;
     return u;
   };
-  for (let i = 0; i < 9; i++) body('hoplite', rng.range(-12, 12), rng.range(0.05, 0.75));
+  // the dead of the first clash lie in heaps where the fighting was hottest,
+  // two or three men across one another in the strip between the fronts
+  for (let h = 0; h < 5; h++) {
+    const ha = rng.range(-12, 12), hd = rng.range(0.25, 0.9);
+    const n = rng.int(2, 3);
+    for (let i = 0; i < n; i++) body('hoplite', ha + rng.range(-0.45, 0.45), hd + rng.range(-0.3, 0.3));
+    const [x, z] = P(cx, cz, ha * side, hd * side);
+    fx.scar(x, z, 1.1, 0.6, 0.8);
+  }
+  for (let i = 0; i < 4; i++) body('hoplite', rng.range(-12, 12), rng.range(0.2, 0.9));
   for (const [a, d] of units.gaps) body('hoplite', a + rng.range(-0.2, 0.2), d + rng.range(-0.2, 0.3));
   // riders and archers cut down where the cavalry wing hit the archer screen
   for (let i = 0; i < 2; i++) body('hippikon', rng.range(10, 17), rng.range(5.5, 9.5));
@@ -100,10 +113,12 @@ function fallen(game, units, owner, side, cx, cz) {
 // earth, heaviest along the seam, ragged at the edges, blood where men fell.
 function churn(game, cx, cz) {
   const rng = game.rng, fx = game.combat.fx;
-  for (let a = -14.5; a <= 14.5; a += 0.45) {
-    if (rng.chance(0.12)) continue;
-    const [x, z] = P(cx, cz, a + rng.range(-0.2, 0.2), rng.range(-0.9, 0.9));
-    fx.scar(x, z, rng.range(0.7, 1.4), rng.range(0.45, 0.9), rng.chance(0.18) ? rng.range(0.3, 0.7) : 0);
+  for (let a = -15; a <= 15; a += 0.35) {
+    for (const d of [-0.9, 0, 0.9]) {
+      if (rng.chance(0.1)) continue;
+      const [x, z] = P(cx, cz, a + rng.range(-0.25, 0.25), d + rng.range(-0.5, 0.5));
+      fx.scar(x, z, rng.range(0.7, 1.3), d === 0 ? rng.range(0.7, 1.0) : rng.range(0.35, 0.7), rng.chance(0.15) ? rng.range(0.3, 0.7) : 0);
+    }
   }
   for (let i = 0; i < 70; i++) {
     const [x, z] = P(cx, cz, rng.range(-14, 14), (rng.chance(0.5) ? 1 : -1) * rng.range(1, 4.2));

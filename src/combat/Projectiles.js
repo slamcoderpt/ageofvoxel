@@ -42,17 +42,23 @@ export class Projectiles {
           vec3 p = mix(aTail, aHead, along);
           vec3 dir = aHead - aTail;
           vec3 side = normalize(cross(dir + vec3(1e-4), cameraPosition - p));
-          p += side * position.y * mix(0.015, 0.075, along);
+          p += side * position.y * mix(0.03, 0.16, along * along);
           vUv = vec2(along, position.y * 2.0);
           gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
         }`,
+      // a bright streak: hot white-gold at the head (it catches the bloom)
+      // fading through amber to nothing along the trail
       fragmentShader: `
         varying vec2 vUv;
         void main(){
-          float a = pow(vUv.x, 1.6) * (1.0 - abs(vUv.y)) * 0.55;
-          gl_FragColor = vec4(vec3(1.0, 0.96, 0.86) * 1.4, a);
+          float k = vUv.x;
+          float core = 1.0 - smoothstep(0.0, 1.0, abs(vUv.y));
+          float a = pow(k, 1.3) * core;
+          vec3 c = mix(vec3(1.0, 0.55, 0.18), vec3(1.0, 0.95, 0.8), k * k) * (0.6 + 2.2 * k * k * k);
+          gl_FragColor = vec4(c * a, a);
         }`,
       transparent: true,
+      blending: THREE.AdditiveBlending,
       depthWrite: false,
       side: THREE.DoubleSide,
     }));
@@ -133,7 +139,7 @@ export class Projectiles {
       this.mesh.setMatrixAt(i, this._m);
       if (p.tx !== undefined) {
         const k = Math.min(1, p.t / p.dur);
-        this.posAt(p, Math.max(0, k - 0.16), tail);
+        this.posAt(p, Math.max(0, k - 0.28), tail);
         this.aHead.setXYZ(t, p.x - this._d.x * 0.3, p.y - this._d.y * 0.3, p.z - this._d.z * 0.3);
         this.aTail.setXYZ(t, tail.x, tail.y, tail.z);
         t++;

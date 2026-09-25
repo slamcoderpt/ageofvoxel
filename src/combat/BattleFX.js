@@ -14,8 +14,10 @@ import { Debris } from './Debris.js';
 // visual RNG is private so gameplay randomness is untouched.
 
 const MAX_CELLS = 12000;
-const MAX_DUST = 3000;
-const MAX_SPARK = 2000;
+const MAX_DUST = 4000;
+const MAX_SPARK = 3000;
+// brown-ochre dust of trampled dry earth
+const OCHRE = [0xd2b184, 0xc8a574, 0xdcc298, 0xbf9c6c];
 
 export class BattleFX {
   constructor(game) {
@@ -62,9 +64,9 @@ export class BattleFX {
         void main(){
           vec2 p = gl_PointCoord - 0.5;
           float d = length(p) * 2.0;
-          float core = 1.0 - smoothstep(0.0, 0.45, d);
+          float core = 1.0 - smoothstep(0.1, 0.6, d);
           float halo = 1.0 - smoothstep(0.3, 1.0, d);
-          float a = vA * (core + 0.45 * halo * halo);
+          float a = vA * (core + 0.6 * halo * halo);
           if (a < 0.01) discard;
           gl_FragColor = vec4(mix(vCol, vec3(3.0), core * 0.5) * a, a);
         }`,
@@ -305,20 +307,24 @@ export class BattleFX {
       // or a wound (a dark spray of blood). Always a little dirt at the feet.
       const roll = r.next();
       const shielded = target.def?.class === 'infantry' || target.def?.class === 'cavalry';
-      if (roll < 0.36) {
-        this.spark(px, y, pz, { count: 1, color: 0xffd8a0, bright: 1.3, size: r.range(0.45, 0.8), life: 0.12, speed: 0, up: 0, gravity: 0 });
-        this.spark(px, y, pz, { count: r.int(5, 9), color: r.chance(0.5) ? 0xff8a20 : 0xffb050, bright: 1.9, size: 0.26, life: 0.55, speed: r.range(3, 5.5), up: 2.4 });
-        if (r.chance(0.5)) this.spark(px, y, pz, { count: 2, color: 0xfff0d0, bright: 1.5, size: 0.12, life: 0.18, speed: 6, up: 1.4 });
-      } else if (roll < 0.7 && shielded) {
-        game.fx.emit({ x: px, y, z: pz, count: r.int(6, 10), color: r.chance(0.5) ? 0xb88450 : 0xe0bc80, colorVar: 0.2, size: 0.13, life: 0.6, speed: 3, up: 2.8, gravity: -14, spread: 0.08 });
-        this.spark(px, y, pz, { count: 2, color: 0xffc070, bright: 1.1, size: 0.12, life: 0.16, speed: 3, up: 1.5 });
+      // every blow opens with a short white-orange flash at the point of contact
+      this.spark(px, y, pz, { count: 1, color: 0xffe2b0, bright: 1.6, size: r.range(1.0, 1.5), life: 0.4, speed: 0, up: 0, gravity: 0 });
+      if (roll < 0.4) {
+        this.spark(px, y, pz, { count: r.int(8, 13), color: r.chance(0.5) ? 0xff8a20 : 0xffb050, bright: 2.2, size: 0.5, life: 0.65, speed: r.range(3.5, 6), up: 2.8 });
+        this.spark(px, y, pz, { count: 3, color: 0xfff0d0, bright: 1.8, size: 0.3, life: 0.3, speed: 7, up: 1.6 });
+      } else if (roll < 0.72 && shielded) {
+        game.fx.emit({ x: px, y, z: pz, count: r.int(8, 12), color: r.chance(0.5) ? 0xb88450 : 0xe0bc80, colorVar: 0.2, size: 0.17, life: 0.7, speed: 3.2, up: 3, gravity: -14, spread: 0.08 });
+        this.spark(px, y, pz, { count: r.int(4, 6), color: 0xffa040, bright: 2.0, size: 0.42, life: 0.4, speed: 4, up: 2 });
       } else {
-        game.fx.emit({ x: px, y: y - 0.1, z: pz, count: r.int(5, 9), color: 0x8a0e0a, colorVar: 0.25, size: 0.13, life: 0.55, speed: 2, up: 2, gravity: -12, spread: 0.1 });
+        game.fx.emit({ x: px, y: y - 0.1, z: pz, count: r.int(8, 12), color: 0x8a0e0a, colorVar: 0.25, size: 0.17, life: 0.6, speed: 2.4, up: 2.2, gravity: -12, spread: 0.1 });
+        this.spark(px, y, pz, { count: 3, color: 0xff9030, bright: 1.8, size: 0.38, life: 0.35, speed: 4, up: 2 });
         this.scar(x + r.range(-0.3, 0.3), z + r.range(-0.3, 0.3), 0.35, 0.1, 0.5);
       }
       // feet scrabbling: brown dust at ground level, clods of earth
-      if (r.chance(0.7)) this.puff(x + r.range(-0.3, 0.3), z + r.range(-0.3, 0.3), { count: r.int(1, 2), size: r.range(0.8, 1.4), life: 1.4, alpha: 0.6, speed: 0.8, up: 0.45, y: 0.35, spread: 0.3, color: r.chance(0.5) ? 0xb39068 : 0xcdb088 });
-      if (r.chance(0.5)) game.fx.emit({ x: px, y: gy + 0.1, z: pz, count: r.int(2, 5), color: 0x5a3e22, size: 0.11, life: 0.5, speed: 2, up: 2.4, gravity: -13, spread: 0.25 });
+      this.puff(px + r.range(-0.3, 0.3), pz + r.range(-0.3, 0.3), { count: r.int(1, 2), size: r.range(1.1, 1.7), life: 1.8, alpha: 0.45, speed: 0.7, up: 0.3, y: 0.25, spread: 0.35, color: OCHRE[r.int(0, OCHRE.length - 1)] });
+      // voxel chunks: clods of turf and bits of bronze and wood
+      game.fx.emit({ x: px, y: gy + 0.15, z: pz, count: r.int(4, 7), color: 0x4e3620, colorVar: 0.2, size: 0.16, life: 0.6, speed: 2.4, up: 3, gravity: -13, spread: 0.25 });
+      if (r.chance(0.5)) game.fx.emit({ x: px, y, z: pz, count: r.int(2, 4), color: r.chance(0.5) ? 0xc89a50 : 0x9aa0a4, colorVar: 0.15, size: 0.12, life: 0.55, speed: 3, up: 2.5, gravity: -14, spread: 0.1 });
       this.scar(px, pz, 0.5, 0.3, 0.0);
     } else if (kind === 'arrow') {
       if (r.chance(0.5)) game.fx.emit({ x, y, z, count: 3, color: 0x7a0c08, size: 0.08, life: 0.4, speed: 1.2, up: 1.2, gravity: -12, spread: 0.05 });
@@ -377,8 +383,10 @@ export class BattleFX {
     }
     // churn the ground and raise dust along the contact line, not round the fighter
     const mx = t ? (u.x + t.x) / 2 : u.x, mz = t ? (u.z + t.z) / 2 : u.z;
-    this.scar(mx + this.rng.range(-0.2, 0.2), mz + this.rng.range(-0.2, 0.2), 0.75, 0.3);
-    if (this.rng.chance(0.55)) this.puff(mx, mz, { count: 1, size: this.rng.range(1.0, 1.7), life: 2.4, alpha: 0.4, speed: 0.4, up: 0.35, y: 0.6, spread: 0.45, color: this.rng.chance(0.5) ? 0xbfa27c : 0xd6c09c });
+    const r = this.rng;
+    this.scar(mx + r.range(-0.2, 0.2), mz + r.range(-0.2, 0.2), 0.75, 0.3);
+    // a standing bank of ochre dust along the seam, drifting over the feet
+    this.puff(mx, mz, { count: 1, size: r.range(1.8, 2.8), life: 3.4, alpha: r.range(0.32, 0.48), speed: 0.35, up: 0.1, y: 0.2, spread: 0.6, color: OCHRE[r.int(0, OCHRE.length - 1)], dx: r.range(-0.3, 0.3), dz: r.range(-0.3, 0.3) });
     if (this.rng.next() < 0.5) this.game.fx.emit({ x: mx, y: this.game.map.heightAt(mx, mz) + 0.1, z: mz, count: 3, color: 0x5e4126, size: 0.12, life: 0.5, speed: 1.8, up: 2.4, gravity: -13, spread: 0.3 });
   }
 
@@ -395,7 +403,7 @@ export class BattleFX {
       this.dVel[k] *= dr; this.dVel[k + 1] *= dr; this.dVel[k + 2] *= dr;
       this.dPos[k] += this.dVel[k] * dt; this.dPos[k + 1] += this.dVel[k + 1] * dt; this.dPos[k + 2] += this.dVel[k + 2] * dt;
       const t = 1 - this.dLife[i] / this.dMax[i];
-      this.dAlpha[i] = this.dA0[i] * Math.min(1, t * 5) * (1 - t);
+      this.dAlpha[i] = this.dA0[i] * Math.min(1, t * 4) * (1 - t * t);
       this.dSize[i] = this.dBase[i] * (1 + 1.6 * Math.sqrt(t));
       i++;
     }

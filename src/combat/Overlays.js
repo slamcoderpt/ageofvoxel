@@ -116,11 +116,12 @@ export class Overlays {
       const x = u.prevX + (u.x - u.prevX) * alpha, z = u.prevZ + (u.z - u.prevZ) * alpha;
       const selected = sel.has(u.id);
       if (selected || hover === u.id) addRing(u, x, z, u.radius * 1.5 + 0.1);
-      // bars only on damaged (or selected/hovered) units, so in a big fight
-      // they mark the fighters at the contact line and read who is losing
-      // only the wounded show a bar: those just struck, or badly hurt
+      // In a big fight a bar over every scratched man is noise. Bars show on
+      // selected / hovered units, on heroes and myth units once hurt, and on
+      // rank-and-file only when they are close to falling.
       const f = u.hp / u.maxHp;
-      if (selected || hover === u.id || (f < 1 && (f < 0.45 || game.time - (u.combat_hitT ?? -99) < 2.2)))
+      const big = u.def.myth || u.def.hero;
+      if (selected || hover === u.id || (f < 1 && (big ? f < 0.97 : f < 0.3)))
         addBar(u, x, game.map.heightAt(x, z) + game.units.heightOf(u) + 0.35, z, u.def.myth ? 1.5 : u.def.class === 'cavalry' ? 1.0 : 0.8);
     }
     for (const b of game.entities.buildings()) {
