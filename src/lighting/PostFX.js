@@ -27,16 +27,16 @@ const GradeShader = {
     tDiffuse: { value: null },
     uExposure: { value: 1.0 },
     uChromaLimit: { value: 0.42 },
-    uSaturation: { value: 0.82 },
+    uSaturation: { value: 0.78 },
     uGreenShift: { value: 0.5 },
     uGreenDesat: { value: 0.14 },
     uContrast: { value: 1.0 },
     // mid S-curve: lit ground and roofs lift, shade drops (no milky mid-grey)
-    uMidContrast: { value: 0.42 },
+    uMidContrast: { value: 0.22 },
     // shade keeps its colour: chroma boost in the darks instead of a grey veil
     uShadowSat: { value: 0.0 },
     uShadowTint: { value: new THREE.Vector3(0.99, 0.97, 0.98) }, // near neutral: shade reads warm-olive (ground bounce), never lavender
-    uBlackFloor: { value: new THREE.Vector3(0.012, 0.016, 0.012) },
+    uBlackFloor: { value: new THREE.Vector3(0.03, 0.036, 0.026) },
     uVignette: { value: 0.0 },
     uToeLift: { value: 0.0 },
     uKnee: { value: 0.72 },
@@ -44,13 +44,23 @@ const GradeShader = {
     // Top-edge aerial haze: in the RTS view the top of the frame is always
     // the far distance, so it loses contrast and saturation and lifts toward
     // a cool grey-blue (the far forest and shoreline recede).
-    uTopHaze: { value: 0.1 },
-    uTopHazeColor: { value: new THREE.Vector3(0.66, 0.72, 0.78) },
+    uTopHaze: { value: 0.3 },
+    // Measured tonal targets (scripts/lumstats.py vs Retold ss_02): foliage
+    // luminance is compressed into ~0.19..0.53 by a linear remap
+    // (l' = uLeafLum.x + uLeafLum.y * l, soft-capped at uLeafLum.z) on pixels
+    // whose hue/saturation read as foliage, so the canopy can neither crush
+    // to black in shade nor bleach to mint on sunlit tops; uLeafChroma adds
+    // back a little saturation. Everything else gets a soft value floor
+    // (l' = sqrt(l^2 + uFloor^2)) so the darkest non-foliage shade sits ~0.2.
+    uLeafLum: { value: new THREE.Vector3(0.08, 0.61, 0.54) },
+    uLeafChroma: { value: 0.16 },
+    uFloor: { value: 0.12 },
+    uTopHazeColor: { value: new THREE.Vector3(0.7, 0.75, 0.78) },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
     uniform sampler2D tDiffuse; uniform float uTopHaze; uniform vec3 uTopHazeColor;
-    uniform float uMidContrast, uShadowSat;
+    uniform float uMidContrast, uShadowSat, uLeafChroma, uFloor; uniform vec3 uLeafLum;
     uniform float uKnee, uShoulder, uToeLift, uChromaLimit, uExposure, uSaturation, uGreenShift, uGreenDesat, uContrast, uVignette;
     uniform vec3 uShadowTint, uBlackFloor; varying vec2 vUv;
     const vec3 LW = vec3(0.2126, 0.7152, 0.0722);
@@ -94,8 +104,25 @@ const GradeShader = {
       if (l > uKnee) { float e = l - uKnee; c *= (uKnee + e / (1.0 + e * uShoulder)) / l; }
       // --- deep shade floor: the darkest gaps sit just above black, faintly cool
       c += uBlackFloor * pow(1.0 - clamp(l, 0.0, 1.0), 12.0);
+      // --- measured range: compress foliage, soft floor elsewhere
+      {
+        c = clamp(c, 0.0, 1.0);
+        float mxc = max(c.r, max(c.g, c.b)), mnc = min(c.r, min(c.g, c.b)), dc = mxc - mnc;
+        float sc = dc / max(mxc, 1e-4);
+        float hc = mxc == c.r ? mod((c.g - c.b) / max(dc, 1e-4), 6.0) : (mxc == c.g ? (c.b - c.r) / max(dc, 1e-4) + 2.0 : (c.r - c.g) / max(dc, 1e-4) + 4.0);
+        hc /= 6.0;
+        float wf = smoothstep(0.13, 0.18, hc) * (1.0 - smoothstep(0.44, 0.5, hc)) * smoothstep(0.16, 0.28, sc);
+        float l0 = dot(c, LW);
+        float lf = uLeafLum.x + uLeafLum.y * l0;
+        float k = uLeafLum.z - 0.06;
+        if (lf > k) { float e = lf - k; lf = k + e / (1.0 + e * 8.0); }
+        float lg = sqrt(l0 * l0 + uFloor * uFloor);
+        float lt = mix(lg, lf, wf);
+        c *= lt / max(l0, 1e-4);
+        c = max(mix(vec3(lt), c, 1.0 + uLeafChroma * wf), 0.0);
+      }
       // --- top-edge haze: lower contrast and saturation, cool lift
-      float th = smoothstep(0.62, 1.0, vUv.y); th *= th * uTopHaze;
+      float th = smoothstep(0.42, 1.0, vUv.y); th *= th * uTopHaze;
       l = dot(c, LW);
       c = mix(c, vec3(l), th * 1.2);
       c = mix(c, uTopHazeColor, th);
@@ -118,7 +145,7 @@ export class PostFX {
       this.gtao = new GTAOPass(scene, camera, size.x, size.y);
       this.gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.6, thickness: 2.5, scale: 1.6, samples: 12, distanceFallOff: 1.0 });
       this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
-      this.gtao.blendIntensity = 0.9;
+      this.gtao.blendIntensity = 0.72;
       // Let pieces opt objects out of the AO g-buffer with object.userData.noAO
       // (water, overlays, effects).
       const orig = this.gtao._overrideVisibility.bind(this.gtao);

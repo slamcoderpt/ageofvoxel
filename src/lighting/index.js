@@ -59,7 +59,7 @@ export class Lighting {
     // sunlit sandstone to grey-white); all exposure is applied here, before
     // tone mapping, so the grade never has to push values past white.
     renderer.toneMapping = THREE.NeutralToneMapping;
-    renderer.toneMappingExposure = 2.15;
+    renderer.toneMappingExposure = 2.08;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer = renderer;
     const scene = game.scene;
@@ -76,12 +76,15 @@ export class Lighting {
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.035;
     this.sun.shadow.radius = 1.8;
+    // cast shadows are not opaque slabs: ~35% of the sun still reaches them
+    // (Retold's plaza shade stays light and walkable, cobbles readable)
+    this.sun.shadow.intensity = 0.65;
     this.shadowExtent = 60;
     scene.add(this.sun, this.sun.target);
 
     // Sky light is a soft cool blue and the ground bounce warm-brown: shadows
     // read as clean cool shade against the warm sunlit stone and roofs.
-    this.hemi = new THREE.HemisphereLight(0xa2b2c4, 0x86684a, 0.86);
+    this.hemi = new THREE.HemisphereLight(0xa8b8c8, 0x8a7050, 1.0);
     scene.add(this.hemi);
     this.fill = new THREE.DirectionalLight(0xb0bcc8, 0.3); // soft cool bounce from the opposite side
     this.fill.position.set(0.6, 0.5, -0.5);
@@ -93,8 +96,8 @@ export class Lighting {
     // not white fog). It starts just in front of the view centre and ramps
     // slowly, so the forest at the top of an RTS frame recedes and loses
     // contrast while the town in the middle stays clean.
-    this.hazeColor = new THREE.Color(0xbfc9d2); // cool, low-contrast air
-    this.hazeNear = 1.45; this.hazeFar = 4.2; // x camera distance
+    this.hazeColor = new THREE.Color(0xc6ced3); // cool, low-contrast air
+    this.hazeNear = 1.0; this.hazeFar = 3.4; // x camera distance
     scene.fog = new THREE.Fog(this.hazeColor, 80, 400);
     scene.background = this.hazeColor.clone();
 
