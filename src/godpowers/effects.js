@@ -74,7 +74,7 @@ function makeRibbonMaterial(halo, core, coreGain = 4.0, edge = null, screen = 1)
   });
 }
 
-// lines: [{ pts: [{x,y,z}], w, i, taper }]
+// lines: [{ pts: [{x,y,z, m?, wm?}], w, i, taper }] (m / wm: per-point intensity / width multipliers)
 export function ribbonGeometry(lines) {
   const pos = [], tan = [], side = [], w = [], inten = [], core = [], idx = [];
   for (const L of lines) {
@@ -85,8 +85,8 @@ export function ribbonGeometry(lines) {
       const a = pts[Math.max(0, k - 1)], b = pts[Math.min(n - 1, k + 1)];
       const tx = b.x - a.x, ty = b.y - a.y, tz = b.z - a.z;
       const f = k / (n - 1);
-      const ww = L.w * (1 - f * (L.taper ?? 0.5));
-      const ii = L.i * (L.fade ? 1 - f * L.fade : 1);
+      const ww = L.w * (1 - f * (L.taper ?? 0.5)) * (pts[k].wm ?? 1);
+      const ii = L.i * (L.fade ? 1 - f * L.fade : 1) * (pts[k].m ?? 1);
       for (const sd of [-1, 1]) {
         pos.push(pts[k].x, pts[k].y, pts[k].z);
         tan.push(tx, ty, tz);
@@ -428,41 +428,58 @@ const wallMat = () => new THREE.ShaderMaterial({
       float h = vH, y = h * uH, x = vA * 17.5;           // x: arc length-ish round the ring
       vec3 v = normalize(cameraPosition - vW);
       vec2 vh = normalize(v.xz + 1e-5);
-      float ndv = abs(dot(vN.xz, vh));
+      float facing = dot(vN.xz, vh);                     // +1 near side of the funnel .. -1 far side
+      float ndv = abs(facing);
       float fres = pow(1.0 - ndv, 1.4);                  // 1 edge-on .. 0 face-on
-      float body = mix(0.035, 1.0, fres * fres * (3.0 - 2.0 * fres));
-      // two turbulent layers swirling up the wall in opposite senses
-      float t1 = fbm(vec2(x * 0.55 + y * 0.9 - uTime * 2.6, y * 0.45 - uTime * 1.3));
-      float t2 = fbm(vec2(x * 0.8 - y * 1.3 + uTime * 1.9 + 9.0, y * 0.7 - uTime * 2.1));
-      float s1 = smoothstep(0.52, 0.8, t1), s2 = smoothstep(0.58, 0.85, t2);
-      // thin bright filaments on the crests of the first layer
+      float body = mix(0.08, 1.0, fres * fres * (3.0 - 2.0 * fres));
+      // near strands bright, the far side of the funnel a dim veil behind the army
+      float front = mix(0.3, 1.15, smoothstep(-0.75, 0.85, facing));
+      // two turbulent layers spiralling up the funnel with the spin
+      float t1 = fbm(vec2(x * 0.5 + y * 1.1 - uTime * 3.2, y * 0.35 - uTime * 1.1));
+      float t2 = fbm(vec2(x * 0.8 + y * 1.6 - uTime * 4.4 + 9.0, y * 0.6 - uTime * 1.7));
+      float s1 = smoothstep(0.5, 0.8, t1), s2 = smoothstep(0.56, 0.85, t2);
       float fil = pow(1.0 - abs(t1 - 0.62) / 0.05, 3.0) * step(abs(t1 - 0.62), 0.05);
       float hot = hotAt(vA);
       float gfl = 0.85 + 0.15 * h1(floor(uTime * 20.0) * 1.7) + 0.35 * uFlash;
-      // vertical profile: a soft bright foot, the sheet thinning upward,
-      // tattered at the top by the turbulence
-      float foot = exp(-y / 0.32) * smoothstep(0.0, 0.06, y);
-      float top = smoothstep(1.0, 0.35 + 0.35 * t2, h);
-      float sheet = pow(1.0 - h, 1.7) * top;
-      vec3 cFoot = mix(vec3(0.75, 0.4, 1.7), vec3(1.2, 1.1, 1.8), fres);
-      vec3 cLow = vec3(0.5, 0.3, 1.5), cHigh = vec3(0.36, 0.08, 0.95);
-      vec3 cBody = mix(cLow, cHigh, smoothstep(0.0, 0.7, h));
+      // vertical profile: a hot foot on the ground ring, a torn sheet that
+      // thins as the funnel flares, frayed into the cloud at the top
+      float foot = exp(-y / 0.28) * smoothstep(0.0, 0.04, y) * (0.6 + 0.4 * fres);
+      float top = smoothstep(1.0, 0.45 + 0.3 * t2, h);
+      float sheet = smoothstep(0.0, 0.12, h) * pow(1.0 - h, 0.9) * top;
+      vec3 cFoot = mix(vec3(0.7, 0.25, 1.8), vec3(1.2, 0.95, 1.95), fres);
+      vec3 cLow = vec3(0.55, 0.3, 1.5), cHigh = vec3(0.3, 0.08, 0.85);
+      vec3 cBody = mix(cLow, cHigh, smoothstep(0.1, 0.9, h));
       vec3 col = cFoot * foot * (0.7 + 0.3 * t1) * (1.0 + 0.4 * fres) * (0.8 + 1.2 * hot)
-               + cBody * sheet * body * (0.045 + 0.55 * s1 + 0.32 * s2) * (0.85 + 1.2 * hot)
-               + vec3(0.8, 0.75, 1.5) * fil * sheet * (0.25 + 0.75 * fres) * 0.9;
-      gl_FragColor = vec4(col * gfl * uK, 1.0);
+               + cBody * sheet * body * (0.03 + 0.5 * s1 + 0.3 * s2) * (0.85 + 1.0 * hot)
+               + vec3(0.85, 0.75, 1.6) * fil * sheet * (0.3 + 0.7 * fres) * 0.8;
+      gl_FragColor = vec4(col * front * gfl * uK, 1.0);
     }`,
   transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false,
 });
 
-function curtainGeometry(cx, cz, R, H, heightAt, seg = 256) {
-  const pos = [], aH = [], aA = [], idx = [];
-  for (let i = 0; i <= seg; i++) {
-    const a = (i / seg) * Math.PI * 2, x = Math.cos(a) * R, z = Math.sin(a) * R;
-    const y = heightAt(cx + x, cz + z);
-    pos.push(x, y, z, x, y + H, z);
-    aH.push(0, 1); aA.push(a, a);
-    if (i > 0) { const p = (i - 1) * 2, q = i * 2; idx.push(p, q, p + 1, p + 1, q, q + 1); }
+// Funnel profile: radius at height fraction h (0 foot .. 1 top). The storm
+// stands on a ground ring of radius rb and flares out to rt as it climbs.
+const smoothstep = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+const funnelR = (rb, rt, h) => rb + (rt - rb) * Math.pow(h, 1.7);
+
+// The funnel wall: rings stacked up the profile; the foot follows the
+// terrain (smoothed ground heights gh round the circle), upper rings level out.
+function funnelGeometry(gh, rb, rt, H, seg = 192, rows = 18) {
+  const pos = [], aH = [], aA = [], idx = [], NA = gh.length;
+  const base = gh.reduce((m, v) => Math.min(m, v), 1e9);
+  for (let j = 0; j <= rows; j++) {
+    const h = j / rows, r = funnelR(rb, rt, h);
+    for (let i = 0; i <= seg; i++) {
+      const a = (i / seg) * Math.PI * 2;
+      const g = gh[Math.floor((i / seg) * NA) % NA];
+      const y = g + (base - g) * Math.min(1, h * 2.5) + h * H;
+      pos.push(Math.cos(a) * r, y, Math.sin(a) * r);
+      aH.push(h); aA.push(a);
+      if (i > 0 && j > 0) {
+        const p = (j - 1) * (seg + 1) + i - 1, q = j * (seg + 1) + i - 1;
+        idx.push(p, p + 1, q, q, p + 1, q + 1);
+      }
+    }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -471,6 +488,38 @@ function curtainGeometry(cx, cz, R, H, heightAt, seg = 256) {
   g.setIndex(idx);
   return g;
 }
+
+// Dust wall at the funnel's foot: earth and grass torn up and whirled round,
+// alpha-blended (dust darkens and hazes what is behind it, unlike the light),
+// lit violet from inside by the storm, spiralling with the spin.
+const dustMat = () => new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uK: { value: 0 }, uFlash: { value: 0 }, uH: { value: 3 } },
+  vertexShader: `attribute float aH; attribute float aA; varying float vH; varying float vA; varying vec3 vW; varying vec3 vN;
+    void main(){ vH = aH; vA = aA; vN = normalize(vec3(position.x, 0.0, position.z));
+      vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz;
+      gl_Position = projectionMatrix * viewMatrix * w; }`,
+  fragmentShader: `uniform float uTime, uK, uFlash, uH; varying float vH; varying float vA; varying vec3 vW; varying vec3 vN;
+    float hs2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float vn2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hs2(i), hs2(i + vec2(1.0, 0.0)), f.x), mix(hs2(i + vec2(0.0, 1.0)), hs2(i + vec2(1.0, 1.0)), f.x), f.y); }
+    float fbm(vec2 p){ return vn2(p) * 0.5 + vn2(p * 2.1 + 5.2) * 0.3 + vn2(p * 4.3 + 1.7) * 0.2; }
+    void main(){
+      float y = vH * uH, x = vA * 12.0;
+      vec3 v = normalize(cameraPosition - vW);
+      float facing = dot(vN.xz, normalize(v.xz + 1e-5));
+      float n = fbm(vec2(x * 0.7 + y * 1.4 - uTime * 3.0, y * 0.9 - uTime * 0.8));
+      float n2 = fbm(vec2(x * 1.9 - uTime * 5.0 + y * 2.0, y * 2.2));
+      float prof = smoothstep(0.0, 0.05, vH) * pow(1.0 - vH, 1.2);
+      float a = smoothstep(0.25, 0.7, n) * prof * (0.6 + 0.4 * n2);
+      // edge-on stretches read thicker (a wall of dust seen through its depth)
+      a *= mix(0.55, 1.0, pow(1.0 - abs(facing), 1.2));
+      vec3 dust = vec3(0.2, 0.15, 0.17);
+      vec3 lit = vec3(0.42, 0.22, 0.75) * (0.4 + 0.7 * smoothstep(0.6, 0.0, vH));
+      vec3 col = mix(dust, lit, 0.3 + 0.35 * n2) * (1.0 + 0.6 * uFlash);
+      gl_FragColor = vec4(col, clamp(a * 1.6 * uK, 0.0, 0.9));
+    }`,
+  transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
+});
 
 // Full-frame storm grade, drawn after the opaque world and before the
 // additive effects with multiplicative blending (dst * src). Each pixel's
@@ -512,7 +561,13 @@ const stormGradeMat = (add = false) => new THREE.ShaderMaterial({
       // beyond the ring the land sits in the cloud shadow.
       // (the ring is a lit stage: the storm floor stays near full light with a
       // cool cast, and the world past the wall drops into storm dark)
-      vec3 inC = mix(vec3(0.86, 0.9, 1.1), vec3(0.62, 0.64, 0.98), smoothstep(0.2, 1.0, r)) * (0.88 + 0.2 * shade);
+      // inside the funnel the storm floor is lit violet by the whirl: light
+      // arms sweep round with the spin, brightest toward the wall
+      float ga = atan(g.y - uCenter.y, g.x - uCenter.x);
+      float arms = 0.5 + 0.5 * sin(3.0 * ga + 5.0 * r - uTime * 2.6);
+      arms = arms * arms * (0.6 + 0.4 * vn(g * 0.35 + uTime * 0.4));
+      vec3 inC = mix(vec3(0.82, 0.74, 1.12), vec3(0.66, 0.5, 1.08), smoothstep(0.2, 1.0, r)) * (0.9 + 0.15 * shade)
+               + vec3(0.34, 0.1, 0.8) * arms * (0.25 + 0.55 * smoothstep(0.1, 0.95, r));
       vec3 midC = vec3(0.3, 0.33, 0.52) * (0.75 + 0.35 * shade);
       vec3 m = mix(vec3(0.34, 0.37, 0.52), midC, near);
       m = mix(m, inC, inside);
@@ -654,10 +709,20 @@ export class BoltRenderer {
     this.fireMat = makeRibbonMaterial(new THREE.Color(0xff5a10), new THREE.Color(0xffe0a0), 3.0, new THREE.Color(0xc0200a), 0);
     this.meshes = new Map();
     this.lights = [];
-    for (let i = 0; i < 6; i++) {
+    // (4 pooled strike/fire lights + 2 storm lights: the scene's light count
+    // stays at 6 so no material recompiles when a power starts)
+    for (let i = 0; i < 4; i++) {
       const l = new THREE.PointLight(0xa8c4ff, 0, 16, 2);
       this.group.add(l);
       this.lights.push(l);
+    }
+    // violet storm lights: carried round inside the funnel with the spin,
+    // so the whirl lights the ground and the walls and men inside it
+    this.stormLights = [];
+    for (let i = 0; i < 2; i++) {
+      const l = new THREE.PointLight(0x9a60ff, 0, 14, 1.6);
+      this.group.add(l);
+      this.stormLights.push(l);
     }
     // One shadow-casting spot hangs low over the freshest strike, pointing
     // down: units and walls round the impact throw hard shadows outward.
@@ -1040,6 +1105,11 @@ export class BoltRenderer {
       // hotspot eases off once its strike fades (held briefly between bolts)
       const hw = st._hotT === now ? st._hotW : 0;
       if (hw >= (v.hotW ?? 0) * 0.8 && hw > 0) { v.hotW = hw; v.hotA = st._hotA; } else v.hotW = (v.hotW ?? 0) * 0.9;
+      for (const m of [v.dust]) {
+        m.material.uniforms.uK.value = k;
+        m.material.uniforms.uTime.value = now;
+        m.material.uniforms.uFlash.value = fl;
+      }
       for (const m of [v.curtain]) {
         m.material.uniforms.uK.value = k;
         m.material.uniforms.uTime.value = now;
@@ -1055,7 +1125,8 @@ export class BoltRenderer {
     }
     for (const [st, v] of this.stormVisuals) {
       if (aliveStorms.has(st)) continue;
-      this.group.remove(v.rain, v.curtain, v.bands, v.bands2);
+      this.group.remove(v.rain, v.curtain, v.dust, v.bands, v.bands2);
+      v.dust.geometry.dispose(); v.dust.material.dispose();
       for (const bm of [v.bands, v.bands2]) { if (bm.geometry !== this._emptyGeo) bm.geometry.dispose(); bm.material.dispose(); }
       v.curtain.geometry.dispose(); v.curtain.material.dispose();
       v.rain.geometry.dispose(); v.rain.material.dispose();
@@ -1066,6 +1137,14 @@ export class BoltRenderer {
     // below shapes it locally), so the strike lights really carry the scene;
     // health bars are hidden while the storm plays so the strike reads clean
     this.stormLight(gradeK);
+    this.stormLights.forEach((l, i) => {
+      const sv = gst && this.stormVisuals.get(gst);
+      if (!sv) { l.intensity = 0; return; }
+      const a = now * 2.0 + i * Math.PI, r = sv.rb * (0.45 + 0.1 * Math.sin(now * 1.3 + i));
+      const px = gst.x + Math.cos(a) * r, pz = gst.z + Math.sin(a) * r;
+      l.position.set(px, heightAt(px, pz) + 2.2, pz);
+      l.intensity = 34 * gradeK * (0.85 + 0.15 * Math.sin(now * 7 + i * 2)) + 10 * Math.min(1, flash);
+    });
     const ov = game.combat?.overlays;
     if (ov?.bars) {
       if (gradeK > 0) { ov.bars.visible = false; if (ov.marks) ov.marks.visible = false; this._barsHidden = true; }
@@ -1083,7 +1162,7 @@ export class BoltRenderer {
       U.uK.value = gradeK;
       U.uFlash.value = Math.min(1.5, flash);
       U.uTime.value = now;
-      if (gst) { U.uCenter.value.set(gst.x, gst.z); U.uR.value = gst.radius; U.uPlaneY.value = heightAt(gst.x, gst.z); }
+      if (gst) { U.uCenter.value.set(gst.x, gst.z); U.uR.value = this.stormVisuals.get(gst)?.rb ?? gst.radius; U.uPlaneY.value = heightAt(gst.x, gst.z); }
       else if (pools.length) U.uPlaneY.value = heightAt(pools[0].x, pools[0].z);
       for (let i = 0; i < MAX_POOLS; i++) {
         const p = pools[i];
@@ -1133,41 +1212,49 @@ export class BoltRenderer {
     }
   }
 
-  // Spiralling energy ribbons of the storm wall, rebuilt each frame.
+  // Spiralling energy ribbons of the funnel, rebuilt each frame. Strands on
+  // the near side of the funnel are wider and brighter than those behind it.
   renderBands(st, v, now, k, flash) {
     const layers = [[], []], NA = v.gh.length, TAU = Math.PI * 2;
     const ghAt = (a) => {
       const f = ((a % TAU) + TAU) % TAU / TAU * NA, i = Math.floor(f), t = f - i;
       return v.gh[i % NA] * (1 - t) + v.gh[(i + 1) % NA] * t;
     };
+    const base = v.base ?? (v.base = v.gh.reduce((m, x) => Math.min(m, x), 1e9));
+    const cam = this.game.camera.position;
+    const cd = Math.atan2(cam.z - st.z, cam.x - st.x);
     const hotA = v.hotA ?? 0, hotW = v.hotW ?? 0;
     for (const b of v.bandDefs) {
-      const head = b.a0 + b.sp * now, dir = Math.sign(b.sp);
+      const head = b.a0 + b.sp * now;
       const da = Math.abs(((head - hotA) % TAU + TAU * 1.5) % TAU - Math.PI);
-      const pulse = 0.4 + 0.6 * Math.pow(0.5 + 0.5 * Math.sin(now * b.pf + b.ph), 1.5);
+      const pulse = 0.55 + 0.45 * Math.pow(0.5 + 0.5 * Math.sin(now * b.pf + b.ph), 1.5);
       const i = b.i * k * pulse * (0.8 + 0.7 * hotW * Math.exp(-da * da * 1.5) + 0.15 * Math.min(1, flash));
       if (i < 0.02) continue;
-      // the ribbon's climb cycles, so each one rises up the wall and dies at
-      // the top, then is born again at the foot
-      const cyc = (now * 0.35 + b.ph / 6.28) % 1;
-      const lift = cyc * b.climb * 1.4;
-      const pts = [], n = 40;
+      // each ribbon is born at the foot, climbs the funnel as it orbits and
+      // frays out into the cloud at the top, then is born again
+      const cyc = (now * b.rate + b.ph / TAU) % 1;
+      const hHead = b.h0 + cyc * (1.05 - b.h0);
+      const ii = i * Math.min(1, cyc * 6) * (1 - smoothstep(0.7, 1.05, hHead));
+      if (ii < 0.02) continue;
+      const pts = [], n = 44;
       for (let s = 0; s <= n; s++) {
-        const f = s / n, a = head - dir * b.span * f;
-        const r = b.r + 0.35 * Math.sin(a * 3 + now * 2.1 + b.ph) + 0.15 * Math.sin(a * 11 - now * 5 + b.ph * 2);
+        const f = s / n, a = head - b.span * f;
+        const hf = Math.max(0, hHead - b.climb * f);
+        const r = funnelR(v.rb, v.rt, hf) + b.dr + 0.3 * Math.sin(a * 3 + now * 2.1 + b.ph) + 0.12 * Math.sin(a * 11 - now * 5 + b.ph * 2);
+        const g = ghAt(a);
+        const face = Math.cos(a - cd); // +1 on the side toward the camera
+        const fr = smoothstep(-0.75, 0.85, face);
         pts.push({
           x: st.x + Math.cos(a) * r,
-          y: ghAt(a) + b.y0 + lift + b.climb * (1 - f) + b.ya * Math.sin(a * b.yf + now * 2.3 + b.ph) * f,
+          y: g + (base - g) * Math.min(1, hf * 2.5) + 0.15 + hf * v.H + b.ya * Math.sin(a * b.yf + now * 2.3 + b.ph),
           z: st.z + Math.sin(a) * r,
+          m: 0.22 + 0.9 * fr, wm: (0.55 + 0.6 * fr) * (0.8 + 0.5 * hf),
         });
       }
-      const top = Math.max(0, 1 - Math.max(0, b.y0 + lift + b.climb - 5.5) / 3);
-      const ii = i * top * Math.min(1, cyc * 6);
-      if (ii < 0.02) continue;
       const L = layers[b.layer];
-      L.push({ pts, w: b.w, i: 0.75 * ii, taper: 0.92, fade: 1 });
-      L.push({ pts, w: b.w * 3.5, i: 0.34 * ii, taper: 0.85, fade: 0.95, halo: true });
-      L.push({ pts, w: b.w * 11, i: 0.14 * ii, taper: 0.7, fade: 0.9, halo: true });
+      L.push({ pts, w: b.w, i: 0.8 * ii, taper: 0.94, fade: 1 });
+      L.push({ pts, w: b.w * 3.2, i: 0.3 * ii, taper: 0.85, fade: 0.95, halo: true });
+      L.push({ pts, w: b.w * 9, i: 0.11 * ii, taper: 0.7, fade: 0.9, halo: true });
     }
     [v.bands, v.bands2].forEach((m, j) => {
       if (m.geometry !== this._emptyGeo) m.geometry.dispose();
@@ -1176,17 +1263,22 @@ export class BoltRenderer {
     });
   }
 
-  // Debris pulled into the storm wall (visual only, a function of time).
+  // Debris torn up and whirled round the funnel (visual only, a function of
+  // time): picked up at the foot ring, spiralling up and out with the spin.
   pulledDebris(st, v, now, k, out) {
     if (k <= 0.05) return;
     const TAU = Math.PI * 2, NA = v.gh.length;
+    const base = v.base ?? (v.base = v.gh.reduce((m, x) => Math.min(m, x), 1e9));
     for (const d of v.pull) {
       const u = (now * d.rate + d.ph) % 1;
-      const a = d.a + d.w * now + u * 1.6 * Math.sign(d.w);
-      const r = st.radius + d.dr * Math.pow(1 - u, 2);
+      const hf = Math.pow(u, 1.3) * 0.85;
+      const a = d.a + d.w * now + u * 5.5;
+      const r = funnelR(v.rb, v.rt, hf) + d.dr * (1 - 0.5 * u);
       const gi = Math.floor((((a % TAU) + TAU) % TAU) / TAU * NA) % NA;
-      out.push({ x: st.x + Math.cos(a) * r, y: v.gh[gi] + 0.1 + Math.pow(u, 1.25) * 7, z: st.z + Math.sin(a) * r,
-        rx: d.rx * now, ry: a, rz: d.rz * now, s: d.s * (1 - u * 0.5) * Math.min(1, k * 1.5) * Math.min(1, (1 - u) * 5), color: d.color ?? d.col, glow: d.glow, u });
+      const g = v.gh[gi];
+      out.push({ x: st.x + Math.cos(a) * r, y: g + (base - g) * Math.min(1, hf * 2.5) + 0.1 + hf * v.H, z: st.z + Math.sin(a) * r,
+        rx: d.rx * now, ry: a, rz: d.rz * now, sy: d.sy,
+        s: d.s * (1 - u * 0.4) * Math.min(1, k * 1.5) * Math.min(1, (1 - u) * 5) * Math.min(1, u * 12), color: d.color ?? d.col, glow: d.glow, u });
     }
   }
 
@@ -1256,7 +1348,7 @@ export class BoltRenderer {
       if (d.s <= 0.01) continue;
       o.position.set(d.x, d.y, d.z);
       o.rotation.set(d.rx, d.ry, d.rz);
-      o.scale.setScalar(d.s);
+      o.scale.set(d.s, d.s * (d.sy ?? 1), d.s);
       o.updateMatrix();
       if (d.glow && ne < EMBER_MAX) {
         this.embers.setMatrixAt(ne, o.matrix);
@@ -1279,52 +1371,61 @@ export class BoltRenderer {
   makeStorm(st) {
     const R = st.radius;
     const heightAt = (x, z) => this.game.map.heightAt(x, z);
-    const WALL_H = 6.2;
-    const curtain = this.addMesh(new THREE.Mesh(curtainGeometry(st.x, st.z, R, WALL_H, heightAt), wallMat()), 45);
-    curtain.material.uniforms.uH.value = WALL_H;
-    curtain.position.set(st.x, 0, st.z);
-    const rain = this.addMesh(new THREE.LineSegments(rainGeometry(st.t0 * 1000 | 0, R), rainMat()), 46);
-    // the energy wall: comet-like bands of light orbiting the perimeter at
-    // different heights and speeds (the Retold vortex), each a thick white
-    // head tapering into a fading blue-violet tail. Ground heights round the
-    // ring are smoothed along the circle so the bands glide over voxel steps.
+    // the funnel: a ground ring just inside the strike radius flaring out
+    // as it climbs into the cloud
+    const rb = R * 0.85, rt = R * 1.18, H = 11, DUST_H = 3.6;
+    // ground heights round the foot ring, smoothed along the circle so the
+    // foot and the bands glide over voxel steps
     const NA = 256, gh = new Float32Array(NA), raw = new Float32Array(NA);
     for (let i = 0; i < NA; i++) {
       const a = (i / NA) * Math.PI * 2;
-      raw[i] = heightAt(st.x + Math.cos(a) * R, st.z + Math.sin(a) * R);
+      raw[i] = heightAt(st.x + Math.cos(a) * rb, st.z + Math.sin(a) * rb);
     }
     for (let i = 0; i < NA; i++) {
       let m = -1e9, sum = 0;
       for (let d = -6; d <= 6; d++) { const h = raw[(i + d + NA) % NA]; sum += h; m = Math.max(m, h); }
       gh[i] = Math.max(sum / 13, m - 0.35);
     }
+    const curtain = this.addMesh(new THREE.Mesh(funnelGeometry(gh, rb, rt, H), wallMat()), 45);
+    curtain.material.uniforms.uH.value = H;
+    curtain.position.set(st.x, 0, st.z);
+    const dust = this.addMesh(new THREE.Mesh(funnelGeometry(gh, rb * 1.0, rb * 1.3, DUST_H, 160, 8), dustMat()), 30);
+    dust.material.uniforms.uH.value = DUST_H;
+    dust.position.set(st.x, 0, st.z);
+    const rain = this.addMesh(new THREE.LineSegments(rainGeometry(st.t0 * 1000 | 0, R), rainMat()), 46);
     const rng = new RNG((st.t0 * 1000 | 0) ^ 0x9e3779b9);
-    // layered energy ribbons spiralling up the wall (the Retold vortex):
-    // each a white-hot head tapering into a violet or blue tail that climbs
-    // as it orbits, at its own radius, pitch, speed and turbulence
+    // energy ribbons spiralling up the funnel (the Retold vortex): a few
+    // broad bright sweeps, a middle rank and many hair-thin strands, each a
+    // white-hot head tapering into a violet or blue tail, climbing as it
+    // orbits with the spin
     const bandDefs = [];
-    const NB = 30;
+    const NB = 34;
     for (let j = 0; j < NB; j++) {
-      const thick = j % 3 === 0;
+      const tier = j < 6 ? 0 : j < 16 ? 1 : 2;
       bandDefs.push({
-        layer: j % 3 === 2 ? 1 : 0,
-        a0: (j / NB) * Math.PI * 2 + rng.range(-0.25, 0.25), sp: (j % 5 === 3 ? -1 : 1) * rng.range(1.1, 2.1), span: rng.range(0.7, 1.5),
-        r: R + rng.range(-0.55, 0.35), y0: rng.range(0.0, 1.2), climb: rng.range(2.0, 4.2), ya: rng.range(0.2, 0.7),
-        yf: rng.int(2, 5), ph: rng.range(0, 6.28), w: thick ? rng.range(0.2, 0.3) : rng.range(0.07, 0.14), i: rng.range(0.75, 1.1), pf: rng.range(1.2, 3),
+        layer: j % 4 === 3 ? 1 : 0,
+        a0: rng.range(0, Math.PI * 2), sp: rng.range(1.3, 2.3) * (tier === 0 ? 0.9 : 1), span: tier === 0 ? rng.range(1.6, 2.6) : rng.range(0.9, 2.0),
+        h0: rng.range(0.0, 0.5), climb: rng.range(0.25, 0.55), dr: rng.range(-0.35, 0.45), ya: rng.range(0.1, 0.4),
+        yf: rng.int(2, 5), ph: rng.range(0, 6.28), pf: rng.range(1.2, 3), rate: rng.range(0.18, 0.32),
+        w: tier === 0 ? rng.range(0.34, 0.5) : tier === 1 ? rng.range(0.14, 0.22) : rng.range(0.045, 0.09),
+        i: tier === 0 ? rng.range(0.9, 1.15) : tier === 1 ? rng.range(0.7, 1.0) : rng.range(0.5, 0.9),
       });
     }
     const bands = this.addMesh(new THREE.Mesh(new THREE.BufferGeometry(), makeRibbonMaterial(new THREE.Color(0x7a50ff), new THREE.Color(0xf2eaff), 1.9, new THREE.Color(0x9a28ff))), 48);
     const bands2 = this.addMesh(new THREE.Mesh(new THREE.BufferGeometry(), makeRibbonMaterial(new THREE.Color(0x4f8cff), new THREE.Color(0xeef6ff), 1.9, new THREE.Color(0x5a3dff))), 48);
-    // debris torn up and pulled into the wall: earth, turf and stones
-    // spiralling up it (dark against the glow), a few glowing motes
+    // debris torn out of the ground and whirled up the funnel: earth clods,
+    // turf and stones, grass tufts (tall thin blades) and a few glowing motes
     const pull = [];
-    // (lit violet by the wall they are caught in, not black dice)
-    const PCOL = [0x6a5670, 0x5a4a66, 0x7a6478, 0x4e5a3a, 0x8a7a88, 0x514263];
-    for (let j = 0; j < 40; j++) {
-      pull.push({ a: rng.range(0, Math.PI * 2), w: rng.range(0.25, 0.6) * (rng.chance(0.85) ? 1 : -1), rate: rng.range(0.22, 0.45), ph: rng.next(),
-        dr: rng.range(-0.6, 0.9), s: rng.range(0.05, 0.12), col: rng.pick(PCOL), glow: j % 3 === 0, rx: rng.range(-9, 9), rz: rng.range(-9, 9) });
+    const EARTH = [0x6a5238, 0x584330, 0x7a6a5c, 0x4a3a2c, 0x8a8078];
+    const TURF = [0x4e7a2e, 0x5f8a34, 0x3f6526, 0x6f9a3a];
+    for (let j = 0; j < 130; j++) {
+      const kind = j % 5 === 0 ? 'glow' : j % 5 < 3 ? 'earth' : 'grass';
+      pull.push({ a: rng.range(0, Math.PI * 2), w: rng.range(0.7, 1.3), rate: rng.range(0.16, 0.34), ph: rng.next(),
+        dr: rng.range(-0.8, 0.9), s: kind === 'earth' ? rng.range(0.1, 0.26) : kind === 'grass' ? rng.range(0.06, 0.1) : rng.range(0.05, 0.1),
+        sy: kind === 'grass' ? rng.range(2.5, 4) : 1,
+        col: kind === 'earth' ? rng.pick(EARTH) : rng.pick(TURF), glow: kind === 'glow', rx: rng.range(-9, 9), rz: rng.range(-9, 9) });
     }
-    const v = { curtain, rain, bands, bands2, bandDefs, gh, pull };
+    const v = { curtain, dust, rain, bands, bands2, bandDefs, gh, pull, rb, rt, H };
     this.stormVisuals.set(st, v);
     return v;
   }

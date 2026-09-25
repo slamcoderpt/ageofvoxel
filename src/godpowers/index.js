@@ -13,9 +13,9 @@ import { RNG, hash2 } from '../core/rng.js';
 // which the units renderer applies to its root transform.
 export const POWERS = {
   lightning_storm: {
-    name: 'Lightning Storm', god: 'Zeus', cost: { favor: 40 }, cooldown: 45, radius: 11, duration: 9,
+    name: 'Lightning Storm', god: 'Zeus', cost: { favor: 40 }, cooldown: 45, radius: 7.5, duration: 9,
     interval: 0.3, damage: 70, splash: 1.8, hotkey: 'Z',
-    desc: 'Calls down a storm that strikes enemy units in the area with lightning.',
+    desc: 'Calls down a whirling storm that strikes enemy units in the area with lightning and hurls them into the air.',
   },
   bolt: {
     name: 'Bolt', god: 'Zeus', cost: { favor: 15 }, cooldown: 12, radius: 1.5, damage: 400, hotkey: 'X',
@@ -103,7 +103,7 @@ export class GodPowers {
     const heavy = (o.maxHp ?? 100) > 300 ? 0.3 : 1;
     const f = power * (1 - Math.min(1, d / 3) * 0.55) * heavy * (0.8 + hash2(o.id, game.tickCount, 3) * 0.4);
     const a = o.gp_air || (o.gp_air = {});
-    a.done = false;
+    a.done = false; a.vortex = null;
     a.vx = dx * 3.4 * f; a.vz = dz * 3.4 * f; a.vy = 5.5 + 5 * f;
     // tumble backwards, away from the blast (axis perpendicular to the throw, in the unit's frame)
     const c = Math.cos(o.rot || 0), s = Math.sin(o.rot || 0);
@@ -228,6 +228,7 @@ export class GodPowers {
           this.strike(s.owner, s.x + Math.cos(a) * r, s.z + Math.sin(a) * r, 0, s.def.splash, null);
         }
       }
+      this.vortex(s, dt);
       // cosmetic cloud-to-cloud lightning
       s.sky -= dt;
       if (s.sky <= 0) {
@@ -286,6 +287,34 @@ export class GodPowers {
     this.scorches = this.scorches.filter((s) => game.time - s.t0 < 14);
   }
 
+  // The storm is a whirlwind: enemy men inside it are snatched off their feet
+  // (deterministic, game.rng), carried round with the spin while they climb,
+  // tumbling, and then flung outward along the spin. Heavy myth units hold.
+  vortex(s, dt) {
+    const game = this.game, age = game.time - s.t0;
+    if (age < 0.35 || age > s.duration - 1.2) return;
+    const ramp = Math.min(1, (age - 0.35) / 0.8);
+    const cands = game.movement.hash.near(s.x, s.z, s.radius * 0.95, (o) => !o.dead && o.kind === 'unit' && game.isEnemy(s.owner, o.owner));
+    for (const u of cands) {
+      if ((u.maxHp ?? 100) > 300) continue;
+      if (u.gp_air && !u.gp_air.done) continue;
+      if (game.rng.next() > 0.42 * dt * ramp) continue;
+      const a = u.gp_air || (u.gp_air = {});
+      a.done = false;
+      a.vortex = s;
+      a.t0 = game.time;
+      a.hold = 0.9 + game.rng.next() * 1.4;
+      a.flung = false;
+      a.vx = 0; a.vz = 0; a.vy = 3.2 + game.rng.next() * 2.4;
+      const sp = 3 + game.rng.next() * 5;
+      a.wx = (game.rng.next() - 0.5) * sp; a.wz = (game.rng.next() - 0.5) * sp;
+      a.yaw = (4 + game.rng.next() * 5);
+      u.airY = Math.max(u.airY || 0, 0.02); u.airRx = u.airRx || 0; u.airRz = u.airRz || 0;
+      if (!this.airborne.includes(u)) this.airborne.push(u);
+      if (game.commands?.order) game.commands.order(u, { type: 'idle' });
+    }
+  }
+
   updateDebris(dt) {
     const game = this.game, now = game.time;
     for (const d of this.debris) {
@@ -323,13 +352,31 @@ export class GodPowers {
     const game = this.game, map = game.map;
     for (const u of this.airborne) {
       const a = u.gp_air;
-      a.vy -= 18 * dt;
+      const s = a.vortex;
+      if (s && !a.flung) {
+        // carried round the funnel: pulled toward an orbit just inside the
+        // wall, swept along the spin (counter-clockwise seen from above),
+        // buoyed up while it holds, then flung out along the spin
+        let dx = u.x - s.x, dz = u.z - s.z, d = Math.hypot(dx, dz);
+        if (d < 0.05) { dx = 1; dz = 0; d = 1; } else { dx /= d; dz /= d; }
+        const tx = -dz, tz = dx, orbit = s.radius * 0.55;
+        const vt = 5.5, vr = (orbit - d) * 1.6;
+        a.vx += ((tx * vt + dx * vr) - a.vx) * Math.min(1, 3 * dt);
+        a.vz += ((tz * vt + dz * vr) - a.vz) * Math.min(1, 3 * dt);
+        a.vy += (1.6 - a.vy) * Math.min(1, 1.2 * dt) - 1.2 * dt;
+        u.rot = (u.rot || 0) + a.yaw * dt;
+        if (this.game.time - a.t0 > a.hold || s.done) {
+          a.flung = true;
+          a.vx = tx * 6.5 + dx * 5; a.vz = tz * 6.5 + dz * 5; a.vy = 4.5;
+          a.wx *= 1.6; a.wz *= 1.6;
+        }
+      } else a.vy -= 18 * dt;
       u.airY += a.vy * dt;
       const nx = u.x + a.vx * dt, nz = u.z + a.vz * dt;
       if (map.isWalkable(Math.floor(nx), Math.floor(nz))) { u.x = nx; u.z = nz; } else { a.vx = 0; a.vz = 0; }
       u.airRx += a.wx * dt; u.airRz += a.wz * dt;
       if (u.airY <= 0 && a.vy < 0) {
-        u.airY = 0; u.airRx = 0; u.airRz = 0; a.done = true;
+        u.airY = 0; u.airRx = 0; u.airRz = 0; a.done = true; a.vortex = null;
         game.fx.emit({ x: u.x, y: map.heightAt(u.x, u.z) + 0.1, z: u.z, count: 6, color: 0x6b5a44, size: 0.35, life: 0.8, speed: 1.4, up: 0.8, gravity: -2, grow: 1.2 });
       }
     }
