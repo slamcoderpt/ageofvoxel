@@ -299,7 +299,7 @@ export class Economy {
       if (farm) {
         // follow the harvest front along the row
         const [fx, fz] = this.farmSpot(u, t);
-        if (Math.hypot(fx - u.x, fz - u.z) > 0.7) { mv.moveTo(u, fx, fz); return; }
+        if (Math.hypot(fx - u.x, fz - u.z) > 1.25) { mv.moveTo(u, fx, fz); return; }
         const back = Math.floor((t.econ_rows || 0) / FARM_ROWS) % 2 === 1;
         u.rot = back ? -Math.PI / 2 : Math.PI / 2;
       } else u.rot = Math.atan2(t.x - u.x, t.z - u.z);

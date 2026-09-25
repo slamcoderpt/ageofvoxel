@@ -214,3 +214,56 @@ export function cartModel() {
   m.line(0, 4, 6, 0, 3, 12, W);
   return m;
 }
+
+// ---- oversized loads carried by walking villagers (drawn by the economy) ----
+// Built along +z (the walking direction), origin at the bottom centre, so
+// they can sit on a shoulder or a head and read at RTS zoom.
+export function loadSheafModel() {
+  // a long bundle of cut wheat, tied twice, the ears fanning out behind
+  const m = new VoxelModel();
+  const STRAW = pick(0xd8b858, 0xc4a448, 91), EAR = pick(0xf4d668, 0xe2bc4a, 92), TIE = 0x7a5a2c;
+  m.ellipsoid(0, 1.8, 1, 1.7, 1.7, 8, STRAW);
+  m.ellipsoid(0, 1.8, -7, 2.7, 2.2, 3, EAR);
+  m.box(-2, 0, 3, 5, 4, 1, TIE).box(-2, 0, -2, 5, 4, 1, TIE);
+  return m;
+}
+export function loadOreModel() {
+  // a wide wicker basket heaped with gold ore, carried on the head
+  const m = new VoxelModel();
+  const WICKER = (x, y, z) => ((x + y + z) % 2 ? 0xa57a3e : 0x7e5a2a);
+  const G = pick(0xf2c230, 0xd09a1a, 93), ROCK = pick(0x8a8278, 0x6e675e, 94);
+  m.cylinder(0, 0, 0, 4, 3, WICKER).carve(-3, 1, -3, 7, 2, 7);
+  m.ellipsoid(0, 2, 0, 3.6, 2.6, 3.6, (x, y, z) => (hash3(x, y, z, 95) < 0.3 ? ROCK(x, y, z) : G(x, y, z)), { glow: 0.08 });
+  for (let x = -4; x <= 4; x++) for (let z = -4; z <= 4; z++) for (let y = -3; y < 2; y++) if (y < 0) m.remove(x, y, z);
+  m.set(1, 5, 0, 0xffe070, { glow: 0.3 }).set(-2, 4, 1, 0xffe070, { glow: 0.3 });
+  return m;
+}
+export function loadLogModel() {
+  // one long trunk section with pale cut ends
+  const m = new VoxelModel();
+  const B = pick(0x6b4428, 0x523219, 96), END = 0xd2ab70;
+  m.box(-1, 0, -10, 3, 3, 20, B).box(-2, 1, -9, 5, 1, 18, B).box(-1, -1, -9, 3, 1, 18, B).box(-1, 3, -9, 3, 1, 18, B);
+  m.box(-1, 0, -11, 3, 3, 1, END).box(-1, 0, 10, 3, 3, 1, END);
+  m.set(1, 4, 3, 0x4a7a2a).set(1, 5, 3, 0x5a8a30); // a twig
+  return m;
+}
+export function loadHaunchModel() {
+  // a deer haunch slung over the shoulder
+  const m = new VoxelModel();
+  const MEAT = pick(0xa8323a, 0x8c2630, 97), HIDE = pick(0xa8703e, 0x9a6434, 98);
+  m.ellipsoid(0, 2, 0, 2.6, 2.4, 4.5, HIDE);
+  m.box(-2, 0, 3, 4, 4, 2, MEAT);
+  m.box(0, 1, -8, 1, 1, 5, 0xe8d8c8).box(0, 1, -9, 1, 2, 1, 0x3a2a20);
+  return m;
+}
+export function loadBasketModel() {
+  // a big basket of berries on the hip/head
+  const m = new VoxelModel();
+  const WICKER = (x, y, z) => ((x + y + z) % 2 ? 0xb58a4e : 0x8a6330);
+  const B = pick(0xc0282e, 0x8c1a2a, 99);
+  m.cylinder(0, 0, 0, 3.4, 3, WICKER).carve(-2, 1, -2, 5, 2, 5);
+  m.ellipsoid(0, 2, 0, 2.8, 1.8, 2.8, B);
+  for (let x = -4; x <= 4; x++) for (let z = -4; z <= 4; z++) for (let y = -2; y < 0; y++) m.remove(x, y, z);
+  m.set(1, 4, 0, 0x3f7a2c).set(-1, 3, 2, 0x3f7a2c);
+  return m;
+}
