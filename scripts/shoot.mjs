@@ -20,31 +20,40 @@ try {
   const page = await browser.newPage({ viewport: { width: +args.width, height: +args.height }, deviceScaleFactor: 1 });
   page.on('console', (m) => { if (m.type() === 'error') errors.push(`console.error: ${m.text()}`); });
   page.on('pageerror', (e) => { errors.push(`pageerror: ${e.stack || e.message}`); failed = true; });
+  // Other people's edits make the vite dev server full-reload every open page, which
+  // restarts a slow scene mid-capture (the saved PNG then comes out black). Answer the
+  // HMR socket ourselves and never connect it to the server, so the page cannot reload.
+  await page.routeWebSocket(/.*/, (ws) => { ws.send(JSON.stringify({ type: 'connected' })); });
+  let navigations = 0;
+  page.on('framenavigated', (f) => { if (f === page.mainFrame()) navigations++; });
   const t0 = Date.now();
   await page.goto(url, { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction(() => window.__sceneReady === true || (window.__errors && window.__errors.length > 0), null, { timeout: +args.timeout * 1000, polling: 250 });
   const pageErrors = await page.evaluate(() => [...(window.__errors || []), ...((window.__game && window.__game.errors) || [])]);
   if (pageErrors.length) { failed = true; errors.push(...pageErrors.map((e) => `page: ${e}`)); }
-  // blank/black check on the WebGL canvas
-  const stats = await page.evaluate(() => {
-    const src = document.querySelector('#app canvas');
-    if (!src) return null;
+  if (!(await page.evaluate(() => !!document.querySelector('#app canvas')))) throw new Error('no canvas found');
+  const navsBefore = navigations;
+  fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
+  const png = await page.screenshot({ path: out, timeout: 180000 });
+  if (navigations !== navsBefore) throw new Error('page reloaded during capture');
+  // blank/black check on the PNG actually saved (not the live canvas)
+  const stats = await page.evaluate(async (b64) => {
+    const img = new Image();
+    img.src = `data:image/png;base64,${b64}`;
+    await img.decode();
     const c = document.createElement('canvas');
     c.width = 160; c.height = 90;
     const ctx = c.getContext('2d');
-    ctx.drawImage(src, 0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0, c.width, c.height);
     const d = ctx.getImageData(0, 0, c.width, c.height).data;
     let sum = 0, sum2 = 0;
     const n = d.length / 4;
     for (let i = 0; i < d.length; i += 4) { const l = (d[i] + d[i + 1] + d[i + 2]) / 3; sum += l; sum2 += l * l; }
     const mean = sum / n;
     return { mean, std: Math.sqrt(Math.max(0, sum2 / n - mean * mean)) };
-  });
-  fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
-  await page.screenshot({ path: out, timeout: 180000 });
+  }, png.toString('base64'));
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
-  if (!stats) { failed = true; errors.push('no canvas found'); }
-  else if (stats.mean < 8 || stats.std < 4) { failed = true; errors.push(`image looks blank (mean ${stats.mean.toFixed(1)}, std ${stats.std.toFixed(1)})`); }
+  if (stats.mean < 8 || stats.std < 4) { failed = true; errors.push(`image looks blank (mean ${stats.mean.toFixed(1)}, std ${stats.std.toFixed(1)})`); }
   console.log(`[shoot] ${args.scene} -> ${out} in ${secs}s  (mean ${stats?.mean.toFixed(1)}, std ${stats?.std.toFixed(1)})`);
 } catch (err) {
   failed = true;

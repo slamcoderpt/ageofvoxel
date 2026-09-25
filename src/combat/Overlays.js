@@ -116,12 +116,12 @@ export class Overlays {
       const x = u.prevX + (u.x - u.prevX) * alpha, z = u.prevZ + (u.z - u.prevZ) * alpha;
       const selected = sel.has(u.id);
       if (selected || hover === u.id) addRing(u, x, z, u.radius * 1.5 + 0.1);
-      // In a big fight a bar over every scratched man is noise. Bars show on
-      // selected / hovered units, on heroes and myth units once hurt, and on
-      // rank-and-file only when they are close to falling.
+      // In a big fight a bar over every scratched man is noise (a mostly empty
+      // bar reads as a dark dash over the crowd). As in AoM, rank-and-file show
+      // bars only when selected or hovered; heroes and myth units once hurt.
       const f = u.hp / u.maxHp;
       const big = u.def.myth || u.def.hero;
-      if (selected || hover === u.id || (f < 1 && (big ? f < 0.97 : f < 0.3)))
+      if (selected || hover === u.id || (big && f < 0.97))
         addBar(u, x, game.map.heightAt(x, z) + game.units.heightOf(u) + 0.35, z, u.def.myth ? 1.5 : u.def.class === 'cavalry' ? 1.0 : 0.8);
     }
     for (const b of game.entities.buildings()) {
