@@ -48,6 +48,16 @@ export const atmosUniforms = {
   uLeafSun: { value: 1.2 },   // direct sun on foliage (lit crown tops glow warm)
   uFloorShade: { value: 0.45 }, // extra darkening of shadowed forest floor
   uCrownRound: { value: 1.0 },  // tree crowns shaded as rounded masses
+  // Paving (terrain): Retold's roads and plazas are worn cobbles, never a flat
+  // cream slab. uPave scales the procedural stone/mortar breakup, uPaveAlb the
+  // paving albedo (keeps sunlit roads off the clip), uGroundBounce is the warm
+  // light the sunlit ground throws back into nearby shade.
+  uPave: { value: 1.0 },
+  uPaveAlb: { value: 0.58 },
+  uPaveScale: { value: 4.2 },  // cobbles per world unit
+  uPaveJoint: { value: 0.3 },  // joint darkening
+  uGroundBounce: { value: new THREE.Color(0.2, 0.14, 0.08) },
+  uHalo: { value: 1.0 },
 };
 
 const VOXEL_KEYS = ['voxelTeam', 'voxelTeamInst'];
@@ -230,11 +240,58 @@ function patchVoxel(shader) {
     }`);
 }
 
-// Terrain: only the understory darkening under the canopy edge.
+// Terrain: paving breakup, understory darkening under the canopy edge, warm
+// ground bounce in shade and the contact halo round everything standing here.
 function patchGround(shader) {
   patchCommon(shader);
+  prependFragment(shader, `uniform float uPave, uPaveAlb, uHalo, uPaveScale, uPaveJoint;\nuniform vec3 uGroundBounce;
+float atmH2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec2 atmH22(vec2 p) { return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453); }
+float atmVN(vec2 p) {
+  vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(atmH2(i), atmH2(i + vec2(1, 0)), f.x), mix(atmH2(i + vec2(0, 1)), atmH2(i + vec2(1, 1)), f.x), f.y);
+}
+// irregular cobbles: x = stone id hash, y = distance to the nearest joint
+vec2 atmCobble(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  float d1 = 8.0, d2 = 8.0; vec2 id = vec2(0.0);
+  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+    vec2 g = vec2(float(x), float(y));
+    vec2 o = g + 0.15 + 0.7 * atmH22(i + g) - f;
+    float d = dot(o, o);
+    if (d < d1) { d2 = d1; d1 = d; id = i + g; } else if (d < d2) d2 = d;
+  }
+  return vec2(atmH2(id * 1.37 + 3.1), sqrt(d2) - sqrt(d1));
+}`);
   shader.fragmentShader = shader.fragmentShader.replace('#include <lights_physical_fragment>', `
-    diffuseColor.rgb = atmPale(diffuseColor.rgb, uSandAmt);
+    float atmPaveM = 0.0;
+    {
+      vec3 a0 = diffuseColor.rgb;
+      float mx = max(a0.r, max(a0.g, a0.b)), mn = min(a0.r, min(a0.g, a0.b));
+      float sat = (mx - mn) / max(mx, 1e-3);
+      vec3 wUp = inverseTransformDirection(normalize(normal), viewMatrix);
+      // terrain paving is a pale warm grey (linear sat ~0.3-0.4); beach sand
+      // (~0.6) and dirt are more saturated, grass is green-dominant
+      atmPaveM = smoothstep(0.36, 0.48, mx) * (1.0 - smoothstep(0.44, 0.52, sat)) * step(a0.g, a0.r + 0.01)
+               * smoothstep(0.6, 0.9, wUp.y) * uPave;
+      diffuseColor.rgb = atmPale(diffuseColor.rgb, uSandAmt);
+      if (atmPaveM > 0.0) {
+        vec2 wp = vAtmWorld.xz;
+        // stones ~0.3 units, slightly elongated along x, with worn joints
+        vec2 cb = atmCobble(wp * vec2(1.0, 1.2) * uPaveScale);
+        float fw = max(fwidth(cb.y), 1e-3);
+        float joint = 1.0 - smoothstep(0.05 - fw * 0.5, 0.16 + fw, cb.y);
+        float bevel = smoothstep(0.0, 0.42, cb.y);
+        float stone = 0.84 + 0.26 * cb.x;
+        // large, soft wear/dirt patches so the plaza is never one flat value
+        float mott = atmVN(wp * 0.35) * 0.6 + atmVN(wp * 1.1 + 7.3) * 0.4;
+        vec3 dirt = mix(vec3(0.84, 0.8, 0.74), vec3(1.05, 1.02, 0.97), mott);
+        vec3 tint = mix(vec3(1.03, 0.99, 0.92), vec3(0.95, 0.97, 1.02), atmH2(vec2(cb.x, 5.1)));
+        vec3 pav = diffuseColor.rgb * uPaveAlb * dirt * mix(vec3(1.0), tint * stone * (0.9 + 0.1 * bevel), 0.85);
+        pav *= 1.0 - uPaveJoint * joint;
+        diffuseColor.rgb = mix(diffuseColor.rgb, pav, atmPaveM);
+      }
+    }
     #include <lights_physical_fragment>`);
   injectFragment(shader, '#include <lights_fragment_end>', `
     {
@@ -242,14 +299,21 @@ function patchGround(shader) {
       float under = smoothstep(0.1, 0.8, dens) * (1.0 - smoothstep(0.3, 2.6, hA)) * uUnderstory;
       reflectedLight.indirectDiffuse *= mix(vec3(1.0), uDeepShade, under);
       reflectedLight.directDiffuse *= 1.0 - 0.55 * under;
+      float sh = atmSunShadow();
       // forest floor in the crowns' sun shadow: deep, cool green-black gaps
-      float fl = dens > 0.1 ? (1.0 - atmSunShadow()) * smoothstep(0.1, 0.6, dens) : 0.0;
+      float fl = dens > 0.1 ? (1.0 - sh) * smoothstep(0.1, 0.6, dens) : 0.0;
       reflectedLight.indirectDiffuse *= mix(vec3(1.0), uShadeCool * (1.0 - uFloorShade), fl);
+      // warm bounce: open ground in shade is lit by the sunlit stone and earth
+      // around it, so cast shadows on roads read as warm shade, not blue decals
+      reflectedLight.indirectDiffuse += diffuseColor.rgb * uGroundBounce * (0.35 + 0.65 * (1.0 - sh)) * (1.0 - under);
       // contact halo round every building, prop and unit standing here
       float cOcc, hG; atmContact(cOcc, hG);
-      float halo = smoothstep(0.02, 0.75, cOcc) * uContactAO;
-      reflectedLight.indirectDiffuse *= 1.0 - 0.72 * halo;
-      reflectedLight.directDiffuse *= 1.0 - 0.5 * halo;
+      // (a soft skirt ~1 unit wide plus a tight dark core right at the base,
+      // so walls and plinths sit in the road instead of floating on it)
+      float halo = smoothstep(0.02, 0.62, cOcc) * uContactAO * uHalo;
+      float core = smoothstep(0.3, 0.8, cOcc) * uContactAO * uHalo;
+      reflectedLight.indirectDiffuse *= clamp(1.0 - 0.66 * halo - 0.24 * core, 0.0, 1.0);
+      reflectedLight.directDiffuse *= clamp(1.0 - 0.42 * halo - 0.3 * core, 0.0, 1.0);
     }`);
 }
 

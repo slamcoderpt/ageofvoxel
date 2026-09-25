@@ -4,11 +4,17 @@ import { PostFX } from './PostFX.js';
 import { MaterialPatcher } from './MaterialPatches.js';
 import { fowUniforms } from '../core/FogOfWar.js';
 
-// Soft shadows without grain: three's PCF rotates a 5-tap Vogel disk by
-// per-pixel noise, which leaves a stippled, "filtered" fringe on every shadow
-// edge (leaf crowns, plaza). Replace it with a fixed 2x2 box of hardware-PCF
-// (bilinear) taps: similar softness, smooth edges, no per-pixel noise, and
-// one tap cheaper than the stock filter.
+// Soft shadows without grain, with a penumbra that widens with distance from
+// the caster (a cheap PCSS). three's PCF rotates a 5-tap Vogel disk by
+// per-pixel noise, which leaves a stippled fringe on every shadow edge; this
+// uses fixed taps of hardware-PCF (bilinear) lookups instead:
+//  - a tight 2x2 box (contact shadows at wall bases stay crisp),
+//  - two rotated rings of 4 at a wide radius (soft outer penumbra),
+//  - the wide ring again with the receiver depth pulled toward the light by
+//    ~2.5 world units: only blockers further away than that still shadow, so
+//    the ratio says how far the casters are. Near casters -> tight filter,
+//    far casters (a roof edge several units up) -> wide, soft falloff.
+// Shadow camera is orthographic (near 1, far 400): depth is linear in z.
 {
   const src = THREE.ShaderChunk.shadowmap_pars_fragment;
   const a = src.indexOf('float phi = interleavedGradientNoise( gl_FragCoord.xy ) * PI2;');
@@ -16,11 +22,24 @@ import { fowUniforms } from '../core/FogOfWar.js';
   if (a >= 0 && b > a) {
     THREE.ShaderChunk.shadowmap_pars_fragment = src.slice(0, a) + `
 				vec2 st = vec2( radius * 0.4 );
-				shadow = 0.25 * (
-					texture( shadowMap, vec3( shadowCoord.xy + vec2( -st.x, -st.y ), shadowCoord.z ) ) +
-					texture( shadowMap, vec3( shadowCoord.xy + vec2( st.x, -st.y ), shadowCoord.z ) ) +
-					texture( shadowMap, vec3( shadowCoord.xy + vec2( -st.x, st.y ), shadowCoord.z ) ) +
-					texture( shadowMap, vec3( shadowCoord.xy + vec2( st.x, st.y ), shadowCoord.z ) ) );` + src.slice(b + ') * 0.2;'.length);
+				float z = shadowCoord.z;
+				#define ATM_SH( o, zz ) texture( shadowMap, vec3( shadowCoord.xy + ( o ), zz ) )
+				float shN = 0.25 * ( ATM_SH( vec2( -st.x, -st.y ), z ) + ATM_SH( vec2( st.x, -st.y ), z ) +
+					ATM_SH( vec2( -st.x, st.y ), z ) + ATM_SH( vec2( st.x, st.y ), z ) );
+				float rw = radius * 4.2, rd = rw * 0.7071;
+				float zf = z - 0.0065;
+				vec2 w0 = vec2( rw, 0.0 ), w1 = vec2( 0.0, rw ), w2 = vec2( rd, rd ), w3 = vec2( rd, -rd );
+				vec2 m0 = w2 * 0.5, m1 = w3 * 0.5;
+				float shW = 0.125 * ( ATM_SH( w0, z ) + ATM_SH( -w0, z ) + ATM_SH( w1, z ) + ATM_SH( -w1, z ) +
+					ATM_SH( m0, z ) + ATM_SH( -m0, z ) + ATM_SH( m1, z ) + ATM_SH( -m1, z ) );
+				float shF = 0.125 * ( ATM_SH( w0, zf ) + ATM_SH( -w0, zf ) + ATM_SH( w1, zf ) + ATM_SH( -w1, zf ) +
+					ATM_SH( m0, zf ) + ATM_SH( -m0, zf ) + ATM_SH( m1, zf ) + ATM_SH( -m1, zf ) );
+				#undef ATM_SH
+				// fraction of the wide-ring occluders that are far from the receiver
+				float farFrac = clamp( ( 1.0 - shF ) / max( 1.0 - shW, 1e-3 ), 0.0, 1.0 );
+				float soft = smoothstep( 0.15, 0.9, farFrac ) * step( 1e-3, 1.0 - min( shW, shN ) );
+				shadow = mix( shN, 0.5 * shN + 0.5 * shW, 0.35 ) ;
+				shadow = mix( shadow, 0.3 * shN + 0.7 * shW, soft );` + src.slice(b + ') * 0.2;'.length);
   }
 }
 
@@ -70,7 +89,12 @@ export class Lighting {
 
     this.sky = new Sky(this.sunDir);
     scene.add(this.sky.mesh);
-    this.hazeColor = new THREE.Color(0xc4cfd2); // light warm-blue aerial haze
+    // Aerial haze: a soft warm grey-blue (Retold's distance is milky warm air,
+    // not white fog). It starts just in front of the view centre and ramps
+    // slowly, so the forest at the top of an RTS frame recedes and loses
+    // contrast while the town in the middle stays clean.
+    this.hazeColor = new THREE.Color(0xc9ccc4);
+    this.hazeNear = 0.75; this.hazeFar = 2.5; // x camera distance
     scene.fog = new THREE.Fog(this.hazeColor, 80, 400);
     scene.background = this.hazeColor.clone();
 
@@ -99,8 +123,8 @@ export class Lighting {
     const f = this.game.scene.fog;
     // aerial perspective: starts just past the view centre so the top third of
     // an RTS frame lifts and desaturates while the focal area stays clean
-    f.near = ctl.distance * 1.25;
-    f.far = ctl.distance * 3.6 + 30;
+    f.near = ctl.distance * this.hazeNear;
+    f.far = ctl.distance * this.hazeFar + 30;
     this.sky.follow(this.game.camera);
     // with fog of war on, everything beyond the explored map reads as black (AoM style)
     const fow = fowUniforms.fowStrength.value > 0;

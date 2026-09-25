@@ -31,7 +31,7 @@ const GradeShader = {
     uGreenShift: { value: 0.42 },
     uGreenDesat: { value: 0.42 },
     uContrast: { value: 1.12 },
-    uShadowTint: { value: new THREE.Vector3(0.88, 0.96, 1.14) },
+    uShadowTint: { value: new THREE.Vector3(0.92, 0.97, 1.08) }, // mild: shade on roads stays warm-grey (ground bounce), not blue
     uBlackFloor: { value: new THREE.Vector3(0.04, 0.05, 0.068) },
     uVignette: { value: 0.0 },
     uToeLift: { value: 0.0 },
