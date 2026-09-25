@@ -986,19 +986,24 @@ function centaurBlanket() {
   return m;
 }
 
+// dark stockings below the knee (as on a bay): the four legs stand out as
+// dark strokes against both the turf and the dirt, so from above the horse
+// half reads as a horse on legs rather than a coloured block
+const stockings = (m) => { for (const v of m.vox.values()) if (!v.team && COAT_COLS.includes(v.c)) v.c = 0x4a2c18; return m; };
+
 export function centaurRig() {
   return [
     part('body', chestnut(horseBody()), [3, 0, 10.5], [0, 10, 0]),
     part('barding', centaurBlanket(), [3, 0, 10.5], [0, 0, 0], 'body'),
     part('tail', recolor(horseTail(), [0x6c655c, 0x57514a], 0x3a2418), [1, 0, 0], [0, 7, -10], 'body'),
     part('legFL', chestnut(horseUpper(false)), [1, 5, 1], [2, 1, 7], 'body'),
-    part('cannonFL', chestnut(horseLower()), [1, 7, 1], [0, -4, 0], 'legFL'),
+    part('cannonFL', stockings(horseLower()), [1, 7, 1], [0, -4, 0], 'legFL'),
     part('legFR', chestnut(horseUpper(false)), [1, 5, 1], [-2, 1, 7], 'body'),
-    part('cannonFR', chestnut(horseLower()), [1, 7, 1], [0, -4, 0], 'legFR'),
+    part('cannonFR', stockings(horseLower()), [1, 7, 1], [0, -4, 0], 'legFR'),
     part('legBL', chestnut(horseUpper(true)), [1, 5, 1.5], [2, 1, -6.5], 'body'),
-    part('cannonBL', chestnut(horseLower()), [1, 7, 1], [0, -4, 0], 'legBL'),
+    part('cannonBL', stockings(horseLower()), [1, 7, 1], [0, -4, 0], 'legBL'),
     part('legBR', chestnut(horseUpper(true)), [1, 5, 1.5], [-2, 1, -6.5], 'body'),
-    part('cannonBR', chestnut(horseLower()), [1, 7, 1], [0, -4, 0], 'legBR'),
+    part('cannonBR', stockings(horseLower()), [1, 7, 1], [0, -4, 0], 'legBR'),
     part('torso', centaurTorso(), [4, 0, 2], [0, 8, 8], 'body'),
     head('centaur'),
     ...arms('archer'),

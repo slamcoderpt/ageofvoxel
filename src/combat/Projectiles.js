@@ -16,9 +16,11 @@ export class Projectiles {
     this.stuck = [];
     // a dark shaft, a bright steel head and white fletching (a cross of
     // feathers), big enough to read as an arrow from RTS height
-    const m = new VoxelModel().box(0, 0, 0, 1, 1, 8, 0x4a3018).set(0, 0, 8, 0xd8dde2).set(0, 0, 9, 0xd8dde2)
-      .box(0, 0, 0, 1, 1, 3, 0xfaf6ea).box(-1, 0, 0, 3, 1, 2, 0xfaf6ea).box(0, -1, 0, 1, 3, 2, 0xfaf6ea);
-    const geo = buildVoxelGeometry(m, { size: 0.11, pivot: [0.5, 0.5, 4.5], ao: false });
+    // (a pale shaft, a broad bright head and a wide red-dyed feather cross,
+    // so an arrow in flight reads as an arrow, not a grey stick)
+    const m = new VoxelModel().box(0, 0, 0, 1, 1, 9, 0x9a7040).box(0, 0, 9, 1, 1, 2, 0xe8edf2).set(-1, 0, 9, 0xc8ced4).set(1, 0, 9, 0xc8ced4)
+      .box(-1, 0, 0, 3, 1, 3, 0xfaf6ea).box(0, -1, 0, 1, 3, 3, 0xfaf6ea).set(-1, 0, 1, 0xd03020).set(1, 0, 1, 0xd03020).set(0, -1, 1, 0xd03020).set(0, 1, 1, 0xd03020);
+    const geo = buildVoxelGeometry(m, { size: 0.13, pivot: [0.5, 0.5, 5.5], ao: false });
     const mat = makeVoxelMaterial({ instanced: false });
     this.mesh = new THREE.InstancedMesh(geo, mat, MAX);
     this.mesh.count = 0;
@@ -150,11 +152,13 @@ export class Projectiles {
     let m = n;
     for (const s of this.stuck) {
       if (m >= MAX) break;
-      this._d.set(s.dx, s.dy, s.dz);
+      // (leaned over and driven half its length into the turf: a steep
+      // plunging arrow stood bolt upright and read as a signpost)
+      this._d.set(s.dx, s.dy * 0.45, s.dz);
       if (this._d.lengthSq() < 1e-8) this._d.set(0, -1, 0);
       this._q.setFromUnitVectors(this._z, this._d.normalize());
       const sink = Math.max(0, s.t - STUCK_TIME + 1.5) * 0.3;
-      this._m.compose(this._v.set(s.x + this._d.x * 0.2, s.y + this._d.y * 0.2 - sink, s.z + this._d.z * 0.2), this._q, this._s);
+      this._m.compose(this._v.set(s.x + this._d.x * 0.45, s.y + this._d.y * 0.45 - sink, s.z + this._d.z * 0.45), this._q, this._s);
       this.mesh.setMatrixAt(m++, this._m);
     }
     this.mesh.count = m;

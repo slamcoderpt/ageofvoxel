@@ -25,7 +25,7 @@ export function fieldHeroesAndMyth(game, owner, side, P, rot) {
   // a cyclops wading into the line
   put('cyclops', 6.5, 1.2, { combat_leash: 4, combat_reach: 0.3 });
   // medusa behind the phalanx
-  put('medusa', -8, 6.2);
+  put('medusa', -13, 7.2);
   // a centaur troop on the far flank of the archer screen
   for (let i = 0; i < 4; i++) put('centaur', -17.5 + (i % 2) * 1.8, 7.5 + i * 1.3);
   return out;

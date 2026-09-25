@@ -69,6 +69,12 @@ export class Units {
         vec3 teamSat = diffuseColor.rgb * vTeam;
         // (pure hue only: a grey lift turned the red army pink)
         totalEmissiveRadiance += teamSat * (0.7 + teamRim * 1.0);
+        // hit flash tint: the man struck blazes in his own army's colour
+        // (on top of the core white lift), so every blow says who took it
+        // (a saturated tint of his own albedo plus a coloured rim, not a flat
+        // additive wash, which turned whole giants pastel pink and lilac)
+        float hitK = min(vFlash * 20.0, 1.0);
+        totalEmissiveRadiance += diffuseColor.rgb * vTeamCol * (0.3 + 0.2 * teamRim) * hitK;
       }`);
     });
     // Silhouette outline: every part is drawn a second time as a dark
@@ -424,7 +430,7 @@ export class Units {
             this._root.multiply(this._tmp.makeRotationX(dir * (f * 1.5 - bounce)));
             this._root.multiply(this._tmp.makeRotationZ(side * 0.12 * f));
             // pressed flat into the turf, lower than any man still standing
-            this._root.premultiply(this._tmp.makeTranslation(0, -y, 0)).premultiply(this._tmp.makeScale(1, 1 - 0.6 * f, 1)).premultiply(this._tmp.makeTranslation(0, y - 0.05 * f, 0));
+            this._root.premultiply(this._tmp.makeTranslation(0, -y, 0)).premultiply(this._tmp.makeScale(1, 1 - 0.72 * f, 1)).premultiply(this._tmp.makeTranslation(0, y - 0.05 * f, 0));
           }
           this._root.premultiply(this._tmp.makeTranslation(0, -sink, 0));
         }
@@ -445,7 +451,7 @@ export class Units {
           // (and dark: a body lies a full value step below the living, so
           // it reads as part of the ground, not as another man)
           const m = dk * 0.9;
-          this._c.setRGB(this._c.r + (0.4 - this._c.r) * m, this._c.g + (0.36 - this._c.g) * m, this._c.b + (0.32 - this._c.b) * m).multiplyScalar(1 - dk * 0.55);
+          this._c.setRGB(this._c.r + (0.46 - this._c.r) * m, this._c.g + (0.39 - this._c.g) * m, this._c.b + (0.31 - this._c.b) * m).multiplyScalar(1 - dk * 0.4);
         }
         const ck = 1 - (u.gp_char || 0); // god power char (lightning-struck)
         const tr = this._c.r * ck, tg = this._c.g * ck, tb = this._c.b * ck;
@@ -454,8 +460,13 @@ export class Units {
         // (kept low: a strong additive wash turns the man pastel and he reads
         // as a translucent ghost; the hot sparks at the contact point carry
         // the blow, the flash just lifts him a touch)
-        const pop = !u.dead && (u.units_hitT ?? 9) < 0.07 && u.flashT > 0 ? 0.05 : 0;
-        const flash = Math.max(pop, u.dead ? 0 : Math.min(1, u.flashT / 0.1) * 0.02, u.gp_hit || 0);
+        // (the white lift stays modest; the team-coloured tint added in the
+        // unitTeamLift patch carries most of it, so he blazes red or blue
+        // rather than going pastel)
+        // (only a melee blow pops: giants under a steady arrow rain otherwise
+        // stayed lit the whole time)
+        const pop = !u.dead && (u.units_hitT ?? 9) < 0.12 && u.flashT > 0 && this.game.time - (u.combat_meleeT ?? -99) < 0.15 ? (u.def.myth ? 0.025 : 0.035) : 0;
+        const flash = Math.max(pop, u.dead ? 0 : Math.min(1, u.flashT / 0.12) * 0.012, u.gp_hit || 0);
         const fade = u.dead ? 1 - Math.min(1, Math.max(0, (u.anim.dieT - FADE_START) / (CORPSE_TIME - 0.3 - FADE_START))) : 1;
         for (let pi = 0; pi < rig.parts.length; pi++) {
           const p = rig.parts[pi];

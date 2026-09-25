@@ -46,14 +46,15 @@ export class Overlays {
         void main(){
           vec2 px = vUv * vPx;
           float edge = min(min(px.x, vPx.x - px.x), min(px.y, vPx.y - px.y));
-          // thin dark backing (1px) so the bar reads over bright turf and bronze
-          if (edge < 1.0) { gl_FragColor = vec4(0.02, 0.018, 0.015, 0.9); return; }
-          // fill measured inside the backing, with a lit top edge
+          // crisp dark frame (1px) so the bar reads over bright turf and bronze
+          if (edge < 1.0) { gl_FragColor = vec4(0.02, 0.018, 0.015, 0.95); return; }
+          // fill measured inside the frame, with a lit top edge
           float f = (px.x - 1.0) / (vPx.x - 2.0);
           float yy = (px.y - 1.0) / max(1.0, vPx.y - 2.0);
-          // team-tinted fill for the health left, a dark wine for what is lost
-          float lit = 0.8 + 0.25 * yy + (yy > 0.6 ? 0.2 : 0.0);
-          vec3 c = f < vFill ? vCol * lit : vec3(0.2, 0.035, 0.03);
+          // a clear split: bright green for the health left, strong red for
+          // what is lost (the men themselves carry the army colour)
+          float lit = 0.82 + 0.2 * yy + (yy > 0.65 ? 0.18 : 0.0);
+          vec3 c = f < vFill ? vCol * lit : vec3(0.86, 0.1, 0.07) * lit;
           if (abs(f - vFill) * (vPx.x - 2.0) < 0.6) c = vec3(0.02);
           gl_FragColor = vec4(c, 1.0);
         }`,
@@ -84,9 +85,9 @@ export class Overlays {
   resize(w, h) {
     const u = this.bars.material.uniforms;
     u.uResY.value = h;
-    // 5px at 1080p: a 1px dark frame round a 3px fill (thin, so a few bars
-    // over the wounded never become a strip of clutter over the melee)
-    u.uBarPx.value = Math.round(Math.min(8, Math.max(4, h / 1080 * 5)));
+    // 6px at 1080p: a 1px dark frame round a 4px fill, thick enough to read
+    // over a packed melee from RTS height
+    u.uBarPx.value = Math.round(Math.min(10, Math.max(5, h / 1080 * 6)));
   }
 
   render(alpha) {
@@ -100,12 +101,7 @@ export class Overlays {
       this.aInfo.setXYZW(n, Math.max(0, e.hp / e.maxHp), w, px, 0);
       // the fill is the owner's colour (bright, so it reads as a bar and not
       // as another man's tunic); Gaia and buildings keep a neutral green
-      const pc = e.owner > 0 ? game.players?.[e.owner]?.color : null;
-      if (pc != null) {
-        this._c.setHex(pc);
-        const mx = Math.max(this._c.r, this._c.g, this._c.b, 1e-4);
-        this._c.setRGB(0.25 + 0.85 * this._c.r / mx, 0.25 + 0.85 * this._c.g / mx, 0.25 + 0.85 * this._c.b / mx);
-      } else this._c.setRGB(0.3, 0.9, 0.2);
+      this._c.setRGB(0.3, 1.0, 0.18);
       this.aCol.setXYZ(n, this._c.r, this._c.g, this._c.b);
       n++;
     };
@@ -139,9 +135,9 @@ export class Overlays {
       // who were struck in the last couple of seconds (heroes and giants
       // once they are down a quarter). A fixed pixel size per class at a
       // fixed height over the head, so the few there are line up.
-      const hurt = f < (big ? 0.75 : 0.6) && game.time - (u.combat_hitT ?? -99) < 6;
+      const hurt = f < (big ? 0.8 : 0.7) && game.time - (u.combat_hitT ?? -99) < 6;
       if (selected || hover === u.id || hurt)
-        addBar(u, x, game.map.heightAt(u.x, u.z) + game.units.heightOf(u) + 0.3, z, big ? 60 : u.def.class === 'cavalry' ? 42 : 34, 1);
+        addBar(u, x, game.map.heightAt(u.x, u.z) + game.units.heightOf(u) + 0.3, z, big ? 70 : u.def.class === 'cavalry' ? 46 : 40, 1);
     }
     for (const b of game.entities.buildings()) {
       if (b.owner !== game.localPlayer && !game.fog.isExplored(b.x, b.z)) continue;
