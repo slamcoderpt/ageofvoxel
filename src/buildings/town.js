@@ -42,15 +42,17 @@ const S = {
   store2: [13, -5],                        // by the gold mine
   // [dx, dz, plan, yaw]: plans (models.js houseModel) 0 courtyard L,
   // 1 two-storey with balcony, 2 row pair, 3 row house with roof terrace,
-  // 4 cottage behind a walled yard, 5 tower house. Row plots (2, 3) are packed wall to
-  // wall into short terraces; the rest stand a tile or two apart, stepped
-  // back and forth off the street line, some turned to a cross street.
+  // 4 U-plan courtyard, 5 tower house, 6 flat-roofed court house (white
+  // terrace roofs round an open court), 7 one-room hut in a kitchen
+  // garden, 8 flat-roofed block with a gabled annex. Every row mixes flat
+  // white terraces, gables with ridges both ways, hips and small huts, and
+  // turns some plots a quarter so no two neighbours show the same roof.
   houses: [
-    [-11, -5, 2, 0], [-14, -5, 3, 0], [-18, -6, 0, -Math.PI / 2], [-23, -5, 5, 0],        // row A
-    [-12, -12, 4, Math.PI / 2], [-16, -13, 5, 0], [-20, -12, 3, 0], [-23, -12, 2, 0],   // row B
-    [-11, 3, 0, Math.PI / 2], [-15, 3, 2, 0], [-18, 3, 3, 0], [-23, 4, 4, -Math.PI / 2],  // row C
+    [-11, -5, 6, 0], [-14, -5, 2, 0], [-18, -6, 7, -Math.PI / 2], [-23, -5, 8, 0],           // row A
+    [-12, -12, 4, Math.PI / 2], [-16, -13, 6, Math.PI], [-20, -12, 5, 0], [-23, -12, 7, Math.PI / 2], // row B
+    [-11, 3, 8, Math.PI / 2], [-15, 3, 0, 0], [-18, 3, 3, 0], [-23, 4, 6, -Math.PI / 2],     // row C
     [-20, 10, 1, Math.PI / 2],             // row D, beside the academy
-    [-6, 15, 5, Math.PI / 2], [3, 13, 4, 0],   // along the south street
+    [-6, 15, 5, Math.PI / 2], [3, 13, 8, 0],   // along the south street
   ],
   house2: [-6, 10],                        // being built, on the south street corner
   farms: [[9, 3], [14, 3], [9, 9]],

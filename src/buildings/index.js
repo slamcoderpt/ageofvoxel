@@ -9,6 +9,7 @@ import { Placement } from './placement.js';
 import { Props } from './props.js';
 import { withExtras } from './shapes.js';
 import { layoutTown } from './town.js';
+import { Smoke } from './smoke.js';
 
 // Buildings piece: spawning, construction ('build' order), destruction,
 // rendering and the placement flow.
@@ -30,6 +31,7 @@ export class Buildings {
     this.meshes = new Map(); // entity id -> Object3D
     this.placement = new Placement(game, this);
     this.props = new Props(game);
+    this.smoke = new Smoke(game.scene);
 
     game.commands.register('build', {
       start: (u, o) => {
@@ -69,10 +71,12 @@ export class Buildings {
     return { x: b.x + k * 0.45, z: b.z - this.houseSetback(b), yaw: this.houseYaw(b) + j * 0.14 };
   }
 
-  // Hearth smoke: every finished house breathes a thin column of pale grey
-  // voxel puffs from its chimney that drifts downwind and thins out.
-  // Simulated in the fixed tick so paused captures show it.
+  // Hearth smoke: finished houses breathe soft, semi-transparent puffs
+  // (smoke.js) on their own irregular rhythm; about a third of the hearths
+  // are cold at any time. Simulated in the fixed tick so paused captures
+  // show it.
   chimneySmoke(dt) {
+    this.smoke.update(dt);
     const game = this.game;
     this.smokeT = (this.smokeT || 0) + dt;
     if (this.smokeT < 0.1) return;
@@ -84,12 +88,14 @@ export class Buildings {
       const c = this.geometry('house', this.variantOf(b)).userData.chimney;
       if (!c) continue;
       // each hearth puffs at its own rhythm, some cold for a while
-      if (hash3(b.tx, this.smokeN >> 7, b.tz, 97) < 0.2) continue;
+      if (hash3(b.tx, this.smokeN >> 8, b.tz, 97) < 0.38) continue;
+      const beat = 0.5 + 0.5 * Math.sin(this.smokeN * 0.13 + hash3(b.tx, 1, b.tz, 98) * 6.28);
+      if (hash3(b.tx + this.smokeN, 2, b.tz, 99) > 0.08 + 0.2 * beat) continue;
       const p = this.housePose(b);
       const cs = Math.cos(p.yaw), sn = Math.sin(p.yaw);
       const x = p.x + c[0] * cs + c[2] * sn, z = p.z - c[0] * sn + c[2] * cs;
       const y = game.map.heightAt(b.x, b.z) + c[1];
-      game.fx.emit({ x, y, z, count: 1, color: 0xcfcbc3, colorVar: 0.08, size: 0.17, life: 3.0, speed: 0.1, up: 0.75, gravity: 0.05, drag: 0.25, spread: 0.04, grow: 3 });
+      this.smoke.puff(x, y, z, b.tx * 131 + b.tz);
     }
   }
 
@@ -432,6 +438,8 @@ export class Buildings {
     this.props.render();
     this.placement.render();
   }
+
+  resize(w, h) { this.smoke.resize(h); }
 }
 
 export { BUILDING_DEFS };
