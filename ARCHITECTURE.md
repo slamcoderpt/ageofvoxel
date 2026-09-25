@@ -28,7 +28,7 @@ its owner. Shared code lives in `src/core/`.
 | `src/combat/` | `attack` order, auto-targeting, melee/splash/ranged damage with class bonuses, arrows, death, hit flash/particles, health bars, selection rings, Town Center arrows, **enemy AI** (`EnemyAI.js`) | `combat.damage(t, amount, attacker)`, `kill(e)`, `findEnemyNear()`, `combat.ai.enabled` |
 | `src/ui/` | HUD (resource bar, age, clock, god power buttons, portrait/stats/queue, command grid with hotkeys, rotated minimap), box/click/double-click select, right-click smart orders, control groups (Ctrl+1..9), idle villager (`.`), Town Center (`H`), placement and power targeting modes | `ui.message(text)`, `ui.selection.set(ids)`, `ui.setVisible(bool)` |
 | `src/economy/` | gathering state machine and drop-off, farms (row-by-row harvest, crop overlay), hunting (deer/boar herds, thrown spears, carcasses), fishing (shoals + fishing boats), stockpiles by drop-offs, worship → favor, population & cap, training queues, rally points, age advancement, the `economy` scene | `economy.train(b, type)`, `cancelTrain()`, `advanceAge(owner)`, `nearestResource()`, `nearestDropoff()`, `economy.wildlife.spawnHerd()`, `economy.fishing.spawnBoat()` |
-| `src/core/` | game loop (`Game.js`), entity store, events, players, map generation (`GameMap.js`), A* pathfinding + steering (`pathfinding.js`, `Movement.js`), orders (`Commands.js`), input, RTS camera, picking, fog of war, particles (`fx/`), voxel model + mesher + materials (`voxel.js`), composable shader patches, portraits, **scene registry** (`scenes/`) | see below |
+| `src/core/` | game loop (`Game.js`), entity store, events, players, map generation (`GameMap.js`), A* pathfinding + steering (`pathfinding.js`, `Movement.js`), orders (`Commands.js`), input, RTS camera, picking, fog of war, particles (`fx/`), voxel model + mesher + materials (`voxel.js`), composable shader patches, portraits, match end (`Victory.js`), **scene registry** (`scenes/`) | see below |
 
 ### Core concepts
 
@@ -41,11 +41,21 @@ its owner. Shared code lives in `src/core/`.
   (`idle`, `move` in core; `gather`, `dropoff`, `worship` in economy; `build` in buildings; `attack` in combat).
   The owning piece drives units with that order from its `update()`. `commands.smart(units, x, z, target)`
   implements right-click; `commands.move()` does formation moves.
+  When a building is finished its builders move on (buildings piece): one farms a new farm, the rest help on
+  the nearest unfinished site of their owner within 12 tiles, else resume the gather/worship order they had
+  when placement sent them (`order.resume`), else go idle. An `attack` order on a building that switches to
+  nearby defenders keeps the building in `order.buildingId` and returns to it. Gatherers that cannot reach a
+  node mark it (`r.econ_unreachT`) and `economy.nearestResource()` skips it for 90 s.
 - **Movement.** `game.movement.moveTo(u, x, z, {goalRect, range})`, then poll `u.moving` / `u.arrived`.
   Grid A* (8-connected, line-of-sight smoothed) over `map.isWalkable()`; separation steering via a spatial hash
   (`game.movement.hash`, also used for neighbour queries); stuck detection re-paths.
 - **Events** (`game.events.on/emit`): `entity:added|removed|died`, `unit:damaged`, `unit:trained`,
-  `building:placed|completed`, `age:advanced`, `resources:changed`, `selection:changed`, `godpower:cast`.
+  `building:placed|completed`, `age:advanced`, `resources:changed`, `selection:changed`, `godpower:cast`,
+  `game:over` ({ winner, loser, time }).
+- **Match end** (`Victory.js`, last in the sim order). Enabled by the scene (`victory: true`, only the skirmish).
+  A player who has owned a Town Center loses when none is left (foundations count); `game.victory.result`
+  is then set, the game pauses and `game:over` fires. The UI shows a Victory / Defeat card (`.gameover` in
+  `src/ui/hud.css`) whose Play Again button reloads the page with the same URL. `stats().over` reports it.
 - **Determinism.** Sim randomness only from `game.rng` (seeded). Visual randomness uses `hash2/hash3` or
   seeded RNGs. Particles and god-power visuals are simulated in the fixed tick so paused captures match.
 - **Voxel models.** `new VoxelModel().box(x,y,z,w,h,d,color)` (+ `cylinder`, `ellipsoid`, `roofX/Z`, `line`,
@@ -53,6 +63,8 @@ its owner. Shared code lives in `src/core/`.
   `buildVoxelGeometry(model, {size, pivot, jitter})` emits only exposed faces with per-voxel colour jitter and
   baked per-vertex AO. `makeVoxelMaterial()` / `voxelMaterialFor(color)` add team tint, glow, hit flash and fog of war.
 - **Fog of war.** `game.fog.isVisible/isExplored(x, z)`; call `applyFogOfWar(material)` on world materials.
+- **Map edits.** `map.flattenTiles/paintTiles` call `map.onChange({cx0, cz0, cx1, cz1})` (column rect); the terrain
+  piece marks the overlapping mesh chunks and only the resource instancing buckets over that rect for rebuild.
 
 ## Scene harness (deterministic screenshots)
 
@@ -67,6 +79,8 @@ URL params select a reproducible setup (registered in `src/core/scenes/index.js`
 | `coast` | seaside town, beach, cliffs, animated water |
 | `economy` | busy economy: fenced block of farms round a granary, hunters on a deer herd, fishing boats, wood/gold/berries, building, training (used by the smoke test) |
 | `hud` | town with the full HUD visible, a villager selected and control groups set (map revealed) |
+
+Scene fields: `preset, seed, mapSize, hud, revealAll, ai, live, victory, fastForward, camera, setup, after`.
 
 Params: `scene`, `seed`, `live=1` (keep simulating; scenes are paused by default), `hud=0|1`,
 `post=high|low|off`, `fog=0|1`, `timescale=N`, `cam=x,z[,distance[,pitch[,yaw]]]` (camera override for close-ups).
@@ -85,15 +99,17 @@ Both expect a server already running (they build nothing):
 npx vite --port 5173            # or: npm run build && npx vite preview --port 5173
 node scripts/shoot.mjs --scene town --out shots/town.png [--port 5173] [--width 1920 --height 1080] \
      [--params "cam=64,64,20&post=low"] [--timeout 300]
-node scripts/smoke.mjs [--port 5173] [--seconds 20] [--timescale 4]
+node scripts/smoke.mjs [--port 5173] [--seconds 20] [--timescale 4] [--live 60]
 node scripts/longrun.mjs [--port 5173] [--minutes 12]      # long AI-vs-idle sim, checks for runtime errors
 ```
 
 `shoot.mjs` launches headless Chromium with SwiftShader WebGL (`scripts/browser.mjs`; falls back to
 `/opt/pw-browsers/chromium-*/chrome-linux/chrome`), waits for `__sceneReady`, saves the PNG, prints console
 errors and exits non-zero if the page threw or the canvas is blank. Software rendering is slow: expect
-~20–60 s per 1080p capture. `smoke.mjs` loads `?scene=economy&live=1`, runs ~20 s of game time and checks that
-resources rose, units moved and nothing threw.
+~20–60 s per 1080p capture. `smoke.mjs` loads `?scene=economy&live=1`, lets the real loop
+run for up to `--live` wall-clock seconds (it must advance game time), then, if the machine was too slow to get
+there, steps the fixed-step sim in the page until `--seconds` of game time have been simulated. Resource gain,
+unit movement and errors are checked over that simulated span, so the result does not depend on render speed.
 
 ## Known limits / next steps per piece
 
@@ -103,6 +119,8 @@ resources rose, units moved and nothing threw.
 - Units: no formations beyond grid moves, no corpses blood/decals, cavalry rig is basic.
 - Lighting: no time of day; sky rarely visible from the RTS camera.
 - God powers: one god; no ages gating powers.
-- Combat: no attack-move command, simple AI (one attack wave pattern).
-- UI: no tech tree, no garrison, no tooltips for units in the world.
+- Combat: no attack-move command, simple AI (one attack wave pattern; saves food to reach the Classical Age
+  once it has 16 villagers; never casts god powers).
+- UI: no tech tree, no garrison, no tooltips for units in the world; god powers have no keyboard hotkeys.
+- Match: the only end condition is losing every Town Center; Play Again reloads the page.
 - Economy: fishing boats are economy-owned (not selectable/trainable units yet; no dock building); no market/tribute, no techs.
