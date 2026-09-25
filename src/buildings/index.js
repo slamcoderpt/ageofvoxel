@@ -231,8 +231,8 @@ export class Buildings {
     const game = this.game, map = game.map;
     game.terrain.clearRect(tx, tz, def.w, def.h);
     map.flattenTiles(tx, tz, def.w, def.h, null, def.farm ? GROUND.FARM : type === 'town_center' || type === 'temple' ? GROUND.PAVED : GROUND.DIRT);
-    if (type === 'town_center') this.pavePlaza(tx, tz, def.w, def.h, 3.5);
-    else if (type === 'temple') this.pavePlaza(tx, tz, def.w, def.h, 2.5);
+    if (type === 'town_center') this.pavePlaza(tx, tz, def.w, def.h, 5.5);
+    else if (type === 'temple') this.pavePlaza(tx, tz, def.w, def.h, 3);
     // houses and storehouses sit on their own worn-earth lot (no paving),
     // so the paved streets between them read as streets, not one slab
     if (!def.farm) this.yard(tx, tz, def.w, def.h, type === 'town_center' ? 0 : type === 'temple' ? 2 : 1.6);
