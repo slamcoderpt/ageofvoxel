@@ -1,0 +1,89 @@
+import * as THREE from 'three';
+import { voxelMaterialFor } from '../core/voxel.js';
+import { buildGreedyGeometry } from './greedy.js';
+import { hash2 } from '../core/rng.js';
+import { makeTree, makeGoldMine, makeBerryBush, PROP_VOXEL } from './models.js';
+
+const CHUNK = 16; // tiles per instancing bucket (keeps frustum culling useful)
+
+// Instanced rendering for resource props (trees, gold mines, berry bushes).
+// Buckets instances by (model, map chunk) and rebuilds a bucket when an
+// entity in it is added/removed.
+export class ResourceRenderer {
+  constructor(game) {
+    this.game = game;
+    this.group = new THREE.Group();
+    this.group.name = 'resources';
+    this.material = voxelMaterialFor(0xffffff);
+    this.geos = new Map();
+    this.buckets = new Map(); // key -> { ents: Set, mesh, dirty }
+    game.events.on('entity:added', (e) => { if (e.kind === 'resource') this._touch(e, true); });
+    game.events.on('entity:removed', (e) => { if (e.kind === 'resource') this._touch(e, false); });
+  }
+
+  modelKey(e) { return e.type === 'tree' ? `tree${e.variant % 10}` : e.type; }
+
+  geometry(key) {
+    if (!this.geos.has(key)) {
+      let m, pivot;
+      if (key.startsWith('tree')) { m = makeTree(+key.slice(4)); pivot = [1, 0, 1]; }
+      else if (key === 'gold') { m = makeGoldMine(); pivot = [8, 0, 8]; }
+      else { m = makeBerryBush(); pivot = [2.5, 0, 2.5]; }
+      this.geos.set(key, buildGreedyGeometry(m, { size: PROP_VOXEL, pivot, jitter: 0.06, minMergeAO: 1 }));
+    }
+    return this.geos.get(key);
+  }
+
+  _touch(e, add) {
+    const k = `${this.modelKey(e)}|${Math.floor(e.tx / CHUNK)}|${Math.floor(e.tz / CHUNK)}`;
+    let b = this.buckets.get(k);
+    if (!b) { b = { key: this.modelKey(e), cx: Math.floor(e.tx / CHUNK), cz: Math.floor(e.tz / CHUNK), ents: new Set(), mesh: null, dirty: true }; this.buckets.set(k, b); }
+    if (add) b.ents.add(e); else b.ents.delete(e);
+    b.dirty = true;
+  }
+
+  // Terrain under a tile rect changed height: re-seat the props of the
+  // buckets that overlap it (only those; rebuilding every bucket re-uploaded
+  // all ~400 instance buffers on each building placement).
+  markTiles(tx0, tz0, tx1, tz1) {
+    const c0 = Math.floor((tx0 - 1) / CHUNK), c1 = Math.floor((tx1 + 1) / CHUNK);
+    const r0 = Math.floor((tz0 - 1) / CHUNK), r1 = Math.floor((tz1 + 1) / CHUNK);
+    for (const b of this.buckets.values()) if (b.cx >= c0 && b.cx <= c1 && b.cz >= r0 && b.cz <= r1) b.dirty = true;
+  }
+
+  render() {
+    const map = this.game.map;
+    const { m4, q, s, p, col, up } = this._tmp || (this._tmp = {
+      m4: new THREE.Matrix4(), q: new THREE.Quaternion(), s: new THREE.Vector3(), p: new THREE.Vector3(),
+      col: new THREE.Color(), up: new THREE.Vector3(0, 1, 0),
+    });
+    for (const b of this.buckets.values()) {
+      if (!b.dirty) continue;
+      b.dirty = false;
+      if (b.mesh) { this.group.remove(b.mesh); b.mesh.dispose(); b.mesh = null; }
+      if (!b.ents.size) continue;
+      const mesh = new THREE.InstancedMesh(this.geometry(b.key), this.material, b.ents.size);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      let i = 0;
+      for (const e of b.ents) {
+        const h = hash2(e.tx, e.tz, 77);
+        const rot = e.type === 'gold' ? 0 : Math.floor(h * 4) * Math.PI / 2;
+        const sc = e.type === 'tree' ? 0.85 + hash2(e.tx, e.tz, 5) * 0.35 : 1;
+        q.setFromAxisAngle(up, rot);
+        s.set(sc, sc * (0.9 + hash2(e.tx, e.tz, 9) * 0.2), sc);
+        p.set(e.x, map.heightAt(e.x, e.z) - 0.05, e.z);
+        m4.compose(p, q, s);
+        mesh.setMatrixAt(i, m4);
+        const t = e.type === 'tree' ? 0.88 + hash2(e.tx, e.tz, 13) * 0.24 : 1;
+        col.setRGB(t, t * (0.97 + hash2(e.tx, e.tz, 3) * 0.06), t * 0.95);
+        mesh.setColorAt(i, col);
+        i++;
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+      b.mesh = mesh;
+      this.group.add(mesh);
+    }
+  }
+}
