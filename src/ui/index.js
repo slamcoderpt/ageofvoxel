@@ -3,6 +3,7 @@ import { ICONS } from './icons.js';
 import { SelectionController } from './Selection.js';
 import { Minimap } from './Minimap.js';
 import { CommandPanel } from './CommandPanel.js';
+import { PerfMeter } from './PerfMeter.js';
 import { renderPortrait } from '../core/portrait.js';
 import { voxelMaterialFor } from '../core/voxel.js';
 import { AGES } from '../core/constants.js';
@@ -85,6 +86,7 @@ export class UI {
     this.selection = new SelectionController(game, this);
     this.minimap = new Minimap(game, root.querySelector('.mm .dia'));
     this.panel = new CommandPanel(game, this, root.querySelector('.info'), root.querySelector('.commands'));
+    this.perf = new PerfMeter(game);
     this.buildPowers();
     // stop clicks on the HUD from reaching the world
     for (const el of root.querySelectorAll('.topbar, .topright, .groups, .bl, .mm')) el.addEventListener('mousedown', (e) => e.stopPropagation());

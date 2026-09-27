@@ -53,6 +53,7 @@ Military Academy. Advance to the Classical Age at the Town Center to unlock mino
 | Mouse wheel | Zoom in / out |
 | Left-click or drag on the minimap | Jump the camera there |
 | `H` | Select and centre on your Town Center |
+| `F3` | Show or hide the performance meter (FPS, frame time, draw calls, triangles, render resolution) |
 
 ### Selection
 
