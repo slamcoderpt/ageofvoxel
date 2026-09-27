@@ -217,6 +217,8 @@ const AOApplyShader = {
 export class PostFX {
   constructor(renderer, scene, camera, quality = 'high') {
     this.quality = quality;
+    this.renderer = renderer;
+    this.aoScale = 1;
     const size = renderer.getSize(new THREE.Vector2());
     const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
     this.composer = new EffectComposer(renderer, rt);
@@ -230,6 +232,10 @@ export class PostFX {
       this.gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.6, thickness: 2.5, scale: 1.6, samples: 12, distanceFallOff: 1.0 });
       this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
       this.gtao.blendIntensity = 0.6;
+      // AO resolution scale (1 full, 0.5 half: the normal pass, AO and denoise
+      // run on a quarter of the pixels; set by the quality level)
+      const gs = this.gtao.setSize.bind(this.gtao);
+      this.gtao.setSize = (w, h) => gs(Math.max(1, Math.round(w * this.aoScale)), Math.max(1, Math.round(h * this.aoScale)));
       // Let pieces opt objects out of the AO g-buffer with object.userData.noAO
       // (water, overlays, effects).
       const orig = this.gtao._overrideVisibility.bind(this.gtao);
@@ -261,6 +267,19 @@ export class PostFX {
   }
   setSize(w, h) { this.composer.setSize(w, h); }
 
+  // Quality level knobs (see Lighting.setQuality): AO on/off and resolution.
+  setAO(scale) {
+    if (!this.gtao) return;
+    const on = scale > 0;
+    this.gtao.enabled = on;
+    this.aoApply.enabled = on;
+    if (on && scale !== this.aoScale) {
+      this.aoScale = scale;
+      const s = this.renderer.getSize(new THREE.Vector2());
+      this.composer.setSize(s.x, s.y);
+    }
+  }
+  setPixelRatio(r) { this.composer.setPixelRatio(r); }
   render() {
     const c = this.composer;
     if (c.readBuffer !== this.msaa) c.swapBuffers();

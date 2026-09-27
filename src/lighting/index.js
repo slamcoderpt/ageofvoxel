@@ -44,15 +44,27 @@ import { VOXEL } from '../core/constants.js';
   }
 }
 
+// Quality levels (?quality=high|medium|low, or the Graphics row of the HUD's
+// gear card). 'high' is the reference look. The lower levels trade GPU work
+// for fidelity: pixel ratio cap, GTAO resolution (0 = off) and shadow map size.
+// With post-processing every pixel pays for MSAA, GTAO, bloom and the grade;
+// 1.5x on a 2x (high-DPI) screen is 56% of the pixels and looks the same at
+// RTS viewing distance, so even 'high' caps there (2x without post).
+export const QUALITY = {
+  high: { pixelRatio: 1.5, pixelRatioNoPost: 2, ao: 1, shadow: 4096 },
+  medium: { pixelRatio: 1, pixelRatioNoPost: 1, ao: 0.5, shadow: 2048 },
+  low: { pixelRatio: 1, pixelRatioNoPost: 1, ao: 0, shadow: 2048 },
+};
+
 // Owns the renderer, sun/sky/hemisphere lights, shadows, atmospheric fog and
 // post-processing. Other pieces never touch renderer settings directly.
 //
-// Query params: ?post=high|low|off
+// Query params: ?post=high|low|off  ?quality=high|medium|low
 export class Lighting {
-  constructor(game, { post = 'high', preserveDrawingBuffer = false } = {}) {
+  constructor(game, { post = 'high', quality = 'high', preserveDrawingBuffer = false } = {}) {
     this.game = game;
+    this.postLevel = post;
     const renderer = new THREE.WebGLRenderer({ antialias: post === 'off', powerPreference: 'high-performance', preserveDrawingBuffer });
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.setSize(innerWidth, innerHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap; // PCF with a Vogel-disk radius (soft)
@@ -73,8 +85,7 @@ export class Lighting {
     // The sun carries all of the frame's warmth (the grade adds none).
     this.sun = new THREE.DirectionalLight(0xffd9a0, 5.2);
     this.sun.castShadow = true;
-    const sm = post === 'high' ? 4096 : 2048;
-    this.sun.shadow.mapSize.set(sm, sm);
+    this.sun.shadow.mapSize.set(2048, 2048); // set by setQuality()
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.035;
     this.sun.shadow.radius = 1.8;
@@ -112,6 +123,27 @@ export class Lighting {
     const smap = renderer.shadowMap, smRender = smap.render.bind(smap);
     smap.render = (...a) => { this._depthGeometry(true); try { smRender(...a); } finally { this._depthGeometry(false); } };
     if (this.post) this.post.onDepthPass = (on) => this._depthGeometry(on);
+    this.setQuality(quality);
+  }
+
+  // Switch quality level live (no reload): pixel ratio, AO, shadow map size.
+  setQuality(q) {
+    if (!QUALITY[q]) q = 'high';
+    this.quality = q;
+    const Q = QUALITY[q];
+    const r = Math.min(devicePixelRatio, this.post ? Q.pixelRatio : Q.pixelRatioNoPost);
+    const sm = this.postLevel === 'high' ? Q.shadow : 2048;
+    const sh = this.sun.shadow;
+    if (sh.mapSize.x !== sm) {
+      sh.mapSize.set(sm, sm);
+      if (sh.map) { sh.map.dispose(); sh.map = null; }
+    }
+    this.post?.setAO(Q.ao);
+    if (r !== this.renderer.getPixelRatio()) {
+      this.renderer.setPixelRatio(r);
+      this.post?.setPixelRatio(r);
+      if (this.game.scene && this.game.renderOrder) this.game.resize();
+    }
   }
 
   // Visual per-frame update: keep the shadow frustum centred on the view and

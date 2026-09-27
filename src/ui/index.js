@@ -98,12 +98,21 @@ export class UI {
     this.els.army.addEventListener('click', () => this.selectIdleArmy());
     root.querySelector('.rbtn.home').addEventListener('click', () => this.selection.gotoTownCenter());
     root.querySelector('.mbtn.obj').addEventListener('click', () => this.message('Objective: destroy the enemy Town Center'));
-    // the hotkey card stays open on click until clicked again
+    // the hotkey card stays open on click until clicked again; opened that
+    // way it is the settings menu too, with a Graphics quality row
     root.querySelector('.mbtn.menu').addEventListener('click', (e) => {
       const el = e.currentTarget;
       this.tipPinned = this.tipPinned === el ? null : el;
       el.classList.toggle('on', this.tipPinned === el);
-      if (this.tipPinned) this.tooltip({ currentTarget: el }, el.dataset.tip, true); else this.tooltip(null, null, true);
+      if (this.tipPinned) this.showMenuCard(); else this.tooltip(null, null, true);
+    });
+    this.tip.addEventListener('click', (e) => {
+      const q = e.target.closest?.('[data-q]')?.dataset.q;
+      if (!q || !this.tipPinned) return;
+      game.lighting.setQuality(q);
+      try { localStorage.setItem('aov.quality', q); } catch { /* storage may be blocked */ }
+      this.message(`Graphics: ${q[0].toUpperCase()}${q.slice(1)}`);
+      this.showMenuCard();
     });
     root.querySelector('.rbtn.flare').addEventListener('click', () => this.message('Right-click the minimap to send units'));
     root.querySelector('.rbtn.terrain').addEventListener('click', (e) => { this.minimap.showTerrain = !this.minimap.showTerrain; this.minimap.timer = 0; e.currentTarget.classList.toggle('off', !this.minimap.showTerrain); });
@@ -267,8 +276,16 @@ export class UI {
     this.msgT = 2.2;
   }
 
+  showMenuCard() {
+    const el = this.tipPinned, cur = this.game.lighting.quality;
+    const opts = ['high', 'medium', 'low'].map((q) => `<span data-q="${q}" class="${q === cur ? 'on' : ''}">${q[0].toUpperCase()}${q.slice(1)}</span>`).join('');
+    this.tooltip({ currentTarget: el }, `${el.dataset.tip}<div class="qrow">Graphics ${opts}</div>`, true);
+    this.tip.classList.add('pinned');
+  }
+
   tooltip(e, html, force = false) {
     if (this.tipPinned && !force) return;
+    this.tip.classList.remove('pinned');
     if (!e) { this.tip.style.display = 'none'; return; }
     this.tip.innerHTML = html;
     this.tip.style.display = 'block';

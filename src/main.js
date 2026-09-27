@@ -3,7 +3,8 @@ import { SCENES } from './core/scenes/index.js';
 
 // Entry point. Reads URL params, builds the scene and runs the loop.
 //   ?scene=skirmish|town|battle|godpower|coast|economy|hud   (default skirmish)
-//   &seed=N  &live=0|1  &hud=0|1  &post=high|low|off  &timescale=N  &fog=0|1
+//   &seed=N  &live=0|1  &hud=0|1  &post=high|low|off  &quality=high|medium|low
+//   &timescale=N  &fog=0|1
 //   &cam=x,z[,distance[,pitch[,yaw]]]
 const params = new URLSearchParams(location.search);
 const sceneName = params.get('scene') || 'skirmish';
@@ -15,6 +16,10 @@ window.__errors = [];
 addEventListener('error', (e) => window.__errors.push(String(e.error?.stack || e.message)));
 addEventListener('unhandledrejection', (e) => window.__errors.push(String(e.reason?.stack || e.reason)));
 
+function storedQuality() {
+  try { return localStorage.getItem('aov.quality'); } catch { return null; } // storage may be blocked
+}
+
 async function boot() {
   if (!scene) throw new Error(`Unknown scene "${sceneName}". Known: ${[...SCENES.keys()].join(', ')}`);
   const harness = params.has('scene');
@@ -23,6 +28,8 @@ async function boot() {
     preset: scene.preset,
     mapSize: scene.mapSize ?? 128,
     post: params.get('post') || 'high',
+    // graphics quality: URL param, else the level last picked in the HUD
+    quality: params.get('quality') || storedQuality() || 'high',
     timeScale: +(params.get('timescale') ?? 1),
     harness,
   });

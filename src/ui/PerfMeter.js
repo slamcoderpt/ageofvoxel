@@ -93,6 +93,7 @@ export class PerfMeter {
       ['tris', `${(w.tris / n / 1e6).toFixed(2)} M`],
       ['res', `${size.x}×${size.y} @${r.getPixelRatio()}x`],
       ['post', this.post],
+      ['quality', this.game.lighting.quality],
     ];
     this.rowsEl.innerHTML = rows.map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('');
     this.drawGraph();
