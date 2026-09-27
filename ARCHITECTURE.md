@@ -79,12 +79,29 @@ URL params select a reproducible setup (registered in `src/core/scenes/index.js`
 | `coast` | seaside town, beach, cliffs, animated water |
 | `economy` | busy economy: fenced block of farms round a granary, hunters on a deer herd, fishing boats, wood/gold/berries, building, training (used by the smoke test) |
 | `hud` | town with the full HUD visible, a villager selected and control groups set (map revealed) |
+| `stress` | scalability test: 6 players on a 256-tile map, each with a town, villagers gathering and an army fighting on the two fronts it shares with its neighbours; `?units=N` total units (default 2000), `?players=2..6`; live, fog on for player 1, profiler on (`src/core/scenes/stress.js`, used by `scripts/stress.mjs`) |
 
-Scene fields: `preset, seed, mapSize, hud, revealAll, ai, live, victory, fastForward, camera, setup, after`.
+Scene fields: `preset, seed, mapSize, players, hud, revealAll, ai, live, victory, prof, fastForward, camera, setup, after`.
 
 Params: `scene`, `seed`, `live=1` (keep simulating; scenes are paused by default), `hud=0|1`,
 `post=high|low|off`, `quality=high|medium|low`, `fog=0|1`, `timescale=N`, `cam=x,z[,distance[,pitch[,yaw]]]`
-(camera override for close-ups).
+(camera override for close-ups), `prof=1|0` (profiler, below), `mapsize=N` (map size in tiles),
+and for the stress scene `units=N`, `players=2..6`.
+
+**More than two players.** The engine's default is PLAYER (1), ENEMY (2) and GAIA (0). A scene can add
+owners 3-6 with `game.addPlayer(id, {name, isAI})` (colours in `PLAYER_COLORS`) and an AI for each with
+`game.combat.addAI(owner)` (all instances in `combat.ais`); `isEnemy()` already treats any two different
+non-Gaia owners as enemies. Map starts for more than two players exist only in the `stress` preset
+(`generateMap({players})`, a ring round the centre). Victory, fog of war and the HUD still assume one local
+player (PLAYER).
+
+**Profiler** (`src/core/Profiler.js`, `game.prof`). Off by default; `?prof=1` or a scene with `prof: true`
+(the stress scene) turns it on, and `Game.tick()` / `Game.frame()` then take a timed path (otherwise one null
+check). Per tick `game.prof.last` holds ms per system of `game.simOrder`, per EnemyAI instance, a few
+sub-steps (projectiles, battle fx, unit spread) and count + ms of `findPath`, `nearestWalkable`,
+`pickTarget`, `findEnemyNear`, `nearestResource`, `nearestDropoff`; per frame `game.prof.lastFrame` holds CPU
+ms of each `renderOrder` piece's `render()` and of `lighting.draw()`. The F3 meter adds sim ms per tick, the
+costliest system and the unit count while it is on.
 
 Flow (`src/main.js`): generate map from the scene's preset+seed → `scene.setup(game)` → fast-forward N seconds
 of sim → set camera → pause → render 4 frames → `window.__sceneReady = true`. Under automation
@@ -104,7 +121,16 @@ node scripts/smoke.mjs [--port 5173] [--seconds 20] [--timescale 4] [--live 60]
 node scripts/longrun.mjs [--port 5173] [--minutes 12]      # long AI-vs-idle sim, checks for runtime errors
 node scripts/bench.mjs [--port 5173] [--scenes skirmish,town,battle] [--width 1920 --height 1080] [--dpr 1] \
      [--params "quality=medium"] [--json out.json]          # per-frame render cost, see below
+node scripts/stress.mjs [--port 5173] [--units 250,500,1000,2000,3000,4000] [--ticks 600] [--warmup 150] \
+     [--frames 4] [--params "players=6"] [--json out.json]  # sim / render scaling vs unit count
 ```
+
+`stress.mjs` loads `?scene=stress&units=N&prof=1` per N (cross-origin isolated, so `performance.now()` has
+~5 us resolution), pauses the loop and steps `game.tick()` directly: `--warmup` ticks, then `--ticks` recorded
+ticks (total and per-system ms, per AI, pathfinding / search calls, entity counts, JS heap), 60 ticks
+counting spatial-hash queries, and a few rendered frames with fog on and with the map revealed (CPU ms per
+render piece and `lighting.draw()`, draw calls, triangles). It prints mean / p95 / max per system per N and
+the growth exponent of each system. Results and analysis: `docs/stress-report.md`.
 
 `shoot.mjs` launches headless Chromium with SwiftShader WebGL (`scripts/browser.mjs`; falls back to
 `/opt/pw-browsers/chromium-*/chrome-linux/chrome`), waits for `__sceneReady`, saves the PNG, prints console
