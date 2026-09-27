@@ -3,8 +3,9 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { Pass, FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
+import { OutputShader } from 'three/examples/jsm/shaders/OutputShader.js';
 
 // Final colour grade in display space. The renderer tone-maps with Khronos
 // PBR Neutral (index.js), which keeps hue and saturation up to the highlights,
@@ -60,16 +61,15 @@ const GradeShader = {
     // preserved): canopy undersides and cast shadows read blue-green.
     uSplitCool: { value: new THREE.Vector3(0.88, 1.0, 1.16) },
   },
-  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-  fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uTopHaze; uniform vec3 uTopHazeColor;
+  // (declarations and body are joined after the output transform in FinalPass)
+  fragmentDecl: `
+    uniform float uTopHaze; uniform vec3 uTopHazeColor;
     uniform float uMidContrast, uShadowSat, uLeafChroma, uFloor; uniform vec3 uLeafLum;
     uniform float uKnee, uShoulder, uToeLift, uChromaLimit, uExposure, uSaturation, uGreenShift, uGreenDesat, uContrast, uVignette;
-    uniform vec3 uShadowTint, uBlackFloor; varying vec2 vUv;
+    uniform vec3 uShadowTint, uBlackFloor;
     uniform vec3 uSplitCool;
-    const vec3 LW = vec3(0.2126, 0.7152, 0.0722);
-    void main(){
-      vec4 t = texture2D(tDiffuse, vUv);
+    const vec3 LW = vec3(0.2126, 0.7152, 0.0722);`,
+  fragmentBody: `
       vec3 c = t.rgb * uExposure;
       // --- foliage: how "green-dominant" is this pixel?
       float g = clamp((c.g - max(c.r, c.b)) / max(c.g, 1e-3), 0.0, 1.0);
@@ -143,16 +143,87 @@ const GradeShader = {
       vec2 d = vUv - 0.5;
       float v = smoothstep(0.35, 0.85, length(d * vec2(1.25, 1.0)));
       c *= 1.0 - v * uVignette * vec3(0.85, 1.0, 1.15);
-      gl_FragColor = vec4(clamp(c, 0.0, 1.0), t.a);
+      gl_FragColor = vec4(clamp(c, 0.0, 1.0), t.a);`,
+};
+
+// Output transform (exposure, tone mapping, sRGB, as three's OutputPass) and
+// the colour grade above in one full-screen pass straight to the canvas. They
+// used to be two passes with a full-resolution half-float target between them.
+// `uniforms` are the grade's (scenes and god powers ease them by name).
+class FinalPass extends Pass {
+  constructor() {
+    super();
+    this.uniforms = { ...THREE.UniformsUtils.clone(OutputShader.uniforms), ...THREE.UniformsUtils.clone(GradeShader.uniforms) };
+    const body = OutputShader.fragmentShader;
+    const a = body.indexOf('void main() {'), b = body.lastIndexOf('}');
+    this.material = new THREE.RawShaderMaterial({
+      name: 'FinalGradeShader',
+      uniforms: this.uniforms,
+      vertexShader: OutputShader.vertexShader,
+      fragmentShader: `${body.slice(0, a)}
+${GradeShader.fragmentDecl}
+void main() {
+${body.slice(a + 'void main() {'.length, b)}
+  vec4 t = gl_FragColor;
+${GradeShader.fragmentBody}
+}`,
+    });
+    this._fsQuad = new FullScreenQuad(this.material);
+    this._key = null;
+  }
+
+  render(renderer, writeBuffer, readBuffer) {
+    this.uniforms.tDiffuse.value = readBuffer.texture;
+    this.uniforms.toneMappingExposure.value = renderer.toneMappingExposure;
+    const key = `${renderer.outputColorSpace}|${renderer.toneMapping}`;
+    if (key !== this._key) {
+      this._key = key;
+      const d = this.material.defines = {};
+      if (THREE.ColorManagement.getTransfer(renderer.outputColorSpace) === THREE.SRGBTransfer) d.SRGB_TRANSFER = '';
+      const tm = {
+        [THREE.LinearToneMapping]: 'LINEAR', [THREE.ReinhardToneMapping]: 'REINHARD', [THREE.CineonToneMapping]: 'CINEON',
+        [THREE.ACESFilmicToneMapping]: 'ACES_FILMIC', [THREE.AgXToneMapping]: 'AGX', [THREE.NeutralToneMapping]: 'NEUTRAL',
+        [THREE.CustomToneMapping]: 'CUSTOM',
+      }[renderer.toneMapping];
+      if (tm) d[`${tm}_TONE_MAPPING`] = '';
+      this.material.needsUpdate = true;
+    }
+    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
+    this._fsQuad.render(renderer);
+  }
+
+  dispose() { this.material.dispose(); this._fsQuad.dispose(); }
+}
+
+// Multiplies the scene colour by GTAO's denoised AO (GTAOPass's own output
+// copies the frame and then blends the AO over it: two full-screen passes).
+const AOApplyShader = {
+  uniforms: { tDiffuse: { value: null }, tAO: { value: null }, intensity: { value: 1 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse, tAO; uniform float intensity; varying vec2 vUv;
+    void main(){
+      vec4 c = texture2D(tDiffuse, vUv);
+      vec4 ao = texture2D(tAO, vUv);
+      gl_FragColor = c * vec4(mix(vec3(1.0), ao.rgb, intensity), ao.a);
     }`,
 };
 
+// Pipeline (high): scene -> MSAA half-float target; GTAO (normal pass + AO +
+// denoise) -> AO applied into a plain half-float target; bloom added onto it;
+// one final pass (tone map, sRGB, grade) to the canvas. Only the scene pass
+// renders into the 4x multisampled target; the full-screen passes write
+// single-sample targets.
 export class PostFX {
   constructor(renderer, scene, camera, quality = 'high') {
     this.quality = quality;
     const size = renderer.getSize(new THREE.Vector2());
     const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
     this.composer = new EffectComposer(renderer, rt);
+    // The scene pass always draws into the multisampled target (see render());
+    // the other buffer of the ping-pong pair needs no samples.
+    this.msaa = this.composer.renderTarget2;
+    this.composer.renderTarget1.samples = 0;
     this.composer.addPass(new RenderPass(scene, camera));
     if (quality === 'high') {
       this.gtao = new GTAOPass(scene, camera, size.x, size.y);
@@ -167,14 +238,25 @@ export class PostFX {
         scene.traverseVisible((o) => { if (o.userData.noAO) this.gtao._visibilityCache.push(o); });
         for (const o of this.gtao._visibilityCache) o.visible = false;
       };
+      // GTAO only computes the AO map; the next pass applies it.
+      this.gtao.output = GTAOPass.OUTPUT.Off;
+      this.gtao.needsSwap = false;
       this.composer.addPass(this.gtao);
+      this.aoApply = new ShaderPass(AOApplyShader);
+      this.aoApply.uniforms.tAO.value = this.gtao.gtaoMap;
+      this.aoApply.uniforms.intensity.value = this.gtao.blendIntensity;
+      this.composer.addPass(this.aoApply);
     }
     this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.05, 0.2, 0.98);
     this.composer.addPass(this.bloom);
-    this.composer.addPass(new OutputPass());
-    this.grade = new ShaderPass(GradeShader);
+    this.grade = new FinalPass();
     this.composer.addPass(this.grade);
   }
   setSize(w, h) { this.composer.setSize(w, h); }
-  render() { this.composer.render(); }
+
+  render() {
+    const c = this.composer;
+    if (c.readBuffer !== this.msaa) c.swapBuffers();
+    c.render();
+  }
 }
