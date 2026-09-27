@@ -54,10 +54,18 @@ export class Game {
     this.errors = [];
   }
 
+  // Extra players beyond PLAYER / ENEMY (the stress scene). Owner ids 3.. get
+  // their colour from PLAYER_COLORS; hostility needs nothing (isEnemy treats
+  // any two different non-Gaia owners as enemies).
+  addPlayer(id, opts = {}) {
+    if (!this.players[id]) this.players[id] = new Player(id, opts);
+    return this.players[id];
+  }
+
   init() {
     const o = this.opts;
     // world data
-    const gen = generateMap({ seed: o.seed ?? 1, size: o.mapSize ?? 128, preset: o.preset ?? 'skirmish' });
+    const gen = generateMap({ seed: o.seed ?? 1, size: o.mapSize ?? 128, preset: o.preset ?? 'skirmish', players: o.players ?? 2 });
     this.map = gen.map;
     this.starts = gen.starts;
     this.pathfinder = new Pathfinder(this.map);

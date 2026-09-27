@@ -152,8 +152,19 @@ export class GameMap {
 // ---------------------------------------------------------------------------
 // Map generation. Deterministic for a given (seed, preset).
 // Returns { map, starts: [{owner, tx, tz}], resources: [{type, tx, tz, variant}] }
+// Preset 'stress' (the stress-test scene): `players` starts on a ring round
+// the centre, gentle battle-style terrain, no forest on the fronts between
+// neighbouring starts (stressFronts). Other presets always have 2 starts.
 // ---------------------------------------------------------------------------
-export function generateMap({ seed = 1, size = 128, preset = 'skirmish' } = {}) {
+export function stressFronts(starts) {
+  const n = starts.length;
+  return starts.map((a, i) => {
+    const b = starts[(i + 1) % n];
+    return { a: a.owner, b: b.owner, tx: (a.tx + b.tx) / 2, tz: (a.tz + b.tz) / 2 };
+  });
+}
+
+export function generateMap({ seed = 1, size = 128, preset = 'skirmish', players = 2 } = {}) {
   const map = new GameMap(size, seed);
   const rng = new RNG(seed);
   const n1 = makeNoise2D(seed * 7 + 1);
@@ -163,7 +174,14 @@ export function generateMap({ seed = 1, size = 128, preset = 'skirmish' } = {}) 
   const W = map.waterLevel;
 
   const starts = [];
-  if (preset === 'coast') {
+  const stress = preset === 'stress';
+  if (stress) {
+    const R = size * 0.34;
+    for (let i = 0; i < players; i++) {
+      const a = Math.PI * 0.75 + (i / players) * Math.PI * 2;
+      starts.push({ owner: i + 1, tx: Math.round(size / 2 + Math.cos(a) * R), tz: Math.round(size / 2 + Math.sin(a) * R) });
+    }
+  } else if (preset === 'coast') {
     starts.push({ owner: 1, tx: Math.round(size * 0.36), tz: Math.round(size * 0.5) });
     starts.push({ owner: 2, tx: Math.round(size * 0.2), tz: Math.round(size * 0.15) });
   } else {
@@ -181,7 +199,7 @@ export function generateMap({ seed = 1, size = 128, preset = 'skirmish' } = {}) 
       if (preset === 'skirmish') {
         const lake = n3.fbm(u * 2.5 + 4, v * 2.5 + 8, 3);
         if (lake > 0.63) h -= (lake - 0.63) * 70;
-      } else if (preset === 'battle') {
+      } else if (preset === 'battle' || stress) {
         h = 3.5 + (h - 3.5) * 0.45;
       } else if (preset === 'coast') {
         // Sea on the +x side with an irregular shoreline and headland cliffs.
@@ -194,7 +212,7 @@ export function generateMap({ seed = 1, size = 128, preset = 'skirmish' } = {}) 
       for (const s of starts) {
         const dx = cx / cps - s.tx, dz = cz / cps - s.tz;
         const d = Math.sqrt(dx * dx + dz * dz);
-        const R = 15;
+        const R = stress ? 26 : 15;
         if (d < R + 8) {
           const t = Math.min(1, Math.max(0, (d - R) / 8));
           const target = 4.2;
@@ -239,6 +257,8 @@ export function generateMap({ seed = 1, size = 128, preset = 'skirmish' } = {}) 
   const resources = [];
   const occupied = new Uint8Array(size * size);
   const nearStart = (tx, tz, r) => starts.some((s) => (s.tx - tx) ** 2 + (s.tz - tz) ** 2 < r * r);
+  const fronts = stress ? stressFronts(starts) : [];
+  const nearFront = (tx, tz) => fronts.some((f) => (f.tx - tx) ** 2 + (f.tz - tz) ** 2 < 24 * 24);
   const place = (type, tx, tz, w = 1, h = 1, extra = {}) => {
     for (let z = tz; z < tz + h; z++)
       for (let x = tx; x < tx + w; x++) {
@@ -253,7 +273,8 @@ export function generateMap({ seed = 1, size = 128, preset = 'skirmish' } = {}) 
   const forest = makeNoise2D(seed * 101 + 3);
   for (let tz = 1; tz < size - 1; tz++)
     for (let tx = 1; tx < size - 1; tx++) {
-      if (nearStart(tx, tz, 17)) continue;
+      if (nearStart(tx, tz, stress ? 28 : 17)) continue;
+      if (stress && nearFront(tx, tz)) continue;
       if (preset === 'battle' && (tx - size / 2) ** 2 + (tz - size / 2) ** 2 < 26 * 26) continue;
       const f = forest.fbm(tx / size * 7, tz / size * 7, 4);
       const edge = Math.min(tx, tz, size - 1 - tx, size - 1 - tz) < 4 ? 0.12 : 0;
