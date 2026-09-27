@@ -3,6 +3,7 @@ import { VOXEL } from '../core/constants.js';
 import { GROUND } from '../core/GameMap.js';
 import { hash2, makeNoise2D } from '../core/rng.js';
 import { buildVoxelGeometry, voxelMaterialFor } from '../core/voxel.js';
+import { buildGreedyGeometry } from './greedy.js';
 import { makeGrassTuft, makeFlowers, makePebbles, DETAIL_VOXEL } from './models.js';
 
 // Scattered ground detail: grass tufts (denser in lush hollows and around
@@ -32,7 +33,12 @@ export class GroundDetails {
     terrainMesh.onChunkRebuilt = (chx, chz) => this.dirty.add(chz * n + chx);
   }
 
-  _geo(model, seed) { return buildVoxelGeometry(model, { size: DETAIL_VOXEL, pivot: [0, 0, 0], jitter: 0.08, seed }); }
+  _geo(model, seed) {
+    const geo = buildVoxelGeometry(model, { size: DETAIL_VOXEL, pivot: [0, 0, 0], jitter: 0.08, seed, noDown: true });
+    // same surface, fewer triangles, for GTAO's normal pass (see Lighting)
+    geo.userData.shape = buildGreedyGeometry(model, { size: DETAIL_VOXEL, pivot: [0, 0, 0], shape: true });
+    return geo;
+  }
 
   render() {
     if (!this.dirty.size) return;
@@ -105,6 +111,8 @@ export class GroundDetails {
       const cnt = L.length / 3;
       const mesh = new THREE.InstancedMesh(this.geos[k], this.material, cnt);
       mesh.castShadow = false;
+      mesh.matrixAutoUpdate = false; // static, identity transform
+      mesh.userData.depthGeometry = this.geos[k].userData.shape;
       mesh.receiveShadow = true;
       mesh.userData.noAO = false;
       for (let j = 0; j < cnt; j++) {

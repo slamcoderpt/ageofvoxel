@@ -238,6 +238,13 @@ export class PostFX {
         scene.traverseVisible((o) => { if (o.userData.noAO) this.gtao._visibilityCache.push(o); });
         for (const o of this.gtao._visibilityCache) o.visible = false;
       };
+      // the normal pass only needs depth and normals (Lighting swaps in the
+      // lighter depth geometries while it runs)
+      const ro = this.gtao._renderOverride.bind(this.gtao);
+      this.gtao._renderOverride = (...a) => {
+        this.onDepthPass?.(true);
+        try { ro(...a); } finally { this.onDepthPass?.(false); }
+      };
       // GTAO only computes the AO map; the next pass applies it.
       this.gtao.output = GTAOPass.OUTPUT.Off;
       this.gtao.needsSwap = false;

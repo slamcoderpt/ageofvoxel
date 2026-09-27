@@ -135,6 +135,9 @@ export function buildVoxelGeometry(model, opts = {}) {
   const jitter = opts.jitter ?? 0.07;
   const ao = opts.ao ?? true;
   const seed = opts.seed ?? 7;
+  // opts.noDown: leave out faces that look straight down. The RTS camera is
+  // always well above small props, so they are back faces there.
+  const noDown = !!opts.noDown;
   const pos = [], nor = [], col = [], team = [], glow = [], idx = [];
   const occ = (x, y, z) => (model.vox.has(key(x, y, z)) ? 1 : 0);
   for (const [k, v] of model.vox) {
@@ -146,6 +149,7 @@ export function buildVoxelGeometry(model, opts = {}) {
     for (let f = 0; f < 6; f++) {
       const F = FACES[f];
       const [nx, ny, nz] = F.n;
+      if (noDown && ny < 0) continue;
       if (occ(x + nx, y + ny, z + nz)) continue;
       const base = pos.length / 3;
       const aos = [];

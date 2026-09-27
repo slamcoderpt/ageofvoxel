@@ -106,6 +106,12 @@ export class Lighting {
     this.patcher = new MaterialPatcher(game);
 
     this.post = post === 'off' ? null : new PostFX(renderer, scene, game.camera, post);
+    // Depth-only passes (the sun's shadow map, GTAO's normal pass) draw
+    // objects that carry userData.depthGeometry with that geometry instead:
+    // the same surface without colour or AO, so far fewer triangles.
+    const smap = renderer.shadowMap, smRender = smap.render.bind(smap);
+    smap.render = (...a) => { this._depthGeometry(true); try { smRender(...a); } finally { this._depthGeometry(false); } };
+    if (this.post) this.post.onDepthPass = (on) => this._depthGeometry(on);
   }
 
   // Visual per-frame update: keep the shadow frustum centred on the view and
@@ -159,6 +165,18 @@ export class Lighting {
     hidden.length = 0;
   }
 
+  _depthGeometry(on) {
+    // (nested: GTAO's normal pass calls render(), which calls the shadow map)
+    this._depthLevel = (this._depthLevel || 0) + (on ? 1 : -1);
+    if (this._depthLevel !== (on ? 1 : 0)) return;
+    const list = this._cull?.depth;
+    if (!list) return;
+    for (const o of list) {
+      if (on) { o.userData.fullGeometry = o.geometry; o.geometry = o.userData.depthGeometry; }
+      else if (o.userData.fullGeometry) { o.geometry = o.userData.fullGeometry; o.userData.fullGeometry = null; }
+    }
+  }
+
   // Per-frame culling on top of three's own frustum test, undone after the
   // frame is drawn:
   //  - Instanced meshes with no instances this frame are hidden. three skips
@@ -174,9 +192,10 @@ export class Lighting {
   _cullForFrame() {
     const t = this._cull || (this._cull = {
       frustum: new THREE.Frustum(), m: new THREE.Matrix4(), sphere: new THREE.Sphere(),
-      end: new THREE.Vector3(), culled: [], hidden: [],
+      end: new THREE.Vector3(), culled: [], hidden: [], depth: [],
     });
-    const cam = this.game.camera, culled = t.culled, hidden = t.hidden;
+    const cam = this.game.camera, culled = t.culled, hidden = t.hidden, depth = t.depth;
+    depth.length = 0;
     cam.updateMatrixWorld();
     t.m.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
     t.frustum.setFromProjectionMatrix(t.m, cam.coordinateSystem, cam.reversedDepth);
@@ -185,6 +204,7 @@ export class Lighting {
     const floor = this._floorY ?? (this._floorY = Math.min(0, this.game.map.heights.reduce((a, b) => Math.min(a, b), 0) * VOXEL) - 1);
     const test = (o) => {
       if (o.isInstancedMesh && o.count === 0) { o.visible = false; hidden.push(o); return; }
+      if (o.userData.depthGeometry) depth.push(o);
       if (!o.castShadow || !o.frustumCulled || !o.geometry) return;
       const bs = o.isInstancedMesh ? (o.boundingSphere || (o.computeBoundingSphere(), o.boundingSphere)) : (o.geometry.boundingSphere || (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere));
       if (!bs) return;
