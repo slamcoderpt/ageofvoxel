@@ -117,12 +117,11 @@ export class Lighting {
     this.patcher = new MaterialPatcher(game);
 
     this.post = post === 'off' ? null : new PostFX(renderer, scene, game.camera, post);
-    // Depth-only passes (the sun's shadow map, GTAO's normal pass) draw
-    // objects that carry userData.depthGeometry with that geometry instead:
-    // the same surface without colour or AO, so far fewer triangles.
+    // The depth-only pass (the sun's shadow map) draws objects that carry
+    // userData.depthGeometry with that geometry instead: the same surface
+    // without colour or AO, so far fewer triangles.
     const smap = renderer.shadowMap, smRender = smap.render.bind(smap);
     smap.render = (...a) => { this._depthGeometry(true); try { smRender(...a); } finally { this._depthGeometry(false); } };
-    if (this.post) this.post.onDepthPass = (on) => this._depthGeometry(on);
     this.setQuality(quality);
   }
 
@@ -178,13 +177,12 @@ export class Lighting {
   draw() {
     this.patcher.scan();
     this.patcher.update(this.sunDir, this.game.camera);
-    // The shadow map is drawn once per frame, by the first scene render. With
-    // autoUpdate three redraws it on every renderer.render() of the scene, and
-    // GTAO's normal pass is a second one: the whole 4096^2 map twice a frame.
+    // The shadow map is drawn once per frame, by the scene render. With
+    // autoUpdate three redraws it on every renderer.render() of the scene
+    // (GTAO's normal pass used to be a second one).
     this.renderer.shadowMap.needsUpdate = true;
-    // World matrices are brought up to date once here (the scene is drawn by
-    // the main pass and again by GTAO's normal pass; each render() used to
-    // walk and recompose the whole scene graph).
+    // World matrices are brought up to date once here (each render() of the
+    // scene used to walk and recompose the whole scene graph).
     const scene = this.game.scene;
     scene.matrixWorldAutoUpdate = false;
     scene.updateMatrixWorld();
@@ -198,7 +196,7 @@ export class Lighting {
   }
 
   _depthGeometry(on) {
-    // (nested: GTAO's normal pass calls render(), which calls the shadow map)
+    // (counts nesting, in case a depth pass renders the shadow map)
     this._depthLevel = (this._depthLevel || 0) + (on ? 1 : -1);
     if (this._depthLevel !== (on ? 1 : 0)) return;
     const list = this._cull?.depth;
@@ -221,6 +219,8 @@ export class Lighting {
   //    the lowest ground, meets the view frustum. The test is conservative
   //    (per frustum plane, both ends of the sweep), so nothing that could
   //    shade a visible pixel is ever dropped.
+  // It also prepares every visible object's material for the AO g-buffer
+  // while the scene pass writes one (GBuffer.js), before anything is drawn.
   _cullForFrame() {
     const t = this._cull || (this._cull = {
       frustum: new THREE.Frustum(), m: new THREE.Matrix4(), sphere: new THREE.Sphere(),
@@ -232,10 +232,12 @@ export class Lighting {
     t.m.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
     t.frustum.setFromProjectionMatrix(t.m, cam.coordinateSystem, cam.reversedDepth);
     const planes = t.frustum.planes;
+    const gbuf = this.post?.gbufferActive ? this.post.gbuffer : null;
     const d = this.sunDir; // towards the sun; light travels along -d
     const floor = this._floorY ?? (this._floorY = Math.min(0, this.game.map.heights.reduce((a, b) => Math.min(a, b), 0) * VOXEL) - 1);
     const test = (o) => {
       if (o.isInstancedMesh && o.count === 0) { o.visible = false; hidden.push(o); return; }
+      if (gbuf && o.material) gbuf.prepare(o);
       if (o.userData.depthGeometry) depth.push(o);
       if (!o.castShadow || !o.frustumCulled || !o.geometry) return;
       const bs = o.isInstancedMesh ? (o.boundingSphere || (o.computeBoundingSphere(), o.boundingSphere)) : (o.geometry.boundingSphere || (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere));

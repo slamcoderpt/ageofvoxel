@@ -6,6 +6,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { Pass, FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 import { OutputShader } from 'three/examples/jsm/shaders/OutputShader.js';
+import { SceneGBuffer } from './GBuffer.js';
 
 // Final colour grade in display space. The renderer tone-maps with Khronos
 // PBR Neutral (index.js), which keeps hue and saturation up to the highlights,
@@ -209,11 +210,14 @@ const AOApplyShader = {
     }`,
 };
 
-// Pipeline (high): scene -> MSAA half-float target; GTAO (normal pass + AO +
-// denoise) -> AO applied into a plain half-float target; bloom added onto it;
-// one final pass (tone map, sRGB, grade) to the canvas. Only the scene pass
-// renders into the 4x multisampled target; the full-screen passes write
-// single-sample targets.
+// Pipeline (high): scene -> 4x MSAA half-float target with two colour
+// attachments (colour + view-space normal) and a depth texture (GBuffer.js);
+// GTAO reads that normal and depth (it draws no scene of its own) and computes
+// AO + denoise; the AO is applied into a plain half-float target; bloom added
+// onto it; one final pass (tone map, sRGB, grade) to the canvas. Only the scene
+// pass renders into a multisampled target; the full-screen passes write
+// single-sample targets. With AO off (quality low, post=low) the scene pass
+// uses a colour-only MSAA target instead: no normal output, no depth resolve.
 export class PostFX {
   constructor(renderer, scene, camera, quality = 'high') {
     this.quality = quality;
@@ -222,35 +226,46 @@ export class PostFX {
     const size = renderer.getSize(new THREE.Vector2());
     const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
     this.composer = new EffectComposer(renderer, rt);
-    // The scene pass always draws into the multisampled target (see render());
+    // The scene pass always draws into a multisampled target (see render());
     // the other buffer of the ping-pong pair needs no samples.
-    this.msaa = this.composer.renderTarget2;
+    this.msaa = this.plain = this.composer.renderTarget2;
     this.composer.renderTarget1.samples = 0;
-    this.composer.addPass(new RenderPass(scene, camera));
+    const scenePass = new RenderPass(scene, camera);
+    this.composer.addPass(scenePass);
     if (quality === 'high') {
       this.gtao = new GTAOPass(scene, camera, size.x, size.y);
+      // Scene target with the g-buffer: textures[1] is the normal (nearest
+      // filtered, as GTAO's own normal target was); depth resolves into a
+      // 24-bit depth texture. (Made after GTAOPass: its denoise noise comes
+      // from Math.random, which every new texture's uuid also draws from, and
+      // seeded captures keep the same noise this way.)
+      this.gbuf = new THREE.WebGLRenderTarget(size.x, size.y, {
+        type: THREE.HalfFloatType, samples: 4, count: 2,
+        depthTexture: new THREE.DepthTexture(size.x, size.y, THREE.UnsignedIntType),
+      });
+      const nt = this.gbuf.textures[1];
+      nt.name = 'normal';
+      nt.minFilter = nt.magFilter = THREE.NearestFilter;
+      nt.generateMipmaps = false;
+      this.gtao.setGBuffer(this.gbuf.depthTexture, nt);
+      // decides what each draw writes to it (see GBuffer.js) and copies the
+      // depth AO reads before the late draws (outline hulls, blended effects)
+      this.gbuffer = new SceneGBuffer(renderer, this.gbuf);
+      const sr = scenePass.render.bind(scenePass);
+      scenePass.render = (...a) => {
+        const on = this.gbufferActive;
+        if (on) this.gbuffer.begin();
+        sr(...a);
+        if (on) this.gbuffer.end();
+      };
       this.gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.6, thickness: 2.5, scale: 1.6, samples: 12, distanceFallOff: 1.0 });
       this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
       this.gtao.blendIntensity = 0.6;
-      // AO resolution scale (1 full, 0.5 half: the normal pass, AO and denoise
-      // run on a quarter of the pixels; set by the quality level)
+      // AO resolution scale (1 full, 0.5 half: AO and denoise run on a
+      // quarter of the pixels, reading the full-resolution g-buffer; set by
+      // the quality level)
       const gs = this.gtao.setSize.bind(this.gtao);
       this.gtao.setSize = (w, h) => gs(Math.max(1, Math.round(w * this.aoScale)), Math.max(1, Math.round(h * this.aoScale)));
-      // Let pieces opt objects out of the AO g-buffer with object.userData.noAO
-      // (water, overlays, effects).
-      const orig = this.gtao._overrideVisibility.bind(this.gtao);
-      this.gtao._overrideVisibility = () => {
-        orig();
-        scene.traverseVisible((o) => { if (o.userData.noAO) this.gtao._visibilityCache.push(o); });
-        for (const o of this.gtao._visibilityCache) o.visible = false;
-      };
-      // the normal pass only needs depth and normals (Lighting swaps in the
-      // lighter depth geometries while it runs)
-      const ro = this.gtao._renderOverride.bind(this.gtao);
-      this.gtao._renderOverride = (...a) => {
-        this.onDepthPass?.(true);
-        try { ro(...a); } finally { this.onDepthPass?.(false); }
-      };
       // GTAO only computes the AO map; the next pass applies it.
       this.gtao.output = GTAOPass.OUTPUT.Off;
       this.gtao.needsSwap = false;
@@ -259,6 +274,7 @@ export class PostFX {
       this.aoApply.uniforms.tAO.value = this.gtao.gtaoMap;
       this.aoApply.uniforms.intensity.value = this.gtao.blendIntensity;
       this.composer.addPass(this.aoApply);
+      this.msaa = this.gbuf;
     }
     this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.05, 0.2, 0.98);
     this.composer.addPass(this.bloom);
@@ -267,12 +283,17 @@ export class PostFX {
   }
   setSize(w, h) { this.composer.setSize(w, h); }
 
+  // True while the scene pass writes the g-buffer: every visible object then
+  // goes through gbuffer.prepare() before the frame is drawn (Lighting).
+  get gbufferActive() { return this.msaa === this.gbuf; }
+
   // Quality level knobs (see Lighting.setQuality): AO on/off and resolution.
   setAO(scale) {
     if (!this.gtao) return;
     const on = scale > 0;
     this.gtao.enabled = on;
     this.aoApply.enabled = on;
+    this.msaa = on ? this.gbuf : this.plain;
     if (on && scale !== this.aoScale) {
       this.aoScale = scale;
       const s = this.renderer.getSize(new THREE.Vector2());
@@ -281,8 +302,12 @@ export class PostFX {
   }
   setPixelRatio(r) { this.composer.setPixelRatio(r); }
   render() {
-    const c = this.composer;
-    if (c.readBuffer !== this.msaa) c.swapBuffers();
+    const c = this.composer, t = this.msaa, w = c.renderTarget1.width, h = c.renderTarget1.height;
+    // (the composer sizes renderTarget1/2; the scene target not in use follows here)
+    if (t.width !== w || t.height !== h) t.setSize(w, h);
+    c.renderTarget2 = t;
+    c.readBuffer = t;
+    c.writeBuffer = c.renderTarget1;
     c.render();
   }
 }

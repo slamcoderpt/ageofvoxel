@@ -11,7 +11,7 @@ import { hash3 } from '../core/rng.js';
 // coplanar face regardless of colour and AO. It covers exactly the same
 // voxels, so it gives the same depth and normals with a fraction of the
 // triangles: used in place of the full geometry in passes that only need
-// depth or normals (the sun's shadow map, GTAO's normal pass).
+// depth (the sun's shadow map).
 const AO_CURVE = [0.5, 0.68, 0.84, 1.0];
 const _c = new THREE.Color();
 

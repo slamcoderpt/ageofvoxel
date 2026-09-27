@@ -23,7 +23,7 @@ its owner. Shared code lives in `src/core/`.
 | `src/terrain/` | voxel heightfield mesh (chunked, per-vertex AO), ground palette, animated water shader, trees / gold mines / berry bushes (instanced, bucketed by map chunk), resource definitions | `terrain.spawnResource(type, tx, tz, {variant})`, `removeResource(e)`, `clearRect()` |
 | `src/buildings/` | Greek building defs + voxel models (Town Center, House, Storehouse, Farm, Temple, Military Academy), placement ghost/validation, construction (`build` order), destruction, rendering | `buildings.spawn(type, owner, tx, tz, {built})`, `canPlace()`, `placement.begin/hover/confirm/cancel`, `destroy(b)`, `geometry(type)` |
 | `src/units/` | unit defs, voxel part rigs (villager, hoplite, toxotes, hippikon, minotaur), procedural part animation (idle/walk/gather/build/worship/attack/die), instanced rendering per (type, part) | `units.spawn(type, owner, x, z)`, `portraitObject(type, owner)`, `heightOf(u)`; systems request an animation with `u.anim.want = 'gather'` |
-| `src/lighting/` | renderer, sun + soft shadows (texel-snapped, follows the view), hemisphere + fill light, sky dome, distance haze, post (GTAO ambient occlusion, bloom, tone map, colour grade + vignette), graphics quality levels, per-frame render culling (see *Rendering performance*) | `lighting.sunDir`, `?post=high|low|off`, `?quality=high|medium|low`, `lighting.setQuality(q)`; objects opt out of AO with `obj.userData.noAO = true`; `obj.userData.depthGeometry` is drawn instead of `obj.geometry` in the shadow and AO passes |
+| `src/lighting/` | renderer, sun + soft shadows (texel-snapped, follows the view), hemisphere + fill light, sky dome, distance haze, post (GTAO ambient occlusion, bloom, tone map, colour grade + vignette), graphics quality levels, per-frame render culling (see *Rendering performance*) | `lighting.sunDir`, `?post=high|low|off`, `?quality=high|medium|low`, `lighting.setQuality(q)`; objects opt out of AO with `obj.userData.noAO = true` (blended materials always do; opaque `noAO` objects need `renderOrder >= 2`, see *Rendering performance*); `obj.userData.depthGeometry` is drawn instead of `obj.geometry` in the shadow pass |
 | `src/godpowers/` | favor-costed powers: Lightning Storm and Bolt (Zeus); bolt ribbons, pooled flash lights, sparks, scorch decals, storm ring/cloud | `godpowers.cast(owner, id, x, z)`, `canCast()`, `cooldownLeft()` |
 | `src/combat/` | `attack` order, auto-targeting, melee/splash/ranged damage with class bonuses, arrows, death, hit flash/particles, health bars, selection rings, Town Center arrows, **enemy AI** (`EnemyAI.js`) | `combat.damage(t, amount, attacker)`, `kill(e)`, `findEnemyNear()`, `combat.ai.enabled` |
 | `src/ui/` | HUD (resource bar, age, clock, god power buttons, portrait/stats/queue, command grid with hotkeys, rotated minimap), box/click/double-click select, right-click smart orders, control groups (Ctrl+1..9), idle villager (`.`), Town Center (`H`), placement and power targeting modes, performance meter (`F3`, `PerfMeter.js`; `?fps=1|0` forces it, hidden by default in capture scenes), settings card (gear button, clicked open: hotkeys and the Graphics quality row, remembered in localStorage `aov.quality`) | `ui.message(text)`, `ui.selection.set(ids)`, `ui.setVisible(bool)` |
@@ -126,14 +126,16 @@ production build (`npm run build && npx vite preview`).
 
 What keeps a frame cheap (all invisible at the default `quality=high`):
 
-- **One shadow map per frame.** `shadowMap.autoUpdate` is off; `Lighting.draw()` flags it once, so the first
-  scene render draws it (three used to redraw it for GTAO's normal pass too).
+- **One scene render per frame.** The main pass also writes GTAO's g-buffer (below); GTAO used to draw the
+  whole scene a second time with a normal material (on a Mac, ~260 draw calls and 1.4M triangles a frame).
+- **One shadow map per frame.** `shadowMap.autoUpdate` is off; `Lighting.draw()` flags it once, so the scene
+  render draws it.
 - **Shadow caster culling** (`Lighting._cullForFrame`). A caster is left out of the shadow pass when the
   volume its bounding sphere sweeps along the sunlight, down to the lowest ground, misses the view frustum.
   Conservative, so no visible shadow is lost. Instanced props are bucketed per map chunk for this.
-- **Depth geometries.** Objects with `userData.depthGeometry` are drawn with it in the shadow pass and GTAO's
-  normal pass: the same voxel surface meshed greedily without colour or AO (`buildGreedyGeometry(model,
-  { shape: true })`), about 30% fewer triangles for trees and 55% for grass tufts.
+- **Depth geometries.** Objects with `userData.depthGeometry` are drawn with it in the shadow pass: the same
+  voxel surface meshed greedily without colour or AO (`buildGreedyGeometry(model, { shape: true })`), about
+  30% fewer triangles for trees.
 - **No downward faces on props** (`noDown` in both meshers): the RTS camera is always above them, so those
   are back faces; the shadow geometries keep them.
 - **Empty instanced meshes are hidden** for the frame (units keep a mesh per type and body part; three still
@@ -142,9 +144,27 @@ What keeps a frame cheap (all invisible at the default `quality=high`):
   (terrain chunks, resource buckets, ground details, building props) have `matrixAutoUpdate = false`.
 - **Building props are instanced** per (kind, owner) (`src/buildings/props.js`); `ATM_STATIC_INST` keeps the
   lighting patches from treating them as trees.
-- **Post pipeline** (`PostFX.js`): only the scene pass renders into the 4x MSAA half-float target; GTAO only
+- **Post pipeline** (`PostFX.js`): only the scene pass renders into a 4x MSAA half-float target; GTAO only
   computes its AO map, one pass applies it into a single-sample target, bloom adds onto that, and one final
   pass does tone mapping, sRGB and the grade straight to the canvas (was: copy + blend, output, grade).
+- **AO g-buffer from the scene pass** (`GBuffer.js`). With AO on, the scene target has two colour
+  attachments (colour + view-space normal, packed like `MeshNormalMaterial`) and a depth texture;
+  `GTAOPass.setGBuffer(depth, normal)` reads them. `Lighting._cullForFrame` hands every visible object to
+  `post.gbuffer.prepare()` before the frame is drawn. Opaque materials (except on `noAO` objects) get a
+  patch that writes the vertex normal (not the bent shading normal; a screen-derivative face normal for
+  unlit built-ins, a camera-facing one for the sky); WebGL drops any draw that leaves an active draw buffer
+  unwritten. Blended materials and opaque `noAO` objects are *late* draws: the opaque `noAO` ones (unit
+  outline hulls, god power debris) have `renderOrder = 2`, so they come after the rest of the opaque scene
+  (same image: they are depth-tested; 4 pixels of a 1080p battle frame change on ties). The first late draw
+  copies the multisampled depth into the depth texture and switches the normal attachment off, so outlines,
+  water, contact shadows, particles and effects leave the AO input alone, as with the old separate pass;
+  with no late draw the depth is copied after the pass. With AO off (`quality=low`, `post=low`) the scene
+  target is colour-only (no normal output, no depth copy), as before.
+  Remaining difference from the old pass: at silhouettes and voxel steps the MSAA resolve averages the 4
+  samples' normals and the depth is one sample's, where the old pass sampled pixel centres without
+  multisampling. AO moves by about GTAO's own noise: mean absolute difference 0.31-0.57 of 255 per scene
+  (re-seeding GTAO's denoise noise alone gives ~0.7) with a slight brightening bias (+0.06 to +0.11), and no
+  visible change in 4x crops of building bases, tree gaps or unit contact.
 - **Pixel ratio** is capped at 1.5 with post-processing (2 without).
 
 Quality levels (`?quality=`, or the Graphics row of the gear card; `lighting.setQuality()` switches live):
@@ -155,12 +175,26 @@ Quality levels (`?quality=`, or the Graphics row of the gear card; `lighting.set
 | `medium` | 1 | half resolution (softer crevice AO) | 2048 |
 | `low` | 1 | off | 2048 |
 
+Per frame at 1920x1080, `quality=high` (`scripts/bench.mjs`), before and after the g-buffer change:
+
+| scene | draw calls | triangles | scene renders |
+|---|---|---|---|
+| skirmish | 744 -> 484 | 2.67M -> 1.89M | 2 -> 1 |
+| town | 1167 -> 760 | 5.78M -> 4.04M | 2 -> 1 |
+| battle | 1026 -> 719 | 6.18M -> 4.58M | 2 -> 1 |
+
+Mean absolute pixel difference against the old separate normal pass (seeded captures, 0-255): town 0.57,
+battle 0.48, godpower 0.31, coast 0.47, economy 0.48, hud 0.44.
+
+`medium` drops the same draws (its half-resolution AO now reads the full-resolution g-buffer); `low` is
+unchanged (481 / 757 / 716 draws, one scene render, same targets).
+
 `?post=low|off` still overrides the post chain (and uses a 2048 shadow map).
 
 ## Known limits / next steps per piece
 
 - Terrain: no smoothing between ground types; trees are ~0.5-0.8k triangles each (~0.3-0.7k in the
-  shadow/AO passes) and, with the grass tufts, still the biggest triangle cost; a distance LOD would change
+  shadow pass) and, with the grass tufts, still the biggest triangle cost; a distance LOD would change
   the look.
 - Buildings: no rotation, no wall/tower, construction shown by vertical scale only.
 - Units: no formations beyond grid moves, no corpses blood/decals, cavalry rig is basic.

@@ -31,7 +31,7 @@ export class ResourceRenderer {
       else if (key === 'gold') { m = makeGoldMine(); pivot = [8, 0, 8]; }
       else { m = makeBerryBush(); pivot = [2.5, 0, 2.5]; }
       this.geos.set(key, buildGreedyGeometry(m, { size: PROP_VOXEL, pivot, jitter: 0.06, minMergeAO: 1, noDown: true }));
-      // same surface, fewer triangles, for the depth/normal-only passes
+      // same surface, fewer triangles, for the depth-only (shadow) pass
       this.shapes.set(key, buildGreedyGeometry(m, { size: PROP_VOXEL, pivot, shape: true }));
     }
     return this.geos.get(key);

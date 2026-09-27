@@ -885,7 +885,7 @@ export class BoltRenderer {
     this.debris.castShadow = true;
     this.debris.receiveShadow = true;
     this.debris.count = 0;
-    this.addMesh(this.debris, 0);
+    this.addMesh(this.debris, 2); // after the opaque scene: out of the AO depth (lighting/GBuffer.js)
     this.embers = new THREE.InstancedMesh(box, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, fog: false }), EMBER_MAX);
     this.embers.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(EMBER_MAX * 3), 3);
     this.embers.count = 0;
