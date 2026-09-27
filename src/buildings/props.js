@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { VoxelModel, TEAM, buildVoxelGeometry, voxelMaterialFor } from '../core/voxel.js';
+import { VoxelModel, TEAM, buildVoxelGeometry, makeVoxelMaterial } from '../core/voxel.js';
 import { hash3 } from '../core/rng.js';
 import { BUILDING_VOXEL } from './defs.js';
 import { GROUND } from '../core/GameMap.js';
@@ -468,26 +468,74 @@ export class Props {
     return out;
   }
 
-  rebuild() {
-    this.dirty = false;
-    for (const it of this.items) this.group.remove(it.mesh);
-    const game = this.game;
-    this.items = this.layout().map((it) => {
-      const mesh = new THREE.Mesh(this.geometry(it.kind), voxelMaterialFor(game.players[it.owner].color));
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      mesh.position.set(it.x, game.map.heightAt(it.x, it.z), it.z);
-      mesh.rotation.y = it.rot;
-      this.group.add(mesh);
-      return { ...it, mesh };
-    });
+  // One instanced mesh per (prop kind, owner) instead of a mesh per prop: a
+  // developed town has ~80 props, each drawn in the main, shadow and AO
+  // passes. The material is the plain voxel one (ATM_STATIC_INST keeps the
+  // lighting patches shading each instance exactly like a single mesh).
+  material(owner) {
+    if (!this.mats) this.mats = new Map();
+    let m = this.mats.get(owner);
+    if (!m) {
+      m = makeVoxelMaterial({ teamColor: this.game.players[owner].color });
+      m.defines = { ...(m.defines || {}), ATM_STATIC_INST: '' };
+      this.mats.set(owner, m);
+    }
+    return m;
   }
 
+  rebuild() {
+    this.dirty = false;
+    for (const b of this.batches || []) { this.group.remove(b.mesh); b.mesh.dispose(); }
+    const game = this.game;
+    this.items = this.layout();
+    const byKey = new Map();
+    for (const it of this.items) {
+      const k = `${it.kind}|${it.owner}`;
+      if (!byKey.has(k)) byKey.set(k, []);
+      byKey.get(k).push(it);
+    }
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
+    this.batches = [];
+    for (const list of byKey.values()) {
+      const { kind, owner } = list[0];
+      const mesh = new THREE.InstancedMesh(this.geometry(kind), this.material(owner), list.length);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.matrixAutoUpdate = false;
+      list.forEach((it, i) => {
+        const pos = new THREE.Vector3(it.x, game.map.heightAt(it.x, it.z), it.z);
+        it.matrix = new THREE.Matrix4().compose(pos, q.setFromAxisAngle(up, it.rot), one);
+        it.hidden = new THREE.Matrix4().makeScale(0, 0, 0).setPosition(pos);
+        it.shown = null;
+        it.index = i;
+      });
+      const batch = { mesh, list };
+      this.batches.push(batch);
+      this.group.add(mesh);
+    }
+  }
+
+  // Props outside the explored area are hidden (zero-scale instances, so
+  // they draw nothing); matrices are only rewritten when that changes.
   render() {
     if (this.dirty) this.rebuild();
     const game = this.game;
-    for (const it of this.items)
-      it.mesh.visible = it.owner === game.localPlayer || game.fog.isExplored(it.x, it.z);
+    for (const { mesh, list } of this.batches || []) {
+      let changed = false, any = false;
+      for (const it of list) {
+        const v = it.owner === game.localPlayer || game.fog.isExplored(it.x, it.z);
+        any ||= v;
+        if (v === it.shown) continue;
+        it.shown = v;
+        mesh.setMatrixAt(it.index, v ? it.matrix : it.hidden);
+        changed = true;
+      }
+      mesh.visible = any;
+      if (changed) {
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.computeBoundingSphere();
+      }
+    }
   }
 }
 

@@ -81,6 +81,10 @@ function patchCommon(shader) {
       vec4 aw = vec4(transformed, 1.0);
       #ifdef USE_INSTANCING
         aw = instanceMatrix * aw;
+      #endif
+      // (ATM_STATIC_INST: instancing used only to batch draws of props that
+      // are shaded like single meshes, without a per-instance seed or crown)
+      #if defined( USE_INSTANCING ) && !defined( ATM_STATIC_INST )
         vec2 ip = floor(instanceMatrix[3].xz * 2.0 + 0.5);
         vAtmSeed = fract(sin(dot(ip, vec2(12.9898, 78.233))) * 43758.5453);
         // crown centre of this instance (tree geometry has its pivot at the
