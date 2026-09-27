@@ -3,6 +3,7 @@ import { Sky } from './Sky.js';
 import { PostFX } from './PostFX.js';
 import { MaterialPatcher } from './MaterialPatches.js';
 import { fowUniforms } from '../core/FogOfWar.js';
+import { VOXEL } from '../core/constants.js';
 
 // Soft shadows without grain, with a penumbra that widens with distance from
 // the caster (a cheap PCSS). three's PCF rotates a 5-tap Vogel disk by
@@ -55,6 +56,7 @@ export class Lighting {
     renderer.setSize(innerWidth, innerHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap; // PCF with a Vogel-disk radius (soft)
+    renderer.shadowMap.autoUpdate = false; // drawn once per frame, see draw()
     // PBR Neutral keeps hue and saturation into the highlights (ACES bleached
     // sunlit sandstone to grey-white); all exposure is applied here, before
     // tone mapping, so the grade never has to push values past white.
@@ -138,8 +140,69 @@ export class Lighting {
   draw() {
     this.patcher.scan();
     this.patcher.update(this.sunDir, this.game.camera);
+    // The shadow map is drawn once per frame, by the first scene render. With
+    // autoUpdate three redraws it on every renderer.render() of the scene, and
+    // GTAO's normal pass is a second one: the whole 4096^2 map twice a frame.
+    this.renderer.shadowMap.needsUpdate = true;
+    // World matrices are brought up to date once here (the scene is drawn by
+    // the main pass and again by GTAO's normal pass; each render() used to
+    // walk and recompose the whole scene graph).
+    const scene = this.game.scene;
+    scene.matrixWorldAutoUpdate = false;
+    scene.updateMatrixWorld();
+    const { culled, hidden } = this._cullForFrame();
     if (this.post) this.post.render();
     else this.renderer.render(this.game.scene, this.game.camera);
+    for (const o of culled) o.castShadow = true;
+    for (const o of hidden) o.visible = true;
+    culled.length = 0;
+    hidden.length = 0;
+  }
+
+  // Per-frame culling on top of three's own frustum test, undone after the
+  // frame is drawn:
+  //  - Instanced meshes with no instances this frame are hidden. three skips
+  //    their draw but still binds program, uniforms and buffers for each one
+  //    in every pass (units keep a mesh per type and body part).
+  //  - Shadow casters whose shadow cannot reach anything on screen are left out
+  //    of the shadow pass. The shadow camera covers a square round the view
+  //    centre, much of it below and beside the screen; a caster matters only
+  //    if the volume its bounding sphere sweeps along the sunlight, down to
+  //    the lowest ground, meets the view frustum. The test is conservative
+  //    (per frustum plane, both ends of the sweep), so nothing that could
+  //    shade a visible pixel is ever dropped.
+  _cullForFrame() {
+    const t = this._cull || (this._cull = {
+      frustum: new THREE.Frustum(), m: new THREE.Matrix4(), sphere: new THREE.Sphere(),
+      end: new THREE.Vector3(), culled: [], hidden: [],
+    });
+    const cam = this.game.camera, culled = t.culled, hidden = t.hidden;
+    cam.updateMatrixWorld();
+    t.m.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+    t.frustum.setFromProjectionMatrix(t.m, cam.coordinateSystem, cam.reversedDepth);
+    const planes = t.frustum.planes;
+    const d = this.sunDir; // towards the sun; light travels along -d
+    const floor = this._floorY ?? (this._floorY = Math.min(0, this.game.map.heights.reduce((a, b) => Math.min(a, b), 0) * VOXEL) - 1);
+    const test = (o) => {
+      if (o.isInstancedMesh && o.count === 0) { o.visible = false; hidden.push(o); return; }
+      if (!o.castShadow || !o.frustumCulled || !o.geometry) return;
+      const bs = o.isInstancedMesh ? (o.boundingSphere || (o.computeBoundingSphere(), o.boundingSphere)) : (o.geometry.boundingSphere || (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere));
+      if (!bs) return;
+      const s = t.sphere.copy(bs).applyMatrix4(o.matrixWorld);
+      const c = s.center, r = s.radius;
+      const k = Math.max(0, (c.y + r - floor) / d.y);
+      t.end.set(c.x - d.x * k, c.y - d.y * k, c.z - d.z * k);
+      for (let i = 0; i < 6; i++) {
+        const p = planes[i];
+        if (p.distanceToPoint(c) < -r && p.distanceToPoint(t.end) < -r) {
+          o.castShadow = false;
+          culled.push(o);
+          return;
+        }
+      }
+    };
+    this.game.scene.traverseVisible(test);
+    return t;
   }
 
   resize(w, h) {
