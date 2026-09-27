@@ -24,6 +24,13 @@ try {
   // restarts a slow scene mid-capture (the saved PNG then comes out black). Answer the
   // HMR socket ourselves and never connect it to the server, so the page cannot reload.
   await page.routeWebSocket(/.*/, (ws) => { ws.send(JSON.stringify({ type: 'connected' })); });
+  // Math.random is seeded so frames are identical run to run (GTAO's denoise
+  // noise texture is built from it); before/after captures can then be
+  // compared pixel by pixel.
+  await page.addInitScript(() => {
+    let a = 0x9e3779b9;
+    Math.random = () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  });
   let navigations = 0;
   page.on('framenavigated', (f) => { if (f === page.mainFrame()) navigations++; });
   const t0 = Date.now();

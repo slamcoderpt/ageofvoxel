@@ -6,6 +6,12 @@ import { hash3 } from '../core/rng.js';
 // with the same colour and light AO are merged into larger quads, which
 // cuts a tree from ~1.5k to ~0.9k triangles. Faces in dark creases
 // stay 1x1 so the contact shading is kept.
+//
+// opts.shape: build the bare surface only (position + normal), merging every
+// coplanar face regardless of colour and AO. It covers exactly the same
+// voxels, so it gives the same depth and normals with a fraction of the
+// triangles: used in place of the full geometry in passes that only need
+// depth (the sun's shadow map).
 const AO_CURVE = [0.5, 0.68, 0.84, 1.0];
 const _c = new THREE.Color();
 
@@ -24,12 +30,16 @@ export function buildGreedyGeometry(model, opts = {}) {
     for (let a = 0; a < 3; a++) { mn[a] = Math.min(mn[a], p[a]); mx[a] = Math.max(mx[a], p[a]); }
   }
   const occ = (p) => (vox.has(K(p[0], p[1], p[2])) ? 1 : 0);
+  const shape = !!opts.shape;
   const pos = [], nor = [], col = [], team = [], glow = [], idx = [];
 
   for (let d = 0; d < 3; d++) {
     const u = (d + 1) % 3, w = (d + 2) % 3;
     const nu = mx[u] - mn[u] + 1, nw = mx[w] - mn[w] + 1;
     for (const s of [1, -1]) {
+      // opts.noDown: no faces looking straight down (back faces for the RTS
+      // camera, which is always well above props; keep them for shadows)
+      if (opts.noDown && d === 1 && s < 0) continue;
       const n = [0, 0, 0]; n[d] = s;
       for (let sl = mn[d]; sl <= mx[d]; sl++) {
         // build the mask for this slice
@@ -54,7 +64,8 @@ export function buildGreedyGeometry(model, opts = {}) {
             // its corner AO from the corner faces (the tiny 2-vs-3 steps inside are
             // smoothed over). Darker creases stay per-voxel.
             const lit = Math.min(ao[0], ao[1], ao[2], ao[3]) >= (opts.minMergeAO ?? 2);
-            mask[j * nu + i] = { v, ao, key: lit ? `${v.c}|${v.team}|${v.glow}` : null, p };
+            const key = shape ? 's' : lit ? `${v.c}|${v.team}|${v.glow}` : null;
+            mask[j * nu + i] = { v, ao, key, p };
           }
         // greedy merge
         for (let j = 0; j < nw; j++)
@@ -89,13 +100,14 @@ export function buildGreedyGeometry(model, opts = {}) {
             P[w] = mn[w] + cs[k][1];
             pos.push((P[0] - pivot[0]) * size, (P[1] - pivot[1]) * size, (P[2] - pivot[2]) * size);
             nor.push(n[0], n[1], n[2]);
+            if (shape) continue;
             const a = AO_CURVE[ao[k]];
             col.push(r * a, g * a, b * a);
             team.push(m.v.team);
             glow.push(m.v.glow);
           }
           // (u, w, d) is right-handed, so corners run CCW seen from +d
-          const flipDiag = ao[0] + ao[2] < ao[1] + ao[3];
+          const flipDiag = !shape && ao[0] + ao[2] < ao[1] + ao[3];
           const tri = flipDiag ? [1, 2, 3, 1, 3, 0] : [0, 1, 2, 0, 2, 3];
           if (s < 0) for (let t = 0; t < 6; t += 3) { const tmp = tri[t + 1]; tri[t + 1] = tri[t + 2]; tri[t + 2] = tmp; }
           for (const t of tri) idx.push(base + t);
@@ -106,9 +118,11 @@ export function buildGreedyGeometry(model, opts = {}) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  geo.setAttribute('team', new THREE.Float32BufferAttribute(team, 1));
-  geo.setAttribute('glow', new THREE.Float32BufferAttribute(glow, 1));
+  if (!shape) {
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.setAttribute('team', new THREE.Float32BufferAttribute(team, 1));
+    geo.setAttribute('glow', new THREE.Float32BufferAttribute(glow, 1));
+  }
   geo.setIndex(pos.length / 3 > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
   geo.computeBoundingSphere();
   geo.computeBoundingBox();

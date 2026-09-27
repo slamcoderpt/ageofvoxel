@@ -32,7 +32,9 @@ export class GroundDetails {
     terrainMesh.onChunkRebuilt = (chx, chz) => this.dirty.add(chz * n + chx);
   }
 
-  _geo(model, seed) { return buildVoxelGeometry(model, { size: DETAIL_VOXEL, pivot: [0, 0, 0], jitter: 0.08, seed }); }
+  _geo(model, seed) {
+    return buildVoxelGeometry(model, { size: DETAIL_VOXEL, pivot: [0, 0, 0], jitter: 0.08, seed, noDown: true });
+  }
 
   render() {
     if (!this.dirty.size) return;
@@ -105,6 +107,7 @@ export class GroundDetails {
       const cnt = L.length / 3;
       const mesh = new THREE.InstancedMesh(this.geos[k], this.material, cnt);
       mesh.castShadow = false;
+      mesh.matrixAutoUpdate = false; // static, identity transform
       mesh.receiveShadow = true;
       mesh.userData.noAO = false;
       for (let j = 0; j < cnt; j++) {

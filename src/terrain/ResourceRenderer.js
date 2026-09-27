@@ -16,6 +16,7 @@ export class ResourceRenderer {
     this.group.name = 'resources';
     this.material = voxelMaterialFor(0xffffff);
     this.geos = new Map();
+    this.shapes = new Map();
     this.buckets = new Map(); // key -> { ents: Set, mesh, dirty }
     game.events.on('entity:added', (e) => { if (e.kind === 'resource') this._touch(e, true); });
     game.events.on('entity:removed', (e) => { if (e.kind === 'resource') this._touch(e, false); });
@@ -29,7 +30,9 @@ export class ResourceRenderer {
       if (key.startsWith('tree')) { m = makeTree(+key.slice(4)); pivot = [1, 0, 1]; }
       else if (key === 'gold') { m = makeGoldMine(); pivot = [8, 0, 8]; }
       else { m = makeBerryBush(); pivot = [2.5, 0, 2.5]; }
-      this.geos.set(key, buildGreedyGeometry(m, { size: PROP_VOXEL, pivot, jitter: 0.06, minMergeAO: 1 }));
+      this.geos.set(key, buildGreedyGeometry(m, { size: PROP_VOXEL, pivot, jitter: 0.06, minMergeAO: 1, noDown: true }));
+      // same surface, fewer triangles, for the depth-only (shadow) pass
+      this.shapes.set(key, buildGreedyGeometry(m, { size: PROP_VOXEL, pivot, shape: true }));
     }
     return this.geos.get(key);
   }
@@ -65,6 +68,8 @@ export class ResourceRenderer {
       const mesh = new THREE.InstancedMesh(this.geometry(b.key), this.material, b.ents.size);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
+      mesh.matrixAutoUpdate = false; // static, identity transform
+      mesh.userData.depthGeometry = this.shapes.get(b.key); // see Lighting
       let i = 0;
       for (const e of b.ents) {
         const h = hash2(e.tx, e.tz, 77);

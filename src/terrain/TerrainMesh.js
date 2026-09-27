@@ -359,6 +359,7 @@ export class TerrainMesh {
     mesh.receiveShadow = true;
     mesh.castShadow = true;
     mesh.name = `chunk_${chx}_${chz}`;
+    mesh.matrixAutoUpdate = false; // static, identity transform
     return mesh;
   }
 

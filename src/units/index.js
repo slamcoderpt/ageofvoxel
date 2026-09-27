@@ -217,6 +217,9 @@ export class Units {
     ol.frustumCulled = false;
     ol.castShadow = false; ol.receiveShadow = false;
     ol.userData.noAO = true;
+    // drawn after the opaque scene (same image: it is depth-tested), so it
+    // stays out of the depth AO reads (see lighting/GBuffer.js)
+    ol.renderOrder = 2;
     ol.name = 'unitOutline';
     part.outline = ol;
     this.group.add(ol);

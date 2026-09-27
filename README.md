@@ -53,6 +53,7 @@ Military Academy. Advance to the Classical Age at the Town Center to unlock mino
 | Mouse wheel | Zoom in / out |
 | Left-click or drag on the minimap | Jump the camera there |
 | `H` | Select and centre on your Town Center |
+| `F3` | Show or hide the performance meter (FPS, frame time, draw calls, triangles, render resolution, graphics quality) |
 
 ### Selection
 
@@ -146,8 +147,11 @@ Favor comes from villagers worshipping at a temple.
 
 ### Other HUD buttons
 
-Top right: game speed (normal / fast), pause, objectives, and hotkeys (click to pin the
-hotkey card open). By the minimap: idle villager, idle military, Town Center, signal
+Top right: game speed (normal / fast), pause, objectives, and the gear: hover for the
+hotkeys, click to pin the card open with a **Graphics** row (High / Medium / Low). High is
+the full look; Medium renders ambient occlusion at half resolution, uses a smaller shadow
+map and caps the resolution at the screen's CSS pixels; Low also turns ambient occlusion
+off. The choice applies at once and is remembered. By the minimap: idle villager, idle military, Town Center, signal
 (explains minimap orders), minimap terrain on/off, and the score list on/off.
 
 ## Scenes
@@ -166,6 +170,7 @@ The game doubles as a deterministic screenshot harness. Pick a scene with `?scen
 
 Harness scenes start paused; add `&live=1` to let them run. Other parameters:
 `seed=N`, `hud=0|1`, `fog=0|1`, `post=high|low|off` (post-processing quality),
+`quality=high|medium|low` (graphics quality, as the Graphics row; overrides the remembered choice),
 `timescale=N` and `cam=x,z[,distance[,pitch[,yaw]]]`.
 
 ## Scripts
@@ -177,7 +182,13 @@ headless Chromium with software WebGL through Playwright.
 node scripts/shoot.mjs --scene town --out shots/town.png [--port 5173] [--width 1920 --height 1080]
 node scripts/smoke.mjs [--port 5173] [--seconds 20] [--live 60]   # short gameplay check
 node scripts/longrun.mjs [--port 5173] [--minutes 12]             # long AI run, checks for runtime errors
+node scripts/bench.mjs [--port 5173] [--scenes skirmish,town,battle]  # draw calls, triangles, CPU ms per frame
 ```
+
+`bench.mjs` reports numbers that do not depend on the (software) GPU: draw calls and
+triangles per frame by pass and by scene group, render passes and render-target sizes,
+CPU time per frame and per piece, and sim time per tick. Measure a production build
+(`npm run build && npx vite preview`).
 
 ## How it was built
 

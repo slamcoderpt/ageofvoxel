@@ -3,6 +3,7 @@ import { Sky } from './Sky.js';
 import { PostFX } from './PostFX.js';
 import { MaterialPatcher } from './MaterialPatches.js';
 import { fowUniforms } from '../core/FogOfWar.js';
+import { VOXEL } from '../core/constants.js';
 
 // Soft shadows without grain, with a penumbra that widens with distance from
 // the caster (a cheap PCSS). three's PCF rotates a 5-tap Vogel disk by
@@ -43,18 +44,31 @@ import { fowUniforms } from '../core/FogOfWar.js';
   }
 }
 
+// Quality levels (?quality=high|medium|low, or the Graphics row of the HUD's
+// gear card). 'high' is the reference look. The lower levels trade GPU work
+// for fidelity: pixel ratio cap, GTAO resolution (0 = off) and shadow map size.
+// With post-processing every pixel pays for MSAA, GTAO, bloom and the grade;
+// 1.5x on a 2x (high-DPI) screen is 56% of the pixels and looks the same at
+// RTS viewing distance, so even 'high' caps there (2x without post).
+export const QUALITY = {
+  high: { pixelRatio: 1.5, pixelRatioNoPost: 2, ao: 1, shadow: 4096 },
+  medium: { pixelRatio: 1, pixelRatioNoPost: 1, ao: 0.5, shadow: 2048 },
+  low: { pixelRatio: 1, pixelRatioNoPost: 1, ao: 0, shadow: 2048 },
+};
+
 // Owns the renderer, sun/sky/hemisphere lights, shadows, atmospheric fog and
 // post-processing. Other pieces never touch renderer settings directly.
 //
-// Query params: ?post=high|low|off
+// Query params: ?post=high|low|off  ?quality=high|medium|low
 export class Lighting {
-  constructor(game, { post = 'high', preserveDrawingBuffer = false } = {}) {
+  constructor(game, { post = 'high', quality = 'high', preserveDrawingBuffer = false } = {}) {
     this.game = game;
+    this.postLevel = post;
     const renderer = new THREE.WebGLRenderer({ antialias: post === 'off', powerPreference: 'high-performance', preserveDrawingBuffer });
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.setSize(innerWidth, innerHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap; // PCF with a Vogel-disk radius (soft)
+    renderer.shadowMap.autoUpdate = false; // drawn once per frame, see draw()
     // PBR Neutral keeps hue and saturation into the highlights (ACES bleached
     // sunlit sandstone to grey-white); all exposure is applied here, before
     // tone mapping, so the grade never has to push values past white.
@@ -71,8 +85,7 @@ export class Lighting {
     // The sun carries all of the frame's warmth (the grade adds none).
     this.sun = new THREE.DirectionalLight(0xffd9a0, 5.2);
     this.sun.castShadow = true;
-    const sm = post === 'high' ? 4096 : 2048;
-    this.sun.shadow.mapSize.set(sm, sm);
+    this.sun.shadow.mapSize.set(2048, 2048); // set by setQuality()
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.035;
     this.sun.shadow.radius = 1.8;
@@ -104,6 +117,32 @@ export class Lighting {
     this.patcher = new MaterialPatcher(game);
 
     this.post = post === 'off' ? null : new PostFX(renderer, scene, game.camera, post);
+    // The depth-only pass (the sun's shadow map) draws objects that carry
+    // userData.depthGeometry with that geometry instead: the same surface
+    // without colour or AO, so far fewer triangles.
+    const smap = renderer.shadowMap, smRender = smap.render.bind(smap);
+    smap.render = (...a) => { this._depthGeometry(true); try { smRender(...a); } finally { this._depthGeometry(false); } };
+    this.setQuality(quality);
+  }
+
+  // Switch quality level live (no reload): pixel ratio, AO, shadow map size.
+  setQuality(q) {
+    if (!Object.hasOwn(QUALITY, q)) q = 'high';
+    this.quality = q;
+    const Q = QUALITY[q];
+    const r = Math.min(devicePixelRatio, this.post ? Q.pixelRatio : Q.pixelRatioNoPost);
+    const sm = this.postLevel === 'high' ? Q.shadow : 2048;
+    const sh = this.sun.shadow;
+    if (sh.mapSize.x !== sm) {
+      sh.mapSize.set(sm, sm);
+      if (sh.map) { sh.map.dispose(); sh.map = null; }
+    }
+    this.post?.setAO(Q.ao);
+    if (r !== this.renderer.getPixelRatio()) {
+      this.renderer.setPixelRatio(r);
+      this.post?.setPixelRatio(r);
+      if (this.game.scene && this.game.renderOrder) this.game.resize();
+    }
   }
 
   // Visual per-frame update: keep the shadow frustum centred on the view and
@@ -138,8 +177,95 @@ export class Lighting {
   draw() {
     this.patcher.scan();
     this.patcher.update(this.sunDir, this.game.camera);
+    // The shadow map is drawn once per frame, by the scene render. With
+    // autoUpdate three redraws it on every renderer.render() of the scene
+    // (GTAO's normal pass used to be a second one).
+    this.renderer.shadowMap.needsUpdate = true;
+    // World matrices are brought up to date once here (each render() of the
+    // scene used to walk and recompose the whole scene graph).
+    const scene = this.game.scene;
+    scene.matrixWorldAutoUpdate = false;
+    scene.updateMatrixWorld();
+    const { culled, hidden } = this._cullForFrame();
     if (this.post) this.post.render();
     else this.renderer.render(this.game.scene, this.game.camera);
+    for (const o of culled) o.castShadow = true;
+    for (const o of hidden) o.visible = true;
+    culled.length = 0;
+    hidden.length = 0;
+  }
+
+  _depthGeometry(on) {
+    // (counts nesting, in case a depth pass renders the shadow map)
+    this._depthLevel = (this._depthLevel || 0) + (on ? 1 : -1);
+    if (this._depthLevel !== (on ? 1 : 0)) return;
+    const list = this._cull?.depth;
+    if (!list) return;
+    for (const o of list) {
+      if (on) { o.userData.fullGeometry = o.geometry; o.geometry = o.userData.depthGeometry; }
+      else if (o.userData.fullGeometry) { o.geometry = o.userData.fullGeometry; o.userData.fullGeometry = null; }
+    }
+  }
+
+  // Per-frame culling on top of three's own frustum test, undone after the
+  // frame is drawn:
+  //  - Instanced meshes with no instances this frame are hidden. three skips
+  //    their draw but still binds program, uniforms and buffers for each one
+  //    in every pass (units keep a mesh per type and body part).
+  //  - Shadow casters whose shadow cannot reach anything on screen are left out
+  //    of the shadow pass. The shadow camera covers a square round the view
+  //    centre, much of it below and beside the screen; a caster matters only
+  //    if the volume its bounding sphere sweeps along the sunlight, down to
+  //    the lowest ground, meets the view frustum. The test is conservative
+  //    (per frustum plane, both ends of the sweep), so nothing that could
+  //    shade a visible pixel is ever dropped.
+  // It also prepares every visible object's material for the AO g-buffer
+  // while the scene pass writes one (GBuffer.js), before anything is drawn.
+  _cullForFrame() {
+    const t = this._cull || (this._cull = {
+      frustum: new THREE.Frustum(), m: new THREE.Matrix4(), sphere: new THREE.Sphere(),
+      end: new THREE.Vector3(), culled: [], hidden: [], depth: [],
+    });
+    const cam = this.game.camera, culled = t.culled, hidden = t.hidden, depth = t.depth;
+    depth.length = 0;
+    cam.updateMatrixWorld();
+    t.m.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+    t.frustum.setFromProjectionMatrix(t.m, cam.coordinateSystem, cam.reversedDepth);
+    const planes = t.frustum.planes;
+    const gbuf = this.post?.gbufferActive ? this.post.gbuffer : null;
+    const d = this.sunDir; // towards the sun; light travels along -d
+    const floor = this._floorY ?? (this._floorY = Math.min(0, this.game.map.heights.reduce((a, b) => Math.min(a, b), 0) * VOXEL) - 1);
+    // The cull only reasons about the sun. When another shadow-casting light
+    // is lit (the god-power strike spot), casters just off-screen can still
+    // shade visible ground through it, so no caster is dropped that frame.
+    let otherShadowLight = false;
+    const test = (o) => {
+      if (o.isLight) { if (o !== this.sun && o.castShadow && o.intensity > 0) otherShadowLight = true; return; }
+      if (o.isInstancedMesh && o.count === 0) { o.visible = false; hidden.push(o); return; }
+      if (gbuf && o.material) gbuf.prepare(o);
+      if (o.userData.depthGeometry) depth.push(o);
+      if (!o.castShadow || !o.frustumCulled || !o.geometry) return;
+      const bs = o.isInstancedMesh ? (o.boundingSphere || (o.computeBoundingSphere(), o.boundingSphere)) : (o.geometry.boundingSphere || (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere));
+      if (!bs) return;
+      const s = t.sphere.copy(bs).applyMatrix4(o.matrixWorld);
+      const c = s.center, r = s.radius;
+      const k = Math.max(0, (c.y + r - floor) / d.y);
+      t.end.set(c.x - d.x * k, c.y - d.y * k, c.z - d.z * k);
+      for (let i = 0; i < 6; i++) {
+        const p = planes[i];
+        if (p.distanceToPoint(c) < -r && p.distanceToPoint(t.end) < -r) {
+          o.castShadow = false;
+          culled.push(o);
+          return;
+        }
+      }
+    };
+    this.game.scene.traverseVisible(test);
+    if (otherShadowLight) {
+      for (const o of culled) o.castShadow = true;
+      culled.length = 0;
+    }
+    return t;
   }
 
   resize(w, h) {

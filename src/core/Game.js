@@ -35,7 +35,7 @@ import { UI } from '../ui/index.js';
 export class Game {
   constructor(container, opts) {
     this.container = container;
-    this.opts = opts; // { seed, preset, mapSize, post, timeScale, harness }
+    this.opts = opts; // { seed, preset, mapSize, post, quality, timeScale, harness }
     this.events = new EventBus();
     this.entities = new EntityStore(this.events);
     this.rng = new RNG(opts.seed ?? 1);  // sim randomness (deterministic)
@@ -65,7 +65,7 @@ export class Game {
     // rendering scaffolding
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(34, innerWidth / innerHeight, 0.5, 900);
-    this.lighting = new Lighting(this, { post: o.post ?? 'high', preserveDrawingBuffer: !!o.harness });
+    this.lighting = new Lighting(this, { post: o.post ?? 'high', quality: o.quality ?? 'high', preserveDrawingBuffer: !!o.harness });
     this.renderer = this.lighting.renderer;
     this.container.appendChild(this.renderer.domElement);
     this.input = new Input(this.renderer.domElement);
