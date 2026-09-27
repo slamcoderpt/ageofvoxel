@@ -13,6 +13,7 @@ import { CameraController } from './CameraController.js';
 import { FogOfWar } from './FogOfWar.js';
 import { Particles } from './fx/Particles.js';
 import { Victory } from './Victory.js';
+import { Profiler } from './Profiler.js';
 import { pickGround, worldToScreen } from './picking.js';
 
 import { Lighting } from '../lighting/index.js';
@@ -52,6 +53,7 @@ export class Game {
     };
     this.localPlayer = PLAYER;
     this.errors = [];
+    this.prof = null; // Profiler when enabled (?prof=1 / stress scene), see enableProfiler()
   }
 
   // Extra players beyond PLAYER / ENEMY (the stress scene). Owner ids 3.. get
@@ -60,6 +62,13 @@ export class Game {
   addPlayer(id, opts = {}) {
     if (!this.players[id]) this.players[id] = new Player(id, opts);
     return this.players[id];
+  }
+
+  // Per-system timing of the sim tick and per-piece timing of the frame
+  // (src/core/Profiler.js). Normal play never calls this.
+  enableProfiler() {
+    if (!this.prof) this.prof = new Profiler(this);
+    return this.prof;
   }
 
   init() {
@@ -108,6 +117,7 @@ export class Game {
   tick(dt = SIM_DT) {
     this.time += dt;
     this.tickCount++;
+    if (this.prof) { this.prof.tick(dt); return; }
     for (const s of this.simOrder) s.update?.(dt);
   }
 
@@ -148,6 +158,7 @@ export class Game {
     }
     this.alpha = this.paused ? 1 : Math.min(1, this.acc / SIM_DT);
     this.cameraCtl.update(realDt);
+    if (this.prof) { this.prof.frame(realDt, this.alpha); return; }
     for (const r of this.renderOrder) r.render?.(realDt, this.alpha);
     this.lighting.draw();
   }

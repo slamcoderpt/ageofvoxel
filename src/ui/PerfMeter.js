@@ -2,7 +2,8 @@
 // triangles and render resolution, sampled over half-second windows.
 // F3 toggles it; the choice is remembered in localStorage. ?fps=1|0 forces it.
 // It starts hidden in the capture scenes (?scene=... other than skirmish) so
-// scripts/shoot.mjs frames stay clean.
+// scripts/shoot.mjs frames stay clean. With the profiler on (?prof=1 or the
+// stress scene) it adds sim ms per tick, the costliest system and the unit count.
 import * as THREE from 'three';
 
 export class PerfMeter {
@@ -95,6 +96,15 @@ export class PerfMeter {
       ['post', this.post],
       ['quality', this.game.lighting.quality],
     ];
+    // with the profiler on (?prof=1, stress scene): sim cost per tick and its top system
+    const prof = this.game.prof;
+    if (prof && prof.sums.ticks) {
+      const S = prof.sums, top = Object.entries(S.sys).sort((a, b) => b[1] - a[1])[0];
+      rows.push(['sim', `${(S.total / S.ticks).toFixed(1)} ms/tick`]);
+      if (top) rows.push([top[0], `${(top[1] / S.ticks).toFixed(1)} ms`]);
+      rows.push(['units', this.game.entities.count('unit')]);
+      prof.reset();
+    }
     this.rowsEl.innerHTML = rows.map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('');
     this.drawGraph();
   }
