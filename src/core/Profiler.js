@@ -8,7 +8,8 @@
 //     ai: { <owner>: ms },                                       each EnemyAI instance (inside combat)
 //     sub: { 'combat.projectiles', 'combat.fx', 'units.spread' }, selected sub-steps
 //     calls: { findPath: [n, ms], nearestWalkable: [n, ms], pickTarget: [n, ms],
-//              findEnemyNear: [n, ms], nearestResource: [n, ms], nearestDropoff: [n, ms] } }
+//              findEnemyNear: [n, ms], nearestResource: [n, ms], nearestDropoff: [n, ms] },
+//     callsBy: { 'findPath@combat': [n, ms], ... } }                the same, split by calling system
 // Per rendered frame (game.prof.lastFrame):
 //   { total, camera, pieces: { lighting, terrain, buildings, units, ... }, draw }  CPU ms
 // game.prof.sums accumulates every tick since the last reset() (for the F3 meter).
@@ -19,6 +20,7 @@ export class Profiler {
     this.lastFrame = null;
     this.names = new Map();
     this.cur = null;
+    this.sys = '';
     this.wrapped = new WeakSet();
     this.reset();
     const nameOf = (piece) => Object.keys(game).find((k) => game[k] === piece && k !== 'prof') || piece.constructor.name;
@@ -46,8 +48,11 @@ export class Profiler {
       if (!c) return orig.apply(this, a);
       const t = performance.now();
       try { return orig.apply(this, a); } finally {
+        const ms = performance.now() - t;
         const e = (c.calls[key] ||= [0, 0]);
-        e[0]++; e[1] += performance.now() - t;
+        e[0]++; e[1] += ms;
+        const b = (c.callsBy[`${key}@${self.sys}`] ||= [0, 0]);
+        b[0]++; b[1] += ms;
       }
     };
   }
@@ -81,14 +86,16 @@ export class Profiler {
   tick(dt) {
     const game = this.game;
     this.wrapAIs();
-    const rec = { tick: game.tickCount, total: 0, sys: {}, ai: {}, sub: {}, calls: {} };
+    const rec = { tick: game.tickCount, total: 0, sys: {}, ai: {}, sub: {}, calls: {}, callsBy: {} };
     this.cur = rec;
     const t0 = performance.now();
     try {
       for (const s of game.simOrder) {
+        const name = this.names.get(s);
+        this.sys = name;
         const t = performance.now();
         s.update?.(dt);
-        rec.sys[this.names.get(s)] = performance.now() - t;
+        rec.sys[name] = performance.now() - t;
       }
     } finally {
       rec.total = performance.now() - t0;
