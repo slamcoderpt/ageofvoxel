@@ -127,7 +127,7 @@ export class Lighting {
 
   // Switch quality level live (no reload): pixel ratio, AO, shadow map size.
   setQuality(q) {
-    if (!QUALITY[q]) q = 'high';
+    if (!Object.hasOwn(QUALITY, q)) q = 'high';
     this.quality = q;
     const Q = QUALITY[q];
     const r = Math.min(devicePixelRatio, this.post ? Q.pixelRatio : Q.pixelRatioNoPost);
@@ -235,7 +235,12 @@ export class Lighting {
     const gbuf = this.post?.gbufferActive ? this.post.gbuffer : null;
     const d = this.sunDir; // towards the sun; light travels along -d
     const floor = this._floorY ?? (this._floorY = Math.min(0, this.game.map.heights.reduce((a, b) => Math.min(a, b), 0) * VOXEL) - 1);
+    // The cull only reasons about the sun. When another shadow-casting light
+    // is lit (the god-power strike spot), casters just off-screen can still
+    // shade visible ground through it, so no caster is dropped that frame.
+    let otherShadowLight = false;
     const test = (o) => {
+      if (o.isLight) { if (o !== this.sun && o.castShadow && o.intensity > 0) otherShadowLight = true; return; }
       if (o.isInstancedMesh && o.count === 0) { o.visible = false; hidden.push(o); return; }
       if (gbuf && o.material) gbuf.prepare(o);
       if (o.userData.depthGeometry) depth.push(o);
@@ -256,6 +261,10 @@ export class Lighting {
       }
     };
     this.game.scene.traverseVisible(test);
+    if (otherShadowLight) {
+      for (const o of culled) o.castShadow = true;
+      culled.length = 0;
+    }
     return t;
   }
 
