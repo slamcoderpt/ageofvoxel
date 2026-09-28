@@ -30,10 +30,14 @@ const HAZE_NEAR := 0.9  # x camera distance (JS hazeNear)
 const HAZE_FAR := 2.6
 const HEMI := 1.05  # hemisphere intensity (JS)
 
+## Medium and low render the 3D world below native resolution, so they keep
+## the 4096 shadow map (at 2048 with 2 cascades the flat ground showed diagonal
+## shadow-acne stripes) and use FXAA instead of MSAA: MSAA together with a 3D
+## scale below 1 broke the fog-of-war pass (the whole world drew as unexplored).
 const QUALITY := {
 	"high": {"msaa": Viewport.MSAA_4X, "ao": true, "shadow": 4096, "splits": 4, "soft": RenderingServer.SHADOW_QUALITY_SOFT_HIGH, "scale": 1.0},
-	"medium": {"msaa": Viewport.MSAA_2X, "ao": true, "shadow": 2048, "splits": 2, "soft": RenderingServer.SHADOW_QUALITY_SOFT_LOW, "scale": 0.75},
-	"low": {"msaa": Viewport.MSAA_DISABLED, "ao": false, "shadow": 2048, "splits": 2, "soft": RenderingServer.SHADOW_QUALITY_HARD, "scale": 0.6},
+	"medium": {"msaa": Viewport.MSAA_DISABLED, "fxaa": true, "ao": true, "shadow": 4096, "splits": 2, "soft": RenderingServer.SHADOW_QUALITY_SOFT_LOW, "scale": 0.75},
+	"low": {"msaa": Viewport.MSAA_DISABLED, "fxaa": true, "ao": false, "shadow": 4096, "splits": 2, "soft": RenderingServer.SHADOW_QUALITY_HARD, "scale": 0.6},
 }
 
 var game: Node = null
@@ -195,6 +199,7 @@ func set_quality(q: String) -> void:
 	var vp := get_viewport()
 	if vp:
 		vp.msaa_3d = Q.msaa
+		vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if Q.get("fxaa", false) else Viewport.SCREEN_SPACE_AA_DISABLED
 		vp.use_debanding = true
 		# 3D resolution (the HUD stays sharp): medium and low render the world
 		# below native resolution, the big saving on HiDPI / Retina screens.
