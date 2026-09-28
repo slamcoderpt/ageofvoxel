@@ -53,7 +53,7 @@ try {
     const t = m.text();
     if (args.verbose) console.log(`[page] ${t}`);
     if (/^aov: scene=/.test(t)) { sceneAt = Date.now(); console.log(`[webshoot] ${t}`); }
-    if (/^(USER |SCRIPT )?ERROR|Parse Error|GDExtension.*(fail|error|not found)|Can't open dynamic library|failed to load|AovSim missing/i.test(t)) errors.push(t);
+    if (/^(USER |SCRIPT )?ERROR|Parse Error|GDExtension.*(fail|error|not found)|Can't open dynamic library|failed to load|AovSim missing|Aborted\(|RuntimeError|corrupted its heap|Class '.*' doesn't exist/i.test(t)) errors.push(t);
   });
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   await page.goto(url);

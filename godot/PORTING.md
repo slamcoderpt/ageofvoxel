@@ -73,14 +73,25 @@ tens of minutes on 2 cores); `build_library=yes` forces that. In this
 container the submodule checkout is hard-linked from `/opt/godot-cpp` (already
 built): do not rebuild it. Use `-j2`: the machine is shared.
 
+SCons does not notice a compiler upgrade (emsdk swaps the clang behind the
+same `emcc`), so `SConstruct` writes the compiler's `--version` line to
+`godot-cpp/bin/.aov-compiler.<platform>.<target>.txt` and, when it changes,
+deletes that platform/target's godot-cpp and libaov objects and library and
+rebuilds them. Mixing godot-cpp objects from one emscripten with libaov from
+another is what made the round-3 web build abort at startup ("Class ''
+doesn't exist" in `bind_methodfi`, then heap corruption). Our own objects
+carry the same per-target suffix as godot-cpp's
+(`src/aov_sim.linux.template_debug.x86_64.os`, `...web.template_release.wasm32.nothreads.o`),
+so switching platform or target never relinks another target's object.
+
 The sim is compiled with `-ffp-contract=off` (MSVC `/fp:precise`): no FMA
 contraction, never `-ffast-math`, or it stops matching the browser.
 
 Web: `source ~/emsdk/emsdk_env.sh && scons -j2 platform=web threads=no
 target=template_release` with **emscripten 4.0.10** (the version the official
 4.5.1 web templates are built with and report at startup; CI pins it too, and
-`~/emsdk` here has it active. 4.0.11 side modules also load; far-off versions
-fail to) gives `bin/libaov.web.template_release.wasm32.nothreads.wasm`. The
+`~/emsdk` here has it active; build godot-cpp and libaov with the same one)
+gives `bin/libaov.web.template_release.wasm32.nothreads.wasm`. The
 web export uses the dlink "nothreads" template: no SharedArrayBuffer, so it
 runs from any static server without cross-origin isolation headers. The first
 web build compiles godot-cpp for wasm (~20 min on 2 cores here).
