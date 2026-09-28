@@ -278,7 +278,7 @@ static func boss(ci: CanvasItem, c: Vector2, half: float) -> void:
 ## Text with the HUD's dark drop shadow (text-shadow: 0 1px 2px #000).
 static func text(ci: CanvasItem, f: Font, pos: Vector2, s: String, size: int, col: Color, align := HORIZONTAL_ALIGNMENT_LEFT,
 		width := -1.0, shadow := 0.85, spacing := 0.0) -> void:
-	if spacing != 0.0:
+	if absf(spacing) >= 0.5:  # sub-half-px letter-spacing: keep the shaped run (kerning)
 		_spaced(ci, f, pos, s, size, col, align, width, shadow, spacing)
 		return
 	if shadow > 0.0:
@@ -301,8 +301,8 @@ static func _spaced(ci: CanvasItem, f: Font, pos: Vector2, s: String, size: int,
 		x += f.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + spacing
 
 static func text_width(f: Font, s: String, size: int, spacing := 0.0) -> float:
-	if spacing == 0.0:
-		return f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	if absf(spacing) < 0.5:
+		return f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + spacing * maxi(0, s.length() - 1)
 	var w := 0.0
 	for ch in s:
 		w += f.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + spacing

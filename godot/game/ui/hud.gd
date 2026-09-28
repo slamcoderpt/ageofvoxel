@@ -389,7 +389,7 @@ func _draw_commands() -> void:
 		var en: bool = c.enabled
 		var mod := Color.WHITE if en else Color(0.45, 0.47, 0.5)
 		if c.get("tex") != null:
-			_clip_tex(c.tex, Rect2(rr.get_center() - Vector2(29, 29), Vector2(58, 58)), rr.grow(-2), mod)
+			_clip_tex(c.tex, Rect2(rr.grow(-2).position, Vector2(58, 58)), rr.grow(-2), mod)  # CSS: the oversized grid item sits at the content box origin, overflowing right / down
 		else:
 			S.draw_icon(self, c.svg, Rect2(rr.get_center() - Vector2(16, 16), Vector2(32, 32)), true, mod)
 		if hover and en:
@@ -398,9 +398,9 @@ func _draw_commands() -> void:
 				draw_rect(rr.grow(1.0 + k * 2.0), Color(233 / 255.0, 200 / 255.0, 120 / 255.0, 0.3 - k * 0.09), false, 2.0)
 		if c.key != "":
 			var f := bold
-			var kx := rr.end.x - 3 - S.text_width(f, c.key, 13)
-			draw_string_outline(f, Vector2(kx, rr.end.y - 3), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 4, Color(0, 0, 0, 0.75))
-			draw_string(f, Vector2(kx, rr.end.y - 3), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color.WHITE)
+			var kx := rr.end.x - 4 - S.text_width(f, c.key, 13)
+			draw_string_outline(f, Vector2(kx, rr.end.y - 4), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 4, Color(0, 0, 0, 0.75))
+			draw_string(f, Vector2(kx, rr.end.y - 4), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color.WHITE)
 		zone(cr, "cmd", i, {"title": c.title, "cost": c.get("cost", {}), "hotkey": c.key, "warn": c.get("warn", "")})
 
 # selection card --------------------------------------------------------------------------------
@@ -471,7 +471,7 @@ func _draw_info() -> void:
 			S.drop_shadow(self, pr, 3, 8, 0.4)
 			S.cell(self, pr, [[0.0, Color("#4f8ea6")], [0.8, Color("#10303c")], [1.0, Color("#10303c")]], Vector2(0.5, 0.38))
 			if info.get("tex") != null:
-				_clip_tex(info.tex, Rect2(pr.get_center() - Vector2(56, 56), Vector2(112, 112)), pr.grow(-2))
+				_clip_tex(info.tex, Rect2(pr.grow(-2).position, Vector2(112, 112)), pr.grow(-2))  # as the browser: anchored top-left, cropped right / down
 			elif info.get("icon", "") != "":
 				S.draw_icon(self, info.icon, Rect2(pr.get_center() - Vector2(27, 27), Vector2(54, 54)))
 			# stats (2 columns) + task + queue

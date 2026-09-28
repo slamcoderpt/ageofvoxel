@@ -10,10 +10,6 @@ extends Node2D
 ## shader reads position / owner / flags / type / selection from data
 ## textures made straight from the sim's packed arrays (minimap_units.gdshader).
 
-const GROUND_RGB := {
-	0: [96, 150, 58], 6: [150, 160, 72], 1: [150, 115, 75], 2: [215, 196, 140],
-	3: [140, 134, 124], 4: [200, 190, 165], 5: [110, 76, 46],
-}
 const RES_RGB := {"tree": [30, 70, 26], "gold": [255, 214, 70], "berry": [214, 70, 88]}
 const RES_WH := {"tree": 1, "gold": 3, "berry": 1}
 
@@ -41,10 +37,8 @@ var _buildings := {}         # last get_buildings()
 var _res_rects := {}         # resource id -> [tx, tz, w, h]
 var _timer := 0.0
 var _view := PackedVector2Array()
-var _cols := [0, 0, 0]
-var _heights := PackedInt32Array()
-var _groundb := PackedByteArray()
-var _water := 0
+var _height_tex: ImageTexture
+var _groundt: ImageTexture
 
 class Overlay extends Node2D:
 	var mm: Node2D
@@ -60,7 +54,7 @@ func setup(g: Node) -> void:
 	_ground = Sprite2D.new()
 	_ground.centered = false
 	_ground.position = Vector2(-ws, -ws) * 0.5
-	_ground.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_ground.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # the shader blends tiles itself
 	_ground_mat = ShaderMaterial.new()
 	_ground_mat.shader = preload("res://game/ui/minimap_ground.gdshader")
 	_ground.material = _ground_mat
@@ -99,35 +93,33 @@ func setup(g: Node) -> void:
 	_units_mat.set_shader_parameter("map_size", ws)
 	_build_base()
 
-## Terrain colour of one tile (Minimap.groundTile).
-func _tile_rgb(tx: int, tz: int) -> Color:
-	var cols: int = _cols[0]
-	var cps: int = _cols[1]
-	var cx := tx * cps
-	var cz := tz * cps
-	var l := _heights[cz * cols + cx]
-	var rgb: Array
-	if l < _water:
-		rgb = [34, 90, 150] if l < _water - 2 else [60, 150, 170]
+## The terrain image (Minimap.groundTile + drawBase) is computed on the GPU
+## by minimap_ground.gdshader from the sim's height / ground columns, so a
+## new building (its plaza, streets and roads reach far past the footprint)
+## costs two texture uploads instead of a script loop over every tile.
+## Resources are a tile-res RGBA8 layer (the sprite's own texture) painted
+## once and cleared per removed resource.
+func _upload_terrain() -> void:
+	var cols := int(sim.get_map_cols())
+	var h: PackedInt32Array = sim.get_heights()
+	# int32 little-endian bytes as RGBA8 (decoded in the shader)
+	var himg := Image.create_from_data(cols, cols, false, Image.FORMAT_RGBA8, h.to_byte_array())
+	var gimg := Image.create_from_data(cols, cols, false, Image.FORMAT_R8, sim.get_ground())
+	if _height_tex == null or _height_tex.get_width() != cols:
+		_height_tex = ImageTexture.create_from_image(himg)
+		_groundt = ImageTexture.create_from_image(gimg)
+		_ground_mat.set_shader_parameter("height_tex", _height_tex)
+		_ground_mat.set_shader_parameter("ground_tex", _groundt)
 	else:
-		rgb = GROUND_RGB.get(_groundb[cz * cols + cx], GROUND_RGB[0])
-	var lw := l
-	if tx > 0 and tz > 0:
-		lw = _heights[(cz - cps) * cols + (cx - cps)]
-	var shade := clampf((l - lw) * 0.09, -0.22, 0.22)
-	var k := (0.84 + clampf((l - 4) * 0.03, -0.2, 0.25)) * (1.0 + shade)
-	return Color(minf(1.0, rgb[0] * k / 255.0), minf(1.0, rgb[1] * k / 255.0), minf(1.0, rgb[2] * k / 255.0))
+		_height_tex.update(himg)
+		_groundt.update(gimg)
+	_ground_mat.set_shader_parameter("cps", cols / N)
+	_ground_mat.set_shader_parameter("tiles", N)
+	_ground_mat.set_shader_parameter("water", int(sim.get_water_level()))
 
 func _build_base() -> void:
-	_heights = sim.get_heights()
-	_groundb = sim.get_ground()
-	_water = int(sim.get_water_level())
-	var cols := int(sim.get_map_cols())
-	_cols = [cols, cols / N, 0]
-	_base = Image.create(N, N, false, Image.FORMAT_RGB8)
-	for tz in N:
-		for tx in N:
-			_base.set_pixel(tx, tz, _tile_rgb(tx, tz))
+	_upload_terrain()
+	_base = Image.create(N, N, false, Image.FORMAT_RGBA8)
 	var r: Dictionary = sim.get_resources()
 	var types: PackedStringArray = r.type_names
 	var tile: PackedInt32Array = r.tile
@@ -147,31 +139,25 @@ func _build_base() -> void:
 	if _base_tex == null:
 		_base_tex = ImageTexture.create_from_image(_base)
 		_ground.texture = _base_tex
+		_ground_mat.set_shader_parameter("res_tex", _base_tex)
 	else:
 		_base_tex.update(_base)
-
-func _repaint(tx: int, tz: int, w: int, h: int) -> void:
-	for z in range(maxi(0, tz), mini(N, tz + h)):
-		for x in range(maxi(0, tx), mini(N, tx + w)):
-			_base.set_pixel(x, z, _tile_rgb(x, z))
 
 ## Sim events of this frame (resources removed, buildings placed).
 func on_events(events: Array) -> void:
 	var dirty := false
+	var terrain := false
 	for e in events:
 		var t: String = e.type
 		if t == "entity:removed" and _res_rects.has(e.id):
 			var rr: Array = _res_rects[e.id]
 			_res_rects.erase(e.id)
-			_repaint(rr[0], rr[1], rr[2], rr[3])
+			_base.fill_rect(Rect2i(rr[0], rr[1], rr[2], rr[3]).intersection(Rect2i(0, 0, N, N)), Color(0, 0, 0, 0))
 			dirty = true
 		elif t == "building:placed":
-			var b: Dictionary = sim.get_building(e.id)
-			if not b.is_empty():
-				_heights = sim.get_heights()
-				_groundb = sim.get_ground()
-				_repaint(int(b.tx) - 2, int(b.tz) - 2, int(b.w) + 4, int(b.h) + 4)
-				dirty = true
+			terrain = true
+	if terrain:
+		_upload_terrain()
 	if dirty:
 		_base_tex.update(_base)
 
@@ -261,14 +247,14 @@ func _draw_overlay(ci: Node2D) -> void:
 			var h := rect[i * 4 + 3]
 			if fog_on and o != local_player and not sim.is_explored(tx + w * 0.5, tz + h * 0.5):
 				continue
-			ci.draw_rect(Rect2(tx - 0.5, tz - 0.5, w + 1, h + 1), Color(0, 0, 0, 0.75))
+			ci.draw_rect(Rect2(tx - 0.5, tz - 0.5, w + 1, h + 1), Color(0, 0, 0, 0.55))  # JS .75, softened there by the canvas downscale
 			ci.draw_rect(Rect2(tx, tz, w, h), _pcol(o))
 	if _view.size() == 4:
 		var k := float(N) / px  # one HUD px in tiles
 		var pts := PackedVector2Array(_view)
 		pts.push_back(_view[0])
-		ci.draw_polyline(pts, Color(0, 0, 0, 0.55), 2.1 * k, true)
-		ci.draw_polyline(pts, Color(1, 1, 1, 0.95), 1.15 * k, true)
+		ci.draw_polyline(pts, Color(0, 0, 0, 0.5), 1.3 * k, true)  # AA feathers ~1 local unit (a tile): thinner than the JS 1.4 / 0.8 to match
+		ci.draw_polyline(pts, Color(1, 1, 1, 0.95), 0.5 * k, true)
 
 var _pcols := {}
 func _pcol(o: int) -> Color:

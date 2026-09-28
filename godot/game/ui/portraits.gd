@@ -2,7 +2,8 @@ extends Node
 ## Unit and building portraits for the HUD (port of src/core/portrait.js +
 ## units.portraitObject / ui.buildingObject): each (kind, type, owner) is
 ## rendered once into its own SubViewport (own world, transparent, MSAA)
-## with a hemisphere-ish key / fill light and the JS framing (fov 30, camera
+## lit by portrait.gdshader (three.js hemisphere + sun, no tonemap, exactly
+## as src/core/portrait.js) and the JS framing (fov 30, camera
 ## at centre + r * (2.2, 1.4, 3.2)), then kept as a ViewportTexture. The
 ## viewports render once (UPDATE_ONCE) and are never redrawn.
 
@@ -30,10 +31,19 @@ func building(type: String, owner: int) -> Texture2D:
 	if not _cache.has(key):
 		var mi := MeshInstance3D.new()
 		mi.mesh = VoxelModels.mesh("buildings", "%s/0" % type)
-		mi.material_override = VoxelModels.team_material(player_color(owner))
+		mi.material_override = _material(owner)
 		var root := Node3D.new()
 		root.add_child(mi)
 		_cache[key] = _render(root)
+	return _cache[key]
+
+func _material(owner: int) -> ShaderMaterial:
+	var key := "m:%d" % owner
+	if not _cache.has(key):
+		var m := ShaderMaterial.new()
+		m.shader = preload("res://game/ui/portrait.gdshader")
+		m.set_shader_parameter("team_color", player_color(owner))
+		_cache[key] = m
 	return _cache[key]
 
 func _unit_object(type: String, owner: int) -> Node3D:
@@ -42,7 +52,7 @@ func _unit_object(type: String, owner: int) -> Node3D:
 	if rig.is_empty():
 		return root
 	var v := float(rig.voxel)
-	var mat := VoxelModels.team_material(player_color(owner))
+	var mat := _material(owner)
 	var world := {}
 	for p in rig.parts:
 		var j: Array = p.joint
@@ -68,15 +78,14 @@ func _render(obj: Node3D) -> Texture2D:
 	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 	vp.positional_shadow_atlas_size = 0
 	add_child(vp)
+	# Lighting lives in portrait.gdshader (unshaded): the environment only
+	# has to stay out of the way (no tonemap, no glow, no ambient).
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
 	e.background_mode = Environment.BG_CLEAR_COLOR
-	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	# HemisphereLight(0xdfeaff, 0x5a4a30, 2.2): the average of sky and ground
-	e.ambient_light_color = Color("#9ea4a0")
-	e.ambient_light_energy = 0.85
-	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	e.tonemap_exposure = 1.05
+	e.ambient_light_source = Environment.AMBIENT_SOURCE_DISABLED
+	e.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	e.tonemap_exposure = 1.0
 	env.environment = e
 	vp.add_child(env)
 	vp.add_child(obj)
@@ -98,19 +107,4 @@ func _render(obj: Node3D) -> Texture2D:
 	cam.position = ctr + Vector3(r * 2.2, r * 1.4, r * 3.2)
 	cam.look_at(ctr, Vector3.UP)
 	cam.current = true
-	var sun := DirectionalLight3D.new()
-	sun.light_color = Color("#fff0d0")
-	sun.light_energy = 1.55
-	vp.add_child(sun)
-	sun.look_at_from_position(ctr + Vector3(3, 5, 4), ctr, Vector3.UP)
-	var sky := DirectionalLight3D.new()  # the hemisphere's sky half, from above-front
-	sky.light_color = Color("#dfeaff")
-	sky.light_energy = 0.45
-	vp.add_child(sky)
-	sky.look_at_from_position(ctr + Vector3(-2, 4, 1), ctr, Vector3.UP)
-	var rim := DirectionalLight3D.new()  # a cool back light so the figure lifts off the teal
-	rim.light_color = Color("#bfe6ff")
-	rim.light_energy = 0.7
-	vp.add_child(rim)
-	rim.look_at_from_position(ctr + Vector3(-3, 2, -4), ctr, Vector3.UP)
 	return vp.get_texture()
