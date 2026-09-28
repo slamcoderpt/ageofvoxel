@@ -52,9 +52,12 @@ public:
 	Array get_resource_spawns() const;     // [{type, tx, tz, variant}]
 	PackedInt32Array take_map_changes();   // dirty column rects (cx0,cz0,cx1,cz1)*, cleared on read
 	int64_t map_hash() const;
-	// First-pass voxel heightfield mesh of a column rect [cx0,cx1)x[cz0,cz1):
-	// Mesh.ARRAY_MAX arrays (vertex, normal, color with baked AO, index).
+	// Terrain piece (terrain_mesher.cpp, TerrainMesh.js): mesh of a column rect
+	// [cx0,cx1)x[cz0,cz1) as Mesh.ARRAY_MAX arrays (vertex, normal, color, index);
+	// water depth bake (cols*cols bytes, metres*40); ground detail instances.
 	Array build_terrain_mesh(int64_t cx0, int64_t cz0, int64_t cx1, int64_t cz1) const;
+	PackedByteArray get_water_depth() const;
+	Array build_ground_details(int64_t cx0, int64_t cz0, int64_t cx1, int64_t cz1) const;
 
 	// --- players (0 = Gaia, 1..6)
 	void add_player(int64_t id, const String &name, bool is_ai);

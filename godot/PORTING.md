@@ -28,7 +28,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | Piece | GDScript (render / UI) | C++ sim (`native/src/sim/…`) | JS reference |
 |---|---|---|---|
 | core (foundation) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck) | `core/` (constants, rng, jsmath, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `sim.{h,cpp}` | `src/core/` |
-| terrain | `game/terrain/terrain.gd` (foundation first pass: C++ mesher, flat water plane ws*5 centred like Water.js, resource MultiMeshes) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
+| terrain | `game/terrain/terrain.gd` + `terrain.gdshader` (chunks, paving cobbles / pale stone of MaterialPatches patchGround), `water.gdshader` (Water.js), `props.gdshader` (voxel.gdshader + MultiMesh instance tint, used by trees / gold / berries / ground details); mesher in `native/src/terrain_mesher.cpp` (TerrainMesh.js full port, water depth bake, GroundDetails.js scatter) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (currently a foundation **placeholder**) | none | `src/lighting/` |
 | buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw; props.js not yet) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
 | units | `game/units/units.gd` (first pass: rigs in the rest pose, conditional parts; animation still to port) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
@@ -326,7 +326,11 @@ Map: `get_map_size()`, `get_map_cols()`, `get_water_level()`, `get_heights()`
 `smooth_height_at(x, z)`, `get_starts()` ([{owner, tx, tz}]),
 `get_resource_spawns()` ([{type, tx, tz, variant}], the initial spawns),
 `take_map_changes()`, `map_hash()`, `build_terrain_mesh(cx0, cz0, cx1, cz1)`
-(Mesh arrays for a column rect: vertex, normal, linear colour, index).
+(Mesh arrays for a column rect: vertex, normal, linear colour, index; the
+full TerrainMesh.js: smoothed shore, talus, cliff relief), `get_water_depth()`
+(cols*cols bytes, metres below the surface * 40 from the smoothed seabed),
+`build_ground_details(cx0, cz0, cx1, cz1)` (12 PackedFloat32Arrays, one per
+`details/` model, already in MultiMesh buffer layout: 3x4 transform + rgba).
 
 Players: `add_player(id, name="", is_ai=true)` (owners 3..6),
 `get_player(id)` ({id, name, is_ai, god, color, food, wood, gold, favor, pop,

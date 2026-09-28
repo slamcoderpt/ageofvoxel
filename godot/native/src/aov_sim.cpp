@@ -37,6 +37,8 @@ void AovSim::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_econ_f64"), &AovSim::get_econ_f64);
 	ClassDB::bind_method(D_METHOD("get_walkable"), &AovSim::get_walkable);
 	ClassDB::bind_method(D_METHOD("build_terrain_mesh", "cx0", "cz0", "cx1", "cz1"), &AovSim::build_terrain_mesh);
+	ClassDB::bind_method(D_METHOD("get_water_depth"), &AovSim::get_water_depth);
+	ClassDB::bind_method(D_METHOD("build_ground_details", "cx0", "cz0", "cx1", "cz1"), &AovSim::build_ground_details);
 	// players
 	ClassDB::bind_method(D_METHOD("add_player", "id", "name", "is_ai"), &AovSim::add_player, DEFVAL(""), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("get_player", "id"), &AovSim::get_player);
