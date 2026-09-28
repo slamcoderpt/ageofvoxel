@@ -173,11 +173,12 @@ signed, not notarized, so Gatekeeper blocks it otherwise), then open it.
 ```
 xcode-select --install                     # clang, once
 brew install scons                         # or: pip3 install scons
-brew install --cask godot                  # Godot 4.5.1, or download it from godotengine.org
+# Godot 4.5.1 from https://godotengine.org/download/archive/4.5.1-stable/ (brew's cask may ship a newer version)
 git submodule update --init godot/native/godot-cpp
 cd godot/native && scons -j8 platform=macos arch=universal && cd ../..   # first build compiles godot-cpp, ~5-10 min
 GODOT=/Applications/Godot.app/Contents/MacOS/Godot
-$GODOT --headless --path godot --import    # registers the extension (once)
+$GODOT --headless --path godot --import    # registers the extension (once; on a fresh clone the first
+                                           # import can crash after writing its cache: run it a second time)
 $GODOT --path godot                        # play (skirmish); or: $GODOT --path godot -- --scene=town
 $GODOT -e --path godot                     # or open the project in the editor
 ```
