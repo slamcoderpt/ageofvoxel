@@ -21,6 +21,8 @@ const S := preload("res://game/ui/hud_style.gd")
 const Hud := preload("res://game/ui/hud.gd")
 const Minimap := preload("res://game/ui/minimap.gd")
 const Portraits := preload("res://game/ui/portraits.gd")
+const PerfMeter := preload("res://game/ui/perf_meter.gd")
+const Settings := preload("res://game/ui/settings.gd")
 
 const AGES := ["Archaic", "Classical", "Heroic", "Mythic"]
 const ROMAN := ["I", "II", "III", "IV"]
@@ -63,6 +65,7 @@ var _layer: CanvasLayer
 var _root: Control
 var _back: Control
 var _front: Control
+var _perf: Control                # F3 meter (perf_meter.gd)
 var _world: Control              # selection box + bars under the HUD
 var _panels: Array = []
 var _portraits: Node
@@ -152,6 +155,10 @@ func setup(g: Node) -> void:
 	_front.layer = "front"
 	_front.mouse_filter = Control.MOUSE_FILTER_STOP
 	_root.add_child(_front)
+	_perf = PerfMeter.new()
+	_perf.name = "PerfMeter"
+	_root.add_child(_perf)
+	_perf.setup(g)
 	_layout()
 	get_viewport().size_changed.connect(_layout)
 
@@ -182,7 +189,7 @@ func _layout() -> void:
 	_scale = clampf(vs.y / 1080.0, 0.7, 2.0)
 	_layer.transform = Transform2D().scaled(Vector2(_scale, _scale))
 	var css := vs / _scale
-	for c in [_root, _world, _back, _front]:
+	for c in [_root, _world, _back, _front, _perf]:
 		c.position = Vector2.ZERO
 		c.size = css
 	var specs: Array = _back.panel_specs()
@@ -993,7 +1000,7 @@ var _mm_drag := false
 
 func _set_hover(z: Dictionary) -> void:
 	var id: String = z.get("id", "")
-	if id == "cmd" or id == "group" or id == "power" or id == "res" or id == "queue" or id == "multi":
+	if id == "cmd" or id == "group" or id == "power" or id == "res" or id == "queue" or id == "multi" or id == "gfx":
 		id = "%s:%s" % [id, z.arg]
 	if id == hover_id:
 		return
@@ -1013,6 +1020,10 @@ func _minimap_click(p: Vector2, button: int) -> void:
 		game.camera.target.z = w.y
 	elif button == MOUSE_BUTTON_RIGHT:
 		_order_at(w.x, w.y, 0)
+
+## The live graphics level (lighting piece), for the settings card.
+func graphics_quality() -> String:
+	return str(game.pieces["lighting"].quality) if game.pieces.has("lighting") else "high"
 
 func _click_zone(id: String, arg) -> void:
 	match id:
@@ -1055,12 +1066,18 @@ func _click_zone(id: String, arg) -> void:
 			game.paused = not game.paused
 			user_paused = game.paused
 			message("Game paused" if game.paused else "Game resumed")
+		"gfx":
+			var q := str(arg)
+			if game.pieces.has("lighting"):
+				game.pieces["lighting"].set_quality(q)
+			Settings.write("graphics", "quality", q)
+			message("Graphics: %s" % q.capitalize())
 		"mb:obj":
 			message("Objective: destroy the enemy Town Center")
 		"mb:menu":
 			menu_open = not menu_open
 			tooltip = {} if not menu_open else {"title": "Hotkeys", "lines": [". idle villager  ·  H Town Center", "Ctrl+1..9 assign group  ·  1..9 recall",
-				"Q/E/F/S/R/B build  ·  X stop", "Space / arrows: pan  ·  wheel: zoom"], "anchor": Rect2(_back.menubar_rect().position + Vector2(0, 50), Vector2(10, 1))}
+				"Q/E/F/S/R/B build  ·  X stop", "Space / arrows: pan  ·  wheel: zoom", "F1 HUD  ·  F3 performance meter"], "menu": true, "anchor": Rect2(_back.menubar_rect().position + Vector2(0, 50), Vector2(10, 1))}
 		"rb:idle":
 			_cycle_idle()
 		"rb:army":

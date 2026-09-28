@@ -19,6 +19,7 @@ extends Node3D
 ## Lambert BRDF, Godot does not, so every JS intensity is divided by PI here and
 ## the JS exposure (2.45, PBR Neutral) is applied in the grade pass.
 
+const Settings := preload("res://game/ui/settings.gd")
 const GradeEffect := preload("res://game/lighting/grade_effect.gd")
 const SkyShader := preload("res://game/lighting/sky.gdshader")
 
@@ -30,9 +31,9 @@ const HAZE_FAR := 2.6
 const HEMI := 1.05  # hemisphere intensity (JS)
 
 const QUALITY := {
-	"high": {"msaa": Viewport.MSAA_4X, "ao": true, "shadow": 4096, "splits": 4, "soft": RenderingServer.SHADOW_QUALITY_SOFT_HIGH},
-	"medium": {"msaa": Viewport.MSAA_2X, "ao": true, "shadow": 2048, "splits": 2, "soft": RenderingServer.SHADOW_QUALITY_SOFT_LOW},
-	"low": {"msaa": Viewport.MSAA_DISABLED, "ao": false, "shadow": 2048, "splits": 2, "soft": RenderingServer.SHADOW_QUALITY_HARD},
+	"high": {"msaa": Viewport.MSAA_4X, "ao": true, "shadow": 4096, "splits": 4, "soft": RenderingServer.SHADOW_QUALITY_SOFT_HIGH, "scale": 1.0},
+	"medium": {"msaa": Viewport.MSAA_2X, "ao": true, "shadow": 2048, "splits": 2, "soft": RenderingServer.SHADOW_QUALITY_SOFT_LOW, "scale": 0.75},
+	"low": {"msaa": Viewport.MSAA_DISABLED, "ao": false, "shadow": 2048, "splits": 2, "soft": RenderingServer.SHADOW_QUALITY_HARD, "scale": 0.6},
 }
 
 var game: Node = null
@@ -177,10 +178,15 @@ func setup(g: Node) -> void:
 		we2.environment = env
 		add_child(we2)
 
-	set_quality(str(args.get("quality", "high")))
+	# interactive play remembers the Graphics choice (settings card);
+	# captures and benches (--out / --quit) always start from --quality or high
+	var q := "high"
+	if not args.has("out") and not AovArgs.flag(args, "quit", false):
+		q = str(Settings.read("graphics", "quality", "high"))
+	set_quality(str(args.get("quality", q)))
 	frame(0.0, 1.0)
 
-## Switch quality level live: MSAA, AO, shadow map size and filter.
+## Switch quality level live: MSAA, AO, shadow map size and filter, 3D resolution.
 func set_quality(q: String) -> void:
 	if not QUALITY.has(q):
 		q = "high"
@@ -190,6 +196,13 @@ func set_quality(q: String) -> void:
 	if vp:
 		vp.msaa_3d = Q.msaa
 		vp.use_debanding = true
+		# 3D resolution (the HUD stays sharp): medium and low render the world
+		# below native resolution, the big saving on HiDPI / Retina screens.
+		# FSR 1 upscales on Forward+; the web's Compatibility renderer only
+		# has bilinear.
+		vp.scaling_3d_scale = Q.scale
+		var fsr := RenderingServer.get_current_rendering_method() == "forward_plus"
+		vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR if fsr and Q.scale < 1.0 else Viewport.SCALING_3D_MODE_BILINEAR
 	RenderingServer.directional_shadow_atlas_set_size(Q.shadow, true)
 	RenderingServer.directional_soft_shadow_filter_set_quality(Q.soft)
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if Q.splits == 4 else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS

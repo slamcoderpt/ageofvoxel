@@ -164,6 +164,11 @@ workflow) and download the `aov-godot-*` artifacts from its Summary page
 (signed-in GitHub users only; they are kept 90 days). The Linux binary loses its
 executable bit in the artifact zip: `chmod +x AgeOfVoxel.x86_64` after unzipping.
 
+The controls are the browser's. **F3** shows the performance meter; the gear (top right) opens the
+hotkeys card with the **Graphics** row: High / Medium / Low, where Medium and Low also render the 3D
+world at 75% / 60% resolution (FSR upscale), the big saving on Retina screens. Both choices are
+remembered (`user://settings.cfg`).
+
 **On a Mac, from the CI artifact:** unzip `aov-godot-macos-universal`, then unzip
 `AgeOfVoxel.zip` and run `xattr -cr "Age of Voxel.app"` once (the app is ad-hoc
 signed, not notarized, so Gatekeeper blocks it otherwise), then open it.

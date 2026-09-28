@@ -708,7 +708,10 @@ func _draw_tooltip() -> void:
 	for k in cost:
 		cost_w += 16 + S.text_width(bold, str(int(cost[k])), 14) + 10
 	w = minf(maxf(w, cost_w), 278.0)
-	var h := 8.0 + 18.0 + lines.size() * 18.0 + (20.0 if not cost.is_empty() else 0.0) + (18.0 if t.get("hotkey", "") != "" else 0.0) + (18.0 if t.get("warn", "") != "" else 0.0) + 8.0
+	var menu: bool = t.get("menu", false)
+	if menu:
+		w = maxf(w, 262.0)  # room for the Graphics row
+	var h := 8.0 + 18.0 + lines.size() * 18.0 + (20.0 if not cost.is_empty() else 0.0) + (18.0 if t.get("hotkey", "") != "" else 0.0) + (18.0 if t.get("warn", "") != "" else 0.0) + (38.0 if menu else 0.0) + 8.0
 	var ar: Rect2 = t.anchor
 	var x := minf(W() - 290.0, ar.position.x)
 	var y := ar.position.y - h - 8.0
@@ -743,9 +746,24 @@ func _draw_tooltip() -> void:
 	if t.get("warn", "") != "":
 		cy += 18
 		S.text(self, sans, Vector2(r.position.x + 11, cy), str(t.warn), 13, Color("#ff8a70"), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
-	if t.get("menu", false):
-		# the graphics quality row of the pinned hotkey card
-		pass
+	if menu:
+		# the graphics quality row of the pinned hotkey card (browser: gear card,
+		# Graphics High / Medium / Low; applies at once and is remembered)
+		cy += 12
+		draw_line(Vector2(r.position.x + 11, cy - 4), Vector2(r.end.x - 11, cy - 4), Color(S.BRONZE_HI, 0.35), 1.0)
+		cy += 18
+		S.text(self, bold, Vector2(r.position.x + 11, cy), "Graphics", 14, S.MUTED, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
+		var cur: String = ui.graphics_quality()
+		var bx := r.position.x + 11 + 70
+		for q in [["high", "High"], ["medium", "Medium"], ["low", "Low"]]:
+			var br := Rect2(bx, cy - 16, 58, 22)
+			var on: bool = cur == q[0]
+			var hov: bool = ui.hover_id == "gfx:" + q[0]
+			draw_rect(br, Color("#2d7489") if on else (Color("#1e5363") if hov else Color(4 / 255.0, 17 / 255.0, 22 / 255.0, 0.9)))
+			draw_rect(br, S.GOLD if on else Color(S.BRONZE_HI, 0.6), false, 1.0)
+			S.text(self, bold if on else sans, Vector2(br.position.x, cy), q[1], 13, S.INK if on else S.MUTED, HORIZONTAL_ALIGNMENT_CENTER, br.size.x, 0.6)
+			zone(br, "gfx", q[0])
+			bx += 62
 
 func _draw_result() -> void:
 	var res: Dictionary = ui.result

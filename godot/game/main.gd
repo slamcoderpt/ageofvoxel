@@ -162,14 +162,24 @@ func scene_opts() -> Dictionary:
 func fast_forward(seconds: float) -> void:
 	sim.tick(int(round(seconds * 30.0)))
 
+## Cost counters for the F3 meter (game/ui/perf_meter.gd): sim time and
+## ticks since it last read them, and the CPU time of the pieces' frame().
+var sim_us := 0
+var sim_ticks := 0
+var frame_us := 0
+
 func _process(delta: float) -> void:
 	if sim == null or camera == null:
 		return
+	var f0 := Time.get_ticks_usec()
 	if not paused:
 		_acc += delta * time_scale
 		var steps := 0
 		while _acc >= SIM_DT and steps < 8:
+			var t0 := Time.get_ticks_usec()
 			sim.tick(1)
+			sim_us += Time.get_ticks_usec() - t0
+			sim_ticks += 1
 			_acc -= SIM_DT
 			steps += 1
 		if steps == 8:
@@ -181,6 +191,7 @@ func _process(delta: float) -> void:
 	for p in pieces:
 		if pieces[p].has_method("frame"):
 			pieces[p].frame(delta, alpha)
+	frame_us += Time.get_ticks_usec() - f0
 	_frames += 1
 	if _frames == _capture_frames and not _capture_done and (args.has("out") or AovArgs.flag(args, "quit", false)):
 		_capture_done = true
