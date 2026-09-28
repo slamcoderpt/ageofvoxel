@@ -5,6 +5,9 @@
 //   2 shock ring (bandRingGeometry 0.75..1 + shockMat): COLOR.rgb * COLOR.a,
 //     custom.y = inner radius fraction;
 //   3 meteor warning ring (ringMat dash): custom.y inner fraction, custom.z time.
+//   4 (Godot) impact ring: a crisp hot band at the quad's edge with a soft
+//     glow inside it, broken up by crackle; COLOR.rgb * COLOR.a,
+//     custom.y = band width (fraction of the radius), custom.z = seed.
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled, fog_disabled, shadows_disabled;
 
@@ -15,6 +18,11 @@ varying vec4 v_c;
 void vertex() {
 	v_col = COLOR;
 	v_c = INSTANCE_CUSTOM;
+	// (Godot) pulled toward the camera along the view ray: the same pixels, but
+	// the flat decal is no longer swallowed by voxel-step bumps in the ground
+	vec3 wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	wp += normalize(CAMERA_POSITION_WORLD - wp) * 0.8;
+	POSITION = PROJECTION_MATRIX * (VIEW_MATRIX * vec4(wp, 1.0));
 }
 
 float h1(float n) { return fract(sin(n * 12.9898) * 43758.5453); }
@@ -23,14 +31,14 @@ float vn1(float x) { float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * 
 float cracks(vec2 q, float seed) {
 	float r = length(q);                  // 0..0.5
 	float ang = atan(q.y, q.x);
-	float v = 0.9 * max(0.0, 1.0 - r / 0.2) * 0.8;
+	float v = 0.9 * pow(max(0.0, 1.0 - r / 0.1), 1.5);
 	for (int k = 0; k < 6; k++) {
 		float fk = float(k);
 		float a0 = fk / 6.0 * 6.2831853 + (h1(fk + seed) - 0.5) * 0.6;
 		float len = 0.14 + 0.12 * h1(fk * 3.7 + seed);
 		float th = a0 + (vn1(r * 28.0 + fk * 5.0 + seed) - 0.5) * 1.1 * clamp(r * 8.0, 0.0, 1.0);
 		float da = abs(mod(ang - th + 3.14159265, 6.2831853) - 3.14159265) * r;
-		float w = 0.024 * (1.0 - 0.6 * r / len);
+		float w = 0.04 * (1.0 - 0.7 * r / len);
 		float line = (1.0 - smoothstep(w * 0.5, w, da)) * step(r, len);
 		v = max(v, line);
 		// one branch off each crack
@@ -40,7 +48,7 @@ float cracks(vec2 q, float seed) {
 		if (rr > 0.0 && rr < len * 0.5) {
 			float thb = ab + (vn1(r * 30.0 + fk * 11.0) - 0.5) * 0.8;
 			float db = abs(mod(ang - thb + 3.14159265, 6.2831853) - 3.14159265) * r;
-			v = max(v, 1.0 - smoothstep(0.004, 0.009, db));
+			v = max(v, 1.0 - smoothstep(0.008, 0.016, db));
 		}
 	}
 	return v;
@@ -63,6 +71,18 @@ void fragment() {
 		float r0 = v_c.y;
 		float b = (d - (r0 + 1.0) * 0.5) / ((1.0 - r0) * 0.5);
 		if (abs(b) <= 1.0) c = v_col.rgb * exp(-pow(b - 0.4, 2.0) * 22.0) * v_col.a;
+	} else if (kind == 4) {
+		float wb = v_c.y, seed = v_c.z * 71.0;
+		float an = atan(p.y, p.x) + 3.14159265;
+		float wob = (vn1(an * 9.0 + seed) - 0.5) * wb * 0.6;
+		float b = (d - (0.9 - wb * 0.5) - wob) / (wb * 0.5);
+		float crackle = 0.55 + 0.45 * vn1(an * 23.0 + seed * 3.0);
+		float band = exp(-b * b * 2.2) * crackle;
+		float edge = exp(-pow(b - 0.2, 2.0) * 14.0) * (0.7 + 0.3 * crackle);
+		float inner = exp(-max(0.0, (0.9 - d)) * 9.0) * 0.06 * step(d, 0.9);
+		c = v_col.rgb * (band * 0.8 + edge * 0.9 + inner) * v_col.a;
+		c += vec3(1.0) * edge * 0.35 * v_col.a * dot(v_col.rgb, vec3(0.2));
+		c *= 1.0 - smoothstep(0.97, 1.0, d);
 	} else {
 		float r0 = v_c.y, t = v_c.z;
 		float b = (d - (r0 + 1.0) * 0.5) / ((1.0 - r0) * 0.5);

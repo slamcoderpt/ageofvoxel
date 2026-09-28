@@ -90,8 +90,9 @@ std::vector<Line> bolt_lines(uint32_t seed, double x, double gy0, double z, H he
 	push(L, main, W0 * 4.2, 0.06, tap * 0.3, 0.2, true);
 	// (Godot: the browser's bloom pass has no counterpart in this renderer's
 	// post, so a wide soft lavender veil stands in for the bloom round the
-	// white-hot leader and its forks)
-	push(L, main, W0 * 9, 0.42, tap * 0.25, 0.15, true, AovGodpowerView::G_BLOOM);
+	// white-hot leader and its forks; kept narrow at the base (about half the
+	// round-1 width there) so the men under the contact stay readable)
+	push(L, main, W0 * 7.5, 0.38, 0.45, 0.15, true, AovGodpowerView::G_BLOOM);
 	const int nf = rng.int_(2, 3) + (rng.chance(0.4) ? 1 : 0);
 	for (int f = 0; f < nf; f++) {
 		const int i = std::min(n - 1, rng.int_((int)std::floor(n * (0.3 + f * 0.14)), (int)std::floor(n * (0.44 + f * 0.14))));
@@ -111,7 +112,7 @@ std::vector<Line> bolt_lines(uint32_t seed, double x, double gy0, double z, H he
 		push(L, fork, fw, 0.85, ft, grounded ? 0.3 : 0.85);
 		push(L, fork, fw * 3, 0.34, ft, grounded ? 0.35 : 0.9, true);
 		push(L, fork, fw * 9, 0.11, ft * 0.8, 0.8, true);
-		push(L, fork, fw * 7, 0.14, ft * 0.8, 0.6, true, AovGodpowerView::G_BLOOM);
+		push(L, fork, fw * 5, 0.12, ft * 0.9, 0.6, true, AovGodpowerView::G_BLOOM);
 		for (int k = 0; k < 3; k++) {
 			if (!rng.chance(0.7)) continue;
 			const int fl = (int)fork.size();
@@ -672,11 +673,12 @@ Dictionary AovGodpowerView::update(double alpha, bool paused, const Vector3 &cam
 		const double e = std::min(1.5, env) * g;
 		emit_lines(G_BOLT, it->second, std::min(1.1, env) * g);
 		const Lin hot = hex_lin(0xdfe9ff), stem = hex_lin(0xf4f0ff);
-		glow(false, b.x, b.y + 0.55, b.z, 0.7 + 0.8 * pin, 0.7 + 0.8 * pin, hot.r, hot.g, hot.b, 3.0 * g * pin, 2);
-		// (Godot: stands in for the browser's bloom round the contact)
-		if (oi == 0) glow(false, b.x, b.y + 0.6, b.z, 5.5, 5.5, 0.85, 0.75, 1.25, 0.5 * g * std::min(1.2, env), 0);
-		decal(I_DECAL_ADD, b.x, b.y + 0.08, b.z, 2.6 + 1.0 * pin, (b.seed % 628) / 100.0, 1, 1, 1,
-				(float)(std::min(1.0, e * 0.8) * (0.1 + 0.9 * pin)), 1);
+		glow(true, b.x, b.y + 0.55, b.z, 0.5 + 0.5 * pin, 0.5 + 0.5 * pin, hot.r, hot.g, hot.b, 2.2 * g * pin, 2);
+		// (Godot: stands in for the browser's bloom round the contact; half
+		// the round-1 radius and depth tested, so it never paints over men)
+		if (oi == 0) glow(true, b.x, b.y + 0.6, b.z, 2.8, 2.8, 0.85, 0.75, 1.25, 0.4 * g * std::min(1.2, env), 0);
+		decal(I_DECAL_ADD, b.x, b.y + 0.08, b.z, 2.0 + 0.8 * pin, (b.seed % 628) / 100.0, 1, 1, 1,
+				(float)(std::min(1.0, e * 0.7) * (0.1 + 0.9 * pin)), 1);
 		const double hero = oi == 0 ? 1 : 0.35;
 		const double sk = std::min(1.0, age / 0.4);
 		glow(false, b.x, b.y + 1.2, b.z, 0.35 + 0.15 * pin, 2.4 + 0.6 * pin, stem.r, stem.g, stem.b,
@@ -761,16 +763,37 @@ Dictionary AovGodpowerView::update(double alpha, bool paused, const Vector3 &cam
 		float er, eg, eb;
 		if (sc.blast) { er = (float)(0.5 + 0.7 * heat); eg = (float)(0.12 + heat * 0.45); eb = (float)(0.04 + heat * 0.35); }
 		else {
+			// (Godot: the fused cracks cool from blue-white through
+			// yellow-orange to a dull red that glows for as long as the scorch
+			// lasts, so every strike point reads as hot damage, not dirt)
 			const double w = std::max(0.0, 1 - age / 0.3) * 0.8;
-			const double q = std::exp(-age / 1.2) * (sc.size > 0 ? 0.22 : 0.38);
-			er = (float)(2.2 * q + (1.8 - 2.2 * q) * w);
-			eg = (float)(0.6 * q * q + (2.3 - 0.6 * q * q) * w);
-			eb = (float)(0.12 * q + (3.4 - 0.12 * q) * w);
+			// (kept below ~2 in linear so the tonemapper leaves them saturated
+			// orange / red instead of washing them to peach)
+			const double t = std::exp(-age / 1.4), q = sc.size > 0 ? 0.7 : 1.0;
+			const double cr = q * (1.25 + 0.5 * t), cg = q * (0.04 + 0.26 * t), cb = q * (0.03 + 0.02 * t);
+			er = (float)(cr + (1.8 - cr) * w);
+			eg = (float)(cg + (2.3 - cg) * w);
+			eb = (float)(cb + (3.4 - cb) * w);
 		}
-		const double eo = std::min(1.0, heat * 0.9);
+		const double eo = sc.blast ? std::min(1.0, heat * 0.9) : std::min(1.0, 0.95 * op);
 		if (eo > 0.01)
-			decal(I_DECAL_ADD, sc.x, sc.y + 0.06, sc.z, size * 0.5, ((sc.seed >> 3) % 628) / 100.0, er, eg, eb, (float)eo, 0,
+			decal(I_DECAL_ADD, sc.x, sc.y + 0.06, sc.z, size * (sc.blast ? 0.5 : 0.62), ((sc.seed >> 3) % 628) / 100.0, er, eg, eb, (float)eo, 0,
 					(float)((sc.seed % 977) / 977.0));
+		if (!sc.blast) {
+			// (Godot) the impact ring: a crisp white-violet ring racing out
+			// over the ground from each strike point, then a hot orange rim
+			// that stays at the crater edge while it cools
+			const double big = sc.size > 0 ? 0.55 : 1.0;
+			const double rk = std::min(1.0, age / 1.0);
+			if (rk < 1) {
+				const double rad = big * (0.8 + 2.6 * (1 - std::pow(1 - rk, 2.4)));
+				decal(I_DECAL_ADD, sc.x, sc.y + 0.14, sc.z, 2 * rad, 0, 1.9f, 1.75f, 2.6f,
+						(float)(std::pow(1 - rk, 0.9) * 3.0), 4, (float)(0.09 + 0.05 * rk), (float)((sc.seed % 811) / 811.0));
+			}
+			const double rim = std::exp(-age / 3.0) * 0.8 + 0.25;
+			decal(I_DECAL_ADD, sc.x, sc.y + 0.1, sc.z, size * 0.46, (sc.seed % 311) / 50.0, 1.7f, 0.32f, 0.06f, (float)(0.8 * rim * op * (1 - 0.6 * std::max(0.0, 1 - age / 0.3))), 4, 0.12f,
+					(float)((sc.seed % 523) / 523.0));
+		}
 		if (sc.blast) {
 			const double k = std::min(1.0, age / 0.7);
 			const Lin gc = hex_lin(0xffa050), rc = hex_lin(0xffa060);

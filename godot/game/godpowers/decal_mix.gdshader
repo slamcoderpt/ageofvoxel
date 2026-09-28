@@ -14,6 +14,11 @@ varying vec4 v_c;
 void vertex() {
 	v_col = COLOR;
 	v_c = INSTANCE_CUSTOM;
+	// (Godot) pulled toward the camera along the view ray: the same pixels, but
+	// the flat decal is no longer swallowed by voxel-step bumps in the ground
+	vec3 wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	wp += normalize(CAMERA_POSITION_WORLD - wp) * 0.6;
+	POSITION = PROJECTION_MATRIX * (VIEW_MATRIX * vec4(wp, 1.0));
 }
 
 float h1(float n) { return fract(sin(n * 12.9898) * 43758.5453); }
@@ -56,6 +61,18 @@ void fragment() {
 		else if (t < 0.78) g = mix(vec4(18.0, 14.0, 11.0, 0.7), vec4(26.0, 20.0, 15.0, 0.22), (t - 0.5) / 0.28);
 		else g = mix(vec4(26.0, 20.0, 15.0, 0.22), vec4(34.0, 27.0, 20.0, 0.0), (t - 0.78) / 0.22);
 		over(P, A, lin(g.rgb), g.a);
+		// (Godot) a blotchy charcoal-grey ash edge round the char (neutral grey,
+		// unlike the maroon-brown debris), under the hot cracks
+		if (v_c.z < 0.5) {
+			vec2 ac = floor(UV * 30.0);
+			float an = h2(ac + seed * 1.3);
+			float ring = smoothstep(0.14, 0.2, r) * (1.0 - smoothstep(0.27, 0.36, r + 0.05 * (h1(floor(ang * 7.0) + seed) - 0.5)));
+			float ash = ring * step(0.35, an) * (0.45 + 0.3 * an);
+			over(P, A, lin(mix(vec3(40.0, 40.0, 42.0), vec3(62.0, 61.0, 62.0), an)), ash);
+			// a thin charred line between the ash and the hot core
+			float cl = exp(-pow((r - 0.155) / 0.02, 2.0));
+			over(P, A, lin(vec3(6.0, 4.0, 4.0)), cl * 0.9);
+		}
 		// blocky soot clods (voxel-scale squares)
 		vec2 cell = floor(UV * 42.0);
 		float hc = h2(cell + seed);
