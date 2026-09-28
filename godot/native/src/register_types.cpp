@@ -5,12 +5,14 @@
 #include <godot_cpp/godot.hpp>
 
 #include "aov_sim.h"
+#include "econ_view.h"
 
 using namespace godot;
 
 static void initialize_aov(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) return;
 	GDREGISTER_CLASS(AovSim);
+	GDREGISTER_CLASS(AovEconView); // economy render data (econ_view.h)
 }
 
 static void uninitialize_aov(ModuleInitializationLevel p_level) {

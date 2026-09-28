@@ -33,7 +33,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
 | units | `game/units/units.gd` (first pass: rigs in the rest pose, conditional parts; animation still to port) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
 | combat (incl. enemy AI) | `game/combat/combat.gd` (not written yet: arrows, hit fx, health bars) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported) | `src/combat/` |
-| economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
+| economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor; Godot-only activity fx: axe / pick chips and dust, sickle chaff, stooks on cut rows, hoof dust, shoal ripples, fish splashes, net ripples, boat wakes; crops sway, `econ_voxel.gdshader`, `fx_chip / fx_puff / fx_ring.gdshader`), buffers built in C++ by `AovEconView` (`native/src/econ_view.{h,cpp}`, render side, reads the sim, never writes it) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
 | godpowers | `game/godpowers/godpowers.gd` (not written yet: bolts, storm funnel, scorches, debris) | `godpowers/` (favor, cooldowns, Lightning Storm, Bolt, Meteor, thrown units: ported) | `src/godpowers/` |
 | ui (HUD, selection, input) | `game/ui/ui.gd` | none | `src/ui/` |
 | scenes | `AovScenes.set_setup()` from the owning piece, else the C++ setup | `scenes/` (helpers.js, skirmish / town / coast / hud, EconomyScene.js; battle.cpp: BattleScene.js + units/battleHost.js, godpower, stress.js: all ported) | `src/core/scenes/`, `BattleScene.js`, `EconomyScene.js` |
@@ -449,6 +449,14 @@ Profiling / checks: `set_profiling(on)`, `get_profile()`, `get_stats()`
 path_searches, path_cache_hits, path_expanded, group_fields, …}),
 `set_census(on)` / `take_census()` (spatial-hash queries), `units_hash()`,
 `get_units_f64()` / `get_econ_f64()` (full-precision dumps for parity tools).
+
+Economy render data: `AovEconView` (`native/src/econ_view.h`), `setup(sim,
+keys)` (the `economy/<key>` model names in MultiMesh order), `update(alpha,
+paused, local_player)` once per frame -> {props: Array[PackedFloat32Array]
+(16 floats per instance: TRANSFORM_3D + custom data = linear team rgb,
+tint), counts, chips / puffs / rings + *_count (20 floats: TRANSFORM_3D +
+colour + custom)}, zero-padded to power-of-two capacities. Fog-aware, closed
+form in the sim time (captures are deterministic), no sim RNG.
 
 Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
 
