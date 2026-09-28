@@ -113,6 +113,7 @@ scripts/godot-export.sh linux|windows|macos|web [release|debug]   # scons for th
 SKIP_BUILD=1 scripts/godot-export.sh linux debug                  # export only (uses native/bin as is)
 python3 -m http.server -d dist-godot/web 8000                     # web: open http://localhost:8000/?scene=town
 node scripts/godot-webshoot.mjs --scene hud [--out shots/godot/web-hud.png]   # web smoke test + screenshot (headless Chromium)
+node scripts/godot-webshoot.mjs --scene none      # no params: the default fog-of-war skirmish (what CI checks)
 dist-godot/linux/AgeOfVoxel.x86_64 -- --scene=town                # exported builds take the same args
 ```
 
@@ -133,7 +134,14 @@ attributes are bound with one component (only red), so
 there; build voxel surfaces through it (and read them back with
 `VoxelModels.voxel_arrays()`), never with a raw `ARRAY_CUSTOM_RGBA8_UNORM`
 flag. Compute / CompositorEffect passes do not run on Compatibility (the
-lighting piece falls back).
+lighting piece falls back). Depth conventions differ: Forward+ / Mobile use
+reversed Z (NDC z in [0, 1], cleared depth 0), Compatibility standard Z (NDC z
+= depth * 2 - 1, cleared depth 1). A shader that reads `hint_depth_texture`
+must branch on `#if CURRENT_RENDERER == RENDERER_COMPATIBILITY` (see
+`fog_of_war.gdshader`), or the whole world reads as sky. `godot-webshoot.mjs`
+fails on a black frame centre ("black 3D world") to catch that. Colours
+drawn by full-screen passes go through AgX there, not the grade, so they may
+need their own Compatibility values (`fog_view.gd`).
 
 ## Run, capture, bench
 

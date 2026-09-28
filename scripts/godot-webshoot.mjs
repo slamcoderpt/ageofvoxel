@@ -1,13 +1,13 @@
 // Smoke-test and screenshot the Godot WEB export (dist-godot/web, made by
 // scripts/godot-export.sh web) in headless Chromium with software WebGL2.
 //
-//   node scripts/godot-webshoot.mjs [--scene town] [--params "seed=7"] [--out shots/godot/web-town.png]
+//   node scripts/godot-webshoot.mjs [--scene town|none] [--params "seed=7"] [--out shots/godot/web-town.png]
 //        [--dir dist-godot/web] [--width 1280 --height 720] [--settle 20] [--timeout 600] [--verbose]
 //
 // Serves --dir on a local port, opens index.html?scene=<scene>&<params>, waits
 // for the scene log line ("aov: scene=...") plus --settle seconds of rendering,
 // saves a screenshot and exits non-zero on a Godot / script error, a missing
-// extension, a timeout or a blank frame.
+// extension, a timeout, a blank frame or a black 3D world behind the HUD.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -37,7 +37,10 @@ const server = http.createServer((req, res) => {
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const port = server.address().port;
-const url = `http://127.0.0.1:${port}/index.html?scene=${encodeURIComponent(args.scene)}${args.params ? `&${args.params}` : ''}`;
+// --scene none: open index.html with no scene param (the default scene, as
+// a player opening the link gets it)
+const query = [args.scene !== 'none' ? `scene=${encodeURIComponent(args.scene)}` : '', args.params || ''].filter(Boolean).join('&');
+const url = `http://127.0.0.1:${port}/index.html${query ? `?${query}` : ''}`;
 
 const t0 = Date.now();
 const browser = await launch();
@@ -68,13 +71,21 @@ try {
     const c = document.createElement('canvas'); c.width = 160; c.height = 90;
     const g = c.getContext('2d'); g.drawImage(img, 0, 0, 160, 90);
     const d = g.getImageData(0, 0, 160, 90).data;
-    let s = 0, s2 = 0, n = 0;
-    for (let i = 0; i < d.length; i += 4) { const l = (d[i] + d[i + 1] + d[i + 2]) / 3; s += l; s2 += l * l; n++; }
-    const mean = s / n; return { mean, std: Math.sqrt(Math.max(0, s2 / n - mean * mean)) };
+    let s = 0, s2 = 0, n = 0, w = 0, wn = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const l = (d[i] + d[i + 1] + d[i + 2]) / 3; s += l; s2 += l * l; n++;
+      // the 3D world alone: the frame centre, clear of the HUD bars and minimap
+      const x = (i / 4) % 160, y = Math.floor(i / 4 / 160);
+      if (x >= 48 && x < 112 && y >= 22 && y < 63) { w += l; wn++; }
+    }
+    const mean = s / n; return { mean, std: Math.sqrt(Math.max(0, s2 / n - mean * mean)), world: w / wn };
   }, png.toString('base64'));
   const secs = ((Date.now() - t0) / 1000).toFixed(0);
-  console.log(`[webshoot] ${args.scene} -> ${out} in ${secs}s  (mean ${stats.mean.toFixed(1)}, std ${stats.std.toFixed(1)})`);
+  console.log(`[webshoot] ${args.scene} -> ${out} in ${secs}s  (mean ${stats.mean.toFixed(1)}, std ${stats.std.toFixed(1)}, world ${stats.world.toFixed(1)})`);
   if (stats.mean < 8 || stats.std < 4) { console.error('[webshoot] blank frame'); code = 3; }
+  // a black 3D world under a live HUD (e.g. a full-screen pass reading the
+  // depth buffer with Forward+ conventions on the Compatibility renderer)
+  else if (stats.world < 16) { console.error('[webshoot] black 3D world (HUD only)'); code = 3; }
 } catch (e) {
   console.error(`[webshoot] ${e.message}`);
   code = 1;

@@ -156,6 +156,28 @@ jobs:
           path: dist-godot/${{ matrix.target }}/
           if-no-files-found: error
 
+      # Smoke test: the web build in headless Chromium (software WebGL2), on
+      # index.html with no params (the default fog-of-war skirmish, what a
+      # player opening the link gets). Fails on script errors, a blank frame
+      # or a black 3D world behind the HUD.
+      - uses: actions/setup-node@v4
+        if: matrix.target == 'web'
+        with:
+          node-version: 22
+          cache: npm
+      - name: Web smoke test
+        if: matrix.target == 'web'
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          node scripts/godot-webshoot.mjs --scene none --out shots/web-default.png --settle 15
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.target == 'web'
+        with:
+          name: aov-godot-web-smoke
+          path: shots/web-default.png
+          if-no-files-found: ignore
+
       - name: Upload Pages artifact
         if: matrix.target == 'web' && vars.GODOT_PAGES == 'true' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3

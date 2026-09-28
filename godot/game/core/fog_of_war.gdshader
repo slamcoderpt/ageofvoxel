@@ -48,8 +48,18 @@ void fragment() {
 		vec3 eye = INV_VIEW_MATRIX[3].xyz;
 		if (dir.y < -1e-4) dist = (eye.y - ground_y) / -dir.y;
 	}
-	if (depth > 0.0) {
-		vec4 vp = INV_PROJECTION_MATRIX * vec4(SCREEN_UV * 2.0 - 1.0, depth, 1.0);
+	// Forward+/Mobile: reversed Z, NDC z in [0, 1], the sky clears to 0.
+	// Compatibility (GLES3 / WebGL2, the web export): standard Z, NDC z is
+	// depth * 2 - 1, the sky clears to 1.
+#if CURRENT_RENDERER == RENDERER_COMPATIBILITY
+	bool geometry = depth < 1.0;
+	vec3 ndc = vec3(SCREEN_UV, depth) * 2.0 - 1.0;
+#else
+	bool geometry = depth > 0.0;
+	vec3 ndc = vec3(SCREEN_UV * 2.0 - 1.0, depth);
+#endif
+	if (geometry) {
+		vec4 vp = INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
 		vp.xyz /= vp.w;
 		vec3 wp = (INV_VIEW_MATRIX * vec4(vp.xyz, 1.0)).xyz;
 		float v = fog_at(wp.xz);

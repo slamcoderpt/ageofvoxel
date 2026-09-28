@@ -184,7 +184,7 @@ Export Templates) and run `GODOT=$GODOT scripts/godot-export.sh macos` (writes
 `dist-godot/macos/AgeOfVoxel.zip`). The same script exports `linux`, `windows` and
 `web`; the web export needs emscripten 4.0.11 (`EMSDK=~/emsdk`) and is served by any
 static server: `python3 -m http.server -d dist-godot/web 8000`, then open
-http://localhost:8000/?scene=town (URL params work like the browser build's).
+http://localhost:8000/ (the skirmish; `?scene=town` etc. work like the browser build's URL params).
 
 ## Scenes
 
