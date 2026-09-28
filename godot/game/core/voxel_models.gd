@@ -34,12 +34,10 @@ static func coarse(mesh: Mesh, factor: int = 2, shadow_only: bool = false) -> Me
 		return _coarse[key]
 	var out: Mesh = mesh
 	if ClassDB.class_exists("AovUnitView"):
-		var arrays: Array = ClassDB.class_call_static("AovUnitView", "lod_mesh", mesh.surface_get_arrays(0), factor, shadow_only)
+		var arrays: Array = ClassDB.class_call_static("AovUnitView", "lod_mesh", voxel_arrays(mesh), factor, shadow_only)
 		if not arrays.is_empty():
 			var am := ArrayMesh.new()
-			var flags := (Mesh.ARRAY_CUSTOM_RGBA8_UNORM << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT) \
-				| (Mesh.ARRAY_CUSTOM_RGBA8_UNORM << Mesh.ARRAY_FORMAT_CUSTOM1_SHIFT)
-			am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, flags)
+			add_voxel_surface(am, arrays)
 			am.resource_name = key
 			out = am
 	_coarse[key] = out
