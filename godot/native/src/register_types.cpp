@@ -8,6 +8,7 @@
 #include "unit_view.h"
 #include "econ_view.h"
 #include "godpower_view.h"
+#include "building_ao.h"
 
 using namespace godot;
 
@@ -17,6 +18,7 @@ static void initialize_aov(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(AovUnitView); // units / combat render data (unit_view.h)
 	GDREGISTER_CLASS(AovEconView); // economy render data (econ_view.h)
 	GDREGISTER_CLASS(AovGodpowerView); // god powers render data (godpower_view.h)
+	GDREGISTER_CLASS(AovBuildingAO); // buildings: baked wide-radius AO (building_ao.h)
 }
 
 static void uninitialize_aov(ModuleInitializationLevel p_level) {

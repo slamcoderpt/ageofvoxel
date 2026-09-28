@@ -27,6 +27,7 @@ const COURTS := ["court_a", "court_b", "court_c", "court_d"]
 const G_PAVED := 4
 const G_FARM := 5
 const LOCAL_PLAYER := 1
+const BuildingAO = preload("res://game/buildings/building_ao.gd")
 
 var game: Node = null
 var _batches := {}     # kind -> {mmi, mm, items: [{x, z, owner, xf}], shown: PackedByteArray}
@@ -71,12 +72,11 @@ func rebuild(blds: Array) -> void:
 			var mm := MultiMesh.new()
 			mm.transform_format = MultiMesh.TRANSFORM_3D
 			mm.use_custom_data = true
-			mm.mesh = VoxelModels.mesh("props", kind)
+			mm.mesh = BuildingAO.mesh("props", kind)
 			var mmi := MultiMeshInstance3D.new()
 			mmi.name = "prop_" + kind
 			mmi.multimesh = mm
-			var mat := VoxelModels.team_material(Color.WHITE, true)
-			mat.set_shader_parameter("roughness_value", 0.93)
+			var mat := BuildingAO.material(Color.WHITE, true)
 			mmi.material_override = mat
 			add_child(mmi)
 			b = {"mmi": mmi, "mm": mm}

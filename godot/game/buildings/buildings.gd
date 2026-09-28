@@ -15,6 +15,7 @@ extends Node3D
 
 const PLAYER_COLORS := [0xbbbbbb, 0x2f6bff, 0xe0282e, 0x2fb04a, 0xf2c21b, 0x8e44d8, 0xf07818]
 const STAGES := 8
+const BuildingAO = preload("res://game/buildings/building_ao.gd")
 
 var game: Node = null
 var _nodes := {}      # id -> {mi: MeshInstance3D, key: String}
@@ -35,8 +36,7 @@ func setup(g: Node) -> void:
 func _material(owner: int) -> ShaderMaterial:
 	if not _mats.has(owner):
 		var c: int = PLAYER_COLORS[owner] if owner < PLAYER_COLORS.size() else 0xffffff
-		var m := VoxelModels.team_material(Color.hex((c << 8) | 0xff))
-		m.set_shader_parameter("roughness_value", 0.93)
+		var m := BuildingAO.material(Color.hex((c << 8) | 0xff))
 		_mats[owner] = m
 	return _mats[owner]
 
@@ -89,7 +89,7 @@ func frame(_dt: float, _alpha: float) -> void:
 			e.mi.visible = owners[i] == 1 or game.sim.is_explored(e.mi.position.x, e.mi.position.z)
 		if e.key != group + "/" + key:
 			e.key = group + "/" + key
-			e.mi.mesh = VoxelModels.mesh(group, key)
+			e.mi.mesh = BuildingAO.mesh(group, key)
 	for id in _nodes.keys():
 		if not seen.has(id):
 			_nodes[id].mi.queue_free()
