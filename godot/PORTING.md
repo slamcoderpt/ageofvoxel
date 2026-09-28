@@ -595,9 +595,15 @@ units, fog off, 1280x720): ~3 ms per update on this container's debug build.
 (voxels rebuilt from the faces, interior filled, factor^3 per cell; with
 shadow_only whole cells and greedy-merged faces), used through
 `VoxelModels.coarse(mesh, factor, shadow_only)`. In `game/units` the full
-part meshes cast no shadow: a 12-triangle box per part (`unit_shadow.gdshader`,
-SHADOWS_ONLY, same buffers) does; units whose 0.07 voxels are under
-`--unit_lod` px (default 2.5, 0 = off) use the coarse twins.
+part meshes cast no shadow: near units cast their coarse shadow-only twin
+(factor 2), LOD units a 12-triangle box per part (`unit_shadow.gdshader`,
+SHADOWS_ONLY, same buffers); units whose 0.07 voxels are under
+`--unit_lod` px (default 2.5, 0 = off) use the coarse twins. The shadow
+shader squashes every caster vertex towards the ground under it
+(`--unit_shadow_squash`, default 0.7, 1 = physical), so each man casts a
+compact shadow of about one body length under the low sun instead of long
+streaks over his neighbours; the ground is `sim.get_heights()` as an RGBA8
+texture, re-uploaded every 1.5 s by `units.gd`.
 
 God power render data: `AovGodpowerView` (`native/src/godpower_view.h`),
 `setup(sim)`, `update(alpha, paused, camera_position)` once per frame ->

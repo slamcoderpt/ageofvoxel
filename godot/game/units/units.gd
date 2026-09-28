@@ -15,8 +15,12 @@ extends Node3D
 ## Shading: unit.gdshader (voxel albedo x team x coat tint, team lift and rim,
 ## hit flash, corpses desaturated, dithered fade) with unit_outline.gdshader
 ## as next pass (the dark inverted-hull silhouette). A contact shadow disc
-## sits under every unit. Performance: the sun's shadow map gets a box per
-## part (unit_shadow.gdshader, same instance buffers), not the voxel meshes,
+## sits under every unit. Sun shadows: unit_shadow.gdshader squashes every
+## caster towards the ground under it (--unit_shadow_squash, default 0.7), so
+## a man casts a compact, crisp shadow of about one body length instead of a
+## long low-sun streak across his neighbours. Performance: the full voxel
+## meshes cast nothing; near units cast their coarse shadow-only voxel twin
+## (factor 2), far (LOD) units a box per part, same instance buffers,
 ## and far units use coarse voxel twins (unit LOD, see _lod_mms).
 ##
 ## Public API: `view` (the AovUnitView, shared with game/combat) and `last`
@@ -30,7 +34,8 @@ var view = null            # AovUnitView
 var last: Dictionary = {}
 var _types: PackedStringArray
 var _mms: Array[MultiMesh] = []   # flat, in AovUnitView part order
-## shadow casters (performance): one box per part, same instance buffers as
+## shadow casters: coarse shadow-only voxel twins (near) / a box per part
+## (far, LOD), same instance buffers as
 ## _mms, drawn only into the shadow map; the full part meshes cast nothing
 var _shadow_mms: Array[MultiMesh] = []
 ## unit LOD (performance): units farther than lod_distance() from the camera
@@ -44,6 +49,25 @@ var _shadow_lod_mms: Array[MultiMesh] = []
 var lod_px := 2.5
 var _shadow_mm: MultiMesh
 var _aabb: AABB
+## ground heights for the shadow casters' squash (unit_shadow.gdshader):
+## the sim's voxel levels as int32 bytes, re-uploaded every GROUND_REFRESH s
+## (buildings flatten tiles) instead of per-unit data
+const GROUND_REFRESH := 1.5
+var _shadow_mat: ShaderMaterial
+var _ground_tex: ImageTexture
+var _ground_t := 0.0
+
+func _upload_ground() -> void:
+	var cols := int(game.sim.get_map_cols())
+	var h: PackedInt32Array = game.sim.get_heights()
+	var img := Image.create_from_data(cols, cols, false, Image.FORMAT_RGBA8, h.to_byte_array())
+	if _ground_tex == null or _ground_tex.get_width() != cols:
+		_ground_tex = ImageTexture.create_from_image(img)
+		_shadow_mat.set_shader_parameter("ground_tex", _ground_tex)
+		_shadow_mat.set_shader_parameter("cell", float(game.sim.get_map_size()) / cols)
+		_shadow_mat.set_shader_parameter("floor_level", float(game.sim.get_water_level()) - 0.3)
+	else:
+		_ground_tex.update(img)
 
 ## A 12-triangle box around a part mesh (its shadow caster proxy), cached.
 static var _boxes := {}
@@ -118,6 +142,9 @@ func setup(g: Node) -> void:
 	mat.next_pass = outline
 	var shadow_mat := ShaderMaterial.new()
 	shadow_mat.shader = load("res://game/units/unit_shadow.gdshader")
+	shadow_mat.set_shader_parameter("squash", float(game.args.get("unit_shadow_squash", 0.7)))
+	_shadow_mat = shadow_mat
+	_upload_ground()
 	var rigs := []
 	for t in _types:
 		var rig := VoxelModels.rig(t)
@@ -127,7 +154,9 @@ func setup(g: Node) -> void:
 		for p in rig.parts:
 			var pm := VoxelModels.mesh("units", str(p.mesh))
 			_mms.append(_add_mm("%s_%s" % [t, p.name], pm, mat, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF))
-			_shadow_mms.append(_add_mm("%s_%s_shadow" % [t, p.name], box_mesh(pm), shadow_mat, GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY))
+			# near units cast their coarse voxel silhouette (a box per part is far
+			# fatter than a shield or an arm and smears the crowd's shadows)
+			_shadow_mms.append(_add_mm("%s_%s_shadow" % [t, p.name], VoxelModels.coarse(pm, 2, true), shadow_mat, GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY))
 			# far units: the coarse voxel twin (small rigs only: big ones are few and their voxels already large)
 			var lm: Mesh = VoxelModels.coarse(pm) if float(rig.voxel) < 0.1 else pm
 			_lod_mms.append(_add_mm("%s_%s_lod" % [t, p.name], lm, mat, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF))
@@ -149,6 +178,10 @@ func setup(g: Node) -> void:
 	view.setup(game.sim, rigs)
 
 func frame(dt: float, alpha: float) -> void:
+	_ground_t += dt
+	if _ground_t >= GROUND_REFRESH:
+		_ground_t = 0.0
+		_upload_ground()
 	var cam := get_viewport().get_camera_3d()
 	last = view.update(dt, alpha, 1, cam.get_frustum() if cam else [],
 		cam.global_position if cam else Vector3(), lod_distance(cam))
