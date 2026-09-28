@@ -31,8 +31,8 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | terrain | `game/terrain/terrain.gd` + `terrain.gdshader` (chunks, paving cobbles / pale stone of MaterialPatches patchGround), `water.gdshader` (Water.js), `props.gdshader` (voxel.gdshader + MultiMesh instance tint, used by trees / gold / berries / ground details); mesher in `native/src/terrain_mesher.cpp` (TerrainMesh.js full port, water depth bake, GroundDetails.js scatter) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (sun + PCSS soft shadows, hemisphere = ambient colour + two unshadowed up/down lights, fill, depth haze following the camera, SSAO, MSAA, `--quality=high\|medium\|low`, `--post=high\|low\|off`), `grade_effect.gd` (CompositorEffect compute pass on the HDR buffer: exposure 2.1 + PBR Neutral + the PostFX.js grade; Godot's tonemap is LINEAR; Compatibility/web falls back to AgX), `sky.gdshader`. MaterialPatches.js canopy / foliage terms not ported yet | none | `src/lighting/` |
 | buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
-| units | `game/units/units.gd` (first pass: rigs in the rest pose, conditional parts; animation still to port) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
-| combat (incl. enemy AI) | `game/combat/combat.gd` (not written yet: arrows, hit fx, health bars) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported) | `src/combat/` |
+| units | `game/units/units.gd` (rigs posed by the full anim.js port, conditional parts, crowd yaw / press / jitter, deaths and corpses, contact shadows), `unit.gdshader` (team lift + rim, hit flash, corpse drain, dithered fade) + `unit_outline.gdshader` (inverted hull, next pass); posing in C++: `native/src/unit_view.cpp` (`AovUnitView`) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
+| combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported) | `src/combat/` |
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor; Godot-only activity fx: axe / pick chips and dust, sickle chaff, stooks on cut rows, hoof dust, shoal ripples, fish splashes, net ripples, boat wakes; crops sway, `econ_voxel.gdshader`, `fx_chip / fx_puff / fx_ring.gdshader`), buffers built in C++ by `AovEconView` (`native/src/econ_view.{h,cpp}`, render side, reads the sim, never writes it) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
 | godpowers | `game/godpowers/godpowers.gd` (not written yet: bolts, storm funnel, scorches, debris) | `godpowers/` (favor, cooldowns, Lightning Storm, Bolt, Meteor, thrown units: ported) | `src/godpowers/` |
 | ui (HUD, selection, input) | `game/ui/ui.gd` | none | `src/ui/` |
@@ -458,6 +458,24 @@ tint), counts, chips / puffs / rings + *_count (20 floats: TRANSFORM_3D +
 colour + custom)}, zero-padded to power-of-two capacities. Fog-aware, closed
 form in the sim time (captures are deterministic), no sim RNG.
 
+Units / combat render data: `AovUnitView` (`native/src/unit_view.h`),
+`setup(sim, rigs)` (one `VoxelModels.rig(type)` per unit type index; it
+subscribes to the sim's `unit:damaged` / `entity:died` to stamp hits with
+the sim time), `update(dt, alpha, local_player, frustum=[])` once per frame
+(`Camera3D.get_frustum()`: units off screen are not posed) -> {parts:
+Array[PackedFloat32Array] (one per rig part, types in index order; COLOR =
+coat / corpse tint + fade, CUSTOM = linear team rgb + floor(dead*100) +
+flash), part_counts, shadows, bars (CUSTOM = hp fraction, width px),
+arrows, streaks (origin = head, COLOR = tail), sparks (COLOR = hdr rgb +
+alpha, CUSTOM = size + velocity), dust, chips, drops: Array[4] (shield,
+helmet, spear, stub; CUSTOM = team rgb), scars (only when scars_changed;
+CUSTOM = dirt, blood), + *_count}; 20 floats per instance (TRANSFORM_3D +
+colour + custom), zero-padded to power-of-two capacities. Visual only: never
+writes the sim, own hash RNG; the anim.js pose, index.js render transforms,
+BattleFX / Particles / Debris / Overlays / Projectiles render maths are
+ported there. Stress (2000 units, fog off, 1280x720): ~3 ms per update on
+this container's debug build.
+
 Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
 
 ## Status
@@ -491,8 +509,7 @@ Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
   stress bench (`godot-stress.mjs`, numbers above).
 - Placeholders to replace: `game/terrain/terrain.gd` (first pass: no shore
   smoothing, talus, cliff relief, water shader or ground details),
-  `game/lighting/lighting.gd`, `game/units/units.gd` (static rest pose: the
-  animation of src/units/anim.js; thrown units: `air`), the placement ghost
-  (UI); `game/combat` and
+  `game/lighting/lighting.gd`, the placement ghost
+  (UI); the
   `game/godpowers` renderers and the fog-of-war shading do not exist yet
   (the sim state they need is exported, see "AovSim API").

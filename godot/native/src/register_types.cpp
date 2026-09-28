@@ -5,6 +5,7 @@
 #include <godot_cpp/godot.hpp>
 
 #include "aov_sim.h"
+#include "unit_view.h"
 #include "econ_view.h"
 
 using namespace godot;
@@ -12,6 +13,7 @@ using namespace godot;
 static void initialize_aov(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) return;
 	GDREGISTER_CLASS(AovSim);
+	GDREGISTER_CLASS(AovUnitView); // units / combat render data (unit_view.h)
 	GDREGISTER_CLASS(AovEconView); // economy render data (econ_view.h)
 }
 
