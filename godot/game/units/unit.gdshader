@@ -10,8 +10,12 @@ render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 uniform float roughness_value : hint_range(0.0, 1.0) = 0.82;
 // dye brightness: keeps the lit team colour below the tone map's highlight
 // desaturation, so red reads red rather than pink
-uniform float dye_gain = 1.0;
-uniform float team_lift = 0.45;
+uniform float dye_gain = 0.85;
+uniform float team_lift = 0.32;
+// material grade: the figures hold more saturation and contrast than the dirt
+// they stand on, so each silhouette separates under the cloud shadows
+uniform float saturation = 1.3;
+uniform float contrast = 1.18;
 
 varying vec3 v_albedo;
 varying float v_team;
@@ -46,6 +50,12 @@ float bayer4(vec2 fc) {
 void fragment() {
 	if (v_fade < 0.999 && bayer4(FRAGCOORD.xy) > v_fade) discard;
 	vec3 c = v_albedo * mix(vec3(1.0), v_team_col * dye_gain, v_team) * v_tint;
+	{
+		float l = max(dot(c, vec3(0.2126, 0.7152, 0.0722)), 1e-4);
+		c = max(mix(vec3(l), c, saturation), vec3(0.0));
+		// contrast around a mid grey in linear light (darks deeper, lights kept)
+		c *= pow(l / 0.18, contrast - 1.0);
+	}
 	// the dead drain to a cool, pale-ish grey
 	float dl = dot(c, vec3(0.3, 0.59, 0.11));
 	c = mix(c, vec3(dl) * vec3(0.94, 0.97, 1.04), v_dead * 0.5);
@@ -55,11 +65,17 @@ void fragment() {
 	// team colour holds its saturation in shade, plus a lit rim on edge-on faces
 	float rim = pow(1.0 - clamp(abs(dot(normalize(NORMAL), normalize(VIEW))), 0.0, 1.0), 1.6);
 	vec3 team_sat = c * v_team * v_team_col * (1.0 - v_dead * 0.75);
-	vec3 em = c * v_glow * 2.5 + vec3(1.0, 0.95, 0.85) * v_flash;
+	vec3 em = c * v_glow * 2.5;
 	em += team_sat * (team_lift + rim * 0.45);
-	em += c * vec3(1.0, 0.93, 0.8) * rim * 0.35 * (1.0 - v_dead);
-	// hit flash: the man struck blazes in his own army's colour
+	// rim light: warm on skin, bronze and cloth, the unit's own dye on team parts
+	// (white on red reads pink), so outlines lift off the ground in shade
+	vec3 rim_col = mix(c * vec3(1.0, 0.93, 0.8), team_sat * 1.2, v_team);
+	em += rim_col * rim * 0.4 * (1.0 - v_dead);
+	// hit flash: the man struck flares white-hot to orange, off every team
+	// colour (the old team-tinted flash made blue soldiers look lit up)
 	float hit_k = min(v_flash * 20.0, 1.0);
-	em += c * v_team_col * v_team_col * (0.26 + 0.2 * rim) * hit_k;
+	vec3 hot = vec3(1.0, 0.52, 0.16);
+	em += (c * vec3(1.0, 0.85, 0.7) * 0.3 + hot * c.r * 0.6 + hot * 0.05) * (0.75 + 0.5 * rim) * hit_k;
+	em += vec3(1.0, 0.72, 0.4) * max(v_flash - 0.05, 0.0); // god-power blasts
 	EMISSION = em;
 }

@@ -871,16 +871,25 @@ void AovUnitView::emit_fx(const HitRec &h, double now) {
 	const double gy = o.map->height_at(x, z);
 	if (landed) {
 		const double k = big ? r.range(1.1, 1.3) : r.range(0.5, 1.15);
-		const Col hot = { h.tr * 1.1f + 0.12f, h.tg * 1.1f + 0.08f, h.tb * 1.1f + 0.05f };
+		const Col hot = hexc(r.chance(0.5) ? 0xffb040 : 0xffd060); // warm, never the victim's dye
 		spark(o, r, age, px, y, pz, 1, hexc(0xfff0d0), 1.2 + 0.5 * k, 0.3 + 0.2 * k, 0.12 + 0.1 * k, 0.4, 0.2, 0, bx, bz, 0.2);
-		// the white-hot flash where the blow lands, tinted by the victim's
-		// army (in the browser the overlapping HDR sparks bloom into one)
+		// the flash where the blow lands: a small, brief white-hot core in an
+		// orange glow, off both team colours so it reads as a strike
 		{
 			const double fl = 0.16 + 0.08 * k;
 			if (age < fl && o.sparks->n < (int)MAX_SPARK) {
 				const double f = 1 - age / fl;
-				o.sparks->push(xl(px, y, pz), 1.4f + h.tr * 1.2f, 1.2f + h.tg * 1.0f, 1.0f + h.tb * 1.0f, (float)(f * f * 0.75),
-						(float)((big ? 1.9 : 1.3) * (0.8 + 0.4 * k)), 0, 0, 0);
+				o.sparks->push(xl(px, y, pz), 2.6f, 1.3f, 0.25f, (float)(std::sqrt(f) * 0.95),
+						(float)((big ? 1.25 : 0.9) * (0.8 + 0.4 * k)), 0, 0, 0);
+			}
+		}
+		// 3-5 voxel debris thrown off the struck man: bronze, splinters, his dye
+		{
+			const int nd = r.irange(3, 5);
+			for (int q = 0; q < nd; q++) {
+				const uint32_t dc = q == 0 ? 0xd8a048 : (q == 1 ? 0x6a4424 : 0);
+				const Col c = dc ? hexc(dc) : Col{ h.tr, h.tg, h.tb };
+				emit(o, r, age, px, y + 0.05, pz, 1, c, 0.12, 0.24, 0.7, 3.2, 3.4, -18, 0.06);
 			}
 		}
 		const int n = (int)std::lround((big ? 10 : 5) + 6 * k * r.range(0.7, 1.2));

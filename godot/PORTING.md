@@ -569,7 +569,9 @@ Array[PackedFloat32Array] (one per rig part, types in index order; COLOR =
 coat / corpse tint + fade, CUSTOM = linear team rgb + floor(dead*100) +
 flash), part_counts, shadows, bars (CUSTOM = hp fraction, width px),
 arrows, streaks (origin = head, COLOR = tail), sparks (COLOR = hdr rgb +
-alpha, CUSTOM = size + velocity), dust, chips, drops: Array[4] (shield,
+alpha, CUSTOM = size + velocity; zero velocity = an impact flash, always warm
+white-hot to orange, never team-tinted), dust, chips (incl. 3-5 voxel
+debris per landed blow), drops: Array[4] (shield,
 helmet, spear, stub; CUSTOM = team rgb), scars (only when scars_changed;
 CUSTOM = dirt, blood), + *_count}; 20 floats per instance (TRANSFORM_3D +
 colour + custom), zero-padded to power-of-two capacities. Visual only: never

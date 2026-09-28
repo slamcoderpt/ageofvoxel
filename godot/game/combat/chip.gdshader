@@ -15,6 +15,10 @@ void vertex() {
 }
 
 void fragment() {
-	ALBEDO = v_col.rgb;
+	// a tiny voxel, not a flat square: lit top-left bevel, dark lower-right edge
+	vec2 q = UV;
+	float edge = min(min(q.x, q.y), min(1.0 - q.x, 1.0 - q.y));
+	float lit = q.x + q.y < 0.9 ? 1.18 : 0.78;
+	ALBEDO = v_col.rgb * mix(0.45, lit, smoothstep(0.06, 0.16, edge));
 	ALPHA = v_col.a;
 }
