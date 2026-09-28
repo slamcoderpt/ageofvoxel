@@ -1,0 +1,120 @@
+#!/usr/bin/env python
+# Age of Voxel GDExtension (the deterministic simulation, see ../PORTING.md).
+#
+#   cd godot/native && scons -j2                     # linux debug (template_debug)
+#   scons -j2 target=template_release                # release
+#   scons platform=web target=template_release       # needs emsdk (dlink build)
+#
+# godot-cpp is the submodule in ./godot-cpp (tag godot-4.5-stable). When its
+# static library for the requested platform/target already exists it is linked
+# as is (build_library=no), so the ~1700 binding sources are not recompiled;
+# pass build_library=yes to force a rebuild of godot-cpp.
+import os
+import sys
+
+ARGS = ARGUMENTS.copy()
+platform = ARGS.get("platform", "linux" if sys.platform.startswith("linux") else "macos" if sys.platform == "darwin" else "windows")
+target = ARGS.get("target", "template_debug")
+
+
+def compiler_id():
+    # SCons does not notice a compiler upgrade (emsdk swaps the clang behind
+    # the same emcc path), so a prebuilt godot-cpp built with an older
+    # emscripten would be relinked as is: mixing those objects with ours made
+    # the web build abort at startup ("Class '' doesn't exist" in
+    # bind_methodfi, then heap corruption). Stamp the compiler instead.
+    import subprocess
+    if platform == "web":
+        cmd = ["emcc", "--version"]
+    elif platform == "windows" and not ARGS.get("use_mingw"):
+        return None  # MSVC: CI builds it from a cache keyed on the runner image
+    elif ARGS.get("use_llvm") in ("yes", "true", "1") or platform in ("macos", "ios"):
+        cmd = ["clang++", "--version"]
+    else:
+        cmd = [os.environ.get("CXX", "g++"), "--version"]
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True).stdout.strip()
+        return out.splitlines()[0] if out else None
+    except OSError:
+        return None
+
+
+def drop_stale(pattern_dirs, suffix):
+    n = 0
+    for d in pattern_dirs:
+        for root, _, files in os.walk(d):
+            for f in files:
+                if suffix in f and (f.endswith(".o") or f.endswith(".os") or f.endswith(".obj") or f.endswith(".a")):
+                    os.remove(os.path.join(root, f))
+                    n += 1
+    return n
+
+
+# Objects and libraries of one platform/target carry this in their name.
+variant = ".{}.{}.".format(platform, target)
+cid = compiler_id()
+stamp = "godot-cpp/bin/.aov-compiler{}txt".format(variant)
+if cid:
+    old = open(stamp).read().strip() if os.path.exists(stamp) else None
+    if old is not None and old != cid:
+        n = drop_stale(["godot-cpp/src", "godot-cpp/gen/src", "godot-cpp/bin", "src"], variant)
+        print("aov: compiler changed ({} -> {}): removed {} stale {} objects".format(old, cid, n, variant.strip(".")))
+        ARGS["build_library"] = ARGUMENTS["build_library"] = "yes"
+    if old != cid:
+        os.makedirs("godot-cpp/bin", exist_ok=True)
+        with open(stamp, "w") as f:
+            f.write(cid + "\n")
+
+if "build_library" not in ARGS:
+    prebuilt = Glob("godot-cpp/bin/libgodot-cpp.{}.{}.*".format(platform, target))
+    if prebuilt:
+        ARGUMENTS["build_library"] = "no"
+        print("aov: linking prebuilt " + str(prebuilt[0]))
+
+env = SConscript("godot-cpp/SConstruct")
+# Our own objects are per platform / target too (aov_sim.linux.template_debug.x86_64.os,
+# ...), like godot-cpp's: switching target never reuses another target's object.
+for key in ("OBJSUFFIX", "SHOBJSUFFIX"):
+    if not env[key].startswith(env["suffix"]):
+        env[key] = env["suffix"] + env[key]
+
+env.Append(CPPPATH=["src/"])
+# The sim is bit-exact with the browser (doubles, V8 Math ports): never fuse
+# a*b+c into FMA, and never use -ffast-math.
+if env.get("is_msvc", False):
+    env.Append(CCFLAGS=["/fp:precise"])
+else:
+    env.Append(CCFLAGS=["-ffp-contract=off"])
+sources = Glob("src/*.cpp") + Glob("src/sim/*.cpp") + Glob("src/sim/*/*.cpp")
+
+if env["platform"] == "macos":
+    # A framework bundle (arch=universal in CI: one binary for x86_64 + arm64);
+    # Resources/Info.plist lets the macOS export sign it.
+    fw = "bin/libaov.{}.{}.framework".format(env["platform"], env["target"])
+    library = env.SharedLibrary(
+        "{}/libaov.{}.{}".format(fw, env["platform"], env["target"]),
+        source=sources,
+    )
+    plist = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleExecutable</key><string>libaov.macos.{t}</string>
+	<key>CFBundleIdentifier</key><string>io.github.ageofvoxel.libaov</string>
+	<key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+	<key>CFBundleName</key><string>libaov.macos.{t}</string>
+	<key>CFBundlePackageType</key><string>FMWK</string>
+	<key>CFBundleShortVersionString</key><string>1.0.0</string>
+	<key>CFBundleSupportedPlatforms</key><array><string>MacOSX</string></array>
+	<key>CFBundleVersion</key><string>1.0.0</string>
+	<key>LSMinimumSystemVersion</key><string>10.13</string>
+</dict>
+</plist>
+""".format(t=env["target"])
+    env.Tool("textfile")
+    library += env.Textfile(target=fw + "/Resources/Info.plist", source=[env.Value(plist)])
+else:
+    library = env.SharedLibrary("bin/libaov{}{}".format(env["suffix"], env["SHLIBSUFFIX"]), source=sources)
+
+env.NoCache(library)
+Default(library)

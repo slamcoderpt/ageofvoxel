@@ -1,0 +1,492 @@
+// Port of src/combat/index.js and Projectiles.js (see combat.h).
+#include "combat.h"
+
+#include <algorithm>
+#include <cmath>
+#include <string>
+
+#include "../core/jsmath.h"
+#include "../sim.h"
+
+namespace aov {
+
+static const double PI = 3.141592653589793;
+
+void Combat::init(Sim *s) {
+	sim = s;
+	projectiles.clear();
+	stuck.clear();
+	scars.clear();
+	drops.clear();
+	ais.clear();
+	ais.emplace_back(s, ENEMY);
+	scan_timer = 0;
+	attackers_.clear();
+	touched_.clear();
+	s->commands.register_handler(O_ATTACK, [this](int r, const Order &o) { return start_attack(r, o); });
+}
+
+EnemyAI &Combat::add_ai(int owner) {
+	ais.emplace_back(sim, owner);
+	return ais.back();
+}
+
+bool Combat::start_attack(int r, const Order &o) {
+	Entities &E = sim->entities;
+	UnitStore &U = E.units;
+	const int s = E.slot(o.target);
+	const Kind k = E.kind(o.target);
+	if (s < 0 || (k != K_UNIT && k != K_BUILDING)) return false;
+	const bool dead = k == K_UNIT ? U.dead[s] : E.buildings.dead[s];
+	const int owner = k == K_UNIT ? U.owner[s] : E.buildings.owner[s];
+	if (dead || !unit_def(U.type[r]).has_attack || !Sim::is_enemy(U.owner[r], owner)) return false;
+	U.order_x[r] = 0; // o.repath
+	approach(r, o.target);
+	return true;
+}
+
+void Combat::add_attacker(int32_t id) {
+	if (id <= 0) return;
+	if (id >= (int32_t)attackers_.size()) attackers_.resize((size_t)id + 1024, 0);
+	if (attackers_[id]++ == 0) touched_.push_back(id);
+}
+
+void Combat::clear_attackers() {
+	for (int32_t id : touched_) attackers_[id] = 0;
+	touched_.clear();
+}
+
+// combat_reach: extra reach for spearmen holding a line (BattleScene)
+double Combat::range_of(int r) const {
+	const UnitStore &U = sim->entities.units;
+	const UnitDef &d = unit_def(U.type[r]);
+	return (d.has_attack ? d.attack.range : 0.5) + U.combat_reach[r];
+}
+
+void Combat::approach(int r, int32_t tid) {
+	Entities &E = sim->entities;
+	const int s = E.slot(tid);
+	if (s < 0) return;
+	const double range = range_of(r);
+	if (E.kind(tid) == K_BUILDING) {
+		const BuildingStore &B = E.buildings;
+		GoalRect g{ (double)B.tx[s], (double)B.tz[s], (double)B.w[s], (double)B.h[s] };
+		sim->movement.move_to(r, B.x[s], B.z[s], &g, range);
+	} else if (E.kind(tid) == K_UNIT) {
+		const UnitStore &U = E.units;
+		sim->movement.move_to(r, U.x[s], U.z[s], nullptr, range + U.radius[r] + U.radius[s] * 0.8);
+	}
+}
+
+int Combat::find_enemy_near(double x, double z, int owner, double radius, const std::function<bool(int)> &pred) {
+	CallTimer tm(&sim->prof, "findEnemyNear");
+	const UnitStore &U = sim->entities.units;
+	int best = -1;
+	double bd = radius * radius;
+	sim->movement.hash.count_query(x, z, radius);
+	sim->movement.hash.for_each_near(x, z, radius, [&](int o) {
+		if (U.dead[o] || !Sim::is_enemy(owner, U.owner[o])) return;
+		if (pred && !pred(o)) return;
+		const double dx = U.x[o] - x, dz = U.z[o] - z;
+		const double d = dx * dx + dz * dz;
+		if (d < bd) {
+			bd = d;
+			best = o;
+		}
+	});
+	return best;
+}
+
+// Target choice that spreads attackers across the enemy line instead of
+// piling onto the nearest unit: distance, plus a crowding penalty, minus a
+// preference for classes this unit has a bonus against.
+int Combat::pick_target(int r, double radius) {
+	CallTimer tm(&sim->prof, "pickTarget");
+	const UnitStore &U = sim->entities.units;
+	const UnitDef &ud = unit_def(U.type[r]);
+	const bool melee = !ud.attack.projectile;
+	const double ux = U.x[r], uz = U.z[r];
+	const int owner = U.owner[r];
+	int best = -1;
+	double bs = INFINITY;
+	sim->movement.hash.count_query(ux, uz, radius);
+	sim->movement.hash.for_each_near(ux, uz, radius, [&](int o) {
+		if (U.dead[o] || !Sim::is_enemy(owner, U.owner[o])) return;
+		const double d = jsm::hypot(U.x[o] - ux, U.z[o] - uz);
+		if (d > radius) return;
+		const UnitDef &od = unit_def(U.type[o]);
+		const int n = attackers_of(U.id[o]);
+		const int cap = od.myth ? 4 : od.cls == CLS_CAVALRY ? 3 : 2;
+		double s = d + (melee ? 1.8 * std::max(0, n + 1 - cap) + 0.35 * n : 0.25 * n);
+		if (ud.bonus[od.cls] != 0) s -= melee ? 2.5 : 1.0;
+		if (od.gatherer) s += 3;
+		if (s < bs) {
+			bs = s;
+			best = o;
+		}
+	});
+	if (best >= 0) add_attacker(U.id[best]);
+	return best;
+}
+
+int Combat::find_enemy_building_near(double x, double z, int owner, double radius) const {
+	const BuildingStore &B = sim->entities.buildings;
+	int best = -1;
+	double bd = radius * radius;
+	for (int b = 0; b < B.size(); b++) {
+		if (B.removed[b] || !Sim::is_enemy(owner, B.owner[b])) continue;
+		const double dx = B.x[b] - x, dz = B.z[b] - z;
+		const double d = dx * dx + dz * dz;
+		if (d < bd) {
+			bd = d;
+			best = b;
+		}
+	}
+	return best;
+}
+
+Hitter Combat::hitter_of(int32_t id) const {
+	const Entities &E = sim->entities;
+	const int s = E.slot(id);
+	Hitter h;
+	if (s < 0) return h;
+	h.id = id;
+	h.kind = E.kind(id);
+	h.row = s;
+	h.owner = h.kind == K_UNIT ? E.units.owner[s] : h.kind == K_BUILDING ? E.buildings.owner[s] : GAIA;
+	return h;
+}
+
+void Combat::damage(int32_t tid, double amount, const Hitter &a, uint8_t kind) {
+	Entities &E = sim->entities;
+	UnitStore &U = E.units;
+	BuildingStore &B = E.buildings;
+	const int t = E.slot(tid);
+	const Kind tk = E.kind(tid);
+	if (t < 0 || (tk != K_UNIT && tk != K_BUILDING)) return;
+	if (tk == K_UNIT ? U.dead[t] : B.dead[t]) return;
+	const UnitDef *ad = a.kind == K_UNIT ? &unit_def(U.type[a.row]) : nullptr;
+	const UnitDef *td = tk == K_UNIT ? &unit_def(U.type[t]) : nullptr;
+	double dmg = amount;
+	if (ad && td && ad->bonus[td->cls] != 0) dmg *= ad->bonus[td->cls];
+	if (tk == K_BUILDING) dmg *= (ad && ad->cls == CLS_MYTH) || a.myth_class ? 1.2 : 0.35;
+	dmg *= 1 - (td ? td->armor : 0);
+	const double time = sim->time;
+	if (tk == K_UNIT) {
+		U.hp[t] -= dmg;
+		// a white hit flash long enough to read at RTS distance (units piece fades it)
+		U.flash_t[t] = td->myth ? 0.14 : kind == DK_ARROW || (ad && ad->attack.projectile) ? 0.12 : 0.22;
+		U.hit_time[t] = time;
+		// melee blows shove the man struck back a step and make him reel
+		const bool has_pos = a.kind == K_UNIT || a.kind == K_BUILDING;
+		const bool a_proj = a.kind == K_BUILDING || (ad && ad->attack.projectile); // (Town Center: an 'arrow' attack)
+		if (has_pos && kind != DK_ARROW && !td->myth && !a_proj) {
+			const double ax = U.x[a.row], az = U.z[a.row];
+			const double dx = U.x[t] - ax, dz = U.z[t] - az;
+			double d = jsm::hypot(dx, dz);
+			if (d == 0 || std::isnan(d)) d = 1;
+			const double push = (ad->myth ? 0.45 : 0.05 + 0.12 * sim->rng.next()) * (td->cls == CLS_CAVALRY ? 0.4 : 1);
+			const double nx = U.x[t] + (dx / d) * push, nz = U.z[t] + (dz / d) * push;
+			if (sim->map().is_walkable((int)std::floor(nx), (int)std::floor(nz))) {
+				U.x[t] = nx;
+				U.z[t] = nz;
+			}
+			U.stag_t[t] = time;
+			U.stag_k[t] = ad->myth ? 1.5 : 0.6 + 0.5 * sim->rng.next();
+		}
+		// BattleFX.hit: the melee contact time (battle scene capture beat, hit pop)
+		const bool melee = kind == DK_MELEE || (kind == DK_DEFAULT && ad && !ad->attack.projectile);
+		if (melee) U.melee_t[t] = time;
+	} else {
+		B.hp[t] -= dmg;
+		B.hit_time[t] = time;
+	}
+	Event ev;
+	ev.type = EV_UNIT_DAMAGED;
+	ev.kind = tk;
+	ev.id = tid;
+	ev.other = a.id;
+	ev.owner = a.owner;
+	ev.amount = dmg;
+	ev.x = tk == K_UNIT ? U.x[t] : B.x[t];
+	ev.z = tk == K_UNIT ? U.z[t] : B.z[t];
+	sim->events.emit(ev);
+	// retaliate
+	if (tk == K_UNIT && a.id && td->has_attack) {
+		const bool a_dead = a.kind == K_UNIT ? U.dead[a.row] : B.dead[a.row];
+		if (!a_dead) {
+			const double ax = a.kind == K_UNIT ? U.x[a.row] : B.x[a.row], az = a.kind == K_UNIT ? U.z[a.row] : B.z[a.row];
+			const int ot = U.order_type[t];
+			const Player *tp = sim->player(U.owner[t]);
+			const bool ai = tp && tp->is_ai;
+			const bool leashed = U.combat_leash[t] != 0 && jsm::hypot(ax - U.x[t], az - U.z[t]) > U.combat_leash[t] + 1;
+			Order o = Order::with_target(O_ATTACK, a.id);
+			o.b = ATK_AUTO;
+			if (leashed) { /* holding the line: ignore distant attackers */ }
+			else if (ot == O_IDLE || (ot == O_MOVE && ai)) sim->commands.order(t, o);
+			else if (td->gatherer && ot != O_ATTACK && ai && sim->rng.chance(0.3)) sim->commands.order(t, o);
+		}
+	}
+	if ((tk == K_UNIT ? U.hp[t] : B.hp[t]) <= 0) kill(tid, a);
+}
+
+void Combat::kill(int32_t id, const Hitter &killer) {
+	Entities &E = sim->entities;
+	const int s = E.slot(id);
+	const Kind k = E.kind(id);
+	if (s < 0) return;
+	Event ev;
+	ev.type = EV_ENTITY_DIED;
+	ev.kind = k;
+	ev.id = id;
+	ev.other = killer.id;
+	if (k == K_UNIT) {
+		UnitStore &U = E.units;
+		if (U.dead[s]) return;
+		U.hp[s] = 0;
+		U.dead[s] = 1;
+		U.died_at[s] = sim->time;
+		sim->commands.set(s, Order::idle()); // (direct: no cancel handler, as the JS)
+		sim->movement.stop(s);
+		U.anim_die_t[s] = 0;
+		U.carry_type[s] = RES_NONE;
+		U.carry_amount[s] = 0;
+		ev.owner = U.owner[s];
+		ev.x = U.x[s];
+		ev.z = U.z[s];
+	} else if (k == K_BUILDING) {
+		BuildingStore &B = E.buildings;
+		if (B.dead[s]) return;
+		B.hp[s] = 0;
+		B.dead[s] = 1;
+		ev.owner = B.owner[s];
+		ev.x = B.x[s];
+		ev.z = B.z[s];
+		sim->buildings.destroy(id);
+	} else
+		return;
+	sim->events.emit(ev);
+}
+
+void Combat::fire(int32_t attacker_id, int32_t target_id, double dmg, double from_y) {
+	const Entities &E = sim->entities;
+	const int as = E.slot(attacker_id), ts = E.slot(target_id);
+	if (as < 0 || ts < 0) return;
+	const bool ab = E.kind(attacker_id) == K_BUILDING, tb = E.kind(target_id) == K_BUILDING;
+	Projectile p;
+	p.sx = ab ? E.buildings.x[as] : E.units.x[as];
+	p.sz = ab ? E.buildings.z[as] : E.units.z[as];
+	p.sy = sim->map().height_at(p.sx, p.sz) + from_y;
+	const double tx = tb ? E.buildings.x[ts] : E.units.x[ts], tz = tb ? E.buildings.z[ts] : E.units.z[ts];
+	p.dist = jsm::hypot(tx - p.sx, tz - p.sz);
+	p.x = p.px = p.sx;
+	p.y = p.py = p.sy;
+	p.z = p.pz = p.sz;
+	p.target = target_id;
+	p.attacker = attacker_id;
+	p.owner = ab ? E.buildings.owner[as] : E.units.owner[as];
+	p.damage = dmg;
+	p.t = 0;
+	p.dur = 0.4 + p.dist * 0.065;
+	p.arc = 0.6 + p.dist * 0.16;
+	projectiles.push_back(p);
+}
+
+void Combat::update_projectiles(double dt) {
+	const Entities &E = sim->entities;
+	const GameMap &map = sim->map();
+	std::vector<Projectile> list;
+	list.swap(projectiles);
+	std::vector<Projectile> out;
+	out.reserve(list.size());
+	for (Projectile &p : list) {
+		p.t += dt;
+		const int ts = E.slot(p.target);
+		const Kind tk = E.kind(p.target);
+		const bool alive = ts >= 0 && (tk == K_UNIT ? !E.units.dead[ts] : tk == K_BUILDING ? !E.buildings.dead[ts] : true);
+		if (alive) {
+			const bool b = tk == K_BUILDING;
+			p.tx = b ? E.buildings.x[ts] : tk == K_UNIT ? E.units.x[ts] : E.resources.x[ts];
+			p.tz = b ? E.buildings.z[ts] : tk == K_UNIT ? E.units.z[ts] : E.resources.z[ts];
+			p.ty = map.height_at(p.tx, p.tz) + (b ? 1.5 : 1.0);
+			p.has_t = true;
+		} else if (p.has_t && !p.lost) {
+			// target died mid-flight: the arrow falls to the ground where it was
+			p.lost = true;
+			p.ty = map.height_at(p.tx, p.tz) + 0.15;
+		}
+		if (!p.has_t) continue;
+		const double k = std::min(1.0, p.t / p.dur);
+		p.px = p.x;
+		p.py = p.y;
+		p.pz = p.z;
+		p.x = p.sx + (p.tx - p.sx) * k;
+		p.z = p.sz + (p.tz - p.sz) * k;
+		p.y = p.sy + (p.ty - p.sy) * k + jsm::sin(k * PI) * p.arc;
+		if (k >= 1) {
+			if (alive) {
+				Hitter h = hitter_of(p.attacker);
+				if (!h.id) h = Hitter::pseudo(p.owner);
+				damage(p.target, p.damage, h, DK_ARROW);
+			} else if ((int)stuck.size() < STUCK_MAX)
+				stuck.push_back({ p.x, p.y, p.z, p.x - p.px, p.y - p.py, p.z - p.pz, 0 });
+			continue;
+		}
+		out.push_back(p);
+	}
+	projectiles.swap(out);
+	if (!stuck.empty()) {
+		for (auto &s : stuck) s.t += dt;
+		if (stuck[0].t > STUCK_TIME)
+			stuck.erase(std::remove_if(stuck.begin(), stuck.end(), [](const StuckArrow &s) { return s.t > STUCK_TIME; }), stuck.end());
+	}
+}
+
+// Phalanx discipline (set up by the battle scene): a man with combat_line
+// never steps past his army's side of the seam.
+void Combat::hold_lines() {
+	UnitStore &U = sim->entities.units;
+	const GameMap &map = sim->map();
+	for (int r = 0; r < U.size(); r++) {
+		if (U.removed[r] || !U.combat_line[r] || U.dead[r]) continue;
+		const double d = (U.x[r] - U.line_cx[r]) * U.line_nx[r] + (U.z[r] - U.line_cz[r]) * U.line_nz[r];
+		if (d >= U.line_d0[r]) continue;
+		const double nx = U.x[r] + (U.line_d0[r] - d) * U.line_nx[r], nz = U.z[r] + (U.line_d0[r] - d) * U.line_nz[r];
+		if (map.is_walkable((int)std::floor(nx), (int)std::floor(nz))) {
+			U.x[r] = nx;
+			U.z[r] = nz;
+		}
+	}
+}
+
+void Combat::update(double dt) {
+	Entities &E = sim->entities;
+	UnitStore &U = E.units;
+	BuildingStore &B = E.buildings;
+	const double time = sim->time;
+	scan_timer -= dt;
+	const bool scan = scan_timer <= 0;
+	if (scan) {
+		scan_timer = 0.5;
+		clear_attackers();
+		for (int r = 0; r < U.size(); r++)
+			if (!U.removed[r] && !U.dead[r] && U.order_type[r] == O_ATTACK) add_attacker(U.order_target[r]);
+	}
+	for (int r = 0; r < U.size(); r++) {
+		if (U.removed[r]) continue;
+		if (U.dead[r]) {
+			// keep the fallen on the field (lying pose) for a while
+			if (!std::isnan(U.died_at[r]) && time - U.died_at[r] < CORPSE_HOLD) U.anim_die_t[r] = std::min(U.anim_die_t[r], 2.0);
+			continue;
+		}
+		const UnitDef &def = unit_def(U.type[r]);
+		if (!def.has_attack) continue;
+		U.attack_cd[r] = std::max(0.0, U.attack_cd[r] - dt);
+		const int ot = U.order_type[r];
+		// auto-acquire for idle soldiers
+		if (ot == O_IDLE && scan && !def.gatherer) {
+			const int e = pick_target(r, U.combat_leash[r] != 0 ? U.combat_leash[r] : U.sight[r]);
+			if (e >= 0) {
+				Order o = Order::with_target(O_ATTACK, U.id[e]);
+				o.b = ATK_AUTO;
+				sim->commands.order(r, o);
+			}
+			continue;
+		}
+		if (ot != O_ATTACK) continue;
+		int32_t tid = U.order_target[r];
+		int ts = E.slot(tid);
+		Kind tk = E.kind(tid);
+		if (ts >= 0 && tk != K_UNIT && tk != K_BUILDING) ts = -1;
+		// soldiers attacking a building switch to nearby enemy units
+		if (scan && ts >= 0 && tk == K_BUILDING && !def.gatherer) {
+			const int e = find_enemy_near(U.x[r], U.z[r], U.owner[r], 6);
+			if (e >= 0) {
+				U.order_a[r] = tid; // (remember the building, so the attack goes back to it afterwards)
+				tid = U.order_target[r] = U.id[e];
+				ts = e;
+				tk = K_UNIT;
+			}
+		}
+		const bool tdead = ts < 0 || (tk == K_UNIT ? U.dead[ts] : B.dead[ts]);
+		if (tdead) {
+			const int e = !def.gatherer ? pick_target(r, U.combat_leash[r] != 0 ? U.combat_leash[r] : U.sight[r]) : -1;
+			const int32_t back_id = U.order_a[r];
+			const int bs = back_id ? E.building_slot(back_id) : -1;
+			if (e >= 0) {
+				U.order_target[r] = U.id[e];
+				approach(r, U.id[e]);
+			} else if (bs >= 0 && !B.dead[bs]) {
+				U.order_target[r] = back_id;
+				approach(r, back_id);
+			} else if (U.order_b[r] & ATK_THEN_BUILDINGS) {
+				const int b = find_enemy_building_near(U.x[r], U.z[r], U.owner[r], 200);
+				if (b >= 0) {
+					U.order_target[r] = B.id[b];
+					approach(r, B.id[b]);
+				} else
+					sim->commands.idle(r);
+			} else
+				sim->commands.idle(r);
+			continue;
+		}
+		const double range = range_of(r);
+		const double dist = sim->movement.distance_to(r, tid) - U.radius[r];
+		if (dist > range + 0.25) {
+			U.order_x[r] -= dt; // o.repath
+			if (!U.moving[r] || U.order_x[r] <= 0) {
+				approach(r, tid);
+				U.order_x[r] = 0.6;
+			}
+			continue;
+		}
+		if (U.moving[r]) sim->movement.stop(r);
+		const double tx = tk == K_UNIT ? U.x[ts] : B.x[ts], tz = tk == K_UNIT ? U.z[ts] : B.z[ts];
+		U.rot[r] = jsm::atan2(tx - U.x[r], tz - U.z[r]);
+		U.anim_want[r] = A_ATTACK;
+		if (U.attack_cd[r] <= 0) {
+			const UnitAttack &a = def.attack;
+			U.attack_cd[r] = a.cooldown * (0.85 + 0.3 * sim->rng.next());
+			U.anim_attack_t[r] = 0;
+			if (a.projectile) fire(U.id[r], tid, a.damage, 1.3);
+			else {
+				Hitter h = hitter_of(U.id[r]);
+				damage(tid, a.damage, h);
+				if (a.splash > 0) {
+					const double cx = tk == K_UNIT ? U.x[ts] : B.x[ts], cz = tk == K_UNIT ? U.z[ts] : B.z[ts];
+					const int owner = U.owner[r];
+					sim->movement.hash.count_query(cx, cz, a.splash);
+					sim->movement.hash.for_each_near(cx, cz, a.splash, [&](int o) {
+						if (tk == K_UNIT && o == ts) return;
+						if (U.dead[o] || !Sim::is_enemy(owner, U.owner[o])) return;
+						if (jsm::hypot(U.x[o] - cx, U.z[o] - cz) < a.splash) damage(U.id[o], a.damage * 0.5, h);
+					});
+				}
+			}
+		}
+	}
+	// buildings that shoot (Town Center)
+	for (int b = 0; b < B.size(); b++) {
+		if (B.removed[b]) continue;
+		const BuildingDef &d = building_def(B.type[b]);
+		if (!d.has_attack || !B.built[b]) continue;
+		B.attack_cd[b] = std::max(0.0, B.attack_cd[b] - dt);
+		if (B.attack_cd[b] > 0) continue;
+		const int e = find_enemy_near(B.x[b], B.z[b], B.owner[b], d.attack_range + B.w[b] / 2.0);
+		if (e >= 0) {
+			B.attack_cd[b] = d.attack_cooldown;
+			fire(B.id[b], U.id[e], d.attack_damage, 4);
+		}
+	}
+	hold_lines();
+	{
+		ScopedTimer t(sim->prof.enabled ? &sim->prof.sub["combat.projectiles"] : nullptr);
+		update_projectiles(dt);
+	}
+	for (size_t i = 0; i < ais.size(); i++) {
+		ScopedTimer t(sim->prof.enabled ? &sim->prof.ai[std::to_string(ais[i].owner)] : nullptr);
+		ais[i].update(dt);
+	}
+}
+
+} // namespace aov

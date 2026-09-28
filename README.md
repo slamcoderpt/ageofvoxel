@@ -154,6 +154,50 @@ map and caps the resolution at the screen's CSS pixels; Low also turns ambient o
 off. The choice applies at once and is remembered. By the minimap: idle villager, idle military, Town Center, signal
 (explains minimap orders), minimap terrain on/off, and the score list on/off.
 
+## Godot build (desktop and web)
+
+`godot/` is a Godot 4.5.1 port of the same game (C++ simulation in a GDExtension,
+see `godot/PORTING.md`). CI (`.github/workflows/godot.yml`) builds it for Linux,
+Windows, macOS (universal: Intel + Apple Silicon) and the web on every push that
+touches `godot/`: open the run under the repository's Actions tab ("Godot"
+workflow) and download the `aov-godot-*` artifacts from its Summary page
+(signed-in GitHub users only; they are kept 90 days). The Linux binary loses its
+executable bit in the artifact zip: `chmod +x AgeOfVoxel.x86_64` after unzipping.
+
+The controls are the browser's. **F3** shows the performance meter; the gear (top right) opens the
+hotkeys card with the **Graphics** row: High / Medium / Low, where Medium and Low also render the 3D
+world at 75% / 60% resolution (FSR upscale), the big saving on Retina screens. Both choices are
+remembered (`user://settings.cfg`).
+
+**On a Mac, from the CI artifact:** unzip `aov-godot-macos-universal`, then unzip
+`AgeOfVoxel.zip` and run `xattr -cr "Age of Voxel.app"` once (the app is ad-hoc
+signed, not notarized, so Gatekeeper blocks it otherwise), then open it.
+
+**On a Mac, from source** (Xcode command line tools, Python 3, Godot 4.5.1):
+
+```
+xcode-select --install                     # clang, once
+brew install scons                         # or: pip3 install scons
+# Godot 4.5.1 from https://godotengine.org/download/archive/4.5.1-stable/ (brew's cask may ship a newer version)
+git submodule update --init godot/native/godot-cpp
+cd godot/native && scons -j8 platform=macos arch=universal && cd ../..   # first build compiles godot-cpp, ~5-10 min
+GODOT=/Applications/Godot.app/Contents/MacOS/Godot
+$GODOT --headless --path godot --import    # registers the extension (once; on a fresh clone the first
+                                           # import can crash after writing its cache: run it a second time)
+$GODOT --path godot                        # play (skirmish); or: $GODOT --path godot -- --scene=town
+$GODOT -e --path godot                     # or open the project in the editor
+```
+
+To export a standalone app, install the 4.5.1 export templates (Editor > Manage
+Export Templates) and run `GODOT=$GODOT scripts/godot-export.sh macos` (writes
+`dist-godot/macos/AgeOfVoxel.zip`; it builds the release library for the app
+and the debug one the editor itself loads to run the export). The same script
+exports `linux`, `windows` and `web`; the web export needs emscripten 4.0.10, the
+version the official templates use (`./emsdk install 4.0.10 && ./emsdk activate
+4.0.10`, then `EMSDK=~/emsdk`), and is served by any
+static server: `python3 -m http.server -d dist-godot/web 8000`, then open
+http://localhost:8000/ (the skirmish; `?scene=town` etc. work like the browser build's URL params).
+
 ## Scenes
 
 The game doubles as a deterministic screenshot harness. Pick a scene with `?scene=`:

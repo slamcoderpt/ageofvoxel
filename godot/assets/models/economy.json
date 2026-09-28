@@ -1,0 +1,476 @@
+{
+ "format": 2,
+ "group": "economy",
+ "bin": "economy.bin.gz",
+ "bytes": 1220864,
+ "models": {
+  "deer": {
+   "vertices": 2480,
+   "indices": 3720,
+   "aabb": [
+    -0.45,
+    0,
+    -0.7,
+    0.45,
+    2.3,
+    1.2
+   ],
+   "position": 0,
+   "normal": 29760,
+   "color": 59520,
+   "extra": 69440,
+   "index": 79360,
+   "shadow": true
+  },
+  "boar": {
+   "vertices": 2752,
+   "indices": 4128,
+   "aabb": [
+    -0.35,
+    0,
+    -0.8,
+    0.35,
+    1.2,
+    1.1
+   ],
+   "position": 94240,
+   "normal": 127264,
+   "color": 160288,
+   "extra": 171296,
+   "index": 182304,
+   "shadow": true
+  },
+  "spear": {
+   "vertices": 264,
+   "indices": 396,
+   "aabb": [
+    -0.05,
+    -0.05,
+    -0.7,
+    0.05,
+    0.05,
+    0.9
+   ],
+   "position": 198816,
+   "normal": 201984,
+   "color": 205152,
+   "extra": 206208,
+   "index": 207264,
+   "shadow": true
+  },
+  "fish": {
+   "vertices": 240,
+   "indices": 360,
+   "aabb": [
+    -0.03,
+    -0.09,
+    -0.24,
+    0.03,
+    0.15,
+    0.18
+   ],
+   "position": 208848,
+   "normal": 211728,
+   "color": 214608,
+   "extra": 215568,
+   "index": 216528,
+   "shadow": true
+  },
+  "boat": {
+   "vertices": 6584,
+   "indices": 9876,
+   "aabb": [
+    -0.8,
+    -0.1,
+    -2,
+    0.8,
+    2.5,
+    1.7
+   ],
+   "position": 217968,
+   "normal": 296976,
+   "color": 375984,
+   "extra": 402320,
+   "index": 428656,
+   "shadow": true
+  },
+  "wheat0": {
+   "vertices": 200,
+   "indices": 300,
+   "aabb": [
+    0,
+    0,
+    -0.15,
+    1,
+    0.1,
+    0.05
+   ],
+   "position": 468160,
+   "normal": 470560,
+   "color": 472960,
+   "extra": 473760,
+   "index": 474560,
+   "shadow": false
+  },
+  "wheat1": {
+   "vertices": 624,
+   "indices": 936,
+   "aabb": [
+    0,
+    0,
+    -0.25,
+    1,
+    0.4,
+    0.15
+   ],
+   "position": 475760,
+   "normal": 483248,
+   "color": 490736,
+   "extra": 493232,
+   "index": 495728,
+   "shadow": true
+  },
+  "wheat2": {
+   "vertices": 1080,
+   "indices": 1620,
+   "aabb": [
+    0,
+    0,
+    -0.25,
+    1,
+    0.9,
+    0.15
+   ],
+   "position": 499472,
+   "normal": 512432,
+   "color": 525392,
+   "extra": 529712,
+   "index": 534032,
+   "shadow": true
+  },
+  "fence": {
+   "vertices": 392,
+   "indices": 588,
+   "aabb": [
+    0,
+    0,
+    -0.05,
+    1,
+    0.6,
+    0.05
+   ],
+   "position": 540512,
+   "normal": 545216,
+   "color": 549920,
+   "extra": 551488,
+   "index": 553056,
+   "shadow": true
+  },
+  "hay": {
+   "vertices": 856,
+   "indices": 1284,
+   "aabb": [
+    -0.35,
+    0,
+    -0.35,
+    0.35,
+    0.5,
+    0.35
+   ],
+   "position": 555408,
+   "normal": 565680,
+   "color": 575952,
+   "extra": 579376,
+   "index": 582800,
+   "shadow": true
+  },
+  "sheaf": {
+   "vertices": 696,
+   "indices": 1044,
+   "aabb": [
+    -0.25,
+    0,
+    -0.25,
+    0.25,
+    0.9,
+    0.25
+   ],
+   "position": 587936,
+   "normal": 596288,
+   "color": 604640,
+   "extra": 607424,
+   "index": 610208,
+   "shadow": true
+  },
+  "sack": {
+   "vertices": 360,
+   "indices": 540,
+   "aabb": [
+    -0.2,
+    0,
+    -0.15,
+    0.2,
+    0.6,
+    0.15
+   ],
+   "position": 614384,
+   "normal": 618704,
+   "color": 623024,
+   "extra": 624464,
+   "index": 625904,
+   "shadow": true
+  },
+  "amphora": {
+   "vertices": 328,
+   "indices": 492,
+   "aabb": [
+    -0.15,
+    0,
+    -0.15,
+    0.15,
+    0.7,
+    0.15
+   ],
+   "position": 628064,
+   "normal": 632000,
+   "color": 635936,
+   "extra": 637248,
+   "index": 638560,
+   "shadow": true
+  },
+  "logs": {
+   "vertices": 2080,
+   "indices": 3120,
+   "aabb": [
+    -0.4,
+    0,
+    -0.8,
+    0.4,
+    0.6,
+    0.8
+   ],
+   "position": 640528,
+   "normal": 665488,
+   "color": 690448,
+   "extra": 698768,
+   "index": 707088,
+   "shadow": true
+  },
+  "goldpile": {
+   "vertices": 928,
+   "indices": 1392,
+   "aabb": [
+    -0.35,
+    -0.2,
+    -0.35,
+    0.35,
+    0.4,
+    0.35
+   ],
+   "position": 719568,
+   "normal": 730704,
+   "color": 741840,
+   "extra": 745552,
+   "index": 749264,
+   "shadow": true
+  },
+  "cart": {
+   "vertices": 2480,
+   "indices": 3720,
+   "aabb": [
+    -0.55,
+    0,
+    -0.6,
+    0.55,
+    0.9,
+    1.3
+   ],
+   "position": 754832,
+   "normal": 784592,
+   "color": 814352,
+   "extra": 824272,
+   "index": 834192,
+   "shadow": true
+  },
+  "crate_grain": {
+   "vertices": 704,
+   "indices": 1056,
+   "aabb": [
+    -0.3,
+    0,
+    -0.3,
+    0.3,
+    0.5,
+    0.3
+   ],
+   "position": 849072,
+   "normal": 857520,
+   "color": 865968,
+   "extra": 868784,
+   "index": 871600,
+   "shadow": true
+  },
+  "crate_apples": {
+   "vertices": 704,
+   "indices": 1056,
+   "aabb": [
+    -0.3,
+    0,
+    -0.3,
+    0.3,
+    0.5,
+    0.3
+   ],
+   "position": 875824,
+   "normal": 884272,
+   "color": 892720,
+   "extra": 895536,
+   "index": 898352,
+   "shadow": true
+  },
+  "crate_grapes": {
+   "vertices": 704,
+   "indices": 1056,
+   "aabb": [
+    -0.3,
+    0,
+    -0.3,
+    0.3,
+    0.5,
+    0.3
+   ],
+   "position": 902576,
+   "normal": 911024,
+   "color": 919472,
+   "extra": 922288,
+   "index": 925104,
+   "shadow": true
+  },
+  "crate_fish": {
+   "vertices": 704,
+   "indices": 1056,
+   "aabb": [
+    -0.3,
+    0,
+    -0.3,
+    0.3,
+    0.5,
+    0.3
+   ],
+   "position": 929328,
+   "normal": 937776,
+   "color": 946224,
+   "extra": 949040,
+   "index": 951856,
+   "shadow": true
+  },
+  "crate_gold": {
+   "vertices": 704,
+   "indices": 1056,
+   "aabb": [
+    -0.3,
+    0,
+    -0.3,
+    0.3,
+    0.5,
+    0.3
+   ],
+   "position": 956080,
+   "normal": 964528,
+   "color": 972976,
+   "extra": 975792,
+   "index": 978608,
+   "shadow": true
+  },
+  "load_sheaf": {
+   "vertices": 1496,
+   "indices": 2244,
+   "aabb": [
+    -0.25,
+    0,
+    -1.05,
+    0.25,
+    0.5,
+    0.95
+   ],
+   "position": 982832,
+   "normal": 1000784,
+   "color": 1018736,
+   "extra": 1024720,
+   "index": 1030704,
+   "shadow": true
+  },
+  "load_ore": {
+   "vertices": 1128,
+   "indices": 1692,
+   "aabb": [
+    -0.45,
+    0,
+    -0.45,
+    0.45,
+    0.6,
+    0.45
+   ],
+   "position": 1039680,
+   "normal": 1053216,
+   "color": 1066752,
+   "extra": 1071264,
+   "index": 1075776,
+   "shadow": true
+  },
+  "load_log": {
+   "vertices": 1800,
+   "indices": 2700,
+   "aabb": [
+    -0.25,
+    -0.15,
+    -1.15,
+    0.25,
+    0.55,
+    1.05
+   ],
+   "position": 1082544,
+   "normal": 1104144,
+   "color": 1125744,
+   "extra": 1132944,
+   "index": 1140144,
+   "shadow": true
+  },
+  "load_haunch": {
+   "vertices": 944,
+   "indices": 1416,
+   "aabb": [
+    -0.25,
+    0,
+    -0.95,
+    0.25,
+    0.5,
+    0.45
+   ],
+   "position": 1150944,
+   "normal": 1162272,
+   "color": 1173600,
+   "extra": 1177376,
+   "index": 1181152,
+   "shadow": true
+  },
+  "load_basket": {
+   "vertices": 896,
+   "indices": 1344,
+   "aabb": [
+    -0.35,
+    0,
+    -0.35,
+    0.35,
+    0.5,
+    0.35
+   ],
+   "position": 1186816,
+   "normal": 1197568,
+   "color": 1208320,
+   "extra": 1211904,
+   "index": 1215488,
+   "shadow": true
+  }
+ }
+}

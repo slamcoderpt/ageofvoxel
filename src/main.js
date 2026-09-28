@@ -6,6 +6,9 @@ import { SCENES } from './core/scenes/index.js';
 //   &seed=N  &live=0|1  &hud=0|1  &post=high|low|off  &quality=high|medium|low
 //   &timescale=N  &fog=0|1
 //   &cam=x,z[,distance[,pitch[,yaw]]]
+//   &prof=1        per-system sim / per-piece render timing (game.prof, src/core/Profiler.js)
+//   &mapsize=N     map size in tiles (default: the scene's, usually 128)
+//   stress scene:  &units=N (total units, default 2000)  &players=2..6 (default 6)
 const params = new URLSearchParams(location.search);
 const sceneName = params.get('scene') || 'skirmish';
 const scene = SCENES.get(sceneName);
@@ -26,7 +29,8 @@ async function boot() {
   const game = new Game(document.getElementById('app'), {
     seed: +(params.get('seed') ?? scene.seed ?? 1),
     preset: scene.preset,
-    mapSize: scene.mapSize ?? 128,
+    mapSize: +(params.get('mapsize') ?? scene.mapSize ?? 128),
+    players: scene.players ? Math.max(2, Math.min(6, +(params.get('players') ?? scene.players))) : 2,
     post: params.get('post') || 'high',
     // graphics quality: URL param, else the level last picked in the HUD
     quality: params.get('quality') || storedQuality() || 'high',
@@ -35,6 +39,7 @@ async function boot() {
   });
   window.__game = game;
   game.init();
+  if (bool('prof', !!scene.prof)) game.enableProfiler();
   game.combat.ai.enabled = !!scene.ai;
   game.victory.enabled = !!scene.victory;
   const ctx = scene.setup(game) || {};

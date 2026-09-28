@@ -20,13 +20,14 @@ function findChrome() {
   return null;
 }
 
-export async function launch() {
+export async function launch(extraArgs = []) {
+  const args = [...GL_ARGS, ...extraArgs];
   try {
-    return await chromium.launch({ args: GL_ARGS });
+    return await chromium.launch({ args });
   } catch (err) {
     const exe = findChrome();
     if (!exe) throw err;
-    return chromium.launch({ args: GL_ARGS, executablePath: exe });
+    return chromium.launch({ args, executablePath: exe });
   }
 }
 

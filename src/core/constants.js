@@ -13,6 +13,11 @@ export const PLAYER_COLORS = {
   0: 0xbbbbbb,
   1: 0x2f6bff, // blue
   2: 0xe0282e, // red
+  // extra players (the stress scene: up to 6 players)
+  3: 0x2fb04a, // green
+  4: 0xf2c21b, // yellow
+  5: 0x8e44d8, // purple
+  6: 0xf07818, // orange
 };
 
 export const RESOURCES = ['food', 'wood', 'gold', 'favor'];

@@ -1,6 +1,7 @@
 import { PLAYER, ENEMY } from '../constants.js';
 import { battleScene } from '../../combat/BattleScene.js';
 import { economyScene } from '../../economy/EconomyScene.js';
+import { stressScene } from './stress.js';
 import { standardStart, buildTown, spawnBlock, placeNear, nearestResource, assignGatherers } from './helpers.js';
 
 // Scene registry for the deterministic screenshot harness.
@@ -118,3 +119,7 @@ registerScene('hud', {
   },
   camera: (game, ctx) => ({ x: ctx.focus.x + 2, z: ctx.focus.z + 5, distance: 44 }),
 });
+
+// Scalability stress test (6 players, ?units=N; profiler on): see ./stress.js
+// and scripts/stress.mjs.
+registerScene('stress', stressScene);

@@ -16,6 +16,8 @@ const STAGGER = 0.5; // seconds a hit man reels back
 //   combat.kill(entity, killer)
 //   combat.findEnemyNear(entity, radius)
 //   combat.fx   (BattleFX: ground scars, dust, hit sparks)
+//   combat.ai   (EnemyAI for ENEMY); combat.addAI(owner) adds one more AI
+//               player (the stress scene); every instance is in combat.ais
 export class Combat {
   constructor(game) {
     this.game = game;
@@ -24,6 +26,7 @@ export class Combat {
     this.fx = new BattleFX(game);
     this.attackers = new Map(); // targetId -> number of units attacking it (refreshed every scan)
     this.ai = new EnemyAI(game, ENEMY);
+    this.ais = [this.ai];
     this.scanTimer = 0;
     game.commands.register('attack', {
       start: (u, o) => {
@@ -38,6 +41,12 @@ export class Combat {
 
   // combat_reach: extra reach for spearmen holding a line (BattleScene), which
   // keeps a visible seam of open ground between the two fronts.
+  addAI(owner) {
+    const ai = new EnemyAI(this.game, owner);
+    this.ais.push(ai);
+    return ai;
+  }
+
   rangeOf(u) { return (u.def.attack?.range ?? 0.5) + (u.combat_reach || 0); }
 
   approach(u, t) {
@@ -120,8 +129,8 @@ export class Combat {
       const ot = target.order?.type;
       const leashed = target.combat_leash && Math.hypot(attacker.x - target.x, attacker.z - target.z) > target.combat_leash + 1;
       if (leashed) { /* holding the line: ignore distant attackers */ }
-      else if (ot === 'idle' || (ot === 'move' && target.owner === ENEMY)) game.commands.order(target, { type: 'attack', targetId: attacker.id, auto: true });
-      else if (target.def.gatherer && ot !== 'attack' && target.owner === ENEMY && game.rng.chance(0.3)) game.commands.order(target, { type: 'attack', targetId: attacker.id, auto: true });
+      else if (ot === 'idle' || (ot === 'move' && game.players[target.owner]?.isAI)) game.commands.order(target, { type: 'attack', targetId: attacker.id, auto: true });
+      else if (target.def.gatherer && ot !== 'attack' && game.players[target.owner]?.isAI && game.rng.chance(0.3)) game.commands.order(target, { type: 'attack', targetId: attacker.id, auto: true });
     }
     if (target.hp <= 0) this.kill(target, attacker);
   }
@@ -231,7 +240,7 @@ export class Combat {
     this.holdLines();
     this.projectiles.update(dt);
     this.fx.update(dt);
-    this.ai.update(dt);
+    for (const ai of this.ais) ai.update(dt);
   }
 
   // Phalanx discipline (set up by BattleScene): a man with combat_line never

@@ -3,3 +3,4 @@ dist/
 shots/
 .vite/
 __pycache__/
+dist-godot/

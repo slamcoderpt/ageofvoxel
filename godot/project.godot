@@ -1,0 +1,28 @@
+; Engine configuration file.
+; Age of Voxel, Godot port. See PORTING.md.
+
+config_version=5
+
+[application]
+
+config/name="Age of Voxel"
+config/description="Voxel RTS in the spirit of Age of Mythology (Godot 4 port)."
+run/main_scene="res://game/main.tscn"
+config/features=PackedStringArray("4.5", "Forward Plus")
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/stretch/aspect="expand"
+
+[editor]
+
+naming/default_signal_callback_name="_on_{node_name}_{signal_name}"
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
+renderer/rendering_method.mobile="forward_plus"
+anti_aliasing/quality/msaa_3d=0
+textures/vram_compression/import_etc2_astc=true

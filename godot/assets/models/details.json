@@ -1,0 +1,212 @@
+{
+ "format": 2,
+ "group": "details",
+ "bin": "details.bin.gz",
+ "bytes": 195776,
+ "models": {
+  "tuft0": {
+   "vertices": 456,
+   "indices": 684,
+   "aabb": [
+    -0.15,
+    0,
+    -0.075,
+    0.3,
+    0.525,
+    0.15
+   ],
+   "position": 0,
+   "normal": 5472,
+   "color": 10944,
+   "extra": 12768,
+   "index": 14592
+  },
+  "tuft1": {
+   "vertices": 516,
+   "indices": 774,
+   "aabb": [
+    -0.225,
+    0,
+    -0.075,
+    0.3,
+    0.525,
+    0.15
+   ],
+   "position": 17328,
+   "normal": 23520,
+   "color": 29712,
+   "extra": 31776,
+   "index": 33840
+  },
+  "tuft2": {
+   "vertices": 572,
+   "indices": 858,
+   "aabb": [
+    -0.15,
+    0,
+    -0.075,
+    0.225,
+    0.525,
+    0.225
+   ],
+   "position": 36936,
+   "normal": 43800,
+   "color": 50664,
+   "extra": 52952,
+   "index": 55240
+  },
+  "tuft3": {
+   "vertices": 472,
+   "indices": 708,
+   "aabb": [
+    -0.15,
+    0,
+    -0.075,
+    0.3,
+    0.6,
+    0.225
+   ],
+   "position": 58672,
+   "normal": 64336,
+   "color": 70000,
+   "extra": 71888,
+   "index": 73776
+  },
+  "tuft4": {
+   "vertices": 716,
+   "indices": 1074,
+   "aabb": [
+    -0.15,
+    0,
+    -0.225,
+    0.3,
+    0.6,
+    0.15
+   ],
+   "position": 76608,
+   "normal": 85200,
+   "color": 93792,
+   "extra": 96656,
+   "index": 99520
+  },
+  "flowers0": {
+   "vertices": 472,
+   "indices": 708,
+   "aabb": [
+    -0.225,
+    0,
+    -0.15,
+    0.3,
+    0.375,
+    0.3
+   ],
+   "position": 103816,
+   "normal": 109480,
+   "color": 115144,
+   "extra": 117032,
+   "index": 118920
+  },
+  "flowers1": {
+   "vertices": 504,
+   "indices": 756,
+   "aabb": [
+    -0.225,
+    0,
+    -0.225,
+    0.3,
+    0.375,
+    0.225
+   ],
+   "position": 121752,
+   "normal": 127800,
+   "color": 133848,
+   "extra": 135864,
+   "index": 137880
+  },
+  "flowers2": {
+   "vertices": 448,
+   "indices": 672,
+   "aabb": [
+    -0.225,
+    0,
+    -0.15,
+    0.3,
+    0.375,
+    0.225
+   ],
+   "position": 140904,
+   "normal": 146280,
+   "color": 151656,
+   "extra": 153448,
+   "index": 155240
+  },
+  "flowers3": {
+   "vertices": 432,
+   "indices": 648,
+   "aabb": [
+    -0.15,
+    0,
+    -0.075,
+    0.225,
+    0.375,
+    0.3
+   ],
+   "position": 157928,
+   "normal": 163112,
+   "color": 168296,
+   "extra": 170024,
+   "index": 171752
+  },
+  "pebbles0": {
+   "vertices": 148,
+   "indices": 222,
+   "aabb": [
+    0,
+    0,
+    -0.075,
+    0.375,
+    0.225,
+    0.15
+   ],
+   "position": 174344,
+   "normal": 176120,
+   "color": 177896,
+   "extra": 178488,
+   "index": 179080
+  },
+  "pebbles1": {
+   "vertices": 180,
+   "indices": 270,
+   "aabb": [
+    -0.15,
+    0,
+    -0.15,
+    0.225,
+    0.225,
+    0.225
+   ],
+   "position": 179968,
+   "normal": 182128,
+   "color": 184288,
+   "extra": 185008,
+   "index": 185728
+  },
+  "pebbles2": {
+   "vertices": 236,
+   "indices": 354,
+   "aabb": [
+    -0.075,
+    0,
+    0,
+    0.3,
+    0.225,
+    0.375
+   ],
+   "position": 186808,
+   "normal": 189640,
+   "color": 192472,
+   "extra": 193416,
+   "index": 194360
+  }
+ }
+}
