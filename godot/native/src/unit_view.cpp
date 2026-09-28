@@ -126,7 +126,8 @@ PackedFloat32Array AovUnitView::pack(const Buf &b) {
 
 void AovUnitView::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("setup", "sim", "rigs"), &AovUnitView::setup);
-	ClassDB::bind_method(D_METHOD("update", "dt", "alpha", "local_player", "frustum"), &AovUnitView::update, DEFVAL(Array()));
+	ClassDB::bind_method(D_METHOD("update", "dt", "alpha", "local_player", "frustum", "lod_origin", "lod_dist"), &AovUnitView::update, DEFVAL(Array()), DEFVAL(Vector3()), DEFVAL(0.0));
+	ClassDB::bind_static_method("AovUnitView", D_METHOD("lod_mesh", "arrays", "factor", "shadow_only"), &AovUnitView::lod_mesh, DEFVAL(2), DEFVAL(false));
 }
 
 void AovUnitView::setup(const Ref<AovSim> &sim, const Array &rigs) {
@@ -1005,7 +1006,7 @@ void AovUnitView::scan(double now, bool particles) {
 
 // ---- per frame ------------------------------------------------------------------
 
-Dictionary AovUnitView::update(double dt, double alpha, int64_t local_player, const Array &frustum) {
+Dictionary AovUnitView::update(double dt, double alpha, int64_t local_player, const Array &frustum, const Vector3 &lod_origin, double lod_dist) {
 	Dictionary out;
 	if (sim_ref_.is_null()) return out;
 	local_player_ = (int)local_player;
@@ -1014,6 +1015,10 @@ Dictionary AovUnitView::update(double dt, double alpha, int64_t local_player, co
 	const aov::GameMap &map = SM.map();
 	const double now = SM.time;
 	for (Buf &b : part_bufs_) b.clear();
+	part_bufs_lod_.resize(part_bufs_.size());
+	for (Buf &b : part_bufs_lod_) b.clear();
+	int n_posed = 0, n_lod = 0;
+	const double lod_d2 = lod_dist > 0 ? lod_dist * lod_dist : -1;
 	shadows_.clear(); bars_.clear(); arrows_.clear(); streaks_.clear(); sparks_.clear(); dust_.clear(); chips_.clear();
 	for (Buf &b : drops_) b.clear();
 
@@ -1157,6 +1162,11 @@ Dictionary AovUnitView::update(double dt, double alpha, int64_t local_player, co
 		const Gear gear = (type == aov::U_HOPLITE || type == aov::U_TOXOTES) ? gear_of(id, type, U.kit[i]) : Gear{ 0, 0, 0, 0, 0, 0 };
 		const int nparts = (int)rig.parts.size();
 		world.resize(nparts);
+		n_posed++;
+		const double lx = px - lod_origin.x, ly = y - lod_origin.y, lz = pz - lod_origin.z;
+		const bool far = lod_d2 > 0 && lx * lx + ly * ly + lz * lz > lod_d2;
+		if (far) n_lod++;
+		std::vector<Buf> &pbufs = far ? part_bufs_lod_ : part_bufs_;
 		for (int pi = 0; pi < nparts; pi++) {
 			const Part &p = rig.parts[pi];
 			const Transform3D &parent = p.parent >= 0 ? world[p.parent] : root;
@@ -1187,7 +1197,7 @@ Dictionary AovUnitView::update(double dt, double alpha, int64_t local_player, co
 			} else {
 				cr = cg = (float)(1 - dk * 0.22); cb = (float)(1 - dk * 0.2);
 			}
-			part_bufs_[rig.first + pi].push(world[pi], cr, cg, cb, (float)fade, c.r, c.g, c.b, packed);
+			pbufs[rig.first + pi].push(world[pi], cr, cg, cb, (float)fade, c.r, c.g, c.b, packed);
 		}
 		// Overlays: health bars over the badly hurt, struck in the last seconds
 		if (!dead) {
@@ -1313,6 +1323,16 @@ Dictionary AovUnitView::update(double dt, double alpha, int64_t local_player, co
 	}
 	out["parts"] = parts;
 	out["part_counts"] = counts;
+	Array parts_lod;
+	PackedInt32Array counts_lod;
+	for (const Buf &b : part_bufs_lod_) {
+		parts_lod.push_back(pack(b));
+		counts_lod.push_back(b.n);
+	}
+	out["parts_lod"] = parts_lod;
+	out["part_counts_lod"] = counts_lod;
+	out["unit_count"] = n_posed;
+	out["lod_count"] = n_lod;
 	out["shadows"] = pack(shadows_);
 	out["shadow_count"] = shadows_.n;
 	out["bars"] = pack(bars_);

@@ -72,7 +72,7 @@ const char *LOAD_KEYS[5] = { "load_log", "load_ore", "load_sheaf", "load_basket"
 
 void AovEconView::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("setup", "sim", "keys"), &AovEconView::setup);
-	ClassDB::bind_method(D_METHOD("update", "alpha", "paused", "local_player"), &AovEconView::update);
+	ClassDB::bind_method(D_METHOD("update", "alpha", "paused", "local_player", "frustum"), &AovEconView::update, DEFVAL(Array()));
 }
 
 void AovEconView::setup(const Ref<AovSim> &sim, const PackedStringArray &keys) {
@@ -93,6 +93,13 @@ void AovEconView::setup(const Ref<AovSim> &sim, const PackedStringArray &keys) {
 void AovEconView::draw(int k, double x, double y, double z, double yaw, double pitch, double roll, double sx, double sy,
 		double sz, float tr, float tg, float tb, float tint) {
 	if (k < 0) return;
+	if (!planes_.empty()) {
+		// off screen, shadow margin included (a boat is ~3 m, crops cast < 2 m)
+		const real_t r = (real_t)(3.5 * std::max({ std::abs(sx), std::abs(sy), std::abs(sz) }));
+		const Vector3 c((real_t)x, (real_t)y, (real_t)z);
+		for (const Plane &p : planes_)
+			if (p.distance_to(c) > r) return;
+	}
 	Buf &b = props_[k];
 	Basis B;
 	if (pitch == 0 && roll == 0) B = Basis(Vector3(0, 1, 0), (real_t)yaw);
@@ -153,9 +160,11 @@ const std::vector<AovEconView::Slot> &AovEconView::stock_slots(int row) {
 	return slots_[id] = res;
 }
 
-Dictionary AovEconView::update(double alpha, bool paused, int64_t local_player) {
+Dictionary AovEconView::update(double alpha, bool paused, int64_t local_player, const Array &frustum) {
 	Dictionary out;
 	if (sim_ref_.is_null()) return out;
+	planes_.clear();
+	for (int64_t k = 0; k < frustum.size(); k++) planes_.push_back(frustum[k]);
 	const aov::Sim &SM = sim_ref_->sim();
 	const aov::GameMap &map = SM.map();
 	const aov::Economy &ec = SM.economy;

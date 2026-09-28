@@ -36,6 +36,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor; Godot-only activity fx: axe / pick chips and dust, sickle chaff, stooks on cut rows, hoof dust, shoal ripples, fish splashes, net ripples, boat wakes; crops sway, `econ_voxel.gdshader`, `fx_chip / fx_puff / fx_ring.gdshader`), buffers built in C++ by `AovEconView` (`native/src/econ_view.{h,cpp}`, render side, reads the sim, never writes it) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
 | godpowers | `game/godpowers/godpowers.gd` (the whole BoltRenderer of effects.js: bolt / sky / zap ribbons, impact flash sprites and decals, scorches with ember cracks, crater debris, char rims, spark streaks, smoke and flames, the storm funnel (wall, cloud body, dust wall, ground shockwave, rain, energy bands, whirled debris), flyer trails / back lights / drop shadows, meteor fireball and fire, strike / storm point lights and the shadow spot, the full-frame storm grade with light pools; dims the lighting piece's sun / sky / grade while a storm plays), shaders beside it; buffers built in C++ by `AovGodpowerView` (`native/src/godpower_view.{h,cpp}`, render side, reads the sim, never writes it) | `godpowers/` (favor, cooldowns, Lightning Storm, Bolt, Meteor, thrown units: ported) | `src/godpowers/` |
 | ui (HUD, selection, input) | `game/ui/ui.gd` (selection, box / double-click select, smart orders, rally points, control groups, hotkeys, placement ghost, god-power targeting ring, move markers, selection rings (one MultiMesh) + bars, event feed, messages, result card; public: `pieces.ui.selected`, `hover_entity`, `message()`, `feed()`), `hud.gd` (the drawn HUD, two layers with hit zones), `hud_style.gd` (palette, Cinzel / Alegreya fonts in `fonts/`, SVG icons from `icons.gd` = `src/ui/icons.js` rasterised at runtime, draw helpers), `panel.gdshader` (the gilded teal panels), `minimap.gd` + `minimap_ground/units.gdshader` (unit dots read straight from `get_units()` arrays as data textures: no per-unit script), `portraits.gd` (one SubViewport per type / owner, rendered once) | none | `src/ui/` |
+| performance (6 teams, 2000 units) | `game/perf/perf.gd` (the render bench, `--renderbench`), and in the render paths of the stress scene: unit LOD + box shadow casters (`game/units`), coarse voxel twins `VoxelModels.coarse()` (tree shadow casters), tight resource / ground-detail buckets (`game/terrain`), economy props frustum culling (`AovEconView`); report in `../docs/godot-stress-report.md` | sim hot paths (with their owners); `native/src/unit_lod.cpp` (`AovUnitView.lod_mesh`) | `docs/stress-report.md` |
 | exports (Windows, macOS, Linux, web) | `export_presets.cfg`, `../scripts/godot-export.sh`, `../.github/workflows/godot.yml`, `native/SConstruct` + `native/aov.gdextension` (platform entries); see "Export" | none | `vite build` |
 | scenes | `AovScenes.set_setup()` from the owning piece, else the C++ setup | `scenes/` (helpers.js, skirmish / town / coast / hud, EconomyScene.js; battle.cpp: BattleScene.js + units/battleHost.js, godpower, stress.js: all ported) | `src/core/scenes/`, `BattleScene.js`, `EconomyScene.js` |
 
@@ -197,14 +198,36 @@ Result on this container (Xeon 2.1 GHz, shared, `template_debug` build, seed 23,
 
 | N | 250 | 500 | 1000 | 2000 | 3000 | 4000 |
 |---|---:|---:|---:|---:|---:|---:|
-| Godot C++ sim, mean ms/tick | 0.14 | 0.26 | 0.63 | **1.30** | 2.12 | 3.38 |
-| Godot C++ sim, p95 | 0.22 | 0.37 | 0.82 | **2.06** | 3.43 | 5.28 |
+| Godot C++ sim, mean ms/tick | 0.09 | 0.17 | 0.38 | **0.95** | 1.50 | 2.61 |
+| Godot C++ sim, p95 | 0.19 | 0.25 | 0.53 | **1.32** | 2.65 | 4.02 |
 | browser JS sim, mean (report) | 2.4 | 3.3 | 7.6 | **15.0** | 25.2 | 40.7 |
 
-At 2000 units: movement 0.47, units 0.44 (spread 0.40), combat 0.26 (AI of
-all 6 players 0.01), economy 0.10, fog 0.03 ms/tick; `findPath` 183 calls/tick
+At 2000 units: movement 0.32, units 0.29 (spread 0.28), combat 0.23 (AI of
+all 6 players 0.01), economy 0.08, fog 0.02 ms/tick; `findPath` 183 calls/tick
 (172 from combat, exactly the browser's counts: the two sims run the same
-game), 0.14 ms/tick; 16.7 neighbours visited per hash query.
+game), 0.12 ms/tick; 16.7 neighbours visited per hash query (23.1 at 4000:
+the armies get denser on the fixed map, hence 2.7x from 2000 to 4000, as in
+the browser). The separation loops read the hash's position mirror
+(`SpatialHash::for_each_near_xz`, kept exact with `sync()` / `moved()`).
+Wall times on this shared machine vary by +-30 %; the render numbers and
+their method are in `../docs/godot-stress-report.md`.
+
+Render bench (xvfb + lavapipe, the counterpart of `scripts/bench.mjs`;
+`game/perf/perf.gd` pauses the sim like bench.mjs, turns vsync off and times
+`--frames` frames after `--warmup`):
+
+```
+node scripts/godot-renderbench.mjs [--scene stress] [--params "units=2000&fog=0"] [--width 1280 --height 720]
+     [--frames 30] [--warmup 10] [--live 0|1] [--json out.json]
+godot --path godot --rendering-driver vulkan -- --scene=stress --units=2000 --fog=0 --renderbench=30 [--rb_warmup=10]
+```
+
+It prints wall ms per frame (mean / median / p95), process CPU ms per frame
+(all threads: lavapipe rasterises on worker threads; steadier than wall time
+on this shared machine), draw calls / primitives for the main and the shadow
+passes, units posed / at LOD. Experiments: `--rb_hide=units,terrain/Resources`
+hides pieces or their child nodes, `--rb_off=shadow,msaa,ao,post` turns one
+render feature off. Numbers next to the browser's: `../docs/godot-stress-report.md`.
 
 Skirmish playtest (the whole match through real input events: box select,
 right-click gather, control groups, house placement, train, advance age,
@@ -360,7 +383,7 @@ marches them onto each other, e.g.
 ## Piece contract (GDScript)
 
 `game/main.gd` instances every existing `res://game/<piece>/<piece>.gd` in the
-order `lighting, terrain, buildings, units, economy, combat, godpowers, ui`
+order `lighting, terrain, buildings, units, economy, combat, godpowers, ui, perf`
 as a child node (no edit to `main.gd` needed to add a piece), then:
 
 - `setup(game)` once, after the sim world exists (`game.sim` is the `AovSim`,
@@ -519,7 +542,8 @@ path_searches, path_cache_hits, path_expanded, group_fields, …}),
 
 Economy render data: `AovEconView` (`native/src/econ_view.h`), `setup(sim,
 keys)` (the `economy/<key>` model names in MultiMesh order), `update(alpha,
-paused, local_player)` once per frame -> {props: Array[PackedFloat32Array]
+paused, local_player, frustum=[])` once per frame (props off screen, a
+shadow margin included, are skipped) -> {props: Array[PackedFloat32Array]
 (16 floats per instance: TRANSFORM_3D + custom data = linear team rgb,
 tint), counts, chips / puffs / rings + *_count (20 floats: TRANSFORM_3D +
 colour + custom)}, zero-padded to power-of-two capacities. Fog-aware, closed
@@ -528,8 +552,11 @@ form in the sim time (captures are deterministic), no sim RNG.
 Units / combat render data: `AovUnitView` (`native/src/unit_view.h`),
 `setup(sim, rigs)` (one `VoxelModels.rig(type)` per unit type index; it
 subscribes to the sim's `unit:damaged` / `entity:died` to stamp hits with
-the sim time), `update(dt, alpha, local_player, frustum=[])` once per frame
-(`Camera3D.get_frustum()`: units off screen are not posed) -> {parts:
+the sim time), `update(dt, alpha, local_player, frustum=[], lod_origin,
+lod_dist=0)` once per frame (`Camera3D.get_frustum()`: units off screen are
+not posed; units farther than `lod_dist` from `lod_origin`, the camera, go
+to `parts_lod` / `part_counts_lod` instead, drawn with the coarse twins) ->
+{parts:
 Array[PackedFloat32Array] (one per rig part, types in index order; COLOR =
 coat / corpse tint + fade, CUSTOM = linear team rgb + floor(dead*100) +
 flash), part_counts, shadows, bars (CUSTOM = hp fraction, width px),
@@ -540,8 +567,16 @@ CUSTOM = dirt, blood), + *_count}; 20 floats per instance (TRANSFORM_3D +
 colour + custom), zero-padded to power-of-two capacities. Visual only: never
 writes the sim, own hash RNG; the anim.js pose, index.js render transforms,
 BattleFX / Particles / Debris / Overlays / Projectiles render maths are
-ported there. Stress (2000 units, fog off, 1280x720): ~3 ms per update on
-this container's debug build.
+ported there; also `unit_count` (posed) and `lod_count`. Stress (2000
+units, fog off, 1280x720): ~3 ms per update on this container's debug build.
+`AovUnitView.lod_mesh(arrays, factor=2, shadow_only=false)` (static,
+`native/src/unit_lod.cpp`): the coarse voxel twin of an exported model
+(voxels rebuilt from the faces, interior filled, factor^3 per cell; with
+shadow_only whole cells and greedy-merged faces), used through
+`VoxelModels.coarse(mesh, factor, shadow_only)`. In `game/units` the full
+part meshes cast no shadow: a 12-triangle box per part (`unit_shadow.gdshader`,
+SHADOWS_ONLY, same buffers) does; units whose 0.07 voxels are under
+`--unit_lod` px (default 2.5, 0 = off) use the coarse twins.
 
 God power render data: `AovGodpowerView` (`native/src/godpower_view.h`),
 `setup(sim)`, `update(alpha, paused, camera_position)` once per frame ->

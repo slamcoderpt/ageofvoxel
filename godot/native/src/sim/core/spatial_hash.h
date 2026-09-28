@@ -19,6 +19,8 @@ public:
 	int n = 0;
 	std::vector<int32_t> start; // n*n + 1
 	std::vector<int32_t> items; // unit rows
+	std::vector<double> px, pz, pr; // per item: position mirror, effective radius (0 -> 0.3)
+	std::vector<int32_t> slot_of;   // row -> item index, -1 not hashed
 	// census (scripts/godot-stress.mjs "census"), counted while `census` is on
 	bool census = false;
 	int64_t queries = 0, cells_scanned = 0, visited = 0;
@@ -36,7 +38,7 @@ public:
 	}
 	// rows: candidate rows in order; include(row) filters; X/Z arrays give positions.
 	template <class Inc>
-	void rebuild(int rows, const double *X, const double *Z, Inc include) {
+	void rebuild(int rows, const double *X, const double *Z, const double *R, Inc include) {
 		std::fill(start.begin(), start.end(), 0);
 		tmp_.resize(rows);
 		int count = 0;
@@ -49,9 +51,46 @@ public:
 		}
 		for (int c = 0; c < n * n; c++) start[c + 1] += start[c];
 		items.resize(count);
+		px.resize(count);
+		pz.resize(count);
+		pr.resize(count);
+		slot_of.assign(rows, -1);
 		fill_.assign(start.begin(), start.end() - 1);
 		for (int r = 0; r < rows; r++)
-			if (tmp_[r] >= 0) items[fill_[tmp_[r]]++] = r;
+			if (tmp_[r] >= 0) {
+				const int k = fill_[tmp_[r]]++;
+				items[k] = r;
+				slot_of[r] = k;
+				px[k] = X[r];
+				pz[k] = Z[r];
+				pr[k] = R[r] != 0 ? R[r] : 0.3;
+			}
+	}
+	// refresh the position mirror from the live arrays (rows moved since the rebuild)
+	void sync(const double *X, const double *Z) {
+		for (size_t k = 0; k < items.size(); k++) {
+			px[k] = X[items[k]];
+			pz[k] = Z[items[k]];
+		}
+	}
+	// a hashed row moved: keep the mirror exact
+	void moved(int row, double x, double z) {
+		if (row >= 0 && row < (int)slot_of.size() && slot_of[row] >= 0) {
+			px[slot_of[row]] = x;
+			pz[slot_of[row]] = z;
+		}
+	}
+	// fn(row, x, z, radius) for every unit whose cell overlaps the query
+	// square, from the mirror (same units, same order as for_each_near)
+	template <class F>
+	void for_each_near_xz(double x, double z, double r, F fn) const {
+		const double c = cell;
+		int x0 = std::max(0, (int)std::floor((x - r) / c)), x1 = std::min(n - 1, (int)std::floor((x + r) / c));
+		int z0 = std::max(0, (int)std::floor((z - r) / c)), z1 = std::min(n - 1, (int)std::floor((z + r) / c));
+		const int32_t *it = items.data();
+		const double *X = px.data(), *Z = pz.data(), *R = pr.data();
+		for (int cz = z0; cz <= z1; cz++)
+			for (int k = start[cz * n + x0], e = start[cz * n + x1 + 1]; k < e; k++) fn(it[k], X[k], Z[k], R[k]);
 	}
 	// fn(row) for every unit whose cell overlaps the query square (JS forEachNear)
 	template <class F>

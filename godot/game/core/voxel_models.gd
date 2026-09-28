@@ -11,6 +11,8 @@ extends RefCounted
 ##   var mesh := VoxelModels.mesh("resources", "tree3")
 ##   var rig := VoxelModels.rig("hoplite")   # parts, joints, parents (units.json)
 ##   for p in rig.parts: VoxelModels.mesh("units", p.mesh)
+##   var far := VoxelModels.coarse(mesh)        # 2x2x2 voxels per cell (unit LOD)
+##   var caster := VoxelModels.coarse(mesh, 2, true)  # merged, for shadow-only twins
 
 const DIR := "res://assets/models/"
 const FORMAT := 2
@@ -18,6 +20,30 @@ const FORMAT := 2
 static var _groups := {}   # group -> {man: Dictionary, bin: PackedByteArray}
 static var _meshes := {}   # "group/name" -> ArrayMesh
 static var _material: ShaderMaterial = null
+static var _coarse := {}   # "group/name#factor" -> Mesh
+
+## The coarse voxel twin of an exported model (performance: far unit LOD,
+## cheap shadow casters): factor^3 voxels merged per cell, same vertex
+## format, built in C++ (AovUnitView.lod_mesh, native/src/unit_lod.cpp),
+## cached. shadow_only: whole cells and greedy-merged faces in one colour
+## (for SHADOWS_ONLY instances). Returns the mesh itself if it is not a
+## voxel model.
+static func coarse(mesh: Mesh, factor: int = 2, shadow_only: bool = false) -> Mesh:
+	var key := "%s#%d%s" % [mesh.resource_name, factor, "s" if shadow_only else ""]
+	if _coarse.has(key):
+		return _coarse[key]
+	var out: Mesh = mesh
+	if ClassDB.class_exists("AovUnitView"):
+		var arrays: Array = ClassDB.class_call_static("AovUnitView", "lod_mesh", mesh.surface_get_arrays(0), factor, shadow_only)
+		if not arrays.is_empty():
+			var am := ArrayMesh.new()
+			var flags := (Mesh.ARRAY_CUSTOM_RGBA8_UNORM << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT) \
+				| (Mesh.ARRAY_CUSTOM_RGBA8_UNORM << Mesh.ARRAY_FORMAT_CUSTOM1_SHIFT)
+			am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, flags)
+			am.resource_name = key
+			out = am
+	_coarse[key] = out
+	return out
 
 static func group(g: String) -> Dictionary:
 	if _groups.has(g):

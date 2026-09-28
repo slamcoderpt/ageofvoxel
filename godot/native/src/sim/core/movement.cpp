@@ -131,7 +131,7 @@ void Movement::update(double dt) {
 		U.prev_z[r] = U.z[r];
 		U.prev_rot[r] = U.rot[r];
 	}
-	hash.rebuild(n, U.x.data(), U.z.data(), [&](int r) { return !U.dead[r] && !U.removed[r]; });
+	hash.rebuild(n, U.x.data(), U.z.data(), U.radius.data(), [&](int r) { return !U.dead[r] && !U.removed[r]; });
 	repaths_this_tick = 0;
 	const bool budgeted = repath_budget > 0;
 
@@ -175,12 +175,13 @@ void Movement::update(double dt) {
 		const int32_t uid = U.id[r];
 		double sx = 0, sz = 0;
 		hash.count_query(ux, uz, rad + 1);
-		hash.for_each_near(ux, uz, rad + 1, [&](int o) {
-			if (o == r || U.dead[o]) return;
-			const double dx = ux - U.x[o], dz = uz - U.z[o];
-			const double min = rad + (U.radius[o] != 0 ? U.radius[o] : 0.3);
+		// (the hash's position mirror: same units, same order, same values as U.x / U.z)
+		hash.for_each_near_xz(ux, uz, rad + 1, [&](int o, double ox, double oz, double ro) {
+			if (o == r) return;
+			const double dx = ux - ox, dz = uz - oz;
+			const double min = rad + ro;
 			const double d2 = dx * dx + dz * dz;
-			if (d2 >= min * min) return;
+			if (d2 >= min * min || U.dead[o]) return;
 			double d = std::sqrt(d2);
 			if (d == 0) d = 0.001;
 			const double push = (min - d) / min;
@@ -196,6 +197,7 @@ void Movement::update(double dt) {
 		else if (map.is_walkable((int)std::floor(nx), (int)std::floor(U.z[r]))) U.x[r] = nx;
 		else if (map.is_walkable((int)std::floor(U.x[r]), (int)std::floor(nz))) U.z[r] = nz;
 		else if (!map.is_walkable((int)std::floor(U.x[r]), (int)std::floor(U.z[r]))) { U.x[r] = nx; U.z[r] = nz; } // escape if embedded
+		hash.moved(r, U.x[r], U.z[r]);
 		if (U.moving[r]) {
 			const double want = jsm::atan2(vx, vz);
 			double dr = want - U.rot[r];

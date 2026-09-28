@@ -83,6 +83,7 @@ private:
 	Ref<AovSim> sim_ref_;
 	std::vector<Rig> rigs_;
 	std::vector<Buf> part_bufs_;
+	std::vector<Buf> part_bufs_lod_; // units past the LOD distance (lod_mesh twins, same part order)
 	Buf shadows_, bars_, arrows_, streaks_, sparks_, dust_, chips_;
 	Buf drops_[4];
 	std::vector<float> press_, yaw_; // per unit id, visual crowd variety (index.js update)
@@ -121,7 +122,17 @@ public:
 	// spark_count, dust, dust_count, chips, chip_count, drops: Array[4], drop_counts}.
 	// frustum: Camera3D.get_frustum() (world planes, normals outward) to skip
 	// posing units off screen, or an empty Array to pose every unit.
-	Dictionary update(double dt, double alpha, int64_t local_player, const Array &frustum);
+	// lod_origin / lod_dist (performance): units farther than lod_dist from
+	// lod_origin (the camera) go to parts_lod (drawn with the lod_mesh twins)
+	// instead of parts; lod_dist <= 0 keeps every unit at full detail. The
+	// result also has parts_lod, part_counts_lod, unit_count (posed) and
+	// lod_count.
+	Dictionary update(double dt, double alpha, int64_t local_player, const Array &frustum, const Vector3 &lod_origin, double lod_dist);
+	// Unit LOD mesh (unit_lod.cpp): the coarser voxel twin of one exported
+	// unit part (Mesh.surface_get_arrays(0)), factor^3 voxels per cell; the
+	// same vertex format. shadow_only: whole cells, greedy-merged faces, for
+	// shadow-only casters. Empty Array if the input is not a voxel model.
+	static Array lod_mesh(const Array &arrays, int64_t factor, bool shadow_only);
 };
 
 } // namespace godot

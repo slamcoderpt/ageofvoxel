@@ -12,8 +12,9 @@ extends Node3D
 ## depth texture baked from the smoothed seabed (AovSim.get_water_depth()).
 ## Resources: one MultiMesh per (model, 16x16-tile bucket) like
 ## ResourceRenderer.js, with the JS per-tree scale / tint and a shadow-only
-## twin on the lighter `_shape` mesh; only buckets whose content changed are
-## rebuilt (entity events of kind 3 in game.events, map edits under them).
+## twin on the lighter `_shape` mesh (coarsened by VoxelModels.coarse); only
+## buckets whose content changed are rebuilt (entity events of kind 3 in
+## game.events, map edits under them).
 ##
 ## Public API: `terrain_material` (ShaderMaterial of every chunk: terrain.gdshader,
 ## uniforms pave*, pale, sand*), `water_material` (water.gdshader),
@@ -21,8 +22,9 @@ extends Node3D
 
 const VOXEL := 0.5
 const CHUNK := 32        # columns per chunk side (16 tiles), as TerrainMesh.js
-const RES_BUCKET := 64   # tiles per resource bucket side (JS: 16; fewer draw calls here)
-const DET_REGION := 4    # ground details are batched per 4x4 terrain chunks (fewer draw calls)
+const RES_BUCKET := 16   # tiles per resource bucket side, as the JS: tight culling (stress: 3x fewer tree triangles)
+const DET_REGION := 1    # ground details are batched per terrain chunk: tight culling (stress: 5.2M -> ~1.8M triangles)
+const DETAIL_RANGE := 150.0  # ground details are culled past this camera distance
 const DETAIL_NAMES := ["tuft0", "tuft1", "tuft2", "tuft3", "tuft4",
 	"flowers0", "flowers1", "flowers2", "flowers3", "pebbles0", "pebbles1", "pebbles2"]
 
@@ -157,6 +159,10 @@ func _build_details(k: Vector2i) -> void:
 		mmi.multimesh = mm
 		mmi.material_override = _prop_material
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		# performance: a chunk's tufts / flowers / pebbles are a pixel or two
+		# past this distance (zoomed-out views of a 256 map: ~25M triangles)
+		mmi.visibility_range_end = DETAIL_RANGE
+		mmi.visibility_range_end_margin = 20.0
 		_det_root.add_child(mmi)
 		nodes.append(mmi)
 	_details[k] = nodes
@@ -289,7 +295,11 @@ func _build_bucket(key: String, model: String, rows: PackedInt32Array, R: Dictio
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
 		mm.use_colors = true
-		mm.mesh = VoxelModels.mesh("resources", model + ("_shape" if s == 1 else ""))
+		# shadow twin: the `_shape` mesh coarsened to 2x2x2 voxels per cell,
+		# faces merged (performance: fewer shadow-pass triangles, the same
+		# silhouette at shadow-map resolution)
+		mm.mesh = VoxelModels.mesh("resources", model) if s == 0 \
+			else VoxelModels.coarse(VoxelModels.mesh("resources", model + "_shape"), 2, true)
 		mm.instance_count = rows.size()
 		mm.buffer = buf
 		nodes[s].multimesh = mm

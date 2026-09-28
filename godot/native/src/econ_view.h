@@ -26,6 +26,7 @@
 #pragma once
 
 #include <godot_cpp/classes/ref_counted.hpp>
+#include <godot_cpp/variant/plane.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
@@ -61,6 +62,7 @@ private:
 	int k_deer = -1, k_boar = -1, k_spear = -1, k_fish = -1, k_boat = -1, k_sheaf = -1, k_wheat[3] = { -1, -1, -1 };
 	int k_load[5] = { -1, -1, -1, -1, -1 }; // log, ore, sheaf, basket, haunch (by load kind)
 	int k_stock[6][3];
+	std::vector<Plane> planes_; // this frame's camera frustum (empty: no culling)
 
 	void draw(int k, double x, double y, double z, double yaw, double pitch = 0, double roll = 0, double sx = 1, double sy = 1,
 			double sz = 1, float tr = 1, float tg = 1, float tb = 1, float tint = 1);
@@ -77,7 +79,11 @@ public:
 	void setup(const Ref<AovSim> &sim, const PackedStringArray &keys);
 	// One call per frame. Returns {props: Array[PackedFloat32Array], counts:
 	// PackedInt32Array, chips, chip_count, puffs, puff_count, rings, ring_count}.
-	Dictionary update(double alpha, bool paused, int64_t local_player);
+	// frustum (performance): Camera3D.get_frustum(); props whose bounding
+	// sphere (with a margin for the shadows they cast into view) is off
+	// screen are skipped, in the main and the shadow passes alike. Empty:
+	// every prop.
+	Dictionary update(double alpha, bool paused, int64_t local_player, const Array &frustum);
 };
 
 } // namespace godot

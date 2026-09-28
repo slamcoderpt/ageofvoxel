@@ -60,8 +60,11 @@ void Units::spread(double dt) {
 	Entities &E = sim->entities;
 	UnitStore &U = E.units;
 	const GameMap &map = sim->map();
-	const SpatialHash &hash = sim->movement.hash;
+	SpatialHash &hash = sim->movement.hash;
 	if (hash.n == 0) return;
+	// combat / god powers moved units since the hash was built: refresh its
+	// position mirror (read by for_each_near_xz; kept exact with moved())
+	hash.sync(U.x.data(), U.z.data());
 	const double max_step = SPREAD_SPEED * dt;
 	const int n = U.size();
 	for (int r = 0; r < n; r++) {
@@ -76,12 +79,14 @@ void Units::spread(double dt) {
 		const int32_t uid = U.id[r];
 		double sx = 0, sz = 0;
 		sim->movement.hash.count_query(ux, uz, rad + 2);
-		hash.for_each_near(ux, uz, rad + 2, [&](int o) {
-			if (o == r || U.dead[o]) return;
-			const double ro = U.radius[o] != 0 ? U.radius[o] : 0.3;
-			const double want = rad + ro + (uline && U.combat_line[o] ? 1.3 : SPREAD_GAP) * std::min(rad, ro);
-			const double dx = ux - U.x[o], dz = uz - U.z[o];
+		hash.for_each_near_xz(ux, uz, rad + 2, [&](int o, double ox, double oz, double ro) {
+			if (o == r) return;
+			const double dx = ux - ox, dz = uz - oz;
 			const double d2 = dx * dx + dz * dz;
+			// cheap reject first (the widest gap), then the exact JS test on the live arrays
+			const double wmax = rad + ro + std::max(1.3, SPREAD_GAP) * std::min(rad, ro);
+			if (d2 >= wmax * wmax || U.dead[o]) return;
+			const double want = rad + ro + (uline && U.combat_line[o] ? 1.3 : SPREAD_GAP) * std::min(rad, ro);
 			if (d2 >= want * want) return;
 			const double d = std::sqrt(d2);
 			const double w = (U.moving[o] ? 0.4 : 1) * std::min(2.0, ro / rad);
@@ -105,6 +110,7 @@ void Units::spread(double dt) {
 		if (map.is_walkable((int)std::floor(nx), (int)std::floor(nz))) {
 			U.x[r] = nx;
 			U.z[r] = nz;
+			hash.moved(r, nx, nz);
 		}
 	}
 }
@@ -137,6 +143,7 @@ void Units::clear_corpse(int r, double dt) {
 	if (sim->map().is_walkable((int)std::floor(nx), (int)std::floor(nz))) {
 		U.prev_x[r] = U.x[r] = nx;
 		U.prev_z[r] = U.z[r] = nz;
+		sim->movement.hash.moved(r, nx, nz);
 	}
 }
 

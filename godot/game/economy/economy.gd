@@ -113,7 +113,9 @@ static func _upload(mm: MultiMesh, buf: PackedFloat32Array, n: int, stride: int)
 	mm.visible_instance_count = n
 
 func frame(_dt: float, alpha: float) -> void:
-	var d: Dictionary = view.update(alpha, game.paused, 1)
+	# (performance: props off screen are culled in C++, shadow margin included)
+	var cam := get_viewport().get_camera_3d()
+	var d: Dictionary = view.update(alpha, game.paused, 1, cam.get_frustum() if cam else [])
 	var props: Array = d.props
 	var counts: PackedInt32Array = d.counts
 	for k in _mms.size():

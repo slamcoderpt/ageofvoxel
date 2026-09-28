@@ -13,7 +13,7 @@ extends Node3D
 ## exists, frame(dt, alpha) once per displayed frame (visual only). Pieces
 ## read sim state from `game.sim` (AovSim) through its packed-array getters.
 
-const PIECE_ORDER := ["lighting", "terrain", "buildings", "units", "economy", "combat", "godpowers", "ui"]
+const PIECE_ORDER := ["lighting", "terrain", "buildings", "units", "economy", "combat", "godpowers", "ui", "perf"]
 const SIM_DT := 1.0 / 30.0
 
 var args := {}
