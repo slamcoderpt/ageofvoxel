@@ -1,0 +1,11 @@
+# Godot cache / imports
+.godot/
+*.import.tmp
+# GDExtension build outputs (build with: cd native && scons -j2)
+native/bin/
+native/**/*.o
+native/**/*.os
+native/**/*.obj
+native/.sconsign.dblite
+# captures
+shots/

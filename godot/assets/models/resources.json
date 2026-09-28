@@ -1,0 +1,428 @@
+{
+ "format": 2,
+ "group": "resources",
+ "bin": "resources.bin.gz",
+ "bytes": 1091512,
+ "models": {
+  "tree0": {
+   "vertices": 1464,
+   "indices": 2196,
+   "aabb": [
+    -1.08,
+    0,
+    -1.26,
+    1.26,
+    3.6,
+    1.44
+   ],
+   "position": 0,
+   "normal": 17568,
+   "color": 35136,
+   "extra": 40992,
+   "index": 46848
+  },
+  "tree0_shape": {
+   "vertices": 1260,
+   "indices": 1890,
+   "aabb": [
+    -1.08,
+    0,
+    -1.26,
+    1.26,
+    3.6,
+    1.44
+   ],
+   "position": 55632,
+   "normal": 70752,
+   "color": 85872,
+   "extra": 90912,
+   "index": 95952,
+   "shadowOnly": true
+  },
+  "tree1": {
+   "vertices": 1420,
+   "indices": 2130,
+   "aabb": [
+    -1.26,
+    0,
+    -1.08,
+    1.26,
+    3.78,
+    1.26
+   ],
+   "position": 103512,
+   "normal": 120552,
+   "color": 137592,
+   "extra": 143272,
+   "index": 148952
+  },
+  "tree1_shape": {
+   "vertices": 1268,
+   "indices": 1902,
+   "aabb": [
+    -1.26,
+    0,
+    -1.08,
+    1.26,
+    3.78,
+    1.26
+   ],
+   "position": 157472,
+   "normal": 172688,
+   "color": 187904,
+   "extra": 192976,
+   "index": 198048,
+   "shadowOnly": true
+  },
+  "tree2": {
+   "vertices": 1492,
+   "indices": 2238,
+   "aabb": [
+    -1.08,
+    0,
+    -1.26,
+    1.62,
+    3.42,
+    1.26
+   ],
+   "position": 205656,
+   "normal": 223560,
+   "color": 241464,
+   "extra": 247432,
+   "index": 253400
+  },
+  "tree2_shape": {
+   "vertices": 1348,
+   "indices": 2022,
+   "aabb": [
+    -1.08,
+    0,
+    -1.26,
+    1.62,
+    3.42,
+    1.26
+   ],
+   "position": 262352,
+   "normal": 278528,
+   "color": 294704,
+   "extra": 300096,
+   "index": 305488,
+   "shadowOnly": true
+  },
+  "tree3": {
+   "vertices": 1368,
+   "indices": 2052,
+   "aabb": [
+    -1.26,
+    0,
+    -1.08,
+    1.26,
+    3.42,
+    1.26
+   ],
+   "position": 313576,
+   "normal": 329992,
+   "color": 346408,
+   "extra": 351880,
+   "index": 357352
+  },
+  "tree3_shape": {
+   "vertices": 1236,
+   "indices": 1854,
+   "aabb": [
+    -1.26,
+    0,
+    -1.08,
+    1.26,
+    3.42,
+    1.26
+   ],
+   "position": 365560,
+   "normal": 380392,
+   "color": 395224,
+   "extra": 400168,
+   "index": 405112,
+   "shadowOnly": true
+  },
+  "tree4": {
+   "vertices": 828,
+   "indices": 1242,
+   "aabb": [
+    -0.54,
+    0,
+    -0.54,
+    0.54,
+    4.14,
+    0.54
+   ],
+   "position": 412528,
+   "normal": 422464,
+   "color": 432400,
+   "extra": 435712,
+   "index": 439024
+  },
+  "tree4_shape": {
+   "vertices": 576,
+   "indices": 864,
+   "aabb": [
+    -0.54,
+    0,
+    -0.54,
+    0.54,
+    4.14,
+    0.54
+   ],
+   "position": 443992,
+   "normal": 450904,
+   "color": 457816,
+   "extra": 460120,
+   "index": 462424,
+   "shadowOnly": true
+  },
+  "tree5": {
+   "vertices": 828,
+   "indices": 1242,
+   "aabb": [
+    -0.54,
+    0,
+    -0.54,
+    0.54,
+    4.32,
+    0.54
+   ],
+   "position": 465880,
+   "normal": 475816,
+   "color": 485752,
+   "extra": 489064,
+   "index": 492376
+  },
+  "tree5_shape": {
+   "vertices": 576,
+   "indices": 864,
+   "aabb": [
+    -0.54,
+    0,
+    -0.54,
+    0.54,
+    4.32,
+    0.54
+   ],
+   "position": 497344,
+   "normal": 504256,
+   "color": 511168,
+   "extra": 513472,
+   "index": 515776,
+   "shadowOnly": true
+  },
+  "tree6": {
+   "vertices": 904,
+   "indices": 1356,
+   "aabb": [
+    -0.54,
+    0,
+    -0.54,
+    0.54,
+    4.5,
+    0.54
+   ],
+   "position": 519232,
+   "normal": 530080,
+   "color": 540928,
+   "extra": 544544,
+   "index": 548160
+  },
+  "tree6_shape": {
+   "vertices": 576,
+   "indices": 864,
+   "aabb": [
+    -0.54,
+    0,
+    -0.54,
+    0.54,
+    4.5,
+    0.54
+   ],
+   "position": 553584,
+   "normal": 560496,
+   "color": 567408,
+   "extra": 569712,
+   "index": 572016,
+   "shadowOnly": true
+  },
+  "tree7": {
+   "vertices": 1644,
+   "indices": 2466,
+   "aabb": [
+    -1.08,
+    0,
+    -1.08,
+    1.08,
+    5.04,
+    1.08
+   ],
+   "position": 575472,
+   "normal": 595200,
+   "color": 614928,
+   "extra": 621504,
+   "index": 628080
+  },
+  "tree7_shape": {
+   "vertices": 1376,
+   "indices": 2064,
+   "aabb": [
+    -1.08,
+    0,
+    -1.08,
+    1.08,
+    5.04,
+    1.08
+   ],
+   "position": 637944,
+   "normal": 654456,
+   "color": 670968,
+   "extra": 676472,
+   "index": 681976,
+   "shadowOnly": true
+  },
+  "tree8": {
+   "vertices": 1568,
+   "indices": 2352,
+   "aabb": [
+    -1.08,
+    0,
+    -1.08,
+    1.08,
+    4.68,
+    1.08
+   ],
+   "position": 690232,
+   "normal": 709048,
+   "color": 727864,
+   "extra": 734136,
+   "index": 740408
+  },
+  "tree8_shape": {
+   "vertices": 1376,
+   "indices": 2064,
+   "aabb": [
+    -1.08,
+    0,
+    -1.08,
+    1.08,
+    4.68,
+    1.08
+   ],
+   "position": 749816,
+   "normal": 766328,
+   "color": 782840,
+   "extra": 788344,
+   "index": 793848,
+   "shadowOnly": true
+  },
+  "tree9": {
+   "vertices": 1580,
+   "indices": 2370,
+   "aabb": [
+    -1.08,
+    0,
+    -1.08,
+    1.08,
+    5.04,
+    1.08
+   ],
+   "position": 802104,
+   "normal": 821064,
+   "color": 840024,
+   "extra": 846344,
+   "index": 852664
+  },
+  "tree9_shape": {
+   "vertices": 1376,
+   "indices": 2064,
+   "aabb": [
+    -1.08,
+    0,
+    -1.08,
+    1.08,
+    5.04,
+    1.08
+   ],
+   "position": 862144,
+   "normal": 878656,
+   "color": 895168,
+   "extra": 900672,
+   "index": 906176,
+   "shadowOnly": true
+  },
+  "gold": {
+   "vertices": 2352,
+   "indices": 3528,
+   "aabb": [
+    -1.44,
+    0,
+    -1.44,
+    1.62,
+    1.62,
+    1.8
+   ],
+   "position": 914432,
+   "normal": 942656,
+   "color": 970880,
+   "extra": 980288,
+   "index": 989696
+  },
+  "gold_shape": {
+   "vertices": 1588,
+   "indices": 2382,
+   "aabb": [
+    -1.44,
+    0,
+    -1.44,
+    1.62,
+    1.62,
+    1.8
+   ],
+   "position": 1003808,
+   "normal": 1022864,
+   "color": 1041920,
+   "extra": 1048272,
+   "index": 1054624,
+   "shadowOnly": true
+  },
+  "berry": {
+   "vertices": 444,
+   "indices": 666,
+   "aabb": [
+    -0.63,
+    0,
+    -0.45,
+    0.81,
+    0.9,
+    0.63
+   ],
+   "position": 1064152,
+   "normal": 1069480,
+   "color": 1074808,
+   "extra": 1076584,
+   "index": 1078360
+  },
+  "berry_shape": {
+   "vertices": 276,
+   "indices": 414,
+   "aabb": [
+    -0.63,
+    0,
+    -0.45,
+    0.81,
+    0.9,
+    0.63
+   ],
+   "position": 1081024,
+   "normal": 1084336,
+   "color": 1087648,
+   "extra": 1088752,
+   "index": 1089856,
+   "shadowOnly": true
+  }
+ }
+}

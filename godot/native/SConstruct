@@ -1,0 +1,38 @@
+#!/usr/bin/env python
+# Age of Voxel GDExtension (the deterministic simulation, see ../PORTING.md).
+#
+#   cd godot/native && scons -j2                     # linux debug (template_debug)
+#   scons -j2 target=template_release                # release
+#   scons platform=web target=template_release       # needs emsdk (dlink build)
+#
+# godot-cpp is the submodule in ./godot-cpp (tag godot-4.5-stable). When its
+# static library for the requested platform/target already exists it is linked
+# as is (build_library=no), so the ~1700 binding sources are not recompiled;
+# pass build_library=yes to force a rebuild of godot-cpp.
+import os
+import sys
+
+ARGS = ARGUMENTS.copy()
+platform = ARGS.get("platform", "linux" if sys.platform.startswith("linux") else "macos" if sys.platform == "darwin" else "windows")
+target = ARGS.get("target", "template_debug")
+if "build_library" not in ARGS:
+    prebuilt = Glob("godot-cpp/bin/libgodot-cpp.{}.{}.*".format(platform, target))
+    if prebuilt:
+        ARGUMENTS["build_library"] = "no"
+        print("aov: linking prebuilt " + str(prebuilt[0]))
+
+env = SConscript("godot-cpp/SConstruct")
+
+env.Append(CPPPATH=["src/"])
+sources = Glob("src/*.cpp") + Glob("src/sim/*.cpp") + Glob("src/sim/*/*.cpp")
+
+if env["platform"] == "macos":
+    library = env.SharedLibrary(
+        "bin/libaov.{}.{}.framework/libaov.{}.{}".format(env["platform"], env["target"], env["platform"], env["target"]),
+        source=sources,
+    )
+else:
+    library = env.SharedLibrary("bin/libaov{}{}".format(env["suffix"], env["SHLIBSUFFIX"]), source=sources)
+
+env.NoCache(library)
+Default(library)

@@ -1,0 +1,4125 @@
+{
+ "format": 2,
+ "group": "units",
+ "bin": "units.bin.gz",
+ "bytes": 4643296,
+ "rigs": {
+  "villager": {
+   "voxel": 0.07,
+   "anim": "human",
+   "style": "villager",
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "legL",
+     "anim": "legL",
+     "joint": [
+      1.7,
+      12,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "villager/legL"
+    },
+    {
+     "name": "shinL",
+     "anim": "shinL",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "legL",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "villager/shinL"
+    },
+    {
+     "name": "legR",
+     "anim": "legR",
+     "joint": [
+      -1.7,
+      12,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "villager/legR"
+    },
+    {
+     "name": "shinR",
+     "anim": "shinR",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "legR",
+     "parentIdx": 2,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "villager/shinR"
+    },
+    {
+     "name": "torso",
+     "anim": "torso",
+     "joint": [
+      0,
+      12,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "villager/torso"
+    },
+    {
+     "name": "head",
+     "anim": "head",
+     "joint": [
+      0,
+      10,
+      0.2
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "villager/head"
+    },
+    {
+     "name": "armL",
+     "anim": "armL",
+     "joint": [
+      5.5,
+      8,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "villager/armL"
+    },
+    {
+     "name": "armR",
+     "anim": "armR",
+     "joint": [
+      -5.5,
+      8,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "villager/armR"
+    },
+    {
+     "name": "toolAxe",
+     "anim": "toolAxe",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "armR",
+     "parentIdx": 7,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "villager/toolAxe"
+    },
+    {
+     "name": "toolPick",
+     "anim": "toolPick",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "armR",
+     "parentIdx": 7,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "villager/toolPick"
+    },
+    {
+     "name": "toolSickle",
+     "anim": "toolSickle",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "armR",
+     "parentIdx": 7,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "villager/toolSickle"
+    },
+    {
+     "name": "toolHammer",
+     "anim": "toolHammer",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "armR",
+     "parentIdx": 7,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "villager/toolHammer"
+    },
+    {
+     "name": "carryWood",
+     "anim": "carryWood",
+     "joint": [
+      -2.5,
+      8.5,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "villager/carryWood"
+    },
+    {
+     "name": "carryGold",
+     "anim": "carryGold",
+     "joint": [
+      0,
+      1,
+      -2
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "villager/carryGold"
+    },
+    {
+     "name": "carryFood",
+     "anim": "carryFood",
+     "joint": [
+      0,
+      1,
+      -2
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "villager/carryFood"
+    }
+   ]
+  },
+  "hoplite": {
+   "voxel": 0.07,
+   "anim": "human",
+   "style": "hoplite",
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "legL",
+     "anim": "legL",
+     "joint": [
+      1.7,
+      12,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hoplite/legL"
+    },
+    {
+     "name": "shinL",
+     "anim": "shinL",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "legL",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hoplite/shinL"
+    },
+    {
+     "name": "legR",
+     "anim": "legR",
+     "joint": [
+      -1.7,
+      12,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hoplite/legR"
+    },
+    {
+     "name": "shinR",
+     "anim": "shinR",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "legR",
+     "parentIdx": 2,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hoplite/shinR"
+    },
+    {
+     "name": "torso",
+     "anim": "torso",
+     "joint": [
+      0,
+      12,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hoplite/torso"
+    },
+    {
+     "name": "armL",
+     "anim": "armL",
+     "joint": [
+      5.5,
+      8,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hoplite/armL"
+    },
+    {
+     "name": "armR",
+     "anim": "armR",
+     "joint": [
+      -5.5,
+      8,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hoplite/armR"
+    },
+    {
+     "name": "head",
+     "anim": "head",
+     "joint": [
+      0,
+      10,
+      0.2
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": true,
+     "mesh": "hoplite/head"
+    },
+    {
+     "name": "head1",
+     "anim": "head",
+     "joint": [
+      0,
+      10,
+      0.2
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "hoplite/head1"
+    },
+    {
+     "name": "head2",
+     "anim": "head",
+     "joint": [
+      0,
+      10,
+      0.2
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "hoplite/head2"
+    },
+    {
+     "name": "head3",
+     "anim": "head",
+     "joint": [
+      0,
+      10,
+      0.2
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "hoplite/head3"
+    },
+    {
+     "name": "cloakLong",
+     "anim": "cloakLong",
+     "joint": [
+      0,
+      0,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": true,
+     "mesh": "hoplite/cloakLong"
+    },
+    {
+     "name": "cloakShort",
+     "anim": "cloakShort",
+     "joint": [
+      0,
+      0,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "hoplite/cloakShort"
+    },
+    {
+     "name": "weapon",
+     "anim": "weapon",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "armR",
+     "parentIdx": 6,
+     "coat": false,
+     "portrait": true,
+     "conditional": true,
+     "mesh": "hoplite/weapon"
+    },
+    {
+     "name": "pennant",
+     "anim": "weapon",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "armR",
+     "parentIdx": 6,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "hoplite/pennant"
+    },
+    {
+     "name": "sword",
+     "anim": "weapon",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "armR",
+     "parentIdx": 6,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "hoplite/sword"
+    },
+    {
+     "name": "shield",
+     "anim": "shield",
+     "joint": [
+      1.5,
+      -4,
+      3.2
+     ],
+     "parent": "armL",
+     "parentIdx": 5,
+     "coat": false,
+     "portrait": true,
+     "conditional": true,
+     "mesh": "hoplite/shield"
+    },
+    {
+     "name": "shield1",
+     "anim": "shield",
+     "joint": [
+      1.5,
+      -4,
+      3.2
+     ],
+     "parent": "armL",
+     "parentIdx": 5,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "hoplite/shield1"
+    },
+    {
+     "name": "shield2",
+     "anim": "shield",
+     "joint": [
+      1.5,
+      -4,
+      3.2
+     ],
+     "parent": "armL",
+     "parentIdx": 5,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "hoplite/shield2"
+    },
+    {
+     "name": "shield3",
+     "anim": "shield",
+     "joint": [
+      1.5,
+      -4,
+      3.2
+     ],
+     "parent": "armL",
+     "parentIdx": 5,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "hoplite/shield3"
+    },
+    {
+     "name": "thureos",
+     "anim": "shield",
+     "joint": [
+      1.5,
+      -3.5,
+      3.2
+     ],
+     "parent": "armL",
+     "parentIdx": 5,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "hoplite/thureos"
+    }
+   ]
+  },
+  "toxotes": {
+   "voxel": 0.07,
+   "anim": "archer",
+   "style": "archer",
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "legL",
+     "anim": "legL",
+     "joint": [
+      1.7,
+      12,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "toxotes/legL"
+    },
+    {
+     "name": "shinL",
+     "anim": "shinL",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "legL",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "toxotes/shinL"
+    },
+    {
+     "name": "legR",
+     "anim": "legR",
+     "joint": [
+      -1.7,
+      12,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "toxotes/legR"
+    },
+    {
+     "name": "shinR",
+     "anim": "shinR",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "legR",
+     "parentIdx": 2,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "toxotes/shinR"
+    },
+    {
+     "name": "torso",
+     "anim": "torso",
+     "joint": [
+      0,
+      12,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "toxotes/torso"
+    },
+    {
+     "name": "armL",
+     "anim": "armL",
+     "joint": [
+      5.5,
+      8,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "toxotes/armL"
+    },
+    {
+     "name": "armR",
+     "anim": "armR",
+     "joint": [
+      -5.5,
+      8,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "toxotes/armR"
+    },
+    {
+     "name": "head",
+     "anim": "head",
+     "joint": [
+      0,
+      10,
+      0.2
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": true,
+     "mesh": "toxotes/head"
+    },
+    {
+     "name": "head1",
+     "anim": "head",
+     "joint": [
+      0,
+      10,
+      0.2
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "toxotes/head1"
+    },
+    {
+     "name": "head2",
+     "anim": "head",
+     "joint": [
+      0,
+      10,
+      0.2
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "toxotes/head2"
+    },
+    {
+     "name": "weapon",
+     "anim": "weapon",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "armL",
+     "parentIdx": 5,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "toxotes/weapon"
+    },
+    {
+     "name": "arrow",
+     "anim": "arrow",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "armR",
+     "parentIdx": 6,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "toxotes/arrow"
+    }
+   ]
+  },
+  "hippikon": {
+   "voxel": 0.07,
+   "anim": "horse",
+   "style": "rider",
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "body",
+     "anim": "body",
+     "joint": [
+      0,
+      10,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": true,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/body"
+    },
+    {
+     "name": "barding",
+     "anim": "barding",
+     "joint": [
+      0,
+      0,
+      0
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/barding"
+    },
+    {
+     "name": "riderLegs",
+     "anim": "riderLegs",
+     "joint": [
+      0,
+      0,
+      0
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/riderLegs"
+    },
+    {
+     "name": "neck",
+     "anim": "neck",
+     "joint": [
+      0,
+      5.5,
+      8
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": true,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/neck"
+    },
+    {
+     "name": "tail",
+     "anim": "tail",
+     "joint": [
+      0,
+      7,
+      -10
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": true,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/tail"
+    },
+    {
+     "name": "legFL",
+     "anim": "legFL",
+     "joint": [
+      2,
+      1,
+      7
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": true,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/legFL"
+    },
+    {
+     "name": "cannonFL",
+     "anim": "cannonFL",
+     "joint": [
+      0,
+      -4,
+      0
+     ],
+     "parent": "legFL",
+     "parentIdx": 5,
+     "coat": true,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/cannonFL"
+    },
+    {
+     "name": "legFR",
+     "anim": "legFR",
+     "joint": [
+      -2,
+      1,
+      7
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": true,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/legFR"
+    },
+    {
+     "name": "cannonFR",
+     "anim": "cannonFR",
+     "joint": [
+      0,
+      -4,
+      0
+     ],
+     "parent": "legFR",
+     "parentIdx": 7,
+     "coat": true,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/cannonFR"
+    },
+    {
+     "name": "legBL",
+     "anim": "legBL",
+     "joint": [
+      2,
+      1,
+      -6.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": true,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/legBL"
+    },
+    {
+     "name": "cannonBL",
+     "anim": "cannonBL",
+     "joint": [
+      0,
+      -4,
+      0
+     ],
+     "parent": "legBL",
+     "parentIdx": 9,
+     "coat": true,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/cannonBL"
+    },
+    {
+     "name": "legBR",
+     "anim": "legBR",
+     "joint": [
+      -2,
+      1,
+      -6.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": true,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/legBR"
+    },
+    {
+     "name": "cannonBR",
+     "anim": "cannonBR",
+     "joint": [
+      0,
+      -4,
+      0
+     ],
+     "parent": "legBR",
+     "parentIdx": 11,
+     "coat": true,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/cannonBR"
+    },
+    {
+     "name": "torso",
+     "anim": "torso",
+     "joint": [
+      0,
+      10,
+      0.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/torso"
+    },
+    {
+     "name": "head",
+     "anim": "head",
+     "joint": [
+      0,
+      10,
+      0.2
+     ],
+     "parent": "torso",
+     "parentIdx": 13,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/head"
+    },
+    {
+     "name": "armL",
+     "anim": "armL",
+     "joint": [
+      5.5,
+      8,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 13,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/armL"
+    },
+    {
+     "name": "armR",
+     "anim": "armR",
+     "joint": [
+      -5.5,
+      8,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 13,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/armR"
+    },
+    {
+     "name": "weapon",
+     "anim": "weapon",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "armR",
+     "parentIdx": 16,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/weapon"
+    },
+    {
+     "name": "shield",
+     "anim": "shield",
+     "joint": [
+      1.5,
+      -4,
+      1.5
+     ],
+     "parent": "armL",
+     "parentIdx": 15,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippikon/shield"
+    }
+   ]
+  },
+  "minotaur": {
+   "voxel": 0.1,
+   "anim": "beast",
+   "style": "beast",
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "legL",
+     "anim": "legL",
+     "joint": [
+      2.5,
+      12,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "minotaur/legL"
+    },
+    {
+     "name": "shinL",
+     "anim": "shinL",
+     "joint": [
+      0,
+      -5,
+      0.5
+     ],
+     "parent": "legL",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "minotaur/shinL"
+    },
+    {
+     "name": "legR",
+     "anim": "legR",
+     "joint": [
+      -2.5,
+      12,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "minotaur/legR"
+    },
+    {
+     "name": "shinR",
+     "anim": "shinR",
+     "joint": [
+      0,
+      -5,
+      0.5
+     ],
+     "parent": "legR",
+     "parentIdx": 2,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "minotaur/shinR"
+    },
+    {
+     "name": "torso",
+     "anim": "torso",
+     "joint": [
+      0,
+      12,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "minotaur/torso"
+    },
+    {
+     "name": "head",
+     "anim": "head",
+     "joint": [
+      0,
+      13,
+      2.5
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "minotaur/head"
+    },
+    {
+     "name": "armL",
+     "anim": "armL",
+     "joint": [
+      7.5,
+      11.5,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "minotaur/armL"
+    },
+    {
+     "name": "foreL",
+     "anim": "foreL",
+     "joint": [
+      0,
+      -6.5,
+      0
+     ],
+     "parent": "armL",
+     "parentIdx": 6,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "minotaur/foreL"
+    },
+    {
+     "name": "armR",
+     "anim": "armR",
+     "joint": [
+      -7.5,
+      11.5,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "minotaur/armR"
+    },
+    {
+     "name": "foreR",
+     "anim": "foreR",
+     "joint": [
+      0,
+      -6.5,
+      0
+     ],
+     "parent": "armR",
+     "parentIdx": 8,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "minotaur/foreR"
+    },
+    {
+     "name": "weapon",
+     "anim": "weapon",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "foreR",
+     "parentIdx": 9,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "minotaur/weapon"
+    }
+   ]
+  },
+  "hero": {
+   "voxel": 0.12,
+   "anim": "human",
+   "style": "hero",
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "legL",
+     "anim": "legL",
+     "joint": [
+      1.7,
+      12,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hero/legL"
+    },
+    {
+     "name": "shinL",
+     "anim": "shinL",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "legL",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hero/shinL"
+    },
+    {
+     "name": "legR",
+     "anim": "legR",
+     "joint": [
+      -1.7,
+      12,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hero/legR"
+    },
+    {
+     "name": "shinR",
+     "anim": "shinR",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "legR",
+     "parentIdx": 2,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hero/shinR"
+    },
+    {
+     "name": "torso",
+     "anim": "torso",
+     "joint": [
+      0,
+      12,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hero/torso"
+    },
+    {
+     "name": "head",
+     "anim": "head",
+     "joint": [
+      0,
+      10,
+      0.2
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hero/head"
+    },
+    {
+     "name": "armL",
+     "anim": "armL",
+     "joint": [
+      5.5,
+      8,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hero/armL"
+    },
+    {
+     "name": "armR",
+     "anim": "armR",
+     "joint": [
+      -5.5,
+      8,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hero/armR"
+    },
+    {
+     "name": "weapon",
+     "anim": "weapon",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "armR",
+     "parentIdx": 7,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hero/weapon"
+    },
+    {
+     "name": "shield",
+     "anim": "shield",
+     "joint": [
+      1.5,
+      -4,
+      2.5
+     ],
+     "parent": "armL",
+     "parentIdx": 6,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hero/shield"
+    }
+   ]
+  },
+  "cyclops": {
+   "voxel": 0.15,
+   "anim": "beast",
+   "style": "beast",
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "legL",
+     "anim": "legL",
+     "joint": [
+      3,
+      13,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "cyclops/legL"
+    },
+    {
+     "name": "shinL",
+     "anim": "shinL",
+     "joint": [
+      0,
+      -6.5,
+      0.3
+     ],
+     "parent": "legL",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "cyclops/shinL"
+    },
+    {
+     "name": "legR",
+     "anim": "legR",
+     "joint": [
+      -3,
+      13,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "cyclops/legR"
+    },
+    {
+     "name": "shinR",
+     "anim": "shinR",
+     "joint": [
+      0,
+      -6.5,
+      0.3
+     ],
+     "parent": "legR",
+     "parentIdx": 2,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "cyclops/shinR"
+    },
+    {
+     "name": "torso",
+     "anim": "torso",
+     "joint": [
+      0,
+      13,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "cyclops/torso"
+    },
+    {
+     "name": "head",
+     "anim": "head",
+     "joint": [
+      0,
+      14.5,
+      2.5
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "cyclops/head"
+    },
+    {
+     "name": "armL",
+     "anim": "armL",
+     "joint": [
+      7.6,
+      12.5,
+      -0.5
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "cyclops/armL"
+    },
+    {
+     "name": "foreL",
+     "anim": "foreL",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "armL",
+     "parentIdx": 6,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "cyclops/foreL"
+    },
+    {
+     "name": "armR",
+     "anim": "armR",
+     "joint": [
+      -7.6,
+      12.5,
+      -0.5
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "cyclops/armR"
+    },
+    {
+     "name": "foreR",
+     "anim": "foreR",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "armR",
+     "parentIdx": 8,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "cyclops/foreR"
+    },
+    {
+     "name": "weapon",
+     "anim": "weapon",
+     "joint": [
+      0,
+      -8.5,
+      0.3
+     ],
+     "parent": "foreR",
+     "parentIdx": 9,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "cyclops/weapon"
+    }
+   ]
+  },
+  "centaur": {
+   "voxel": 0.08,
+   "anim": "centaur",
+   "style": "centaur",
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "body",
+     "anim": "body",
+     "joint": [
+      0,
+      10,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "centaur/body"
+    },
+    {
+     "name": "barding",
+     "anim": "barding",
+     "joint": [
+      0,
+      0,
+      0
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "centaur/barding"
+    },
+    {
+     "name": "tail",
+     "anim": "tail",
+     "joint": [
+      0,
+      7,
+      -10
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "centaur/tail"
+    },
+    {
+     "name": "legFL",
+     "anim": "legFL",
+     "joint": [
+      2,
+      1,
+      7
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "centaur/legFL"
+    },
+    {
+     "name": "cannonFL",
+     "anim": "cannonFL",
+     "joint": [
+      0,
+      -4,
+      0
+     ],
+     "parent": "legFL",
+     "parentIdx": 3,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "centaur/cannonFL"
+    },
+    {
+     "name": "legFR",
+     "anim": "legFR",
+     "joint": [
+      -2,
+      1,
+      7
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "centaur/legFR"
+    },
+    {
+     "name": "cannonFR",
+     "anim": "cannonFR",
+     "joint": [
+      0,
+      -4,
+      0
+     ],
+     "parent": "legFR",
+     "parentIdx": 5,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "centaur/cannonFR"
+    },
+    {
+     "name": "legBL",
+     "anim": "legBL",
+     "joint": [
+      2,
+      1,
+      -6.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "centaur/legBL"
+    },
+    {
+     "name": "cannonBL",
+     "anim": "cannonBL",
+     "joint": [
+      0,
+      -4,
+      0
+     ],
+     "parent": "legBL",
+     "parentIdx": 7,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "centaur/cannonBL"
+    },
+    {
+     "name": "legBR",
+     "anim": "legBR",
+     "joint": [
+      -2,
+      1,
+      -6.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "centaur/legBR"
+    },
+    {
+     "name": "cannonBR",
+     "anim": "cannonBR",
+     "joint": [
+      0,
+      -4,
+      0
+     ],
+     "parent": "legBR",
+     "parentIdx": 9,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "centaur/cannonBR"
+    },
+    {
+     "name": "torso",
+     "anim": "torso",
+     "joint": [
+      0,
+      8,
+      8
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "centaur/torso"
+    },
+    {
+     "name": "head",
+     "anim": "head",
+     "joint": [
+      0,
+      10,
+      0.2
+     ],
+     "parent": "torso",
+     "parentIdx": 11,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "centaur/head"
+    },
+    {
+     "name": "armL",
+     "anim": "armL",
+     "joint": [
+      5.5,
+      8,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 11,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "centaur/armL"
+    },
+    {
+     "name": "armR",
+     "anim": "armR",
+     "joint": [
+      -5.5,
+      8,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 11,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "centaur/armR"
+    },
+    {
+     "name": "weapon",
+     "anim": "weapon",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "armL",
+     "parentIdx": 13,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "centaur/weapon"
+    },
+    {
+     "name": "arrow",
+     "anim": "arrow",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "armR",
+     "parentIdx": 14,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "centaur/arrow"
+    }
+   ]
+  },
+  "medusa": {
+   "voxel": 0.12,
+   "anim": "medusa",
+   "style": "medusa",
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "coil",
+     "anim": "coil",
+     "joint": [
+      0,
+      0,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "medusa/coil"
+    },
+    {
+     "name": "tailA",
+     "anim": "tailA",
+     "joint": [
+      -2,
+      2,
+      -4
+     ],
+     "parent": "coil",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "medusa/tailA"
+    },
+    {
+     "name": "tailB",
+     "anim": "tailB",
+     "joint": [
+      0,
+      0,
+      -8
+     ],
+     "parent": "tailA",
+     "parentIdx": 1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "medusa/tailB"
+    },
+    {
+     "name": "tailC",
+     "anim": "tailC",
+     "joint": [
+      0,
+      0,
+      -8
+     ],
+     "parent": "tailB",
+     "parentIdx": 2,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "medusa/tailC"
+    },
+    {
+     "name": "torso",
+     "anim": "torso",
+     "joint": [
+      0,
+      11,
+      1
+     ],
+     "parent": "coil",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "medusa/torso"
+    },
+    {
+     "name": "head",
+     "anim": "head",
+     "joint": [
+      0,
+      10,
+      0.2
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "medusa/head"
+    },
+    {
+     "name": "armL",
+     "anim": "armL",
+     "joint": [
+      5.5,
+      8,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "medusa/armL"
+    },
+    {
+     "name": "armR",
+     "anim": "armR",
+     "joint": [
+      -5.5,
+      8,
+      0
+     ],
+     "parent": "torso",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "medusa/armR"
+    },
+    {
+     "name": "weapon",
+     "anim": "weapon",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "armL",
+     "parentIdx": 6,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "medusa/weapon"
+    },
+    {
+     "name": "arrow",
+     "anim": "arrow",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "armR",
+     "parentIdx": 7,
+     "coat": false,
+     "portrait": false,
+     "conditional": true,
+     "mesh": "medusa/arrow"
+    }
+   ]
+  }
+ },
+ "unitTypes": [
+  "villager",
+  "hoplite",
+  "toxotes",
+  "hippikon",
+  "minotaur",
+  "hero",
+  "cyclops",
+  "centaur",
+  "medusa"
+ ],
+ "models": {
+  "villager/legL": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.07,
+    -0.42,
+    -0.07,
+    0.07,
+    0,
+    0.07
+   ],
+   "position": 0,
+   "normal": 2688,
+   "color": 5376,
+   "extra": 6272,
+   "index": 7168
+  },
+  "villager/shinL": {
+   "vertices": 248,
+   "indices": 372,
+   "aabb": [
+    -0.07,
+    -0.42,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 8512,
+   "normal": 11488,
+   "color": 14464,
+   "extra": 15456,
+   "index": 16448
+  },
+  "villager/legR": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.07,
+    -0.42,
+    -0.07,
+    0.07,
+    0,
+    0.07
+   ],
+   "position": 17936,
+   "normal": 20624,
+   "color": 23312,
+   "extra": 24208,
+   "index": 25104
+  },
+  "villager/shinR": {
+   "vertices": 248,
+   "indices": 372,
+   "aabb": [
+    -0.07,
+    -0.42,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 26448,
+   "normal": 29424,
+   "color": 32400,
+   "extra": 33392,
+   "index": 34384
+  },
+  "villager/torso": {
+   "vertices": 1696,
+   "indices": 2544,
+   "aabb": [
+    -0.28,
+    -0.21,
+    -0.21,
+    0.28,
+    0.7,
+    0.21
+   ],
+   "position": 35872,
+   "normal": 56224,
+   "color": 76576,
+   "extra": 83360,
+   "index": 90144
+  },
+  "villager/head": {
+   "vertices": 1256,
+   "indices": 1884,
+   "aabb": [
+    -0.252,
+    -0.056,
+    -0.252,
+    0.252,
+    0.448,
+    0.252
+   ],
+   "position": 100320,
+   "normal": 115392,
+   "color": 130464,
+   "extra": 135488,
+   "index": 140512
+  },
+  "villager/armL": {
+   "vertices": 272,
+   "indices": 408,
+   "aabb": [
+    -0.07,
+    -0.49,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 148048,
+   "normal": 151312,
+   "color": 154576,
+   "extra": 155664,
+   "index": 156752
+  },
+  "villager/armR": {
+   "vertices": 272,
+   "indices": 408,
+   "aabb": [
+    -0.07,
+    -0.49,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 158384,
+   "normal": 161648,
+   "color": 164912,
+   "extra": 166000,
+   "index": 167088
+  },
+  "villager/toolAxe": {
+   "vertices": 248,
+   "indices": 372,
+   "aabb": [
+    0,
+    -0.07,
+    -0.07,
+    0.07,
+    0.28,
+    0.63
+   ],
+   "position": 168720,
+   "normal": 171696,
+   "color": 174672,
+   "extra": 175664,
+   "index": 176656
+  },
+  "villager/toolPick": {
+   "vertices": 312,
+   "indices": 468,
+   "aabb": [
+    0,
+    -0.28,
+    -0.07,
+    0.07,
+    0.35,
+    0.7
+   ],
+   "position": 178144,
+   "normal": 181888,
+   "color": 185632,
+   "extra": 186880,
+   "index": 188128
+  },
+  "villager/toolSickle": {
+   "vertices": 240,
+   "indices": 360,
+   "aabb": [
+    0,
+    0,
+    -0.07,
+    0.07,
+    0.28,
+    0.77
+   ],
+   "position": 190000,
+   "normal": 192880,
+   "color": 195760,
+   "extra": 196720,
+   "index": 197680
+  },
+  "villager/toolHammer": {
+   "vertices": 264,
+   "indices": 396,
+   "aabb": [
+    -0.07,
+    -0.07,
+    -0.07,
+    0.14,
+    0.14,
+    0.49
+   ],
+   "position": 199120,
+   "normal": 202288,
+   "color": 205456,
+   "extra": 206512,
+   "index": 207568
+  },
+  "villager/carryWood": {
+   "vertices": 992,
+   "indices": 1488,
+   "aabb": [
+    -0.14,
+    0,
+    -0.49,
+    0.14,
+    0.28,
+    0.49
+   ],
+   "position": 209152,
+   "normal": 221056,
+   "color": 232960,
+   "extra": 236928,
+   "index": 240896
+  },
+  "villager/carryGold": {
+   "vertices": 808,
+   "indices": 1212,
+   "aabb": [
+    -0.21,
+    0,
+    -0.28,
+    0.21,
+    0.49,
+    0
+   ],
+   "position": 246848,
+   "normal": 256544,
+   "color": 266240,
+   "extra": 269472,
+   "index": 272704
+  },
+  "villager/carryFood": {
+   "vertices": 816,
+   "indices": 1224,
+   "aabb": [
+    -0.21,
+    0,
+    -0.28,
+    0.21,
+    0.49,
+    0
+   ],
+   "position": 277552,
+   "normal": 287344,
+   "color": 297136,
+   "extra": 300400,
+   "index": 303664
+  },
+  "hoplite/legL": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.07,
+    -0.42,
+    -0.07,
+    0.07,
+    0,
+    0.07
+   ],
+   "position": 308560,
+   "normal": 311248,
+   "color": 313936,
+   "extra": 314832,
+   "index": 315728
+  },
+  "hoplite/shinL": {
+   "vertices": 248,
+   "indices": 372,
+   "aabb": [
+    -0.07,
+    -0.42,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 317072,
+   "normal": 320048,
+   "color": 323024,
+   "extra": 324016,
+   "index": 325008
+  },
+  "hoplite/legR": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.07,
+    -0.42,
+    -0.07,
+    0.07,
+    0,
+    0.07
+   ],
+   "position": 326496,
+   "normal": 329184,
+   "color": 331872,
+   "extra": 332768,
+   "index": 333664
+  },
+  "hoplite/shinR": {
+   "vertices": 248,
+   "indices": 372,
+   "aabb": [
+    -0.07,
+    -0.42,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 335008,
+   "normal": 337984,
+   "color": 340960,
+   "extra": 341952,
+   "index": 342944
+  },
+  "hoplite/torso": {
+   "vertices": 2752,
+   "indices": 4128,
+   "aabb": [
+    -0.35,
+    -0.35,
+    -0.21,
+    0.35,
+    0.7,
+    0.28
+   ],
+   "position": 344432,
+   "normal": 377456,
+   "color": 410480,
+   "extra": 421488,
+   "index": 432496
+  },
+  "hoplite/armL": {
+   "vertices": 272,
+   "indices": 408,
+   "aabb": [
+    -0.07,
+    -0.49,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 449008,
+   "normal": 452272,
+   "color": 455536,
+   "extra": 456624,
+   "index": 457712
+  },
+  "hoplite/armR": {
+   "vertices": 272,
+   "indices": 408,
+   "aabb": [
+    -0.07,
+    -0.49,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 459344,
+   "normal": 462608,
+   "color": 465872,
+   "extra": 466960,
+   "index": 468048
+  },
+  "hoplite/head": {
+   "vertices": 2688,
+   "indices": 4032,
+   "aabb": [
+    -0.196,
+    -0.056,
+    -0.364,
+    0.196,
+    0.84,
+    0.308
+   ],
+   "position": 469680,
+   "normal": 501936,
+   "color": 534192,
+   "extra": 544944,
+   "index": 555696
+  },
+  "hoplite/head1": {
+   "vertices": 2640,
+   "indices": 3960,
+   "aabb": [
+    -0.196,
+    -0.112,
+    -0.364,
+    0.196,
+    0.896,
+    0.252
+   ],
+   "position": 571824,
+   "normal": 603504,
+   "color": 635184,
+   "extra": 645744,
+   "index": 656304
+  },
+  "hoplite/head2": {
+   "vertices": 1880,
+   "indices": 2820,
+   "aabb": [
+    -0.252,
+    -0.056,
+    -0.196,
+    0.252,
+    0.784,
+    0.252
+   ],
+   "position": 672144,
+   "normal": 694704,
+   "color": 717264,
+   "extra": 724784,
+   "index": 732304
+  },
+  "hoplite/head3": {
+   "vertices": 1592,
+   "indices": 2388,
+   "aabb": [
+    -0.196,
+    -0.056,
+    -0.308,
+    0.196,
+    0.784,
+    0.252
+   ],
+   "position": 743584,
+   "normal": 762688,
+   "color": 781792,
+   "extra": 788160,
+   "index": 794528
+  },
+  "hoplite/cloakLong": {
+   "vertices": 1352,
+   "indices": 2028,
+   "aabb": [
+    -0.28,
+    -0.21,
+    -0.35,
+    0.28,
+    0.63,
+    0
+   ],
+   "position": 804080,
+   "normal": 820304,
+   "color": 836528,
+   "extra": 841936,
+   "index": 847344
+  },
+  "hoplite/cloakShort": {
+   "vertices": 872,
+   "indices": 1308,
+   "aabb": [
+    -0.28,
+    0.14,
+    -0.28,
+    0.28,
+    0.63,
+    0.21
+   ],
+   "position": 855456,
+   "normal": 865920,
+   "color": 876384,
+   "extra": 879872,
+   "index": 883360
+  },
+  "hoplite/weapon": {
+   "vertices": 696,
+   "indices": 1044,
+   "aabb": [
+    -0.07,
+    -0.77,
+    -0.07,
+    0.14,
+    1.68,
+    0.14
+   ],
+   "position": 888592,
+   "normal": 896944,
+   "color": 905296,
+   "extra": 908080,
+   "index": 910864
+  },
+  "hoplite/pennant": {
+   "vertices": 176,
+   "indices": 264,
+   "aabb": [
+    0,
+    0.84,
+    0.07,
+    0.07,
+    1.12,
+    0.42
+   ],
+   "position": 915040,
+   "normal": 917152,
+   "color": 919264,
+   "extra": 919968,
+   "index": 920672
+  },
+  "hoplite/sword": {
+   "vertices": 520,
+   "indices": 780,
+   "aabb": [
+    -0.07,
+    -0.21,
+    -0.07,
+    0.14,
+    0.91,
+    0.14
+   ],
+   "position": 921728,
+   "normal": 927968,
+   "color": 934208,
+   "extra": 936288,
+   "index": 938368
+  },
+  "hoplite/shield": {
+   "vertices": 1432,
+   "indices": 2148,
+   "aabb": [
+    -0.42,
+    -0.42,
+    -0.07,
+    0.49,
+    0.49,
+    0.21
+   ],
+   "position": 941488,
+   "normal": 958672,
+   "color": 975856,
+   "extra": 981584,
+   "index": 987312
+  },
+  "hoplite/shield1": {
+   "vertices": 1432,
+   "indices": 2148,
+   "aabb": [
+    -0.42,
+    -0.42,
+    -0.07,
+    0.49,
+    0.49,
+    0.21
+   ],
+   "position": 995904,
+   "normal": 1013088,
+   "color": 1030272,
+   "extra": 1036000,
+   "index": 1041728
+  },
+  "hoplite/shield2": {
+   "vertices": 1432,
+   "indices": 2148,
+   "aabb": [
+    -0.42,
+    -0.42,
+    -0.07,
+    0.49,
+    0.49,
+    0.21
+   ],
+   "position": 1050320,
+   "normal": 1067504,
+   "color": 1084688,
+   "extra": 1090416,
+   "index": 1096144
+  },
+  "hoplite/shield3": {
+   "vertices": 1432,
+   "indices": 2148,
+   "aabb": [
+    -0.42,
+    -0.42,
+    -0.07,
+    0.49,
+    0.49,
+    0.21
+   ],
+   "position": 1104736,
+   "normal": 1121920,
+   "color": 1139104,
+   "extra": 1144832,
+   "index": 1150560
+  },
+  "hoplite/thureos": {
+   "vertices": 2376,
+   "indices": 3564,
+   "aabb": [
+    -0.35,
+    -0.56,
+    -0.14,
+    0.42,
+    0.63,
+    0.21
+   ],
+   "position": 1159152,
+   "normal": 1187664,
+   "color": 1216176,
+   "extra": 1225680,
+   "index": 1235184
+  },
+  "toxotes/legL": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.07,
+    -0.42,
+    -0.07,
+    0.07,
+    0,
+    0.07
+   ],
+   "position": 1249440,
+   "normal": 1252128,
+   "color": 1254816,
+   "extra": 1255712,
+   "index": 1256608
+  },
+  "toxotes/shinL": {
+   "vertices": 248,
+   "indices": 372,
+   "aabb": [
+    -0.07,
+    -0.42,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 1257952,
+   "normal": 1260928,
+   "color": 1263904,
+   "extra": 1264896,
+   "index": 1265888
+  },
+  "toxotes/legR": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.07,
+    -0.42,
+    -0.07,
+    0.07,
+    0,
+    0.07
+   ],
+   "position": 1267376,
+   "normal": 1270064,
+   "color": 1272752,
+   "extra": 1273648,
+   "index": 1274544
+  },
+  "toxotes/shinR": {
+   "vertices": 248,
+   "indices": 372,
+   "aabb": [
+    -0.07,
+    -0.42,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 1275888,
+   "normal": 1278864,
+   "color": 1281840,
+   "extra": 1282832,
+   "index": 1283824
+  },
+  "toxotes/torso": {
+   "vertices": 2440,
+   "indices": 3660,
+   "aabb": [
+    -0.35,
+    -0.21,
+    -0.35,
+    0.35,
+    0.84,
+    0.28
+   ],
+   "position": 1285312,
+   "normal": 1314592,
+   "color": 1343872,
+   "extra": 1353632,
+   "index": 1363392
+  },
+  "toxotes/armL": {
+   "vertices": 272,
+   "indices": 408,
+   "aabb": [
+    -0.07,
+    -0.49,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 1378032,
+   "normal": 1381296,
+   "color": 1384560,
+   "extra": 1385648,
+   "index": 1386736
+  },
+  "toxotes/armR": {
+   "vertices": 272,
+   "indices": 408,
+   "aabb": [
+    -0.07,
+    -0.49,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 1388368,
+   "normal": 1391632,
+   "color": 1394896,
+   "extra": 1395984,
+   "index": 1397072
+  },
+  "toxotes/head": {
+   "vertices": 1360,
+   "indices": 2040,
+   "aabb": [
+    -0.196,
+    -0.056,
+    -0.196,
+    0.196,
+    0.504,
+    0.196
+   ],
+   "position": 1398704,
+   "normal": 1415024,
+   "color": 1431344,
+   "extra": 1436784,
+   "index": 1442224
+  },
+  "toxotes/head1": {
+   "vertices": 1064,
+   "indices": 1596,
+   "aabb": [
+    -0.196,
+    -0.056,
+    -0.196,
+    0.196,
+    0.448,
+    0.196
+   ],
+   "position": 1450384,
+   "normal": 1463152,
+   "color": 1475920,
+   "extra": 1480176,
+   "index": 1484432
+  },
+  "toxotes/head2": {
+   "vertices": 1296,
+   "indices": 1944,
+   "aabb": [
+    -0.196,
+    -0.056,
+    -0.196,
+    0.196,
+    0.392,
+    0.252
+   ],
+   "position": 1490816,
+   "normal": 1506368,
+   "color": 1521920,
+   "extra": 1527104,
+   "index": 1532288
+  },
+  "toxotes/weapon": {
+   "vertices": 1056,
+   "indices": 1584,
+   "aabb": [
+    0,
+    -0.84,
+    0,
+    0.14,
+    0.91,
+    0.35
+   ],
+   "position": 1540064,
+   "normal": 1552736,
+   "color": 1565408,
+   "extra": 1569632,
+   "index": 1573856
+  },
+  "toxotes/arrow": {
+   "vertices": 312,
+   "indices": 468,
+   "aabb": [
+    0,
+    -0.07,
+    -0.21,
+    0.07,
+    0.14,
+    0.98
+   ],
+   "position": 1580192,
+   "normal": 1583936,
+   "color": 1587680,
+   "extra": 1588928,
+   "index": 1590176
+  },
+  "hippikon/body": {
+   "vertices": 3360,
+   "indices": 5040,
+   "aabb": [
+    -0.21,
+    0,
+    -0.735,
+    0.28,
+    0.7,
+    0.805
+   ],
+   "position": 1592048,
+   "normal": 1632368,
+   "color": 1672688,
+   "extra": 1686128,
+   "index": 1699568
+  },
+  "hippikon/barding": {
+   "vertices": 1984,
+   "indices": 2976,
+   "aabb": [
+    -0.35,
+    0.21,
+    -0.735,
+    0.42,
+    0.84,
+    0.805
+   ],
+   "position": 1719728,
+   "normal": 1743536,
+   "color": 1767344,
+   "extra": 1775280,
+   "index": 1783216
+  },
+  "hippikon/riderLegs": {
+   "vertices": 912,
+   "indices": 1368,
+   "aabb": [
+    -0.42,
+    0.28,
+    -0.105,
+    0.49,
+    0.91,
+    0.315
+   ],
+   "position": 1795120,
+   "normal": 1806064,
+   "color": 1817008,
+   "extra": 1820656,
+   "index": 1824304
+  },
+  "hippikon/neck": {
+   "vertices": 2528,
+   "indices": 3792,
+   "aabb": [
+    -0.175,
+    -0.21,
+    -0.35,
+    0.175,
+    1.12,
+    0.84
+   ],
+   "position": 1829776,
+   "normal": 1860112,
+   "color": 1890448,
+   "extra": 1900560,
+   "index": 1910672
+  },
+  "hippikon/tail": {
+   "vertices": 400,
+   "indices": 600,
+   "aabb": [
+    -0.07,
+    -0.7,
+    -0.21,
+    0.07,
+    0.07,
+    0.07
+   ],
+   "position": 1925840,
+   "normal": 1930640,
+   "color": 1935440,
+   "extra": 1937040,
+   "index": 1938640
+  },
+  "hippikon/legFL": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.07,
+    -0.35,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 1941040,
+   "normal": 1943728,
+   "color": 1946416,
+   "extra": 1947312,
+   "index": 1948208
+  },
+  "hippikon/cannonFL": {
+   "vertices": 280,
+   "indices": 420,
+   "aabb": [
+    -0.07,
+    -0.49,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 1949552,
+   "normal": 1952912,
+   "color": 1956272,
+   "extra": 1957392,
+   "index": 1958512
+  },
+  "hippikon/legFR": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.07,
+    -0.35,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 1960192,
+   "normal": 1962880,
+   "color": 1965568,
+   "extra": 1966464,
+   "index": 1967360
+  },
+  "hippikon/cannonFR": {
+   "vertices": 280,
+   "indices": 420,
+   "aabb": [
+    -0.07,
+    -0.49,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 1968704,
+   "normal": 1972064,
+   "color": 1975424,
+   "extra": 1976544,
+   "index": 1977664
+  },
+  "hippikon/legBL": {
+   "vertices": 320,
+   "indices": 480,
+   "aabb": [
+    -0.07,
+    -0.35,
+    -0.175,
+    0.07,
+    0,
+    0.175
+   ],
+   "position": 1979344,
+   "normal": 1983184,
+   "color": 1987024,
+   "extra": 1988304,
+   "index": 1989584
+  },
+  "hippikon/cannonBL": {
+   "vertices": 280,
+   "indices": 420,
+   "aabb": [
+    -0.07,
+    -0.49,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 1991504,
+   "normal": 1994864,
+   "color": 1998224,
+   "extra": 1999344,
+   "index": 2000464
+  },
+  "hippikon/legBR": {
+   "vertices": 320,
+   "indices": 480,
+   "aabb": [
+    -0.07,
+    -0.35,
+    -0.175,
+    0.07,
+    0,
+    0.175
+   ],
+   "position": 2002144,
+   "normal": 2005984,
+   "color": 2009824,
+   "extra": 2011104,
+   "index": 2012384
+  },
+  "hippikon/cannonBR": {
+   "vertices": 280,
+   "indices": 420,
+   "aabb": [
+    -0.07,
+    -0.49,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 2014304,
+   "normal": 2017664,
+   "color": 2021024,
+   "extra": 2022144,
+   "index": 2023264
+  },
+  "hippikon/torso": {
+   "vertices": 2448,
+   "indices": 3672,
+   "aabb": [
+    -0.35,
+    -0.35,
+    -0.28,
+    0.35,
+    0.7,
+    0.28
+   ],
+   "position": 2024944,
+   "normal": 2054320,
+   "color": 2083696,
+   "extra": 2093488,
+   "index": 2103280
+  },
+  "hippikon/head": {
+   "vertices": 2688,
+   "indices": 4032,
+   "aabb": [
+    -0.196,
+    -0.056,
+    -0.364,
+    0.196,
+    0.84,
+    0.308
+   ],
+   "position": 2117968,
+   "normal": 2150224,
+   "color": 2182480,
+   "extra": 2193232,
+   "index": 2203984
+  },
+  "hippikon/armL": {
+   "vertices": 272,
+   "indices": 408,
+   "aabb": [
+    -0.07,
+    -0.49,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 2220112,
+   "normal": 2223376,
+   "color": 2226640,
+   "extra": 2227728,
+   "index": 2228816
+  },
+  "hippikon/armR": {
+   "vertices": 272,
+   "indices": 408,
+   "aabb": [
+    -0.07,
+    -0.49,
+    -0.07,
+    0.07,
+    0,
+    0.14
+   ],
+   "position": 2230448,
+   "normal": 2233712,
+   "color": 2236976,
+   "extra": 2238064,
+   "index": 2239152
+  },
+  "hippikon/weapon": {
+   "vertices": 776,
+   "indices": 1164,
+   "aabb": [
+    -0.07,
+    -0.77,
+    -0.07,
+    0.14,
+    2.03,
+    0.14
+   ],
+   "position": 2240784,
+   "normal": 2250096,
+   "color": 2259408,
+   "extra": 2262512,
+   "index": 2265616
+  },
+  "hippikon/shield": {
+   "vertices": 824,
+   "indices": 1236,
+   "aabb": [
+    -0.28,
+    -0.28,
+    -0.07,
+    0.35,
+    0.35,
+    0.21
+   ],
+   "position": 2270272,
+   "normal": 2280160,
+   "color": 2290048,
+   "extra": 2293344,
+   "index": 2296640
+  },
+  "minotaur/legL": {
+   "vertices": 560,
+   "indices": 840,
+   "aabb": [
+    -0.2,
+    -0.6,
+    -0.3,
+    0.2,
+    0,
+    0.2
+   ],
+   "position": 2301584,
+   "normal": 2308304,
+   "color": 2315024,
+   "extra": 2317264,
+   "index": 2319504
+  },
+  "minotaur/shinL": {
+   "vertices": 464,
+   "indices": 696,
+   "aabb": [
+    -0.15,
+    -0.7,
+    -0.15,
+    0.15,
+    0,
+    0.35
+   ],
+   "position": 2322864,
+   "normal": 2328432,
+   "color": 2334000,
+   "extra": 2335856,
+   "index": 2337712
+  },
+  "minotaur/legR": {
+   "vertices": 560,
+   "indices": 840,
+   "aabb": [
+    -0.2,
+    -0.6,
+    -0.3,
+    0.2,
+    0,
+    0.2
+   ],
+   "position": 2340496,
+   "normal": 2347216,
+   "color": 2353936,
+   "extra": 2356176,
+   "index": 2358416
+  },
+  "minotaur/shinR": {
+   "vertices": 464,
+   "indices": 696,
+   "aabb": [
+    -0.15,
+    -0.7,
+    -0.15,
+    0.15,
+    0,
+    0.35
+   ],
+   "position": 2361776,
+   "normal": 2367344,
+   "color": 2372912,
+   "extra": 2374768,
+   "index": 2376624
+  },
+  "minotaur/torso": {
+   "vertices": 3672,
+   "indices": 5508,
+   "aabb": [
+    -0.6,
+    -0.5,
+    -0.35,
+    0.6,
+    1.4,
+    0.45
+   ],
+   "position": 2379408,
+   "normal": 2423472,
+   "color": 2467536,
+   "extra": 2482224,
+   "index": 2496912
+  },
+  "minotaur/head": {
+   "vertices": 1504,
+   "indices": 2256,
+   "aabb": [
+    -0.7,
+    -0.1,
+    -0.2,
+    0.7,
+    1,
+    0.7
+   ],
+   "position": 2518944,
+   "normal": 2536992,
+   "color": 2555040,
+   "extra": 2561056,
+   "index": 2567072
+  },
+  "minotaur/armL": {
+   "vertices": 840,
+   "indices": 1260,
+   "aabb": [
+    -0.2,
+    -0.8,
+    -0.2,
+    0.3,
+    0.2,
+    0.3
+   ],
+   "position": 2576096,
+   "normal": 2586176,
+   "color": 2596256,
+   "extra": 2599616,
+   "index": 2602976
+  },
+  "minotaur/foreL": {
+   "vertices": 600,
+   "indices": 900,
+   "aabb": [
+    -0.15,
+    -0.75,
+    -0.15,
+    0.25,
+    0.15,
+    0.25
+   ],
+   "position": 2608016,
+   "normal": 2615216,
+   "color": 2622416,
+   "extra": 2624816,
+   "index": 2627216
+  },
+  "minotaur/armR": {
+   "vertices": 840,
+   "indices": 1260,
+   "aabb": [
+    -0.2,
+    -0.8,
+    -0.2,
+    0.3,
+    0.2,
+    0.3
+   ],
+   "position": 2630816,
+   "normal": 2640896,
+   "color": 2650976,
+   "extra": 2654336,
+   "index": 2657696
+  },
+  "minotaur/foreR": {
+   "vertices": 600,
+   "indices": 900,
+   "aabb": [
+    -0.15,
+    -0.75,
+    -0.15,
+    0.25,
+    0.15,
+    0.25
+   ],
+   "position": 2662736,
+   "normal": 2669936,
+   "color": 2677136,
+   "extra": 2679536,
+   "index": 2681936
+  },
+  "minotaur/weapon": {
+   "vertices": 984,
+   "indices": 1476,
+   "aabb": [
+    0,
+    -0.4,
+    -0.5,
+    0.1,
+    2.1,
+    0.6
+   ],
+   "position": 2685536,
+   "normal": 2697344,
+   "color": 2709152,
+   "extra": 2713088,
+   "index": 2717024
+  },
+  "hero/legL": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.12,
+    -0.72,
+    -0.12,
+    0.12,
+    0,
+    0.12
+   ],
+   "position": 2722928,
+   "normal": 2725616,
+   "color": 2728304,
+   "extra": 2729200,
+   "index": 2730096
+  },
+  "hero/shinL": {
+   "vertices": 248,
+   "indices": 372,
+   "aabb": [
+    -0.12,
+    -0.72,
+    -0.12,
+    0.12,
+    0,
+    0.24
+   ],
+   "position": 2731440,
+   "normal": 2734416,
+   "color": 2737392,
+   "extra": 2738384,
+   "index": 2739376
+  },
+  "hero/legR": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.12,
+    -0.72,
+    -0.12,
+    0.12,
+    0,
+    0.12
+   ],
+   "position": 2740864,
+   "normal": 2743552,
+   "color": 2746240,
+   "extra": 2747136,
+   "index": 2748032
+  },
+  "hero/shinR": {
+   "vertices": 248,
+   "indices": 372,
+   "aabb": [
+    -0.12,
+    -0.72,
+    -0.12,
+    0.12,
+    0,
+    0.24
+   ],
+   "position": 2749376,
+   "normal": 2752352,
+   "color": 2755328,
+   "extra": 2756320,
+   "index": 2757312
+  },
+  "hero/torso": {
+   "vertices": 4056,
+   "indices": 6084,
+   "aabb": [
+    -0.6,
+    -0.84,
+    -0.6,
+    0.6,
+    1.2,
+    0.36
+   ],
+   "position": 2758800,
+   "normal": 2807472,
+   "color": 2856144,
+   "extra": 2872368,
+   "index": 2888592
+  },
+  "hero/head": {
+   "vertices": 2432,
+   "indices": 3648,
+   "aabb": [
+    -0.336,
+    -0.096,
+    -0.624,
+    0.336,
+    1.344,
+    0.432
+   ],
+   "position": 2912928,
+   "normal": 2942112,
+   "color": 2971296,
+   "extra": 2981024,
+   "index": 2990752
+  },
+  "hero/armL": {
+   "vertices": 272,
+   "indices": 408,
+   "aabb": [
+    -0.12,
+    -0.84,
+    -0.12,
+    0.12,
+    0,
+    0.24
+   ],
+   "position": 3005344,
+   "normal": 3008608,
+   "color": 3011872,
+   "extra": 3012960,
+   "index": 3014048
+  },
+  "hero/armR": {
+   "vertices": 272,
+   "indices": 408,
+   "aabb": [
+    -0.12,
+    -0.84,
+    -0.12,
+    0.12,
+    0,
+    0.24
+   ],
+   "position": 3015680,
+   "normal": 3018944,
+   "color": 3022208,
+   "extra": 3023296,
+   "index": 3024384
+  },
+  "hero/weapon": {
+   "vertices": 904,
+   "indices": 1356,
+   "aabb": [
+    -0.12,
+    -1.32,
+    -0.12,
+    0.24,
+    4.44,
+    0.24
+   ],
+   "position": 3026016,
+   "normal": 3036864,
+   "color": 3047712,
+   "extra": 3051328,
+   "index": 3054944
+  },
+  "hero/shield": {
+   "vertices": 1432,
+   "indices": 2148,
+   "aabb": [
+    -0.72,
+    -0.72,
+    -0.12,
+    0.84,
+    0.84,
+    0.36
+   ],
+   "position": 3060368,
+   "normal": 3077552,
+   "color": 3094736,
+   "extra": 3100464,
+   "index": 3106192
+  },
+  "cyclops/legL": {
+   "vertices": 792,
+   "indices": 1188,
+   "aabb": [
+    -0.3,
+    -1.125,
+    -0.3,
+    0.45,
+    0.225,
+    0.45
+   ],
+   "position": 3114784,
+   "normal": 3124288,
+   "color": 3133792,
+   "extra": 3136960,
+   "index": 3140128
+  },
+  "cyclops/shinL": {
+   "vertices": 736,
+   "indices": 1104,
+   "aabb": [
+    -0.225,
+    -1.05,
+    -0.42,
+    0.375,
+    0.15,
+    0.63
+   ],
+   "position": 3144880,
+   "normal": 3153712,
+   "color": 3162544,
+   "extra": 3165488,
+   "index": 3168432
+  },
+  "cyclops/legR": {
+   "vertices": 792,
+   "indices": 1188,
+   "aabb": [
+    -0.3,
+    -1.125,
+    -0.3,
+    0.45,
+    0.225,
+    0.45
+   ],
+   "position": 3172848,
+   "normal": 3182352,
+   "color": 3191856,
+   "extra": 3195024,
+   "index": 3198192
+  },
+  "cyclops/shinR": {
+   "vertices": 736,
+   "indices": 1104,
+   "aabb": [
+    -0.225,
+    -1.05,
+    -0.42,
+    0.375,
+    0.15,
+    0.63
+   ],
+   "position": 3202944,
+   "normal": 3211776,
+   "color": 3220608,
+   "extra": 3223552,
+   "index": 3226496
+  },
+  "cyclops/torso": {
+   "vertices": 5512,
+   "indices": 8268,
+   "aabb": [
+    -0.9,
+    -0.9,
+    -1.05,
+    1.05,
+    2.55,
+    1.2
+   ],
+   "position": 3230912,
+   "normal": 3297056,
+   "color": 3363200,
+   "extra": 3385248,
+   "index": 3407296
+  },
+  "cyclops/head": {
+   "vertices": 2488,
+   "indices": 3732,
+   "aabb": [
+    -0.9,
+    -0.3,
+    -0.45,
+    0.9,
+    2.25,
+    1.05
+   ],
+   "position": 3440368,
+   "normal": 3470224,
+   "color": 3500080,
+   "extra": 3510032,
+   "index": 3519984
+  },
+  "cyclops/armL": {
+   "vertices": 1176,
+   "indices": 1764,
+   "aabb": [
+    -0.45,
+    -1.35,
+    -0.45,
+    0.6,
+    0.3,
+    0.6
+   ],
+   "position": 3534912,
+   "normal": 3549024,
+   "color": 3563136,
+   "extra": 3567840,
+   "index": 3572544
+  },
+  "cyclops/foreL": {
+   "vertices": 992,
+   "indices": 1488,
+   "aabb": [
+    -0.3,
+    -1.5,
+    -0.3,
+    0.45,
+    0.15,
+    0.45
+   ],
+   "position": 3579600,
+   "normal": 3591504,
+   "color": 3603408,
+   "extra": 3607376,
+   "index": 3611344
+  },
+  "cyclops/armR": {
+   "vertices": 1176,
+   "indices": 1764,
+   "aabb": [
+    -0.45,
+    -1.35,
+    -0.45,
+    0.6,
+    0.3,
+    0.6
+   ],
+   "position": 3617296,
+   "normal": 3631408,
+   "color": 3645520,
+   "extra": 3650224,
+   "index": 3654928
+  },
+  "cyclops/foreR": {
+   "vertices": 992,
+   "indices": 1488,
+   "aabb": [
+    -0.3,
+    -1.5,
+    -0.3,
+    0.45,
+    0.15,
+    0.45
+   ],
+   "position": 3661984,
+   "normal": 3673888,
+   "color": 3685792,
+   "extra": 3689760,
+   "index": 3693728
+  },
+  "cyclops/weapon": {
+   "vertices": 1632,
+   "indices": 2448,
+   "aabb": [
+    -0.45,
+    -0.6,
+    -0.45,
+    0.45,
+    2.85,
+    0.45
+   ],
+   "position": 3699680,
+   "normal": 3719264,
+   "color": 3738848,
+   "extra": 3745376,
+   "index": 3751904
+  },
+  "centaur/body": {
+   "vertices": 3360,
+   "indices": 5040,
+   "aabb": [
+    -0.24,
+    0,
+    -0.84,
+    0.32,
+    0.8,
+    0.92
+   ],
+   "position": 3761696,
+   "normal": 3802016,
+   "color": 3842336,
+   "extra": 3855776,
+   "index": 3869216
+  },
+  "centaur/barding": {
+   "vertices": 984,
+   "indices": 1476,
+   "aabb": [
+    -0.4,
+    0.48,
+    -0.36,
+    0.48,
+    0.88,
+    0.12
+   ],
+   "position": 3889376,
+   "normal": 3901184,
+   "color": 3912992,
+   "extra": 3916928,
+   "index": 3920864
+  },
+  "centaur/tail": {
+   "vertices": 400,
+   "indices": 600,
+   "aabb": [
+    -0.08,
+    -0.8,
+    -0.24,
+    0.08,
+    0.08,
+    0.08
+   ],
+   "position": 3926768,
+   "normal": 3931568,
+   "color": 3936368,
+   "extra": 3937968,
+   "index": 3939568
+  },
+  "centaur/legFL": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.08,
+    -0.4,
+    -0.08,
+    0.08,
+    0,
+    0.16
+   ],
+   "position": 3941968,
+   "normal": 3944656,
+   "color": 3947344,
+   "extra": 3948240,
+   "index": 3949136
+  },
+  "centaur/cannonFL": {
+   "vertices": 280,
+   "indices": 420,
+   "aabb": [
+    -0.08,
+    -0.56,
+    -0.08,
+    0.08,
+    0,
+    0.16
+   ],
+   "position": 3950480,
+   "normal": 3953840,
+   "color": 3957200,
+   "extra": 3958320,
+   "index": 3959440
+  },
+  "centaur/legFR": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.08,
+    -0.4,
+    -0.08,
+    0.08,
+    0,
+    0.16
+   ],
+   "position": 3961120,
+   "normal": 3963808,
+   "color": 3966496,
+   "extra": 3967392,
+   "index": 3968288
+  },
+  "centaur/cannonFR": {
+   "vertices": 280,
+   "indices": 420,
+   "aabb": [
+    -0.08,
+    -0.56,
+    -0.08,
+    0.08,
+    0,
+    0.16
+   ],
+   "position": 3969632,
+   "normal": 3972992,
+   "color": 3976352,
+   "extra": 3977472,
+   "index": 3978592
+  },
+  "centaur/legBL": {
+   "vertices": 320,
+   "indices": 480,
+   "aabb": [
+    -0.08,
+    -0.4,
+    -0.2,
+    0.08,
+    0,
+    0.2
+   ],
+   "position": 3980272,
+   "normal": 3984112,
+   "color": 3987952,
+   "extra": 3989232,
+   "index": 3990512
+  },
+  "centaur/cannonBL": {
+   "vertices": 280,
+   "indices": 420,
+   "aabb": [
+    -0.08,
+    -0.56,
+    -0.08,
+    0.08,
+    0,
+    0.16
+   ],
+   "position": 3992432,
+   "normal": 3995792,
+   "color": 3999152,
+   "extra": 4000272,
+   "index": 4001392
+  },
+  "centaur/legBR": {
+   "vertices": 320,
+   "indices": 480,
+   "aabb": [
+    -0.08,
+    -0.4,
+    -0.2,
+    0.08,
+    0,
+    0.2
+   ],
+   "position": 4003072,
+   "normal": 4006912,
+   "color": 4010752,
+   "extra": 4012032,
+   "index": 4013312
+  },
+  "centaur/cannonBR": {
+   "vertices": 280,
+   "indices": 420,
+   "aabb": [
+    -0.08,
+    -0.56,
+    -0.08,
+    0.08,
+    0,
+    0.16
+   ],
+   "position": 4015232,
+   "normal": 4018592,
+   "color": 4021952,
+   "extra": 4023072,
+   "index": 4024192
+  },
+  "centaur/torso": {
+   "vertices": 2056,
+   "indices": 3084,
+   "aabb": [
+    -0.4,
+    -0.24,
+    -0.32,
+    0.4,
+    0.88,
+    0.24
+   ],
+   "position": 4025872,
+   "normal": 4050544,
+   "color": 4075216,
+   "extra": 4083440,
+   "index": 4091664
+  },
+  "centaur/head": {
+   "vertices": 1432,
+   "indices": 2148,
+   "aabb": [
+    -0.224,
+    -0.128,
+    -0.224,
+    0.224,
+    0.448,
+    0.224
+   ],
+   "position": 4104000,
+   "normal": 4121184,
+   "color": 4138368,
+   "extra": 4144096,
+   "index": 4149824
+  },
+  "centaur/armL": {
+   "vertices": 272,
+   "indices": 408,
+   "aabb": [
+    -0.08,
+    -0.56,
+    -0.08,
+    0.08,
+    0,
+    0.16
+   ],
+   "position": 4158416,
+   "normal": 4161680,
+   "color": 4164944,
+   "extra": 4166032,
+   "index": 4167120
+  },
+  "centaur/armR": {
+   "vertices": 272,
+   "indices": 408,
+   "aabb": [
+    -0.08,
+    -0.56,
+    -0.08,
+    0.08,
+    0,
+    0.16
+   ],
+   "position": 4168752,
+   "normal": 4172016,
+   "color": 4175280,
+   "extra": 4176368,
+   "index": 4177456
+  },
+  "centaur/weapon": {
+   "vertices": 1056,
+   "indices": 1584,
+   "aabb": [
+    0,
+    -0.96,
+    0,
+    0.16,
+    1.04,
+    0.4
+   ],
+   "position": 4179088,
+   "normal": 4191760,
+   "color": 4204432,
+   "extra": 4208656,
+   "index": 4212880
+  },
+  "centaur/arrow": {
+   "vertices": 312,
+   "indices": 468,
+   "aabb": [
+    0,
+    -0.08,
+    -0.24,
+    0.08,
+    0.16,
+    1.12
+   ],
+   "position": 4219216,
+   "normal": 4222960,
+   "color": 4226704,
+   "extra": 4227952,
+   "index": 4229200
+  },
+  "medusa/coil": {
+   "vertices": 3344,
+   "indices": 5016,
+   "aabb": [
+    -0.84,
+    0,
+    -0.96,
+    0.96,
+    1.32,
+    0.84
+   ],
+   "position": 4231072,
+   "normal": 4271200,
+   "color": 4311328,
+   "extra": 4324704,
+   "index": 4338080
+  },
+  "medusa/tailA": {
+   "vertices": 808,
+   "indices": 1212,
+   "aabb": [
+    -0.24,
+    -0.24,
+    -0.84,
+    0.36,
+    0.36,
+    0.12
+   ],
+   "position": 4358144,
+   "normal": 4367840,
+   "color": 4377536,
+   "extra": 4380768,
+   "index": 4384000
+  },
+  "medusa/tailB": {
+   "vertices": 552,
+   "indices": 828,
+   "aabb": [
+    -0.24,
+    -0.24,
+    -0.84,
+    0.36,
+    0.36,
+    0.12
+   ],
+   "position": 4388848,
+   "normal": 4395472,
+   "color": 4402096,
+   "extra": 4404304,
+   "index": 4406512
+  },
+  "medusa/tailC": {
+   "vertices": 392,
+   "indices": 588,
+   "aabb": [
+    -0.12,
+    -0.12,
+    -0.84,
+    0.24,
+    0.24,
+    0.12
+   ],
+   "position": 4409824,
+   "normal": 4414528,
+   "color": 4419232,
+   "extra": 4420800,
+   "index": 4422368
+  },
+  "medusa/torso": {
+   "vertices": 1792,
+   "indices": 2688,
+   "aabb": [
+    -0.6,
+    -0.12,
+    -0.36,
+    0.6,
+    1.2,
+    0.36
+   ],
+   "position": 4424720,
+   "normal": 4446224,
+   "color": 4467728,
+   "extra": 4474896,
+   "index": 4482064
+  },
+  "medusa/head": {
+   "vertices": 2048,
+   "indices": 3072,
+   "aabb": [
+    -0.624,
+    -0.192,
+    -0.624,
+    0.624,
+    0.96,
+    0.432
+   ],
+   "position": 4492816,
+   "normal": 4517392,
+   "color": 4541968,
+   "extra": 4550160,
+   "index": 4558352
+  },
+  "medusa/armL": {
+   "vertices": 272,
+   "indices": 408,
+   "aabb": [
+    -0.12,
+    -0.84,
+    -0.12,
+    0.12,
+    0,
+    0.24
+   ],
+   "position": 4570640,
+   "normal": 4573904,
+   "color": 4577168,
+   "extra": 4578256,
+   "index": 4579344
+  },
+  "medusa/armR": {
+   "vertices": 272,
+   "indices": 408,
+   "aabb": [
+    -0.12,
+    -0.84,
+    -0.12,
+    0.12,
+    0,
+    0.24
+   ],
+   "position": 4580976,
+   "normal": 4584240,
+   "color": 4587504,
+   "extra": 4588592,
+   "index": 4589680
+  },
+  "medusa/weapon": {
+   "vertices": 1056,
+   "indices": 1584,
+   "aabb": [
+    0,
+    -1.44,
+    0,
+    0.24,
+    1.56,
+    0.6
+   ],
+   "position": 4591312,
+   "normal": 4603984,
+   "color": 4616656,
+   "extra": 4620880,
+   "index": 4625104
+  },
+  "medusa/arrow": {
+   "vertices": 312,
+   "indices": 468,
+   "aabb": [
+    0,
+    -0.12,
+    -0.36,
+    0.12,
+    0.24,
+    1.68
+   ],
+   "position": 4631440,
+   "normal": 4635184,
+   "color": 4638928,
+   "extra": 4640176,
+   "index": 4641424
+  }
+ }
+}

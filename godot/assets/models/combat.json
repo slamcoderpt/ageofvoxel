@@ -1,0 +1,110 @@
+{
+ "format": 2,
+ "group": "combat",
+ "bin": "combat.bin.gz",
+ "bytes": 91200,
+ "models": {
+  "arrow": {
+   "vertices": 392,
+   "indices": 588,
+   "aabb": [
+    -0.09,
+    -0.09,
+    -0.48,
+    0.09,
+    0.09,
+    0.48
+   ],
+   "position": 0,
+   "normal": 4704,
+   "color": 9408,
+   "extra": 10976,
+   "index": 12544
+  },
+  "debris_shield": {
+   "vertices": 616,
+   "indices": 924,
+   "aabb": [
+    -0.3,
+    0,
+    -0.3,
+    0.4,
+    0.3,
+    0.4
+   ],
+   "position": 14896,
+   "normal": 22288,
+   "color": 29680,
+   "extra": 32144,
+   "index": 34608
+  },
+  "debris_spear": {
+   "vertices": 488,
+   "indices": 732,
+   "aabb": [
+    0,
+    0,
+    -1.5,
+    0.1,
+    0.1,
+    1.5
+   ],
+   "position": 38304,
+   "normal": 44160,
+   "color": 50016,
+   "extra": 51968,
+   "index": 53920
+  },
+  "debris_stub": {
+   "vertices": 184,
+   "indices": 276,
+   "aabb": [
+    0,
+    0,
+    -0.6,
+    0.2,
+    0.1,
+    0.4
+   ],
+   "position": 56848,
+   "normal": 59056,
+   "color": 61264,
+   "extra": 62000,
+   "index": 62736
+  },
+  "debris_helmet": {
+   "vertices": 568,
+   "indices": 852,
+   "aabb": [
+    -0.2,
+    0,
+    -0.3,
+    0.2,
+    0.6,
+    0.3
+   ],
+   "position": 63840,
+   "normal": 70656,
+   "color": 77472,
+   "extra": 79744,
+   "index": 82016
+  },
+  "debris_arrows": {
+   "vertices": 152,
+   "indices": 228,
+   "aabb": [
+    0,
+    0,
+    -0.5,
+    0.1,
+    0.1,
+    0.4
+   ],
+   "position": 85424,
+   "normal": 87248,
+   "color": 89072,
+   "extra": 89680,
+   "index": 90288
+  }
+ }
+}
