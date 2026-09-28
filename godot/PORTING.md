@@ -77,9 +77,10 @@ The sim is compiled with `-ffp-contract=off` (MSVC `/fp:precise`): no FMA
 contraction, never `-ffast-math`, or it stops matching the browser.
 
 Web: `source ~/emsdk/emsdk_env.sh && scons -j2 platform=web threads=no
-target=template_release` with **emscripten 4.0.11** (the version the official
-4.5.1 web templates are built with; other versions fail to load the side
-module) gives `bin/libaov.web.template_release.wasm32.nothreads.wasm`. The
+target=template_release` with **emscripten 4.0.10** (the version the official
+4.5.1 web templates are built with and report at startup; CI pins it too, and
+`~/emsdk` here has it active. 4.0.11 side modules also load; far-off versions
+fail to) gives `bin/libaov.web.template_release.wasm32.nothreads.wasm`. The
 web export uses the dlink "nothreads" template: no SharedArrayBuffer, so it
 runs from any static server without cross-origin isolation headers. The first
 web build compiles godot-cpp for wasm (~20 min on 2 cores here).
@@ -116,6 +117,16 @@ node scripts/godot-webshoot.mjs --scene hud [--out shots/godot/web-hud.png]   # 
 node scripts/godot-webshoot.mjs --scene none      # no params: the default fog-of-war skirmish (what CI checks)
 dist-godot/linux/AgeOfVoxel.x86_64 -- --scene=town                # exported builds take the same args
 ```
+
+The editor that runs an export loads the extension through the *debug*
+entry for its own OS (`linux.debug.x86_64` on Linux, `macos.debug` on a Mac),
+whatever the target: without that `template_debug` library it logs
+"GDExtension dynamic library not found" and the export fails. The script
+builds it along with the target's library, or, with `SKIP_BUILD=1`, stops
+early naming whichever of the two is missing; CI's linux native job builds
+both `template_release` and `template_debug` for that reason. The web library
+is built with emscripten 4.0.10, the version the official 4.5.1 web templates
+report at startup.
 
 Output: `../dist-godot/<target>/` (gitignored). In the web build the page's
 query string is read like the command line (`AovArgs.parse`). CI:

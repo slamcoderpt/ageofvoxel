@@ -19,7 +19,9 @@ concurrency:
 
 env:
   GODOT_VERSION: 4.5.1
-  EM_VERSION: 4.0.11 # the emscripten the official 4.5.1 web templates are built with
+  # The emscripten the official 4.5.1 web templates are built with (the web
+  # build logs "Emscripten 4.0.10" at startup): a dlink side module should match it.
+  EM_VERSION: 4.0.10
   SCONS_CACHE_LIMIT: 4096
 
 jobs:
@@ -28,20 +30,29 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
+      # targets: template_release is what each exported game links. Linux also
+      # builds template_debug: the export job runs the Linux *editor*, which
+      # loads the extension through aov.gdextension's linux.debug.x86_64 entry
+      # (libaov.linux.template_debug.x86_64.so). Without it the editor logs
+      # "GDExtension dynamic library not found" and every export fails.
       matrix:
         include:
           - name: linux-x86_64
             os: ubuntu-22.04 # old glibc: the .so loads on older distros too
             flags: platform=linux arch=x86_64
+            targets: template_release template_debug
           - name: windows-x86_64
             os: windows-latest
             flags: platform=windows arch=x86_64
+            targets: template_release
           - name: macos-universal
             os: macos-latest
             flags: platform=macos arch=universal
+            targets: template_release
           - name: web-wasm32
             os: ubuntu-22.04
             flags: platform=web threads=no
+            targets: template_release
     steps:
       - uses: actions/checkout@v4
         with:
@@ -74,12 +85,16 @@ jobs:
           path: |
             godot/native/godot-cpp/bin
             godot/native/godot-cpp/gen
-          key: godot-cpp-${{ matrix.name }}-${{ steps.gdcpp.outputs.sha }}-em${{ env.EM_VERSION }}-v1
+          key: godot-cpp-${{ matrix.name }}-${{ steps.gdcpp.outputs.sha }}-em${{ env.EM_VERSION }}-v2
 
-      - name: Build (template_release)
+      - name: Build (${{ matrix.targets }})
         shell: bash
         working-directory: godot/native
-        run: scons -j4 ${{ matrix.flags }} target=template_release
+        run: |
+          for t in ${{ matrix.targets }}; do
+            scons -j4 ${{ matrix.flags }} target=$t
+          done
+          ls -la bin
 
       - uses: actions/upload-artifact@v4
         with:
@@ -145,7 +160,8 @@ jobs:
       - name: Export
         env:
           GODOT: /home/runner/godot-bin/godot
-          SKIP_BUILD: "1"
+          SKIP_BUILD: "1" # the libraries come from the native jobs; the script
+          # still checks that the editor's (linux template_debug) one is there
         run: |
           ls -la godot/native/bin
           scripts/godot-export.sh ${{ matrix.target }} release

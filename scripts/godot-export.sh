@@ -24,21 +24,40 @@ GODOT=${GODOT:-godot}
 JOBS=${JOBS:-2}
 
 case "$target" in
-	linux)   preset=Linux;   out=AgeOfVoxel.x86_64; sargs="platform=linux arch=x86_64" ;;
-	windows) preset=Windows; out=AgeOfVoxel.exe;    sargs="platform=windows arch=x86_64" ;;
-	macos)   preset=macOS;   out=AgeOfVoxel.zip;    sargs="platform=macos arch=universal" ;;
-	web)     preset=Web;     out=index.html;        sargs="platform=web threads=no" ;;
+	linux)   preset=Linux;   out=AgeOfVoxel.x86_64; sargs="platform=linux arch=x86_64";    tlib=linux.template_MODE.x86_64.so ;;
+	windows) preset=Windows; out=AgeOfVoxel.exe;    sargs="platform=windows arch=x86_64";  tlib=windows.template_MODE.x86_64.dll ;;
+	macos)   preset=macOS;   out=AgeOfVoxel.zip;    sargs="platform=macos arch=universal"; tlib=macos.template_MODE.framework ;;
+	web)     preset=Web;     out=index.html;        sargs="platform=web threads=no";       tlib=web.template_MODE.wasm32.nothreads.wasm ;;
 	*) echo "unknown target: $target" >&2; exit 2 ;;
 esac
 case "$mode" in release|debug) ;; *) echo "mode must be release or debug" >&2; exit 2 ;; esac
+tlib=libaov.${tlib/MODE/$mode}
+
+# The editor that runs the export loads the extension too, through the
+# *debug* entry for the machine it runs on (aov.gdextension). Without that
+# library it logs "GDExtension dynamic library not found" and the export fails,
+# whatever the target, so it is built (or checked) as well.
+case "$(uname -s)" in
+	Linux)  harch=$(uname -m); [ "$harch" = aarch64 ] && harch=arm64
+	        hargs="platform=linux arch=$harch"; hlib=libaov.linux.template_debug.$harch.so ;;
+	Darwin) hargs="platform=macos arch=universal"; hlib=libaov.macos.template_debug.framework ;;
+	MINGW*|MSYS*|CYGWIN*) hargs="platform=windows arch=x86_64"; hlib=libaov.windows.template_debug.x86_64.dll ;;
+	*) echo "unsupported host: $(uname -s)" >&2; exit 2 ;;
+esac
 
 if [ "${SKIP_BUILD:-0}" != 1 ]; then
+	(cd "$root/godot/native" && scons -j"$JOBS" $hargs target=template_debug)
 	if [ "$target" = web ] && ! command -v emcc >/dev/null 2>&1; then
 		# shellcheck disable=SC1091
 		source "${EMSDK:-$HOME/emsdk}/emsdk_env.sh" >/dev/null
 	fi
 	(cd "$root/godot/native" && scons -j"$JOBS" $sargs target=template_"$mode")
 fi
+[ -e "$root/godot/native/bin/$tlib" ] || {
+	echo "missing godot/native/bin/$tlib (the $target library the export ships)" >&2; exit 1; }
+[ -e "$root/godot/native/bin/$hlib" ] || {
+	echo "missing godot/native/bin/$hlib: the editor needs it to load the extension" >&2
+	echo "(build it: cd godot/native && scons $hargs target=template_debug)" >&2; exit 1; }
 
 # Godot only loads a GDExtension listed in .godot/extension_list.cfg (written by an import).
 if [ ! -f "$root/godot/.godot/extension_list.cfg" ]; then

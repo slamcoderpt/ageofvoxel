@@ -159,7 +159,10 @@ off. The choice applies at once and is remembered. By the minimap: idle villager
 `godot/` is a Godot 4.5.1 port of the same game (C++ simulation in a GDExtension,
 see `godot/PORTING.md`). CI (`.github/workflows/godot.yml`) builds it for Linux,
 Windows, macOS (universal: Intel + Apple Silicon) and the web on every push that
-touches `godot/`; download the `aov-godot-*` artifacts from the workflow run.
+touches `godot/`: open the run under the repository's Actions tab ("Godot"
+workflow) and download the `aov-godot-*` artifacts from its Summary page
+(signed-in GitHub users only; they are kept 90 days). The Linux binary loses its
+executable bit in the artifact zip: `chmod +x AgeOfVoxel.x86_64` after unzipping.
 
 **On a Mac, from the CI artifact:** unzip `aov-godot-macos-universal`, then unzip
 `AgeOfVoxel.zip` and run `xattr -cr "Age of Voxel.app"` once (the app is ad-hoc
@@ -181,8 +184,11 @@ $GODOT -e --path godot                     # or open the project in the editor
 
 To export a standalone app, install the 4.5.1 export templates (Editor > Manage
 Export Templates) and run `GODOT=$GODOT scripts/godot-export.sh macos` (writes
-`dist-godot/macos/AgeOfVoxel.zip`). The same script exports `linux`, `windows` and
-`web`; the web export needs emscripten 4.0.11 (`EMSDK=~/emsdk`) and is served by any
+`dist-godot/macos/AgeOfVoxel.zip`; it builds the release library for the app
+and the debug one the editor itself loads to run the export). The same script
+exports `linux`, `windows` and `web`; the web export needs emscripten 4.0.10, the
+version the official templates use (`./emsdk install 4.0.10 && ./emsdk activate
+4.0.10`, then `EMSDK=~/emsdk`), and is served by any
 static server: `python3 -m http.server -d dist-godot/web 8000`, then open
 http://localhost:8000/ (the skirmish; `?scene=town` etc. work like the browser build's URL params).
 
