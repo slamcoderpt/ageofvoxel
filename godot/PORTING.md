@@ -126,6 +126,7 @@ SKIP_BUILD=1 scripts/godot-export.sh linux debug                  # export only 
 python3 -m http.server -d dist-godot/web 8000                     # web: open http://localhost:8000/?scene=town
 node scripts/godot-webshoot.mjs --scene hud [--out shots/godot/web-hud.png]   # web smoke test + screenshot (headless Chromium)
 node scripts/godot-webshoot.mjs --scene none      # no params: the default fog-of-war skirmish (what CI checks)
+node scripts/godot-webshoot.mjs --scene none --coi   # same, served with COOP/COEP (the nothreads build must start both ways)
 dist-godot/linux/AgeOfVoxel.x86_64 -- --scene=town                # exported builds take the same args
 ```
 

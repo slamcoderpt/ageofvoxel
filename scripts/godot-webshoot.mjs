@@ -2,7 +2,7 @@
 // scripts/godot-export.sh web) in headless Chromium with software WebGL2.
 //
 //   node scripts/godot-webshoot.mjs [--scene town|none] [--params "seed=7"] [--out shots/godot/web-town.png]
-//        [--dir dist-godot/web] [--width 1280 --height 720] [--settle 20] [--timeout 600] [--verbose]
+//        [--dir dist-godot/web] [--width 1280 --height 720] [--settle 20] [--timeout 600] [--coi] [--verbose]
 //
 // Serves --dir on a local port, opens index.html?scene=<scene>&<params>, waits
 // for the scene log line ("aov: scene=...") plus --settle seconds of rendering,
@@ -32,7 +32,10 @@ const server = http.createServer((req, res) => {
   if (!p.startsWith(root) || !fs.existsSync(p) || fs.statSync(p).isDirectory()) {
     res.writeHead(404); res.end(); return;
   }
-  res.writeHead(200, { 'Content-Type': MIME[path.extname(p)] || 'application/octet-stream' });
+  // --coi: serve with cross-origin isolation (COOP/COEP) too; the nothreads
+  // build must start either way
+  const coi = args.coi ? { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' } : {};
+  res.writeHead(200, { 'Content-Type': MIME[path.extname(p)] || 'application/octet-stream', ...coi });
   fs.createReadStream(p).pipe(res);
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
