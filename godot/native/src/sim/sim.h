@@ -26,6 +26,9 @@
 #include "core/players.h"
 #include "core/profile.h"
 #include "core/rng.h"
+#include "buildings/buildings.h"
+#include "economy/economy.h"
+#include "scenes/scenes.h"
 #include "units/units.h"
 
 namespace aov {
@@ -48,6 +51,9 @@ public:
 	Movement movement;
 	Commands commands;
 	Units units;
+	Economy economy;
+	Buildings buildings;
+	SceneCtx scene; // the last scene setup's context (AovSim.setup_scene)
 
 	GameMap &map() { return world.map; }
 	const GameMap &map() const { return world.map; }
@@ -57,6 +63,8 @@ public:
 	void new_game(uint32_t seed_, int map_size, const std::string &preset, int n_players);
 	// One fixed 1/30 s step: game.tick() with the systems in the JS simOrder.
 	void tick(double dt = SIM_DT);
+	// game.fastForward(seconds): Math.round(seconds / SIM_DT) ticks
+	void fast_forward(double seconds);
 
 	Player *player(int id) { return id >= 0 && id < MAX_PLAYERS && players[id].exists ? &players[id] : nullptr; }
 	Player &add_player(int id, const std::string &name, bool is_ai);
@@ -64,7 +72,10 @@ public:
 
 	// terrain piece, sim side (src/terrain/index.js): Gaia resource nodes
 	int32_t spawn_resource(int type, int tx, int tz, int variant = 0);
+	// terrain.removeResource(e): unblocks its tiles (an animal, whose rect is
+	// fractional, only unblocks when x - 0.5 happens to be a whole tile, as in JS)
 	void remove_resource(int32_t id);
+	// terrain.clearRect: every resource (animals too) overlapping the tile rect
 	void clear_rect(int tx, int tz, int w, int h);
 
 	// src/core/scenes/helpers.js spawnBlock (loose block formation centred on

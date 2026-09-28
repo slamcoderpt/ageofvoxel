@@ -23,6 +23,9 @@ void Sim::new_game(uint32_t seed_, int map_size, const std::string &preset, int 
 	movement.init(this);
 	commands.init(this);
 	units.init(this);
+	economy.init(this);
+	buildings.init(this);
+	scene = SceneCtx();
 	for (const auto &r : world.resources) {
 		int t = resource_type_of(r.type.c_str());
 		if (t >= 0) spawn_resource(t, r.tx, r.tz, r.variant);
@@ -45,6 +48,14 @@ void Sim::tick(double dt) {
 	const bool P = prof.enabled;
 	// JS simOrder: economy, buildings, combat, godpowers, units, movement, fx, fog, victory
 	{
+		ScopedTimer t(P ? &prof.sys["economy"] : nullptr);
+		economy.update(dt);
+	}
+	{
+		ScopedTimer t(P ? &prof.sys["buildings"] : nullptr);
+		buildings.update(dt);
+	}
+	{
 		ScopedTimer t(P ? &prof.sys["units"] : nullptr);
 		units.update(dt);
 	}
@@ -53,6 +64,11 @@ void Sim::tick(double dt) {
 		movement.update(dt);
 	}
 	if (P) prof.total = ms_since(t0);
+}
+
+void Sim::fast_forward(double seconds) {
+	const int n = (int)js_round(seconds / SIM_DT);
+	for (int i = 0; i < n; i++) tick(SIM_DT);
 }
 
 int32_t Sim::spawn_resource(int type, int tx, int tz, int variant) {
@@ -80,7 +96,10 @@ void Sim::remove_resource(int32_t id) {
 	int s = entities.resource_slot(id);
 	if (s < 0) return;
 	const ResourceStore &R = entities.resources;
-	world.map.unblock(R.tx[s], R.tz[s], R.w[s], R.h[s]);
+	if (is_animal_type(R.type[s])) {
+		const double tx = R.x[s] - 0.5, tz = R.z[s] - 0.5;
+		if (tx == std::floor(tx) && tz == std::floor(tz)) world.map.unblock((int)tx, (int)tz, 1, 1);
+	} else world.map.unblock(R.tx[s], R.tz[s], R.w[s], R.h[s]);
 	entities.remove(id);
 }
 
@@ -89,7 +108,8 @@ void Sim::clear_rect(int tx, int tz, int w, int h) {
 	const ResourceStore &R = entities.resources;
 	for (int i = 0; i < R.size(); i++) {
 		if (R.removed[i]) continue;
-		if (R.tx[i] < tx + w && R.tx[i] + R.w[i] > tx && R.tz[i] < tz + h && R.tz[i] + R.h[i] > tz) ids.push_back(R.id[i]);
+		const double rtx = R.x[i] - R.w[i] / 2.0, rtz = R.z[i] - R.h[i] / 2.0; // (fractional for animals)
+		if (rtx < tx + w && rtx + R.w[i] > tx && rtz < tz + h && rtz + R.h[i] > tz) ids.push_back(R.id[i]);
 	}
 	for (int32_t id : ids) remove_resource(id);
 }

@@ -1,5 +1,7 @@
 #include "aov_sim.h"
 
+#include <algorithm>
+
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 
@@ -32,6 +34,7 @@ void AovSim::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("take_census"), &AovSim::take_census);
 	ClassDB::bind_method(D_METHOD("units_hash"), &AovSim::units_hash);
 	ClassDB::bind_method(D_METHOD("get_units_f64"), &AovSim::get_units_f64);
+	ClassDB::bind_method(D_METHOD("get_econ_f64"), &AovSim::get_econ_f64);
 	ClassDB::bind_method(D_METHOD("get_walkable"), &AovSim::get_walkable);
 	ClassDB::bind_method(D_METHOD("build_terrain_mesh", "cx0", "cz0", "cx1", "cz1"), &AovSim::build_terrain_mesh);
 	// players
@@ -66,6 +69,38 @@ void AovSim::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_repath_budget", "n"), &AovSim::set_repath_budget);
 	ClassDB::bind_method(D_METHOD("set_path_cache", "on"), &AovSim::set_path_cache);
 	ClassDB::bind_method(D_METHOD("set_group_paths", "min_units"), &AovSim::set_group_paths);
+	// buildings
+	ClassDB::bind_method(D_METHOD("building_type_names"), &AovSim::building_type_names);
+	ClassDB::bind_method(D_METHOD("get_building_def", "type"), &AovSim::get_building_def);
+	ClassDB::bind_method(D_METHOD("spawn_building", "type", "owner", "tx", "tz", "built", "site"), &AovSim::spawn_building, DEFVAL(true), DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("can_place", "type", "tx", "tz"), &AovSim::can_place);
+	ClassDB::bind_method(D_METHOD("place_building", "type", "owner", "tx", "tz", "builders"), &AovSim::place_building, DEFVAL(PackedInt32Array()));
+	ClassDB::bind_method(D_METHOD("destroy_building", "id"), &AovSim::destroy_building);
+	ClassDB::bind_method(D_METHOD("get_building", "id"), &AovSim::get_building);
+	// economy
+	ClassDB::bind_method(D_METHOD("train", "building", "unit_type"), &AovSim::train);
+	ClassDB::bind_method(D_METHOD("cancel_train", "building", "index"), &AovSim::cancel_train);
+	ClassDB::bind_method(D_METHOD("advance_age", "owner"), &AovSim::advance_age);
+	ClassDB::bind_method(D_METHOD("next_age_cost", "owner"), &AovSim::next_age_cost);
+	ClassDB::bind_method(D_METHOD("set_rally", "building", "x", "z", "target_id"), &AovSim::set_rally, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("clear_rally", "building"), &AovSim::clear_rally);
+	ClassDB::bind_method(D_METHOD("nearest_resource", "x", "z", "res_type", "max_dist"), &AovSim::nearest_resource, DEFVAL(14.0));
+	ClassDB::bind_method(D_METHOD("nearest_dropoff", "owner", "x", "z", "res_type"), &AovSim::nearest_dropoff);
+	ClassDB::bind_method(D_METHOD("order_gather", "ids", "target"), &AovSim::order_gather);
+	ClassDB::bind_method(D_METHOD("order_build", "ids", "target"), &AovSim::order_build);
+	ClassDB::bind_method(D_METHOD("order_worship", "ids", "target"), &AovSim::order_worship);
+	ClassDB::bind_method(D_METHOD("order_dropoff", "ids", "target"), &AovSim::order_dropoff);
+	ClassDB::bind_method(D_METHOD("set_player_resources", "owner", "res"), &AovSim::set_player_resources);
+	ClassDB::bind_method(D_METHOD("set_player_age", "owner", "age"), &AovSim::set_player_age);
+	ClassDB::bind_method(D_METHOD("spawn_herd", "type", "x", "z", "n"), &AovSim::spawn_herd);
+	ClassDB::bind_method(D_METHOD("spawn_boat", "owner", "x", "z", "rot"), &AovSim::spawn_boat, DEFVAL(0.0));
+	ClassDB::bind_method(D_METHOD("spawn_shoal", "x", "z", "amount"), &AovSim::spawn_shoal, DEFVAL(300.0));
+	ClassDB::bind_method(D_METHOD("get_economy"), &AovSim::get_economy);
+	ClassDB::bind_method(D_METHOD("get_decor"), &AovSim::get_decor);
+	// scenes
+	ClassDB::bind_method(D_METHOD("has_scene_setup", "name"), &AovSim::has_scene_setup);
+	ClassDB::bind_method(D_METHOD("setup_scene", "name"), &AovSim::setup_scene);
+	ClassDB::bind_method(D_METHOD("scene_after", "name"), &AovSim::scene_after);
 	// events
 	ClassDB::bind_method(D_METHOD("take_events"), &AovSim::take_events);
 	ClassDB::bind_method(D_METHOD("set_record_events", "on"), &AovSim::set_record_events);
@@ -261,6 +296,9 @@ Dictionary AovSim::get_player(int64_t id) const {
 	d["pop_cap"] = p.pop_cap;
 	d["age"] = p.age;
 	d["age_name"] = aov::AGES[p.age & 3];
+	d["advancing"] = p.advancing;
+	d["advance_t"] = p.advancing_t;
+	d["advance_total"] = p.advancing_total;
 	return d;
 }
 
@@ -378,6 +416,27 @@ static PA packed_rows(const std::vector<uint8_t> &removed, const std::vector<T> 
 	return out;
 }
 
+// What a villager carries as the EconomyView draws it (drawLoads): 0 wood,
+// 1 gold, 2 grain, 3 fruit, 4 meat, 255 nothing.
+static uint8_t load_kind(const aov::Entities &E, int r) {
+	const aov::UnitStore &U = E.units;
+	const int c = U.carry_type[r];
+	if (c == aov::RES_NONE || U.carry_amount[r] <= 0) return 255;
+	if (c == aov::RES_WOOD) return 0;
+	if (c == aov::RES_GOLD) return 1;
+	if (c != aov::RES_FOOD) return 255;
+	const int32_t src = U.econ_phase[r] != aov::EP_NONE ? U.econ_res[r] : 0;
+	const int s = E.slot(src);
+	if (s >= 0 && E.kind(src) == aov::K_BUILDING && aov::building_def(E.buildings.type[s]).farm) return 2;
+	if (s >= 0 && E.kind(src) == aov::K_RESOURCE) {
+		const int t = E.resources.type[s];
+		if (aov::is_animal_type(t)) return 4;
+		if (t == aov::R_BERRY) return 3;
+	}
+	if (U.econ_phase[r] != aov::EP_NONE && U.econ_hunt[r]) return 4;
+	return 2;
+}
+
 Dictionary AovSim::get_units() const {
 	const aov::UnitStore &U = sim_.entities.units;
 	const int n = U.size();
@@ -385,12 +444,17 @@ Dictionary AovSim::get_units() const {
 	for (int r = 0; r < n; r++) live += !U.removed[r];
 	PackedInt32Array ids, target;
 	PackedFloat32Array pos, prev, rot, prot, hp, mhp, at, atk, die, hit, flash, gy;
-	PackedByteArray type, owner, anim, order, flags, carry;
+	PackedByteArray type, owner, anim, order, flags, carry, load, task;
+	PackedFloat32Array carry_amt;
 	ids.resize(live); target.resize(live);
 	pos.resize(live * 2); prev.resize(live * 2);
 	rot.resize(live); prot.resize(live); hp.resize(live); mhp.resize(live); at.resize(live); atk.resize(live); die.resize(live);
 	hit.resize(live); flash.resize(live); gy.resize(live);
 	type.resize(live); owner.resize(live); anim.resize(live); order.resize(live); flags.resize(live); carry.resize(live);
+	load.resize(live); carry_amt.resize(live); task.resize(live);
+	uint8_t *wld = load.ptrw(), *wtk = task.ptrw();
+	float *wcam = carry_amt.ptrw();
+	const aov::Entities &E = sim_.entities;
 	int32_t *wid = ids.ptrw(), *wtg = target.ptrw();
 	float *wp = pos.ptrw(), *wpp = prev.ptrw(), *wr = rot.ptrw(), *wpr = prot.ptrw(), *wh = hp.ptrw(), *wmh = mhp.ptrw(), *wat = at.ptrw(),
 		  *watk = atk.ptrw(), *wdie = die.ptrw(), *whit = hit.ptrw(), *wfl = flash.ptrw(), *wgy = gy.ptrw();
@@ -422,6 +486,9 @@ Dictionary AovSim::get_units() const {
 		wfg[k] = (uint8_t)((U.moving[r] ? aov::UF_MOVING : 0) | (U.dead[r] ? aov::UF_DEAD : 0) | (U.arrived[r] ? aov::UF_ARRIVED : 0) |
 				(U.carry_amount[r] > 0 ? aov::UF_CARRY : 0) | (U.combat_line[r] ? aov::UF_LINE : 0));
 		wca[k] = U.carry_type[r];
+		wcam[k] = (float)U.carry_amount[r];
+		wld[k] = load_kind(E, r);
+		wtk[k] = U.econ_phase[r] != aov::EP_NONE ? U.econ_res_type[r] : 255;
 		k++;
 	}
 	Dictionary d;
@@ -446,6 +513,9 @@ Dictionary AovSim::get_units() const {
 	d["target"] = target;
 	d["flags"] = flags;
 	d["carry"] = carry;
+	d["carry_amount"] = carry_amt;
+	d["load"] = load;
+	d["task"] = task; // the resource kind being gathered (u.econ.resType), 255 none
 	return d;
 }
 
@@ -469,6 +539,27 @@ Dictionary AovSim::get_buildings() const {
 	d["max_hp"] = packed_rows<double, PackedFloat32Array>(B.removed, B.max_hp);
 	d["built"] = packed_rows<uint8_t, PackedByteArray>(B.removed, B.built);
 	d["progress"] = packed_rows<double, PackedFloat32Array>(B.removed, B.progress);
+	d["variant"] = packed_rows<int32_t, PackedInt32Array>(B.removed, B.bld_variant);
+	d["yaw"] = packed_rows<double, PackedFloat32Array>(B.removed, B.bld_yaw);
+	d["setback"] = packed_rows<double, PackedFloat32Array>(B.removed, B.bld_setback);
+	d["farm_rows"] = packed_rows<double, PackedFloat32Array>(B.removed, B.econ_rows);
+	PackedFloat32Array stock, rally;
+	PackedByteArray qlen;
+	for (int r = 0; r < B.size(); r++) {
+		if (B.removed[r]) continue;
+		const double st[6] = { B.stock_grain[r], B.stock_fruit[r], B.stock_meat[r], B.stock_fish[r], B.stock_wood[r], B.stock_gold[r] };
+		for (double v : st) stock.push_back((float)v);
+		qlen.push_back((uint8_t)std::min<size_t>(255, B.queue[r].size()));
+		rally.push_back(B.rally[r] ? 1.f : 0.f);
+		rally.push_back((float)B.rally_x[r]);
+		rally.push_back((float)B.rally_z[r]);
+	}
+	d["stock"] = stock; // 6 per building: grain, fruit, meat, fish, wood, gold
+	d["queue_len"] = qlen;
+	d["rally"] = rally; // 3 per building: set, x, z
+	PackedStringArray names;
+	for (int i = 0; i < aov::B_TYPE_COUNT; i++) names.push_back(aov::building_def(i).key);
+	d["type_names"] = names;
 	return d;
 }
 
@@ -487,6 +578,7 @@ Dictionary AovSim::get_resources() const {
 	d["tile"] = tile;
 	d["amount"] = packed_rows<double, PackedFloat32Array>(R.removed, R.amount);
 	d["variant"] = packed_rows<int32_t, PackedInt32Array>(R.removed, R.variant);
+	d["max_amount"] = packed_rows<double, PackedFloat32Array>(R.removed, R.max_amount);
 	PackedStringArray names;
 	for (int i = 0; i < aov::R_TYPE_COUNT; i++) names.push_back(aov::resource_def(i).key);
 	d["type_names"] = names;
@@ -620,6 +712,365 @@ PackedFloat64Array AovSim::get_units_f64() const {
 		double v[8] = { (double)U.id[r], U.x[r], U.z[r], U.rot[r], U.hp[r],
 			(double)(U.moving[r] | (U.dead[r] << 1) | (U.arrived[r] << 2)), (double)U.order_type[r], (double)U.anim_state[r] };
 		for (double d : v) out.push_back(d);
+	}
+	return out;
+}
+
+// ---- buildings -------------------------------------------------------------
+
+static int res_kind_of(const String &s) {
+	for (int k = 0; k < aov::RES_COUNT; k++)
+		if (s == aov::res_name(k)) return k;
+	return -1;
+}
+
+static Dictionary cost_dict(const aov::Cost &c) {
+	Dictionary d;
+	for (int k = 0; k < aov::RES_COUNT; k++)
+		if (c.has[k]) d[aov::res_name(k)] = c.v[k];
+	return d;
+}
+
+static Dictionary result_dict(const aov::Result &r) {
+	Dictionary d;
+	d["ok"] = r.ok;
+	d["reason"] = String(r.reason.c_str());
+	return d;
+}
+
+PackedStringArray AovSim::building_type_names() const {
+	PackedStringArray out;
+	for (int i = 0; i < aov::B_TYPE_COUNT; i++) out.push_back(aov::building_def(i).key);
+	return out;
+}
+
+Dictionary AovSim::get_building_def(const String &type) const {
+	Dictionary d;
+	const int t = aov::building_type_of(type.utf8().get_data());
+	if (t < 0) return d;
+	const aov::BuildingDef &b = aov::building_def(t);
+	d["type"] = t;
+	d["key"] = b.key;
+	d["name"] = b.name;
+	d["w"] = b.w;
+	d["h"] = b.h;
+	d["hp"] = b.hp;
+	d["cost"] = cost_dict(b.cost);
+	d["build_time"] = b.build_time;
+	d["pop"] = b.pop;
+	d["sight"] = b.sight;
+	PackedStringArray drop, trains;
+	for (int k = 0; k < 3; k++)
+		if (b.drops(k)) drop.push_back(aov::res_name(k));
+	for (int i = 0; i < 4 && b.trains[i] >= 0; i++) trains.push_back(aov::unit_def(b.trains[i]).key);
+	d["dropoff"] = drop;
+	d["trains"] = trains;
+	d["age_up"] = b.age_up;
+	d["farm"] = b.farm;
+	d["walkable"] = b.walkable;
+	d["worship"] = b.worship;
+	d["hotkey"] = b.hotkey;
+	d["min_age"] = b.min_age;
+	d["variants"] = b.variants;
+	return d;
+}
+
+int64_t AovSim::spawn_building(const String &type, int64_t owner, int64_t tx, int64_t tz, bool built, bool site) {
+	const int t = aov::building_type_of(type.utf8().get_data());
+	if (t < 0) {
+		ERR_PRINT("AovSim.spawn_building: unknown building type " + type);
+		return 0;
+	}
+	const int b = sim_.buildings.spawn(t, (int)owner, (int)tx, (int)tz, built, site);
+	return sim_.entities.buildings.id[b];
+}
+
+bool AovSim::can_place(const String &type, int64_t tx, int64_t tz) const {
+	return sim_.buildings.can_place(aov::building_type_of(type.utf8().get_data()), (int)tx, (int)tz);
+}
+
+int64_t AovSim::place_building(const String &type, int64_t owner, int64_t tx, int64_t tz, const PackedInt32Array &builders) {
+	return sim_.buildings.place(aov::building_type_of(type.utf8().get_data()), (int)owner, (int)tx, (int)tz, rows_of(sim_.entities, builders));
+}
+
+void AovSim::destroy_building(int64_t id) { sim_.buildings.destroy((int32_t)id); }
+
+Dictionary AovSim::get_building(int64_t id) const {
+	Dictionary d;
+	const int b = sim_.entities.building_slot((int32_t)id);
+	if (b < 0) return d;
+	const aov::BuildingStore &B = sim_.entities.buildings;
+	d["id"] = B.id[b];
+	d["type"] = aov::building_def(B.type[b]).key;
+	d["owner"] = B.owner[b];
+	d["tx"] = B.tx[b];
+	d["tz"] = B.tz[b];
+	d["w"] = B.w[b];
+	d["h"] = B.h[b];
+	d["x"] = B.x[b];
+	d["z"] = B.z[b];
+	d["hp"] = B.hp[b];
+	d["max_hp"] = B.max_hp[b];
+	d["built"] = (bool)B.built[b];
+	d["progress"] = B.progress[b];
+	d["variant"] = B.bld_variant[b];
+	Array q;
+	for (const aov::TrainItem &it : B.queue[b]) {
+		Dictionary e;
+		e["type"] = aov::unit_def(it.type).key;
+		e["t"] = it.t;
+		e["total"] = it.total;
+		q.push_back(e);
+	}
+	d["queue"] = q;
+	if (B.rally[b]) {
+		Dictionary r;
+		r["x"] = B.rally_x[b];
+		r["z"] = B.rally_z[b];
+		r["target"] = B.rally_target[b];
+		d["rally"] = r;
+	}
+	d["farm_rows"] = B.econ_rows[b];
+	d["farmer"] = B.farmer[b];
+	return d;
+}
+
+// ---- economy ---------------------------------------------------------------
+
+Dictionary AovSim::train(int64_t building, const String &unit_type) {
+	const int b = sim_.entities.building_slot((int32_t)building);
+	const int t = aov::unit_type_of(unit_type.utf8().get_data());
+	if (b < 0 || t < 0) return result_dict({ false, "Cannot train here" });
+	return result_dict(sim_.economy.train(b, t));
+}
+
+void AovSim::cancel_train(int64_t building, int64_t index) {
+	sim_.economy.cancel_train(sim_.entities.building_slot((int32_t)building), (int)index);
+}
+
+Dictionary AovSim::advance_age(int64_t owner) { return result_dict(sim_.economy.advance_age((int)owner)); }
+
+Dictionary AovSim::next_age_cost(int64_t owner) const {
+	aov::Cost c;
+	if (owner < 0 || owner >= aov::MAX_PLAYERS || !sim_.economy.next_age_cost((int)owner, c)) return Dictionary();
+	return cost_dict(c);
+}
+
+void AovSim::set_rally(int64_t building, double x, double z, int64_t target_id) {
+	const int b = sim_.entities.building_slot((int32_t)building);
+	if (b < 0) return;
+	aov::BuildingStore &B = sim_.entities.buildings;
+	B.rally[b] = 1;
+	B.rally_x[b] = x;
+	B.rally_z[b] = z;
+	B.rally_target[b] = (int32_t)target_id;
+}
+
+void AovSim::clear_rally(int64_t building) {
+	const int b = sim_.entities.building_slot((int32_t)building);
+	if (b >= 0) sim_.entities.buildings.rally[b] = 0;
+}
+
+int64_t AovSim::nearest_resource(double x, double z, const String &res_type, double max_dist) {
+	const int k = res_kind_of(res_type);
+	return k < 0 ? 0 : sim_.economy.nearest_resource(x, z, k, max_dist);
+}
+
+int64_t AovSim::nearest_dropoff(int64_t owner, double x, double z, const String &res_type) {
+	const int k = res_kind_of(res_type);
+	return k < 0 ? 0 : sim_.economy.nearest_dropoff((int)owner, x, z, k);
+}
+
+void AovSim::order_gather(const PackedInt32Array &ids, int64_t target) {
+	for (int r : rows_of(sim_.entities, ids)) sim_.commands.order(r, aov::Order::with_target(aov::O_GATHER, (int32_t)target));
+}
+void AovSim::order_build(const PackedInt32Array &ids, int64_t target) {
+	for (int r : rows_of(sim_.entities, ids)) sim_.commands.order(r, aov::Order::with_target(aov::O_BUILD, (int32_t)target));
+}
+void AovSim::order_worship(const PackedInt32Array &ids, int64_t target) {
+	for (int r : rows_of(sim_.entities, ids)) sim_.commands.order(r, aov::Order::with_target(aov::O_WORSHIP, (int32_t)target));
+}
+void AovSim::order_dropoff(const PackedInt32Array &ids, int64_t target) {
+	for (int r : rows_of(sim_.entities, ids)) sim_.commands.order(r, aov::Order::with_target(aov::O_DROPOFF, (int32_t)target));
+}
+
+void AovSim::set_player_resources(int64_t owner, const Dictionary &res) {
+	if (owner < 0 || owner >= aov::MAX_PLAYERS || !sim_.players[owner].exists) return;
+	for (int k = 0; k < aov::RES_COUNT; k++)
+		if (res.has(aov::res_name(k))) sim_.players[owner].res[k] = (double)res[aov::res_name(k)];
+}
+
+void AovSim::set_player_age(int64_t owner, int64_t age) {
+	if (owner < 0 || owner >= aov::MAX_PLAYERS || !sim_.players[owner].exists) return;
+	sim_.players[owner].age = (int)std::max<int64_t>(0, std::min<int64_t>(3, age));
+}
+
+PackedInt32Array AovSim::spawn_herd(const String &type, double x, double z, int64_t n) {
+	PackedInt32Array out;
+	const int t = aov::resource_type_of(type.utf8().get_data());
+	if (!aov::is_animal_type(t)) {
+		ERR_PRINT("AovSim.spawn_herd: not an animal: " + type);
+		return out;
+	}
+	for (int32_t id : sim_.economy.wildlife.spawn_herd(t, x, z, (int)n)) out.push_back(id);
+	return out;
+}
+
+int64_t AovSim::spawn_boat(int64_t owner, double x, double z, double rot) {
+	return sim_.economy.fishing.boats[sim_.economy.fishing.spawn_boat((int)owner, x, z, rot)].id;
+}
+
+int64_t AovSim::spawn_shoal(double x, double z, double amount) {
+	return sim_.economy.fishing.shoals[sim_.economy.fishing.spawn_shoal(x, z, amount)].id;
+}
+
+Dictionary AovSim::get_economy() const {
+	const aov::Economy &ec = sim_.economy;
+	const aov::ResourceStore &R = sim_.entities.resources;
+	Dictionary d;
+	{
+		PackedInt32Array ids;
+		PackedByteArray type, alive, moving;
+		PackedFloat32Array pos, prev, rot, prot, flash, speed, graze, dead_t, amount, max_amount, ground;
+		const aov::GameMap &map = sim_.world.map;
+		for (int32_t id : ec.wildlife.animals) {
+			const int a = sim_.entities.resource_slot(id);
+			if (a < 0) continue;
+			ids.push_back(id);
+			type.push_back(R.type[a] == aov::R_BOAR ? 1 : 0);
+			alive.push_back(R.alive[a]);
+			moving.push_back(R.an_moving[a]);
+			pos.push_back((float)R.x[a]);
+			pos.push_back((float)R.z[a]);
+			prev.push_back((float)R.prev_x[a]);
+			prev.push_back((float)R.prev_z[a]);
+			rot.push_back((float)R.rot[a]);
+			prot.push_back((float)R.prev_rot[a]);
+			flash.push_back((float)R.flash_t[a]);
+			speed.push_back((float)R.an_speed[a]);
+			graze.push_back((float)R.an_graze[a]);
+			dead_t.push_back((float)R.an_dead_t[a]);
+			amount.push_back((float)R.amount[a]);
+			max_amount.push_back((float)R.max_amount[a]);
+			ground.push_back((float)map.height_at(R.x[a], R.z[a]));
+		}
+		Dictionary an;
+		an["count"] = ids.size();
+		an["ids"] = ids;
+		an["type"] = type; // 0 deer, 1 boar
+		an["alive"] = alive;
+		an["moving"] = moving;
+		an["pos"] = pos;
+		an["prev_pos"] = prev;
+		an["rot"] = rot;
+		an["prev_rot"] = prot;
+		an["flash_t"] = flash;
+		an["speed"] = speed;
+		an["graze"] = graze;
+		an["dead_t"] = dead_t;
+		an["amount"] = amount;
+		an["max_amount"] = max_amount;
+		an["ground_y"] = ground;
+		d["animals"] = an;
+	}
+	{
+		PackedFloat32Array sp;
+		for (const aov::Spear &s : ec.spears) {
+			const double v[8] = { s.x0, s.z0, s.y0, s.x1, s.z1, s.y1, s.t, s.dur };
+			for (double x : v) sp.push_back((float)x);
+		}
+		d["spears"] = sp; // 8 per spear: x0, z0, y0, x1, z1, y1, t, dur
+	}
+	{
+		PackedFloat32Array sh;
+		for (const aov::Shoal &s : ec.fishing.shoals) {
+			const double v[6] = { (double)s.id, s.x, s.z, s.amount, s.max_amount, s.phase };
+			for (double x : v) sh.push_back((float)x);
+		}
+		d["shoals"] = sh; // 6 per shoal: id, x, z, amount, max_amount, phase
+	}
+	{
+		PackedFloat32Array bo;
+		for (const aov::Boat &b : ec.fishing.boats) {
+			const double v[10] = { (double)b.id, (double)b.owner, b.x, b.z, b.prev_x, b.prev_z, b.rot, b.prev_rot, (double)b.state, b.carry };
+			for (double x : v) bo.push_back((float)x);
+		}
+		d["boats"] = bo; // 10 per boat: id, owner, x, z, prev_x, prev_z, rot, prev_rot, state (0 idle 1 to shoal 2 fishing 3 to dock), carry
+	}
+	return d;
+}
+
+Dictionary AovSim::get_decor() const {
+	Dictionary d;
+	PackedStringArray keys;
+	PackedFloat32Array xf;
+	for (const aov::Decor &e : sim_.economy.decor) {
+		keys.push_back(e.key.c_str());
+		xf.push_back((float)e.x);
+		xf.push_back((float)e.z);
+		xf.push_back((float)e.rot);
+		xf.push_back((float)e.scale);
+		xf.push_back((float)e.y);
+	}
+	d["count"] = keys.size();
+	d["keys"] = keys;
+	d["xform"] = xf;
+	return d;
+}
+
+// ---- scenes ----------------------------------------------------------------
+
+bool AovSim::has_scene_setup(const String &name) const { return aov::scenes::has(name.utf8().get_data()); }
+
+static PackedInt32Array ids_of(const std::vector<int32_t> &v) {
+	PackedInt32Array out;
+	for (int32_t id : v) out.push_back(id);
+	return out;
+}
+
+Dictionary AovSim::setup_scene(const String &name) {
+	sim_.scene = aov::scenes::setup(sim_, name.utf8().get_data());
+	const aov::SceneCtx &c = sim_.scene;
+	Dictionary d;
+	if (!c.ok) return d;
+	d["focus"] = Vector2((real_t)c.focus_x, (real_t)c.focus_z);
+	d["tc"] = c.tc.id;
+	if (c.fields) {
+		PackedInt32Array f;
+		f.push_back(c.fields_x0);
+		f.push_back(c.fields_z0);
+		f.push_back(c.fields_cols);
+		d["fields"] = f;
+	}
+	if (!c.hunt_spot.empty()) d["hunt_spot"] = Vector2((real_t)c.hunt_spot[0], (real_t)c.hunt_spot[1]);
+	d["select"] = ids_of(c.select);
+	d["army"] = ids_of(c.army);
+	d["villagers"] = ids_of(c.villagers);
+	return d;
+}
+
+void AovSim::scene_after(const String &name) { aov::scenes::after(sim_, name.utf8().get_data(), sim_.scene); }
+
+PackedFloat64Array AovSim::get_econ_f64() const {
+	PackedFloat64Array out;
+	for (const aov::Player &p : sim_.players) {
+		if (!p.exists) continue;
+		for (double v : p.res) out.push_back(v);
+		out.push_back(p.pop);
+		out.push_back(p.pop_cap);
+		out.push_back(p.age);
+	}
+	const aov::BuildingStore &B = sim_.entities.buildings;
+	for (int b = 0; b < B.size(); b++) {
+		if (B.removed[b]) continue;
+		const double v[6] = { (double)B.id[b], B.hp[b], B.progress[b], (double)B.built[b], (double)B.queue[b].size(), B.econ_rows[b] };
+		for (double x : v) out.push_back(x);
+	}
+	const aov::ResourceStore &R = sim_.entities.resources;
+	for (int r = 0; r < R.size(); r++) {
+		if (R.removed[r]) continue;
+		const double v[4] = { (double)R.id[r], R.amount[r], R.x[r], R.z[r] };
+		for (double x : v) out.push_back(x);
 	}
 	return out;
 }

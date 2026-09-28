@@ -30,13 +30,13 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | core (foundation) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck) | `core/` (constants, rng, jsmath, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile; later fog, victory), `sim.{h,cpp}` | `src/core/` |
 | terrain | `game/terrain/terrain.gd` (foundation first pass: C++ mesher, flat water plane ws*5 centred like Water.js, resource MultiMeshes) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (currently a foundation **placeholder**) | none | `src/lighting/` |
-| buildings | `game/buildings/buildings.gd` | `buildings/` | `src/buildings/` |
-| units | `game/units/units.gd` | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
+| buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw; props.js not yet) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
+| units | `game/units/units.gd` (first pass: rigs in the rest pose, conditional parts; animation still to port) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
 | combat (incl. enemy AI) | `game/combat/combat.gd` | `combat/` | `src/combat/` |
-| economy | `game/economy/economy.gd` | `economy/` | `src/economy/` |
+| economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
 | godpowers | `game/godpowers/godpowers.gd` | `godpowers/` | `src/godpowers/` |
 | ui (HUD, selection, input) | `game/ui/ui.gd` | none | `src/ui/` |
-| scenes | `AovScenes.set_setup()` from the owning piece | `scenes/` (deterministic scene setups) | `src/core/scenes/`, `BattleScene.js`, `EconomyScene.js` |
+| scenes | `AovScenes.set_setup()` from the owning piece, else the C++ setup | `scenes/` (helpers.js, skirmish / town / coast / hud, EconomyScene.js: ported) | `src/core/scenes/`, `BattleScene.js`, `EconomyScene.js` |
 
 ```
 godot/
@@ -141,14 +141,16 @@ Other tools:
 node scripts/check-mapgen.mjs            # C++ vs JS generateMap() for every scene's seed/preset: heights, ground,
                                          # passability, walkable after resources, resources, starts (all "ok")
 node scripts/check-sim.mjs [--only a,b]  # C++ sim vs the JS modules: scenarios (skirmish 3, town 7, battle 19, coast 5,
-                                         # stress 2000 and 4200 units) spawn, order, step up to 1350 ticks and compare
-                                         # every unit bit for bit at every checkpoint (all "ok"); ~3 min
+                                         # stress 2000 and 4200 units; the town / economy / coast / hud scene setups
+                                         # and econ-ops: placement, training, age, destroy) spawn, order, step up to
+                                         # 4000 ticks and compare every unit, player, building and resource bit for
+                                         # bit at every checkpoint (all "ok"); ~5 min
 node scripts/export-models.mjs           # re-export godot/assets/models from the JS model code (~5 s)
 godot --headless --path godot -s res://game/core/simcheck.gd -- --mapdump=F | --scenario=F --out=F   # their C++ side
 ```
 
 Sim debug view: `--simdebug=1` draws every unit as a box in its owner's
-colour (on by default while `game/units/units.gd` does not exist);
+colour (off by default now that `game/units/units.gd` exists);
 `--simdemo=1 [--simdemo_t=7]` spawns two armies at the first two starts and
 marches them onto each other, e.g.
 `node scripts/godot-shoot.mjs --scene skirmish --params "simdemo=1"`.
@@ -180,7 +182,9 @@ marches them onto each other, e.g.
   row order (= id order = JS Map order). `generate_map` and the whole core
   (entities, units update / spread, pathfinding, movement, commands) are
   bit-exact with the browser (`check-mapgen.mjs`, `check-sim.mjs`); extend
-  `check-sim.mjs` with your system's scenario when you port one.
+  `check-sim.mjs` with your system's scenario when you port one. `Math.pow`
+  (and `**`) is `jsm::pow`: V8's fdlibm pow with its own quirk, glibc's
+  differs for ~10 % of inputs.
 - **Entity store** (`sim/core/entities.h`): struct-of-arrays per kind
   (`entities.units / buildings / resources`), one id counter, ids never
   reused, `id_slot`/`id_kind` map an id to its row. Rows are dense in id
@@ -192,6 +196,11 @@ marches them onto each other, e.g.
   live in `order_type / order_target / order_x / order_z / order_a..c`;
   register a handler per order type with `sim.commands.register_handler()`.
   Animation requests: set `units.anim_want[row]` each tick (`A_GATHER` …).
+  Huntable animals (deer, boar) are resource rows too (`R_DEER` / `R_BOAR`,
+  `is_animal_type()`), never blocking tiles, with a fractional rect: take a
+  resource's rect as `x - w / 2, z - h / 2` (exact for every node), not
+  `tx / tz`. Sim order per tick: economy, buildings, units, movement (JS
+  `simOrder`; combat and godpowers slot in after buildings).
 - **Paths**: `Movement::move_to(row, x, z, rect, range)` like `moveTo`;
   waypoints live in `sim.paths` (a pool, handle per unit). `Pathfinder`
   caches A* results per (start tile, goal tile, rect) while walkability is
@@ -253,8 +262,13 @@ as a child node (no edit to `main.gd` needed to add a piece), then:
 The game loop (in `main.gd`) ticks `sim.tick(1)` at 30 Hz while not paused
 (`live` scenes, or `--live=1`); a scene's `fast_forward` seconds are stepped
 before the first frame. A scene setup is registered with
-`AovScenes.set_setup(name, callable)`; it runs after all `setup()` calls and
-returns a ctx Dictionary (`focus`, …).
+`AovScenes.set_setup(name, callable)` (register a **static** function: a
+lambda capturing a node outlives it in the static registry and crashes the
+engine at exit); it runs after all `setup()` calls and returns a ctx
+Dictionary (`focus`, …). Without one, main.gd runs the C++ setup when
+`AovSim.has_scene_setup(name)` (skirmish, town, coast, hud; economy
+registers itself from `game/economy`), then `AovSim.scene_after(name)`
+after the fast-forward (the JS `scene.after`).
 
 ## AovSim API (so far)
 
@@ -274,7 +288,9 @@ Map: `get_map_size()`, `get_map_cols()`, `get_water_level()`, `get_heights()`
 
 Players: `add_player(id, name="", is_ai=true)` (owners 3..6),
 `get_player(id)` ({id, name, is_ai, god, color, food, wood, gold, favor, pop,
-pop_cap, age, age_name}), `get_player_ids()`, `is_enemy(a, b)`.
+pop_cap, age, age_name, advancing, advance_t, advance_total}),
+`get_player_ids()`, `is_enemy(a, b)`, `set_player_resources(owner,
+{food, …})`, `set_player_age(owner, age)`.
 
 Entities: `unit_type_names()` (type index -> key), `get_unit_def(key)`,
 `spawn_unit(type, owner, x, z, rot=0)` -> id, `spawn_block(type, owner,
@@ -294,19 +310,52 @@ Per-frame state, one call each, parallel arrays (index i = one entity):
   `anim_t`, `attack_t`, `die_t`, `hit_t` (-1 = never hit), `flash_t`,
   `order` (Byte: 0 idle, 1 move, 2 gather, 3 dropoff, 4 worship, 5 build,
   6 attack), `target` (order target id), `flags` (Byte: 1 moving, 2 dead,
-  4 arrived, 8 carrying, 16 battle line), `carry` (Byte resource kind, 255
-  none).
-- `get_buildings()`: `count`, `ids`, `type`, `owner`, `rect` (tx,tz,w,h),
-  `hp`, `max_hp`, `built`, `progress`.
+  4 arrived, 8 carrying, 16 battle line), `carry` (Byte resource kind 0
+  food 1 wood 2 gold, 255 none), `carry_amount`, `task` (Byte: the kind
+  being gathered, u.econ.resType, 255 none), `load` (Byte, what drawLoads
+  shows: 0 wood, 1 gold, 2 grain, 3 fruit, 4 meat, 255 none).
+- `get_buildings()`: `count`, `ids`, `type` (index into `type_names`:
+  town_center, house, storehouse, farm, temple, barracks), `owner`, `rect`
+  (tx,tz,w,h), `hp`, `max_hp`, `built`, `progress`, `variant` (model
+  variant, variantOf), `yaw` / `setback` (houses), `farm_rows`, `stock` (6
+  per building: grain, fruit, meat, fish, wood, gold), `queue_len`, `rally`
+  (3 per building: set, x, z), `type_names`.
 - `get_resources()`: `count`, `ids`, `type` (index into `type_names`:
-  tree, gold, berry), `tile` (tx,tz), `amount`, `variant`, `type_names`.
+  tree, gold, berry, deer, boar), `tile` (tx,tz; animals: floor(x - 0.5)),
+  `amount`, `max_amount`, `variant`, `type_names`.
+- `get_economy()`: `animals` ({count, ids, type (0 deer 1 boar), alive,
+  moving, pos, prev_pos, rot, prev_rot, flash_t, speed, graze, dead_t,
+  amount, max_amount, ground_y}), `spears` (8 floats each: x0, z0, y0, x1,
+  z1, y1, t, dur), `shoals` (6: id, x, z, amount, max_amount, phase),
+  `boats` (10: id, owner, x, z, prev_x, prev_z, rot, prev_rot, state 0 idle
+  1 to shoal 2 fishing 3 to dock, carry). `get_decor()`: {count, keys,
+  xform (5 each: x, z, rot, scale, y)}, the scenes' field dressing.
 
 Commands: `order(id, {type, target, x, z, a, b, c})`, `order_move(ids, x, z)`
 (formation move), `order_idle(ids)`, `smart(ids, x, z, target_id=0)`
 (right-click; order types whose piece is not ported yet fall back to a
-move), `move_to(id, x, z, range=0)`, `find_path(sx, sz, gx, gz)`
+move), `order_gather / order_build / order_worship / order_dropoff(ids,
+target)`, `move_to(id, x, z, range=0)`, `find_path(sx, sz, gx, gz)`
 (PackedVector2Array), `set_group_paths(min_units)`, `set_repath_budget(n)`,
 `set_path_cache(on)`.
+
+Buildings: `building_type_names()`, `get_building_def(key)`,
+`spawn_building(type, owner, tx, tz, built=true, site=true)` -> id
+(buildings.spawn: clears resources, flattens, ground dressing),
+`can_place(type, tx, tz)`, `place_building(type, owner, tx, tz, builder_ids)`
+-> id or 0 (placement.confirm: pay, foundation, builders ordered and told to
+resume their gather / worship afterwards), `destroy_building(id)`,
+`get_building(id)` (incl. `queue` [{type, t, total}], `rally`).
+
+Economy: `train(building, unit_type)` / `advance_age(owner)` -> {ok,
+reason}, `cancel_train(building, index)`, `next_age_cost(owner)`,
+`set_rally(building, x, z, target_id=0)`, `clear_rally(building)`,
+`nearest_resource(x, z, res_type, max_dist=14)` (grid index, same answer as
+the JS scan), `nearest_dropoff(owner, x, z, res_type)`, `spawn_herd(type,
+x, z, n)`, `spawn_boat(owner, x, z, rot)`, `spawn_shoal(x, z, amount)`.
+
+Scenes: `has_scene_setup(name)`, `setup_scene(name)` -> {focus: Vector2,
+tc, fields, hunt_spot, select, army, villagers}, `scene_after(name)`.
 
 Events (`game.events`, drained by main.gd): [{type, id, kind, other, owner,
 a, x, z, amount}], type one of `entity:added` (a = type index),
@@ -320,7 +369,7 @@ Profiling / checks: `set_profiling(on)`, `get_profile()`, `get_stats()`
 ({alive, dead, moving, buildings, projectiles, resources, paths, path_calls,
 path_searches, path_cache_hits, path_expanded, group_fields, …}),
 `set_census(on)` / `take_census()` (spatial-hash queries), `units_hash()`,
-`get_units_f64()` (full-precision dump for parity tools).
+`get_units_f64()` / `get_econ_f64()` (full-precision dumps for parity tools).
 
 Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
 
@@ -336,7 +385,17 @@ Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
   the browser (`check-sim.mjs`: 4200 units over 900 ticks match; C++ 1.7
   ms/tick vs JS 31 ms). First-pass terrain (C++ chunk mesher with the JS
   palette and AO) and a sim debug view.
+- Done (sim core B): economy (gathering state machine and drop-off, farms,
+  hunting with herds / spears / carcasses, fishing boats and shoals,
+  worship -> favor, population and cap, training queues, rally points, age
+  advancement, nearestResource grid index), buildings (placement,
+  foundations, construction, builders moving on, destruction, ground
+  dressing, the planned town), scene setups (skirmish, town, coast, hud,
+  economy), all bit-exact with the browser (`check-sim.mjs`). Rendered:
+  buildings and construction stages, units in the rest pose, the economy
+  view.
 - Placeholders to replace: `game/terrain/terrain.gd` (first pass: no shore
   smoothing, talus, cliff relief, water shader or ground details),
-  `game/lighting/lighting.gd`, `game/core/sim_debug.gd` (until the units
-  piece renders units).
+  `game/lighting/lighting.gd`, `game/units/units.gd` (static rest pose: the
+  animation of src/units/anim.js), town props (src/buildings/props.js), the
+  placement ghost (UI).

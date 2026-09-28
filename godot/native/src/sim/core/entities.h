@@ -23,6 +23,13 @@
 
 namespace aov {
 
+// One queued unit of a building's training queue (b.queue[i]).
+struct TrainItem {
+	uint8_t type = 0;
+	double t = 0, total = 0;
+};
+using TrainQueue = std::vector<TrainItem>;
+
 enum Kind : uint8_t { K_NONE = 0, K_UNIT = 1, K_BUILDING = 2, K_RESOURCE = 3 };
 
 // Order types (u.order.type). Handlers are registered in Commands.
@@ -100,7 +107,18 @@ enum UnitFlag : uint8_t { UF_MOVING = 1, UF_DEAD = 2, UF_ARRIVED = 4, UF_CARRY =
 	X(uint8_t, carry_type, 255)   /* ResKind, 255 = null */                    \
 	X(double, carry_amount, 0)                                                 \
 	X(double, attack_cd, 0)                                                    \
-	X(uint8_t, combat_line, 0)
+	X(uint8_t, combat_line, 0)                                                 \
+	/* economy (sim/economy): the JS u.econ object; econ_phase EP_NONE = null */ \
+	X(uint8_t, econ_phase, 0)     /* EconPhase */                              \
+	X(int32_t, econ_res, 0)       /* resId (0 = null) */                       \
+	X(uint8_t, econ_res_type, 255) /* resType (ResKind, 255 = undefined) */    \
+	X(int32_t, econ_drop, 0)      /* dropId */                                 \
+	X(int32_t, econ_temple, 0)    /* templeId */                               \
+	X(int32_t, econ_tries, 0)                                                  \
+	X(double, econ_throw_cd, 0)                                                \
+	X(uint8_t, econ_hunt, 0)      /* huntAt set */                             \
+	X(double, econ_hunt_x, 0)                                                  \
+	X(double, econ_hunt_z, 0)
 
 #define AOV_BUILDING_COLUMNS(X)                                                \
 	X(int32_t, id, 0)                                                          \
@@ -120,9 +138,30 @@ enum UnitFlag : uint8_t { UF_MOVING = 1, UF_DEAD = 2, UF_ARRIVED = 4, UF_CARRY =
 	X(double, radius, 0)                                                       \
 	X(uint8_t, built, 1)                                                       \
 	X(double, progress, 1)                                                     \
-	X(uint8_t, def_flags, 0)  /* BuildingDefFlag bits (smart orders) */
+	X(uint8_t, def_flags, 0)  /* BuildingDefFlag bits (smart orders) */       \
+	X(double, sight, 0)                                                        \
+	/* buildings piece (sim/buildings): visual variant, house yaw/setback */  \
+	X(int32_t, bld_variant, -1)                                                \
+	X(double, bld_yaw, 0)                                                      \
+	X(double, bld_setback, 0)                                                  \
+	/* economy: training queue, rally point, farm, stockpiles */             \
+	X(TrainQueue, queue, TrainQueue())                                         \
+	X(uint8_t, rally, 0)                                                       \
+	X(double, rally_x, 0)                                                      \
+	X(double, rally_z, 0)                                                      \
+	X(int32_t, rally_target, 0)                                                \
+	X(double, econ_rows, 0)       /* farm rows harvested (b.econ_rows) */      \
+	X(int32_t, farmer, 0)         /* farm: b.farmer */                         \
+	X(double, stock_grain, 0)     /* b.econ_stock (STOCK_ORDER) */             \
+	X(double, stock_fruit, 0)                                                  \
+	X(double, stock_meat, 0)                                                   \
+	X(double, stock_fish, 0)                                                   \
+	X(double, stock_wood, 0)                                                   \
+	X(double, stock_gold, 0)
 
 enum BuildingDefFlag : uint8_t { BF_WORSHIP = 1, BF_FARM = 2, BF_DROPOFF = 4 };
+enum EconPhase : uint8_t { EP_NONE, EP_TO_RES, EP_GATHERING, EP_TO_DROP, EP_TO_TEMPLE };
+enum StockKind : uint8_t { ST_GRAIN, ST_FRUIT, ST_MEAT, ST_FISH, ST_WOOD, ST_GOLD, ST_COUNT };
 
 #define AOV_RESOURCE_COLUMNS(X)                                                \
 	X(int32_t, id, 0)                                                          \
@@ -138,16 +177,44 @@ enum BuildingDefFlag : uint8_t { BF_WORSHIP = 1, BF_FARM = 2, BF_DROPOFF = 4 };
 	X(double, x, 0)                                                            \
 	X(double, z, 0)                                                            \
 	X(double, radius, 0.5)                                                     \
-	X(int32_t, variant, 0)
+	X(int32_t, variant, 0)                                                     \
+	X(double, econ_unreach_t, NAN) /* r.econ_unreachT, NaN = undefined */       \
+	/* animals (sim/economy/wildlife): huntable deer/boar are resources too */ \
+	X(double, rot, 0)                                                          \
+	X(double, prev_x, 0)                                                       \
+	X(double, prev_z, 0)                                                       \
+	X(double, prev_rot, 0)                                                     \
+	X(double, hp, 1)                                                           \
+	X(double, max_hp, 1)                                                       \
+	X(uint8_t, alive, 0)                                                       \
+	X(double, flash_t, 0)                                                      \
+	X(int32_t, an_home, -1)       /* econ_home: index into Wildlife::homes */  \
+	X(uint8_t, an_goal, 0)        /* econ_goal != null */                      \
+	X(double, an_goal_x, 0)                                                    \
+	X(double, an_goal_z, 0)                                                    \
+	X(double, an_wait, 0)                                                      \
+	X(double, an_flee, 0)                                                      \
+	X(double, an_threat_x, 0)                                                  \
+	X(double, an_threat_z, 0)                                                  \
+	X(double, an_dead_t, 0)                                                    \
+	X(double, an_graze, 0)                                                     \
+	X(uint32_t, an_seed, 0)                                                    \
+	X(uint8_t, an_moving, 0)                                                   \
+	X(double, an_speed, 0)
 
-// Gaia resources: port of src/terrain/resourceDefs.js
-enum ResourceType : uint8_t { R_TREE, R_GOLD, R_BERRY, R_TYPE_COUNT };
+// Gaia resources: port of src/terrain/resourceDefs.js, plus the huntable
+// animals of src/economy/Wildlife.js (ANIMAL_DEFS), which are resource
+// entities too (kind 'resource', resType food) but never block tiles.
+enum ResourceType : uint8_t { R_TREE, R_GOLD, R_BERRY, R_DEER, R_BOAR, R_TYPE_COUNT };
+inline bool is_animal_type(int t) { return t == R_DEER || t == R_BOAR; }
 struct ResourceDef { const char *key, *name; ResKind res_type; double amount; int w, h; };
 inline const ResourceDef &resource_def(int t) {
 	static const ResourceDef D[R_TYPE_COUNT] = {
 		{ "tree", "Tree", RES_WOOD, 100, 1, 1 },
 		{ "gold", "Gold Mine", RES_GOLD, 2000, 3, 3 },
 		{ "berry", "Berry Bush", RES_FOOD, 125, 1, 1 },
+		{ "deer", "Deer", RES_FOOD, 100, 1, 1 },
+		{ "boar", "Boar", RES_FOOD, 250, 1, 1 },
 	};
 	return D[t];
 }

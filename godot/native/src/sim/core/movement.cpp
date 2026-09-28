@@ -88,7 +88,10 @@ double Movement::distance_to(int r, int32_t id) const {
 	if (s < 0) return 1e30;
 	switch (E.kind(id)) {
 		case K_BUILDING: return rect(E.buildings.tx[s], E.buildings.tz[s], E.buildings.w[s], E.buildings.h[s]);
-		case K_RESOURCE: return rect(E.resources.tx[s], E.resources.tz[s], E.resources.w[s], E.resources.h[s]);
+		case K_RESOURCE: { // animals keep a fractional tx = x - 0.5: use the exact rect
+			const ResourceStore &R = E.resources;
+			return rect(R.x[s] - R.w[s] / 2.0, R.z[s] - R.h[s] / 2.0, R.w[s], R.h[s]);
+		}
 		case K_UNIT: {
 			double rad = U.radius[s] != 0 ? U.radius[s] : 0.3;
 			return std::max(0.0, jsm::hypot(U.x[s] - x, U.z[s] - z) - rad);

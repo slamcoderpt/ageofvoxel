@@ -2,7 +2,10 @@
 // Parity check of the C++ sim core (godot/native/src/sim) against the JS
 // modules it ports: map + initial resources, entity store, units (spawn,
 // anim state, _spread, corpse clearing), A* pathfinding, Movement and
-// Commands (move / formation move / smart / idle). Each scenario spawns
+// Commands (move / formation move / smart / idle), the economy (gathering,
+// farms, hunting, fishing, worship, training, age) and buildings
+// (placement, construction, builders moving on), and the scene setups
+// (town, economy, ...: op 'scene' / 'after'). Each scenario spawns
 // armies on a scene map (seeds and presets of the scenes), gives orders,
 // steps the fixed 30 Hz tick and compares every unit's id, x, z, rot, hp,
 // flags, order and anim state bit for bit at every checkpoint.
@@ -10,8 +13,11 @@
 //   node scripts/check-sim.mjs [--only name,name] [--godot godot] [--keep]
 //
 // The JS side runs the real src/core modules headless (no renderer): the
-// Units piece is used through its prototype (spawn / update / _spread), and
-// resources are spawned like terrain.spawnResource. The C++ side is
+// Units piece is used through its prototype (spawn / update / _spread),
+// resources are spawned like terrain.spawnResource, and the real Economy and
+// Buildings pieces run on a THREE.Scene that is never drawn (combat, the
+// enemy AI and god powers are not ported yet, so they are left out on both
+// sides). Checkpoints also compare players, buildings and resources. The C++ side is
 // godot/game/core/simcheck.gd. Exit code 1 on any difference.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -29,6 +35,12 @@ import { GAIA } from '../src/core/constants.js';
 import { RESOURCE_DEFS } from '../src/terrain/resourceDefs.js';
 import { Units } from '../src/units/index.js';
 import { UNIT_DEFS } from '../src/units/defs.js';
+import * as THREE from 'three';
+import { Player } from '../src/core/Players.js';
+import { PLAYER, ENEMY } from '../src/core/constants.js';
+import { Economy } from '../src/economy/index.js';
+import { Buildings } from '../src/buildings/index.js';
+import { SCENES } from '../src/core/scenes/index.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -56,21 +68,50 @@ function makeGame({ seed, size, preset, players }) {
   game.units.game = game;
   game.units.defs = UNIT_DEFS;
   game.isEnemy = (a, b) => a !== b && a !== GAIA && b !== GAIA;
-  for (const r of gen.resources) {
-    const def = RESOURCE_DEFS[r.type];
-    const e = game.entities.add({
-      kind: 'resource', type: r.type, owner: GAIA, def, resType: def.resType, amount: def.amount, maxAmount: def.amount,
-      tx: r.tx, tz: r.tz, w: def.w, h: def.h, x: r.tx + def.w / 2, z: r.tz + def.h / 2, rot: 0, hp: 1, maxHp: 1,
-      radius: Math.max(def.w, def.h) / 2, variant: r.variant ?? 0,
-    });
-    game.map.block(r.tx, r.tz, def.w, def.h, e.id);
-  }
+  game.players = {
+    [GAIA]: new Player(GAIA, { name: 'Gaia' }),
+    [PLAYER]: new Player(PLAYER, { name: 'You' }),
+    [ENEMY]: new Player(ENEMY, { name: 'Enemy', isAI: true }),
+  };
+  game.localPlayer = PLAYER;
+  game.addPlayer = (id, opts = {}) => (game.players[id] ||= new Player(id, opts));
+  for (let id = 3; id <= players; id++) game.addPlayer(id, { name: `AI ${id}`, isAI: true }); // as simcheck.gd
+  game.scene = new THREE.Scene();
+  game.fx = { emit() {} };
+  game.combat = { ai: { enabled: false }, ais: [], addAI() {} };
+  game.terrain = {
+    spawnResource(type, tx, tz, opts = {}) {
+      const def = RESOURCE_DEFS[type];
+      const e = game.entities.add({
+        kind: 'resource', type, owner: GAIA, def, resType: def.resType, amount: def.amount, maxAmount: def.amount,
+        tx, tz, w: def.w, h: def.h, x: tx + def.w / 2, z: tz + def.h / 2, rot: 0, hp: 1, maxHp: 1,
+        radius: Math.max(def.w, def.h) / 2, variant: opts.variant ?? 0,
+      });
+      game.map.block(tx, tz, def.w, def.h, e.id);
+      return e;
+    },
+    removeResource(e) {
+      if (e.removed) return;
+      game.map.unblock(e.tx, e.tz, e.w, e.h);
+      game.entities.remove(e);
+    },
+    clearRect(tx, tz, w, h) {
+      for (const e of [...game.entities.resources()])
+        if (e.tx < tx + w && e.tx + e.w > tx && e.tz < tz + h && e.tz + e.h > tz) this.removeResource(e);
+    },
+  };
+  game.buildings = new Buildings(game);
+  game.economy = new Economy(game);
+  for (const r of gen.resources) game.terrain.spawnResource(r.type, r.tx, r.tz, r);
   game.tick = (dt = 1 / 30) => {
     game.time += dt;
     game.tickCount++;
+    game.economy.update(dt);
+    game.buildings.update(dt);
     game.units.update(dt);
     game.movement.update(dt);
   };
+  game.fastForward = (seconds) => { const n = Math.round(seconds / (1 / 30)); for (let i = 0; i < n; i++) game.tick(1 / 30); };
   return game;
 }
 
@@ -101,6 +142,33 @@ function unitsDump(game) {
   return out;
 }
 
+// src/buildings/placement.js confirm() for any owner
+function placeBuilding(game, type, owner, tx, tz, builders) {
+  const def = game.buildings.defs[type];
+  const player = game.players[owner];
+  if (!game.buildings.canPlace(type, tx, tz) || !player.canAfford(def.cost)) return null;
+  if (!player.pay(def.cost)) return null;
+  const b = game.buildings.spawn(type, owner, tx, tz, { built: false });
+  for (const u of builders) {
+    const prev = u.order?.type === 'build' ? u.order.resume : u.order;
+    game.commands.order(u, { type: 'build', targetId: b.id });
+    if (u.order.type === 'build' && prev && (prev.type === 'gather' || prev.type === 'worship'))
+      u.order.resume = { type: prev.type, targetId: prev.targetId, resType: u.econ?.resType };
+  }
+  return b;
+}
+
+function econDump(game) {
+  const out = [];
+  for (const id in game.players) {
+    const p = game.players[id];
+    out.push(p.res.food, p.res.wood, p.res.gold, p.res.favor, p.pop, p.popCap, p.age);
+  }
+  for (const b of game.entities.buildings()) out.push(b.id, b.hp, b.progress, b.built ? 1 : 0, b.queue.length, b.econ_rows || 0);
+  for (const r of game.entities.resources()) out.push(r.id, r.amount, r.x, r.z);
+  return out;
+}
+
 function hashDump(d) {
   let h = 2166136261 >>> 0;
   const mix = (v) => { v >>>= 0; for (let k = 0; k < 4; k++) { h ^= (v >>> (k * 8)) & 255; h = Math.imul(h, 16777619) >>> 0; } };
@@ -117,6 +185,7 @@ function runJS(sc) {
   const groups = {};
   const ids = (spec) => spec.split(',').flatMap((g) => groups[g] || []).map((id) => game.entities.get(id)).filter(Boolean);
   const checkpoints = [];
+  let sceneCtx = {};
   const t0 = performance.now();
   for (const op of sc.ops) {
     switch (op.op) {
@@ -142,10 +211,27 @@ function runJS(sc) {
           game.tick();
           if (game.tickCount % (sc.every ?? 15) === 0) {
             const units = unitsDump(game);
-            checkpoints.push({ tick: game.tickCount, hash: hashDump(units), units });
+            checkpoints.push({ tick: game.tickCount, hash: hashDump(units), units, econ: econDump(game) });
           }
         }
         break;
+      case 'units':
+        groups[op.as] = [...game.entities.units()].filter((u) => u.type === op.type && u.owner === op.owner && !u.dead).map((u) => u.id); break;
+      case 'buildings':
+        groups[op.as] = [...game.entities.buildings()].filter((b) => b.type === op.type && b.owner === op.owner).map((b) => b.id); break;
+      case 'setRes': Object.assign(game.players[op.owner].res, op.res); break;
+      case 'train': for (const b of ids(op.group)) for (let i = 0; i < (op.count ?? 1); i++) game.economy.train(b, op.type); break;
+      case 'cancel': for (const b of ids(op.group)) game.economy.cancelTrain(b, op.index ?? 0); break;
+      case 'age': game.economy.advanceAge(op.owner); break;
+      case 'place': { const b = placeBuilding(game, op.type, op.owner, op.tx, op.tz, ids(op.group ?? '')); groups[op.as] = b ? [b.id] : []; break; }
+      case 'destroy': for (const b of ids(op.group)) game.buildings.destroy(b); break;
+      case 'gather': {
+        const r = game.economy.nearestResource(op.x, op.z, op.resType, 30);
+        if (r) for (const u of ids(op.group)) game.commands.order(u, { type: 'gather', targetId: r.id });
+        break;
+      }
+      case 'scene': sceneCtx = SCENES.get(op.name).setup(game) || {}; break;
+      case 'after': SCENES.get(op.name).after?.(game, sceneCtx); break;
       default: throw new Error(`unknown op ${op.op}`);
     }
   }
@@ -228,6 +314,46 @@ function scenarios() {
       { op: 'run', ticks: 450 },
     ] });
   }
+  // scene setups (C++ sim/scenes vs src/core/scenes + EconomyScene.js), then the
+  // economy and buildings running them: gathering, farms, hunting, fishing,
+  // worship, training, construction
+  out.push({ name: 'town-scene', seed: 7, size: 128, preset: 'skirmish', players: 2, every: 30, ops: [
+    { op: 'scene', name: 'town' }, { op: 'run', ticks: 900 }, { op: 'run', ticks: 900 },
+  ] });
+  out.push({ name: 'econ-scene', seed: 3, size: 128, preset: 'skirmish', players: 2, every: 30, ops: [
+    { op: 'scene', name: 'economy' }, { op: 'run', ticks: 450 }, { op: 'after', name: 'economy' }, { op: 'run', ticks: 3600 },
+  ] });
+  out.push({ name: 'coast-scene', seed: 5, size: 128, preset: 'coast', players: 2, every: 30, ops: [
+    { op: 'scene', name: 'coast' }, { op: 'run', ticks: 900 },
+  ] });
+  out.push({ name: 'hud-scene', seed: 7, size: 128, preset: 'skirmish', players: 2, every: 30, ops: [
+    { op: 'scene', name: 'hud' }, { op: 'run', ticks: 900 },
+  ] });
+  {
+    // placement, construction and builders moving on, training queues and
+    // cancel, age advancement, destruction, gather orders
+    const [a] = starts(3, 128, 'skirmish', 2);
+    out.push({ name: 'econ-ops', seed: 3, size: 128, preset: 'skirmish', players: 2, every: 30, ops: [
+      { op: 'scene', name: 'skirmish' },
+      { op: 'units', as: 'v', type: 'villager', owner: 1 },
+      { op: 'buildings', as: 'tc', type: 'town_center', owner: 1 },
+      { op: 'setRes', owner: 1, res: { food: 2000, wood: 2000, gold: 2000, favor: 50 } },
+      { op: 'gather', group: 'v', x: a.tx, z: a.tz, resType: 'wood' },
+      { op: 'run', ticks: 120 },
+      { op: 'train', group: 'tc', type: 'villager', count: 4 },
+      { op: 'cancel', group: 'tc', index: 3 },
+      { op: 'age', owner: 1 },
+      { op: 'place', as: 'h1', type: 'house', owner: 1, tx: a.tx + 6, tz: a.tz - 9, group: 'v' },
+      { op: 'place', as: 'f1', type: 'farm', owner: 1, tx: a.tx - 12, tz: a.tz + 5, group: '' },
+      { op: 'run', ticks: 900 },
+      { op: 'units', as: 'v2', type: 'villager', owner: 1 },
+      { op: 'place', as: 'h2', type: 'storehouse', owner: 1, tx: a.tx + 9, tz: a.tz + 6, group: 'v2' },
+      { op: 'place', as: 'f2', type: 'farm', owner: 1, tx: a.tx - 7, tz: a.tz + 9, group: 'v2' },
+      { op: 'run', ticks: 900 },
+      { op: 'destroy', group: 'h1' },
+      { op: 'run', ticks: 600 },
+    ] });
+  }
   for (const [name, per] of [['stress', 330], ['stress4k', 700]]) {
     // stress seed 23, 6 players on 256 tiles: ~2000 (4200) units converge on the centre
     const st = starts(23, 256, 'stress', 6);
@@ -290,22 +416,30 @@ for (const sc of scenarios()) {
     const a = js.checkpoints[i], b = cpp.checkpoints[i];
     if (!a || !b || a.tick !== b.tick) { diff = { tick: a?.tick ?? b?.tick, why: 'checkpoint count' }; break; }
     const ua = a.units, ub = b.units;
-    if (a.hash === b.hash && ua.length === ub.length) continue;
-    for (let k = 0; k < Math.max(ua.length, ub.length); k += 8) {
-      const ra = ua.slice(k, k + 8), rb = (ub.slice ? ub.slice(k, k + 8) : []);
-      if (ra.length !== rb.length || ra.some((v, j) => v !== rb[j])) {
-        diff = { tick: a.tick, why: `unit row ${k / 8}`, js: ra, cpp: rb };
-        break;
+    if (a.hash !== b.hash || ua.length !== ub.length) {
+      for (let k = 0; k < Math.max(ua.length, ub.length); k += 8) {
+        const ra = ua.slice(k, k + 8), rb = (ub.slice ? ub.slice(k, k + 8) : []);
+        if (ra.length !== rb.length || ra.some((v, j) => v !== rb[j])) {
+          diff = { tick: a.tick, why: `unit row ${k / 8}`, js: ra, cpp: rb };
+          break;
+        }
       }
+      if (!diff) diff = { tick: a.tick, why: `hash js ${a.hash} c++ ${b.hash}` };
     }
-    if (!diff) diff = { tick: a.tick, why: `hash js ${a.hash} c++ ${b.hash}` };
+    // players [res x4, pop, popCap, age]*, buildings [id, hp, progress, built, queue, rows]*, resources [id, amount, x, z]*
+    const ea = a.econ || [], eb = b.econ || [];
+    if (!diff && (ea.length !== eb.length || ea.some((v, j) => v !== eb[j]))) {
+      let k = 0;
+      while (k < Math.min(ea.length, eb.length) && ea[k] === eb[k]) k++;
+      diff = { tick: a.tick, why: `econ state at ${k} of ${ea.length} (js) / ${eb.length} (c++)`, econ: true, js: ea.slice(Math.max(0, k - 4), k + 6), cpp: eb.slice(Math.max(0, k - 4), k + 6) };
+    }
   }
   const last = js.checkpoints[js.checkpoints.length - 1];
   const units = last ? last.units.length / 8 : 0;
   if (diff) {
     bad++;
     console.log(`DIFF ${sc.name.padEnd(9)} first at tick ${diff.tick}: ${diff.why}`);
-    if (diff.js) console.log(`     [id, x, z, rot, hp, flags, order, anim]\n     js  ${JSON.stringify(diff.js)}\n     c++ ${JSON.stringify(diff.cpp)}`);
+    if (diff.js) console.log(`     ${diff.econ ? '[... around the first difference]' : '[id, x, z, rot, hp, flags, order, anim]'}\n     js  ${JSON.stringify(diff.js)}\n     c++ ${JSON.stringify(diff.cpp)}`);
   } else {
     console.log(`ok   ${sc.name.padEnd(9)} seed ${String(sc.seed).padEnd(3)} ${sc.preset.padEnd(9)} ${String(units).padStart(5)} units  ${js.checkpoints.length} checkpoints up to tick ${last?.tick}, all bit-exact  (js ${js.ms.toFixed(2)} ms/tick, c++ ${perf})`);
   }

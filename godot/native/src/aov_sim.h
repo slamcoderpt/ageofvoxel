@@ -91,6 +91,41 @@ public:
 	// Formation moves of >= min_units share one Dijkstra field (0 = off, JS-exact; see pathfinding.h)
 	void set_group_paths(int64_t min_units) { sim_.pathfinder.group_min = (int)min_units; }
 
+	// --- buildings (sim/buildings; see PORTING.md "AovSim API")
+	PackedStringArray building_type_names() const;
+	Dictionary get_building_def(const String &type) const;
+	int64_t spawn_building(const String &type, int64_t owner, int64_t tx, int64_t tz, bool built, bool site);
+	bool can_place(const String &type, int64_t tx, int64_t tz) const;
+	int64_t place_building(const String &type, int64_t owner, int64_t tx, int64_t tz, const PackedInt32Array &builders);
+	void destroy_building(int64_t id);
+	Dictionary get_building(int64_t id) const; // one building incl. its queue and rally point
+
+	// --- economy (sim/economy)
+	Dictionary train(int64_t building, const String &unit_type);
+	void cancel_train(int64_t building, int64_t index);
+	Dictionary advance_age(int64_t owner);
+	Dictionary next_age_cost(int64_t owner) const;
+	void set_rally(int64_t building, double x, double z, int64_t target_id);
+	void clear_rally(int64_t building);
+	int64_t nearest_resource(double x, double z, const String &res_type, double max_dist);
+	int64_t nearest_dropoff(int64_t owner, double x, double z, const String &res_type);
+	void order_gather(const PackedInt32Array &ids, int64_t target);
+	void order_build(const PackedInt32Array &ids, int64_t target);
+	void order_worship(const PackedInt32Array &ids, int64_t target);
+	void order_dropoff(const PackedInt32Array &ids, int64_t target);
+	void set_player_resources(int64_t owner, const Dictionary &res);
+	void set_player_age(int64_t owner, int64_t age);
+	PackedInt32Array spawn_herd(const String &type, double x, double z, int64_t n);
+	int64_t spawn_boat(int64_t owner, double x, double z, double rot);
+	int64_t spawn_shoal(double x, double z, double amount);
+	Dictionary get_economy() const; // animals, spears, shoals, boats (packed arrays)
+	Dictionary get_decor() const;   // scene field dressing: {count, keys, xform: [x, z, rot, scale, y]*}
+
+	// --- deterministic scene setups (sim/scenes)
+	bool has_scene_setup(const String &name) const;
+	Dictionary setup_scene(const String &name); // -> ctx {focus: Vector2, ...}
+	void scene_after(const String &name);        // the scene's after(), once the fast-forward is done
+
 	// --- events: [{type: "entity:added", id, kind, other, owner, a, x, z, amount}], cleared on read
 	Array take_events();
 	void set_record_events(bool on) { sim_.events.record = on; }
@@ -105,6 +140,9 @@ public:
 	int64_t units_hash() const { return sim_.units_hash(); }
 	// Full-precision dump for parity checks: [id, x, z, rot, hp, flags, order, anim] per unit
 	PackedFloat64Array get_units_f64() const;
+	// Economy / buildings state for parity checks: per player [res x4, pop, pop_cap, age],
+	// per building [id, hp, progress, built, queue length, farm rows], per resource [id, amount, x, z]
+	PackedFloat64Array get_econ_f64() const;
 };
 
 } // namespace godot

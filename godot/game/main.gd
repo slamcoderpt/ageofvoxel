@@ -110,6 +110,10 @@ func _ready() -> void:
 	var setup := AovScenes.get_setup(scene_name)
 	if setup.is_valid():
 		ctx = setup.call(self)
+	elif sim.has_scene_setup(scene_name):
+		# deterministic setups ported to C++ (native/src/sim/scenes: skirmish,
+		# town, coast, hud; economy registers itself from game/economy)
+		ctx = sim.setup_scene(scene_name)
 	if not ctx.has("focus"):
 		var s: Dictionary = sim.get_starts()[0]
 		ctx["focus"] = Vector2(s.tx + 0.5, s.tz + 0.5)
@@ -117,6 +121,8 @@ func _ready() -> void:
 	var ff := float(scene_def.fast_forward)
 	if ff > 0:
 		fast_forward(ff)
+	if sim.has_scene_setup(scene_name):
+		sim.scene_after(scene_name)  # the scene's after() (JS main.js runs it after the fast-forward)
 
 	var cam: Dictionary = AovScenes.DEFAULT_CAMERA.duplicate()
 	cam.merge(scene_def.camera, true)

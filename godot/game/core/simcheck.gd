@@ -101,6 +101,50 @@ func _scenario(a: Dictionary) -> int:
 					sim.kill_unit(ids[i])
 			"clearRect":
 				sim.clear_rect(int(op.tx), int(op.tz), int(op.w), int(op.h))
+			"scene":
+				sim.setup_scene(str(op.name))
+			"after":
+				sim.scene_after(str(op.name))
+			"units":
+				var U: Dictionary = sim.get_units()
+				var t := Array(sim.unit_type_names()).find(str(op.type))
+				var ids := PackedInt32Array()
+				for i in int(U.count):
+					if U.type[i] == t and U.owner[i] == int(op.owner) and (U.flags[i] & 2) == 0:
+						ids.append(U.ids[i])
+				groups[op["as"]] = ids
+			"buildings":
+				var B: Dictionary = sim.get_buildings()
+				var t := Array(sim.building_type_names()).find(str(op.type))
+				var ids := PackedInt32Array()
+				for i in int(B.count):
+					if B.type[i] == t and B.owner[i] == int(op.owner):
+						ids.append(B.ids[i])
+				groups[op["as"]] = ids
+			"setRes":
+				var res := {}
+				for k in op.res:
+					res[k] = _f(op.res[k])
+				sim.set_player_resources(int(op.owner), res)
+			"train":
+				for id in _ids(groups, op.group):
+					for i in int(op.get("count", 1)):
+						sim.train(id, str(op.type))
+			"cancel":
+				for id in _ids(groups, op.group):
+					sim.cancel_train(id, int(op.get("index", 0)))
+			"age":
+				sim.advance_age(int(op.owner))
+			"place":
+				var id: int = sim.place_building(str(op.type), int(op.owner), int(op.tx), int(op.tz), _ids(groups, str(op.get("group", ""))))
+				groups[op["as"]] = PackedInt32Array([id]) if id else PackedInt32Array()
+			"destroy":
+				for id in _ids(groups, op.group):
+					sim.destroy_building(id)
+			"gather":
+				var r: int = sim.nearest_resource(_f(op.x), _f(op.z), str(op.resType), 30.0)
+				if r:
+					sim.order_gather(_ids(groups, op.group), r)
 			"run":
 				for i in int(op.ticks):
 					var s := Time.get_ticks_usec()
@@ -111,7 +155,7 @@ func _scenario(a: Dictionary) -> int:
 						max_tick = dt
 						max_at = sim.get_tick()
 					if sim.get_tick() % every == 0:
-						checkpoints.append({"tick": sim.get_tick(), "hash": "%08x" % sim.units_hash(), "units": sim.get_units_f64()})
+						checkpoints.append({"tick": sim.get_tick(), "hash": "%08x" % sim.units_hash(), "units": sim.get_units_f64(), "econ": sim.get_econ_f64()})
 			_:
 				printerr("simcheck: unknown op %s" % op.op)
 				return 1
@@ -135,5 +179,6 @@ static func _f(v: Variant) -> float:
 func _ids(groups: Dictionary, spec: String) -> PackedInt32Array:
 	var out := PackedInt32Array()
 	for g in spec.split(","):
-		out.append_array(groups.get(g, PackedInt32Array()))
+		if g != "":
+			out.append_array(groups.get(g, PackedInt32Array()))
 	return out

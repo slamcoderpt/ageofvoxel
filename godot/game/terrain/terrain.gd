@@ -108,6 +108,8 @@ func _build_resources() -> void:
 	var by_key := {}
 	for i in int(R.count):
 		var type := names[types[i]]
+		if type != "tree" and type != "gold" and type != "berry":
+			continue  # huntable animals are resources too: game/economy draws them
 		var key: String = "tree%d" % (variants[i] % 10) if type == "tree" else type
 		var size := 3.0 if type == "gold" else 1.0
 		var tx := tiles[i * 2]
