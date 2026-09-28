@@ -71,13 +71,53 @@ static func mesh(g: String, model_name: String) -> ArrayMesh:
 	arrays[Mesh.ARRAY_CUSTOM0] = bin.slice(int(m.color), int(m.color) + nv * 4)
 	arrays[Mesh.ARRAY_CUSTOM1] = bin.slice(int(m.extra), int(m.extra) + nv * 4)
 	arrays[Mesh.ARRAY_INDEX] = bin.slice(int(m.index), int(m.index) + ni * 4).to_int32_array()
-	var flags := (Mesh.ARRAY_CUSTOM_RGBA8_UNORM << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT) \
-		| (Mesh.ARRAY_CUSTOM_RGBA8_UNORM << Mesh.ARRAY_FORMAT_CUSTOM1_SHIFT)
 	var am := ArrayMesh.new()
-	am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, flags)
+	add_voxel_surface(am, arrays)
 	am.resource_name = key
 	_meshes[key] = am
 	return am
+
+## Adds a voxel surface (VERTEX, NORMAL, CUSTOM0 / CUSTOM1 as RGBA8 bytes,
+## INDEX) to am. Compatibility renderer (the web export): Godot 4.5's GLES3
+## backend binds an RGBA8 custom attribute with ONE component
+## (drivers/gles3/storage/mesh_storage.cpp: size = bytes / sizeof(float)), so
+## every model would come out red; there CUSTOM0 / CUSTOM1 are uploaded as
+## RGBA float instead (same values in the shaders).
+static func add_voxel_surface(am: ArrayMesh, arrays: Array) -> void:
+	var c := Mesh.ARRAY_CUSTOM_RGBA8_UNORM
+	if _float_custom():
+		c = Mesh.ARRAY_CUSTOM_RGBA_FLOAT
+		arrays[Mesh.ARRAY_CUSTOM0] = _rgba8_to_float(arrays[Mesh.ARRAY_CUSTOM0])
+		arrays[Mesh.ARRAY_CUSTOM1] = _rgba8_to_float(arrays[Mesh.ARRAY_CUSTOM1])
+	var flags := (c << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT) | (c << Mesh.ARRAY_FORMAT_CUSTOM1_SHIFT)
+	am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, flags)
+
+## Surface 0 of a voxel mesh with CUSTOM0 / CUSTOM1 as RGBA8 bytes, whatever
+## the renderer (input of AovUnitView.lod_mesh).
+static func voxel_arrays(mesh: Mesh) -> Array:
+	var arrays := mesh.surface_get_arrays(0)
+	for k in [Mesh.ARRAY_CUSTOM0, Mesh.ARRAY_CUSTOM1]:
+		if arrays[k] is PackedFloat32Array:
+			var f: PackedFloat32Array = arrays[k]
+			var img := Image.create_from_data(f.size() / 4, 1, false, Image.FORMAT_RGBAF, f.to_byte_array())
+			img.convert(Image.FORMAT_RGBA8)
+			arrays[k] = img.get_data()
+	return arrays
+
+static var _float_custom_mode := -1
+
+static func _float_custom() -> bool:
+	if _float_custom_mode < 0:
+		_float_custom_mode = 1 if RenderingServer.get_current_rendering_method() == "gl_compatibility" \
+			and DisplayServer.get_name() != "headless" else 0
+	return _float_custom_mode == 1
+
+static func _rgba8_to_float(b: PackedByteArray) -> PackedFloat32Array:
+	if b.size() < 4:
+		return PackedFloat32Array()
+	var img := Image.create_from_data(b.size() / 4, 1, false, Image.FORMAT_RGBA8, b)
+	img.convert(Image.FORMAT_RGBAF)   # x / 255, no colour-space change
+	return img.get_data().to_float32_array()
 
 ## Shared voxel material (team colour from the `team_color` uniform, or per
 ## instance from MultiMesh custom data when use_instance_team is set).

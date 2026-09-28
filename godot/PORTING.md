@@ -36,6 +36,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor; Godot-only activity fx: axe / pick chips and dust, sickle chaff, stooks on cut rows, hoof dust, shoal ripples, fish splashes, net ripples, boat wakes; crops sway, `econ_voxel.gdshader`, `fx_chip / fx_puff / fx_ring.gdshader`), buffers built in C++ by `AovEconView` (`native/src/econ_view.{h,cpp}`, render side, reads the sim, never writes it) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
 | godpowers | `game/godpowers/godpowers.gd` (the whole BoltRenderer of effects.js: bolt / sky / zap ribbons, impact flash sprites and decals, scorches with ember cracks, crater debris, char rims, spark streaks, smoke and flames, the storm funnel (wall, cloud body, dust wall, ground shockwave, rain, energy bands, whirled debris), flyer trails / back lights / drop shadows, meteor fireball and fire, strike / storm point lights and the shadow spot, the full-frame storm grade with light pools; dims the lighting piece's sun / sky / grade while a storm plays), shaders beside it; buffers built in C++ by `AovGodpowerView` (`native/src/godpower_view.{h,cpp}`, render side, reads the sim, never writes it) | `godpowers/` (favor, cooldowns, Lightning Storm, Bolt, Meteor, thrown units: ported) | `src/godpowers/` |
 | ui (HUD, selection, input) | `game/ui/ui.gd` (selection, box / double-click select, smart orders, rally points, control groups, hotkeys, placement ghost, god-power targeting ring, move markers, selection rings (one MultiMesh) + bars, event feed, messages, result card; public: `pieces.ui.selected`, `hover_entity`, `message()`, `feed()`), `hud.gd` (the drawn HUD, two layers with hit zones), `hud_style.gd` (palette, Cinzel / Alegreya fonts in `fonts/`, SVG icons from `icons.gd` = `src/ui/icons.js` rasterised at runtime, draw helpers), `panel.gdshader` (the gilded teal panels), `minimap.gd` + `minimap_ground/units.gdshader` (unit dots read straight from `get_units()` arrays as data textures: no per-unit script), `portraits.gd` (one SubViewport per type / owner, rendered once) | none | `src/ui/` |
+| exports (Windows, macOS, Linux, web) | `export_presets.cfg`, `../scripts/godot-export.sh`, `../.github/workflows/godot.yml`, `native/SConstruct` + `native/aov.gdextension` (platform entries); see "Export" | none | `vite build` |
 | scenes | `AovScenes.set_setup()` from the owning piece, else the C++ setup | `scenes/` (helpers.js, skirmish / town / coast / hud, EconomyScene.js; battle.cpp: BattleScene.js + units/battleHost.js, godpower, stress.js: all ported) | `src/core/scenes/`, `BattleScene.js`, `EconomyScene.js` |
 
 ```
@@ -74,8 +75,15 @@ built): do not rebuild it. Use `-j2`: the machine is shared.
 The sim is compiled with `-ffp-contract=off` (MSVC `/fp:precise`): no FMA
 contraction, never `-ffast-math`, or it stops matching the browser.
 
-Web: the extension must be built with emscripten (`platform=web`, dlink) and
-exported with "Extensions Support" on; not set up yet.
+Web: `source ~/emsdk/emsdk_env.sh && scons -j2 platform=web threads=no
+target=template_release` with **emscripten 4.0.11** (the version the official
+4.5.1 web templates are built with; other versions fail to load the side
+module) gives `bin/libaov.web.template_release.wasm32.nothreads.wasm`. The
+web export uses the dlink "nothreads" template: no SharedArrayBuffer, so it
+runs from any static server without cross-origin isolation headers. The first
+web build compiles godot-cpp for wasm (~20 min on 2 cores here).
+macOS: `platform=macos arch=universal` builds `bin/libaov.macos.<target>.framework`
+(one binary for x86_64 + arm64, plus `Resources/Info.plist` for signing).
 
 **Godot only loads a GDExtension listed in `.godot/extension_list.cfg`**,
 which an import writes. After a fresh clone (or if `AovSim` is missing):
@@ -86,6 +94,45 @@ godot --headless --path godot --import     # may print a crash on first run; the
 
 `scripts/godot-shoot.mjs` does this automatically when the file is missing.
 `.godot/` is never committed.
+
+## Export (owner: exports / platforms piece)
+
+`export_presets.cfg` has four presets: `Linux` (x86_64), `Windows` (x86_64),
+`macOS` (universal, ad-hoc signed, not notarized: a `.zip` holding
+`Age of Voxel.app`) and `Web` (Compatibility renderer, dlink nothreads). The
+models (`assets/models/*`) and the woff2 fonts are read with `FileAccess`, so
+they are listed in each preset's `include_filter`: keep that in mind if you add
+raw data files (the fonts' `.import` files say `importer="keep"` so the woff2
+bytes themselves are exported). Official 4.5.1 templates go in
+`~/.local/share/godot/export_templates/4.5.1.stable/` (installed in this
+container: linux, windows, macos, web).
+
+```
+scripts/godot-export.sh linux|windows|macos|web [release|debug]   # scons for the target, then export
+SKIP_BUILD=1 scripts/godot-export.sh linux debug                  # export only (uses native/bin as is)
+python3 -m http.server -d dist-godot/web 8000                     # web: open http://localhost:8000/?scene=town
+node scripts/godot-webshoot.mjs --scene hud [--out shots/godot/web-hud.png]   # web smoke test + screenshot (headless Chromium)
+dist-godot/linux/AgeOfVoxel.x86_64 -- --scene=town                # exported builds take the same args
+```
+
+Output: `../dist-godot/<target>/` (gitignored). In the web build the page's
+query string is read like the command line (`AovArgs.parse`). CI:
+`.github/workflows/godot.yml` builds the extension on ubuntu-22.04 (linux),
+windows-latest (MSVC), macos-latest (universal) and ubuntu + emsdk (web),
+caches godot-cpp per submodule commit, exports the four presets on Linux and
+uploads `aov-godot-{linux-x86_64,windows-x86_64,macos-universal,web}`; with the
+repository variable `GODOT_PAGES=true` it also publishes the web build on
+GitHub Pages from main.
+
+**Web = Compatibility renderer** (GLES3 / WebGL2; Forward+ does not exist on
+the web). Test it on desktop with `--rendering-method gl_compatibility
+--rendering-driver opengl3`. Known 4.5 GLES3 bug: RGBA8 custom vertex
+attributes are bound with one component (only red), so
+`VoxelModels.add_voxel_surface()` uploads CUSTOM0 / CUSTOM1 as RGBA float
+there; build voxel surfaces through it (and read them back with
+`VoxelModels.voxel_arrays()`), never with a raw `ARRAY_CUSTOM_RGBA8_UNORM`
+flag. Compute / CompositorEffect passes do not run on Compatibility (the
+lighting piece falls back).
 
 ## Run, capture, bench
 

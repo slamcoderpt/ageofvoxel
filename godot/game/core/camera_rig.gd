@@ -18,6 +18,9 @@ var pitch := deg_to_rad(52.0)
 var yaw := deg_to_rad(45.0)
 var pan_speed := 1.0
 var edge_scroll := true
+# Web: no edge scroll until the pointer is over the canvas (the browser reports
+# (0, 0) before the first mouse event, and keeps the last position after it leaves).
+var _mouse_in := not OS.has_feature("web")
 var user_control := true
 var sim: Object = null  # AovSim, for smooth_height_at / map size
 
@@ -80,6 +83,10 @@ func _unhandled_input(e: InputEvent) -> void:
 		yaw = home_yaw
 		pitch = home_pitch
 
+func _notification(what: int) -> void:
+	if OS.has_feature("web") and (what == NOTIFICATION_WM_MOUSE_ENTER or what == NOTIFICATION_WM_MOUSE_EXIT):
+		_mouse_in = what == NOTIFICATION_WM_MOUSE_ENTER
+
 func _process(dt: float) -> void:
 	if user_control:
 		var sp := distance * 1.1 * dt * pan_speed
@@ -89,7 +96,7 @@ func _process(dt: float) -> void:
 		if Input.is_key_pressed(KEY_DOWN): f -= sp
 		if Input.is_key_pressed(KEY_RIGHT): r += sp
 		if Input.is_key_pressed(KEY_LEFT): r -= sp
-		if edge_scroll and DisplayServer.window_is_focused():
+		if edge_scroll and _mouse_in and DisplayServer.window_is_focused():
 			var m := get_viewport().get_mouse_position()
 			var s := get_viewport().get_visible_rect().size
 			if m.x <= 6: r -= sp
