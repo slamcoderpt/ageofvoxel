@@ -14,8 +14,8 @@ uniform float dye_gain = 0.85;
 uniform float team_lift = 0.32;
 // material grade: the figures hold more saturation and contrast than the dirt
 // they stand on, so each silhouette separates under the cloud shadows
-uniform float saturation = 1.3;
-uniform float contrast = 1.18;
+uniform float saturation = 1.45;
+uniform float contrast = 1.3;
 
 varying vec3 v_albedo;
 varying float v_team;
@@ -75,7 +75,10 @@ void fragment() {
 	// colour (the old team-tinted flash made blue soldiers look lit up)
 	float hit_k = min(v_flash * 20.0, 1.0);
 	vec3 hot = vec3(1.0, 0.52, 0.16);
-	em += (c * vec3(1.0, 0.85, 0.7) * 0.3 + hot * c.r * 0.6 + hot * 0.05) * (0.75 + 0.5 * rim) * hit_k;
+	// Only skin, bronze and wood flare: warm light on the dye itself reads
+	// violet on blue and pink on red, and the impact burst over him already
+	// carries the strike.
+	em += (c * vec3(1.0, 0.85, 0.7) * 0.3 + hot * c.r * 0.6 + hot * 0.05) * (0.75 + 0.5 * rim) * hit_k * (1.0 - 0.9 * v_team);
 	em += vec3(1.0, 0.72, 0.4) * max(v_flash - 0.05, 0.0); // god-power blasts
 	EMISSION = em;
 }

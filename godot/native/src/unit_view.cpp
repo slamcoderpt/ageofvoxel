@@ -875,14 +875,32 @@ void AovUnitView::emit_fx(const HitRec &h, double now) {
 		spark(o, r, age, px, y, pz, 1, hexc(0xfff0d0), 1.2 + 0.5 * k, 0.3 + 0.2 * k, 0.12 + 0.1 * k, 0.4, 0.2, 0, bx, bz, 0.2);
 		// the flash where the blow lands: a small, brief white-hot core in an
 		// orange glow, off both team colours so it reads as a strike
+		// An impact burst (spark.gdshader burst mode, flagged by a negative
+		// size): a 20-30 px star of a white-hot core, an orange-yellow glow
+		// and a few rays, popping open and fading over ~0.35 s so two or
+		// three stay on screen along a busy front line.
 		{
-			const double fl = 0.16 + 0.08 * k;
+			const double fl = 0.3 + 0.08 * k + (big ? 0.08 : 0.0);
+			const float rays = (float)r.next();
 			if (age < fl && o.sparks->n < (int)MAX_SPARK) {
-				const double f = 1 - age / fl;
-				o.sparks->push(xl(px, y, pz), 2.6f, 1.3f, 0.25f, (float)(std::sqrt(f) * 0.95),
-						(float)((big ? 1.25 : 0.9) * (0.8 + 0.4 * k)), 0, 0, 0);
+				const double t = age / fl;
+				o.sparks->push(xl(px, y + 0.05, pz), 0.7f, 0.17f, 0.012f, (float)(1.0 - t * t),
+						(float)(-(big ? 1.3 : 1.0) * (0.85 + 0.25 * k)), (float)t, rays, 0);
 			}
 		}
+		// 4-6 hot voxel sparks flying out of the burst (HDR-bright chips that
+		// cool from yellow-white to orange as they fall)
+		{
+			const int nh = r.irange(4, 6);
+			for (int q = 0; q < nh; q++) {
+				const double cool = std::min(1.0, age / 0.5);
+				const Col hc = { (float)(1.0 - 0.3 * cool), (float)(0.42 - 0.3 * cool), (float)(0.04 - 0.03 * cool) };
+				emit(o, r, age, px, y + 0.05, pz, 1, hc, 0.08, 0.22, 0.65, 4.2, 3.6, -20, 0.05);
+			}
+		}
+		// a small brown dust puff kicked up at the struck man's feet: darker
+		// than the tan dirt so it reads against it
+		puff(o, r, age, x, z, 4, 1.2 + 0.3 * k, 1.0, 0.7, 0.9, 0.35, r.chance(0.5) ? 0x6a4a2c : 0x7e5c38, 0.55, 0.5, bx * 0.5, bz * 0.5);
 		// 3-5 voxel debris thrown off the struck man: bronze, splinters, his dye
 		{
 			const int nd = r.irange(3, 5);
@@ -914,7 +932,7 @@ void AovUnitView::emit_fx(const HitRec &h, double now) {
 	const double fx0 = x + bx * 0.25, fz0 = z + bz * 0.25;
 	puff(o, r, age, fx0, fz0, 2, big ? 1.5 : 1.0, 1.2, 0.4, 0.3, 0.05, 0xd2bf98, 0.1, 0.08, bx * 0.8, bz * 0.8);
 	emit(o, r, age, fx0, gy + 0.12, fz0, r.irange(3, 5), hexc(0x5a3e22), 0.2, 0.13, 0.55, 1.2, 2.4, -14, 0.2);
-	emit(o, r, age, fx0, gy + 0.12, fz0, big ? 16 : 10, hexc(0xe2cfa6), 0.12, big ? 0.22 : 0.18, 0.6, big ? 2.8 : 1.8, 1.4, -9, 0.18, 2.5);
+	emit(o, r, age, fx0, gy + 0.12, fz0, big ? 8 : 5, hexc(0xc8ac80), 0.12, big ? 0.22 : 0.18, 0.6, big ? 2.8 : 1.8, 1.4, -9, 0.18, 2.5);
 }
 
 // ---- BattleFX ground scars ------------------------------------------------------

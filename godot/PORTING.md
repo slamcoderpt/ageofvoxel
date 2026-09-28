@@ -580,9 +580,12 @@ Array[PackedFloat32Array] (one per rig part, types in index order; COLOR =
 coat / corpse tint + fade, CUSTOM = linear team rgb + floor(dead*100) +
 flash), part_counts, shadows, bars (CUSTOM = hp fraction, width px),
 arrows, streaks (origin = head, COLOR = tail), sparks (COLOR = hdr rgb +
-alpha, CUSTOM = size + velocity; zero velocity = an impact flash, always warm
-white-hot to orange, never team-tinted), dust, chips (incl. 3-5 voxel
-debris per landed blow), drops: Array[4] (shield,
+alpha, CUSTOM = size + velocity; zero velocity = a slow spark; negative
+size = an impact burst, CUSTOM = (-scale, age 0..1, ray seed): a 20-30 px
+star (at 1080p) of a white-hot core, a yellow glow and a mid-bright orange
+halo that keeps its hue through the grade, ~0.35 s, never team-tinted),
+dust (incl. a brown puff at the struck man's feet), chips (incl. 3-5 voxel
+debris and 4-6 hot sparks per landed blow), drops: Array[4] (shield,
 helmet, spear, stub; CUSTOM = team rgb), scars (only when scars_changed;
 CUSTOM = dirt, blood), + *_count}; 20 floats per instance (TRANSFORM_3D +
 colour + custom), zero-padded to power-of-two capacities. Visual only: never
