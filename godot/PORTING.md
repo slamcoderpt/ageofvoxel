@@ -27,7 +27,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 
 | Piece | GDScript (render / UI) | C++ sim (`native/src/sim/…`) | JS reference |
 |---|---|---|---|
-| core (foundation) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck) | `core/` (constants, rng, jsmath, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `sim.{h,cpp}` | `src/core/` |
+| core (foundation; skirmish builder: camera, fog pass, playtest) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck, `fog_view.gd` + `fog_of_war.gdshader` (fog-of-war shading, one full-screen pass), `playtest.gd` (scripted skirmish playthrough)) | `core/` (constants, rng, jsmath, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `sim.{h,cpp}` | `src/core/` |
 | terrain | `game/terrain/terrain.gd` + `terrain.gdshader` (chunks, paving cobbles / pale stone of MaterialPatches patchGround), `water.gdshader` (Water.js), `props.gdshader` (voxel.gdshader + MultiMesh instance tint, used by trees / gold / berries / ground details); mesher in `native/src/terrain_mesher.cpp` (TerrainMesh.js full port, water depth bake, GroundDetails.js scatter) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (sun + PCSS soft shadows, hemisphere = ambient colour + two unshadowed up/down lights, fill, depth haze following the camera, SSAO, MSAA, `--quality=high\|medium\|low`, `--post=high\|low\|off`), `grade_effect.gd` (CompositorEffect compute pass on the HDR buffer: exposure 2.1 + PBR Neutral + the PostFX.js grade; Godot's tonemap is LINEAR; Compatibility/web falls back to AgX), `sky.gdshader`. MaterialPatches.js canopy / foliage terms not ported yet | none | `src/lighting/` |
 | buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
@@ -44,7 +44,8 @@ godot/
   PORTING.md               this file
   game/main.tscn|gd        entry: args, sim, pieces, loop, capture, bench
   game/core/               args.gd, scenes.gd, camera_rig.gd, voxel_models.gd,
-                           voxel.gdshader, bench.gd, model_gallery.gd
+                           voxel.gdshader, bench.gd, model_gallery.gd,
+                           fog_view.gd + fog_of_war.gdshader, playtest.gd
   game/<piece>/<piece>.gd  one node per piece (see "Piece contract")
   assets/models/           exported voxel models (generated, committed)
   native/SConstruct        builds bin/libaov.<platform>.<target>.<arch>.so|dll|…
@@ -158,6 +159,17 @@ all 6 players 0.01), economy 0.10, fog 0.03 ms/tick; `findPath` 183 calls/tick
 (172 from combat, exactly the browser's counts: the two sims run the same
 game), 0.14 ms/tick; 16.7 neighbours visited per hash query.
 
+Skirmish playtest (the whole match through real input events: box select,
+right-click gather, control groups, house placement, train, advance age,
+double-click, stop, camera zoom / turn / pan, a Bolt by hotkey + click, two
+minutes against the AI, the victory card and Play Again; ~12 min on lavapipe):
+
+```
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 1280x720x24" \
+  godot --path godot --rendering-driver vulkan --audio-driver Dummy --resolution 1280x720 \
+  -s res://game/core/playtest.gd -- --scene=skirmish     # "PLAYTEST ok|FAIL <step>", exit = failures
+```
+
 Other tools:
 
 ```
@@ -192,7 +204,15 @@ marches them onto each other, e.g.
 - **Camera**: `AovCameraRig` (`game/core/camera_rig.gd`) is
   `CameraController.js`: vertical fov 34, near 0.5, far 900, target / distance /
   pitch / yaw in the same units; `set_view({x, z, distance, pitch, yaw})` takes
-  degrees like `setView`. Scene cameras in `game/core/scenes.gd` use the JS
+  degrees like `setView`. Input as the JS (arrows, edge scroll, middle-drag
+  pan, wheel zoom, eased), plus Godot-only turning: Alt / Ctrl + middle-drag
+  (yaw, pitch 30..70), `[` / `]`, Home resets. The camera owns the
+  fog-of-war pass (`AovFogView`, a full-screen quad drawn last in the
+  transparent pass: world position from the depth buffer, the JS
+  `applyFogOfWar` factor from `get_fog()` uploaded on `fog_version()`
+  changes, unexplored = black under the depth haze, graded to the browser's
+  frame); hidden when the map is revealed. Entities in the fog are hidden by
+  their renderers. Scene cameras in `game/core/scenes.gd` use the JS
   numbers, so captures line up with `reference/browser/<scene>.png`. Where a JS
   camera is relative to the setup's focus (`ctx.focus`), the scene setup must
   return `{"focus": Vector2(x, z)}`; until it exists the focus falls back to
@@ -523,8 +543,11 @@ Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
   stress bench (`godot-stress.mjs`, numbers above).
 - Placeholders to replace: `game/terrain/terrain.gd` (first pass: no shore
   smoothing, talus, cliff relief, water shader or ground details),
-  `game/lighting/lighting.gd`; the fog-of-war shading does not exist yet (the sim state it needs
-  is exported, see "AovSim API").
+  `game/lighting/lighting.gd`.
+- Done (skirmish): fog-of-war shading (`game/core/fog_view.gd`), camera
+  turning and eased zoom, the minimap / picking / placement now honour the
+  fog in the skirmish (ui.gd read the `fog` flag inverted), and
+  `game/core/playtest.gd` plays the match end to end (all steps "ok").
 - Done (ui): the full browser HUD (resource strip with villager counts, age
   medallion, god-power slots with cooldowns, menu buttons, clock, scores,
   control-group cards, feed, command grid, selection card, diamond minimap

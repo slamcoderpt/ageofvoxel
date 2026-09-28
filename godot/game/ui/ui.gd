@@ -107,7 +107,7 @@ func setup(g: Node) -> void:
 	for n in sim.power_names():
 		_pdefs[n] = sim.get_power_def(n)
 	hud_visible = AovArgs.flag(g.args, "hud", bool(g.scene_def.get("hud", false)))
-	_fog_on = not AovArgs.flag(g.args, "fog", not bool(g.scene_def.get("reveal_all", false)))
+	_fog_on = AovArgs.flag(g.args, "fog", not bool(g.scene_def.get("reveal_all", false)))
 	# interactive play: formation moves share one path field (PORTING.md);
 	# deterministic captures keep the browser-exact per-unit paths
 	if not g.args.has("out") and not AovArgs.flag(g.args, "quit", false):
