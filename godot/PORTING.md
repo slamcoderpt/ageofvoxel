@@ -27,16 +27,16 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 
 | Piece | GDScript (render / UI) | C++ sim (`native/src/sim/…`) | JS reference |
 |---|---|---|---|
-| core (foundation) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck) | `core/` (constants, rng, jsmath, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile; later fog, victory), `sim.{h,cpp}` | `src/core/` |
+| core (foundation) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck) | `core/` (constants, rng, jsmath, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `sim.{h,cpp}` | `src/core/` |
 | terrain | `game/terrain/terrain.gd` (foundation first pass: C++ mesher, flat water plane ws*5 centred like Water.js, resource MultiMeshes) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (currently a foundation **placeholder**) | none | `src/lighting/` |
 | buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw; props.js not yet) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
 | units | `game/units/units.gd` (first pass: rigs in the rest pose, conditional parts; animation still to port) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
-| combat (incl. enemy AI) | `game/combat/combat.gd` | `combat/` | `src/combat/` |
+| combat (incl. enemy AI) | `game/combat/combat.gd` (not written yet: arrows, hit fx, health bars) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported) | `src/combat/` |
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
-| godpowers | `game/godpowers/godpowers.gd` | `godpowers/` | `src/godpowers/` |
+| godpowers | `game/godpowers/godpowers.gd` (not written yet: bolts, storm funnel, scorches, debris) | `godpowers/` (favor, cooldowns, Lightning Storm, Bolt, Meteor, thrown units: ported) | `src/godpowers/` |
 | ui (HUD, selection, input) | `game/ui/ui.gd` | none | `src/ui/` |
-| scenes | `AovScenes.set_setup()` from the owning piece, else the C++ setup | `scenes/` (helpers.js, skirmish / town / coast / hud, EconomyScene.js: ported) | `src/core/scenes/`, `BattleScene.js`, `EconomyScene.js` |
+| scenes | `AovScenes.set_setup()` from the owning piece, else the C++ setup | `scenes/` (helpers.js, skirmish / town / coast / hud, EconomyScene.js; battle.cpp: BattleScene.js + units/battleHost.js, godpower, stress.js: all ported) | `src/core/scenes/`, `BattleScene.js`, `EconomyScene.js` |
 
 ```
 godot/
@@ -103,7 +103,11 @@ godot --path godot -- --scene=town [--seed=N] [--mapsize=N] [--units=N] [--playe
   seconds (default 600) so a script error never hangs a capture.
 - Scenes: `skirmish town battle godpower coast economy hud stress` (same
   presets, seeds, map sizes and cameras as the JS registry) and the Godot-only
-  `models` (every exported model on one strip).
+  `models` (every exported model on one strip). Like main.js, main.gd turns
+  the ENEMY AI and Victory on per scene (`ai`, `victory`) before the setup,
+  sets the fog (`reveal_all`, `--fog`) after it, and pauses when the match is
+  decided (`AovSim.is_paused()`). `--units=N` reaches the C++ setup through
+  `setup_scene(name, {units})`.
 
 Capture (xvfb + lavapipe software Vulkan; there is no GPU here):
 
@@ -127,13 +131,32 @@ godot --headless --path godot -- --scene=stress --units=2000 --bench --ticks=600
 
 `godot-stress.mjs` prints exactly the tables of `scripts/stress.mjs` (its
 summarize/print code is copied unchanged), fed by `game/core/bench.gd`, which
-steps `AovSim.tick()` with the profiler on and reads `AovSim.get_profile()`
-(`{total, sys:{name:ms}, sub:{}, ai:{player:ms}, calls:{name:[n, ms]}}`) and
-`get_stats()` (`{alive, dead, moving, buildings, projectiles}`). **Sim pieces
-must fill these**: time each system of the sim order with
-`ScopedTimer t(prof.enabled ? &prof.sys["movement"] : nullptr);` (names as in
-the JS `game.simOrder`), AI players under `prof.ai`, counted calls
-(`findPath`, `nearestResource`, …) under `prof.calls`.
+runs the scene setup (C++ `setup_scene("stress", {units})`, fog on for player
+1, the ENEMY AI on as in main.js), then the same protocol as stress.mjs:
+`--warmup` ticks, `--ticks` recorded ticks with the profiler on
+(`AovSim.get_profile()`: `{total, sys:{name:ms}, sub:{}, ai:{player:ms},
+calls:{name:[n, ms]}, callsBy:{"findPath@combat":[n, ms]}}`, `get_stats()`:
+`{alive, dead, moving, buildings, projectiles}`), then 60 ticks of spatial-hash
+census (per tick). `Sim::tick` runs each system of the JS `game.simOrder`
+(economy, buildings, combat, godpowers, units, movement, fog, victory) under
+its name; **sim pieces must fill the rest**: sub-steps under `prof.sub`
+(`ScopedTimer`), AI players under `prof.ai` (inside combat, like the JS),
+counted calls with `CallTimer ct(&sim->prof, "findPath");` (fills `calls` and
+`callsBy` with the running system).
+
+Result on this container (Xeon 2.1 GHz, shared, `template_debug` build, seed 23,
+6 players, 600 recorded ticks), next to the browser's in `docs/stress-report.md`:
+
+| N | 250 | 500 | 1000 | 2000 | 3000 | 4000 |
+|---|---:|---:|---:|---:|---:|---:|
+| Godot C++ sim, mean ms/tick | 0.14 | 0.26 | 0.63 | **1.30** | 2.12 | 3.38 |
+| Godot C++ sim, p95 | 0.22 | 0.37 | 0.82 | **2.06** | 3.43 | 5.28 |
+| browser JS sim, mean (report) | 2.4 | 3.3 | 7.6 | **15.0** | 25.2 | 40.7 |
+
+At 2000 units: movement 0.47, units 0.44 (spread 0.40), combat 0.26 (AI of
+all 6 players 0.01), economy 0.10, fog 0.03 ms/tick; `findPath` 183 calls/tick
+(172 from combat, exactly the browser's counts: the two sims run the same
+game), 0.14 ms/tick; 16.7 neighbours visited per hash query.
 
 Other tools:
 
@@ -141,10 +164,13 @@ Other tools:
 node scripts/check-mapgen.mjs            # C++ vs JS generateMap() for every scene's seed/preset: heights, ground,
                                          # passability, walkable after resources, resources, starts (all "ok")
 node scripts/check-sim.mjs [--only a,b]  # C++ sim vs the JS modules: scenarios (skirmish 3, town 7, battle 19, coast 5,
-                                         # stress 2000 and 4200 units; the town / economy / coast / hud scene setups
-                                         # and econ-ops: placement, training, age, destroy) spawn, order, step up to
-                                         # 4000 ticks and compare every unit, player, building and resource bit for
-                                         # bit at every checkpoint (all "ok"); ~5 min
+                                         # stress 2000 and 4200 units; the town / economy / coast / hud / battle /
+                                         # godpower / stress scene setups, econ-ops: placement, training, age, destroy,
+                                         # skirmish-ai: 5 min of the enemy AI, combat-ops: attack orders, Town Center
+                                         # arrows, every god power) spawn, order, step up to 9000 ticks and compare
+                                         # every unit, player, building, resource, arrow in flight, thrown unit and AI
+                                         # wave state bit for bit at every checkpoint (all "ok"); ~10 min. The JS side
+                                         # runs the real Combat / EnemyAI / GodPowers / Victory without their renderers
 node scripts/export-models.mjs           # re-export godot/assets/models from the JS model code (~5 s)
 godot --headless --path godot -s res://game/core/simcheck.gd -- --mapdump=F | --scenario=F --out=F   # their C++ side
 ```
@@ -211,6 +237,22 @@ marches them onto each other, e.g.
   `AovSim.set_repath_budget(n)` (max stuck re-paths per tick, the rest wait).
   Interactive play (the ui piece) should turn group paths on (~24);
   deterministic captures and parity checks leave them off.
+- **Combat** (`sim/combat`): an attack order is `order_type = O_ATTACK`,
+  `order_target` = target id, `order_x` = re-path timer, `order_a` = the
+  building it switched away from, `order_b` bits `ATK_THEN_BUILDINGS` /
+  `ATK_AUTO`. `combat.damage(target_id, amount, Hitter, kind)` /
+  `combat.kill(id, Hitter)` are the only way to hurt or kill (never set `dead`
+  yourself). The JS `u.combat_*` fields are unit columns (`combat_leash`,
+  `combat_reach`, `combat_line` + `line_*`, `died_at`, `hit_time`, `stag_t` /
+  `stag_k`, `melee_t`, `kit`); the corpse hold (`dieT <= 2` for 30 s after
+  death) is in combat, removal in units. Visual-only JS parts (BattleFX,
+  Debris, Overlays, the stagger lean, arrow streaks) belong to
+  `game/combat`, fed by `get_units()` / `get_combat()`.
+- **God powers** (`sim/godpowers`): thrown units carry `air_y`, `air_rx`,
+  `air_rz` (exported as `get_units().air`); the units renderer lifts and
+  tumbles them. Bolt channels (`boltLines(seed, …)` in effects.js), debris,
+  sparks, smoke and flames are visual: `get_godpowers()` gives the seeds and
+  times to draw them.
 - **Sim / render split**: GDScript never mutates sim state directly; it calls
   `AovSim` commands. Per frame, pieces pull packed arrays (positions, rotations,
   anim state, hp, …) with one call each, never per entity. The sim keeps the
@@ -296,8 +338,8 @@ Entities: `unit_type_names()` (type index -> key), `get_unit_def(key)`,
 `spawn_unit(type, owner, x, z, rot=0)` -> id, `spawn_block(type, owner,
 count, x, z, cols=0, spacing=1, rot=0, jitter=0.15)` -> ids (helpers.js
 spawnBlock), `spawn_resource(type, tx, tz, variant=0)`, `remove_resource(id)`,
-`clear_rect(tx, tz, w, h)`, `kill_unit(id, killer=0)` (minimal: dead, hp 0,
-stop, `entity:died`; combat will own the real one), `entity_kind(id)` (0
+`clear_rect(tx, tz, w, h)`, `kill_unit(id, killer=0)` (combat.kill: dead,
+idle, corpse hold, `entity:died`), `entity_kind(id)` (0
 none, 1 unit, 2 building, 3 resource), `get_unit_count()`, `get_unit(id)`
 (one unit as a Dictionary incl. its remaining path: UI / debugging only),
 `units_near(x, z, r, owner=-1)`.
@@ -354,15 +396,48 @@ reason}, `cancel_train(building, index)`, `next_age_cost(owner)`,
 the JS scan), `nearest_dropoff(owner, x, z, res_type)`, `spawn_herd(type,
 x, z, n)`, `spawn_boat(owner, x, z, rot)`, `spawn_shoal(x, z, amount)`.
 
-Scenes: `has_scene_setup(name)`, `setup_scene(name)` -> {focus: Vector2,
-tc, fields, hunt_spot, select, army, villagers}, `scene_after(name)`.
+Scenes: `has_scene_setup(name)`, `setup_scene(name, opts={units})` ->
+{focus: Vector2, tc, fields, hunt_spot, select, army, villagers},
+`scene_after(name)`.
+
+Combat: `kill_unit(id, killer=0)` (combat.kill), `damage(target, amount,
+attacker=0)`, `order(id, {type: "attack", target, auto, then_buildings})`,
+`set_unit_combat(id, {leash, reach, kit, line: {cx, cz, nx, nz, d0} | null})`,
+`set_ai_enabled(on)` (the ENEMY's EnemyAI), `add_ai(owner)`, `get_ai(owner)` /
+`set_ai(owner, {enabled, next_wave_at, wave_size, aggression})`,
+`get_combat()` ({projectiles: 16 floats each (x, y, z, px, py, pz, sx, sy,
+sz, tx, ty, tz, t, dur, arc, dist), projectile_info: 2 ints (target, has
+target pos), stuck: 7 (x, y, z, dx, dy, dz, t), scars: 5 (x, z, radius,
+dirt, blood), drops: 9 (kind shield/helmet/spear/stub, x, z, rot, owner,
+tilt, roll, lift, die time)}). `get_units()` also has `air` (3 each: airY,
+airRx, airRz), `stagger` (2: stagT, stagK), `melee_t`, `gp_hit_t`,
+`hit_time` (game times, -1 never), `kit` (255 unset).
+
+God powers: `power_names()` (lightning_storm, bolt, meteor),
+`get_power_def(key)`, `can_cast(owner, key)` -> {ok, reason},
+`cast_power(owner, key, x, z)`, `power_cooldown(owner, key)`,
+`get_godpowers()` ({time, storms: 6 each (owner, x, z, t0, duration,
+radius), bolts: 6 (x, y, z, t0, life, sky) + bolt_seeds, scorches: 6 (x, y,
+z, t0, size, blast) + scorch_seeds, zaps: 5 (x, y, z, t0, life) + zap_units
+(id, seed), meteors: 9 (owner, x, z, t0, delay, radius, sx, sy, sz), fires:
+6 (x, y, z, r, t0, dur)}).
+
+Fog of war (player 1) and victory: `set_fog_reveal_all(on)`,
+`fog_recompute()`, `get_fog()` (size*size bytes: 0 unexplored, 128
+explored, 255 visible), `fog_version()`, `is_explored(x, z)`,
+`is_visible(x, z)`, `set_victory_enabled(on)`, `get_victory()` ({enabled,
+decided, winner, loser, time}), `is_paused()`, `set_paused(on)`.
 
 Events (`game.events`, drained by main.gd): [{type, id, kind, other, owner,
 a, x, z, amount}], type one of `entity:added` (a = type index),
-`entity:removed`, `entity:died` (other = killer), `unit:damaged`,
+`entity:removed`, `entity:died` (other = killer, x, z), `unit:damaged` (id =
+target unit or building, kind, other = attacker id (0 god power / gone),
+owner = attacker's owner, amount = damage after bonus and armor, x, z),
 `building:placed`, `building:completed`, `unit:trained`, `age:advanced`,
-`resources:changed`, `godpower:cast`, `command:smart` (other = target, a =
-unit count), `game:over`; `set_record_events(on)`. C++ systems subscribe
+`resources:changed`, `godpower:cast` (owner, a = power index in
+`power_names()`, x, z), `command:smart` (other = target, a =
+unit count), `game:over` (owner = winner, a = loser, amount = time);
+`set_record_events(on)`. C++ systems subscribe
 with `sim.events.on(EV_…, fn)`.
 
 Profiling / checks: `set_profiling(on)`, `get_profile()`, `get_stats()`
@@ -394,8 +469,18 @@ Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
   economy), all bit-exact with the browser (`check-sim.mjs`). Rendered:
   buildings and construction stages, units in the rest pose, the economy
   view.
+- Done (sim core C): combat (attack orders, auto-targeting with the
+  crowding penalty, melee / splash / ranged damage, class bonuses, armor,
+  knock-back and stagger, projectiles, death and the corpse hold, Town Center
+  arrows, phalanx lines), the enemy AI (any number of AI players), god powers
+  (favor, cooldowns, Lightning Storm with its whirlwind, Bolt, Meteor, thrown
+  units), fog of war, victory, and the battle / godpower / stress scene
+  setups, all bit-exact with the browser (`check-sim.mjs`); the headless
+  stress bench (`godot-stress.mjs`, numbers above).
 - Placeholders to replace: `game/terrain/terrain.gd` (first pass: no shore
   smoothing, talus, cliff relief, water shader or ground details),
   `game/lighting/lighting.gd`, `game/units/units.gd` (static rest pose: the
-  animation of src/units/anim.js), town props (src/buildings/props.js), the
-  placement ghost (UI).
+  animation of src/units/anim.js; thrown units: `air`), town props
+  (src/buildings/props.js), the placement ghost (UI); `game/combat` and
+  `game/godpowers` renderers and the fog-of-war shading do not exist yet
+  (the sim state they need is exported, see "AovSim API").

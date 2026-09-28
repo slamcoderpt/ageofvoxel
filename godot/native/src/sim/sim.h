@@ -4,8 +4,8 @@
 // update(dt). AovSim (../aov_sim.h) exposes it to GDScript.
 //
 // Layout mirrors the JS pieces: sim/core (map, rng, entities, players,
-// events, spatial hash, pathfinding, movement, commands; later fog,
-// victory), sim/units, sim/buildings, sim/combat (incl. the enemy AI),
+// events, spatial hash, pathfinding, movement, commands, fog, victory),
+// sim/units, sim/buildings, sim/combat (incl. the enemy AI),
 // sim/economy, sim/godpowers, sim/scenes.
 //
 // Determinism: everything is ported JS-exact (doubles, the JS Math
@@ -16,18 +16,22 @@
 #include <string>
 #include <vector>
 
+#include "combat/combat.h"
 #include "core/commands.h"
 #include "core/constants.h"
 #include "core/entities.h"
 #include "core/events.h"
+#include "core/fog.h"
 #include "core/game_map.h"
 #include "core/movement.h"
 #include "core/pathfinding.h"
 #include "core/players.h"
 #include "core/profile.h"
 #include "core/rng.h"
+#include "core/victory.h"
 #include "buildings/buildings.h"
 #include "economy/economy.h"
+#include "godpowers/godpowers.h"
 #include "scenes/scenes.h"
 #include "units/units.h"
 
@@ -41,6 +45,9 @@ public:
 	uint32_t seed = 1;
 	int64_t tick_count = 0;
 	double time = 0; // seconds of game time
+	// set by Victory when the match is decided (the JS game.paused): the
+	// game loop stops ticking; tick() itself never checks it (fast-forward)
+	bool paused = false;
 
 	EventBus events;
 	Entities entities;
@@ -53,6 +60,10 @@ public:
 	Units units;
 	Economy economy;
 	Buildings buildings;
+	Combat combat;
+	GodPowers godpowers;
+	FogOfWar fog;
+	Victory victory;
 	SceneCtx scene; // the last scene setup's context (AovSim.setup_scene)
 
 	GameMap &map() { return world.map; }

@@ -115,6 +115,7 @@ void Units::clear_corpse(int r, double dt) {
 	const double ux = U.x[r], uz = U.z[r];
 	const int32_t uid = U.id[r];
 	double sx = 0, sz = 0;
+	sim->movement.hash.count_query(ux, uz, rad + 1.5);
 	sim->movement.hash.for_each_near(ux, uz, rad + 1.5, [&](int o) {
 		if (o == r || U.dead[o]) return;
 		const double want = rad + (U.radius[o] != 0 ? U.radius[o] : 0.3) * 1.2;

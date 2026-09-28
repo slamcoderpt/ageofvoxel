@@ -70,7 +70,7 @@ public:
 	int64_t spawn_resource(const String &type, int64_t tx, int64_t tz, int64_t variant);
 	void remove_resource(int64_t id) { sim_.remove_resource((int32_t)id); }
 	void clear_rect(int64_t tx, int64_t tz, int64_t w, int64_t h) { sim_.clear_rect((int)tx, (int)tz, (int)w, (int)h); }
-	void kill_unit(int64_t id, int64_t killer);
+	void kill_unit(int64_t id, int64_t killer); // combat.kill
 	int64_t entity_kind(int64_t id) const { return sim_.entities.slot((int32_t)id) >= 0 ? sim_.entities.kind((int32_t)id) : 0; }
 	int64_t get_unit_count() const { return sim_.entities.count_units(); }
 	Dictionary get_units() const;     // packed arrays, one entry per unit (see PORTING.md)
@@ -121,9 +121,36 @@ public:
 	Dictionary get_economy() const; // animals, spears, shoals, boats (packed arrays)
 	Dictionary get_decor() const;   // scene field dressing: {count, keys, xform: [x, z, rot, scale, y]*}
 
+	// --- combat (sim/combat)
+	void damage(int64_t target, double amount, int64_t attacker); // combat.damage (attacker 0 = none)
+	void set_ai_enabled(bool on);                  // combat.ai.enabled (the ENEMY's EnemyAI)
+	void add_ai(int64_t owner);                    // combat.addAI(owner)
+	Dictionary get_ai(int64_t owner) const;        // {enabled, wave_size, next_wave_at} or {}
+	void set_ai(int64_t owner, const Dictionary &d); // enabled / next_wave_at / wave_size / aggression
+	Dictionary get_combat() const;                 // projectiles, stuck arrows, scene scars / dropped gear
+	void set_unit_combat(int64_t id, const Dictionary &d); // leash, reach, line {cx, cz, nx, nz, d0} | null, kit
+	// --- god powers (sim/godpowers)
+	PackedStringArray power_names() const;
+	Dictionary get_power_def(const String &power) const;
+	Dictionary can_cast(int64_t owner, const String &power) const; // {ok, reason}
+	bool cast_power(int64_t owner, const String &power, double x, double z);
+	double power_cooldown(int64_t owner, const String &power) const;
+	Dictionary get_godpowers() const; // storms, bolts, scorches, zaps, meteors, fires (packed)
+	// --- fog of war (player 1) and victory
+	void set_fog_reveal_all(bool on) { sim_.fog.set_reveal_all(on); }
+	void fog_recompute() { sim_.fog.recompute(); }
+	PackedByteArray get_fog() const;  // size*size: 0 unexplored, 128 explored, 255 visible (JS fog texture)
+	int64_t fog_version() const { return sim_.fog.version; }
+	bool is_explored(double x, double z) const { return sim_.fog.is_explored(x, z); }
+	bool is_visible(double x, double z) const { return sim_.fog.is_visible(x, z); }
+	void set_victory_enabled(bool on) { sim_.victory.enabled = on; }
+	Dictionary get_victory() const;   // {decided, winner, loser, time}
+	bool is_paused() const { return sim_.paused; }
+	void set_paused(bool on) { sim_.paused = on; }
+
 	// --- deterministic scene setups (sim/scenes)
 	bool has_scene_setup(const String &name) const;
-	Dictionary setup_scene(const String &name); // -> ctx {focus: Vector2, ...}
+	Dictionary setup_scene(const String &name, const Dictionary &opts); // -> ctx {focus: Vector2, ...}; opts {units}
 	void scene_after(const String &name);        // the scene's after(), once the fast-forward is done
 
 	// --- events: [{type: "entity:added", id, kind, other, owner, a, x, z, amount}], cleared on read
@@ -140,7 +167,7 @@ public:
 	int64_t units_hash() const { return sim_.units_hash(); }
 	// Full-precision dump for parity checks: [id, x, z, rot, hp, flags, order, anim] per unit
 	PackedFloat64Array get_units_f64() const;
-	// Economy / buildings state for parity checks: per player [res x4, pop, pop_cap, age],
+	// Economy / buildings / combat state for parity checks: per player [res x4, pop, pop_cap, age],
 	// per building [id, hp, progress, built, queue length, farm rows], per resource [id, amount, x, z]
 	PackedFloat64Array get_econ_f64() const;
 };

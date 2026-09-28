@@ -102,7 +102,24 @@ func _scenario(a: Dictionary) -> int:
 			"clearRect":
 				sim.clear_rect(int(op.tx), int(op.tz), int(op.w), int(op.h))
 			"scene":
-				sim.setup_scene(str(op.name))
+				sim.setup_scene(str(op.name), {"units": int(op.get("units", 2000))})
+			"ai":
+				var set := {}
+				if op.has("enabled"):
+					set["enabled"] = bool(op.enabled)
+				if op.has("nextWaveAt"):
+					set["next_wave_at"] = _f(op.nextWaveAt)
+				for pid in range(1, 7):
+					if not op.has("owner") or int(op.owner) == pid:
+						sim.set_ai(pid, set)
+			"attack":
+				var t := _ids(groups, op.target)
+				if t.size():
+					for id in _ids(groups, op.group):
+						sim.order(id, {"type": "attack", "target": t[0], "auto": bool(op.get("auto", false)),
+							"then_buildings": bool(op.get("thenBuildings", false))})
+			"cast":
+				sim.cast_power(int(op.owner), str(op.power), _f(op.x), _f(op.z))
 			"after":
 				sim.scene_after(str(op.name))
 			"units":

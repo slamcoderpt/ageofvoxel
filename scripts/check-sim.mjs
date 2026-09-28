@@ -3,22 +3,26 @@
 // modules it ports: map + initial resources, entity store, units (spawn,
 // anim state, _spread, corpse clearing), A* pathfinding, Movement and
 // Commands (move / formation move / smart / idle), the economy (gathering,
-// farms, hunting, fishing, worship, training, age) and buildings
-// (placement, construction, builders moving on), and the scene setups
-// (town, economy, ...: op 'scene' / 'after'). Each scenario spawns
-// armies on a scene map (seeds and presets of the scenes), gives orders,
-// steps the fixed 30 Hz tick and compares every unit's id, x, z, rot, hp,
-// flags, order and anim state bit for bit at every checkpoint.
+// farms, hunting, fishing, worship, training, age), buildings (placement,
+// construction, builders moving on), combat (attack orders, targeting,
+// damage, projectiles, death, Town Center arrows), the enemy AI, god powers,
+// victory, and the scene setups (town, economy, battle, godpower, stress,
+// ...: op 'scene' / 'after'). Each scenario spawns armies on a scene map
+// (seeds and presets of the scenes), gives orders, steps the fixed 30 Hz
+// tick and compares every unit's id, x, z, rot, hp, flags, order and anim
+// state bit for bit at every checkpoint.
 //
 //   node scripts/check-sim.mjs [--only name,name] [--godot godot] [--keep]
 //
-// The JS side runs the real src/core modules headless (no renderer): the
-// Units piece is used through its prototype (spawn / update / _spread),
-// resources are spawned like terrain.spawnResource, and the real Economy and
-// Buildings pieces run on a THREE.Scene that is never drawn (combat, the
-// enemy AI and god powers are not ported yet, so they are left out on both
-// sides). Checkpoints also compare players, buildings and resources. The C++ side is
-// godot/game/core/simcheck.gd. Exit code 1 on any difference.
+// The JS side runs the real src/ modules headless (no renderer): the Units
+// piece is used through its prototype (spawn / update / _spread), resources
+// are spawned like terrain.spawnResource, the real Economy and Buildings
+// pieces run on a THREE.Scene that is never drawn, and Combat, EnemyAI,
+// GodPowers and Victory run without their renderers (BattleFX, Overlays,
+// BoltRenderer; see makeCombat / makeGodPowers). Checkpoints also compare
+// players, buildings, resources, arrows in flight, thrown units and the AI
+// wave state. The C++ side is godot/game/core/simcheck.gd. Exit code 1 on any
+// difference.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -41,6 +45,11 @@ import { PLAYER, ENEMY } from '../src/core/constants.js';
 import { Economy } from '../src/economy/index.js';
 import { Buildings } from '../src/buildings/index.js';
 import { SCENES } from '../src/core/scenes/index.js';
+import { Combat } from '../src/combat/index.js';
+import { Projectiles } from '../src/combat/Projectiles.js';
+import { EnemyAI } from '../src/combat/EnemyAI.js';
+import { GodPowers, POWERS } from '../src/godpowers/index.js';
+import { Victory } from '../src/core/Victory.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -78,7 +87,9 @@ function makeGame({ seed, size, preset, players }) {
   for (let id = 3; id <= players; id++) game.addPlayer(id, { name: `AI ${id}`, isAI: true }); // as simcheck.gd
   game.scene = new THREE.Scene();
   game.fx = { emit() {} };
-  game.combat = { ai: { enabled: false }, ais: [], addAI() {} };
+  game.combat = makeCombat(game);
+  game.godpowers = makeGodPowers(game);
+  game.victory = new Victory(game);
   game.terrain = {
     spawnResource(type, tx, tz, opts = {}) {
       const def = RESOURCE_DEFS[type];
@@ -108,11 +119,55 @@ function makeGame({ seed, size, preset, players }) {
     game.tickCount++;
     game.economy.update(dt);
     game.buildings.update(dt);
+    game.combat.update(dt);
+    game.godpowers.update(dt);
     game.units.update(dt);
     game.movement.update(dt);
+    game.victory.update(dt);
   };
   game.fastForward = (seconds) => { const n = Math.round(seconds / (1 / 30)); for (let i = 0; i < n; i++) game.tick(1 / 30); };
   return game;
+}
+
+// The real Combat piece without its renderers: Projectiles' sim half, a
+// stand-in for BattleFX that only records what the sim reads back
+// (combat_meleeT, the battle scene's capture beat), the attack order handler
+// of the Combat constructor, and the enemy AI (off, as main.js does for
+// scenes without `ai`; scene setups turn it on).
+function makeCombat(game) {
+  const c = Object.create(Combat.prototype);
+  c.game = game;
+  c.projectiles = Object.assign(Object.create(Projectiles.prototype), { game, combat: c, list: [], stuck: [] });
+  c.fx = {
+    hit(target, attacker, kind) { if (target.kind !== 'building' && kind === 'melee') target.combat_meleeT = game.time; },
+    death() {}, scuff() {}, slam() {}, update() {}, scar() {}, puff() {}, debris: { drop() {} },
+  };
+  c.attackers = new Map();
+  c.ai = new EnemyAI(game, ENEMY);
+  c.ai.enabled = false;
+  c.ais = [c.ai];
+  c.scanTimer = 0;
+  // (the Combat constructor's handler, verbatim)
+  game.commands.register('attack', {
+    start: (u, o) => {
+      const t = game.entities.get(o.targetId);
+      if (!t || t.dead || !u.def.attack || !game.isEnemy(u.owner, t.owner)) return false;
+      o.repath = 0;
+      c.approach(u, t);
+      return true;
+    },
+  });
+  return c;
+}
+
+// The real GodPowers piece without its renderer (BoltRenderer).
+function makeGodPowers(game) {
+  const g = Object.create(GodPowers.prototype);
+  Object.assign(g, {
+    game, powers: POWERS, storms: [], bolts: [], scorches: [], zaps: [], meteors: [], fires: [],
+    debris: [], sparks: [], airborne: [], struck: [], cooldowns: {}, vrng: new RNG(8675309), fx: { render() {} },
+  });
+  return g;
 }
 
 // helpers.js spawnBlock
@@ -166,6 +221,12 @@ function econDump(game) {
   }
   for (const b of game.entities.buildings()) out.push(b.id, b.hp, b.progress, b.built ? 1 : 0, b.queue.length, b.econ_rows || 0);
   for (const r of game.entities.resources()) out.push(r.id, r.amount, r.x, r.z);
+  // combat: arrows in flight, god power state (thrown units' height), AI wave state
+  out.push(game.combat.projectiles.list.length);
+  for (const p of game.combat.projectiles.list) out.push(p.targetId, p.x, p.y, p.z);
+  out.push(game.godpowers.airborne.length);
+  for (const u of game.godpowers.airborne) out.push(u.id, u.airY);
+  for (const ai of game.combat.ais) out.push(ai.owner, ai.waveSize, ai.nextWaveAt);
   return out;
 }
 
@@ -199,7 +260,7 @@ function runJS(sc) {
       case 'moveTo': for (const u of ids(op.group)) game.movement.moveTo(u, op.x, op.z, { range: op.range ?? 0 }); break;
       case 'kill': {
         const list = ids(op.group).slice(0, op.count ?? Infinity);
-        for (const u of list) { if (u.dead) continue; u.dead = true; u.hp = 0; game.movement.stop(u); }
+        for (const u of list) game.combat.kill(u);
         break;
       }
       case 'clearRect':
@@ -230,7 +291,22 @@ function runJS(sc) {
         if (r) for (const u of ids(op.group)) game.commands.order(u, { type: 'gather', targetId: r.id });
         break;
       }
-      case 'scene': sceneCtx = SCENES.get(op.name).setup(game) || {}; break;
+      case 'scene':
+        globalThis.location = { search: op.units ? `?units=${op.units}` : '' }; // (stress.js reads ?units=N)
+        sceneCtx = SCENES.get(op.name).setup(game) || {};
+        break;
+      case 'ai':
+        for (const ai of game.combat.ais) if (op.owner === undefined || ai.owner === op.owner) {
+          if (op.enabled !== undefined) ai.enabled = op.enabled;
+          if (op.nextWaveAt !== undefined) ai.nextWaveAt = op.nextWaveAt;
+        }
+        break;
+      case 'attack': {
+        const t = ids(op.target)[0];
+        if (t) for (const u of ids(op.group)) game.commands.order(u, { type: 'attack', targetId: t.id, ...(op.auto ? { auto: true } : {}), ...(op.thenBuildings ? { thenBuildings: true } : {}) });
+        break;
+      }
+      case 'cast': game.godpowers.cast(op.owner, op.power, op.x, op.z); break;
       case 'after': SCENES.get(op.name).after?.(game, sceneCtx); break;
       default: throw new Error(`unknown op ${op.op}`);
     }
@@ -354,6 +430,51 @@ function scenarios() {
       { op: 'run', ticks: 600 },
     ] });
   }
+  // combat, the enemy AI and god powers: the combat scene setups (C++
+  // sim/scenes/battle.cpp vs BattleScene.js, the godpower entry, stress.js),
+  // a skirmish left to the AI for five minutes, and explicit attack orders,
+  // Town Center arrows and every god power
+  out.push({ name: 'battle-scene', seed: 11, size: 128, preset: 'battle', players: 2, every: 15, ops: [
+    { op: 'scene', name: 'battle' }, { op: 'run', ticks: 195 }, { op: 'after', name: 'battle' }, { op: 'run', ticks: 900 },
+  ] });
+  out.push({ name: 'godpower-scene', seed: 19, size: 128, preset: 'battle', players: 2, every: 15, ops: [
+    { op: 'scene', name: 'godpower' }, { op: 'run', ticks: 600 },
+  ] });
+  out.push({ name: 'skirmish-ai', seed: 3, size: 128, preset: 'skirmish', players: 2, every: 60, ops: [
+    { op: 'scene', name: 'skirmish' }, { op: 'setRes', owner: 2, res: { food: 1500, wood: 1500, gold: 1500 } },
+    { op: 'ai', owner: 2, nextWaveAt: 150 }, { op: 'run', ticks: 9000 },
+  ] });
+  {
+    const [a, b] = starts(3, 128, 'skirmish', 2);
+    const A = { x: a.tx + 0.5, z: a.tz + 0.5 }, B = { x: b.tx + 0.5, z: b.tz + 0.5 };
+    out.push({ name: 'combat-ops', seed: 3, size: 128, preset: 'skirmish', players: 2, every: 15, ops: [
+      { op: 'scene', name: 'skirmish' },
+      { op: 'ai', enabled: false },
+      { op: 'buildings', as: 'tc', type: 'town_center', owner: 1 },
+      { op: 'buildings', as: 'etc', type: 'town_center', owner: 2 },
+      { op: 'block', as: 'eh', type: 'hoplite', owner: 2, count: 12, x: A.x + 12, z: A.z + 10, cols: 4 },
+      { op: 'block', as: 'et', type: 'toxotes', owner: 2, count: 8, x: A.x + 15, z: A.z + 13, cols: 4 },
+      { op: 'block', as: 'em', type: 'minotaur', owner: 2, count: 2, x: A.x + 10, z: A.z + 14, spacing: 2.2 },
+      { op: 'block', as: 'ph', type: 'hippikon', owner: 1, count: 6, x: A.x - 6, z: A.z + 8, cols: 3, spacing: 1.6 },
+      { op: 'block', as: 'pc', type: 'cyclops', owner: 1, count: 1, x: B.x - 12, z: B.z - 10 },
+      { op: 'attack', group: 'eh,et,em', target: 'tc', thenBuildings: true },
+      { op: 'attack', group: 'pc', target: 'etc' },
+      { op: 'setRes', owner: 1, res: { favor: 200 } },
+      { op: 'run', ticks: 240 },
+      { op: 'cast', owner: 1, power: 'lightning_storm', x: A.x + 4, z: A.z + 4 },
+      { op: 'run', ticks: 90 },
+      { op: 'cast', owner: 1, power: 'bolt', x: A.x + 5, z: A.z + 3 },
+      { op: 'cast', owner: 1, power: 'meteor', x: A.x + 6, z: A.z + 6 },
+      { op: 'cast', owner: 1, power: 'bolt', x: A.x, z: A.z }, // (recharging: refused)
+      { op: 'run', ticks: 600 },
+      { op: 'units', as: 'v1', type: 'villager', owner: 1 },
+      { op: 'attack', group: 'v1', target: 'eh' },
+      { op: 'run', ticks: 1200 },
+    ] });
+  }
+  out.push({ name: 'stress-scene', seed: 23, size: 256, preset: 'stress', players: 6, every: 30, ops: [
+    { op: 'ai', owner: 2, enabled: true }, { op: 'scene', name: 'stress', units: 2000 }, { op: 'run', ticks: 600 },
+  ] });
   for (const [name, per] of [['stress', 330], ['stress4k', 700]]) {
     // stress seed 23, 6 players on 256 tiles: ~2000 (4200) units converge on the centre
     const st = starts(23, 256, 'stress', 6);

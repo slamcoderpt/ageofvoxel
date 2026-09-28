@@ -81,7 +81,7 @@ size_t Pathfinder::KeyHash::operator()(const Key &k) const {
 
 bool Pathfinder::nearest_walkable(int tx, int tz, int max_r, int &ox, int &oz) const {
 	const GameMap &m = *map;
-	if (prof && prof->enabled) prof->calls["nearestWalkable"].first++; // counted like the JS profiler (not timed)
+	CallTimer ct(prof, "nearestWalkable");
 	if (m.is_walkable(tx, tz)) { ox = tx; oz = tz; return true; }
 	for (int r = 1; r <= max_r; r++) {
 		bool any = false;
@@ -378,11 +378,7 @@ void Pathfinder::find_path(double sx, double sz, double gx, double gz, const Goa
 	out.clear();
 	if (field_active_ && !rect) {
 		if (field_path(sx, sz, gx, gz, out)) {
-			if (timed) {
-				auto &c = prof->calls["findPath"];
-				c.first++;
-				c.second += ms_since(t0);
-			}
+			if (timed) prof->add_call("findPath", ms_since(t0));
 			return;
 		}
 		field_fallbacks++;
@@ -449,11 +445,7 @@ void Pathfinder::find_path(double sx, double sz, double gx, double gz, const Goa
 			if (r->found && !rect && !out.empty()) out.back() = { gx, gz };
 		}
 	}
-	if (timed) {
-		auto &c = prof->calls["findPath"];
-		c.first++;
-		c.second += ms_since(t0);
-	}
+	if (timed) prof->add_call("findPath", ms_since(t0));
 }
 
 } // namespace aov

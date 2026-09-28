@@ -74,6 +74,10 @@ func _ready() -> void:
 	print("aov: scene=%s seed=%d map=%d preset=%s players=%d  %s  map_hash=%08x" % [
 		scene_name, seed, map_size, scene_def.preset, players, sim.version(), sim.map_hash()])
 
+	# the JS main.js: combat.ai.enabled = !!scene.ai; victory.enabled = !!scene.victory (before the setup)
+	sim.set_ai_enabled(bool(scene_def.ai))
+	sim.set_victory_enabled(bool(scene_def.victory))
+
 	if AovArgs.flag(args, "bench", false):
 		sim.set_record_events(false)
 		var bench := preload("res://game/core/bench.gd").new()
@@ -113,7 +117,9 @@ func _ready() -> void:
 	elif sim.has_scene_setup(scene_name):
 		# deterministic setups ported to C++ (native/src/sim/scenes: skirmish,
 		# town, coast, hud; economy registers itself from game/economy)
-		ctx = sim.setup_scene(scene_name)
+		ctx = sim.setup_scene(scene_name, scene_opts())
+	# fog of war for player 1 (the JS game.fog.setRevealAll(!bool('fog', !scene.revealAll)))
+	sim.set_fog_reveal_all(not AovArgs.flag(args, "fog", not bool(scene_def.reveal_all)))
 	if not ctx.has("focus"):
 		var s: Dictionary = sim.get_starts()[0]
 		ctx["focus"] = Vector2(s.tx + 0.5, s.tz + 0.5)
@@ -123,6 +129,7 @@ func _ready() -> void:
 		fast_forward(ff)
 	if sim.has_scene_setup(scene_name):
 		sim.scene_after(scene_name)  # the scene's after() (JS main.js runs it after the fast-forward)
+	sim.fog_recompute()
 
 	var cam: Dictionary = AovScenes.DEFAULT_CAMERA.duplicate()
 	cam.merge(scene_def.camera, true)
@@ -147,6 +154,10 @@ func _ready() -> void:
 		camera.edge_scroll = false
 	_capture_frames = int(args.get("frames", 4))
 
+## URL-style parameters the C++ scene setups read (the stress scene's units=N).
+func scene_opts() -> Dictionary:
+	return {"units": maxi(12, int(round(float(args.get("units", scene_def.get("units", 2000))))))}
+
 ## Step the fixed-rate sim n seconds without rendering (scene fast-forward).
 func fast_forward(seconds: float) -> void:
 	sim.tick(int(round(seconds * 30.0)))
@@ -163,6 +174,8 @@ func _process(delta: float) -> void:
 			steps += 1
 		if steps == 8:
 			_acc = 0.0
+		if sim.is_paused():
+			paused = true  # the match is decided (Victory): the JS game.paused
 	alpha = 1.0 if paused else _acc / SIM_DT  # paused: show the last tick (JS Game.frame)
 	events = sim.take_events()
 	for p in pieces:

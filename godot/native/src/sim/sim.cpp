@@ -11,6 +11,7 @@ void Sim::new_game(uint32_t seed_, int map_size, const std::string &preset, int 
 	rng = RNG(seed_);
 	tick_count = 0;
 	time = 0;
+	paused = false;
 	events.clear();
 	entities.reset(&events);
 	for (auto &p : players) p = Player();
@@ -25,6 +26,11 @@ void Sim::new_game(uint32_t seed_, int map_size, const std::string &preset, int 
 	units.init(this);
 	economy.init(this);
 	buildings.init(this);
+	combat.init(this);
+	combat.ai().enabled = false; // main.gd turns it on per scene (the JS main.js: combat.ai.enabled = !!scene.ai)
+	godpowers.init(this);
+	fog.init(this);
+	victory.init(this);
 	scene = SceneCtx();
 	for (const auto &r : world.resources) {
 		int t = resource_type_of(r.type.c_str());
@@ -47,22 +53,22 @@ void Sim::tick(double dt) {
 	tick_count++;
 	const bool P = prof.enabled;
 	// JS simOrder: economy, buildings, combat, godpowers, units, movement, fx, fog, victory
-	{
-		ScopedTimer t(P ? &prof.sys["economy"] : nullptr);
-		economy.update(dt);
-	}
-	{
-		ScopedTimer t(P ? &prof.sys["buildings"] : nullptr);
-		buildings.update(dt);
-	}
-	{
-		ScopedTimer t(P ? &prof.sys["units"] : nullptr);
-		units.update(dt);
-	}
-	{
-		ScopedTimer t(P ? &prof.sys["movement"] : nullptr);
-		movement.update(dt);
-	}
+	// (fx is visual: game/)
+	auto run = [&](const char *name, auto &&fn) {
+		if (!P) return fn();
+		prof.sys_name = name;
+		ScopedTimer t(&prof.sys[name]);
+		fn();
+	};
+	run("economy", [&] { economy.update(dt); });
+	run("buildings", [&] { buildings.update(dt); });
+	run("combat", [&] { combat.update(dt); });
+	run("godpowers", [&] { godpowers.update(dt); });
+	run("units", [&] { units.update(dt); });
+	run("movement", [&] { movement.update(dt); });
+	run("fog", [&] { fog.update(dt); });
+	run("victory", [&] { victory.update(dt); });
+	if (P) prof.sys_name.clear();
 	if (P) prof.total = ms_since(t0);
 }
 

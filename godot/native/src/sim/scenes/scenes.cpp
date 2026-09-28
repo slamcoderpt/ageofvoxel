@@ -497,8 +497,8 @@ SceneCtx economy_setup(Sim &sim) {
 	dress_yard(sim, gold_store, gold);
 
 	standard_start(sim, ENEMY, e, 6);
-	// (the JS turns the enemy AI on with its attack waves pushed to 1e9: the
-	// AI belongs to the combat piece, not ported yet)
+	sim.combat.ai().enabled = true;
+	sim.combat.ai().next_wave_at = 1e9; // keep the economy scene peaceful
 
 	// frame the town centre, the mine and the field block tightly
 	const double fcx = fields ? fb.x0 + fb.cols * 2 : tc.x + 8, fcz = fields ? fb.z0 + 6 : tc.z + 4;
@@ -561,9 +561,15 @@ void economy_after(Sim &sim, const SceneCtx &ctx) {
 
 } // namespace
 
-bool has(const std::string &n) { return n == "skirmish" || n == "town" || n == "coast" || n == "hud" || n == "economy"; }
+bool has(const std::string &n) {
+	return n == "skirmish" || n == "town" || n == "coast" || n == "hud" || n == "economy" || n == "battle" || n == "godpower" ||
+			n == "stress";
+}
 
-SceneCtx setup(Sim &sim, const std::string &name) {
+SceneCtx setup(Sim &sim, const std::string &name, const SceneOpts &opts) {
+	if (name == "battle") return battle_setup(sim);
+	if (name == "godpower") return godpower_setup(sim);
+	if (name == "stress") return stress_setup(sim, opts.units);
 	SceneCtx ctx;
 	const auto &starts = sim.world.starts;
 	if (starts.size() < 2) return ctx;
@@ -571,6 +577,7 @@ SceneCtx setup(Sim &sim, const std::string &name) {
 	if (name == "skirmish") {
 		const StartResult me = standard_start(sim, PLAYER, p, 5);
 		standard_start(sim, ENEMY, e, 5);
+		sim.combat.ai().enabled = true;
 		const SceneRef tc = ref_of(sim, me.tc);
 		ctx.tc = tc;
 		ctx.focus_x = tc.x;
@@ -622,6 +629,7 @@ SceneCtx setup(Sim &sim, const std::string &name) {
 
 void after(Sim &sim, const std::string &name, const SceneCtx &ctx) {
 	if (name == "economy" && ctx.ok) economy_after(sim, ctx);
+	if (name == "battle" && ctx.ok) battle_after(sim, ctx);
 }
 
 } // namespace scenes

@@ -107,7 +107,42 @@ enum UnitFlag : uint8_t { UF_MOVING = 1, UF_DEAD = 2, UF_ARRIVED = 4, UF_CARRY =
 	X(uint8_t, carry_type, 255)   /* ResKind, 255 = null */                    \
 	X(double, carry_amount, 0)                                                 \
 	X(double, attack_cd, 0)                                                    \
-	X(uint8_t, combat_line, 0)                                                 \
+	X(uint8_t, combat_line, 0)    /* u.combat_line set (holdLines, spread) */  \
+	/* combat (sim/combat): the JS u.combat_* fields */                        \
+	X(double, combat_leash, 0)                                                 \
+	X(double, combat_reach, 0)                                                 \
+	X(double, line_cx, 0)         /* combat_line {cx, cz, nx, nz, d0} */       \
+	X(double, line_cz, 0)                                                      \
+	X(double, line_nx, 0)                                                      \
+	X(double, line_nz, 0)                                                      \
+	X(double, line_d0, 0)                                                      \
+	X(double, died_at, NAN)       /* combat_diedAt, NaN = undefined */         \
+	X(double, hit_time, NAN)      /* combat_hitT (game time of the last hit) */ \
+	X(double, stag_t, NAN)        /* combat_stagT (stagger start) */           \
+	X(double, stag_k, 1)          /* combat_stagK */                           \
+	X(double, melee_t, NAN)       /* combat_meleeT (last melee blow taken) */  \
+	X(uint8_t, kit, 255)          /* units_kit (battle scene), 255 = unset */  \
+	/* god powers (sim/godpowers): thrown units, u.gp_air + airY / airRx / airRz */ \
+	X(double, air_y, 0)                                                        \
+	X(double, air_rx, 0)                                                       \
+	X(double, air_rz, 0)                                                       \
+	X(uint8_t, gp_state, 0)       /* 0 no gp_air, 1 airborne, 2 done */        \
+	X(int32_t, gp_storm, -1)      /* gp_air.vortex: index into GodPowers::storms */ \
+	X(uint8_t, gp_flung, 0)                                                    \
+	X(double, gp_vx, 0)                                                        \
+	X(double, gp_vy, 0)                                                        \
+	X(double, gp_vz, 0)                                                        \
+	X(double, gp_wx, 0)                                                        \
+	X(double, gp_wz, 0)                                                        \
+	X(double, gp_t0, 0)                                                        \
+	X(double, gp_ht, 0)                                                        \
+	X(double, gp_orb, 0)                                                       \
+	X(double, gp_hold, 0)                                                      \
+	X(double, gp_tilt, 0)                                                      \
+	X(double, gp_wf, 0)                                                        \
+	X(double, gp_ph, 0)                                                        \
+	X(double, gp_yaw, 0)                                                       \
+	X(double, gp_hit_t, NAN)      /* gp_hitT (lightning strike) */             \
 	/* economy (sim/economy): the JS u.econ object; econ_phase EP_NONE = null */ \
 	X(uint8_t, econ_phase, 0)     /* EconPhase */                              \
 	X(int32_t, econ_res, 0)       /* resId (0 = null) */                       \
@@ -140,6 +175,9 @@ enum UnitFlag : uint8_t { UF_MOVING = 1, UF_DEAD = 2, UF_ARRIVED = 4, UF_CARRY =
 	X(double, progress, 1)                                                     \
 	X(uint8_t, def_flags, 0)  /* BuildingDefFlag bits (smart orders) */       \
 	X(double, sight, 0)                                                        \
+	/* combat: Town Center arrows, last hit */                                 \
+	X(double, attack_cd, 0)                                                    \
+	X(double, hit_time, NAN)                                                   \
 	/* buildings piece (sim/buildings): visual variant, house yaw/setback */  \
 	X(int32_t, bld_variant, -1)                                                \
 	X(double, bld_yaw, 0)                                                      \

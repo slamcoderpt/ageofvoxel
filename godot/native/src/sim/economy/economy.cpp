@@ -183,8 +183,7 @@ void Economy::approach(int r, int32_t id) {
 }
 
 int32_t Economy::nearest_resource(double x, double z, int res, double max_dist, int32_t exclude) {
-	ScopedTimer tm(sim->prof.enabled ? &sim->prof.calls["nearestResource"].second : nullptr);
-	if (sim->prof.enabled) sim->prof.calls["nearestResource"].first++;
+	CallTimer tm(&sim->prof, "nearestResource");
 	const ResourceStore &R = sim->entities.resources;
 	const double now = sim->time;
 	double bd = max_dist * max_dist;
@@ -213,8 +212,7 @@ int32_t Economy::nearest_resource(double x, double z, int res, double max_dist, 
 }
 
 int32_t Economy::nearest_dropoff(int owner, double x, double z, int res) {
-	ScopedTimer tm(sim->prof.enabled ? &sim->prof.calls["nearestDropoff"].second : nullptr);
-	if (sim->prof.enabled) sim->prof.calls["nearestDropoff"].first++;
+	CallTimer tm(&sim->prof, "nearestDropoff");
 	if (owner < 0 || owner >= MAX_PLAYERS) return 0;
 	const BuildingStore &B = sim->entities.buildings;
 	double bd = INFINITY;

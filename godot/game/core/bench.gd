@@ -10,9 +10,17 @@ func run(game: Node) -> void:
 	var sim: Object = game.sim
 	var ticks := int(a.get("ticks", 600))
 	var warmup := int(a.get("warmup", 150))
-	var setup := AovScenes.get_setup(str(game.scene_def.name))
+	var scene_name := str(game.scene_def.name)
+	var setup := AovScenes.get_setup(scene_name)
 	if setup.is_valid():
 		setup.call(game)
+	elif sim.has_scene_setup(scene_name):
+		sim.setup_scene(scene_name, game.scene_opts())
+	# fog of war as in the scene (stress: on for player 1, ?fog=0 reveals all)
+	sim.set_fog_reveal_all(not AovArgs.flag(a, "fog", not bool(game.scene_def.reveal_all)))
+	var ff := float(game.scene_def.fast_forward)
+	if ff > 0:
+		game.fast_forward(ff)
 	sim.set_profiling(true)
 	var start: Dictionary = sim.get_stats()
 	sim.tick(warmup)
@@ -54,6 +62,16 @@ func run(game: Node) -> void:
 					T.calls[k + suffix] = arr
 			T.calls[k + ".n"][i] = r.calls[k][0]
 			T.calls[k + ".ms"][i] = r.calls[k][1]
+		var by: Dictionary = r.get("callsBy", {})
+		for k in by:
+			for suffix in [".n", ".ms"]:
+				if not T.callsBy.has(k + suffix):
+					var arr := []
+					arr.resize(ticks)
+					arr.fill(0.0)
+					T.callsBy[k + suffix] = arr
+			T.callsBy[k + ".n"][i] = by[k][0]
+			T.callsBy[k + ".ms"][i] = by[k][1]
 		var c: Dictionary = sim.get_stats()
 		T.alive.append(c.alive)
 		T.dead.append(c.dead)
@@ -63,8 +81,11 @@ func run(game: Node) -> void:
 	# spatial-hash census over 60 more ticks (stress.mjs counts the same)
 	sim.set_census(true)
 	sim.set_profiling(false)
-	sim.tick(60)
+	const CT := 60
+	sim.tick(CT)
 	var census: Dictionary = sim.take_census()
+	for k in census:
+		census[k] = float(census[k]) / CT  # per tick, as stress.mjs
 	sim.set_census(false)
 	var res := {"start": start, "end": sim.get_stats(), "heap0": T.heap[0] if T.heap.size() else 0.0,
 		"census": census, "T": T, "fogFrames": [], "allFrames": [],

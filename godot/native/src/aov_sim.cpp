@@ -99,7 +99,31 @@ void AovSim::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_decor"), &AovSim::get_decor);
 	// scenes
 	ClassDB::bind_method(D_METHOD("has_scene_setup", "name"), &AovSim::has_scene_setup);
-	ClassDB::bind_method(D_METHOD("setup_scene", "name"), &AovSim::setup_scene);
+	ClassDB::bind_method(D_METHOD("setup_scene", "name", "opts"), &AovSim::setup_scene, DEFVAL(Dictionary()));
+	// combat, god powers, fog, victory
+	ClassDB::bind_method(D_METHOD("damage", "target", "amount", "attacker"), &AovSim::damage, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("set_ai_enabled", "on"), &AovSim::set_ai_enabled);
+	ClassDB::bind_method(D_METHOD("add_ai", "owner"), &AovSim::add_ai);
+	ClassDB::bind_method(D_METHOD("get_ai", "owner"), &AovSim::get_ai);
+	ClassDB::bind_method(D_METHOD("set_ai", "owner", "settings"), &AovSim::set_ai);
+	ClassDB::bind_method(D_METHOD("get_combat"), &AovSim::get_combat);
+	ClassDB::bind_method(D_METHOD("set_unit_combat", "id", "settings"), &AovSim::set_unit_combat);
+	ClassDB::bind_method(D_METHOD("power_names"), &AovSim::power_names);
+	ClassDB::bind_method(D_METHOD("get_power_def", "power"), &AovSim::get_power_def);
+	ClassDB::bind_method(D_METHOD("can_cast", "owner", "power"), &AovSim::can_cast);
+	ClassDB::bind_method(D_METHOD("cast_power", "owner", "power", "x", "z"), &AovSim::cast_power);
+	ClassDB::bind_method(D_METHOD("power_cooldown", "owner", "power"), &AovSim::power_cooldown);
+	ClassDB::bind_method(D_METHOD("get_godpowers"), &AovSim::get_godpowers);
+	ClassDB::bind_method(D_METHOD("set_fog_reveal_all", "on"), &AovSim::set_fog_reveal_all);
+	ClassDB::bind_method(D_METHOD("fog_recompute"), &AovSim::fog_recompute);
+	ClassDB::bind_method(D_METHOD("get_fog"), &AovSim::get_fog);
+	ClassDB::bind_method(D_METHOD("fog_version"), &AovSim::fog_version);
+	ClassDB::bind_method(D_METHOD("is_explored", "x", "z"), &AovSim::is_explored);
+	ClassDB::bind_method(D_METHOD("is_visible", "x", "z"), &AovSim::is_visible);
+	ClassDB::bind_method(D_METHOD("set_victory_enabled", "on"), &AovSim::set_victory_enabled);
+	ClassDB::bind_method(D_METHOD("get_victory"), &AovSim::get_victory);
+	ClassDB::bind_method(D_METHOD("is_paused"), &AovSim::is_paused);
+	ClassDB::bind_method(D_METHOD("set_paused", "on"), &AovSim::set_paused);
 	ClassDB::bind_method(D_METHOD("scene_after", "name"), &AovSim::scene_after);
 	// events
 	ClassDB::bind_method(D_METHOD("take_events"), &AovSim::take_events);
@@ -214,6 +238,14 @@ Dictionary AovSim::get_profile() const {
 		calls[String(kv.first.c_str())] = a;
 	}
 	d["calls"] = calls;
+	Dictionary by;
+	for (const auto &kv : p.calls_by) {
+		Array a;
+		a.push_back(kv.second.first);
+		a.push_back(kv.second.second);
+		by[String(kv.first.c_str())] = a;
+	}
+	d["callsBy"] = by; // "findPath@combat": [n, ms] (the JS prof.last.callsBy)
 	return d;
 }
 
@@ -236,7 +268,7 @@ Dictionary AovSim::get_stats() const {
 	d["dead"] = dead;
 	d["moving"] = moving;
 	d["buildings"] = buildings;
-	d["projectiles"] = 0;
+	d["projectiles"] = (int64_t)sim_.combat.projectiles.size();
 	d["resources"] = resources;
 	d["paths"] = sim_.paths.live();
 	d["path_calls"] = sim_.pathfinder.calls;
@@ -385,22 +417,8 @@ int64_t AovSim::spawn_resource(const String &type, int64_t tx, int64_t tz, int64
 }
 
 void AovSim::kill_unit(int64_t id, int64_t killer) {
-	int r = sim_.entities.unit_slot((int32_t)id);
-	if (r < 0) return;
-	auto &U = sim_.entities.units;
-	if (U.dead[r]) return;
-	U.dead[r] = 1;
-	U.hp[r] = 0;
-	sim_.movement.stop(r);
-	aov::Event e;
-	e.type = aov::EV_ENTITY_DIED;
-	e.kind = aov::K_UNIT;
-	e.id = (int32_t)id;
-	e.other = (int32_t)killer;
-	e.owner = U.owner[r];
-	e.x = U.x[r];
-	e.z = U.z[r];
-	sim_.events.emit(e);
+	if (sim_.entities.slot((int32_t)id) < 0) return;
+	sim_.combat.kill((int32_t)id, sim_.combat.hitter_of((int32_t)killer));
 }
 
 template <class T, class PA>
@@ -516,6 +534,33 @@ Dictionary AovSim::get_units() const {
 	d["carry_amount"] = carry_amt;
 	d["load"] = load;
 	d["task"] = task; // the resource kind being gathered (u.econ.resType), 255 none
+	// combat / god power state for the renderer (times are game times, -1 = never)
+	PackedFloat32Array air, stag, melee, gphit, hitt;
+	PackedByteArray kit;
+	air.resize(live * 3); stag.resize(live * 2); melee.resize(live); gphit.resize(live); hitt.resize(live); kit.resize(live);
+	float *wair = air.ptrw(), *wst = stag.ptrw(), *wme = melee.ptrw(), *wgp = gphit.ptrw(), *wht = hitt.ptrw();
+	uint8_t *wkit = kit.ptrw();
+	auto tv = [](double v) { return std::isnan(v) ? -1.f : (float)v; };
+	k = 0;
+	for (int r = 0; r < n; r++) {
+		if (U.removed[r]) continue;
+		wair[k * 3] = (float)U.air_y[r];
+		wair[k * 3 + 1] = (float)U.air_rx[r];
+		wair[k * 3 + 2] = (float)U.air_rz[r];
+		wst[k * 2] = tv(U.stag_t[r]);
+		wst[k * 2 + 1] = (float)U.stag_k[r];
+		wme[k] = tv(U.melee_t[r]);
+		wgp[k] = tv(U.gp_hit_t[r]);
+		wht[k] = tv(U.hit_time[r]);
+		wkit[k] = U.kit[r];
+		k++;
+	}
+	d["air"] = air;        // 3 per unit: airY, airRx, airRz (thrown by a god power)
+	d["stagger"] = stag;   // 2 per unit: combat_stagT, combat_stagK (lean = combat.lean)
+	d["melee_t"] = melee;  // combat_meleeT
+	d["gp_hit_t"] = gphit; // gp_hitT (lightning strike: white flash, then charred)
+	d["hit_time"] = hitt;  // combat_hitT (health bars)
+	d["kit"] = kit;        // units_kit (battle scene), 255 unset
 	return d;
 }
 
@@ -660,6 +705,10 @@ bool AovSim::order(int64_t id, const Dictionary &o) {
 	ord.a = (int32_t)(int64_t)o.get("a", 0);
 	ord.b = (int32_t)(int64_t)o.get("b", 0);
 	ord.c = (int32_t)(int64_t)o.get("c", 0);
+	if (type == aov::O_ATTACK) { // {auto, then_buildings} (the JS order flags)
+		if ((bool)o.get("auto", false)) ord.b |= aov::ATK_AUTO;
+		if ((bool)o.get("then_buildings", false)) ord.b |= aov::ATK_THEN_BUILDINGS;
+	}
 	return sim_.commands.order(r, ord);
 }
 
@@ -1028,8 +1077,10 @@ static PackedInt32Array ids_of(const std::vector<int32_t> &v) {
 	return out;
 }
 
-Dictionary AovSim::setup_scene(const String &name) {
-	sim_.scene = aov::scenes::setup(sim_, name.utf8().get_data());
+Dictionary AovSim::setup_scene(const String &name, const Dictionary &opts) {
+	aov::scenes::SceneOpts so;
+	if (opts.has("units")) so.units = (int)(int64_t)opts["units"];
+	sim_.scene = aov::scenes::setup(sim_, name.utf8().get_data(), so);
 	const aov::SceneCtx &c = sim_.scene;
 	Dictionary d;
 	if (!c.ok) return d;
@@ -1072,5 +1123,224 @@ PackedFloat64Array AovSim::get_econ_f64() const {
 		const double v[4] = { (double)R.id[r], R.amount[r], R.x[r], R.z[r] };
 		for (double x : v) out.push_back(x);
 	}
+	// combat: arrows in flight, god power state (thrown units' height), AI wave state
+	out.push_back((double)sim_.combat.projectiles.size());
+	for (const aov::Projectile &p : sim_.combat.projectiles) {
+		out.push_back(p.target);
+		out.push_back(p.x);
+		out.push_back(p.y);
+		out.push_back(p.z);
+	}
+	out.push_back((double)sim_.godpowers.airborne.size());
+	for (int32_t id : sim_.godpowers.airborne) {
+		out.push_back(id);
+		const int u = sim_.entities.unit_slot(id);
+		out.push_back(u >= 0 ? sim_.entities.units.air_y[u] : 0);
+	}
+	for (const aov::EnemyAI &ai : sim_.combat.ais) {
+		out.push_back(ai.owner);
+		out.push_back(ai.wave_size);
+		out.push_back(ai.next_wave_at);
+	}
 	return out;
+}
+
+// ---- combat ----------------------------------------------------------------
+
+void AovSim::damage(int64_t target, double amount, int64_t attacker) {
+	aov::Hitter h = sim_.combat.hitter_of((int32_t)attacker);
+	if (!h.id) h.none = true;
+	sim_.combat.damage((int32_t)target, amount, h);
+}
+
+void AovSim::set_ai_enabled(bool on) { sim_.combat.ai().enabled = on; }
+void AovSim::add_ai(int64_t owner) { sim_.combat.add_ai((int)owner); }
+
+Dictionary AovSim::get_ai(int64_t owner) const {
+	Dictionary d;
+	for (const aov::EnemyAI &ai : sim_.combat.ais) {
+		if (ai.owner != owner) continue;
+		d["enabled"] = ai.enabled;
+		d["wave_size"] = ai.wave_size;
+		d["next_wave_at"] = ai.next_wave_at;
+		d["aggression"] = ai.aggression;
+		break;
+	}
+	return d;
+}
+
+void AovSim::set_ai(int64_t owner, const Dictionary &d) {
+	for (aov::EnemyAI &ai : sim_.combat.ais) {
+		if (ai.owner != owner) continue;
+		if (d.has("enabled")) ai.enabled = d["enabled"];
+		if (d.has("wave_size")) ai.wave_size = (int)(int64_t)d["wave_size"];
+		if (d.has("next_wave_at")) ai.next_wave_at = d["next_wave_at"];
+		if (d.has("aggression")) ai.aggression = d["aggression"];
+		return;
+	}
+}
+
+void AovSim::set_unit_combat(int64_t id, const Dictionary &d) {
+	const int r = sim_.entities.unit_slot((int32_t)id);
+	if (r < 0) return;
+	aov::UnitStore &U = sim_.entities.units;
+	if (d.has("leash")) U.combat_leash[r] = d["leash"];
+	if (d.has("reach")) U.combat_reach[r] = d["reach"];
+	if (d.has("kit")) U.kit[r] = (uint8_t)(int64_t)d["kit"];
+	if (d.has("line")) {
+		const Variant v = d["line"];
+		if (v.get_type() == Variant::DICTIONARY) {
+			const Dictionary l = v;
+			U.combat_line[r] = 1;
+			U.line_cx[r] = l.get("cx", 0.0);
+			U.line_cz[r] = l.get("cz", 0.0);
+			U.line_nx[r] = l.get("nx", 0.0);
+			U.line_nz[r] = l.get("nz", 0.0);
+			U.line_d0[r] = l.get("d0", 0.0);
+		} else
+			U.combat_line[r] = 0;
+	}
+}
+
+Dictionary AovSim::get_combat() const {
+	const aov::Combat &C = sim_.combat;
+	Dictionary d;
+	PackedFloat32Array pr, st, sc, dr;
+	PackedInt32Array pt;
+	for (const aov::Projectile &p : C.projectiles) {
+		// 16 floats: x, y, z, px, py, pz, sx, sy, sz, tx, ty, tz, t, dur, arc, dist (tx.. valid once has_t)
+		const double v[16] = { p.x, p.y, p.z, p.px, p.py, p.pz, p.sx, p.sy, p.sz, p.tx, p.ty, p.tz, p.t, p.dur, p.arc, p.dist };
+		for (double x : v) pr.push_back((float)x);
+		pt.push_back(p.target);
+		pt.push_back(p.has_t ? 1 : 0);
+	}
+	for (const aov::StuckArrow &s : C.stuck) {
+		const double v[7] = { s.x, s.y, s.z, s.dx, s.dy, s.dz, s.t };
+		for (double x : v) st.push_back((float)x);
+	}
+	for (const aov::Scar &s : C.scars) {
+		const double v[5] = { s.x, s.z, s.radius, s.dirt, s.blood };
+		for (double x : v) sc.push_back((float)x);
+	}
+	for (const aov::Drop &g : C.drops) {
+		const double v[9] = { (double)g.kind, g.x, g.z, g.rot, (double)g.owner, g.tilt, g.roll, g.lift, g.life };
+		for (double x : v) dr.push_back((float)x);
+	}
+	d["projectiles"] = pr;     // 16 floats each (see above)
+	d["projectile_info"] = pt; // 2 ints each: target id, has target position
+	d["stuck"] = st;           // 7 floats each: x, y, z, dx, dy, dz, t (arrows in the ground)
+	d["scars"] = sc;           // 5 floats each: x, z, radius, dirt, blood (BattleFX.scar of the scene)
+	d["drops"] = dr;           // 9 floats each: kind (shield, helmet, spear, stub), x, z, rot, owner, tilt, roll, lift, die time
+	return d;
+}
+
+// ---- god powers ---------------------------------------------------------------
+
+PackedStringArray AovSim::power_names() const {
+	PackedStringArray out;
+	for (int i = 0; i < aov::GP_COUNT; i++) out.push_back(aov::power_def(i).key);
+	return out;
+}
+
+Dictionary AovSim::get_power_def(const String &power) const {
+	const int id = aov::power_of(power.utf8().get_data());
+	Dictionary d;
+	if (id < 0) return d;
+	const aov::PowerDef &p = aov::power_def(id);
+	d["key"] = p.key;
+	d["name"] = p.name;
+	d["god"] = p.god;
+	d["favor"] = p.cost.v[aov::RES_FAVOR];
+	d["cooldown"] = p.cooldown;
+	d["radius"] = p.radius;
+	d["duration"] = p.duration;
+	d["damage"] = p.damage;
+	d["hotkey"] = p.hotkey;
+	d["desc"] = p.desc;
+	return d;
+}
+
+Dictionary AovSim::can_cast(int64_t owner, const String &power) const {
+	const aov::CastCheck c = sim_.godpowers.can_cast((int)owner, aov::power_of(power.utf8().get_data()));
+	Dictionary d;
+	d["ok"] = c.ok;
+	d["reason"] = String(c.reason.c_str());
+	return d;
+}
+
+bool AovSim::cast_power(int64_t owner, const String &power, double x, double z) {
+	return sim_.godpowers.cast((int)owner, aov::power_of(power.utf8().get_data()), x, z);
+}
+
+double AovSim::power_cooldown(int64_t owner, const String &power) const {
+	return sim_.godpowers.cooldown_left((int)owner, aov::power_of(power.utf8().get_data()));
+}
+
+Dictionary AovSim::get_godpowers() const {
+	const aov::GodPowers &G = sim_.godpowers;
+	Dictionary d;
+	PackedFloat32Array storms, bolts, scorches, zaps, meteors, fires;
+	PackedInt32Array bolt_seeds, scorch_seeds, zap_units;
+	for (const aov::Storm &s : G.storms) {
+		if (s.done) continue;
+		const double v[6] = { (double)s.owner, s.x, s.z, s.t0, s.duration, s.radius };
+		for (double x : v) storms.push_back((float)x);
+	}
+	for (const aov::Bolt &b : G.bolts) {
+		const double v[6] = { b.x, b.y, b.z, b.t0, b.life, b.sky ? 1.0 : 0.0 };
+		for (double x : v) bolts.push_back((float)x);
+		bolt_seeds.push_back((int32_t)b.seed);
+	}
+	for (const aov::Scorch &s : G.scorches) {
+		const double v[6] = { s.x, s.y, s.z, s.t0, s.size, s.blast ? 1.0 : 0.0 };
+		for (double x : v) scorches.push_back((float)x);
+		scorch_seeds.push_back((int32_t)s.seed);
+	}
+	for (const aov::Zap &z : G.zaps) {
+		const double v[5] = { z.x, z.y, z.z, z.t0, z.life };
+		for (double x : v) zaps.push_back((float)x);
+		zap_units.push_back(z.unit);
+		zap_units.push_back((int32_t)z.seed);
+	}
+	for (const aov::Meteor &m : G.meteors) {
+		const double v[9] = { (double)m.owner, m.x, m.z, m.t0, m.delay, m.radius, m.sx, m.sy, m.sz };
+		for (double x : v) meteors.push_back((float)x);
+	}
+	for (const aov::Fire &f : G.fires) {
+		const double v[6] = { f.x, f.y, f.z, f.r, f.t0, f.dur };
+		for (double x : v) fires.push_back((float)x);
+	}
+	d["time"] = sim_.time;
+	d["storms"] = storms;         // 6 each: owner, x, z, t0, duration, radius
+	d["bolts"] = bolts;           // 6 each: x, y (ground; sky bolts: cloud height), z, t0, life, sky
+	d["bolt_seeds"] = bolt_seeds; // boltLines(seed, ...) seeds (uint32 bits)
+	d["scorches"] = scorches;     // 6 each: x, y, z, t0, size (0 = default), blast
+	d["scorch_seeds"] = scorch_seeds;
+	d["zaps"] = zaps;             // 5 each: x, y, z, t0, life
+	d["zap_units"] = zap_units;   // 2 each: unit id, seed
+	d["meteors"] = meteors;       // 9 each: owner, x, z, t0, delay, radius, sx, sy, sz
+	d["fires"] = fires;           // 6 each: x, y, z, r, t0, dur
+	return d;
+}
+
+// ---- fog / victory ------------------------------------------------------------
+
+PackedByteArray AovSim::get_fog() const {
+	PackedByteArray out;
+	const auto &s = sim_.fog.state;
+	out.resize((int64_t)s.size());
+	uint8_t *w = out.ptrw();
+	for (size_t i = 0; i < s.size(); i++) w[i] = s[i] == 2 ? 255 : s[i] == 1 ? 128 : 0;
+	return out;
+}
+
+Dictionary AovSim::get_victory() const {
+	const aov::Victory &v = sim_.victory;
+	Dictionary d;
+	d["enabled"] = v.enabled;
+	d["decided"] = v.decided;
+	d["winner"] = v.winner;
+	d["loser"] = v.loser;
+	d["time"] = v.at;
+	return d;
 }

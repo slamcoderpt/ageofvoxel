@@ -52,9 +52,22 @@ StartResult standard_start(Sim &sim, int owner, const Start &start, int villager
 struct TownResult { int32_t tc; std::vector<int32_t> villagers, army; };
 TownResult build_town(Sim &sim, int owner, const Start &start, int villagers = 24, int soldiers = 6);
 
+// URL-style scene parameters (the stress scene's ?units=N)
+struct SceneOpts {
+	int units = 2000;
+};
+
 bool has(const std::string &name);
-SceneCtx setup(Sim &sim, const std::string &name);
+SceneCtx setup(Sim &sim, const std::string &name, const SceneOpts &opts = SceneOpts());
 void after(Sim &sim, const std::string &name, const SceneCtx &ctx);
+
+// combat scenes (scenes/battle.cpp): src/combat/BattleScene.js (with
+// src/units/battleHost.js), the godpower entry of src/core/scenes/index.js,
+// src/core/scenes/stress.js
+SceneCtx battle_setup(Sim &sim);
+void battle_after(Sim &sim, const SceneCtx &ctx);
+SceneCtx godpower_setup(Sim &sim);
+SceneCtx stress_setup(Sim &sim, int units);
 
 } // namespace scenes
 } // namespace aov
