@@ -31,6 +31,10 @@ var _frames := 0
 var _capture_frames := 4
 var _capture_done := false
 var errors: Array[String] = []
+## Sim events of this frame (AovSim.take_events(), drained once per frame by
+## main.gd before the pieces' frame()): [{type: "entity:added", id, kind, ...}].
+## Pieces read this; never call sim.take_events() yourself.
+var events: Array = []
 
 func _ready() -> void:
 	AovScenes.set_setup("models", preload("res://game/core/model_gallery.gd").setup)
@@ -66,10 +70,12 @@ func _ready() -> void:
 	if AovScenes.SCENES[scene_name].has("players") and args.has("players"):
 		players = clampi(int(args.players), 2, 6)
 	sim.new_game(seed, map_size, scene_def.preset, players)
+	sim.take_events()  # the initial resources' entity:added (pieces read the world in setup)
 	print("aov: scene=%s seed=%d map=%d preset=%s players=%d  %s  map_hash=%08x" % [
 		scene_name, seed, map_size, scene_def.preset, players, sim.version(), sim.map_hash()])
 
 	if AovArgs.flag(args, "bench", false):
+		sim.set_record_events(false)
 		var bench := preload("res://game/core/bench.gd").new()
 		add_child(bench)
 		bench.run(self)
@@ -90,6 +96,13 @@ func _ready() -> void:
 		node.name = p.capitalize().replace(" ", "")
 		add_child(node)
 		pieces[p] = node
+	# Sim debug view (unit markers, --simdemo armies): on while the units
+	# piece has no renderer yet, or with --simdebug=1.
+	if AovArgs.flag(args, "simdebug", not pieces.has("units")) or AovArgs.flag(args, "simdemo", false):
+		var dbg: Node = preload("res://game/core/sim_debug.gd").new()
+		dbg.name = "SimDebug"
+		add_child(dbg)
+		pieces["sim_debug"] = dbg
 	for p in pieces:
 		if pieces[p].has_method("setup"):
 			pieces[p].setup(self)
@@ -144,7 +157,8 @@ func _process(delta: float) -> void:
 			steps += 1
 		if steps == 8:
 			_acc = 0.0
-	alpha = _acc / SIM_DT
+	alpha = 1.0 if paused else _acc / SIM_DT  # paused: show the last tick (JS Game.frame)
+	events = sim.take_events()
 	for p in pieces:
 		if pieces[p].has_method("frame"):
 			pieces[p].frame(delta, alpha)

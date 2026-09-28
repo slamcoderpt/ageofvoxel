@@ -60,8 +60,14 @@ func run(game: Node) -> void:
 		T.moving.append(c.moving)
 		T.projectiles.append(c.projectiles)
 		T.heap.append(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0)
+	# spatial-hash census over 60 more ticks (stress.mjs counts the same)
+	sim.set_census(true)
+	sim.set_profiling(false)
+	sim.tick(60)
+	var census: Dictionary = sim.take_census()
+	sim.set_census(false)
 	var res := {"start": start, "end": sim.get_stats(), "heap0": T.heap[0] if T.heap.size() else 0.0,
-		"census": {"queries": 0, "cellsScanned": 0, "entitiesVisited": 0}, "T": T, "fogFrames": [], "allFrames": [],
+		"census": census, "T": T, "fogFrames": [], "allFrames": [],
 		"isolated": true, "timerRes": 1.0, "map": sim.get_map_size(), "players": sim.get_starts().size(),
 		"errors": game.errors}
 	var text := JSON.stringify(res)

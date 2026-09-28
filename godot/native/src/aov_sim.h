@@ -1,14 +1,19 @@
 // AovSim: the GDScript-facing handle on the C++ simulation.
 // Game code creates one (AovSim.new()), calls new_game(), then tick() at
-// 30 Hz and reads state through the packed-array getters once per frame.
+// 30 Hz and reads state through the packed-array getters once per frame
+// (never per entity). Commands forward to the sim; the method list is in
+// godot/PORTING.md ("AovSim API").
 #pragma once
 
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
-#include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/variant/packed_float64_array.hpp>
+#include <godot_cpp/variant/packed_int32_array.hpp>
+#include <godot_cpp/variant/packed_string_array.hpp>
+#include <godot_cpp/variant/packed_vector2_array.hpp>
 #include <godot_cpp/variant/string.hpp>
 
 #include "sim/sim.h"
@@ -24,6 +29,7 @@ protected:
 	static void _bind_methods();
 
 public:
+	aov::Sim &sim() { return sim_; }
 	String version() const;
 
 	void new_game(int64_t seed, int64_t map_size, const String &preset, int64_t players);
@@ -38,19 +44,67 @@ public:
 	int64_t get_water_level() const { return sim_.world.map.water_level; }
 	PackedInt32Array get_heights() const;  // cols*cols voxel levels, row-major (z, x)
 	PackedByteArray get_ground() const;    // cols*cols Ground enum
-	PackedByteArray get_passable() const;  // size*size
+	PackedByteArray get_passable() const;  // size*size terrain-only passability
+	PackedByteArray get_walkable() const;  // size*size: passable and not blocked (what A* uses)
 	double height_at(double x, double z) const { return sim_.world.map.height_at(x, z); }
 	double smooth_height_at(double x, double z) const { return sim_.world.map.smooth_height_at(x, z); }
 	Array get_starts() const;              // [{owner, tx, tz}]
 	Array get_resource_spawns() const;     // [{type, tx, tz, variant}]
 	PackedInt32Array take_map_changes();   // dirty column rects (cx0,cz0,cx1,cz1)*, cleared on read
 	int64_t map_hash() const;
+	// First-pass voxel heightfield mesh of a column rect [cx0,cx1)x[cz0,cz1):
+	// Mesh.ARRAY_MAX arrays (vertex, normal, color with baked AO, index).
+	Array build_terrain_mesh(int64_t cx0, int64_t cz0, int64_t cx1, int64_t cz1) const;
+
+	// --- players (0 = Gaia, 1..6)
+	void add_player(int64_t id, const String &name, bool is_ai);
+	Dictionary get_player(int64_t id) const; // {id, name, is_ai, color, food, wood, gold, favor, pop, pop_cap, age}
+	PackedInt32Array get_player_ids() const;
+	bool is_enemy(int64_t a, int64_t b) const { return aov::Sim::is_enemy((int)a, (int)b); }
+
+	// --- entities
+	PackedStringArray unit_type_names() const;
+	Dictionary get_unit_def(const String &type) const;
+	int64_t spawn_unit(const String &type, int64_t owner, double x, double z, double rot);
+	PackedInt32Array spawn_block(const String &type, int64_t owner, int64_t count, double x, double z, int64_t cols, double spacing, double rot, double jitter);
+	int64_t spawn_resource(const String &type, int64_t tx, int64_t tz, int64_t variant);
+	void remove_resource(int64_t id) { sim_.remove_resource((int32_t)id); }
+	void clear_rect(int64_t tx, int64_t tz, int64_t w, int64_t h) { sim_.clear_rect((int)tx, (int)tz, (int)w, (int)h); }
+	void kill_unit(int64_t id, int64_t killer);
+	int64_t entity_kind(int64_t id) const { return sim_.entities.slot((int32_t)id) >= 0 ? sim_.entities.kind((int32_t)id) : 0; }
+	int64_t get_unit_count() const { return sim_.entities.count_units(); }
+	Dictionary get_units() const;     // packed arrays, one entry per unit (see PORTING.md)
+	Dictionary get_buildings() const;
+	Dictionary get_resources() const;
+	Dictionary get_unit(int64_t id) const; // one unit's fields (UI / debugging, not per frame)
+	PackedInt32Array units_near(double x, double z, double r, int64_t owner) const; // living units, owner -1 = any
+
+	// --- commands
+	bool order(int64_t id, const Dictionary &order); // {type: "idle"|"move"|..., target, x, z}
+	void order_move(const PackedInt32Array &ids, double x, double z); // formation move
+	void order_idle(const PackedInt32Array &ids);
+	void smart(const PackedInt32Array &ids, double x, double z, int64_t target_id);
+	bool move_to(int64_t id, double x, double z, double range);
+	PackedVector2Array find_path(double sx, double sz, double gx, double gz);
+	void set_repath_budget(int64_t n) { sim_.movement.repath_budget = (int)n; }
+	void set_path_cache(bool on) { sim_.pathfinder.use_cache = on; }
+	// Formation moves of >= min_units share one Dijkstra field (0 = off, JS-exact; see pathfinding.h)
+	void set_group_paths(int64_t min_units) { sim_.pathfinder.group_min = (int)min_units; }
+
+	// --- events: [{type: "entity:added", id, kind, other, owner, a, x, z, amount}], cleared on read
+	Array take_events();
+	void set_record_events(bool on) { sim_.events.record = on; }
 
 	// --- profiling / stats (scripts/godot-stress.mjs)
 	void set_profiling(bool on) { sim_.prof.enabled = on; }
 	bool is_profiling() const { return sim_.prof.enabled; }
 	Dictionary get_profile() const;  // {total, sys:{}, sub:{}, ai:{}, calls:{name:[n, ms]}} of the last tick
-	Dictionary get_stats() const;    // {alive, dead, moving, buildings, projectiles}              // FNV-1a over heights+ground+resources (determinism checks)
+	Dictionary get_stats() const;    // {alive, dead, moving, buildings, projectiles, resources, paths, path_searches, path_cache_hits}
+	void set_census(bool on);
+	Dictionary take_census();        // spatial-hash {queries, cellsScanned, entitiesVisited} since the last call
+	int64_t units_hash() const { return sim_.units_hash(); }
+	// Full-precision dump for parity checks: [id, x, z, rot, hp, flags, order, anim] per unit
+	PackedFloat64Array get_units_f64() const;
 };
 
 } // namespace godot

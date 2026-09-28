@@ -27,11 +27,11 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 
 | Piece | GDScript (render / UI) | C++ sim (`native/src/sim/…`) | JS reference |
 |---|---|---|---|
-| core (foundation) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench) | `core/` (constants, rng, game_map; later entities, movement, pathfinding, commands, fog, players, victory), `sim.h` | `src/core/` |
-| terrain | `game/terrain/terrain.gd` (currently a foundation **placeholder**) | map edits live in `core/game_map` | `src/terrain/` |
+| core (foundation) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck) | `core/` (constants, rng, jsmath, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile; later fog, victory), `sim.{h,cpp}` | `src/core/` |
+| terrain | `game/terrain/terrain.gd` (foundation first pass: C++ mesher, flat water, resource MultiMeshes) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (currently a foundation **placeholder**) | none | `src/lighting/` |
 | buildings | `game/buildings/buildings.gd` | `buildings/` | `src/buildings/` |
-| units | `game/units/units.gd` | `units/` | `src/units/` |
+| units | `game/units/units.gd` | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
 | combat (incl. enemy AI) | `game/combat/combat.gd` | `combat/` | `src/combat/` |
 | economy | `game/economy/economy.gd` | `economy/` | `src/economy/` |
 | godpowers | `game/godpowers/godpowers.gd` | `godpowers/` | `src/godpowers/` |
@@ -69,6 +69,9 @@ seconds). A fresh clone has no prebuilt library and builds it (~1700 files,
 tens of minutes on 2 cores); `build_library=yes` forces that. In this
 container the submodule checkout is hard-linked from `/opt/godot-cpp` (already
 built): do not rebuild it. Use `-j2`: the machine is shared.
+
+The sim is compiled with `-ffp-contract=off` (MSVC `/fp:precise`): no FMA
+contraction, never `-ffast-math`, or it stops matching the browser.
 
 Web: the extension must be built with emscripten (`platform=web`, dlink) and
 exported with "Extensions Support" on; not set up yet.
@@ -135,9 +138,20 @@ the JS `game.simOrder`), AI players under `prof.ai`, counted calls
 Other tools:
 
 ```
-node scripts/check-mapgen.mjs            # C++ generate_map() vs JS generateMap(): hash per preset (must be all "ok")
+node scripts/check-mapgen.mjs            # C++ vs JS generateMap() for every scene's seed/preset: heights, ground,
+                                         # passability, walkable after resources, resources, starts (all "ok")
+node scripts/check-sim.mjs [--only a,b]  # C++ sim vs the JS modules: scenarios (skirmish 3, town 7, battle 19, coast 5,
+                                         # stress 2000 and 4200 units) spawn, order, step up to 1350 ticks and compare
+                                         # every unit bit for bit at every checkpoint (all "ok"); ~3 min
 node scripts/export-models.mjs           # re-export godot/assets/models from the JS model code (~5 s)
+godot --headless --path godot -s res://game/core/simcheck.gd -- --mapdump=F | --scenario=F --out=F   # their C++ side
 ```
+
+Sim debug view: `--simdebug=1` draws every unit as a box in its owner's
+colour (on by default while `game/units/units.gd` does not exist);
+`--simdemo=1 [--simdemo_t=7]` spawns two armies at the first two starts and
+marches them onto each other, e.g.
+`node scripts/godot-shoot.mjs --scene skirmish --params "simdemo=1"`.
 
 ## Conventions
 
@@ -159,15 +173,44 @@ node scripts/export-models.mjs           # re-export godot/assets/models from th
   (mulberry32, bit-exact with `src/core/rng.js`, including `hash2/hash3` and
   `Noise2D`); visual randomness from hashes. Port JS arithmetic faithfully:
   doubles, `Math.round` = `aov::js_round` (floor(x + 0.5)), `| 0` =
-  `aov::js_int32`, Float32Array values stored as `float`. `generate_map` is
-  bit-exact with `generateMap` (`scripts/check-mapgen.mjs`); aim for the same
-  for every system so a scene can be checked against the browser by hash.
+  `aov::js_int32`, Float32Array values stored as `float`, and **the JS Math
+  functions from `core/jsmath.h`**: `jsm::atan2 / sin / cos / atan` (V8's
+  fdlibm) and `jsm::hypot` (V8's scaled sum). glibc's differ in the last bit
+  for 3-17 % of inputs, enough to make a battle drift. Iterate entities in
+  row order (= id order = JS Map order). `generate_map` and the whole core
+  (entities, units update / spread, pathfinding, movement, commands) are
+  bit-exact with the browser (`check-mapgen.mjs`, `check-sim.mjs`); extend
+  `check-sim.mjs` with your system's scenario when you port one.
+- **Entity store** (`sim/core/entities.h`): struct-of-arrays per kind
+  (`entities.units / buildings / resources`), one id counter, ids never
+  reused, `id_slot`/`id_kind` map an id to its row. Rows are dense in id
+  order; `remove()` only flags the row (`removed`), and rows are compacted
+  once per tick right before Movement rebuilds the spatial hash, so a row
+  index is stable for a whole tick (the hash stores rows). Skip `removed`
+  rows in loops. Pieces add per-entity fields as columns in the X-macro lists
+  (`AOV_UNIT_COLUMNS` …; prefix private ones with the piece name). Orders
+  live in `order_type / order_target / order_x / order_z / order_a..c`;
+  register a handler per order type with `sim.commands.register_handler()`.
+  Animation requests: set `units.anim_want[row]` each tick (`A_GATHER` …).
+- **Paths**: `Movement::move_to(row, x, z, rect, range)` like `moveTo`;
+  waypoints live in `sim.paths` (a pool, handle per unit). `Pathfinder`
+  caches A* results per (start tile, goal tile, rect) while walkability is
+  unchanged (`GameMap::pass_version`, bumped by `block` / passability):
+  exact. Two opt-in scalers that are NOT bit-exact with the browser, off by
+  default: `AovSim.set_group_paths(n)` (formation moves of >= n units share
+  one Dijkstra field: 360 units into a forest 544 ms -> 30 ms) and
+  `AovSim.set_repath_budget(n)` (max stuck re-paths per tick, the rest wait).
+  Interactive play (the ui piece) should turn group paths on (~24);
+  deterministic captures and parity checks leave them off.
 - **Sim / render split**: GDScript never mutates sim state directly; it calls
   `AovSim` commands. Per frame, pieces pull packed arrays (positions, rotations,
   anim state, hp, …) with one call each, never per entity. The sim keeps the
-  previous tick's positions so renderers interpolate with `game.alpha`.
-  `AovSim.take_map_changes()` returns dirty column rects (cx0, cz0, cx1, cz1)
-  since the last call (the JS `map.onChange`).
+  previous tick's positions so renderers interpolate with `game.alpha` (1
+  while paused). `AovSim.take_map_changes()` returns dirty column rects
+  (cx0, cz0, cx1, cz1) since the last call (the JS `map.onChange`); only the
+  terrain piece drains it. Sim events are drained once per frame by
+  `main.gd` into `game.events` (an Array of Dictionaries, see below): read
+  that in `frame()`, never call `take_events()` yourself.
 - **Voxel models**: exported once from the JS builders by
   `scripts/export-models.mjs` into `assets/models/<group>.json` + `.bin.gz`
   (groups: units, buildings, construction, props, resources, details,
@@ -215,21 +258,85 @@ returns a ctx Dictionary (`focus`, …).
 
 ## AovSim API (so far)
 
-`new_game(seed, map_size=128, preset="skirmish", players=2)`, `tick(n=1)`,
-`get_tick()`, `get_time()`, `get_seed()`, `version()`; map:
-`get_map_size()`, `get_map_cols()`, `get_water_level()`, `get_heights()`
+Lifecycle: `new_game(seed, map_size=128, preset="skirmish", players=2)`
+(players Gaia / 1 "You" / 2 "Enemy", the map, the initial resources as
+entities blocking their tiles), `tick(n=1)`, `get_tick()`, `get_time()`,
+`get_seed()`, `version()`.
+
+Map: `get_map_size()`, `get_map_cols()`, `get_water_level()`, `get_heights()`
 (PackedInt32Array, cols*cols, row-major z then x), `get_ground()`
-(PackedByteArray, `aov::Ground`), `get_passable()`, `height_at(x, z)`,
+(PackedByteArray, `aov::Ground`), `get_passable()`, `get_walkable()`
+(passable and not blocked: what A* sees), `height_at(x, z)`,
 `smooth_height_at(x, z)`, `get_starts()` ([{owner, tx, tz}]),
 `get_resource_spawns()` ([{type, tx, tz, variant}], the initial spawns),
-`take_map_changes()`, `map_hash()`; profiling: `set_profiling(on)`,
-`get_profile()`, `get_stats()`. Add methods in `aov_sim.{h,cpp}` next to the
-piece's section and list them here.
+`take_map_changes()`, `map_hash()`, `build_terrain_mesh(cx0, cz0, cx1, cz1)`
+(Mesh arrays for a column rect: vertex, normal, linear colour, index).
+
+Players: `add_player(id, name="", is_ai=true)` (owners 3..6),
+`get_player(id)` ({id, name, is_ai, god, color, food, wood, gold, favor, pop,
+pop_cap, age, age_name}), `get_player_ids()`, `is_enemy(a, b)`.
+
+Entities: `unit_type_names()` (type index -> key), `get_unit_def(key)`,
+`spawn_unit(type, owner, x, z, rot=0)` -> id, `spawn_block(type, owner,
+count, x, z, cols=0, spacing=1, rot=0, jitter=0.15)` -> ids (helpers.js
+spawnBlock), `spawn_resource(type, tx, tz, variant=0)`, `remove_resource(id)`,
+`clear_rect(tx, tz, w, h)`, `kill_unit(id, killer=0)` (minimal: dead, hp 0,
+stop, `entity:died`; combat will own the real one), `entity_kind(id)` (0
+none, 1 unit, 2 building, 3 resource), `get_unit_count()`, `get_unit(id)`
+(one unit as a Dictionary incl. its remaining path: UI / debugging only),
+`units_near(x, z, r, owner=-1)`.
+
+Per-frame state, one call each, parallel arrays (index i = one entity):
+- `get_units()`: `count`, `ids` (Int32), `pos` / `prev_pos` (Float32, x,z
+  pairs), `rot` / `prev_rot`, `ground_y` (terrain height under pos), `type`
+  (Byte, index into `unit_type_names()`), `owner`, `hp`, `max_hp`, `anim`
+  (Byte: 0 idle, 1 walk, 2 gather, 3 build, 4 worship, 5 attack, 6 die),
+  `anim_t`, `attack_t`, `die_t`, `hit_t` (-1 = never hit), `flash_t`,
+  `order` (Byte: 0 idle, 1 move, 2 gather, 3 dropoff, 4 worship, 5 build,
+  6 attack), `target` (order target id), `flags` (Byte: 1 moving, 2 dead,
+  4 arrived, 8 carrying, 16 battle line), `carry` (Byte resource kind, 255
+  none).
+- `get_buildings()`: `count`, `ids`, `type`, `owner`, `rect` (tx,tz,w,h),
+  `hp`, `max_hp`, `built`, `progress`.
+- `get_resources()`: `count`, `ids`, `type` (index into `type_names`:
+  tree, gold, berry), `tile` (tx,tz), `amount`, `variant`, `type_names`.
+
+Commands: `order(id, {type, target, x, z, a, b, c})`, `order_move(ids, x, z)`
+(formation move), `order_idle(ids)`, `smart(ids, x, z, target_id=0)`
+(right-click; order types whose piece is not ported yet fall back to a
+move), `move_to(id, x, z, range=0)`, `find_path(sx, sz, gx, gz)`
+(PackedVector2Array), `set_group_paths(min_units)`, `set_repath_budget(n)`,
+`set_path_cache(on)`.
+
+Events (`game.events`, drained by main.gd): [{type, id, kind, other, owner,
+a, x, z, amount}], type one of `entity:added` (a = type index),
+`entity:removed`, `entity:died` (other = killer), `unit:damaged`,
+`building:placed`, `building:completed`, `unit:trained`, `age:advanced`,
+`resources:changed`, `godpower:cast`, `command:smart` (other = target, a =
+unit count), `game:over`; `set_record_events(on)`. C++ systems subscribe
+with `sim.events.on(EV_…, fn)`.
+
+Profiling / checks: `set_profiling(on)`, `get_profile()`, `get_stats()`
+({alive, dead, moving, buildings, projectiles, resources, paths, path_calls,
+path_searches, path_cache_hits, path_expanded, group_fields, …}),
+`set_census(on)` / `take_census()` (spatial-hash queries), `units_hash()`,
+`get_units_f64()` (full-precision dump for parity tools).
+
+Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
 
 ## Status
 
-- Done (foundation): project, GDExtension + `AovSim` with the bit-exact map
-  generator, model export (all JS models incl. unit rigs), placeholder terrain
-  (heightfield + water + initial resources) and lighting, capture and bench
-  scripts.
-- Placeholders to replace: `game/terrain/terrain.gd`, `game/lighting/lighting.gd`.
+- Done (foundation): project, GDExtension + `AovSim`, model export (all JS
+  models incl. unit rigs), capture and bench scripts.
+- Done (sim core A): bit-exact map generator for every preset and player
+  count; entity store, players (Gaia + 6), events, spatial hash, A* with
+  line-of-sight smoothing (+ exact path cache), movement (separation,
+  sliding, stuck re-paths), units spawn / anim state / spread / corpse
+  clearing, commands (idle, move, formation move, smart), all bit-exact with
+  the browser (`check-sim.mjs`: 4200 units over 900 ticks match; C++ 1.7
+  ms/tick vs JS 31 ms). First-pass terrain (C++ chunk mesher with the JS
+  palette and AO) and a sim debug view.
+- Placeholders to replace: `game/terrain/terrain.gd` (first pass: no shore
+  smoothing, talus, cliff relief, water shader or ground details),
+  `game/lighting/lighting.gd`, `game/core/sim_debug.gd` (until the units
+  piece renders units).

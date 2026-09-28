@@ -26,6 +26,7 @@ public:
 	std::vector<uint16_t> blocked; // size*size occupancy refcount
 	std::unordered_map<int, int> blockers; // tile index -> entity id
 	std::vector<MapChange> changes; // dirty column rects since the renderer last drained them
+	uint32_t pass_version = 0; // bumped whenever walkability may change (block / passability): path cache key
 
 	GameMap() = default;
 	GameMap(int size_tiles, uint32_t seed);

@@ -24,6 +24,12 @@ if "build_library" not in ARGS:
 env = SConscript("godot-cpp/SConstruct")
 
 env.Append(CPPPATH=["src/"])
+# The sim is bit-exact with the browser (doubles, V8 Math ports): never fuse
+# a*b+c into FMA, and never use -ffast-math.
+if env.get("is_msvc", False):
+    env.Append(CCFLAGS=["/fp:precise"])
+else:
+    env.Append(CCFLAGS=["-ffp-contract=off"])
 sources = Glob("src/*.cpp") + Glob("src/sim/*.cpp") + Glob("src/sim/*/*.cpp")
 
 if env["platform"] == "macos":
