@@ -7,6 +7,7 @@
 #include "aov_sim.h"
 #include "unit_view.h"
 #include "econ_view.h"
+#include "godpower_view.h"
 
 using namespace godot;
 
@@ -15,6 +16,7 @@ static void initialize_aov(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(AovSim);
 	GDREGISTER_CLASS(AovUnitView); // units / combat render data (unit_view.h)
 	GDREGISTER_CLASS(AovEconView); // economy render data (econ_view.h)
+	GDREGISTER_CLASS(AovGodpowerView); // god powers render data (godpower_view.h)
 }
 
 static void uninitialize_aov(ModuleInitializationLevel p_level) {

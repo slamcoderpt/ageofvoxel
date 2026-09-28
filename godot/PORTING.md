@@ -34,7 +34,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | units | `game/units/units.gd` (rigs posed by the full anim.js port, conditional parts, crowd yaw / press / jitter, deaths and corpses, contact shadows), `unit.gdshader` (team lift + rim, hit flash, corpse drain, dithered fade) + `unit_outline.gdshader` (inverted hull, next pass); posing in C++: `native/src/unit_view.cpp` (`AovUnitView`) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
 | combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported) | `src/combat/` |
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor; Godot-only activity fx: axe / pick chips and dust, sickle chaff, stooks on cut rows, hoof dust, shoal ripples, fish splashes, net ripples, boat wakes; crops sway, `econ_voxel.gdshader`, `fx_chip / fx_puff / fx_ring.gdshader`), buffers built in C++ by `AovEconView` (`native/src/econ_view.{h,cpp}`, render side, reads the sim, never writes it) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
-| godpowers | `game/godpowers/godpowers.gd` (not written yet: bolts, storm funnel, scorches, debris) | `godpowers/` (favor, cooldowns, Lightning Storm, Bolt, Meteor, thrown units: ported) | `src/godpowers/` |
+| godpowers | `game/godpowers/godpowers.gd` (the whole BoltRenderer of effects.js: bolt / sky / zap ribbons, impact flash sprites and decals, scorches with ember cracks, crater debris, char rims, spark streaks, smoke and flames, the storm funnel (wall, cloud body, dust wall, ground shockwave, rain, energy bands, whirled debris), flyer trails / back lights / drop shadows, meteor fireball and fire, strike / storm point lights and the shadow spot, the full-frame storm grade with light pools; dims the lighting piece's sun / sky / grade while a storm plays), shaders beside it; buffers built in C++ by `AovGodpowerView` (`native/src/godpower_view.{h,cpp}`, render side, reads the sim, never writes it) | `godpowers/` (favor, cooldowns, Lightning Storm, Bolt, Meteor, thrown units: ported) | `src/godpowers/` |
 | ui (HUD, selection, input) | `game/ui/ui.gd` | none | `src/ui/` |
 | scenes | `AovScenes.set_setup()` from the owning piece, else the C++ setup | `scenes/` (helpers.js, skirmish / town / coast / hud, EconomyScene.js; battle.cpp: BattleScene.js + units/battleHost.js, godpower, stress.js: all ported) | `src/core/scenes/`, `BattleScene.js`, `EconomyScene.js` |
 
@@ -476,6 +476,20 @@ BattleFX / Particles / Debris / Overlays / Projectiles render maths are
 ported there. Stress (2000 units, fog off, 1280x720): ~3 ms per update on
 this container's debug build.
 
+God power render data: `AovGodpowerView` (`native/src/godpower_view.h`),
+`setup(sim)`, `update(alpha, paused, camera_position)` once per frame ->
+{active (false: nothing to draw, nothing else returned), time, ribbons:
+Array (one per group: ground bolts, sky bolts, zaps, bands, bands2, trails,
+fire, sparks, bloom veil; null or ArrayMesh arrays with CUSTOM0 = side,
+width, intensity, core and CUSTOM1 = tangent, CUSTOM2 = spark colour), inst:
+Array[PackedFloat32Array] (20 floats per instance: TRANSFORM_3D + colour +
+custom; debris, embers, glows, rims, decals mix / add / mul, smoke, flames),
+counts, lights (9 floats each), spot, pools, flash, storm, storms};
+`storm_static(id)` -> {gh, rb, rt, H, base, rain}. Bolt channels are
+rebuilt from their seeds with the JS RNG (same shapes as the browser),
+crater debris and sparks are stepped at 30 Hz from their strike, smoke and
+flames are the Particles.js emits in closed form: a paused capture is exact.
+
 Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
 
 ## Status
@@ -510,6 +524,9 @@ Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
 - Placeholders to replace: `game/terrain/terrain.gd` (first pass: no shore
   smoothing, talus, cliff relief, water shader or ground details),
   `game/lighting/lighting.gd`, the placement ghost
-  (UI); the
-  `game/godpowers` renderers and the fog-of-war shading do not exist yet
-  (the sim state they need is exported, see "AovSim API").
+  (UI); the fog-of-war shading does not exist yet (the sim state it needs
+  is exported, see "AovSim API").
+- Done (godpowers render): `game/godpowers` + `AovGodpowerView`, see the
+  table and "AovSim API". Godot-only: a lavender veil round the bolts and
+  the contact stands in for the browser's bloom pass (this renderer has
+  none); the storm floor is a touch brighter. Not fog-aware yet.
