@@ -78,7 +78,8 @@ func _build_water() -> void:
 	var water := MeshInstance3D.new()
 	water.name = "Water"
 	var pm := PlaneMesh.new()
-	pm.size = Vector2(ws, ws)
+	# the sea runs far past the map rim, as in src/terrain/Water.js (ws * 5, centred)
+	pm.size = Vector2(ws * 5.0, ws * 5.0)
 	water.mesh = pm
 	water.position = Vector3(ws / 2, (game.sim.get_water_level() - 0.3) * VOXEL, ws / 2)
 	var wm := StandardMaterial3D.new()

@@ -28,7 +28,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | Piece | GDScript (render / UI) | C++ sim (`native/src/sim/…`) | JS reference |
 |---|---|---|---|
 | core (foundation) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck) | `core/` (constants, rng, jsmath, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile; later fog, victory), `sim.{h,cpp}` | `src/core/` |
-| terrain | `game/terrain/terrain.gd` (foundation first pass: C++ mesher, flat water, resource MultiMeshes) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
+| terrain | `game/terrain/terrain.gd` (foundation first pass: C++ mesher, flat water plane ws*5 centred like Water.js, resource MultiMeshes) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (currently a foundation **placeholder**) | none | `src/lighting/` |
 | buildings | `game/buildings/buildings.gd` | `buildings/` | `src/buildings/` |
 | units | `game/units/units.gd` | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
