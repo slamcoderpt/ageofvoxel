@@ -30,7 +30,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | core (foundation) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck) | `core/` (constants, rng, jsmath, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `sim.{h,cpp}` | `src/core/` |
 | terrain | `game/terrain/terrain.gd` + `terrain.gdshader` (chunks, paving cobbles / pale stone of MaterialPatches patchGround), `water.gdshader` (Water.js), `props.gdshader` (voxel.gdshader + MultiMesh instance tint, used by trees / gold / berries / ground details); mesher in `native/src/terrain_mesher.cpp` (TerrainMesh.js full port, water depth bake, GroundDetails.js scatter) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (sun + PCSS soft shadows, hemisphere = ambient colour + two unshadowed up/down lights, fill, depth haze following the camera, SSAO, MSAA, `--quality=high\|medium\|low`, `--post=high\|low\|off`), `grade_effect.gd` (CompositorEffect compute pass on the HDR buffer: exposure 2.1 + PBR Neutral + the PostFX.js grade; Godot's tonemap is LINEAR; Compatibility/web falls back to AgX), `sky.gdshader`. MaterialPatches.js canopy / foliage terms not ported yet | none | `src/lighting/` |
-| buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw; props.js not yet) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
+| buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
 | units | `game/units/units.gd` (first pass: rigs in the rest pose, conditional parts; animation still to port) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
 | combat (incl. enemy AI) | `game/combat/combat.gd` (not written yet: arrows, hit fx, health bars) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported) | `src/combat/` |
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
@@ -484,7 +484,7 @@ Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
 - Placeholders to replace: `game/terrain/terrain.gd` (first pass: no shore
   smoothing, talus, cliff relief, water shader or ground details),
   `game/lighting/lighting.gd`, `game/units/units.gd` (static rest pose: the
-  animation of src/units/anim.js; thrown units: `air`), town props
-  (src/buildings/props.js), the placement ghost (UI); `game/combat` and
+  animation of src/units/anim.js; thrown units: `air`), the placement ghost
+  (UI); `game/combat` and
   `game/godpowers` renderers and the fog-of-war shading do not exist yet
   (the sim state they need is exported, see "AovSim API").
