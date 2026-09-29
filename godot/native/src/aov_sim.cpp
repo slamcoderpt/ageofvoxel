@@ -24,6 +24,7 @@ void AovSim::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("smooth_height_at", "x", "z"), &AovSim::smooth_height_at);
 	ClassDB::bind_method(D_METHOD("get_starts"), &AovSim::get_starts);
 	ClassDB::bind_method(D_METHOD("get_resource_spawns"), &AovSim::get_resource_spawns);
+	ClassDB::bind_method(D_METHOD("get_mapgen_info"), &AovSim::get_mapgen_info);
 	ClassDB::bind_method(D_METHOD("take_map_changes"), &AovSim::take_map_changes);
 	ClassDB::bind_method(D_METHOD("map_hash"), &AovSim::map_hash);
 	ClassDB::bind_method(D_METHOD("set_profiling", "on"), &AovSim::set_profiling);
@@ -173,6 +174,14 @@ Array AovSim::get_starts() const {
 		out.push_back(d);
 	}
 	return out;
+}
+
+Dictionary AovSim::get_mapgen_info() const {
+	Dictionary d;
+	d["felled"] = sim_.world.felled;
+	d["graded"] = sim_.world.graded;
+	d["woodline"] = sim_.world.woodline;
+	return d;
 }
 
 Array AovSim::get_resource_spawns() const {

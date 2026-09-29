@@ -4,11 +4,15 @@ extends SceneTree
 ## compare exactly). Run headless:
 ##
 ##   godot --headless --path godot -s res://game/core/simcheck.gd -- --mapdump=out.json \
-##         --seed=3 --size=128 --preset=skirmish --players=2
+##         --seed=3 --size=128 --preset=skirmish --players=2 [--rules=browser|godot]
 ##   godot --headless --path godot -s res://game/core/simcheck.gd -- --scenario=in.json --out=out.json
 ##
 ## mapdump: heights (int16 LE), ground, passable and walkable (after the
 ## initial resources block their tiles) as base64, plus resources / starts.
+## --rules=browser (default): the browser's generator only (set_godot_rules
+## off), what check-mapgen compares with the JS; godot: the game's map, with
+## the Godot-only passes (connected starts, start woodlines) and their counts
+## (mapgen: {felled, graded, woodline}).
 ## scenario: {seed, size, preset, players, every, ops: [...]} (see
 ## check-sim.mjs); writes {checkpoints: [{tick, hash, units: [id, x, z, rot,
 ## hp, flags, order, anim]*}]} with full-precision doubles.
@@ -40,6 +44,7 @@ func _write(path: String, data: Variant) -> int:
 
 func _mapdump(a: Dictionary) -> int:
 	var sim: Object = ClassDB.instantiate("AovSim")
+	sim.set_godot_rules(str(a.get("rules", "browser")) == "godot")
 	sim.new_game(int(a.get("seed", 1)), int(a.get("size", 128)), str(a.get("preset", "skirmish")), int(a.get("players", 2)))
 	var hs: PackedInt32Array = sim.get_heights()
 	var hb := PackedByteArray()
@@ -56,7 +61,7 @@ func _mapdump(a: Dictionary) -> int:
 		"size": sim.get_map_size(), "cols": sim.get_map_cols(), "waterLevel": sim.get_water_level(),
 		"heights": Marshalls.raw_to_base64(hb), "ground": Marshalls.raw_to_base64(sim.get_ground()),
 		"passable": Marshalls.raw_to_base64(sim.get_passable()), "walkable": Marshalls.raw_to_base64(sim.get_walkable()),
-		"resources": res, "starts": starts, "hash": "%08x" % sim.map_hash()})
+		"resources": res, "starts": starts, "hash": "%08x" % sim.map_hash(), "mapgen": sim.get_mapgen_info()})
 
 func _scenario(a: Dictionary) -> int:
 	var sc: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(str(a.scenario)))

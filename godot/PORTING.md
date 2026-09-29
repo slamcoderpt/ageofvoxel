@@ -242,9 +242,10 @@ the browser). The separation loops read the hash's position mirror
 (`SpatialHash::for_each_near_xz`, kept exact with `sync()` / `moved()`).
 Wall times on this shared machine vary by +-30 %. Since the enemy AI casts
 god powers, every seat's storms and meteors thin the stress armies (2000
-units: 1336 alive on average over the recorded ticks instead of 1926, 0.75
-ms/tick mean); `--params "godot_rules=0"` gives the workload of the table
-above (1.09 ms/tick mean on this machine today). The render numbers and
+units: about 1340 alive on average over the recorded ticks instead of 1926,
+0.75 ms/tick mean); `--params "godot_rules=0"` (the browser's map and rules)
+gives the workload of the table above (1.06-1.09 ms/tick mean on this
+machine today). The render numbers and
 their method are in `../docs/godot-stress-report.md`.
 
 Render bench (xvfb + lavapipe, the counterpart of `scripts/bench.mjs`;
@@ -294,9 +295,13 @@ with no script error.
 Other tools:
 
 ```
-node scripts/check-mapgen.mjs            # C++ vs JS generateMap() for every scene's seed/preset: heights, ground,
-                                         # passability, walkable after resources, resources, starts (all "ok")
-node scripts/check-sim.mjs [--only a,b]  # C++ sim vs the JS modules: scenarios (skirmish 3, town 7, battle 19, coast 5,
+node scripts/check-mapgen.mjs            # per scene seed/preset (+ stress 2-6 players, 3 split skirmish seeds):
+                                         # 1. the C++ generator with the Godot passes off vs JS generateMap(): heights,
+                                         #    ground, passability, walkable after resources, resources, starts (exact);
+                                         # 2. the game's map (NOT the browser's: woodlines, connected starts): >= 16 trees
+                                         #    8-14 tiles from every Town Center, every start and nearby mine / bush
+                                         #    reachable, terrain changed only where graded (all "ok")
+node scripts/check-sim.mjs [--only a,b]  # C++ sim (with set_godot_rules(false): the browser's map and rules) vs the JS modules: scenarios (skirmish 3, town 7, battle 19, coast 5,
                                          # stress 2000 and 4200 units; the town / economy / coast / hud / battle /
                                          # godpower / stress scene setups, econ-ops: placement, training, age, destroy,
                                          # skirmish-ai: 5 min of the enemy AI, combat-ops: attack orders, Town Center
@@ -353,7 +358,17 @@ marches them onto each other, e.g.
   when the forest noise closes a band of trees across the map or a lake cuts
   it in two, the cheapest route is cleared, a lane three trees wide, and
   water / cliffs on it are graded into a causeway or ramp; 5 of the first 40
-  skirmish seeds needed it, none of the scenes' seeds do). The whole core
+  skirmish seeds needed it, none of the scenes' seeds do), and **every start
+  gets a woodline** (`place_woodlines`: 28 trees in a band about 10 tiles
+  along, their centres 8.5-13.5 tiles from the Town Center's centre, in the
+  direction nearest the start forest's that keeps 50 degrees clear of the
+  start gold and berries and 40 of the Town Center's south door; open ground
+  only, a tile gap round mines and bushes, and a flood fill rejects a band
+  that would cut any tile off; its own RNG, so the rest of the map is
+  untouched). The planned towns (`layout_town`: town, hud, coast, stress)
+  clear trees from their streets and lots, so there the plan decides what is
+  left of it. `AovSim.get_mapgen_info()` = {felled, graded, woodline};
+  `set_godot_rules(false)` before `new_game` gives the browser's map. The whole core
   (entities, units update / spread, pathfinding, movement, commands) is
   bit-exact with the browser (`check-mapgen.mjs`, `check-sim.mjs`); extend
   `check-sim.mjs` with your system's scenario when you port one. `Math.pow`
@@ -744,3 +759,10 @@ Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
   table and "AovSim API". Godot-only: a lavender veil round the bolts and
   the contact stands in for the browser's bloom pass (this renderer has
   none); the storm floor is a touch brighter. Not fog-aware yet.
+- Done (group 0, Godot-only gameplay; the browser is frozen, so these break
+  parity on purpose and `set_godot_rules(false)` switches them off for the
+  parity tools): every start connected on foot (split maps stalled the AI's
+  attack waves for good), a start woodline 8-14 tiles from every Town
+  Center, the free villager, the enemy AI's god powers, god power hotkeys
+  Z / C / V. Checks: `aivai.gd`, `softlock_check.gd`, `playtest.gd`,
+  `check-mapgen.mjs`.

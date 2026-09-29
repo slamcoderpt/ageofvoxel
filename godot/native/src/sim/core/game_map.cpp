@@ -6,6 +6,7 @@
 #include <queue>
 
 #include "constants.h"
+#include "jsmath.h"
 #include "rng.h"
 
 namespace aov {
@@ -276,9 +277,120 @@ ConnectResult connect_starts(GameMap &map, const std::vector<Start> &starts, std
 	return out;
 }
 
+// Godot-only pass: a woodline for every start. The browser's generator puts
+// the start forest 16-21 tiles out, a long walk for the first villagers, so
+// each start also gets a cluster of trees whose centres lie 8.5-13.5 tiles
+// from the Town Center's centre: a band about 9 tiles along and 3 deep
+// (WOOD_MIN..WOOD_MAX trees), ragged at its ends. Its direction is the one
+// closest to the start forest's (a0) that stays 50 degrees clear of the start
+// gold and berries and 40 degrees clear of the Town Center's south door
+// (where villagers spawn and walk out). A tile must be open passable ground
+// with no mine or bush in its 3x3; a candidate is rejected if it would cut
+// any tile off from the start (flood fill before / after: only the trees'
+// own tiles may leave the region), so paths, the gold and the berries stay
+// reachable. Deterministic (its own RNG from the seed, drawn in start order).
+constexpr int WOOD_MIN = 16, WOOD_MAX = 28;
+
+int place_woodlines(GameMap &map, uint32_t seed, const std::vector<Start> &starts, const std::vector<double> &forest_dir,
+		std::vector<ResourceSpawn> &resources, std::vector<uint8_t> &occupied) {
+	const int N = map.size;
+	RNG wr(seed * 2246822519u + 0x9e37u);
+	// tiles next to a mine or a bush (keep a lane round them)
+	std::vector<uint8_t> near_node((size_t)N * N, 0);
+	for (const ResourceSpawn &r : resources) {
+		if (r.type == "tree") continue;
+		const int d = r.type == "gold" ? 3 : 1;
+		for (int z = r.tz - 1; z <= r.tz + d; z++)
+			for (int x = r.tx - 1; x <= r.tx + d; x++)
+				if (map.in_tiles(x, z)) near_node[(size_t)z * N + x] = 1;
+	}
+	const int DX[4] = { 1, -1, 0, 0 }, DZ[4] = { 0, 0, 1, -1 };
+	std::vector<uint8_t> seen;
+	std::vector<int> q;
+	auto flood = [&](int from) {
+		seen.assign((size_t)N * N, 0);
+		q.clear();
+		if (map.passable[from] != 1 || occupied[from]) return 0;
+		q.push_back(from);
+		seen[from] = 1;
+		for (size_t h = 0; h < q.size(); h++) {
+			const int i = q[h], x = i % N, z = i / N;
+			for (int k = 0; k < 4; k++) {
+				const int nx = x + DX[k], nz = z + DZ[k];
+				if (!map.in_tiles(nx, nz)) continue;
+				const int j = nz * N + nx;
+				if (seen[j] || map.passable[j] != 1 || occupied[j]) continue;
+				seen[j] = 1;
+				q.push_back(j);
+			}
+		}
+		return (int)q.size();
+	};
+	auto adiff = [](double a, double b) {
+		double d = std::fmod(std::fabs(a - b), PI * 2);
+		return d > PI ? PI * 2 - d : d;
+	};
+	int placed_total = 0;
+	for (size_t si = 0; si < starts.size(); si++) {
+		const Start &s = starts[si];
+		const double a0 = forest_dir[si];
+		const double gold_a = a0 + PI * 0.75, berry_a = a0 - PI * 0.7, door_a = PI * 0.5; // +z: the TC's south side
+		// 24 directions, best first: nearest the start forest's
+		std::vector<std::pair<double, double>> dirs; // (score, angle)
+		const double off = wr.range(-0.13, 0.13);
+		for (int k = 0; k < 24; k++) {
+			const double a = a0 + off + (k - 12) * (PI * 2 / 24);
+			if (adiff(a, gold_a) < 0.87 || adiff(a, berry_a) < 0.87 || adiff(a, door_a) < 0.7) continue;
+			dirs.push_back({ adiff(a, a0), a });
+		}
+		std::stable_sort(dirs.begin(), dirs.end(), [](const auto &p, const auto &q2) { return p.first < q2.first; });
+		const int from = s.tz * N + s.tx;
+		for (const auto &dir : dirs) {
+			const double a = dir.second, ca = jsm::cos(a), sa = jsm::sin(a);
+			std::vector<int> tiles;
+			for (int dz = -14; dz <= 14; dz++)
+				for (int dx = -14; dx <= 14; dx++) {
+					const int x = s.tx + dx, z = s.tz + dz;
+					if (!map.in_tiles(x, z) || x < 1 || z < 1 || x >= N - 1 || z >= N - 1) continue;
+					const double r = std::sqrt((double)dx * dx + (double)dz * dz);
+					const double along = -dx * sa + dz * ca;  // tangential offset
+					const double out = dx * ca + dz * sa;     // radial, in the band's direction
+					if (out <= 0 || r < 8.5 || r > 13.5 || std::fabs(along) > 5) continue;
+					// ragged ends: thin the band's last tiles with a hash of the tile
+					if (std::fabs(along) > 3.5 && hash2(x, z, (int32_t)(seed & 0x7fffffff)) < 0.45) continue;
+					const size_t i = (size_t)z * N + x;
+					if (map.passable[i] != 1 || occupied[i] || near_node[i]) continue;
+					tiles.push_back((int)i);
+				}
+			if ((int)tiles.size() < WOOD_MIN) continue;
+			if ((int)tiles.size() > WOOD_MAX) {
+				// keep the ones nearest the band's middle circle (r = 11)
+				std::stable_sort(tiles.begin(), tiles.end(), [&](int i1, int i2) {
+					const double r1 = std::fabs(jsm::hypot(i1 % N - s.tx, i1 / N - s.tz) - 11), r2 = std::fabs(jsm::hypot(i2 % N - s.tx, i2 / N - s.tz) - 11);
+					return r1 < r2;
+				});
+				tiles.resize(WOOD_MAX);
+			}
+			const int before = flood(from);
+			if (!before) break;
+			for (int i : tiles) occupied[i] = 1;
+			const int after = flood(from);
+			if (after != before - (int)tiles.size()) {
+				for (int i : tiles) occupied[i] = 0; // it would wall something in: next direction
+				continue;
+			}
+			std::sort(tiles.begin(), tiles.end()); // row order, like the generator's own trees
+			for (int i : tiles) resources.push_back({ "tree", i % N, i / N, wr.int_(0, 9) });
+			placed_total += (int)tiles.size();
+			break;
+		}
+	}
+	return placed_total;
+}
+
 } // namespace
 
-MapGenResult generate_map(uint32_t seed, int size, const std::string &preset, int players) {
+MapGenResult generate_map(uint32_t seed, int size, const std::string &preset, int players, bool godot_passes) {
 	MapGenResult R;
 	R.map = GameMap(size, seed);
 	GameMap &map = R.map;
@@ -398,8 +510,10 @@ MapGenResult generate_map(uint32_t seed, int size, const std::string &preset, in
 				place("tree", tx, tz, 1, 1, var);
 			}
 		}
+	std::vector<double> forest_dir; // each start forest's direction (the woodline pass)
 	for (const Start &s : starts) {
 		double a0 = rng.range(0, PI * 2);
+		forest_dir.push_back(a0);
 		for (int k = 0; k < 90; k++) {
 			double a = a0 + rng.range(-0.7, 0.7);
 			double r = rng.range(16, 21);
@@ -419,9 +533,11 @@ MapGenResult generate_map(uint32_t seed, int size, const std::string &preset, in
 		if (!near_start(tx, tz, 22)) place("gold", tx, tz, 3, 3, 0);
 	}
 	// --- Godot-only from here on (the browser's generateMap stops above)
+	if (!godot_passes) return R;
 	const ConnectResult cr = connect_starts(map, starts, resources, occupied);
 	R.felled = cr.felled;
 	R.graded = cr.graded;
+	R.woodline = place_woodlines(map, seed, starts, forest_dir, resources, occupied);
 	return R;
 }
 

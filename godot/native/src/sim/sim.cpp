@@ -18,7 +18,7 @@ void Sim::new_game(uint32_t seed_, int map_size, const std::string &preset, int 
 	players[GAIA].init(GAIA, "Gaia", false);
 	players[PLAYER].init(PLAYER, "You", false);
 	players[ENEMY].init(ENEMY, "Enemy", true);
-	world = generate_map(seed_, map_size, preset, n_players);
+	world = generate_map(seed_, map_size, preset, n_players, godot_rules);
 	paths.reset();
 	pathfinder.init(&world.map, &prof);
 	movement.init(this);

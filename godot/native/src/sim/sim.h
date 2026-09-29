@@ -49,7 +49,8 @@ public:
 	// game loop stops ticking; tick() itself never checks it (fast-forward)
 	bool paused = false;
 	// Godot-only rules on top of the browser's game (the browser build is
-	// frozen): the enemy AI's god powers, the free villager (Economy::rescue).
+	// frozen): the map passes (connected starts, start woodlines; read by
+	// new_game), the enemy AI's god powers, the free villager (Economy::rescue).
 	// Off only for the parity tools (scripts/check-sim.mjs via simcheck.gd),
 	// which compare against the browser.
 	bool godot_rules = true;
