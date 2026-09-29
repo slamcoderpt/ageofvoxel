@@ -533,10 +533,21 @@ Buildings: `building_type_names()`, `get_building_def(key)`,
 `can_place(type, tx, tz)`, `place_building(type, owner, tx, tz, builder_ids)`
 -> id or 0 (placement.confirm: pay, foundation, builders ordered and told to
 resume their gather / worship afterwards), `destroy_building(id)`,
-`get_building(id)` (incl. `queue` [{type, t, total}], `rally`).
+`get_building(id)` (incl. `queue` [{type, t, total, free}], `rally`).
+
+**Free villager** (Godot-only rule, `Economy::rescue`, checked once a
+second for every player, AI included): a player who still owns a completed
+Town Center, has no living villager and none queued, and cannot afford one
+would be stuck for good, so that Town Center trains one villager for free
+(normal train time, at the head of its queue, population cap ignored) and
+emits `villager:free`; the HUD feeds "Your Town Center calls a new
+villager." to the local player. It cannot stack: the rule never fires while
+a villager is queued. Checked by
+`godot --headless --path godot -s res://game/core/softlock_check.gd -- --scene=skirmish`
+("SOFTLOCK ok|FAIL <step>", exit = failures).
 
 Economy: `train(building, unit_type)` / `advance_age(owner)` -> {ok,
-reason}, `cancel_train(building, index)`, `next_age_cost(owner)`,
+reason}, `cancel_train(building, index)` (a free villager refunds nothing), `next_age_cost(owner)`,
 `set_rally(building, x, z, target_id=0)`, `clear_rally(building)`,
 `nearest_resource(x, z, res_type, max_dist=14)` (grid index, same answer as
 the JS scan), `nearest_dropoff(owner, x, z, res_type)`, `spawn_herd(type,
@@ -583,7 +594,8 @@ owner = attacker's owner, amount = damage after bonus and armor, x, z),
 `building:placed`, `building:completed`, `unit:trained`, `age:advanced`,
 `resources:changed`, `godpower:cast` (owner, a = power index in
 `power_names()`, x, z), `command:smart` (other = target, a =
-unit count), `game:over` (owner = winner, a = loser, amount = time);
+unit count), `game:over` (owner = winner, a = loser, amount = time), `villager:free`
+(owner, id = the Town Center: see "Free villager" below);
 `set_record_events(on)`. C++ systems subscribe
 with `sim.events.on(EV_…, fn)`.
 

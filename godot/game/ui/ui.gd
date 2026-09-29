@@ -339,6 +339,9 @@ func _handle_events(events: Array) -> void:
 					var u: Dictionary = sim.get_unit(e.id)
 					if not u.is_empty():
 						batch.append(["%s trained." % _defs.get(u.type, {}).get("name", u.type), false])
+			"villager:free":
+				if int(e.owner) == me:
+					batch.append(["Your Town Center calls a new villager.", true])
 			"age:advanced":
 				if int(e.owner) == me:
 					batch.append(["You reached the %s Age!" % AGES[clampi(int(e.a), 0, 3)], true])
@@ -699,7 +702,7 @@ func _info_for() -> Dictionary:
 		var q: Array = e.get("queue", [])
 		for qi in q.size():
 			var it: Dictionary = q[qi]
-			d.queue.append({"i": qi, "tex": _portraits.unit(it.type, int(e.owner)), "name": _defs[it.type].name,
+			d.queue.append({"i": qi, "tex": _portraits.unit(it.type, int(e.owner)), "name": _defs[it.type].name + (" (free)" if bool(it.get("free", false)) else ""),
 				"p": float(it.t) / maxf(0.001, float(it.total)) if qi == 0 else 0.0})
 	else:
 		var r: Dictionary = sim.get_resources()

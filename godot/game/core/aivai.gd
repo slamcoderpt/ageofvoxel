@@ -2,8 +2,8 @@ extends SceneTree
 ## AI-vs-AI skirmish check: the real main scene (skirmish, every piece
 ## loaded), an EnemyAI for player 1 too, the sim stepped fast until Victory
 ## decides the match. Logs every attack wave (size, target, where its men
-## are over time, whether it reached the target) and every god power cast,
-## then one summary line:
+## are over time, whether it reached the target), every god power cast and
+## every free villager (Economy::rescue), then one summary line:
 ##
 ##   godot --headless --path godot -s res://game/core/aivai.gd -- --scene=skirmish --seed=5 [--minutes=60] [--quiet=1] [--verbose=1]
 ##
@@ -24,7 +24,6 @@ var waves := {}             # "owner:index" -> {owner, t, size, target, x, z, un
 var casts := {}             # owner -> {power: n}
 var free_vills := {}        # owner -> n
 var last_log := 0.0
-var trained := {}           # owner -> villagers trained
 
 func _initialize() -> void:
 	t0 = Time.get_ticks_msec()
@@ -64,6 +63,10 @@ func _read_events(sim: Object) -> void:
 				casts[o][pn] = int(casts[o].get(pn, 0)) + 1
 				if not quiet:
 					print("AIVAI t=%6.1f p%d casts %s at (%.1f, %.1f)" % [sim.get_time(), o, pn, e.x, e.z])
+			"villager:free":
+				free_vills[int(e.owner)] = int(free_vills.get(int(e.owner), 0)) + 1
+				if not quiet:
+					print("AIVAI t=%6.1f p%d: free villager (no villager left, food %d)" % [sim.get_time(), int(e.owner), int(sim.get_player(int(e.owner)).food)])
 
 func _track(sim: Object) -> void:
 	var u: Dictionary = sim.get_units()
@@ -158,7 +161,7 @@ func _finish(sim: Object, v: Dictionary) -> void:
 			launched += 1
 			sizes.append("%d%s(best %.0f)" % [w.size, "+" if w.arrived >= 0 else "-", w.best])
 			if w.arrived >= 0: arrived += 1
-		per[str(o)] = {"waves": launched, "arrived": arrived, "sizes": sizes, "casts": casts.get(o, {})}
+		per[str(o)] = {"waves": launched, "arrived": arrived, "sizes": sizes, "casts": casts.get(o, {}), "free_villagers": free_vills.get(o, 0)}
 	var res := {"seed": sim.get_seed(), "decided": bool(v.decided), "winner": int(v.get("winner", 0)), "time": float(sim.get_time()),
 		"errors": main.errors.size(), "wall_s": (Time.get_ticks_msec() - t0) / 1000.0, "players": per}
 	print("AIVAI_RESULT %s" % JSON.stringify(res))

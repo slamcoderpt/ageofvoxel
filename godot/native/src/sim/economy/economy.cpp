@@ -256,8 +256,53 @@ void Economy::cancel_train(int b, int i) {
 	BuildingStore &B = sim->entities.buildings;
 	if (b < 0 || B.removed[b] || i < 0 || i >= (int)B.queue[b].size()) return;
 	const int type = B.queue[b][i].type;
+	if (!B.queue[b][i].free) sim->players[B.owner[b]].refund(unit_def(type).cost);
 	B.queue[b].erase(B.queue[b].begin() + i);
-	sim->players[B.owner[b]].refund(unit_def(type).cost);
+}
+
+// Godot-only rule (no browser counterpart): a player who still owns a
+// completed Town Center but has no living villager, none in training and
+// not the food for one would be stuck for good (nothing gathers, nothing can
+// be trained). Their first completed Town Center then trains one villager
+// for free, at the normal train time, at the head of its queue; the
+// condition cannot hold again while that villager is queued, so free
+// villagers never stack. Checked once a second, for every player (AI too).
+void Economy::rescue() {
+	Entities &E = sim->entities;
+	const UnitStore &U = E.units;
+	BuildingStore &B = E.buildings;
+	bool has_villager[MAX_PLAYERS] = {};
+	int tc[MAX_PLAYERS];
+	for (int &t : tc) t = -1;
+	for (int r = 0; r < U.size(); r++)
+		if (!U.removed[r] && !U.dead[r] && U.type[r] == U_VILLAGER) has_villager[U.owner[r]] = true;
+	for (int b = 0; b < B.size(); b++) {
+		if (B.removed[b] || B.dead[b]) continue;
+		const int o = B.owner[b];
+		for (const TrainItem &q : B.queue[b])
+			if (q.type == U_VILLAGER) has_villager[o] = true;
+		if (tc[o] < 0 && B.type[b] == B_TOWN_CENTER && B.built[b]) tc[o] = b;
+	}
+	const UnitDef &vd = unit_def(U_VILLAGER);
+	for (int id = 1; id < MAX_PLAYERS; id++) {
+		Player &p = sim->players[id];
+		if (!p.exists || has_villager[id] || tc[id] < 0 || p.can_afford(vd.cost)) continue;
+		const int b = tc[id];
+		TrainItem it;
+		it.type = (uint8_t)U_VILLAGER;
+		it.total = vd.train_time;
+		it.free = true;
+		B.queue[b].insert(B.queue[b].begin(), it);
+		p.pop += vd.pop;
+		Event e;
+		e.type = EV_FREE_VILLAGER;
+		e.kind = K_BUILDING;
+		e.id = B.id[b];
+		e.owner = id;
+		e.x = B.x[b];
+		e.z = B.z[b];
+		sim->events.emit(e);
+	}
 }
 
 bool Economy::next_age_cost(int owner, Cost &out) const {
@@ -396,6 +441,7 @@ void Economy::update(double dt) {
 		}
 	}
 	recount();
+	if (sim->tick_count % 30 == 0) rescue();
 	// age advancement
 	for (int id = 0; id < MAX_PLAYERS; id++) {
 		Player &p = sim->players[id];

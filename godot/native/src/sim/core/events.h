@@ -14,6 +14,7 @@
 //   godpower:cast    EV_GODPOWER_CAST     owner, a = power id, x, z
 //   command:smart    EV_COMMAND_SMART     owner, other = target id, x, z, a = unit count
 //   game:over        EV_GAME_OVER         owner = winner, a = loser, amount = time
+//   villager:free    EV_FREE_VILLAGER     owner, id = the Town Center (Godot-only: Economy::rescue)
 #pragma once
 #include <cstdint>
 #include <functional>
@@ -24,13 +25,13 @@ namespace aov {
 enum EventType : uint8_t {
 	EV_ENTITY_ADDED, EV_ENTITY_REMOVED, EV_ENTITY_DIED, EV_UNIT_DAMAGED, EV_BUILDING_PLACED,
 	EV_BUILDING_COMPLETED, EV_UNIT_TRAINED, EV_AGE_ADVANCED, EV_RESOURCES_CHANGED, EV_GODPOWER_CAST,
-	EV_COMMAND_SMART, EV_GAME_OVER, EV_COUNT
+	EV_COMMAND_SMART, EV_GAME_OVER, EV_FREE_VILLAGER, EV_COUNT
 };
 
 inline const char *event_name(int t) {
 	static const char *names[] = { "entity:added", "entity:removed", "entity:died", "unit:damaged", "building:placed",
 		"building:completed", "unit:trained", "age:advanced", "resources:changed", "godpower:cast", "command:smart",
-		"game:over" };
+		"game:over", "villager:free" };
 	return t >= 0 && t < EV_COUNT ? names[t] : "?";
 }
 

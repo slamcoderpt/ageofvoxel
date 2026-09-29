@@ -871,6 +871,7 @@ Dictionary AovSim::get_building(int64_t id) const {
 		e["type"] = aov::unit_def(it.type).key;
 		e["t"] = it.t;
 		e["total"] = it.total;
+		e["free"] = it.free;
 		q.push_back(e);
 	}
 	d["queue"] = q;
