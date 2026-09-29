@@ -266,7 +266,9 @@ render feature off. Numbers next to the browser's: `../docs/godot-stress-report.
 
 Skirmish playtest (the whole match through real input events: box select,
 right-click gather, control groups, house placement, train, advance age,
-double-click, stop, camera zoom / turn / pan, a Bolt by hotkey + click, two
+double-click, stop, the god power hotkeys with villagers selected (no clash
+with a command key, the key in the tooltip, the "Not enough favor" message,
+targeting mode, Esc), camera zoom / turn / pan, a Bolt by hotkey + click, two
 minutes against the AI, the victory card and Play Again; ~12 min on lavapipe):
 
 ```
@@ -575,7 +577,10 @@ tilt, roll, lift, die time)}). `get_units()` also has `air` (3 each: airY,
 airRx, airRz), `stagger` (2: stagT, stagK), `melee_t`, `gp_hit_t`,
 `hit_time` (game times, -1 never), `kit` (255 unset).
 
-God powers: `power_names()` (lightning_storm, bolt, meteor),
+God powers: `power_names()` (lightning_storm, bolt, meteor; hotkeys Z / C
+/ V in their defs, Godot: the browser's X for Bolt is the Stop command, so
+it only worked with nothing selected; ui.gd checks the power keys first and
+shows them in the button tooltip and the gear's hotkeys card),
 `get_power_def(key)`, `can_cast(owner, key)` -> {ok, reason},
 `cast_power(owner, key, x, z)`, `power_cooldown(owner, key)`,
 `get_godpowers()` ({time, storms: 6 each (owner, x, z, t0, duration,

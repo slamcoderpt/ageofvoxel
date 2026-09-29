@@ -13,12 +13,13 @@ namespace aov {
 static const double PI = 3.141592653589793;
 
 const PowerDef &power_def(int id) {
+	// hotkeys Z / C / V (Godot: the browser's Bolt key X is the Stop command)
 	// clang-format off
 	static const PowerDef D[GP_COUNT] = {
 		{ "lightning_storm", "Lightning Storm", "Zeus", Cost(0, 0, 0, 40), 45, 7.5, 9, 0.3, 70, 1.8, 0, "Z",
 			"Calls down a whirling storm that strikes enemy units in the area with lightning and hurls them into the air." },
-		{ "bolt", "Bolt", "Zeus", Cost(0, 0, 0, 15), 12, 1.5, 0, 0, 400, 0, 0, "X", "A single bolt that slays one target." },
-		{ "meteor", "Meteor", "Hephaestus", Cost(0, 0, 0, 30), 30, 4.5, 0, 0, 260, 0, 1.8, "C",
+		{ "bolt", "Bolt", "Zeus", Cost(0, 0, 0, 15), 12, 1.5, 0, 0, 400, 0, 0, "C", "A single bolt that slays one target." },
+		{ "meteor", "Meteor", "Hephaestus", Cost(0, 0, 0, 30), 30, 4.5, 0, 0, 260, 0, 1.8, "V",
 			"A blazing meteor falls from the heavens, smashing units and buildings where it lands." },
 	};
 	// clang-format on

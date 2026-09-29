@@ -274,6 +274,36 @@ func _run() -> void:
 			idle += 1
 	_check("X stops the selection", idle == ui.selected.size(), "%d idle" % idle)
 
+	# god power hotkeys work with units selected (X is Stop there): a real key
+	# event, the same "can't cast" message as the button, then targeting mode
+	var storm_key := str(sim.get_power_def("lightning_storm").get("hotkey", ""))
+	var used := {"X": true, "H": true}
+	for c in ui.commands:
+		if c != null: used[str(c.key)] = true
+	var clash := []
+	for pn in sim.power_names():
+		var k := str(sim.get_power_def(pn).get("hotkey", ""))
+		if k == "" or used.has(k): clash.append("%s:%s" % [pn, k])
+	_check("power hotkeys clash with no command", clash.is_empty(), str(clash))
+	var tip := ""
+	for z in ui._back.zones + ui._front.zones:
+		if z.id == "power" and str(z.arg) == "lightning_storm":
+			tip = str(z.tip.get("hotkey", ""))
+	_check("power tooltip shows its hotkey", tip == storm_key and tip != "", "'%s'" % tip)
+	var n_sel: int = ui.selected.size()
+	var fav0 := float(sim.get_player(1).favor)
+	sim.set_player_resources(1, {"favor": 0.0})
+	await _frames(15)
+	await _key(OS.find_keycode_from_string(storm_key))
+	_check("power hotkey without favor: the button's message", str(ui._mode.get("kind", "")) == "" and ui.msg_text == "Not enough favor", "'%s'" % ui.msg_text)
+	sim.set_player_resources(1, {"favor": maxf(fav0, 60.0)})
+	await _frames(15)
+	await _key(OS.find_keycode_from_string(storm_key))
+	_check("%s enters Lightning Storm targeting" % storm_key, str(ui._mode.get("kind", "")) == "power" and str(ui._mode.get("id", "")) == "lightning_storm"
+		and ui.selected.size() == n_sel, "mode %s, %d selected" % [ui._mode, ui.selected.size()])
+	await _key(KEY_ESCAPE)
+	_check("Esc leaves targeting", ui._mode.is_empty())
+
 	# camera: wheel zoom, [ turn, middle-drag pan, Home resets
 	var d0: float = cam.distance
 	await _button(root.get_visible_rect().get_center(), MOUSE_BUTTON_WHEEL_UP, true)

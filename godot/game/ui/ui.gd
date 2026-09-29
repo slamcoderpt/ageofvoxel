@@ -1050,6 +1050,7 @@ func _click_zone(id: String, arg) -> void:
 			if not p.can:
 				message(p.reason)
 				return
+			_cancel_mode()  # (drops a building ghost still on the cursor)
 			_mode = {"kind": "power", "id": arg}
 			message("%s: choose a target" % p.def.name)
 			_hud_t = 0.0
@@ -1313,17 +1314,20 @@ func _key(e: InputEventKey) -> void:
 	var ch := OS.get_keycode_string(kc).to_upper()
 	if ch.length() != 1:
 		return
+	# god power hotkeys (Z / C / V, from the power defs): letters no command
+	# grid slot uses (units Q/W/E/R/T, buildings T/E/S/F/R/B, A age, X stop),
+	# so they work whatever is selected; same path as clicking the button
+	for p in powers:
+		if str(p.def.get("hotkey", "")) == ch:
+			_click_zone("power", p.key)
+			get_viewport().set_input_as_handled()
+			return
 	for c in commands:
 		if c != null and c.key == ch:
 			if c.enabled:
 				_run_command(c)
 			else:
 				message(c.get("warn", "") if c.get("warn", "") != "" else "Cannot do that yet")
-			return
-	# god power hotkeys (Z / X / C) when the key is free
-	for p in powers:
-		if str(p.def.get("hotkey", "")) == ch:
-			_click_zone("power", p.key)
 			return
 
 func _recall_group(k: String, add: bool, center: bool) -> void:
