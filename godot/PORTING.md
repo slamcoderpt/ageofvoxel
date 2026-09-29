@@ -32,7 +32,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | lighting | `game/lighting/lighting.gd` (sun + PCSS soft shadows, hemisphere = ambient colour + two unshadowed up/down lights, fill, depth haze following the camera, SSAO, MSAA, `--quality=high\|medium\|low`, `--post=high\|low\|off`), `grade_effect.gd` (CompositorEffect compute pass on the HDR buffer: exposure 2.1 + PBR Neutral + the PostFX.js grade; Godot's tonemap is LINEAR; Compatibility/web falls back to AgX), `sky.gdshader`. MaterialPatches.js canopy / foliage terms not ported yet | none | `src/lighting/` |
 | buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
 | units | `game/units/units.gd` (rigs posed by the full anim.js port, conditional parts, crowd yaw / press / jitter, deaths and corpses, contact shadows), `unit.gdshader` (team lift + rim, hit flash, corpse drain, dithered fade) + `unit_outline.gdshader` (inverted hull, next pass); posing in C++: `native/src/unit_view.cpp` (`AovUnitView`) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
-| combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported) | `src/combat/` |
+| combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported, plus god powers and a wave log, Godot-only) | `src/combat/` |
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor; Godot-only activity fx: axe / pick chips and dust, sickle chaff, stooks on cut rows, hoof dust, shoal ripples, fish splashes, net ripples, boat wakes; crops sway, `econ_voxel.gdshader`, `fx_chip / fx_puff / fx_ring.gdshader`), buffers built in C++ by `AovEconView` (`native/src/econ_view.{h,cpp}`, render side, reads the sim, never writes it) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
 | godpowers | `game/godpowers/godpowers.gd` (the whole BoltRenderer of effects.js: bolt / sky / zap ribbons, impact flash sprites and decals, scorches with ember cracks (hot orange / red, glowing as long as the scorch lasts), a charcoal ash edge and a hot rim, an expanding impact ring at every strike point (Godot-only; decals are pulled toward the camera so voxel bumps do not swallow them), crater debris, char rims, spark streaks, smoke and flames, the storm funnel (wall, cloud body, dust wall, ground shockwave, rain, energy bands, whirled debris), flyer trails / back lights / drop shadows, meteor fireball and fire, strike / storm point lights and the shadow spot, the full-frame storm grade with light pools; dims the lighting piece's sun / sky / grade while a storm plays), shaders beside it; buffers built in C++ by `AovGodpowerView` (`native/src/godpower_view.{h,cpp}`, render side, reads the sim, never writes it) | `godpowers/` (favor, cooldowns, Lightning Storm, Bolt, Meteor, thrown units: ported) | `src/godpowers/` |
 | ui (HUD, selection, input) | `game/ui/ui.gd` (selection, box / double-click select, smart orders, rally points, control groups, hotkeys, placement ghost, god-power targeting ring, move markers, selection rings (one MultiMesh) + bars, event feed, messages, result card; public: `pieces.ui.selected`, `hover_entity`, `message()`, `feed()`), `hud.gd` (the drawn HUD, two layers with hit zones), `hud_style.gd` (palette, Cinzel / Alegreya fonts in `fonts/`, SVG icons from `icons.gd` = `src/ui/icons.js` rasterised at runtime, draw helpers), `panel.gdshader` (the gilded teal panels), `minimap.gd` + `minimap_ground/units.gdshader` (terrain colours computed in the shader from `get_heights()` / `get_ground()` uploaded as textures, re-uploaded on `building:placed`; unit dots read straight from `get_units()` arrays as data textures: no per-unit script), `portraits.gd` + `portrait.gdshader` (one SubViewport per type / owner, rendered once, unshaded with the browser's three.js hemisphere + sun lighting, no tonemap) | none | `src/ui/` |
@@ -240,7 +240,12 @@ game), 0.12 ms/tick; 16.7 neighbours visited per hash query (23.1 at 4000:
 the armies get denser on the fixed map, hence 2.7x from 2000 to 4000, as in
 the browser). The separation loops read the hash's position mirror
 (`SpatialHash::for_each_near_xz`, kept exact with `sync()` / `moved()`).
-Wall times on this shared machine vary by +-30 %; the render numbers and
+Wall times on this shared machine vary by +-30 %. Since the enemy AI casts
+god powers, every seat's storms and meteors thin the stress armies (2000
+units: about 1340 alive on average over the recorded ticks instead of 1926,
+0.75 ms/tick mean); `--params "godot_rules=0"` (the browser's map and rules)
+gives the workload of the table above (1.06-1.09 ms/tick mean on this
+machine today). The render numbers and
 their method are in `../docs/godot-stress-report.md`.
 
 Render bench (xvfb + lavapipe, the counterpart of `scripts/bench.mjs`;
@@ -262,7 +267,9 @@ render feature off. Numbers next to the browser's: `../docs/godot-stress-report.
 
 Skirmish playtest (the whole match through real input events: box select,
 right-click gather, control groups, house placement, train, advance age,
-double-click, stop, camera zoom / turn / pan, a Bolt by hotkey + click, two
+double-click, stop, the god power hotkeys with villagers selected (no clash
+with a command key, the key in the tooltip, the "Not enough favor" message,
+targeting mode, Esc), camera zoom / turn / pan, a Bolt by hotkey + click, two
 minutes against the AI, the victory card and Play Again; ~12 min on lavapipe):
 
 ```
@@ -271,12 +278,30 @@ VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 
   -s res://game/core/playtest.gd -- --scene=skirmish     # "PLAYTEST ok|FAIL <step>", exit = failures
 ```
 
+AI-vs-AI skirmish (the real main scene headless, an EnemyAI for player 1 as
+well, the sim stepped 15 ticks per frame until Victory decides; ~20 s):
+
+```
+godot --headless --path godot -s res://game/core/aivai.gd -- --scene=skirmish --seed=5 [--minutes=60] [--quiet=1] [--verbose=1]
+```
+
+It logs every attack wave (`AovSim.get_ai(owner).waves`: launch time,
+target building, the men sent), where its men are every 20 s and when half
+of the survivors are within 16 tiles of the target ("ARRIVED"), every god
+power cast, and ends with `AIVAI_RESULT {json}` (match length, winner, per
+player waves / arrived / sizes / casts); exit 0 when the match was decided
+with no script error.
+
 Other tools:
 
 ```
-node scripts/check-mapgen.mjs            # C++ vs JS generateMap() for every scene's seed/preset: heights, ground,
-                                         # passability, walkable after resources, resources, starts (all "ok")
-node scripts/check-sim.mjs [--only a,b]  # C++ sim vs the JS modules: scenarios (skirmish 3, town 7, battle 19, coast 5,
+node scripts/check-mapgen.mjs            # per scene seed/preset (+ stress 2-6 players, 3 split skirmish seeds):
+                                         # 1. the C++ generator with the Godot passes off vs JS generateMap(): heights,
+                                         #    ground, passability, walkable after resources, resources, starts (exact);
+                                         # 2. the game's map (NOT the browser's: woodlines, connected starts): >= 16 trees
+                                         #    8-14 tiles from every Town Center, every start and nearby mine / bush
+                                         #    reachable, terrain changed only where graded (all "ok")
+node scripts/check-sim.mjs [--only a,b]  # C++ sim (with set_godot_rules(false): the browser's map and rules) vs the JS modules: scenarios (skirmish 3, town 7, battle 19, coast 5,
                                          # stress 2000 and 4200 units; the town / economy / coast / hud / battle /
                                          # godpower / stress scene setups, econ-ops: placement, training, age, destroy,
                                          # skirmish-ai: 5 min of the enemy AI, combat-ops: attack orders, Town Center
@@ -326,8 +351,25 @@ marches them onto each other, e.g.
   functions from `core/jsmath.h`**: `jsm::atan2 / sin / cos / atan` (V8's
   fdlibm) and `jsm::hypot` (V8's scaled sum). glibc's differ in the last bit
   for 3-17 % of inputs, enough to make a battle drift. Iterate entities in
-  row order (= id order = JS Map order). `generate_map` and the whole core
-  (entities, units update / spread, pathfinding, movement, commands) are
+  row order (= id order = JS Map order). `generate_map` runs the browser's
+  generator bit for bit and then Godot-only passes (the browser build is
+  frozen, so the Godot map may now differ from it): **every start is
+  connected on foot to the others** (`connect_starts` in `game_map.cpp`:
+  when the forest noise closes a band of trees across the map or a lake cuts
+  it in two, the cheapest route is cleared, a lane three trees wide, and
+  water / cliffs on it are graded into a causeway or ramp; 5 of the first 40
+  skirmish seeds needed it, none of the scenes' seeds do), and **every start
+  gets a woodline** (`place_woodlines`: 28 trees in a band about 10 tiles
+  along, their centres 8.5-13.5 tiles from the Town Center's centre, in the
+  direction nearest the start forest's that keeps 50 degrees clear of the
+  start gold and berries and 40 of the Town Center's south door; open ground
+  only, a tile gap round mines and bushes, and a flood fill rejects a band
+  that would cut any tile off; its own RNG, so the rest of the map is
+  untouched). The planned towns (`layout_town`: town, hud, coast, stress)
+  clear trees from their streets and lots, so there the plan decides what is
+  left of it. `AovSim.get_mapgen_info()` = {felled, graded, woodline};
+  `set_godot_rules(false)` before `new_game` gives the browser's map. The whole core
+  (entities, units update / spread, pathfinding, movement, commands) is
   bit-exact with the browser (`check-mapgen.mjs`, `check-sim.mjs`); extend
   `check-sim.mjs` with your system's scenario when you port one. `Math.pow`
   (and `**`) is `jsm::pow`: V8's fdlibm pow with its own quirk, glibc's
@@ -512,10 +554,21 @@ Buildings: `building_type_names()`, `get_building_def(key)`,
 `can_place(type, tx, tz)`, `place_building(type, owner, tx, tz, builder_ids)`
 -> id or 0 (placement.confirm: pay, foundation, builders ordered and told to
 resume their gather / worship afterwards), `destroy_building(id)`,
-`get_building(id)` (incl. `queue` [{type, t, total}], `rally`).
+`get_building(id)` (incl. `queue` [{type, t, total, free}], `rally`).
+
+**Free villager** (Godot-only rule, `Economy::rescue`, checked once a
+second for every player, AI included): a player who still owns a completed
+Town Center, has no living villager and none queued, and cannot afford one
+would be stuck for good, so that Town Center trains one villager for free
+(normal train time, at the head of its queue, population cap ignored) and
+emits `villager:free`; the HUD feeds "Your Town Center calls a new
+villager." to the local player. It cannot stack: the rule never fires while
+a villager is queued. Checked by
+`godot --headless --path godot -s res://game/core/softlock_check.gd -- --scene=skirmish`
+("SOFTLOCK ok|FAIL <step>", exit = failures).
 
 Economy: `train(building, unit_type)` / `advance_age(owner)` -> {ok,
-reason}, `cancel_train(building, index)`, `next_age_cost(owner)`,
+reason}, `cancel_train(building, index)` (a free villager refunds nothing), `next_age_cost(owner)`,
 `set_rally(building, x, z, target_id=0)`, `clear_rally(building)`,
 `nearest_resource(x, z, res_type, max_dist=14)` (grid index, same answer as
 the JS scan), `nearest_dropoff(owner, x, z, res_type)`, `spawn_herd(type,
@@ -528,8 +581,9 @@ Scenes: `has_scene_setup(name)`, `setup_scene(name, opts={units})` ->
 Combat: `kill_unit(id, killer=0)` (combat.kill), `damage(target, amount,
 attacker=0)`, `order(id, {type: "attack", target, auto, then_buildings})`,
 `set_unit_combat(id, {leash, reach, kit, line: {cx, cz, nx, nz, d0} | null})`,
-`set_ai_enabled(on)` (the ENEMY's EnemyAI), `add_ai(owner)`, `get_ai(owner)` /
-`set_ai(owner, {enabled, next_wave_at, wave_size, aggression})`,
+`set_ai_enabled(on)` (the ENEMY's EnemyAI), `add_ai(owner)`, `get_ai(owner)`
+({enabled, wave_size, next_wave_at, aggression, waves: [{t, target, x, z,
+units}], casts: {power: n}}) / `set_ai(owner, {enabled, next_wave_at, wave_size, aggression})`,
 `get_combat()` ({projectiles: 16 floats each (x, y, z, px, py, pz, sx, sy,
 sz, tx, ty, tz, t, dur, arc, dist), projectile_info: 2 ints (target, has
 target pos), stuck: 7 (x, y, z, dx, dy, dz, t), scars: 5 (x, z, radius,
@@ -538,7 +592,10 @@ tilt, roll, lift, die time)}). `get_units()` also has `air` (3 each: airY,
 airRx, airRz), `stagger` (2: stagT, stagK), `melee_t`, `gp_hit_t`,
 `hit_time` (game times, -1 never), `kit` (255 unset).
 
-God powers: `power_names()` (lightning_storm, bolt, meteor),
+God powers: `power_names()` (lightning_storm, bolt, meteor; hotkeys Z / C
+/ V in their defs, Godot: the browser's X for Bolt is the Stop command, so
+it only worked with nothing selected; ui.gd checks the power keys first and
+shows them in the button tooltip and the gear's hotkeys card),
 `get_power_def(key)`, `can_cast(owner, key)` -> {ok, reason},
 `cast_power(owner, key, x, z)`, `power_cooldown(owner, key)`,
 `get_godpowers()` ({time, storms: 6 each (owner, x, z, t0, duration,
@@ -546,6 +603,23 @@ radius), bolts: 6 (x, y, z, t0, life, sky) + bolt_seeds, scorches: 6 (x, y,
 z, t0, size, blast) + scorch_seeds, zaps: 5 (x, y, z, t0, life) + zap_units
 (id, seed), meteors: 9 (owner, x, z, t0, delay, radius, sx, sy, sz), fires:
 6 (x, y, z, r, t0, dur)}).
+
+**Enemy AI god powers** (Godot-only, `EnemyAI::use_powers`): every 2 s each
+AI player looks at the enemy units within 12 tiles of one of its soldiers
+or 16 of one of its buildings and casts through the same
+`GodPowers::can_cast` / `cast` as the HUD (favor and cooldowns exactly as
+for the player): a Lightning Storm on the densest cluster if it catches at
+least 6 men (counted within the storm's strike radius, 0.78 x 7.5), else a
+Meteor on a clump of at least 2 enemy buildings next to its army or on 8+
+men, else a Bolt on a myth unit or hero (a plain soldier only with 70+
+favor to spare; never a villager). No random draws: ties go to the first
+candidate in row order. The HUD feeds "<name> uses the <power> God Power!"
+when an enemy casts.
+
+`set_godot_rules(on)` (default on, kept across `new_game`): off = the
+browser's rules only (no AI god powers, no free villager); `simcheck.gd`
+turns it off for `check-sim.mjs`, and `--godot_rules=0` does it for a run
+(A/B benches: the AI's storms thin the stress armies, so its numbers move).
 
 Fog of war (player 1) and victory: `set_fog_reveal_all(on)`,
 `fog_recompute()`, `get_fog()` (size*size bytes: 0 unexplored, 128
@@ -561,7 +635,8 @@ owner = attacker's owner, amount = damage after bonus and armor, x, z),
 `building:placed`, `building:completed`, `unit:trained`, `age:advanced`,
 `resources:changed`, `godpower:cast` (owner, a = power index in
 `power_names()`, x, z), `command:smart` (other = target, a =
-unit count), `game:over` (owner = winner, a = loser, amount = time);
+unit count), `game:over` (owner = winner, a = loser, amount = time), `villager:free`
+(owner, id = the Town Center: see "Free villager" below);
 `set_record_events(on)`. C++ systems subscribe
 with `sim.events.on(EV_…, fn)`.
 
@@ -684,3 +759,10 @@ Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
   table and "AovSim API". Godot-only: a lavender veil round the bolts and
   the contact stands in for the browser's bloom pass (this renderer has
   none); the storm floor is a touch brighter. Not fog-aware yet.
+- Done (group 0, Godot-only gameplay; the browser is frozen, so these break
+  parity on purpose and `set_godot_rules(false)` switches them off for the
+  parity tools): every start connected on foot (split maps stalled the AI's
+  attack waves for good), a start woodline 8-14 tiles from every Town
+  Center, the free villager, the enemy AI's god powers, god power hotkeys
+  Z / C / V. Checks: `aivai.gd`, `softlock_check.gd`, `playtest.gd`,
+  `check-mapgen.mjs`.

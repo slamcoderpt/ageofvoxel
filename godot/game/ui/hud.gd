@@ -220,7 +220,7 @@ func _draw_power(r: Rect2, p: Dictionary) -> void:
 			draw_rect(r.grow(1.0 + k * 2.0), Color(0.62, 0.82, 1.0, 0.35 - k * 0.1), false, 2.0)
 	var def: Dictionary = p.def
 	zone(r, "power", p.key, {"title": def.get("name", ""), "sub": "(%s)" % def.get("god", ""), "lines": [def.get("desc", "")],
-		"cost": {"favor": def.get("favor", 0)}, "hotkey": "", "warn": "" if ok else p.reason})
+		"cost": {"favor": def.get("favor", 0)}, "hotkey": str(def.get("hotkey", "")), "warn": "" if ok else p.reason})
 
 func _conic_ring(c: Vector2, r0: float, r1: float, stops: Array, a0 := 0.0, a1 := TAU, n := 72) -> void:
 	for k in n:
@@ -275,6 +275,15 @@ func _draw_medal(st: Dictionary) -> void:
 
 # top right --------------------------------------------------------------------------
 
+## "Z storm  ·  C bolt  ·  V meteor" (god power hotkeys, from the power defs)
+func _power_keys_line() -> String:
+	var parts := []
+	for p in ui.powers:
+		var k := str(p.def.get("hotkey", ""))
+		if k != "":
+			parts.append("%s %s" % [k, str(p.def.get("name", p.key)).split(" ")[-1].to_lower()])
+	return "  ·  ".join(parts) + " (god powers)"
+
 func _draw_topright() -> void:
 	var r := menubar_rect()
 	var bx := r.position.x + 3 + 22 + 4
@@ -282,7 +291,8 @@ func _draw_topright() -> void:
 		["speed", "fast", {"title": "Game Speed", "lines": ["Toggle normal / fast"]}],
 		["pause", "play" if ui.user_paused else "pause", {"title": "Pause", "lines": ["Pause or resume the game"]}],
 		["obj", "scroll", {"title": "Objectives", "lines": ["Destroy the enemy Town Center"]}],
-		["menu", "gear", {"title": "Hotkeys", "lines": [". idle villager  ·  H Town Center", "Ctrl+1..9 assign group  ·  1..9 recall", "Q/E/F/S/R/B build  ·  X stop"]}],
+		["menu", "gear", {"title": "Hotkeys", "lines": [". idle villager  ·  H Town Center", "Ctrl+1..9 assign group  ·  1..9 recall", "Q/E/F/S/R/B build  ·  X stop",
+			_power_keys_line()]}],
 	]
 	for i in btns.size():
 		var c := Vector2(bx + 15 + i * 42, 4 + 4 + 15)

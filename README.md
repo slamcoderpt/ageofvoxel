@@ -164,7 +164,10 @@ workflow) and download the `aov-godot-*` artifacts from its Summary page
 (signed-in GitHub users only; they are kept 90 days). The Linux binary loses its
 executable bit in the artifact zip: `chmod +x AgeOfVoxel.x86_64` after unzipping.
 
-The controls are the browser's. **F3** shows the performance meter; the gear (top right) opens the
+The controls are the browser's, plus god power hotkeys that work whatever is selected: **Z** Lightning
+Storm, **C** Bolt, **V** Meteor (then click the target; Esc cancels). A player left with no villager, none in training and less food
+than one costs is never stuck: their Town Center trains one villager for free (the AI's too).
+**F3** shows the performance meter; the gear (top right) opens the
 hotkeys card with the **Graphics** row: High / Medium / Low, where Medium and Low also render the 3D
 world at 75% / 60% resolution (FSR upscale), the big saving on Retina screens. Both choices are
 remembered (`user://settings.cfg`).

@@ -339,13 +339,18 @@ func _handle_events(events: Array) -> void:
 					var u: Dictionary = sim.get_unit(e.id)
 					if not u.is_empty():
 						batch.append(["%s trained." % _defs.get(u.type, {}).get("name", u.type), false])
+			"villager:free":
+				if int(e.owner) == me:
+					batch.append(["Your Town Center calls a new villager.", true])
 			"age:advanced":
 				if int(e.owner) == me:
 					batch.append(["You reached the %s Age!" % AGES[clampi(int(e.a), 0, 3)], true])
 			"godpower:cast":
+				var pn: String = sim.power_names()[clampi(int(e.a), 0, 2)]
 				if int(e.owner) == me:
-					var pn: String = sim.power_names()[clampi(int(e.a), 0, 2)]
 					batch.append(["You use the %s God Power!" % _pdefs[pn].name, true])
+				elif sim.is_enemy(me, int(e.owner)):
+					batch.append(["%s uses the %s God Power!" % [str(sim.get_player(int(e.owner)).get("name", "The enemy")), _pdefs[pn].name], false])
 			"game:over":
 				_show_result(int(e.owner), float(e.amount))
 	# notices from a fast-forward arrive together: keep the latest of a kind
@@ -699,7 +704,7 @@ func _info_for() -> Dictionary:
 		var q: Array = e.get("queue", [])
 		for qi in q.size():
 			var it: Dictionary = q[qi]
-			d.queue.append({"i": qi, "tex": _portraits.unit(it.type, int(e.owner)), "name": _defs[it.type].name,
+			d.queue.append({"i": qi, "tex": _portraits.unit(it.type, int(e.owner)), "name": _defs[it.type].name + (" (free)" if bool(it.get("free", false)) else ""),
 				"p": float(it.t) / maxf(0.001, float(it.total)) if qi == 0 else 0.0})
 	else:
 		var r: Dictionary = sim.get_resources()
@@ -1045,6 +1050,7 @@ func _click_zone(id: String, arg) -> void:
 			if not p.can:
 				message(p.reason)
 				return
+			_cancel_mode()  # (drops a building ghost still on the cursor)
 			_mode = {"kind": "power", "id": arg}
 			message("%s: choose a target" % p.def.name)
 			_hud_t = 0.0
@@ -1308,17 +1314,20 @@ func _key(e: InputEventKey) -> void:
 	var ch := OS.get_keycode_string(kc).to_upper()
 	if ch.length() != 1:
 		return
+	# god power hotkeys (Z / C / V, from the power defs): letters no command
+	# grid slot uses (units Q/W/E/R/T, buildings T/E/S/F/R/B, A age, X stop),
+	# so they work whatever is selected; same path as clicking the button
+	for p in powers:
+		if str(p.def.get("hotkey", "")) == ch:
+			_click_zone("power", p.key)
+			get_viewport().set_input_as_handled()
+			return
 	for c in commands:
 		if c != null and c.key == ch:
 			if c.enabled:
 				_run_command(c)
 			else:
 				message(c.get("warn", "") if c.get("warn", "") != "" else "Cannot do that yet")
-			return
-	# god power hotkeys (Z / X / C) when the key is free
-	for p in powers:
-		if str(p.def.get("hotkey", "")) == ch:
-			_click_zone("power", p.key)
 			return
 
 func _recall_group(k: String, add: bool, center: bool) -> void:

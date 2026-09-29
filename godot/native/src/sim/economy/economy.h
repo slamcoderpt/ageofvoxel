@@ -124,6 +124,7 @@ public:
 	// public API (economy.train / cancelTrain / advanceAge / nextAgeCost)
 	Result train(int brow, int unit_type);
 	void cancel_train(int brow, int index);
+	void rescue(); // the free villager of a player left with none (see economy.cpp)
 	Result advance_age(int owner);
 	bool next_age_cost(int owner, Cost &out) const;
 	void recount();

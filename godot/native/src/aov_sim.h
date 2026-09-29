@@ -50,6 +50,7 @@ public:
 	double smooth_height_at(double x, double z) const { return sim_.world.map.smooth_height_at(x, z); }
 	Array get_starts() const;              // [{owner, tx, tz}]
 	Array get_resource_spawns() const;     // [{type, tx, tz, variant}]
+	Dictionary get_mapgen_info() const;    // the Godot-only map passes: {felled, graded, woodline}
 	PackedInt32Array take_map_changes();   // dirty column rects (cx0,cz0,cx1,cz1)*, cleared on read
 	int64_t map_hash() const;
 	// Terrain piece (terrain_mesher.cpp, TerrainMesh.js): mesh of a column rect
@@ -147,6 +148,10 @@ public:
 	bool is_explored(double x, double z) const { return sim_.fog.is_explored(x, z); }
 	bool is_visible(double x, double z) const { return sim_.fog.is_visible(x, z); }
 	void set_victory_enabled(bool on) { sim_.victory.enabled = on; }
+	// Godot-only rules (AI god powers, free villager; see Sim::godot_rules).
+	// Kept across new_game(); the parity tools turn them off.
+	void set_godot_rules(bool on) { sim_.godot_rules = on; }
+	bool get_godot_rules() const { return sim_.godot_rules; }
 	Dictionary get_victory() const;   // {decided, winner, loser, time}
 	bool is_paused() const { return sim_.paused; }
 	void set_paused(bool on) { sim_.paused = on; }

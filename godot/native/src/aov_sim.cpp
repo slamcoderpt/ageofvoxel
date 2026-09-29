@@ -24,6 +24,7 @@ void AovSim::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("smooth_height_at", "x", "z"), &AovSim::smooth_height_at);
 	ClassDB::bind_method(D_METHOD("get_starts"), &AovSim::get_starts);
 	ClassDB::bind_method(D_METHOD("get_resource_spawns"), &AovSim::get_resource_spawns);
+	ClassDB::bind_method(D_METHOD("get_mapgen_info"), &AovSim::get_mapgen_info);
 	ClassDB::bind_method(D_METHOD("take_map_changes"), &AovSim::take_map_changes);
 	ClassDB::bind_method(D_METHOD("map_hash"), &AovSim::map_hash);
 	ClassDB::bind_method(D_METHOD("set_profiling", "on"), &AovSim::set_profiling);
@@ -123,6 +124,8 @@ void AovSim::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_explored", "x", "z"), &AovSim::is_explored);
 	ClassDB::bind_method(D_METHOD("is_visible", "x", "z"), &AovSim::is_visible);
 	ClassDB::bind_method(D_METHOD("set_victory_enabled", "on"), &AovSim::set_victory_enabled);
+	ClassDB::bind_method(D_METHOD("set_godot_rules", "on"), &AovSim::set_godot_rules);
+	ClassDB::bind_method(D_METHOD("get_godot_rules"), &AovSim::get_godot_rules);
 	ClassDB::bind_method(D_METHOD("get_victory"), &AovSim::get_victory);
 	ClassDB::bind_method(D_METHOD("is_paused"), &AovSim::is_paused);
 	ClassDB::bind_method(D_METHOD("set_paused", "on"), &AovSim::set_paused);
@@ -171,6 +174,14 @@ Array AovSim::get_starts() const {
 		out.push_back(d);
 	}
 	return out;
+}
+
+Dictionary AovSim::get_mapgen_info() const {
+	Dictionary d;
+	d["felled"] = sim_.world.felled;
+	d["graded"] = sim_.world.graded;
+	d["woodline"] = sim_.world.woodline;
+	return d;
 }
 
 Array AovSim::get_resource_spawns() const {
@@ -871,6 +882,7 @@ Dictionary AovSim::get_building(int64_t id) const {
 		e["type"] = aov::unit_def(it.type).key;
 		e["t"] = it.t;
 		e["total"] = it.total;
+		e["free"] = it.free;
 		q.push_back(e);
 	}
 	d["queue"] = q;
@@ -1166,6 +1178,22 @@ Dictionary AovSim::get_ai(int64_t owner) const {
 		d["wave_size"] = ai.wave_size;
 		d["next_wave_at"] = ai.next_wave_at;
 		d["aggression"] = ai.aggression;
+		Array waves;
+		for (const aov::WaveLog &w : ai.waves) {
+			Dictionary wd;
+			wd["t"] = w.t;
+			wd["target"] = w.target;
+			wd["x"] = w.tx;
+			wd["z"] = w.tz;
+			PackedInt32Array ids;
+			for (int32_t id : w.units) ids.push_back(id);
+			wd["units"] = ids;
+			waves.push_back(wd);
+		}
+		d["waves"] = waves;
+		Dictionary casts;
+		for (int k = 0; k < aov::GP_COUNT; k++) casts[aov::power_def(k).key] = ai.casts[k];
+		d["casts"] = casts;
 		break;
 	}
 	return d;

@@ -1,6 +1,9 @@
 // The map: a heightfield of terrain columns (VOXEL wide) plus a coarser tile
 // grid (TILE wide, 2x2 columns). Port of src/core/GameMap.js; generate_map()
-// is bit-exact with generateMap() (checked by scripts/check-mapgen.mjs).
+// runs the browser's generateMap() bit for bit, then Godot-only passes (the
+// browser build is frozen): every start connected on foot to the others and
+// a woodline 8-14 tiles from every Town Center (scripts/check-mapgen.mjs
+// compares the first part with the JS and checks the passes).
 #pragma once
 #include <cstdint>
 #include <string>
@@ -61,10 +64,16 @@ struct MapGenResult {
 	GameMap map;
 	std::vector<Start> starts;
 	std::vector<ResourceSpawn> resources;
+	// Godot-only passes (see generate_map): trees felled / tiles graded to
+	// connect the starts (0 on a map that was already connected)
+	int felled = 0, graded = 0;
+	int woodline = 0; // trees of the start woodlines (appended after the generator's resources)
 };
 
 std::vector<Front> stress_fronts(const std::vector<Start> &starts);
-// preset: skirmish | battle | coast | stress | (anything else: plain)
-MapGenResult generate_map(uint32_t seed = 1, int size = 128, const std::string &preset = "skirmish", int players = 2);
+// preset: skirmish | battle | coast | stress | (anything else: plain).
+// godot_passes = false: the browser's generateMap() only (bit-exact, for
+// scripts/check-mapgen.mjs / check-sim.mjs).
+MapGenResult generate_map(uint32_t seed = 1, int size = 128, const std::string &preset = "skirmish", int players = 2, bool godot_passes = true);
 
 } // namespace aov
