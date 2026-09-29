@@ -1,6 +1,8 @@
 // The map: a heightfield of terrain columns (VOXEL wide) plus a coarser tile
 // grid (TILE wide, 2x2 columns). Port of src/core/GameMap.js; generate_map()
-// is bit-exact with generateMap() (checked by scripts/check-mapgen.mjs).
+// runs the browser's generateMap() bit for bit, then Godot-only passes (the
+// browser build is frozen): every start connected on foot to the others
+// (see scripts/check-mapgen.mjs for what is still compared).
 #pragma once
 #include <cstdint>
 #include <string>
@@ -61,6 +63,9 @@ struct MapGenResult {
 	GameMap map;
 	std::vector<Start> starts;
 	std::vector<ResourceSpawn> resources;
+	// Godot-only passes (see generate_map): trees felled / tiles graded to
+	// connect the starts (0 on a map that was already connected)
+	int felled = 0, graded = 0;
 };
 
 std::vector<Front> stress_fronts(const std::vector<Start> &starts);

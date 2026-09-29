@@ -1166,6 +1166,19 @@ Dictionary AovSim::get_ai(int64_t owner) const {
 		d["wave_size"] = ai.wave_size;
 		d["next_wave_at"] = ai.next_wave_at;
 		d["aggression"] = ai.aggression;
+		Array waves;
+		for (const aov::WaveLog &w : ai.waves) {
+			Dictionary wd;
+			wd["t"] = w.t;
+			wd["target"] = w.target;
+			wd["x"] = w.tx;
+			wd["z"] = w.tz;
+			PackedInt32Array ids;
+			for (int32_t id : w.units) ids.push_back(id);
+			wd["units"] = ids;
+			waves.push_back(wd);
+		}
+		d["waves"] = waves;
 		break;
 	}
 	return d;

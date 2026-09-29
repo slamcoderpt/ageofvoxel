@@ -12,6 +12,14 @@ namespace aov {
 
 class Sim;
 
+// One launched attack wave (debug / report record, never read by the sim).
+struct WaveLog {
+	double t;            // launch time
+	int32_t target;      // building id it was sent at
+	double tx, tz;       // that building's centre
+	std::vector<int32_t> units;
+};
+
 class EnemyAI {
 public:
 	Sim *sim = nullptr;
@@ -21,6 +29,7 @@ public:
 	int wave_size = 8;
 	double next_wave_at = 240; // s of game time before the first wave may launch
 	double aggression = 1;
+	std::vector<WaveLog> waves; // every wave launched (AovSim.get_ai().waves)
 
 	EnemyAI() = default;
 	EnemyAI(Sim *s, int owner_) : sim(s), owner(owner_) {}

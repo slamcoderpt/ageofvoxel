@@ -271,6 +271,20 @@ VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 
   -s res://game/core/playtest.gd -- --scene=skirmish     # "PLAYTEST ok|FAIL <step>", exit = failures
 ```
 
+AI-vs-AI skirmish (the real main scene headless, an EnemyAI for player 1 as
+well, the sim stepped 15 ticks per frame until Victory decides; ~20 s):
+
+```
+godot --headless --path godot -s res://game/core/aivai.gd -- --scene=skirmish --seed=5 [--minutes=60] [--quiet=1] [--verbose=1]
+```
+
+It logs every attack wave (`AovSim.get_ai(owner).waves`: launch time,
+target building, the men sent), where its men are every 20 s and when half
+of the survivors are within 16 tiles of the target ("ARRIVED"), every god
+power cast, and ends with `AIVAI_RESULT {json}` (match length, winner, per
+player waves / arrived / sizes / casts); exit 0 when the match was decided
+with no script error.
+
 Other tools:
 
 ```
@@ -326,8 +340,15 @@ marches them onto each other, e.g.
   functions from `core/jsmath.h`**: `jsm::atan2 / sin / cos / atan` (V8's
   fdlibm) and `jsm::hypot` (V8's scaled sum). glibc's differ in the last bit
   for 3-17 % of inputs, enough to make a battle drift. Iterate entities in
-  row order (= id order = JS Map order). `generate_map` and the whole core
-  (entities, units update / spread, pathfinding, movement, commands) are
+  row order (= id order = JS Map order). `generate_map` runs the browser's
+  generator bit for bit and then Godot-only passes (the browser build is
+  frozen, so the Godot map may now differ from it): **every start is
+  connected on foot to the others** (`connect_starts` in `game_map.cpp`:
+  when the forest noise closes a band of trees across the map or a lake cuts
+  it in two, the cheapest route is cleared, a lane three trees wide, and
+  water / cliffs on it are graded into a causeway or ramp; 5 of the first 40
+  skirmish seeds needed it, none of the scenes' seeds do). The whole core
+  (entities, units update / spread, pathfinding, movement, commands) is
   bit-exact with the browser (`check-mapgen.mjs`, `check-sim.mjs`); extend
   `check-sim.mjs` with your system's scenario when you port one. `Math.pow`
   (and `**`) is `jsm::pow`: V8's fdlibm pow with its own quirk, glibc's
@@ -528,8 +549,9 @@ Scenes: `has_scene_setup(name)`, `setup_scene(name, opts={units})` ->
 Combat: `kill_unit(id, killer=0)` (combat.kill), `damage(target, amount,
 attacker=0)`, `order(id, {type: "attack", target, auto, then_buildings})`,
 `set_unit_combat(id, {leash, reach, kit, line: {cx, cz, nx, nz, d0} | null})`,
-`set_ai_enabled(on)` (the ENEMY's EnemyAI), `add_ai(owner)`, `get_ai(owner)` /
-`set_ai(owner, {enabled, next_wave_at, wave_size, aggression})`,
+`set_ai_enabled(on)` (the ENEMY's EnemyAI), `add_ai(owner)`, `get_ai(owner)`
+({enabled, wave_size, next_wave_at, aggression, waves: [{t, target, x, z,
+units}]}) / `set_ai(owner, {enabled, next_wave_at, wave_size, aggression})`,
 `get_combat()` ({projectiles: 16 floats each (x, y, z, px, py, pz, sx, sy,
 sz, tx, ty, tz, t, dur, arc, dist), projectile_info: 2 ints (target, has
 target pos), stuck: 7 (x, y, z, dx, dy, dz, t), scars: 5 (x, z, radius,

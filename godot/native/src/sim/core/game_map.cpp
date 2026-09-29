@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
+#include <queue>
 
 #include "constants.h"
 #include "rng.h"
@@ -138,6 +140,143 @@ std::vector<Front> stress_fronts(const std::vector<Start> &starts) {
 }
 
 static const double PI = 3.141592653589793;
+
+namespace {
+
+// Godot-only pass (not in the browser's generateMap): make every start
+// reachable on foot from the first one. The forest noise can close a band of
+// trees across the whole map and a lake can cut it in two (skirmish seeds 1,
+// 13, 16, 32, 37 of the first 40), and then attack waves walk to the nearest
+// tile they can reach and stand there for the rest of the match. For each
+// start that is cut off, the cheapest 4-connected route to the first start's
+// region is found (open ground 1, a tree 6, water / cliff 25; mines and
+// bushes are never crossed); the trees on and next to it are felled (a lane
+// three tiles wide) and impassable stretches are graded into a ramp /
+// causeway between the passable ground on either side. Repeats until every
+// start is connected. Returns the number of trees felled; a map that is
+// already connected is left untouched (so it stays identical to the JS).
+struct ConnectResult { int felled = 0, graded = 0; };
+
+ConnectResult connect_starts(GameMap &map, const std::vector<Start> &starts, std::vector<ResourceSpawn> &resources, std::vector<uint8_t> &occupied) {
+	ConnectResult out;
+	const int N = map.size;
+	if (starts.size() < 2) return out;
+	// tile -> resource index (every tile of a footprint)
+	std::vector<int32_t> res_at((size_t)N * N, -1);
+	std::vector<uint8_t> removed(resources.size(), 0);
+	auto dims = [](const ResourceSpawn &r) { return r.type == "gold" ? 3 : 1; };
+	for (size_t k = 0; k < resources.size(); k++) {
+		const int d = dims(resources[k]);
+		for (int z = resources[k].tz; z < resources[k].tz + d; z++)
+			for (int x = resources[k].tx; x < resources[k].tx + d; x++)
+				if (map.in_tiles(x, z)) res_at[(size_t)z * N + x] = (int32_t)k;
+	}
+	auto walk = [&](int i) { return map.passable[i] == 1 && !occupied[i]; };
+	const int DX[4] = { 1, -1, 0, 0 }, DZ[4] = { 0, 0, 1, -1 };
+	std::vector<uint8_t> comp;
+	auto flood = [&]() {
+		comp.assign((size_t)N * N, 0);
+		const int s0 = starts[0].tz * N + starts[0].tx;
+		std::vector<int> q{ s0 };
+		comp[s0] = 1;
+		for (size_t h = 0; h < q.size(); h++) {
+			const int i = q[h], x = i % N, z = i / N;
+			for (int k = 0; k < 4; k++) {
+				const int nx = x + DX[k], nz = z + DZ[k];
+				if (!map.in_tiles(nx, nz)) continue;
+				const int j = nz * N + nx;
+				if (comp[j] || !walk(j)) continue;
+				comp[j] = 1;
+				q.push_back(j);
+			}
+		}
+	};
+	for (int iter = 0; iter < 8 * (int)starts.size(); iter++) {
+		flood();
+		int src = -1;
+		for (size_t k = 1; k < starts.size() && src < 0; k++) {
+			const int i = starts[k].tz * N + starts[k].tx;
+			if (!comp[i]) src = i;
+		}
+		if (src < 0) break;
+		// Dijkstra from the cut-off start to the first start's region
+		std::vector<double> dist((size_t)N * N, INFINITY);
+		std::vector<int32_t> parent((size_t)N * N, -1);
+		typedef std::pair<double, int> QE;
+		std::priority_queue<QE, std::vector<QE>, std::greater<QE>> pq;
+		dist[src] = 0;
+		pq.push({ 0, src });
+		int goal = -1;
+		while (!pq.empty()) {
+			const QE e = pq.top();
+			pq.pop();
+			const int i = e.second;
+			if (e.first > dist[i]) continue;
+			if (comp[i]) { goal = i; break; }
+			const int x = i % N, z = i / N;
+			for (int k = 0; k < 4; k++) {
+				const int nx = x + DX[k], nz = z + DZ[k];
+				if (nx < 1 || nz < 1 || nx >= N - 1 || nz >= N - 1) continue;
+				const int j = nz * N + nx;
+				double c;
+				if (walk(j)) c = 1;
+				else if (occupied[j]) {
+					const int r = res_at[j];
+					if (r < 0 || resources[r].type != "tree") continue;
+					c = 6;
+				} else c = 25;
+				if (dist[i] + c < dist[j]) {
+					dist[j] = dist[i] + c;
+					parent[j] = i;
+					pq.push({ dist[j], j });
+				}
+			}
+		}
+		if (goal < 0) break;
+		std::vector<int> path; // src ... goal
+		for (int i = goal; i >= 0; i = parent[i]) path.push_back(i);
+		std::reverse(path.begin(), path.end());
+		// fell the trees on the route and beside it
+		for (int i : path)
+			for (int dz = -1; dz <= 1; dz++)
+				for (int dx = -1; dx <= 1; dx++) {
+					const int x = i % N + dx, z = i / N + dz;
+					if (!map.in_tiles(x, z)) continue;
+					const int r = res_at[(size_t)z * N + x];
+					if (r < 0 || removed[r] || resources[r].type != "tree") continue;
+					removed[r] = 1;
+					res_at[(size_t)z * N + x] = -1;
+					occupied[(size_t)z * N + x] = 0;
+					out.felled++;
+				}
+		// grade each impassable stretch into a ramp between the ground on either side
+		auto level_of = [&](int i) { return (int)js_round(map.tile_rect_stats(i % N, i / N, 1, 1).avg); };
+		for (size_t k = 0; k < path.size(); k++) {
+			if (map.passable[path[k]] == 1) continue;
+			size_t e = k;
+			while (e + 1 < path.size() && map.passable[path[e + 1]] != 1) e++;
+			const size_t j0 = k >= 3 ? k - 3 : 0, j1 = std::min(path.size() - 1, e + 3);
+			const int a = std::max(map.water_level, level_of(path[j0])), b = std::max(map.water_level, level_of(path[j1]));
+			for (size_t q = j0; q <= j1; q++) {
+				const int L = std::max(map.water_level, (int)js_round(a + (double)(b - a) * (double)(q - j0) / (double)std::max<size_t>(1, j1 - j0)));
+				map.flatten_tiles(path[q] % N - 1, path[q] / N - 1, 3, 3, L);
+				out.graded++;
+			}
+			k = e;
+		}
+	}
+	if (out.felled) {
+		std::vector<ResourceSpawn> keep;
+		for (size_t k = 0; k < resources.size(); k++)
+			if (!removed[k]) keep.push_back(resources[k]);
+		resources.swap(keep);
+	}
+	if (out.graded) map.compute_passability();
+	map.changes.clear(); // (generation, not an edit: the renderer builds the whole map)
+	return out;
+}
+
+} // namespace
 
 MapGenResult generate_map(uint32_t seed, int size, const std::string &preset, int players) {
 	MapGenResult R;
@@ -279,6 +418,10 @@ MapGenResult generate_map(uint32_t seed, int size, const std::string &preset, in
 		int tz = rng.int_(8, size - 10);
 		if (!near_start(tx, tz, 22)) place("gold", tx, tz, 3, 3, 0);
 	}
+	// --- Godot-only from here on (the browser's generateMap stops above)
+	const ConnectResult cr = connect_starts(map, starts, resources, occupied);
+	R.felled = cr.felled;
+	R.graded = cr.graded;
 	return R;
 }
 

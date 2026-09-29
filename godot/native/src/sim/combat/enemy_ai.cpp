@@ -122,6 +122,9 @@ void EnemyAI::update(double dt) {
 		const int t = find_target(tc);
 		if (t >= 0) {
 			const int32_t tid = B.id[t];
+			WaveLog w{ S.time, tid, B.x[t], B.z[t], {} };
+			for (int u : idle_army) w.units.push_back(U.id[u]);
+			waves.push_back(std::move(w));
 			for (int u : idle_army) {
 				Order o = Order::with_target(O_ATTACK, tid);
 				o.b = ATK_THEN_BUILDINGS;
