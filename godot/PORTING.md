@@ -32,7 +32,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | lighting | `game/lighting/lighting.gd` (sun + PCSS soft shadows, hemisphere = ambient colour + two unshadowed up/down lights, fill, depth haze following the camera, SSAO, MSAA, `--quality=high\|medium\|low`, `--post=high\|low\|off`), `grade_effect.gd` (CompositorEffect compute pass on the HDR buffer: exposure 2.1 + PBR Neutral + the PostFX.js grade; Godot's tonemap is LINEAR; Compatibility/web falls back to AgX), `sky.gdshader`. MaterialPatches.js canopy / foliage terms not ported yet | none | `src/lighting/` |
 | buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
 | units | `game/units/units.gd` (rigs posed by the full anim.js port, conditional parts, crowd yaw / press / jitter, deaths and corpses, contact shadows), `unit.gdshader` (team lift + rim, hit flash, corpse drain, dithered fade) + `unit_outline.gdshader` (inverted hull, next pass); posing in C++: `native/src/unit_view.cpp` (`AovUnitView`) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
-| combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported) | `src/combat/` |
+| combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported, plus god powers and a wave log, Godot-only) | `src/combat/` |
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor; Godot-only activity fx: axe / pick chips and dust, sickle chaff, stooks on cut rows, hoof dust, shoal ripples, fish splashes, net ripples, boat wakes; crops sway, `econ_voxel.gdshader`, `fx_chip / fx_puff / fx_ring.gdshader`), buffers built in C++ by `AovEconView` (`native/src/econ_view.{h,cpp}`, render side, reads the sim, never writes it) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
 | godpowers | `game/godpowers/godpowers.gd` (the whole BoltRenderer of effects.js: bolt / sky / zap ribbons, impact flash sprites and decals, scorches with ember cracks (hot orange / red, glowing as long as the scorch lasts), a charcoal ash edge and a hot rim, an expanding impact ring at every strike point (Godot-only; decals are pulled toward the camera so voxel bumps do not swallow them), crater debris, char rims, spark streaks, smoke and flames, the storm funnel (wall, cloud body, dust wall, ground shockwave, rain, energy bands, whirled debris), flyer trails / back lights / drop shadows, meteor fireball and fire, strike / storm point lights and the shadow spot, the full-frame storm grade with light pools; dims the lighting piece's sun / sky / grade while a storm plays), shaders beside it; buffers built in C++ by `AovGodpowerView` (`native/src/godpower_view.{h,cpp}`, render side, reads the sim, never writes it) | `godpowers/` (favor, cooldowns, Lightning Storm, Bolt, Meteor, thrown units: ported) | `src/godpowers/` |
 | ui (HUD, selection, input) | `game/ui/ui.gd` (selection, box / double-click select, smart orders, rally points, control groups, hotkeys, placement ghost, god-power targeting ring, move markers, selection rings (one MultiMesh) + bars, event feed, messages, result card; public: `pieces.ui.selected`, `hover_entity`, `message()`, `feed()`), `hud.gd` (the drawn HUD, two layers with hit zones), `hud_style.gd` (palette, Cinzel / Alegreya fonts in `fonts/`, SVG icons from `icons.gd` = `src/ui/icons.js` rasterised at runtime, draw helpers), `panel.gdshader` (the gilded teal panels), `minimap.gd` + `minimap_ground/units.gdshader` (terrain colours computed in the shader from `get_heights()` / `get_ground()` uploaded as textures, re-uploaded on `building:placed`; unit dots read straight from `get_units()` arrays as data textures: no per-unit script), `portraits.gd` + `portrait.gdshader` (one SubViewport per type / owner, rendered once, unshaded with the browser's three.js hemisphere + sun lighting, no tonemap) | none | `src/ui/` |
@@ -240,7 +240,11 @@ game), 0.12 ms/tick; 16.7 neighbours visited per hash query (23.1 at 4000:
 the armies get denser on the fixed map, hence 2.7x from 2000 to 4000, as in
 the browser). The separation loops read the hash's position mirror
 (`SpatialHash::for_each_near_xz`, kept exact with `sync()` / `moved()`).
-Wall times on this shared machine vary by +-30 %; the render numbers and
+Wall times on this shared machine vary by +-30 %. Since the enemy AI casts
+god powers, every seat's storms and meteors thin the stress armies (2000
+units: 1336 alive on average over the recorded ticks instead of 1926, 0.75
+ms/tick mean); `--params "godot_rules=0"` gives the workload of the table
+above (1.09 ms/tick mean on this machine today). The render numbers and
 their method are in `../docs/godot-stress-report.md`.
 
 Render bench (xvfb + lavapipe, the counterpart of `scripts/bench.mjs`;
@@ -562,7 +566,7 @@ attacker=0)`, `order(id, {type: "attack", target, auto, then_buildings})`,
 `set_unit_combat(id, {leash, reach, kit, line: {cx, cz, nx, nz, d0} | null})`,
 `set_ai_enabled(on)` (the ENEMY's EnemyAI), `add_ai(owner)`, `get_ai(owner)`
 ({enabled, wave_size, next_wave_at, aggression, waves: [{t, target, x, z,
-units}]}) / `set_ai(owner, {enabled, next_wave_at, wave_size, aggression})`,
+units}], casts: {power: n}}) / `set_ai(owner, {enabled, next_wave_at, wave_size, aggression})`,
 `get_combat()` ({projectiles: 16 floats each (x, y, z, px, py, pz, sx, sy,
 sz, tx, ty, tz, t, dur, arc, dist), projectile_info: 2 ints (target, has
 target pos), stuck: 7 (x, y, z, dx, dy, dz, t), scars: 5 (x, z, radius,
@@ -579,6 +583,23 @@ radius), bolts: 6 (x, y, z, t0, life, sky) + bolt_seeds, scorches: 6 (x, y,
 z, t0, size, blast) + scorch_seeds, zaps: 5 (x, y, z, t0, life) + zap_units
 (id, seed), meteors: 9 (owner, x, z, t0, delay, radius, sx, sy, sz), fires:
 6 (x, y, z, r, t0, dur)}).
+
+**Enemy AI god powers** (Godot-only, `EnemyAI::use_powers`): every 2 s each
+AI player looks at the enemy units within 12 tiles of one of its soldiers
+or 16 of one of its buildings and casts through the same
+`GodPowers::can_cast` / `cast` as the HUD (favor and cooldowns exactly as
+for the player): a Lightning Storm on the densest cluster if it catches at
+least 6 men (counted within the storm's strike radius, 0.78 x 7.5), else a
+Meteor on a clump of at least 2 enemy buildings next to its army or on 8+
+men, else a Bolt on a myth unit or hero (a plain soldier only with 70+
+favor to spare; never a villager). No random draws: ties go to the first
+candidate in row order. The HUD feeds "<name> uses the <power> God Power!"
+when an enemy casts.
+
+`set_godot_rules(on)` (default on, kept across `new_game`): off = the
+browser's rules only (no AI god powers, no free villager); `simcheck.gd`
+turns it off for `check-sim.mjs`, and `--godot_rules=0` does it for a run
+(A/B benches: the AI's storms thin the stress armies, so its numbers move).
 
 Fog of war (player 1) and victory: `set_fog_reveal_all(on)`,
 `fog_recompute()`, `get_fog()` (size*size bytes: 0 unexplored, 128

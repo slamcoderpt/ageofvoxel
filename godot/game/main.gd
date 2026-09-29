@@ -69,6 +69,8 @@ func _ready() -> void:
 	var players := int(scene_def.players)
 	if AovScenes.SCENES[scene_name].has("players") and args.has("players"):
 		players = clampi(int(args.players), 2, 6)
+	# --godot_rules=0: the browser's rules only (no AI god powers, no free villager), for A/B runs
+	sim.set_godot_rules(AovArgs.flag(args, "godot_rules", true))
 	sim.new_game(seed, map_size, scene_def.preset, players)
 	sim.take_events()  # the initial resources' entity:added (pieces read the world in setup)
 	print("aov: scene=%s seed=%d map=%d preset=%s players=%d  %s  map_hash=%08x" % [

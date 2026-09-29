@@ -123,6 +123,8 @@ void AovSim::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_explored", "x", "z"), &AovSim::is_explored);
 	ClassDB::bind_method(D_METHOD("is_visible", "x", "z"), &AovSim::is_visible);
 	ClassDB::bind_method(D_METHOD("set_victory_enabled", "on"), &AovSim::set_victory_enabled);
+	ClassDB::bind_method(D_METHOD("set_godot_rules", "on"), &AovSim::set_godot_rules);
+	ClassDB::bind_method(D_METHOD("get_godot_rules"), &AovSim::get_godot_rules);
 	ClassDB::bind_method(D_METHOD("get_victory"), &AovSim::get_victory);
 	ClassDB::bind_method(D_METHOD("is_paused"), &AovSim::is_paused);
 	ClassDB::bind_method(D_METHOD("set_paused", "on"), &AovSim::set_paused);
@@ -1180,6 +1182,9 @@ Dictionary AovSim::get_ai(int64_t owner) const {
 			waves.push_back(wd);
 		}
 		d["waves"] = waves;
+		Dictionary casts;
+		for (int k = 0; k < aov::GP_COUNT; k++) casts[aov::power_def(k).key] = ai.casts[k];
+		d["casts"] = casts;
 		break;
 	}
 	return d;

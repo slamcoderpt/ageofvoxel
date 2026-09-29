@@ -61,6 +61,7 @@ func _mapdump(a: Dictionary) -> int:
 func _scenario(a: Dictionary) -> int:
 	var sc: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(str(a.scenario)))
 	var sim: Object = ClassDB.instantiate("AovSim")
+	sim.set_godot_rules(false)  # compare against the browser's rules (no AI god powers, no free villager)
 	sim.new_game(int(sc.seed), int(sc.size), str(sc.preset), int(sc.players))
 	sim.set_record_events(false)
 	if sc.has("groupPaths"):

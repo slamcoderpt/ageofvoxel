@@ -346,9 +346,11 @@ func _handle_events(events: Array) -> void:
 				if int(e.owner) == me:
 					batch.append(["You reached the %s Age!" % AGES[clampi(int(e.a), 0, 3)], true])
 			"godpower:cast":
+				var pn: String = sim.power_names()[clampi(int(e.a), 0, 2)]
 				if int(e.owner) == me:
-					var pn: String = sim.power_names()[clampi(int(e.a), 0, 2)]
 					batch.append(["You use the %s God Power!" % _pdefs[pn].name, true])
+				elif sim.is_enemy(me, int(e.owner)):
+					batch.append(["%s uses the %s God Power!" % [str(sim.get_player(int(e.owner)).get("name", "The enemy")), _pdefs[pn].name], false])
 			"game:over":
 				_show_result(int(e.owner), float(e.amount))
 	# notices from a fast-forward arrive together: keep the latest of a kind

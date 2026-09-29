@@ -11,6 +11,16 @@ namespace aov {
 
 static const double PI = 3.141592653589793;
 
+// god powers (Godot-only: the browser's EnemyAI never casts)
+static const double POWER_EVERY = 2;      // s between decisions
+static const double REACH_ARMY = 12;      // enemies this close to one of our soldiers are in reach
+static const double REACH_BASE = 16;      // ... or this close to one of our buildings' centre
+static const int STORM_MIN = 6;           // enemy units a Lightning Storm must catch
+static const int METEOR_BUILDINGS = 2;    // enemy buildings a Meteor must hit
+static const int METEOR_UNITS = 8;        // ... or enemy units
+static const double BOLT_SPARE_FAVOR = 70; // Bolt a plain (non-myth) unit only with this much favor
+static const int MAX_CENTRES = 64;        // candidate strike points tried per power
+
 void EnemyAI::update(double dt) {
 	if (!enabled) return;
 	timer -= dt;
@@ -28,6 +38,13 @@ void EnemyAI::update(double dt) {
 	}
 	for (int b = 0; b < B.size(); b++)
 		if (!B.removed[b] && B.owner[b] == owner && !B.dead[b]) buildings.push_back(b);
+	if (S.godot_rules) {
+		power_timer -= 1.0;
+		if (power_timer <= 0) {
+			power_timer = POWER_EVERY;
+			use_powers(army, buildings);
+		}
+	}
 	int tc = -1;
 	for (int b : buildings)
 		if (B.type[b] == B_TOWN_CENTER && B.built[b]) { tc = b; break; }
@@ -133,6 +150,132 @@ void EnemyAI::update(double dt) {
 			wave_size = std::min(40, wave_size + 4);
 			next_wave_at = S.time + 120 / aggression;
 		}
+	}
+}
+
+// God powers, through the same GodPowers::can_cast / cast as the player's
+// HUD (favor costs and cooldowns included). Every POWER_EVERY s, among the
+// enemy units near our army or base: a Lightning Storm on the densest
+// cluster (at least STORM_MIN men inside the strike radius), else a Meteor
+// on a clump of enemy buildings near our army or a big enemy army, else a
+// Bolt on the most valuable single target (a myth unit or hero first; a
+// plain unit only when favor is plentiful). Deterministic: no random draws,
+// ties go to the first candidate in row order.
+void EnemyAI::use_powers(const std::vector<int> &army, const std::vector<int> &buildings) {
+	Sim &S = *sim;
+	GodPowers &G = S.godpowers;
+	const bool storm_ok = G.can_cast(owner, GP_LIGHTNING_STORM).ok, meteor_ok = G.can_cast(owner, GP_METEOR).ok,
+			   bolt_ok = G.can_cast(owner, GP_BOLT).ok;
+	if (!storm_ok && !meteor_ok && !bolt_ok) return;
+	const UnitStore &U = S.entities.units;
+	const BuildingStore &B = S.entities.buildings;
+	const GameMap &map = S.map();
+	// reach: coarse cells (4 tiles) near our soldiers and buildings
+	const int CELL = 4, M = (map.size + CELL - 1) / CELL;
+	reach_.assign((size_t)M * M, 0);
+	auto mark = [&](double x, double z, double r) {
+		const int c0x = std::max(0, (int)std::floor((x - r) / CELL)), c1x = std::min(M - 1, (int)std::floor((x + r) / CELL));
+		const int c0z = std::max(0, (int)std::floor((z - r) / CELL)), c1z = std::min(M - 1, (int)std::floor((z + r) / CELL));
+		for (int cz = c0z; cz <= c1z; cz++)
+			for (int cx = c0x; cx <= c1x; cx++) {
+				const double dx = (cx + 0.5) * CELL - x, dz = (cz + 0.5) * CELL - z;
+				if (dx * dx + dz * dz <= (r + CELL * 0.71) * (r + CELL * 0.71)) reach_[(size_t)cz * M + cx] = 1;
+			}
+	};
+	for (int u : army) mark(U.x[u], U.z[u], REACH_ARMY);
+	for (int b : buildings) mark(B.x[b], B.z[b], REACH_BASE);
+	auto in_reach = [&](double x, double z) {
+		const int cx = (int)std::floor(x / CELL), cz = (int)std::floor(z / CELL);
+		return cx >= 0 && cz >= 0 && cx < M && cz < M && reach_[(size_t)cz * M + cx];
+	};
+	// enemy units in reach (on the ground: men carried up a storm are spoken for)
+	std::vector<int> foes;
+	for (int r = 0; r < U.size(); r++)
+		if (!U.removed[r] && !U.dead[r] && U.gp_state[r] != 1 && Sim::is_enemy(owner, U.owner[r]) && in_reach(U.x[r], U.z[r])) foes.push_back(r);
+	// the densest cluster of `foes` within radius r: count, centre
+	auto cluster = [&](double r, double &ox, double &oz) {
+		int best = 0;
+		const double r2 = r * r;
+		const size_t n = foes.size(), step = std::max<size_t>(1, n / MAX_CENTRES);
+		for (size_t i = 0; i < n; i += step) {
+			const double cx = U.x[foes[i]], cz = U.z[foes[i]];
+			int k = 0;
+			double sx = 0, sz = 0;
+			for (int o : foes) {
+				const double dx = U.x[o] - cx, dz = U.z[o] - cz;
+				if (dx * dx + dz * dz <= r2) {
+					k++;
+					sx += U.x[o];
+					sz += U.z[o];
+				}
+			}
+			if (k <= best) continue;
+			// re-centre on the men caught, keep it if it catches as many
+			const double mx = sx / k, mz = sz / k;
+			int km = 0;
+			for (int o : foes) {
+				const double dx = U.x[o] - mx, dz = U.z[o] - mz;
+				km += dx * dx + dz * dz <= r2;
+			}
+			best = std::max(k, km);
+			ox = km >= k ? mx : cx;
+			oz = km >= k ? mz : cz;
+		}
+		return best;
+	};
+	if (storm_ok && (int)foes.size() >= STORM_MIN) {
+		double x = 0, z = 0;
+		// the storm strikes men within 0.78 of its radius (GodPowers::update)
+		if (cluster(power_def(GP_LIGHTNING_STORM).radius * 0.78, x, z) >= STORM_MIN && G.cast(owner, GP_LIGHTNING_STORM, x, z)) {
+			casts[GP_LIGHTNING_STORM]++;
+			return;
+		}
+	}
+	if (meteor_ok) {
+		const double R = power_def(GP_METEOR).radius;
+		// a clump of enemy buildings our army stands by
+		int best = 0;
+		double bx = 0, bz = 0;
+		for (int b = 0; b < B.size(); b++) {
+			if (B.removed[b] || B.dead[b] || !Sim::is_enemy(owner, B.owner[b]) || !in_reach(B.x[b], B.z[b])) continue;
+			int k = 0;
+			for (int o = 0; o < B.size(); o++) {
+				if (B.removed[o] || B.dead[o] || !Sim::is_enemy(owner, B.owner[o])) continue;
+				const BuildingDef &od = building_def(B.type[o]);
+				if (jsm::hypot(B.x[o] - B.x[b], B.z[o] - B.z[b]) < R + std::max(od.w, od.h) / 2.0) k++;
+			}
+			if (k > best) {
+				best = k;
+				bx = B.x[b];
+				bz = B.z[b];
+			}
+		}
+		double ux = 0, uz = 0;
+		const int men = (int)foes.size() >= METEOR_UNITS ? cluster(R * 0.8, ux, uz) : 0;
+		const bool on_men = men >= METEOR_UNITS, on_town = best >= METEOR_BUILDINGS;
+		if ((on_men || on_town) && G.cast(owner, GP_METEOR, on_men ? ux : bx, on_men ? uz : bz)) {
+			casts[GP_METEOR]++;
+			return;
+		}
+	}
+	if (bolt_ok && !foes.empty()) {
+		// value: myth units and heroes first (by hp left), then the dearest unit
+		int best = -1;
+		double bv = 0;
+		const bool spare = S.players[owner].res[RES_FAVOR] >= BOLT_SPARE_FAVOR;
+		for (int o : foes) {
+			const UnitDef &d = unit_def(U.type[o]);
+			double v;
+			if (d.myth || d.hero) v = 10000 + U.hp[o];
+			else if (spare && !d.gatherer) v = d.cost.v[RES_FOOD] + d.cost.v[RES_WOOD] + d.cost.v[RES_GOLD] + d.cost.v[RES_FAVOR] * 3;
+			else continue;
+			if (v > bv) {
+				bv = v;
+				best = o;
+			}
+		}
+		// (the bolt picks the unit nearest the point: cast right on the target)
+		if (best >= 0 && G.cast(owner, GP_BOLT, U.x[best], U.z[best])) casts[GP_BOLT]++;
 	}
 }
 

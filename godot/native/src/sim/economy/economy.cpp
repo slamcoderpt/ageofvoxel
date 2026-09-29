@@ -441,7 +441,7 @@ void Economy::update(double dt) {
 		}
 	}
 	recount();
-	if (sim->tick_count % 30 == 0) rescue();
+	if (sim->godot_rules && sim->tick_count % 30 == 0) rescue();
 	// age advancement
 	for (int id = 0; id < MAX_PLAYERS; id++) {
 		Player &p = sim->players[id];

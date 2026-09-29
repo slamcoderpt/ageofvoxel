@@ -62,7 +62,24 @@ func _read_events(sim: Object) -> void:
 				if not casts.has(o): casts[o] = {}
 				casts[o][pn] = int(casts[o].get(pn, 0)) + 1
 				if not quiet:
-					print("AIVAI t=%6.1f p%d casts %s at (%.1f, %.1f)" % [sim.get_time(), o, pn, e.x, e.z])
+					# enemy men around the strike point when this script sees the event (up to STEP ticks later)
+					var r := {"lightning_storm": 5.85, "meteor": 4.5, "bolt": 1.5}.get(pn, 3.0) as float
+					var men := 0
+					var what := {}
+					for id in sim.units_near(e.x, e.z, r):
+						var d: Dictionary = sim.get_unit(id)
+						if sim.is_enemy(o, int(d.owner)):
+							men += 1
+							what[d.type] = int(what.get(d.type, 0)) + 1
+					var bl := 0
+					if pn == "meteor":
+						var b: Dictionary = sim.get_buildings()
+						for i in int(b.count):
+							var c := Vector2(b.rect[i * 4] + b.rect[i * 4 + 2] * 0.5, b.rect[i * 4 + 1] + b.rect[i * 4 + 3] * 0.5)
+							if sim.is_enemy(o, int(b.owner[i])) and c.distance_to(Vector2(e.x, e.z)) < r + maxf(b.rect[i * 4 + 2], b.rect[i * 4 + 3]) * 0.5:
+								bl += 1
+					print("AIVAI t=%6.1f p%d casts %s at (%.1f, %.1f): %d enemy men within %.1f %s%s" % [sim.get_time(), o, pn, e.x, e.z, men, r, what,
+						", %d enemy buildings hit" % bl if pn == "meteor" else ""])
 			"villager:free":
 				free_vills[int(e.owner)] = int(free_vills.get(int(e.owner), 0)) + 1
 				if not quiet:

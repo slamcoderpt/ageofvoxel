@@ -30,6 +30,8 @@ public:
 	double next_wave_at = 240; // s of game time before the first wave may launch
 	double aggression = 1;
 	std::vector<WaveLog> waves; // every wave launched (AovSim.get_ai().waves)
+	double power_timer = 0;     // s until the next god power decision
+	int casts[3] = { 0, 0, 0 }; // powers cast, by PowerId (AovSim.get_ai().casts)
 
 	EnemyAI() = default;
 	EnemyAI(Sim *s, int owner_) : sim(s), owner(owner_) {}
@@ -42,6 +44,8 @@ private:
 	bool try_build(int type, int builder_row, int tc_row);
 	bool find_spot(int type, int tc_row, int &tx, int &tz);
 	bool gap_ok(int tx, int tz, int w, int h) const;
+	void use_powers(const std::vector<int> &army, const std::vector<int> &buildings);
+	std::vector<uint8_t> reach_; // scratch: cells in reach of our army / base
 };
 
 } // namespace aov

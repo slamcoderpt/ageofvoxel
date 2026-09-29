@@ -147,6 +147,10 @@ public:
 	bool is_explored(double x, double z) const { return sim_.fog.is_explored(x, z); }
 	bool is_visible(double x, double z) const { return sim_.fog.is_visible(x, z); }
 	void set_victory_enabled(bool on) { sim_.victory.enabled = on; }
+	// Godot-only rules (AI god powers, free villager; see Sim::godot_rules).
+	// Kept across new_game(); the parity tools turn them off.
+	void set_godot_rules(bool on) { sim_.godot_rules = on; }
+	bool get_godot_rules() const { return sim_.godot_rules; }
 	Dictionary get_victory() const;   // {decided, winner, loser, time}
 	bool is_paused() const { return sim_.paused; }
 	void set_paused(bool on) { sim_.paused = on; }
