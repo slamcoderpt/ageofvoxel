@@ -113,6 +113,26 @@ func _run() -> void:
 	_check("hero shot: low camera", rad_to_deg(main.camera.pitch) < 20.0, "%.1f" % rad_to_deg(main.camera.pitch))
 	var boats: PackedFloat32Array = main.sim.get_economy().get("boats", PackedFloat32Array())
 	_check("hero shot: the fleet is out", boats.size() >= 30, str(boats.size() / 10))
+	# the hero landmark: the acropolis temple on the headland fills the
+	# right-centre third of the frame, the boats lie between it and the camera
+	var an: Dictionary = menu._hero_anchor()
+	var eye: Vector3 = menu._anchor_eye(an)
+	var hp: Vector2 = menu._hero_pos()
+	var ts: Vector2 = menu._to_screen(an, eye, Vector3(hp.x, main.sim.height_at(hp.x, hp.y) + 3.0, hp.y))
+	var temples := 0
+	var bl: Dictionary = main.sim.get_buildings()
+	var ti: int = PackedStringArray(bl.get("type_names", PackedStringArray())).find("temple")
+	for ty in PackedByteArray(bl.get("type", PackedByteArray())):
+		temples += 1 if int(ty) == ti else 0
+	_check("hero shot: the acropolis stands in the right-centre third", menu._acro != Vector2.ZERO and temples >= 2 and ts.x > 1000.0 and ts.x < 1500.0 and ts.y > 150.0 and ts.y < 600.0, "%d temples, at %s" % [temples, ts])
+	var near := 0
+	var td := Vector2(eye.x, eye.z).distance_to(hp)
+	for i in range(0, boats.size() - 3, 10):
+		near += 1 if Vector2(eye.x, eye.z).distance_to(Vector2(boats[i + 2], boats[i + 3])) < td * 0.8 else 0
+	_check("hero shot: the fleet lies in the mid-ground before the temple", near >= 3, "%d of %d" % [near, boats.size() / 10])
+	var wm: ShaderMaterial = main.pieces.terrain.water_material
+	var sc: Color = wm.get_shader_parameter("shallow_col")
+	_check("hero shot: the sea graded down from the play map's cyan", sc.s < 0.5 and float(wm.get_shader_parameter("out_sat")) < 1.0, "shallow %s" % sc)
 	_check("no Load row: Quick Match instead", menu._tiles.has("quick") and not menu._tiles.has("load"))
 	await _frames(45)  # the intro
 	# the feature card carries rendered hero art (hero_art.gd), not a flat card

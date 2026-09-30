@@ -14,7 +14,10 @@ extends Node
 ## focused (captures of the states), --menu_options=1 opens Options,
 ## --menu_guide=1 opens How to Play,
 ## --menu_intro=0|1 (default: on when playing, off in captures),
-## --menu_view=x,z,distance,pitch,yaw overrides the camera anchor.
+## --menu_view=x,z,distance,pitch,yaw overrides the camera anchor,
+## --menu_hero=yaw,pitch,dist,left,fwd[,fov] the hero framing,
+## --menu_acro=tx,tz where the acropolis temple stands,
+## --menu_look=sun_x,sun_y,fog_near,fog_far the sun's frame point and the haze.
 ##
 ## Setup screen contract (the match setup piece): Skirmish instances the first
 ## script of Flow.SETUP_SCREENS that exists. A Control goes under the menu's
@@ -83,31 +86,75 @@ var _anchor := {}          # camera anchor: x, z, distance, pitch, yaw
 static func scene_setup(g: Node) -> Dictionary:
 	var ctx: Dictionary = g.sim.setup_scene("coast", g.scene_opts())
 	var m: Node = g.pieces.get("menu")
+	if m and m.has_method("_raise_acropolis"):
+		m._raise_acropolis()
 	if m and m.has_method("_spawn_fleet"):
 		m._spawn_fleet()
+		m._aim_mood()
 	return ctx
 
-## The fleet: [screen x, screen y (1920x1080 frame at the anchor), heading]
-const FLEET := [Vector3(1180, 880, 0.15), Vector3(1450, 925, -0.35), Vector3(1730, 870, 0.3)]
+## The acropolis: a temple raised on the headland at the harbour mouth (tile
+## x, z of its corner), the hero landmark of the shot; the trees in front of
+## it (towards the sea) are felled so nothing hides its columns.
+var ACRO := Vector2i(75, 51)
+var _acro := Vector2.ZERO
 
-## A small fleet fishes off the beach, below the temple: each boat
+func _raise_acropolis() -> void:
+	var sim: Object = game.sim
+	if game.args.has("menu_acro"):
+		var c := str(game.args.menu_acro).split(",")
+		ACRO = Vector2i(int(c[0]), int(c[1]))
+	var id: int = sim.spawn_building("temple", 1, ACRO.x, ACRO.y, true, false)
+	if id == 0:
+		return
+	_acro = Vector2(ACRO.x + 2.5, ACRO.y + 3.0)
+	sim.clear_rect(ACRO.x - 3, ACRO.y - 2, 16, 14)
+	_clear_view()
+
+## The frame's middle, between the menu column and the acropolis, would be a
+## near wall of dark woods: the trees standing there on this side of the
+## temple are felled, so the eye runs past the beach to the hazy town.
+const CLEAR_FRAME := Rect2(640, 200, 440, 470)
+
+func _clear_view() -> void:
+	var sim: Object = game.sim
+	var an := _hero_anchor()
+	var eye := _anchor_eye(an)
+	var h := _hero_pos()
+	var reach := eye.distance_to(Vector3(h.x, eye.y, h.y)) * 1.08
+	var r: Dictionary = sim.get_resources()
+	var names: PackedStringArray = r.get("type_names", PackedStringArray())
+	var types: PackedByteArray = r.get("type", PackedByteArray())
+	var tiles: PackedInt32Array = r.get("tile", PackedInt32Array())
+	var ids: PackedInt32Array = r.get("ids", PackedInt32Array())
+	var fell: Array = []
+	for i in types.size():
+		if not names[int(types[i])].begins_with("tree"):
+			continue
+		var x := tiles[i * 2] + 0.5
+		var z := tiles[i * 2 + 1] + 0.5
+		var p := Vector3(x, sim.height_at(x, z) + 1.5, z)
+		if Vector3(p.x - eye.x, 0.0, p.z - eye.z).length() > reach:
+			continue
+		if CLEAR_FRAME.has_point(_to_screen(an, eye, p)):
+			fell.append(ids[i])
+	for id in fell:
+		sim.remove_resource(id)
+
+## The fleet: [screen x, screen y (1920x1080 frame at the anchor), heading]
+const FLEET := [Vector3(860, 930, 0.5), Vector3(1110, 840, 0.35), Vector3(1320, 775, 0.2)]
+
+## A small fleet fishes in the mid-ground, on a diagonal to the acropolis: each boat
 ## goes where its screen point's ray meets the sea (the anchor's camera), or
 ## is pushed out to sea until it floats.
 func _spawn_fleet() -> void:
 	var sim: Object = game.sim
 	var an := _hero_anchor()
 	var yr := deg_to_rad(float(an.yaw))
-	var pr := deg_to_rad(float(an.pitch))
-	var tgt := Vector3(an.x, sim.smooth_height_at(an.x, an.z), an.z)
-	var pos := tgt + Vector3(sin(yr) * cos(pr), sin(pr), cos(yr) * cos(pr)) * float(an.distance)
-	var fwd := (tgt - pos).normalized()
-	var right := Vector3(cos(yr), 0.0, -sin(yr))
-	var up := right.cross(fwd)
-	var ty := tan(deg_to_rad(17.0))
-	var tx := ty * 16.0 / 9.0
+	var pos := _anchor_eye(an)
 	var wl: float = sim.get_water_level()
 	for b: Vector3 in FLEET:
-		var ray: Vector3 = fwd + right * (b.x / 960.0 - 1.0) * tx + up * (1.0 - b.y / 540.0) * ty
+		var ray: Vector3 = _screen_ray(an, b.x, b.y)
 		if ray.y >= -0.01:
 			continue
 		var p: Vector3 = pos + ray * ((wl - pos.y) / ray.y)
@@ -121,6 +168,38 @@ func _spawn_fleet() -> void:
 		# wandering off to the scene's own shoals
 		sim.spawn_shoal(p.x, p.z, 1.0e6)
 		sim.spawn_boat(1, p.x, p.z, yr + PI * 0.5 + b.z)
+
+## The anchor camera's eye (world).
+func _anchor_eye(an: Dictionary) -> Vector3:
+	var yr := deg_to_rad(float(an.yaw))
+	var pr := deg_to_rad(float(an.pitch))
+	var tgt := Vector3(an.x, game.sim.smooth_height_at(an.x, an.z), an.z)
+	return tgt + Vector3(sin(yr) * cos(pr), sin(pr), cos(yr) * cos(pr)) * float(an.distance)
+
+## The world direction through a point of the 1920x1080 frame at the anchor.
+func _screen_ray(an: Dictionary, px: float, py: float) -> Vector3:
+	var yr := deg_to_rad(float(an.yaw))
+	var pr := deg_to_rad(float(an.pitch))
+	var fwd := -Vector3(sin(yr) * cos(pr), sin(pr), cos(yr) * cos(pr))
+	var right := Vector3(cos(yr), 0.0, -sin(yr))
+	var up := right.cross(fwd)
+	var ty := tan(deg_to_rad(HERO_FOV * 0.5))
+	var tx := ty * 16.0 / 9.0
+	return (fwd + right * (px / 960.0 - 1.0) * tx + up * (1.0 - py / 540.0) * ty).normalized()
+
+## A world point's place in the 1920x1080 frame at the anchor (behind: far off).
+func _to_screen(an: Dictionary, eye: Vector3, p: Vector3) -> Vector2:
+	var yr := deg_to_rad(float(an.yaw))
+	var pr := deg_to_rad(float(an.pitch))
+	var fwd := -Vector3(sin(yr) * cos(pr), sin(pr), cos(yr) * cos(pr))
+	var right := Vector3(cos(yr), 0.0, -sin(yr))
+	var up := right.cross(fwd)
+	var ty := tan(deg_to_rad(HERO_FOV * 0.5))
+	var v := p - eye
+	var dz := v.dot(fwd)
+	if dz <= 0.1:
+		return Vector2(-1e5, -1e5)
+	return Vector2(960.0 * (1.0 + v.dot(right) / (dz * ty * 16.0 / 9.0)), 540.0 * (1.0 - v.dot(up) / (dz * ty)))
 
 func setup(g: Node) -> void:
 	game = g
@@ -136,6 +215,12 @@ func setup(g: Node) -> void:
 	if g.args.has("menu_hero"):
 		var hc := str(g.args.menu_hero).split(",")
 		HERO_YAW = float(hc[0]); HERO_PITCH = float(hc[1]); HERO_DIST = float(hc[2]); HERO_SHIFT = Vector2(float(hc[3]), float(hc[4]))
+		if hc.size() > 5:
+			HERO_FOV = float(hc[5])
+	g.camera.fov = HERO_FOV
+	if g.args.has("menu_look"):   # tuning: sun x,y, fog near,far
+		var lc := str(g.args.menu_look).split(",")
+		SUN_AT = Vector2(float(lc[0]), float(lc[1])); FOG_NEAR = float(lc[2]); FOG_FAR = float(lc[3])
 	_apply_mood()
 	_build()
 	if not AovArgs.flag(g.args, "menu_intro", not capturing):
@@ -495,7 +580,7 @@ func _drive_camera() -> void:
 			for i in mini(c.size(), 5):
 				_anchor[keys[i]] = float(c[i])
 	var s := t
-	var yaw: float = _anchor.yaw + 3.0 * sin(s * TAU / 90.0)
+	var yaw: float = _anchor.yaw + 1.6 * sin(s * TAU / 90.0)
 	var dist: float = _anchor.distance + 2.0 * sin(s * TAU / 53.0)
 	var pitch: float = _anchor.pitch + 1.0 * sin(s * TAU / 61.0)
 	var y := deg_to_rad(yaw)
@@ -505,8 +590,11 @@ func _drive_camera() -> void:
 	var z: float = _anchor.z - sin(y) * side
 	cam.set_view({"x": x, "z": z, "distance": dist, "pitch": pitch, "yaw": yaw})
 
-## Where the temple stands (world x, z), or the scene focus without one.
+## Where the hero temple stands (world x, z): the acropolis, else the town's
+## temple, else the scene focus.
 func _hero_pos() -> Vector2:
+	if _acro != Vector2.ZERO:
+		return _acro
 	var f: Vector2 = game.ctx.get("focus", Vector2(64, 64))
 	var b: Dictionary = game.sim.get_buildings()
 	var names: PackedStringArray = b.get("type_names", PackedStringArray())
@@ -529,10 +617,11 @@ func _hero_anchor() -> Dictionary:
 	var p := h - right * HERO_SHIFT.x + fwd * HERO_SHIFT.y
 	return {"x": p.x, "z": p.y, "distance": HERO_DIST, "pitch": HERO_PITCH, "yaw": yaw}
 
-var HERO_YAW := 82.0
-var HERO_PITCH := 9.0
-var HERO_DIST := 66.0
-var HERO_SHIFT := Vector2(7.0, -4.0)   # temple -> view target: left, forward
+var HERO_YAW := 60.0
+var HERO_PITCH := 7.5
+var HERO_DIST := 64.0
+var HERO_SHIFT := Vector2(8.0, 0.0)    # temple -> view target: left, forward
+var HERO_FOV := 25.0                    # vertical fov: a longer lens than play
 
 # ---- the mood: a warm, low evening sun and haze (menu scene only) --------------
 
@@ -547,54 +636,94 @@ func _apply_mood() -> void:
 	_light = game.pieces.get("lighting")
 	if _light == null or not ("sun" in _light) or _light.sun == null:
 		return
-	var yr := deg_to_rad(HERO_YAW)
-	var right := Vector3(cos(yr), 0.0, -sin(yr))
-	var fwd := Vector3(-sin(yr), 0.0, -cos(yr))
-	var to_sun := (right * 0.85 + fwd * 0.55).normalized()
-	to_sun.y = 0.36
-	to_sun = to_sun.normalized()
 	var sun: DirectionalLight3D = _light.sun
-	sun.light_color = Color(1.0, 0.68, 0.4)
-	sun.light_energy = 7.6 / PI
-	sun.basis = Basis.looking_at(-to_sun, Vector3.UP)
-	sun.shadow_opacity = 0.86
+	sun.light_color = Color(1.0, 0.7, 0.44)
+	sun.light_energy = 6.4 / PI
+	sun.shadow_opacity = 0.8
 	var fill: DirectionalLight3D = _light.fill
 	if fill:
-		fill.light_color = Color(0.55, 0.66, 0.9)
-		fill.light_energy = 0.5 / PI
-		var fd := (-right * 0.8 - fwd * 0.2).normalized()
-		fd.y = 0.45
-		fill.basis = Basis.looking_at(-fd.normalized(), Vector3.UP)
-	# the sky: the glow of the setting sun low behind the temple, off the key's
-	# real direction on purpose (the frame wants the glow, the town the side light)
-	var sky_sun := (fwd * 0.96 + right * 0.26).normalized()
-	sky_sun.y = 0.07
+		fill.light_color = Color(0.62, 0.68, 0.86)
+		fill.light_energy = 1.25 / PI
 	var env: Environment = _light.env
-	var sm := ShaderMaterial.new()
-	sm.shader = SKY
-	sm.set_shader_parameter("sun_dir", sky_sun.normalized())
-	sm.set_shader_parameter("horizon_color", MOOD_HAZE)
+	_sky_sm = ShaderMaterial.new()
+	_sky_sm.shader = SKY
+	_sky_sm.set_shader_parameter("horizon_color", MOOD_HAZE)
 	if env.sky:
-		env.sky.sky_material = sm
+		env.sky.sky_material = _sky_sm
 	env.background_mode = Environment.BG_SKY
 	env.fog_light_color = MOOD_HAZE
 	env.fog_density = 1.0
 	env.fog_sun_scatter = 0.0
-	env.fog_depth_curve = 1.6
-	env.ambient_light_color = Color(0.6, 0.6, 0.7)
-	env.ambient_light_energy *= 0.8
+	env.fog_depth_curve = 1.25
+	env.ambient_light_color = Color(0.64, 0.62, 0.68)
+	env.ambient_light_energy *= 0.85
 	for h in _light.get("hemi_lights"):
 		(h as DirectionalLight3D).light_energy *= 0.75
 	var gr = _light.get("grade")
 	if gr:
-		gr.top_haze = 0.12
+		gr.top_haze = 0.1
 		gr.top_haze_color = Vector3(MOOD_HAZE.r, MOOD_HAZE.g, MOOD_HAZE.b)
 		gr.vignette = 0.7
-		gr.saturation = 0.86
+		gr.saturation = 0.9
+	_aim_mood()
 	_mood_frame()
+
+var _sky_sm: ShaderMaterial
+
+## Where the setting sun sits in the 1920x1080 frame: just behind the
+## acropolis' roof, so the temple stands backlit against its glow.
+var SUN_AT := Vector2(1470, 190)
+
+## Aims the light at the hero framing (again once the acropolis stands): the
+## sky's sun behind the temple, the key from that side but higher (the
+## temple's sea faces sit in its warm shade, its edges catch the light,
+## shadows fall towards the camera), a cool fill from behind the camera,
+## and the sea's glitter path leading from the boats to the temple.
+func _aim_mood() -> void:
+	if _light == null or not ("sun" in _light) or _light.sun == null:
+		return
+	var an := _hero_anchor()
+	var yr := deg_to_rad(float(an.yaw))
+	var right := Vector3(cos(yr), 0.0, -sin(yr))
+	var fwd := Vector3(-sin(yr), 0.0, -cos(yr))
+	var sky_sun := _screen_ray(an, SUN_AT.x, SUN_AT.y)
+	var flat := Vector3(sky_sun.x, 0.0, sky_sun.z).normalized()
+	# the key: the sun's bearing turned a little towards the side, higher
+	var to_sun := (flat * 0.8 + right * 0.45).normalized()
+	to_sun.y = 0.5
+	to_sun = to_sun.normalized()
+	(_light.sun as DirectionalLight3D).basis = Basis.looking_at(-to_sun, Vector3.UP)
+	var fill: DirectionalLight3D = _light.fill
+	if fill:
+		var fd := (-fwd * 0.8 - right * 0.4).normalized()
+		fd.y = 0.5
+		fill.basis = Basis.looking_at(-fd.normalized(), Vector3.UP)
+	if _sky_sm:
+		_sky_sm.set_shader_parameter("sun_dir", sky_sun)
+	_grade_water(sky_sun)
+
+## The sea behind the menu: a deep evening teal instead of the play map's
+## bright cyan (which pulled the eye to the corner), the sky it reflects warm.
+func _grade_water(sky_sun: Vector3) -> void:
+	var tp = game.pieces.get("terrain")
+	if tp == null or not ("water_material" in tp) or tp.water_material == null:
+		return
+	var wm: ShaderMaterial = tp.water_material
+	wm.set_shader_parameter("shallow_col", Color(0.3, 0.46, 0.42))
+	wm.set_shader_parameter("mid_col", Color(0.12, 0.3, 0.34))
+	wm.set_shader_parameter("deep_col", Color(0.05, 0.15, 0.22))
+	wm.set_shader_parameter("sky_col", Color(0.6, 0.5, 0.42))
+	wm.set_shader_parameter("sun_dir", Vector3(sky_sun.x, maxf(sky_sun.y, 0.08), sky_sun.z).normalized())
+	wm.set_shader_parameter("out_sat", 0.8)
+	wm.set_shader_parameter("out_gain", 0.96)
 
 const MOOD_HAZE := Color(0.93, 0.79, 0.62)      # golden evening air
 const MOOD_SKY_TOP := Color(0.36, 0.5, 0.7)
+
+## Aerial depth: the haze starts just past the temple (at the camera's
+## distance), so the woods and the town behind it step back in value.
+var FOG_NEAR := 0.9
+var FOG_FAR := 2.6
 
 ## Per frame after the lighting piece: the haze begins just past the temple
 ## and hides the map's far edge (lighting.frame() resets it from the distance).
@@ -607,8 +736,8 @@ func _mood_frame() -> void:
 	if _light == null or not ("env" in _light) or _light.env == null:
 		return
 	var d: float = game.camera.distance
-	_light.env.fog_depth_begin = d * 1.05
-	_light.env.fog_depth_end = d * 3.4
+	_light.env.fog_depth_begin = d * FOG_NEAR
+	_light.env.fog_depth_end = d * FOG_FAR
 	_light.sun.directional_shadow_max_distance = d * 3.0
 
 # ---- drawing ---------------------------------------------------------------------
@@ -624,14 +753,20 @@ func _draw_shade() -> void:
 	S.vgrad(_shade, Rect2(0, 0, w, 220), [[0.0, Color(0, 0, 0, 0.35)], [1.0, Color(0, 0, 0, 0.0)]])
 
 static var _sun_tex: Texture2D
+static var _sun_core: Texture2D
 
+## The setting sun's bloom over the frame, centred where the sky's sun sits
+## (SUN_AT, just past the acropolis' roof): a broad warm glow and a small
+## bright core that backlights the temple's edge.
 func _draw_sunglow() -> void:
 	if _sun_tex == null:
 		_sun_tex = S.radial_tex([[0.0, Color(1.0, 0.8, 0.52, 0.34)], [0.25, Color(1.0, 0.7, 0.42, 0.16)], [0.6, Color(0.9, 0.55, 0.3, 0.05)], [1.0, Color(0.9, 0.5, 0.3, 0.0)]], Vector2(0.5, 0.5), 0.5, 256)
-	var w := _css.x
-	var c := Vector2(w - 470.0, 150.0)
+		_sun_core = S.radial_tex([[0.0, Color(1.0, 0.95, 0.82, 0.9)], [0.12, Color(1.0, 0.88, 0.62, 0.55)], [0.4, Color(1.0, 0.72, 0.42, 0.16)], [1.0, Color(1.0, 0.6, 0.3, 0.0)]], Vector2(0.5, 0.5), 0.5, 256)
+	var c := SUN_AT
 	var sz := Vector2(1900, 1300)
 	_sunglow.draw_texture_rect(_sun_tex, Rect2(c - sz * 0.5, sz), false)
+	var k := Vector2(330, 330)
+	_sunglow.draw_texture_rect(_sun_core, Rect2(c - k * 0.5, k), false)
 
 func _draw_logo() -> void:
 	var x := 70.0

@@ -332,14 +332,24 @@ marches them onto each other, e.g.
 `game/menu/menu.gd` (a piece: in `PIECE_ORDER`, idle unless the scene is
 `menu`) is Retold's main menu in the HUD style (`hud_style.gd`, the panel
 shader, Cinzel / Alegreya): the coast town plays live behind it (the C++
-`coast` setup, no AI, no HUD) as an evening hero shot: a low camera (pitch
-9, from the sea) with the temple on the right-third line against the sky,
-a fishing fleet off the beach below it (three boats placed where their
-screen points meet the sea, each on its own rich shoal so they stay and
-fish), a warm low sun from the right, `menu_sky.gdshader` (gold horizon to
-dusky blue, the sun's glow low behind the town, cloud streaks) and golden
-haze that hides the map edge, set on the lighting piece's nodes for this
-scene only (`_apply_mood`, `_mood_frame` after lighting's frame), plus a
+`coast` setup, no AI, no HUD) as an evening hero shot through a long lens
+(fov 25, pitch 7.5, from the sea): an acropolis, a temple the menu raises
+on the headland at the harbour mouth (`_raise_acropolis`, `ACRO`), fills
+the right-centre third, backlit by the setting sun that sits just past its
+roof (`SUN_AT`, a frame point: the sky's sun, the additive bloom and the
+sea's glitter path all aim at it; the key light comes from that side,
+higher); three fishing boats lie in the mid-ground on a diagonal leading to
+it (placed where their frame points meet the sea, each on its own rich
+shoal so they stay and fish); the trees that would wall the frame's middle
+on this side of the temple are felled (`_clear_view`, `CLEAR_FRAME`) so
+the eye runs past the beach to the town; depth haze begins just past the
+temple (`FOG_NEAR` / `FOG_FAR` x the camera distance) so the woods and the
+old town step back in value; the sea is graded from the play map's cyan to
+an evening teal (`_grade_water`, the terrain's water material, menu scene
+only); `menu_sky.gdshader` (gold horizon to dusky blue, cloud streaks) and
+golden haze hide the map edge, set on the lighting piece's nodes for this
+scene only (`_apply_mood` / `_aim_mood`, `_mood_frame` after lighting's frame), plus a
+warm additive sun bloomplus a
 warm additive sun bloom and a shadow gradient under the menu column. The
 camera sways slowly round the anchor. Over it: a top bar with the logo
 (`logo.gdshader`: white text shaded as cast gold) and tabs, the Skirmish
@@ -390,7 +400,9 @@ node scripts/godot-shoot.mjs --scene menu --out shots/godot/menu.png
      [--params "menu_options=1"]         # the Options dialog open
      [--params "menu_guide=1"]           # the How to Play sheet open
      [--params "menu_view=x,z,dist,pitch,yaw"]   # camera anchor; menu_intro=1 plays the fade-in (off in captures)
-     [--params "menu_hero=yaw,pitch,dist,left,fwd"]  # the hero framing (temple -> view target shift); fleet and light follow it
+     [--params "menu_hero=yaw,pitch,dist,left,fwd,fov"]  # the hero framing (temple -> view target shift, lens); fleet, felled trees and light follow it
+     [--params "menu_acro=tx,tz"]        # where the acropolis temple is raised (tile corner)
+     [--params "menu_look=sx,sy,near,far"]  # the sun's frame point (1920x1080) and the haze start / end (x camera distance)
      [--params "menu_page=1"]            # the feature card turned N pages (0 Zeus, 1 attack-move, 2 the voxel world)
 VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 1280x720x24" \
   godot --path godot --rendering-driver vulkan --audio-driver Dummy --resolution 1280x720 \
@@ -401,7 +413,8 @@ VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 
 real key, joypad and mouse events: the menu opens with no in-game UI,
 arrows / D-pad move the focus, Enter on an unavailable tile gives its
 notice, the feature card's rendered art (full colour, reframed on a page turn),
-Options only in the top bar, Campaign / Multiplayer art filling the tile,
+Options only in the top bar, the hero shot (the acropolis in the
+right-centre third, the fleet before it, the sea graded down), Campaign / Multiplayer art filling the tile,
 hover, the Options tab (Graphics Low applies live and is remembered, then
 restored), Esc, How to Play open / Esc, world clicks blocked, Skirmish -> the setup screen -> a
 match with its HUD, then back to the menu.
