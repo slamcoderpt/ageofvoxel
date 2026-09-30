@@ -802,7 +802,9 @@ func _draw_result() -> void:
 	S.text(self, S.font("bold"), Vector2(r.position.x, r.position.y + 38), res.kicker, 14, S.MUTED, HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 0.8, 0.6)
 	S.text(self, S.font("black"), Vector2(r.position.x, r.position.y + 96), "VICTORY" if won else "DEFEAT", 48, S.GOLD if won else S.INK, HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 0.9, 5.0)
 	S.text(self, S.font("bold"), Vector2(r.position.x, r.position.y + 126), res.text, 17, S.INK, HORIZONTAL_ALIGNMENT_CENTER, r.size.x)
-	var br := Rect2(r.get_center().x - 90, r.end.y - 58, 180, 38)
-	S.cell(self, br, [[0.0, Color("#2d7489") if ui.hover_id == "restart" else Color("#1e5363")], [0.7, Color("#0a232b")], [1.0, Color("#051216")]], Vector2(0.5, 0.35))
-	S.text(self, S.font("title"), Vector2(br.position.x, br.position.y + 25), "PLAY AGAIN", 16, Color("#fff4dc"), HORIZONTAL_ALIGNMENT_CENTER, br.size.x, 0.85, 1.5)
-	zone(br, "restart")
+	# Play Again (the same match) and Main Menu
+	for b in [["restart", "PLAY AGAIN", -190.0], ["to_menu", "MAIN MENU", 10.0]]:
+		var br := Rect2(r.get_center().x + float(b[2]), r.end.y - 58, 180, 38)
+		S.cell(self, br, [[0.0, Color("#2d7489") if ui.hover_id == b[0] else Color("#1e5363")], [0.7, Color("#0a232b")], [1.0, Color("#051216")]], Vector2(0.5, 0.35))
+		S.text(self, S.font("title"), Vector2(br.position.x, br.position.y + 25), b[1], 16, Color("#fff4dc"), HORIZONTAL_ALIGNMENT_CENTER, br.size.x, 0.85, 1.5)
+		zone(br, b[0])

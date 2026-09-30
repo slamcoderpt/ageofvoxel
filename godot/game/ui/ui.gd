@@ -26,6 +26,7 @@ const Settings := preload("res://game/ui/settings.gd")
 
 const AGES := ["Archaic", "Classical", "Heroic", "Mythic"]
 const ROMAN := ["I", "II", "III", "IV"]
+const FLOW := "res://game/menu/flow.gd"   # screen flow (Play Again, Main Menu), when the menu piece is there
 const BUILD_MENU := ["house", "farm", "storehouse", "temple", "barracks", "town_center"]
 const ORDER_NAMES := {1: "Moving", 2: "Gathering", 3: "Returning", 4: "Worshipping", 5: "Building", 6: "Attacking", 7: "Attack-moving"}
 const AM_COLOR := Color("#ff7a30")   # attack-move: cursor ring and order marker
@@ -1161,7 +1162,14 @@ func _click_zone(id: String, arg) -> void:
 		"rb:score":
 			scores_visible = not scores_visible
 		"restart":
-			get_tree().reload_current_scene()
+			# Play Again: the same match (its args) through the loading screen
+			if ResourceLoader.exists(FLOW):
+				load(FLOW).restart(get_tree())
+			else:
+				get_tree().reload_current_scene()
+		"to_menu":
+			if ResourceLoader.exists(FLOW):
+				load(FLOW).to_main_menu(get_tree())
 		"medal":
 			pass
 
@@ -1380,11 +1388,14 @@ func _update_markers(dt: float) -> void:
 func _key(e: InputEventKey) -> void:
 	var kc := e.keycode
 	if kc == KEY_ESCAPE:
+		var busy := not _mode.is_empty() or menu_open
 		_cancel_mode()
 		if menu_open:
 			menu_open = false
 			tooltip = {}
 			_redraw()
+		if not busy and game.has_method("open_game_menu"):
+			game.open_game_menu()  # nothing to cancel: the in-game menu (game/menu/game_menu.gd)
 		return
 	if kc >= KEY_0 and kc <= KEY_9:
 		var k := str(kc - KEY_0)

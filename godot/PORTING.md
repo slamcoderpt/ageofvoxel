@@ -27,7 +27,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 
 | Piece | GDScript (render / UI) | C++ sim (`native/src/sim/…`) | JS reference |
 |---|---|---|---|
-| core (foundation; skirmish builder: camera, fog pass, playtest) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck, `fog_view.gd` + `fog_of_war.gdshader` (fog-of-war shading, one full-screen pass), `playtest.gd` (scripted skirmish playthrough), `match_rules.gd` + `match_check.gd` (match settings -> the sim, see "Match rules")) | `core/` (constants, rng, jsmath, bounds, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `match/` (the match setup: seats, teams, difficulty, stockpiles), `sim.{h,cpp}` | `src/core/` |
+| core (foundation; skirmish builder: camera, fog pass, playtest) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck, `fog_view.gd` + `fog_of_war.gdshader` (fog-of-war shading, one full-screen pass), `playtest.gd` (scripted skirmish playthrough), `menu_playtest.gd` (the screen flow through real input: menu -> setup -> loading -> match -> Esc menu -> menu, see "Screen flow"), `match_rules.gd` + `match_check.gd` (match settings -> the sim, see "Match rules")) | `core/` (constants, rng, jsmath, bounds, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `match/` (the match setup: seats, teams, difficulty, stockpiles), `sim.{h,cpp}` | `src/core/` |
 | terrain | `game/terrain/terrain.gd` + `terrain.gdshader` (chunks, paving cobbles / pale stone of MaterialPatches patchGround), `water.gdshader` (Water.js), `props.gdshader` (voxel.gdshader + MultiMesh instance tint, used by trees / gold / berries / ground details); mesher in `native/src/terrain_mesher.cpp` (TerrainMesh.js full port, water depth bake, GroundDetails.js scatter) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (sun + PCSS soft shadows, hemisphere = ambient colour + two unshadowed up/down lights, fill, depth haze following the camera, SSAO, MSAA, `--quality=high\|medium\|low`, `--post=high\|low\|off`), `grade_effect.gd` (CompositorEffect compute pass on the HDR buffer: exposure 2.1 + PBR Neutral + the PostFX.js grade; Godot's tonemap is LINEAR; Compatibility/web falls back to AgX), `sky.gdshader`. MaterialPatches.js canopy / foliage terms not ported yet | none | `src/lighting/` |
 | buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
@@ -39,7 +39,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | performance (6 teams, 2000 units) | `game/perf/perf.gd` (the render bench, `--renderbench`), and in the render paths of the stress scene: unit LOD + box shadow casters (`game/units`), coarse voxel twins `VoxelModels.coarse()` (tree shadow casters), tight resource / ground-detail buckets (`game/terrain`), economy props frustum culling (`AovEconView`); report in `../docs/godot-stress-report.md` | sim hot paths (with their owners); `native/src/unit_lod.cpp` (`AovUnitView.lod_mesh`) | `docs/stress-report.md` |
 | exports (Windows, macOS, Linux, web) | `export_presets.cfg`, `../scripts/godot-export.sh`, `../.github/workflows/godot.yml`, `native/SConstruct` + `native/aov.gdextension` (platform entries); see "Export" | none | `vite build` |
 | scenes | `AovScenes.set_setup()` from the owning piece, else the C++ setup | `scenes/` (helpers.js, skirmish / town / coast / hud, EconomyScene.js; battle.cpp: BattleScene.js + units/battleHost.js, godpower, stress.js: all ported) | `src/core/scenes/`, `BattleScene.js`, `EconomyScene.js` |
-| menu (main menu) | `game/menu/`: `menu.gd` (the piece, scene `menu`), `tile.gd`, `art.gd`, `options.gd`, `flow.gd` (screen flow, `AovArgs.override`), `hero_art.gd` + `hero_sky.gdshader` + `hero_bolt.gdshader` (the feature card's rendered art), `logo.gdshader`, `menu_sky.gdshader`, `menu_check.gd`; see "Main menu" | none | none (Godot-only) |
+| menu (main menu) | `game/menu/`: `menu.gd` (the piece, scene `menu`), `tile.gd`, `art.gd`, `options.gd`, `flow.gd` (screen flow, `AovArgs.override`), `loading.gd` (the loading screen), `game_menu.gd` (the in-game Esc menu), `hero_art.gd` + `hero_sky.gdshader` + `hero_bolt.gdshader` (the feature card's rendered art), `logo.gdshader`, `menu_sky.gdshader`, `menu_check.gd`; see "Main menu" | none | none (Godot-only) |
 
 ```
 godot/
@@ -418,6 +418,70 @@ right-centre third, the fleet before it, the sea graded down), Campaign / Multip
 hover, the Options tab (Graphics Low applies live and is remembered, then
 restored), Esc, How to Play open / Esc, world clicks blocked, Skirmish -> the setup screen -> a
 match with its HUD, then back to the menu.
+
+## Screen flow: menu, setup, loading, match, game menu (game/menu/flow.gd)
+
+A plain launch (no `--scene`, the web build without `?scene=`) opens the main
+menu; Skirmish opens the setup screen; its Play (and the menu's Quick Match)
+calls `Flow.start_match(tree, M.to_args(settings))`; the in-game menu's Quit
+to Main Menu and the result card's Main Menu call `Flow.to_main_menu`; the
+result card's Play Again calls `Flow.restart` (the current run's args again:
+exactly the same match, setup settings or command line). Every switch sets
+`AovArgs.override` and goes through **the loading screen**
+(`game/menu/loading.gd`, a CanvasLayer at 128 under the tree *root*, so it
+survives the scene change): it is drawn first (the map's name, kicker and
+blurb, the map preview from the setup screen's cache in a bronze frame, the
+players by team with their voxel portraits, colour tags, god and
+difficulty, a cast-bronze bar with the stage being built, a tip), then
+`main.tscn` reloads under it. main.gd finds it (`loading`, node
+`AovLoading`) and builds in stages, one drawn frame each (`_stage`: new_game,
+each piece's `setup()`, the match seating, the fast-forward), with its own
+process mode disabled until the last `setup()` ran (no piece `frame()` or
+input half set up; `building` is true meanwhile), advances the bar, marks the
+Town Centers in the players' colours once `MatchRules.apply` seated them
+(`loading.seat(sim)`), then `loading.finish()` fades it out. The root
+viewport's 3D is off under the opaque card (a stage then costs ~70 ms instead
+of a full lavapipe frame), except for the two frames that draw the portraits
+(SubViewports rendered while a scene world exists under a root with
+`disable_3d` come out as flat close-ups). A command-line run (captures,
+checks, `--scene=...`) has no loading screen and builds synchronously as
+before; `time_scale` is set before the build so checks that wait a few frames
+after Play still read it.
+
+**In-game menu** (`game/menu/game_menu.gd`, hosted by main.gd as
+`game_menu` in every scene with the in-game UI, a CanvasLayer at 60): Esc
+with nothing to cancel (no placement / targeting mode, no hotkey card: ui.gd
+`_key` calls `game.open_game_menu()`) or F10 opens it; the match pauses
+under a dim veil (restored on close, a decided match stays paused); Resume,
+Options (the main menu's Options dialog: graphics live, display, F3 meter)
+and Quit to Main Menu, in the HUD style (panel.gdshader, `tile.gd` bars),
+keyboard / joypad navigable; Esc closes Options, then the menu; no hotkey
+reaches the HUD while it is open. The result card (hud.gd) has Play Again
+and Main Menu.
+
+```
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 1280x720x24" \
+  godot --path godot --rendering-driver vulkan --audio-driver Dummy --resolution 1280x720 \
+  -s res://game/core/menu_playtest.gd [-- --shots=/abs/dir]    # no --scene on purpose: "FLOW ok|FAIL <step>", exit = failures
+```
+
+`menu_playtest.gd` drives it all with real input events (mouse moves and
+clicks at the widgets' centres, checked to be the control under the mouse;
+keys): plain launch -> the menu -> Skirmish -> setup: 6 players, teams 3 v 3,
+one AI per difficulty (Easy, Moderate, Hard, Titan, Moderate), your colour
+changed to 7 (cyan), map size Large -> Play -> the loading screen -> the
+match, then from the sim: players 1..6, teams (and `is_ally` / `is_enemy`),
+the one human, each seat's difficulty and its AI's, the colours, the map
+size, a Town Center each, the HUD; Esc -> the game menu (the tick stops, H
+does not reach the HUD) -> Resume (the tick runs) -> Esc -> Options -> Esc ->
+Esc -> Esc -> Quit to Main Menu -> the menu -> Skirmish (the setup remembers
+the match) -> Play -> the same match; the enemy team's Town Centers razed
+(harness shortcut) -> the result card -> Play Again (the same match, from
+tick 0) -> the card again -> Main Menu. It prints the clicks it took: 24 from
+the main menu to that match (Skirmish 1, count 2, teams 10, difficulties 6,
+colour 2, map size 2, Play 1; a default skirmish is 2: Skirmish, Play), and
+each load's frames / ms (~2-4 s on lavapipe). `--shots` saves the setup, the
+loading screen, the game menu, its Options and the result card.
 
 ## Match setup and match settings (game/menu/setup)
 
