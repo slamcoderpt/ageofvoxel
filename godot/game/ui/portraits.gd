@@ -66,6 +66,8 @@ func _unit_object(type: String, owner: int) -> Node3D:
 		mi.mesh = VoxelModels.mesh("units", p.mesh)
 		mi.material_override = mat
 		mi.transform = t
+		if str(p.name) == "weapon":
+			mi.set_meta("weapon", true)
 		root.add_child(mi)
 	return root
 
@@ -91,12 +93,22 @@ func _render(obj: Node3D) -> Texture2D:
 	vp.add_child(obj)
 	# bounds of the object
 	var box := AABB()
+	var body := AABB()
 	var first := true
+	var first_body := true
 	for c in obj.get_children():
 		if c is MeshInstance3D and c.mesh:
 			var b: AABB = c.transform * c.mesh.get_aabb()
 			box = b if first else box.merge(b)
 			first = false
+			if not c.has_meta("weapon"):
+				body = b if first_body else body.merge(b)
+				first_body = false
+	# A weapon far taller than the man (the hero's 5.8-unit spear) would
+	# shrink him to a speck in the frame: frame on the body instead, as the
+	# other units already are (their weapons stay within half a body).
+	if not first_body and box.size.y > body.size.y * 1.5:
+		box = body
 	var ctr := box.get_center()
 	var r := maxf(box.size.x, maxf(box.size.y, box.size.z)) * 0.62
 	var cam := Camera3D.new()
