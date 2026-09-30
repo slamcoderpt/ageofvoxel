@@ -4,14 +4,15 @@ extends Node
 ## behind it (the C++ "coast" setup, no AI, no HUD) under a slow drifting
 ## camera; over it: the top bar with the logo and tabs, the Skirmish tile,
 ## Campaign / Multiplayer (unavailable: softer art, a notice when pressed),
-## a feature carousel, Quick Match / Options / Quit, a status plate and
-## notices.
+## a feature carousel, Quick Match / How to Play / Quit, a tip plate and
+## notices; Options sits in the top bar.
 ##
 ## Loaded as a piece in every scene (main.gd PIECE_ORDER) and does nothing
 ## unless the scene is "menu".
 ##
 ## Args (menu scene only): --menu_hover=<tile> draws that tile hovered and
 ## focused (captures of the states), --menu_options=1 opens Options,
+## --menu_guide=1 opens How to Play,
 ## --menu_intro=0|1 (default: on when playing, off in captures),
 ## --menu_view=x,z,distance,pitch,yaw overrides the camera anchor.
 ##
@@ -31,12 +32,23 @@ const Tile := preload("res://game/menu/tile.gd")
 const Art := preload("res://game/menu/art.gd")
 const Flow := preload("res://game/menu/flow.gd")
 const Options := preload("res://game/menu/options.gd")
+const Guide := preload("res://game/menu/guide.gd")
 const HeroArt := preload("res://game/menu/hero_art.gd")
 const PANEL := preload("res://game/ui/panel.gdshader")
 const LOGO := preload("res://game/menu/logo.gdshader")
 const SKY := preload("res://game/menu/menu_sky.gdshader")
 
-const VERSION := "Age of Voxel · Godot build"
+const VERSION := "Age of Voxel  ·  Olympus"
+## The tip plate at the bottom left (where Retold has its chat bar): one tip
+## at a time, turning every TIP_SECONDS (the first one in captures).
+const TIPS := [
+	"Press A and click to attack-move: your army fights on the way.",
+	"Press . to find an idle villager, H to jump to your Town Center.",
+	"Zeus answers with Lightning Storm, Bolt and Meteor: keys Z, C and V.",
+	"Ctrl + 1-9 binds a control group, 1-9 calls it back.",
+	"Fishing boats feed a town fast: build a Dock near the shoals.",
+]
+const TIP_SECONDS := 9.0
 
 var game: Node
 var active := false
@@ -60,6 +72,7 @@ var _toast_t := -1.0
 var _toast_title := ""
 var _toast_text := ""
 var _options: Control
+var _guide: Control
 var _veil: Control
 var _screen: Node = null
 var _fade := 1.0           # 1 = black (the intro fades in / start fades out)
@@ -139,6 +152,8 @@ func setup(g: Node) -> void:
 		_tiles[hv].hover_k = 1.0
 	if AovArgs.flag(g.args, "menu_options", false):
 		_open_options()
+	if AovArgs.flag(g.args, "menu_guide", false):
+		_guide.open()
 		if _tiles.has("seg:" + hv):
 			pass
 
@@ -222,11 +237,12 @@ func _build() -> void:
 			fe.next_page()
 	# (no Load: saved games do not exist yet, so the row is Quick Match)
 	_add("quick", "bar", "QUICK MATCH", Rect2(352, 676, 296, 68))
-	_add("options", "bar", "OPTIONS", Rect2(352, 767, 296, 68))
+	# (Options lives in the top bar, like Retold's; this row is the controls sheet)
+	_add("guide", "bar", "HOW TO PLAY", Rect2(352, 767, 296, 68))
 	var q := _add("quit", "bar", "QUIT", Rect2(352, 858, 296, 68))
 	if OS.has_feature("web"):
 		q.available = false
-	_order = [_tiles.skirmish, _tiles.campaign, _tiles.multiplayer, _tiles.feature, _tiles.quick, _tiles.options, _tiles.quit]
+	_order = [_tiles.skirmish, _tiles.campaign, _tiles.multiplayer, _tiles.feature, _tiles.quick, _tiles.guide, _tiles.quit]
 	for n in _tiles:
 		_tiles[n].pressed.connect(_on_pressed.bind(n))
 	# explicit focus paths for arrows / D-pad (the grid is irregular)
@@ -238,9 +254,9 @@ func _build() -> void:
 		"campaign": {"up": "skirmish", "right": "multiplayer", "down": "feature"},
 		"multiplayer": {"up": "skirmish", "left": "campaign", "down": "quick"},
 		"feature": {"up": "campaign", "right": "quick"},
-		"quick": {"up": "multiplayer", "left": "feature", "down": "options"},
-		"options": {"up": "quick", "left": "feature", "down": "quit"},
-		"quit": {"up": "options", "left": "feature"},
+		"quick": {"up": "multiplayer", "left": "feature", "down": "guide"},
+		"guide": {"up": "quick", "left": "feature", "down": "quit"},
+		"quit": {"up": "guide", "left": "feature"},
 	}
 	var props := {"up": "focus_neighbor_top", "down": "focus_neighbor_bottom", "left": "focus_neighbor_left", "right": "focus_neighbor_right"}
 	for n in nb:
@@ -261,8 +277,14 @@ func _build() -> void:
 	_root.add_child(_options)
 	_options.build()
 	_options.closed.connect(func() -> void:
-		if _tiles.has("options"):
-			_tiles.options.grab_focus())
+		_tiles.tab_options.grab_focus())
+	_guide = Guide.new()
+	_guide.menu = self
+	_guide.visible = false
+	_root.add_child(_guide)
+	_guide.build()
+	_guide.closed.connect(func() -> void:
+		_tiles.guide.grab_focus())
 	# the fade (intro / leaving) over everything
 	_veil = Control.new()
 	_veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -314,7 +336,7 @@ func _layout() -> void:
 	_scale = clampf(vs.y / 1080.0, 0.5, 3.0)
 	_layer.transform = Transform2D().scaled(Vector2(_scale, _scale))
 	_css = vs / _scale
-	for c in [_root, _sunglow, _shade, _ui, _top, _logo, _options, _toast, _veil]:
+	for c in [_root, _sunglow, _shade, _ui, _top, _logo, _options, _guide, _toast, _veil]:
 		c.position = Vector2.ZERO
 		c.size = _css
 	_set_panel_rect(_topbar, Rect2(22, -4, _css.x - 44, 100))
@@ -337,8 +359,10 @@ func _on_pressed(n: String) -> void:
 		"quick":
 			# a default skirmish at once: Greeks against one AI on the default map
 			start_match({})
-		"options", "tab_options", "burger":
+		"tab_options", "burger":
 			_open_options()
+		"guide":
+			_guide.open()
 		"tab_play":
 			pass
 		"feature":
@@ -422,6 +446,9 @@ func _input(e: InputEvent) -> void:
 		if e.is_action_pressed("ui_cancel"):
 			if _options.visible:
 				_options.close()
+				get_viewport().set_input_as_handled()
+			elif _guide.visible:
+				_guide.close()
 				get_viewport().set_input_as_handled()
 
 # ---- per frame -------------------------------------------------------------------
@@ -658,20 +685,33 @@ func _draw_top() -> void:
 	S.text(_top, S.font("title7"), Vector2(pc.x - 118, pc.y + 5), "OFFLINE", 12, S.MUTED, HORIZONTAL_ALIGNMENT_RIGHT, 104, 0.8, 1.5)
 	# status plate (Retold's chat bar: offline here)
 	var h := _css.y
-	var sr := Rect2(26, h - 56, 490, 38)
+	var sr := Rect2(26, h - 56, 622, 38)
 	_top.draw_rect(sr.grow(1), Color(0, 0, 0, 0.6))
 	S.vgrad(_top, sr, [[0.0, Color(0.05, 0.1, 0.12, 0.88)], [1.0, Color(0.02, 0.05, 0.06, 0.88)]])
 	_top.draw_rect(sr, Color(S.BRONZE, 0.6), false, 1.0)
-	_draw_bubble(Vector2(sr.position.x + 22, sr.get_center().y))
-	S.text(_top, S.font("sans"), Vector2(sr.position.x + 46, sr.position.y + 25), "Offline  ·  Single player", 18, S.MUTED, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.8)
+	_draw_tip(sr)
 	S.text(_top, S.font("sans"), Vector2(w - 400, h - 26), VERSION, 15, Color(S.INK, 0.85), HORIZONTAL_ALIGNMENT_RIGHT, 370, 0.9)
 
-func _draw_bubble(c: Vector2) -> void:
-	var r := Rect2(c - Vector2(10, 8), Vector2(20, 13))
-	_top.draw_rect(r, Color(S.MUTED, 0.9))
-	_top.draw_colored_polygon(PackedVector2Array([Vector2(c.x - 6, r.end.y), Vector2(c.x - 1, r.end.y), Vector2(c.x - 7, r.end.y + 5)]), Color(S.MUTED, 0.9))
-	for i in 3:
-		_top.draw_circle(Vector2(c.x - 5 + i * 5, c.y - 1.5), 1.4, Color("#0b1417"))
+## The tip plate: a small gold scroll, "TIP" in small caps and the tip text,
+## crossfading when it turns.
+func _draw_tip(sr: Rect2) -> void:
+	var n := TIPS.size()
+	var ph := 0.0 if capturing else t / TIP_SECONDS
+	var i := int(ph) % n
+	var k := clampf(minf(fmod(ph, 1.0) * TIP_SECONDS / 0.5, (1.0 - fmod(ph, 1.0)) * TIP_SECONDS / 0.5), 0.0, 1.0) if not capturing else 1.0
+	var c := Vector2(sr.position.x + 22, sr.get_center().y)
+	var gold := Color(S.GOLD, 0.95)
+	# the scroll: a sheet with rolled ends
+	_top.draw_rect(Rect2(c - Vector2(7, 6), Vector2(14, 12)), Color(S.GOLD, 0.25))
+	_top.draw_rect(Rect2(c - Vector2(7, 6), Vector2(14, 12)), gold, false, 1.2)
+	_top.draw_arc(c + Vector2(-8, 0), 2.5, 0, TAU, 10, gold, 1.2, true)
+	_top.draw_arc(c + Vector2(8, 0), 2.5, 0, TAU, 10, gold, 1.2, true)
+	for j in 2:
+		_top.draw_line(c + Vector2(-4, -2 + j * 4), c + Vector2(4, -2 + j * 4), gold, 1.0)
+	var tf := S.font("title7")
+	S.text(_top, tf, Vector2(sr.position.x + 42, sr.position.y + 24), "TIP", 13, S.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.8, 2.0)
+	_top.draw_line(Vector2(sr.position.x + 80, sr.position.y + 10), Vector2(sr.position.x + 80, sr.end.y - 10), Color(S.BRONZE, 0.6), 1.0)
+	S.text(_top, S.font("sans"), Vector2(sr.position.x + 92, sr.position.y + 25), TIPS[i], 16, Color(S.INK, 0.9 * k), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.8)
 
 func _draw_toast() -> void:
 	if _toast_t < 0.0:

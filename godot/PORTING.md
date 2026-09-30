@@ -343,9 +343,13 @@ scene only (`_apply_mood`, `_mood_frame` after lighting's frame), plus a
 warm additive sun bloom and a shadow gradient under the menu column. The
 camera sways slowly round the anchor. Over it: a top bar with the logo
 (`logo.gdshader`: white text shaded as cast gold) and tabs, the Skirmish
-tile, Campaign / Multiplayer unavailable (softer gold line art, muted
-title, no label; on hover "Not available in this version.", pressing shows
-a notice), a feature carousel (Zeus, attack-move, the map) whose card
+tile, Campaign / Multiplayer unavailable (each carries a full-bleed
+engraving from `art.gd`, drawn edge to edge inside the frame at about 45%
+over a soft gold glow, bleeding under the label's dark gradient: Campaign a
+hoplite hero charging past a burning trireme under a rain of arrows,
+Multiplayer Zeus rising from storm clouds with his thunderbolt; hatched
+shading via SVG clip paths; a muted title, on hover "Not available in this
+version.", pressing shows a notice), a feature carousel (Zeus, attack-move, the map) whose card
 carries full-colour art rendered live in our own voxel render
 (`hero_art.gd`: a SubViewport with its own World3D, so nothing of it
 reaches the harbour or its light; exported models in rest pose on voxel
@@ -356,8 +360,12 @@ camera framing and mood per page, a slow sway and bolt flicker live, still
 in captures; drawn edge to edge inside the bronze frame, the title on a
 dark gradient, a one-line caption), Quick Match
 (the default skirmish at once; there is no Load until saved games exist),
-Options (`options.gd`: Graphics High / Medium / Low live + remembered like
-the gear card, window mode, F3 meter) and Quit (a notice on the web). Tiles are
+How to Play (`guide.gd`: the goal and the mouse / camera / hotkeys, the
+same framed sheet as Options) and Quit (a notice on the web). Options
+(`options.gd`: Graphics High / Medium / Low live + remembered like the gear
+card, window mode, F3 meter) opens from the top bar's OPTIONS tab or the
+burger, so it appears once. The bottom-left plate (Retold's chat bar) shows
+one gameplay tip at a time, turning every 9 s (the first in captures). Tiles are
 `tile.gd` Buttons (hover / pressed / focus states) with gold line art built
 as SVG in `art.gd`. Keyboard / joypad: the first arrow or D-pad press
 focuses Skirmish, arrows move, Enter / A presses, Esc / B closes Options; the
@@ -378,8 +386,9 @@ node, menu scene only): at that distance they read as specks.
 
 ```
 node scripts/godot-shoot.mjs --scene menu --out shots/godot/menu.png
-     [--params "menu_hover=skirmish"]    # a tile hovered + focused: skirmish campaign multiplayer feature quick options quit tab_play tab_options burger
+     [--params "menu_hover=skirmish"]    # a tile hovered + focused: skirmish campaign multiplayer feature quick guide quit tab_play tab_options burger
      [--params "menu_options=1"]         # the Options dialog open
+     [--params "menu_guide=1"]           # the How to Play sheet open
      [--params "menu_view=x,z,dist,pitch,yaw"]   # camera anchor; menu_intro=1 plays the fade-in (off in captures)
      [--params "menu_hero=yaw,pitch,dist,left,fwd"]  # the hero framing (temple -> view target shift); fleet and light follow it
      [--params "menu_page=1"]            # the feature card turned N pages (0 Zeus, 1 attack-move, 2 the voxel world)
@@ -391,8 +400,10 @@ VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 
 `menu_check.gd` launches with no scene argument and drives the menu through
 real key, joypad and mouse events: the menu opens with no in-game UI,
 arrows / D-pad move the focus, Enter on an unavailable tile gives its
-notice, the feature card's rendered art (full colour, reframed on a page turn), hover, Options (Graphics Low applies live and is remembered, then
-restored), Esc, world clicks blocked, Skirmish -> the setup screen -> a
+notice, the feature card's rendered art (full colour, reframed on a page turn),
+Options only in the top bar, Campaign / Multiplayer art filling the tile,
+hover, the Options tab (Graphics Low applies live and is remembered, then
+restored), Esc, How to Play open / Esc, world clicks blocked, Skirmish -> the setup screen -> a
 match with its HUD, then back to the menu.
 
 ## Match setup and match settings (game/menu/setup)

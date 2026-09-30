@@ -19,6 +19,8 @@ const S := preload("res://game/ui/hud_style.gd")
 const Art := preload("res://game/menu/art.gd")
 const PANEL := preload("res://game/ui/panel.gdshader")
 const MARGIN := 18.0
+## Tiles whose engraving fills the card edge to edge, under the label.
+const FULL_BLEED := ["campaign", "multiplayer"]
 
 var style := "tile"
 var title := ""
@@ -141,6 +143,7 @@ func next_page() -> void:
 # ---- drawing -------------------------------------------------------------------
 
 static var _glow_tex: Texture2D
+static var _art_glow_tex: Texture2D
 
 func _glow() -> Texture2D:
 	if _glow_tex == null:
@@ -156,8 +159,10 @@ func draw_face(ci: Control) -> void:
 		"tab": _draw_tab(ci, r, hk, down, focus_ring); return
 		"burger": _draw_burger(ci, r, hk, down, focus_ring); return
 	var o := Vector2(0, 1) if down else Vector2.ZERO
-	# engraved art
-	if art != "":
+	# engraved art: full bleed (Campaign / Multiplayer), or a vignette
+	if art in FULL_BLEED:
+		_draw_full_bleed(ci, r, hk, o)
+	elif art != "":
 		var ar := _art_rect(r)
 		var tex := Art.texture(art, Vector2i(ar.size))
 		if tex:
@@ -173,7 +178,7 @@ func draw_face(ci: Control) -> void:
 		ci.draw_rect(r.grow(-3.5), Color(S.GOLD_HI, 0.5 * hk * (1.0 if available else 0.5)), false, 1.2)
 	_draw_corners(ci, r, hk)
 	# title
-	var col := S.INK.lerp(S.GOLD_HI, hk) if available else Color(0.60, 0.64, 0.62).lerp(Color(0.72, 0.75, 0.72), hk)
+	var col := S.INK.lerp(S.GOLD_HI, hk) if available else Color(0.74, 0.76, 0.72).lerp(Color(0.86, 0.84, 0.76), hk)
 	var f := S.font("title")
 	match style:
 		"tile":
@@ -203,6 +208,38 @@ func draw_face(ci: Control) -> void:
 		var p := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 1000.0 * 4.0)
 		ci.draw_rect(r.grow(4.0 + p), Color(S.GOLD_HI, 0.55 + 0.35 * p), false, 2.0)
 		ci.draw_rect(r.grow(7.0 + p), Color(S.GOLD, 0.18), false, 3.0)
+
+## The card's face inside the bronze frame (its chamfered corners), inset i.
+func _inner_poly(r: Rect2, i: float) -> PackedVector2Array:
+	var ch := 8.0
+	var w := r.size.x
+	var h := r.size.y
+	return PackedVector2Array([Vector2(i + ch, i), Vector2(w - i - ch, i), Vector2(w - i, i + ch), Vector2(w - i, h - i - ch),
+		Vector2(w - i - ch, h - i), Vector2(i + ch, h - i), Vector2(i, h - i - ch), Vector2(i, i + ch)])
+
+## Campaign / Multiplayer: the engraving fills the card edge to edge, over a
+## soft gold glow behind its figure, with a dark gradient rising under the label.
+func _draw_full_bleed(ci: Control, r: Rect2, hk: float, o: Vector2) -> void:
+	var w := r.size.x
+	var h := r.size.y
+	# the glow behind the figure (right of centre, where the head is)
+	var gc := Vector2(w * 0.62, h * 0.38)
+	var gs := Vector2(h, h) * (1.25 + 0.1 * hk)
+	if _art_glow_tex == null:
+		_art_glow_tex = S.radial_tex([[0.0, Color(1, 0.8, 0.48, 0.3)], [0.45, Color(1, 0.76, 0.42, 0.12)], [1.0, Color(1, 0.76, 0.42, 0.0)]], Vector2(0.5, 0.5), 0.5, 128)
+	ci.draw_texture_rect(_art_glow_tex, Rect2(gc - gs * 0.5, gs), false, Color(1, 1, 1, 0.85 + 0.15 * hk))
+	var tex := Art.texture(art, Vector2i(r.size))
+	if tex:
+		var pts := _inner_poly(r, 3.0)
+		var uvs := PackedVector2Array()
+		var off := PackedVector2Array()
+		for p in pts:
+			uvs.append(p / r.size)
+			off.append(p + o)
+		var a := (0.5 + 0.2 * hk) if available else (0.48 + 0.16 * hk)
+		ci.draw_polygon(off, PackedColorArray([Color(1, 1, 1, a)]), uvs, tex)
+	# the label's shadow, rising from the bottom edge
+	S.vgrad(ci, Rect2(3, h * 0.5, w - 6, h * 0.5 - 3), [[0.0, Color(0.01, 0.03, 0.04, 0.0)], [0.55, Color(0.01, 0.03, 0.04, 0.6)], [1.0, Color(0.01, 0.03, 0.04, 0.88)]])
 
 func _art_rect(r: Rect2) -> Rect2:
 	if art == "skirmish":
@@ -239,11 +276,9 @@ func _draw_feature(ci: Control, r: Rect2, hk: float, o: Vector2) -> void:
 		# corners), fading up from black when the page turns
 		hero.hover = hk
 		var i := 3.0
-		var ch := 8.0
 		var w := r.size.x
 		var h := r.size.y
-		var pts := PackedVector2Array([Vector2(i + ch, i), Vector2(w - i - ch, i), Vector2(w - i, i + ch), Vector2(w - i, h - i - ch),
-			Vector2(w - i - ch, h - i), Vector2(i + ch, h - i), Vector2(i, h - i - ch), Vector2(i, i + ch)])
+		var pts := _inner_poly(r, i)
 		var uvs := PackedVector2Array()
 		for p in pts:
 			uvs.append(p / r.size)

@@ -12,6 +12,7 @@ extends SceneTree
 
 const Settings := preload("res://game/ui/settings.gd")
 const Flow := preload("res://game/menu/flow.gd")
+const Art := preload("res://game/menu/art.gd")
 
 var main: Node
 var menu: Node
@@ -155,11 +156,21 @@ func _run() -> void:
 	var jf := _focus_name()
 	_check("joypad D-pad moves the focus", jf != "" and jf != "tab_play" and jf != "tab_options", jf)
 
-	# mouse: hover shows, then leaves keyboard mode; click Options opens the dialog
-	await _move(_tile_center("options"))
+	# Options exists once (the top bar tab), not again as a row
+	_check("Options is not duplicated as a row", not menu._tiles.has("options") and menu._tiles.has("tab_options"))
+	# Campaign / Multiplayer carry full-bleed engravings, not a small icon
+	var bleed := true
+	for n in ["campaign", "multiplayer"]:
+		var tl: Control = menu._tiles[n]
+		var tx: Texture2D = Art.texture(tl.art, Vector2i(tl.size))
+		bleed = bleed and tl.art in tl.FULL_BLEED and tx != null and tx.get_width() >= int(tl.size.x) - 1 and tx.get_height() >= int(tl.size.y) - 1
+	_check("Campaign / Multiplayer art fills the tile", bleed)
+
+	# mouse: hover shows, then leaves keyboard mode; click the Options tab opens the dialog
+	await _move(_tile_center("tab_options"))
 	await _frames(10)
-	_check("hover highlights a tile", menu._tiles.options.is_hovered() and menu._tiles.options.hover_k > 0.5 and not menu.kb_mode)
-	await _click(_tile_center("options"))
+	_check("hover highlights a tile", menu._tiles.tab_options.is_hovered() and menu._tiles.tab_options.hover_k > 0.5 and not menu.kb_mode)
+	await _click(_tile_center("tab_options"))
 	_check("click Options opens the dialog", menu._options.visible)
 	var lighting: Node = main.pieces.get("lighting")
 	var q0: String = str(lighting.quality) if lighting else ""
@@ -172,9 +183,15 @@ func _run() -> void:
 	_check("Graphics Low is remembered", str(Settings.read("graphics", "quality", "")) == "low")
 	await _key(KEY_ESCAPE)
 	_check("Esc closes Options", not menu._options.visible)
-	_check("focus returns to the Options tile", _focus_name() == "options", _focus_name())
+	_check("focus returns to the Options tab", _focus_name() == "tab_options", _focus_name())
 	if lighting and q0 != "":
 		lighting.set_quality(q0)
+
+	# How to Play: the controls sheet opens, Esc closes it
+	await _click(_tile_center("guide"))
+	_check("How to Play opens the controls sheet", menu._guide.visible)
+	await _key(KEY_ESCAPE)
+	_check("Esc closes How to Play", not menu._guide.visible and _focus_name() == "guide", _focus_name())
 
 	# the world behind the menu takes no clicks (no selection box / orders)
 	var n0: int = ui.selected.size() if ui else 0
