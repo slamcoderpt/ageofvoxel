@@ -101,6 +101,12 @@ func _ready() -> void:
 		if not ResourceLoader.exists(path):
 			continue
 		var script: Script = load(path)
+		# a piece whose script fails to load (a parse error) is skipped and reported,
+		# so it cannot take every other piece and the scene's screen down with it
+		if script == null or not script.can_instantiate():
+			errors.append("piece %s: failed to load %s" % [p, path])
+			push_error("aov: piece %s failed to load (%s), skipped" % [p, path])
+			continue
 		var node: Node = script.new()
 		node.name = p.capitalize().replace(" ", "")
 		add_child(node)
