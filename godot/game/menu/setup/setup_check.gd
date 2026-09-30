@@ -6,7 +6,12 @@ extends SceneTree
 ## add AI players, Esc, then Play: the match loads with the settings in its
 ## args (M.from_args), and a second run checks Leave goes to the main menu.
 ##
-##   godot --headless --path godot -s res://game/menu/setup/setup_check.gd -- --scene=setup
+##   VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 1280x720x24" \
+##     godot --path godot --rendering-driver vulkan --audio-driver Dummy --resolution 1280x720 \
+##     -s res://game/menu/setup/setup_check.gd -- --scene=setup
+##
+## Needs a rendering display, not --headless: the dropdowns register their
+## hit zones while they draw, so headless runs fail the dropdown steps.
 ##
 ## Prints "SETUP ok|FAIL <step>" per step and "SETUP_RESULT {json}"; exits
 ## with the number of failed steps (99 on a timeout).
