@@ -27,7 +27,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 
 | Piece | GDScript (render / UI) | C++ sim (`native/src/sim/…`) | JS reference |
 |---|---|---|---|
-| core (foundation; skirmish builder: camera, fog pass, playtest) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck, `fog_view.gd` + `fog_of_war.gdshader` (fog-of-war shading, one full-screen pass), `playtest.gd` (scripted skirmish playthrough)) | `core/` (constants, rng, jsmath, bounds, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `sim.{h,cpp}` | `src/core/` |
+| core (foundation; skirmish builder: camera, fog pass, playtest) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck, `fog_view.gd` + `fog_of_war.gdshader` (fog-of-war shading, one full-screen pass), `playtest.gd` (scripted skirmish playthrough), `match_rules.gd` + `match_check.gd` (match settings -> the sim, see "Match rules")) | `core/` (constants, rng, jsmath, bounds, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `match/` (the match setup: seats, teams, difficulty, stockpiles), `sim.{h,cpp}` | `src/core/` |
 | terrain | `game/terrain/terrain.gd` + `terrain.gdshader` (chunks, paving cobbles / pale stone of MaterialPatches patchGround), `water.gdshader` (Water.js), `props.gdshader` (voxel.gdshader + MultiMesh instance tint, used by trees / gold / berries / ground details); mesher in `native/src/terrain_mesher.cpp` (TerrainMesh.js full port, water depth bake, GroundDetails.js scatter) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (sun + PCSS soft shadows, hemisphere = ambient colour + two unshadowed up/down lights, fill, depth haze following the camera, SSAO, MSAA, `--quality=high\|medium\|low`, `--post=high\|low\|off`), `grade_effect.gd` (CompositorEffect compute pass on the HDR buffer: exposure 2.1 + PBR Neutral + the PostFX.js grade; Godot's tonemap is LINEAR; Compatibility/web falls back to AgX), `sky.gdshader`. MaterialPatches.js canopy / foliage terms not ported yet | none | `src/lighting/` |
 | buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
@@ -411,23 +411,105 @@ rules):
 ```
 
 `M.team_of(settings, i)` gives the team the rules should use (free for all:
-a team per player); `M.DIFFICULTIES[..].ai` is the suggested
-`AovSim.set_ai` override per difficulty (`{}` = the current AI);
+a team per player); `M.DIFFICULTIES[..].ai` was a hint for
+the rules (unused: they take the difficulty key, see "Match rules");
 `M.RESOURCES[..].res` the `set_player_resources` stockpile (`{}` = the
 default). Play passes main.gd args (strings): `scene=skirmish`, `seed`,
 `mapsize`, `players`, `preset`, `timescale` (speed), `fog=0` (revealed), and
 `match` = the whole Dictionary as JSON; `M.from_args(game.args)` reads it
-back ({} for a run without one). main.gd itself honours seed, mapsize,
-timescale and fog today; players, preset, teams, colours, difficulty and
-resources are for the rules to apply. Which player counts a map takes is
-asked of the generator (`M.starts_for`: the starts `new_game` places), so the
-screen offers the 2-player presets only for 2 players and switches to
-Circle of Poleis (`stress`, a ring of 2-6 starts) above that; a preset that
-learns more starts unlocks itself. Only Zeus is playable: Hades and Poseidon
+back ({} for a run without one). main.gd honours seed, mapsize,
+timescale and fog, and hands the rest to the match rules (below). Which
+player counts a map takes is asked of the generator (`M.starts_for`: the
+starts `new_game` places): Aegean Hills, Marathon and Circle of Poleis take
+2-6, Ionian Coast 2. Only Zeus is playable: Hades and Poseidon
 are shown locked in the pantheon picker. The map preview is the real
 generator's output for the chosen preset / seed / size / player count
 (tiles coloured like the minimap, trees / gold / berries, Town Center
 markers in the players' colours).
+
+## Match rules (native/src/sim/match, game/core/match_rules.gd)
+
+A run with a `match` arg (the setup screen's Play) is a real match:
+main.gd reads it with `MatchRules.settings(args)`
+(`game/core/match_rules.gd`), calls `new_game(seed, mapsize,
+MatchRules.preset(m), player count)` and, in place of the scene setup,
+`MatchRules.apply(sim, m)` -> `AovSim.setup_match(MatchRules.sim_config(m))`
+-> `Sim::setup_match` (`sim/match/match.{h,cpp}`). `AovSim.start_match(cfg)`
+does `new_game` + `setup_match` in one call (checks, tools). The sim config:
+
+```
+{ seed, map_size, preset, resources: "low" | "standard" | "high" | "deathmatch", villagers: 5,
+  players: [ {id: 1..6, name, human: bool, ai: "easy" | "moderate" | "hard" | "titan",
+              team: int (<= 0: his own; free for all sends 0), color: 0xRRGGBB, god: "zeus"}, ... ] }
+-> {ok, error, local, focus: Vector2 (the local Town Center), tcs, slots (start index per player)}
+```
+
+- **Seats**: team mates side by side round the ring (teams in order of
+  first appearance, players in order within one); `get_starts()` is then
+  renumbered so `starts[i].owner == i + 1`. The local player is the first
+  human (fog owner). Each player gets the standard start (Town Center + 5
+  villagers), his stockpile (low 150/150/100/0, standard 300/300/200/20,
+  high 1000/1000/750/50, deathmatch 10000/10000/10000/100), and each AI seat
+  an `EnemyAI` with its difficulty (`combat.ai()` stays the ENEMY's: a
+  disabled placeholder when player 2 is human). Victory is turned on.
+- **Teams** (`Sim::team`, `team_of`, `is_enemy`, `is_ally`; `new_game`
+  gives every player a team of his own, the browser's rule): `is_enemy` is
+  no longer static and every enemy test goes through it, so allies are never
+  auto-targeted, attacked by a right-click / attack order, hit by splash,
+  Town Center arrows, a Lightning Storm, Bolt or Meteor, nor aimed at by the
+  AI's waves and god powers. The fog stamps the sight of the fog owner's
+  allies too (shared vision). Victory is per team (see `victory.h`): a player
+  is out when his last Town Center falls (`player:defeated`), a team when
+  all its players are; the match is decided when one team is left (it
+  wins) or the local player's team is out (defeat). `get_victory()` has
+  `winner_team`. HUD: the score list is grouped by team ("TEAM 1" headers
+  with the team's total, the local team first) whenever a team has two
+  players; the feed says "<name> has been defeated.", the result card
+  "Every enemy Town Center has fallen." / "Your team's last Town Center has fallen.".
+- **Maps**: `skirmish` and `battle` place 3..6 players on a ring (radius
+  0.35 x size, evenly spaced, Godot passes only; 2 players keep the
+  browser's diagonal), `stress` already did. A Godot-only pass,
+  `balance_starts` (after connect_starts, before the woodlines), gives any
+  start the generator shortchanged (a neighbour's forest or a lake on the
+  spot) its gold mine (11-14 tiles out) and berry patch (9-12 out);
+  `get_mapgen_info().balanced` counts what it added.
+- **AI difficulty** (`AIParams` / `ai_params(d)` in `combat/enemy_ai.h`;
+  Moderate = the browser's EnemyAI unchanged): Easy thinks every 2 s, stops
+  at 14 villagers, one academy queue slot, waves of 5 (+2) from 7 min every
+  200 s, one worshipper, a god power decision every 30 s, no Classical Age
+  before 12 min. Hard: 30 villagers, academy at 8, a second academy at 20,
+  queue 4, waves of 8 (+5) every 104 s, 4 worshippers, storms on 5+ men,
+  food-heavy gathering that stops banking gold, houses built earlier, keeps
+  training while saving for the age. Titan: all of Hard and faster (thinks
+  every 0.75 s, 34 villagers, 3 villager slots, second academy at 16, waves
+  of 10 (+6) every 92 s, 5 worshippers, a power decision every second,
+  storms on 4+) plus **+20 % gather rate** (`Player::gather_mult`) and +150
+  food / wood / gold. `set_ai(owner, {difficulty: "hard"})` switches one;
+  `get_ai(owner).difficulty`, `get_player(id)` {team, human, difficulty,
+  gather_mult}.
+- Game speed and visibility stay main.gd's (`timescale`, `fog` args).
+
+```
+godot --headless --path godot -s res://game/core/match_check.gd [-- --only=maps,vision,victory,teams,difficulty,main] [--seeds=6]
+```
+
+`match_check.gd` ("MATCH PASS|FAIL <case>", `MATCH_RESULT {json}`, exit =
+failures, ~50 s): **teams** (two 20-minute 2v2s of Hard AIs: no damage
+event from an ally, no attack order on one, thousands of hits on enemies),
+**vision** (the ally's town and men visible, the enemy's not), **victory**
+(2v2: one enemy down goes on, both = won; my TC down with the ally standing
+goes on, both = lost; FFA of 3; an AI 2v2 plays to a team result),
+**maps** (195 maps: 2-6 players x 96..256 x skirmish / battle / stress x
+seeds: the start count, each start's mine, berries and woodline, all
+reachable, spacing even), **difficulty** (AI vs AI, seats swapped every
+other seed: Hard beats Easy, Titan beats Moderate, Hard beats Moderate,
+Moderate beats Easy in most seeds; peaceful villagers at 6 min /
+population at 9, wave men per minute and casts per minute ordered Easy <
+Moderate < Hard < Titan), **main** (the setup screen's settings through
+main.gd: players, teams, difficulty, colours, resources, speed, fog, the
+team score list). Today: Hard 6/6 over Easy, Titan 5/6 over Moderate (one
+undecided), Hard 4/6 over Moderate, Moderate 3/3 over Easy; peaceful
+villagers at 6 min 14 / 22 / 30 / 35.
 
 ## Conventions
 
@@ -477,7 +559,7 @@ markers in the players' colours).
   that would cut any tile off; its own RNG, so the rest of the map is
   untouched). The planned towns (`layout_town`: town, hud, coast, stress)
   clear trees from their streets and lots, so there the plan decides what is
-  left of it. `AovSim.get_mapgen_info()` = {felled, graded, woodline};
+  left of it. `AovSim.get_mapgen_info()` = {felled, graded, woodline, balanced};
   `set_godot_rules(false)` before `new_game` gives the browser's map. The whole core
   (entities, units update / spread, pathfinding, movement, commands) is
   bit-exact with the browser (`check-mapgen.mjs`, `check-sim.mjs`); extend
@@ -608,7 +690,9 @@ full TerrainMesh.js: smoothed shore, talus, cliff relief), `get_water_depth()`
 Players: `add_player(id, name="", is_ai=true)` (owners 3..6),
 `get_player(id)` ({id, name, is_ai, god, color, food, wood, gold, favor, pop,
 pop_cap, age, age_name, advancing, advance_t, advance_total}),
-`get_player_ids()`, `is_enemy(a, b)`, `set_player_resources(owner,
+`get_player_ids()`, `is_enemy(a, b)`, `is_ally(a, b)`, `get_team(id)`,
+`get_local_player()`, `setup_match(cfg)` / `start_match(cfg)` (see "Match
+rules"), `set_player_resources(owner,
 {food, …})`, `set_player_age(owner, age)`.
 
 Entities: `unit_type_names()` (type index -> key), `get_unit_def(key)`,
@@ -695,7 +779,7 @@ attacker=0)`, `order(id, {type: "attack", target, auto, then_buildings})`,
 `set_unit_combat(id, {leash, reach, kit, line: {cx, cz, nx, nz, d0} | null})`,
 `set_ai_enabled(on)` (the ENEMY's EnemyAI), `add_ai(owner)`, `get_ai(owner)`
 ({enabled, wave_size, next_wave_at, aggression, waves: [{t, target, x, z,
-units}], casts: {power: n}}) / `set_ai(owner, {enabled, next_wave_at, wave_size, aggression})`,
+units}], casts: {power: n}, difficulty}) / `set_ai(owner, {enabled, next_wave_at, wave_size, aggression, difficulty})`,
 `get_combat()` ({projectiles: 16 floats each (x, y, z, px, py, pz, sx, sy,
 sz, tx, ty, tz, t, dur, arc, dist), projectile_info: 2 ints (target, has
 target pos), stuck: 7 (x, y, z, dx, dy, dz, t), scars: 5 (x, z, radius,
@@ -829,11 +913,11 @@ while moving, AI waves attack their target directly); `simcheck.gd`
 turns it off for `check-sim.mjs`, and `--godot_rules=0` does it for a run
 (A/B benches: the AI's storms thin the stress armies, so its numbers move).
 
-Fog of war (player 1) and victory: `set_fog_reveal_all(on)`,
+Fog of war (player 1 and his allies) and victory: `set_fog_reveal_all(on)`,
 `fog_recompute()`, `get_fog()` (size*size bytes: 0 unexplored, 128
 explored, 255 visible), `fog_version()`, `is_explored(x, z)`,
 `is_visible(x, z)`, `set_victory_enabled(on)`, `get_victory()` ({enabled,
-decided, winner, loser, time}), `is_paused()`, `set_paused(on)`.
+decided, winner, loser, winner_team, time}), `is_paused()`, `set_paused(on)`.
 
 Events (`game.events`, drained by main.gd): [{type, id, kind, other, owner,
 a, x, z, amount}], type one of `entity:added` (a = type index),
@@ -844,7 +928,8 @@ owner = attacker's owner, amount = damage after bonus and armor, x, z),
 `resources:changed`, `godpower:cast` (owner, a = power index in
 `power_names()`, x, z), `command:smart` (other = target, a =
 unit count), `game:over` (owner = winner, a = loser, amount = time), `villager:free`
-(owner, id = the Town Center: see "Free villager" below);
+(owner, id = the Town Center: see "Free villager" below), `player:defeated`
+(owner, amount = time; Godot-only, see "Match rules");
 `set_record_events(on)`. C++ systems subscribe
 with `sim.events.on(EV_…, fn)`.
 

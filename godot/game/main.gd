@@ -15,6 +15,7 @@ extends Node3D
 
 const PIECE_ORDER := ["lighting", "terrain", "buildings", "units", "economy", "combat", "godpowers", "ui", "perf", "menu"]
 const SIM_DT := 1.0 / 30.0
+const MatchRules := preload("res://game/core/match_rules.gd")
 
 var args := {}
 var scene_def := {}
@@ -22,6 +23,7 @@ var sim: Object = null           # AovSim (C++)
 var camera: AovCameraRig
 var pieces := {}                 # name -> Node
 var ctx := {}                    # the scene setup's result
+var match_settings := {}         # the setup screen's match (MatchRules.settings(args)), {} without one
 var live := false
 var paused := true
 var time_scale := 1.0
@@ -72,12 +74,18 @@ func _ready() -> void:
 	var players := int(scene_def.players)
 	if AovScenes.SCENES[scene_name].has("players") and args.has("players"):
 		players = clampi(int(args.players), 2, 6)
+	# a match from the setup screen (`match` arg): its map preset and players (game/core/match_rules.gd)
+	var preset := str(scene_def.preset)
+	match_settings = MatchRules.settings(args)
+	if not match_settings.is_empty():
+		preset = MatchRules.preset(match_settings, preset)
+		players = MatchRules.player_count(match_settings)
 	# --godot_rules=0: the browser's rules only (no AI god powers, no free villager), for A/B runs
 	sim.set_godot_rules(AovArgs.flag(args, "godot_rules", true))
-	sim.new_game(seed, map_size, scene_def.preset, players)
+	sim.new_game(seed, map_size, preset, players)
 	sim.take_events()  # the initial resources' entity:added (pieces read the world in setup)
 	print("aov: scene=%s seed=%d map=%d preset=%s players=%d  %s  map_hash=%08x" % [
-		scene_name, seed, map_size, scene_def.preset, players, sim.version(), sim.map_hash()])
+		scene_name, seed, map_size, preset, players, sim.version(), sim.map_hash()])
 
 	# the JS main.js: combat.ai.enabled = !!scene.ai; victory.enabled = !!scene.victory (before the setup)
 	sim.set_ai_enabled(bool(scene_def.ai))
@@ -129,7 +137,9 @@ func _ready() -> void:
 		screen_layer.add_child(load(str(scene_def.screen)).new())
 
 	var setup := AovScenes.get_setup(scene_name)
-	if setup.is_valid():
+	if not match_settings.is_empty():
+		ctx = MatchRules.apply(sim, match_settings)  # players, teams, AI difficulty, resources, starts
+	elif setup.is_valid():
 		ctx = setup.call(self)
 	elif sim.has_scene_setup(scene_name):
 		# deterministic setups ported to C++ (native/src/sim/scenes: skirmish,

@@ -32,6 +32,7 @@
 #include "buildings/buildings.h"
 #include "economy/economy.h"
 #include "godpowers/godpowers.h"
+#include "match/match.h"
 #include "scenes/scenes.h"
 #include "units/units.h"
 
@@ -85,7 +86,18 @@ public:
 
 	Player *player(int id) { return id >= 0 && id < MAX_PLAYERS && players[id].exists ? &players[id] : nullptr; }
 	Player &add_player(int id, const std::string &name, bool is_ai);
-	static bool is_enemy(int a, int b) { return a != b && a != GAIA && b != GAIA; }
+	// Teams (Godot-only, set by the match setup, match.cpp): team[id] of each
+	// owner; new_game gives every player a team of its own (team[id] = id),
+	// which is the browser's rule (everyone else is an enemy).
+	int team[MAX_PLAYERS] = { 0, 1, 2, 3, 4, 5, 6 };
+	int team_of(int id) const { return id >= 0 && id < MAX_PLAYERS ? team[id] : id; }
+	bool is_enemy(int a, int b) const { return a != b && a != GAIA && b != GAIA && team_of(a) != team_of(b); }
+	// same owner, or both on one team (Gaia is nobody's ally)
+	bool is_ally(int a, int b) const { return a == b || (a != GAIA && b != GAIA && team_of(a) == team_of(b)); }
+	// The match setup (sim/match/match.cpp, AovSim.setup_match): players,
+	// teams, colours, AI difficulty, starting resources and every start.
+	// Call right after new_game(cfg.seed, cfg.map_size, cfg.preset, n).
+	MatchResult setup_match(const MatchConfig &cfg);
 
 	// terrain piece, sim side (src/terrain/index.js): Gaia resource nodes
 	int32_t spawn_resource(int type, int tx, int tz, int variant = 0);

@@ -123,7 +123,8 @@ func _run() -> void:
 	var s: Dictionary = screen.settings
 	_check("defaults", s.players.size() == 2 and s.map == "aegean_hills", "%d players, %s" % [s.players.size(), s.map])
 	_check("count 4", await _pick("count", 0, 4) and s.players.size() == 4, str(s.players.size()))
-	_check("map fits the count", M.map_supports(s.map, 4) and s.map != "aegean_hills" and screen._note != "", "%s: %s" % [s.map, screen._note])
+	# (the match rules' generator seats 2-6 players on Aegean Hills / Marathon / Circle of Poleis: the map stays)
+	_check("map fits the count", M.map_supports(s.map, 4) and s.map == "aegean_hills", "%s: %s" % [s.map, screen._note])
 	_check("colour swap", await _pick("color", 1, 1) and int(s.players[1].color) == 1 and int(s.players[0].color) == 2,
 		"%d %d" % [s.players[0].color, s.players[1].color])
 	_check("team", await _pick("team", 2, 1) and int(s.players[2].team) == 1, str(s.players[2].team))
@@ -146,7 +147,7 @@ func _run() -> void:
 	# map chooser
 	await _click(0, "select_map")
 	_check("map modal", screen._modal == "map")
-	_check("2-player map locked", _zone_pos(1, "map_pick", "marathon") == null)
+	_check("2-player map locked", _zone_pos(1, "map_pick", "ionian_coast") == null and _zone_pos(1, "map_pick", "marathon") != null)
 	await _click(1, "map_pick", "random")
 	_check("random map", s.map == "random" and screen._modal == "")
 	# rows

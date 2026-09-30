@@ -15,6 +15,7 @@ void Sim::new_game(uint32_t seed_, int map_size, const std::string &preset, int 
 	events.clear();
 	entities.reset(&events);
 	for (auto &p : players) p = Player();
+	for (int i = 0; i < MAX_PLAYERS; i++) team[i] = i; // every player on a team of its own (setup_match sets teams)
 	players[GAIA].init(GAIA, "Gaia", false);
 	players[PLAYER].init(PLAYER, "You", false);
 	players[ENEMY].init(ENEMY, "Enemy", true);

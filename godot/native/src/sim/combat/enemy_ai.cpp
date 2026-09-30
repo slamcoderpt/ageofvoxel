@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string>
 
 #include "../core/jsmath.h"
 #include "../sim.h"
@@ -23,11 +24,93 @@ static const int MAX_CENTRES = 64;        // candidate strike points tried per p
 static const double STRAY_DIST = 30;      // idle soldiers this far from our Town Center rejoin the attack
 static const int OVERDUE_MIN = 6;         // men an overdue wave needs at least
 
+const char *ai_difficulty_name(int d) {
+	static const char *n[] = { "easy", "moderate", "hard", "titan" };
+	return d >= 0 && d < 4 ? n[d] : "";
+}
+
+int ai_difficulty_of(const char *name) {
+	for (int d = 0; d < 4; d++)
+		if (std::string(name) == ai_difficulty_name(d)) return d;
+	return AI_DEFAULT;
+}
+
+AIParams ai_params(int d) {
+	AIParams p; // AI_DEFAULT / AI_MODERATE: the browser's EnemyAI
+	if (d == AI_EASY) {
+		p.think = 2;
+		p.max_villagers = 14;
+		p.villager_queue = 1;
+		p.academy_at = 12;
+		p.temple_at = 13;
+		p.army_queue = 1;
+		p.wave_size = 5;
+		p.wave_grow = 2;
+		p.wave_max = 16;
+		p.first_wave = 420;
+		p.aggression = 0.6;
+		p.power_every = 30;
+		p.storm_min = 12;
+		p.worshippers = 1;
+		p.age_after = 720;
+	} else if (d == AI_HARD) {
+		p.max_villagers = 30;
+		p.academy_at = 8;
+		p.temple_at = 12;
+		p.academy2_at = 20;
+		p.army_queue = 4;
+		p.wave_size = 8;
+		p.wave_grow = 5;
+		p.wave_max = 44;
+		p.first_wave = 240;
+		p.aggression = 1.15;
+		p.storm_min = 5;
+		p.worshippers = 4;
+		p.house_margin = 6;
+		p.food_share = 0.55;
+		p.gold_share = 0.17;
+		p.bank_cap = 600;
+		p.army_while_saving = true;
+	} else if (d == AI_TITAN) {
+		p.think = 0.75;
+		p.max_villagers = 34;
+		p.villager_queue = 3;
+		p.academy_at = 8;
+		p.temple_at = 11;
+		p.academy2_at = 16;
+		p.army_queue = 5;
+		p.wave_size = 10;
+		p.wave_grow = 6;
+		p.wave_max = 50;
+		p.first_wave = 240;
+		p.aggression = 1.3;
+		p.power_every = 1;
+		p.storm_min = 4;
+		p.worshippers = 5;
+		p.house_margin = 8;
+		p.food_share = 0.58;
+		p.gold_share = 0.16;
+		p.bank_cap = 450;
+		p.army_while_saving = true;
+		p.gather_mult = 1.2;
+		p.bonus_res = 150;
+	}
+	return p;
+}
+
+void EnemyAI::set_difficulty(int d) {
+	difficulty = d;
+	par = ai_params(d);
+	wave_size = par.wave_size;
+	next_wave_at = par.first_wave;
+	aggression = par.aggression;
+}
+
 void EnemyAI::update(double dt) {
 	if (!enabled) return;
 	timer -= dt;
 	if (timer > 0) return;
-	timer = 1.0;
+	timer = par.think;
 	Sim &S = *sim;
 	Entities &E = S.entities;
 	UnitStore &U = E.units;
@@ -41,9 +124,9 @@ void EnemyAI::update(double dt) {
 	for (int b = 0; b < B.size(); b++)
 		if (!B.removed[b] && B.owner[b] == owner && !B.dead[b]) buildings.push_back(b);
 	if (S.godot_rules) {
-		power_timer -= 1.0;
-		if (power_timer <= 0) {
-			power_timer = POWER_EVERY;
+		power_timer -= par.think;
+		if (par.power_every > 0 && power_timer <= 0) {
+			power_timer = difficulty == AI_DEFAULT ? POWER_EVERY : par.power_every;
 			use_powers(army, buildings);
 		}
 	}
@@ -58,7 +141,7 @@ void EnemyAI::update(double dt) {
 	const bool has_age_cost = S.economy.next_age_cost(owner, age_cost);
 	const bool saving = p.age < 1 && !p.advancing && has_age_cost && nv >= 16 && S.time >= 300 && S.time < 540 && !p.can_afford(age_cost);
 	// 1. villagers
-	if (!saving && nv < 22 && B.queue[tc].size() < 2) S.economy.train(tc, U_VILLAGER);
+	if (!saving && nv < par.max_villagers && (int)B.queue[tc].size() < par.villager_queue) S.economy.train(tc, U_VILLAGER);
 	int counts[3] = { 0, 0, 0 };
 	std::vector<int> by_type[3];
 	for (int v : vills)
@@ -68,7 +151,18 @@ void EnemyAI::update(double dt) {
 		}
 	int workers = 0;
 	for (int v : vills) workers += U.order_type[v] == O_IDLE || U.order_type[v] == O_GATHER;
-	const int target[3] = { (int)std::ceil(workers * 0.5), (int)std::floor(workers * 0.3), (int)std::floor(workers * 0.2) };
+	// shares of the workers per resource (food, wood, gold): the browser's 0.5 / 0.3 / 0.2;
+	// a harder AI weighs food (villagers, soldiers, the next age) and stops
+	// piling up what it cannot spend
+	double sh[3] = { 0.5, 0.3, 0.2 };
+	if (par.food_share > 0) {
+		sh[RES_FOOD] = par.food_share;
+		sh[RES_GOLD] = p.res[RES_GOLD] > par.bank_cap ? 0.08 : par.gold_share;
+		if (p.res[RES_WOOD] > par.bank_cap) sh[RES_WOOD] = 0.15;
+		sh[RES_WOOD] = std::min(sh[RES_WOOD], 1 - sh[RES_FOOD] - sh[RES_GOLD]);
+		sh[RES_FOOD] = 1 - sh[RES_WOOD] - sh[RES_GOLD];
+	}
+	const int target[3] = { (int)std::ceil(workers * sh[0]), (int)std::floor(workers * sh[1]), (int)std::floor(workers * sh[2]) };
 	// ['food', 'wood', 'gold'].sort(...)[0]: the most under-staffed, ties to the first
 	auto need = [&]() {
 		int best = 0;
@@ -103,26 +197,30 @@ void EnemyAI::update(double dt) {
 			if (B.type[b] == t && !B.built[b]) return true;
 		return false;
 	};
-	if (p.pop_cap - p.pop < 4 && p.pop_cap < 300 && !building(B_HOUSE)) try_build(B_HOUSE, pick_builder(vills), tc);
+	if (p.pop_cap - p.pop < par.house_margin && p.pop_cap < 300 && !building(B_HOUSE)) try_build(B_HOUSE, pick_builder(vills), tc);
 	// 3. military
-	int academy = -1, temple_any = -1, temple = -1;
+	int academy = -1, temple_any = -1, temple = -1, academy2 = -1;
 	for (int b : buildings) {
+		if (academy >= 0 && academy2 < 0 && B.type[b] == B_BARRACKS) academy2 = b;
 		if (academy < 0 && B.type[b] == B_BARRACKS) academy = b;
 		if (temple_any < 0 && B.type[b] == B_TEMPLE) temple_any = b;
 		if (temple < 0 && B.type[b] == B_TEMPLE && B.built[b]) temple = b;
 	}
-	if (academy < 0 && nv >= 10) try_build(B_BARRACKS, pick_builder(vills), tc);
-	if (temple_any < 0 && nv >= 14) try_build(B_TEMPLE, pick_builder(vills), tc);
-	if (academy >= 0 && B.built[academy] && B.queue[academy].size() < 3 && !saving) {
-		static const int PICK[4] = { U_HOPLITE, U_TOXOTES, U_HOPLITE, U_HIPPIKON };
+	if (academy < 0 && nv >= par.academy_at) try_build(B_BARRACKS, pick_builder(vills), tc);
+	if (temple_any < 0 && nv >= par.temple_at) try_build(B_TEMPLE, pick_builder(vills), tc);
+	if (par.academy2_at > 0 && academy >= 0 && academy2 < 0 && temple_any >= 0 && nv >= par.academy2_at && !building(B_BARRACKS))
+		try_build(B_BARRACKS, pick_builder(vills), tc);
+	static const int PICK[4] = { U_HOPLITE, U_TOXOTES, U_HOPLITE, U_HIPPIKON };
+	if (academy >= 0 && B.built[academy] && (int)B.queue[academy].size() < par.army_queue && (!saving || par.army_while_saving))
 		S.economy.train(academy, PICK[(int64_t)std::floor(S.time / 7) % 4]);
-	}
+	if (academy2 >= 0 && B.built[academy2] && (int)B.queue[academy2].size() < par.army_queue && (!saving || par.army_while_saving))
+		S.economy.train(academy2, PICK[((int64_t)std::floor(S.time / 7) + 1) % 4]);
 	if (temple >= 0 && p.age >= 1 && B.queue[temple].size() < 1) S.economy.train(temple, U_MINOTAUR);
 	// worshippers
 	if (temple >= 0) {
 		int worshipping = 0;
 		for (int v : vills) worshipping += U.order_type[v] == O_WORSHIP;
-		if (worshipping < 3) {
+		if (worshipping < par.worshippers) {
 			for (int v : vills)
 				if (U.order_type[v] == O_GATHER && U.econ_phase[v] != EP_NONE && U.econ_res_type[v] == RES_GOLD) {
 					S.commands.order(v, Order::with_target(O_WORSHIP, B.id[temple]));
@@ -131,7 +229,7 @@ void EnemyAI::update(double dt) {
 		}
 	}
 	// 4. age up
-	if (!p.advancing && p.age < 1 && has_age_cost && (p.res[RES_FOOD] > 500 || (nv >= 16 && p.can_afford(age_cost)))) S.economy.advance_age(owner);
+	if (!p.advancing && p.age < 1 && has_age_cost && S.time >= par.age_after && (p.res[RES_FOOD] > 500 || (nv >= 16 && p.can_afford(age_cost)))) S.economy.advance_age(owner);
 
 	// 5. attack waves
 	std::vector<int> idle_army;
@@ -155,7 +253,7 @@ void EnemyAI::update(double dt) {
 					o.b = ATK_THEN_BUILDINGS;
 					S.commands.order(u, o);
 				}
-			wave_size = std::min(40, wave_size + 4);
+			wave_size = std::min(par.wave_max, wave_size + par.wave_grow);
 			next_wave_at = S.time + 120 / aggression;
 		}
 	} else if (S.godot_rules) {
@@ -207,7 +305,7 @@ void EnemyAI::use_powers(const std::vector<int> &army, const std::vector<int> &b
 	// enemy units in reach (on the ground: men carried up a storm are spoken for)
 	std::vector<int> foes;
 	for (int r = 0; r < U.size(); r++)
-		if (!U.removed[r] && !U.dead[r] && U.gp_state[r] != 1 && Sim::is_enemy(owner, U.owner[r]) && in_reach(U.x[r], U.z[r])) foes.push_back(r);
+		if (!U.removed[r] && !U.dead[r] && U.gp_state[r] != 1 && sim->is_enemy(owner, U.owner[r]) && in_reach(U.x[r], U.z[r])) foes.push_back(r);
 	// the densest cluster of `foes` within radius r: count, centre
 	auto cluster = [&](double r, double &ox, double &oz) {
 		int best = 0;
@@ -239,10 +337,11 @@ void EnemyAI::use_powers(const std::vector<int> &army, const std::vector<int> &b
 		}
 		return best;
 	};
-	if (storm_ok && (int)foes.size() >= STORM_MIN) {
+	const int storm_min = difficulty == AI_DEFAULT ? STORM_MIN : par.storm_min;
+	if (storm_ok && (int)foes.size() >= storm_min) {
 		double x = 0, z = 0;
 		// the storm strikes men within 0.78 of its radius (GodPowers::update)
-		if (cluster(power_def(GP_LIGHTNING_STORM).radius * 0.78, x, z) >= STORM_MIN && G.cast(owner, GP_LIGHTNING_STORM, x, z)) {
+		if (cluster(power_def(GP_LIGHTNING_STORM).radius * 0.78, x, z) >= storm_min && G.cast(owner, GP_LIGHTNING_STORM, x, z)) {
 			casts[GP_LIGHTNING_STORM]++;
 			return;
 		}
@@ -253,10 +352,10 @@ void EnemyAI::use_powers(const std::vector<int> &army, const std::vector<int> &b
 		int best = 0;
 		double bx = 0, bz = 0;
 		for (int b = 0; b < B.size(); b++) {
-			if (B.removed[b] || B.dead[b] || !Sim::is_enemy(owner, B.owner[b]) || !in_reach(B.x[b], B.z[b])) continue;
+			if (B.removed[b] || B.dead[b] || !sim->is_enemy(owner, B.owner[b]) || !in_reach(B.x[b], B.z[b])) continue;
 			int k = 0;
 			for (int o = 0; o < B.size(); o++) {
-				if (B.removed[o] || B.dead[o] || !Sim::is_enemy(owner, B.owner[o])) continue;
+				if (B.removed[o] || B.dead[o] || !sim->is_enemy(owner, B.owner[o])) continue;
 				const BuildingDef &od = building_def(B.type[o]);
 				if (jsm::hypot(B.x[o] - B.x[b], B.z[o] - B.z[b]) < R + std::max(od.w, od.h) / 2.0) k++;
 			}
@@ -328,7 +427,7 @@ int EnemyAI::find_target(int tc) const {
 	int best = -1;
 	double bd = INFINITY;
 	for (int b = 0; b < B.size(); b++) {
-		if (B.removed[b] || !Sim::is_enemy(owner, B.owner[b])) continue;
+		if (B.removed[b] || !sim->is_enemy(owner, B.owner[b])) continue;
 		const double dx = B.x[b] - B.x[tc], dz = B.z[b] - B.z[tc];
 		const double d = dx * dx + dz * dz;
 		if (d < bd) {

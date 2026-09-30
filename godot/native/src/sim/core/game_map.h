@@ -98,6 +98,7 @@ struct MapGenResult {
 	// connect the starts (0 on a map that was already connected)
 	int felled = 0, graded = 0;
 	int woodline = 0; // trees of the start woodlines (appended after the generator's resources)
+	int balanced = 0; // start mines / bushes added so every start has its own (balance_starts)
 };
 
 std::vector<Front> stress_fronts(const std::vector<Start> &starts);

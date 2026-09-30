@@ -359,6 +359,10 @@ func _handle_events(events: Array) -> void:
 					batch.append(["You use the %s God Power!" % _pdefs[pn].name, true])
 				elif sim.is_enemy(me, int(e.owner)):
 					batch.append(["%s uses the %s God Power!" % [str(sim.get_player(int(e.owner)).get("name", "The enemy")), _pdefs[pn].name], false])
+			"player:defeated":
+				if int(e.owner) != me:
+					var dn := str(sim.get_player(int(e.owner)).get("name", "A player"))
+					batch.append(["%s%s has been defeated." % ["Your ally " if sim.is_ally(me, int(e.owner)) else "", dn], true])
 			"game:over":
 				_show_result(int(e.owner), float(e.amount))
 	# notices from a fast-forward arrive together: keep the latest of a kind
@@ -387,9 +391,20 @@ func _show_result(winner: int, time: float) -> void:
 		return
 	var s := int(time)
 	var p: Dictionary = sim.get_player(me)
-	var won := winner == me
+	# teams (match rules): the match is won by a team
+	var won: bool = winner == me or (winner != 0 and bool(sim.is_ally(me, winner)))
+	var teamed := false
+	for pid in sim.get_player_ids():
+		if int(pid) != 0 and int(pid) != me and sim.is_ally(me, int(pid)):
+			teamed = true
+	var foes := 0
+	for pid in sim.get_player_ids():
+		if int(pid) != 0 and sim.is_enemy(me, int(pid)):
+			foes += 1
+	var win_text := "Every enemy Town Center has fallen." if foes > 1 else "The enemy Town Center has fallen."
+	var lose_text := "Your team's last Town Center has fallen." if teamed else "Your last Town Center has fallen."
 	result = {"won": won, "kicker": "%s  ·  %s Age  ·  %02d:%02d" % [p.get("god", "Zeus"), AGES[clampi(int(p.get("age", 0)), 0, 3)], s / 60, s % 60],
-		"text": "The enemy Town Center has fallen." if won else "Your last Town Center has fallen."}
+		"text": win_text if won else lose_text}
 	result_shown = true
 	_cancel_mode()
 	_redraw()
@@ -459,7 +474,38 @@ func _refresh_stats() -> void:
 		if p.is_empty():
 			continue
 		rows.append({"id": int(pid), "name": "You" if int(pid) == me else str(p.name), "god": str(p.god), "color": S.hex(int(p.color)),
-			"age": ROMAN[clampi(int(p.age), 0, 3)], "score": score_arr[int(pid)] + int(p.age) * 100})
+			"age": ROMAN[clampi(int(p.age), 0, 3)], "score": score_arr[int(pid)] + int(p.age) * 100, "team": int(p.get("team", pid))})
+	# teams (match rules): the list grouped by team, the local player's first;
+	# "team_label" on a team's first row when some team has two players or more
+	var members := {}
+	for r in rows:
+		members[r.team] = int(members.get(r.team, 0)) + 1
+	var teamed := false
+	for t in members:
+		teamed = teamed or int(members[t]) > 1
+	if teamed:
+		var my_team := int(sim.get_team(me))
+		var tlist := []
+		for r in rows:
+			if not tlist.has(r.team):
+				tlist.append(r.team)
+		tlist.sort_custom(func(a, b): return (a == my_team and b != my_team) or ((a == my_team) == (b == my_team) and a < b))
+		var sorted := []
+		for ti in tlist.size():
+			var first := true
+			var total := 0
+			for r in rows:
+				if r.team == tlist[ti]:
+					total += int(r.score)
+			for r in rows:
+				if r.team != tlist[ti]:
+					continue
+				if first:
+					r["team_label"] = "Team %d" % (ti + 1)
+					r["team_score"] = total
+					first = false
+				sorted.append(r)
+		rows = sorted
 	hud_state["scores"] = rows
 	# control group cards
 	var gl := []

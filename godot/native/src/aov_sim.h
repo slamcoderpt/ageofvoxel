@@ -64,7 +64,16 @@ public:
 	void add_player(int64_t id, const String &name, bool is_ai);
 	Dictionary get_player(int64_t id) const; // {id, name, is_ai, color, food, wood, gold, favor, pop, pop_cap, age}
 	PackedInt32Array get_player_ids() const;
-	bool is_enemy(int64_t a, int64_t b) const { return aov::Sim::is_enemy((int)a, (int)b); }
+	bool is_enemy(int64_t a, int64_t b) const { return sim_.is_enemy((int)a, (int)b); }
+	bool is_ally(int64_t a, int64_t b) const { return sim_.is_ally((int)a, (int)b); }
+	int64_t get_team(int64_t id) const { return sim_.team_of((int)id); }
+	int64_t get_local_player() const { return sim_.local_player; }
+
+	// --- match setup (sim/match; Godot-only; keys in PORTING.md "Match rules")
+	// setup_match(cfg) after new_game(cfg.seed, cfg.map_size, cfg.preset, players.size());
+	// start_match(cfg) does both. -> {ok, error, local, focus: Vector2, tcs, slots}
+	Dictionary setup_match(const Dictionary &cfg);
+	Dictionary start_match(const Dictionary &cfg);
 
 	// --- entities
 	PackedStringArray unit_type_names() const;

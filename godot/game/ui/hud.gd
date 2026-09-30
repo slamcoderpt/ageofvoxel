@@ -325,11 +325,20 @@ func _draw_topright() -> void:
 			widths.append(wn)
 			maxw = maxf(maxw, wn)
 		var total := 24.0 + maxw + 6 + 19 + 6 + 22 + 6 + 42 + 12
-		var sr := Rect2(W() - total, y, total, 9 + rows.size() * 23.0 - 4.0 + 5)
+		var n_labels := 0
+		for row in rows:
+			if row.has("team_label"):
+				n_labels += 1
+		var sr := Rect2(W() - total, y, total, 9 + rows.size() * 23.0 + n_labels * 19.0 - 4.0 + 5)
 		S.hgrad(self, sr, [[0.0, Color(4 / 255.0, 17 / 255.0, 22 / 255.0, 0.0)], [26.0 / total, Color(4 / 255.0, 17 / 255.0, 22 / 255.0, 0.72)], [1.0, Color(4 / 255.0, 17 / 255.0, 22 / 255.0, 0.72)]])
 		var ry := y + 4
 		for i in rows.size():
 			var row: Dictionary = rows[i]
+			if row.has("team_label"):
+				# a team header (match rules): "Team 1 ........ 1234"
+				S.text(self, S.font("title"), Vector2(W() - total + 26, ry + 13), str(row.team_label).to_upper(), 12, S.GOLD)
+				S.text(self, sans, Vector2(W() - 12 - 42, ry + 13), str(row.team_score), 13, S.MUTED)
+				ry += 19
 			var x1 := W() - 12 - 42 - 6 - 22 - 6 - 19 - 6
 			var nx: float = x1 - widths[i]
 			S.text(self, bold, Vector2(nx, ry + 15), row.name, 15, S.INK)

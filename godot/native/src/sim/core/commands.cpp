@@ -137,7 +137,7 @@ void Commands::smart(const std::vector<int> &rows, double x, double z, int32_t t
 		const UnitDef &d = unit_def(U.type[r]);
 		if (ts >= 0 && !tdead && target_id != U.id[r]) {
 			if (tk == K_RESOURCE && d.gatherer && try_order(r, O_GATHER)) continue;
-			if (towner != U.owner[r] && towner != GAIA && d.has_attack && try_order(r, O_ATTACK)) continue;
+			if (sim->is_enemy(U.owner[r], towner) && d.has_attack && try_order(r, O_ATTACK)) continue;
 			if (tk == K_BUILDING && towner == U.owner[r] && d.builder) {
 				const BuildingStore &B = E.buildings;
 				if (!B.built[ts]) { if (try_order(r, O_BUILD)) continue; }

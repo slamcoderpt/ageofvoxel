@@ -39,6 +39,11 @@ struct Player {
 	int age = 0;
 	bool advancing = false;
 	double advancing_t = 0, advancing_total = 0;
+	// Godot-only (match setup): gather rate multiplier (Titan AI 1.2), AI
+	// difficulty (AIDifficulty, -1 = none / the default AI), human seat
+	double gather_mult = 1;
+	int difficulty = -1;
+	bool human = false;
 
 	void init(int id_, const std::string &name_, bool ai) {
 		*this = Player();

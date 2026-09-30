@@ -397,6 +397,75 @@ int place_woodlines(GameMap &map, uint32_t seed, const std::vector<Start> &start
 	return placed_total;
 }
 
+// Godot-only pass: every start gets the same start resources. The generator
+// places each start's gold mine (12 tiles out) and seven berry bushes (10
+// out) in start order, so on a crowded map (6 players on a small ring) a
+// neighbour's start forest or a lake shore can take the spot and that start
+// goes without. For a start with no mine within 15 tiles of it, or fewer
+// than 5 bushes within 14, a mine / bush patch is placed on open ground at
+// the same distance, trying directions round the generator's own (away from
+// the other starts first). Deterministic (no RNG). Returns what it added.
+int balance_starts(GameMap &map, const std::vector<Start> &starts, const std::vector<double> &forest_dir,
+		std::vector<ResourceSpawn> &resources, std::vector<uint8_t> &occupied) {
+	const int N = map.size;
+	int added = 0;
+	auto free_rect = [&](int tx, int tz, int w, int h, int margin) {
+		for (int z = tz - margin; z < tz + h + margin; z++)
+			for (int x = tx - margin; x < tx + w + margin; x++)
+				if (x < 2 || z < 2 || x >= N - 2 || z >= N - 2 || !map.is_terrain_passable(x, z) || occupied[(size_t)z * N + x]) return false;
+		return true;
+	};
+	auto mark = [&](int tx, int tz, int w, int h) {
+		for (int z = tz; z < tz + h; z++)
+			for (int x = tx; x < tx + w; x++) occupied[(size_t)z * N + x] = 1;
+	};
+	for (size_t si = 0; si < starts.size(); si++) {
+		const Start &s = starts[si];
+		int gold = 0, berries = 0;
+		for (const ResourceSpawn &r : resources) {
+			const double cx = r.tx + (r.type == "gold" ? 1.5 : 0.5), cz = r.tz + (r.type == "gold" ? 1.5 : 0.5);
+			const double d = jsm::hypot(cx - s.tx, cz - s.tz);
+			if (r.type == "gold" && d <= 15) gold++;
+			if (r.type == "berry" && d <= 14) berries++;
+		}
+		// directions to try: the generator's own first, then alternating round it
+		const double a0 = forest_dir[si];
+		auto try_dirs = [&](double base, double r0, double r1, const std::function<bool(double, double)> &fn) {
+			for (int k = 0; k < 24; k++) {
+				const double a = base + ((k + 1) / 2) * (k % 2 ? 1 : -1) * (PI / 12);
+				for (double r = r0; r <= r1; r += 1)
+					if (fn(a, r)) return true;
+			}
+			return false;
+		};
+		if (!gold) {
+			const bool ok = try_dirs(a0 + PI * 0.75, 11, 14, [&](double a, double r) {
+				const int tx = (int)js_round(s.tx + jsm::cos(a) * r) - 1, tz = (int)js_round(s.tz + jsm::sin(a) * r) - 1;
+				if (!free_rect(tx, tz, 3, 3, 1)) return false;
+				mark(tx, tz, 3, 3);
+				resources.push_back({ "gold", tx, tz, 0 });
+				return true;
+			});
+			added += ok;
+		}
+		if (berries < 5) {
+			try_dirs(a0 - PI * 0.7, 9, 12, [&](double a, double r) {
+				const int bx = (int)js_round(s.tx + jsm::cos(a) * r), bz = (int)js_round(s.tz + jsm::sin(a) * r);
+				// the generator's 3 x 3 lattice (every other tile) of 7 bushes
+				if (!free_rect(bx - 2, bz - 2, 5, 5, 0)) return false;
+				for (int k = 0; k < 7; k++) {
+					const int x = bx + (k % 3) * 2 - 2, z = bz + (k / 3) * 2 - 2;
+					mark(x, z, 1, 1);
+					resources.push_back({ "berry", x, z, 0 });
+				}
+				added += 7;
+				return true;
+			});
+		}
+	}
+	return added;
+}
+
 } // namespace
 
 MapGenResult generate_map(uint32_t seed, int size, const std::string &preset, int players, bool godot_passes) {
@@ -410,6 +479,15 @@ MapGenResult generate_map(uint32_t seed, int size, const std::string &preset, in
 	const bool stress = preset == "stress";
 	if (stress) {
 		double Rr = size * 0.34;
+		for (int i = 0; i < players; i++) {
+			double a = PI * 0.75 + ((double)i / players) * PI * 2;
+			starts.push_back({ i + 1, (int)js_round(size / 2.0 + std::cos(a) * Rr), (int)js_round(size / 2.0 + std::sin(a) * Rr) });
+		}
+	} else if (godot_passes && players > 2 && (preset == "skirmish" || preset == "battle")) {
+		// Godot-only: 3..6 players on a ring round the centre, evenly spaced
+		// (every start the same distance from the centre and from both
+		// neighbours; the setup screen puts team mates side by side)
+		double Rr = size * 0.35;
 		for (int i = 0; i < players; i++) {
 			double a = PI * 0.75 + ((double)i / players) * PI * 2;
 			starts.push_back({ i + 1, (int)js_round(size / 2.0 + std::cos(a) * Rr), (int)js_round(size / 2.0 + std::sin(a) * Rr) });
@@ -546,6 +624,7 @@ MapGenResult generate_map(uint32_t seed, int size, const std::string &preset, in
 	const ConnectResult cr = connect_starts(map, starts, resources, occupied);
 	R.felled = cr.felled;
 	R.graded = cr.graded;
+	R.balanced = balance_starts(map, starts, forest_dir, resources, occupied);
 	R.woodline = place_woodlines(map, seed, starts, forest_dir, resources, occupied);
 	return R;
 }

@@ -558,7 +558,9 @@ void Economy::update_gatherer(int r, double dt) {
 		if (farm) base = FARM_RATE;
 		else if (animal) base = ud.gather_rate[RES_FOOD] * 1.35;
 		else base = rt <= RES_GOLD ? ud.gather_rate[rt] : NAN;
-		const double rate = base * dt;
+		double rate = base * dt;
+		const double gm = sim->players[U.owner[r]].gather_mult; // (Godot-only: Titan AI; 1 = exact)
+		if (gm != 1) rate *= gm;
 		U.carry_type[r] = (uint8_t)rt;
 		U.carry_amount[r] = std::min(cap, U.carry_amount[r] + rate);
 		if (farm) B.econ_rows[t] = B.econ_rows[t] + rate / FOOD_PER_ROW;
