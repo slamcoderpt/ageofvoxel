@@ -39,6 +39,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | performance (6 teams, 2000 units) | `game/perf/perf.gd` (the render bench, `--renderbench`), and in the render paths of the stress scene: unit LOD + box shadow casters (`game/units`), coarse voxel twins `VoxelModels.coarse()` (tree shadow casters), tight resource / ground-detail buckets (`game/terrain`), economy props frustum culling (`AovEconView`); report in `../docs/godot-stress-report.md` | sim hot paths (with their owners); `native/src/unit_lod.cpp` (`AovUnitView.lod_mesh`) | `docs/stress-report.md` |
 | exports (Windows, macOS, Linux, web) | `export_presets.cfg`, `../scripts/godot-export.sh`, `../.github/workflows/godot.yml`, `native/SConstruct` + `native/aov.gdextension` (platform entries); see "Export" | none | `vite build` |
 | scenes | `AovScenes.set_setup()` from the owning piece, else the C++ setup | `scenes/` (helpers.js, skirmish / town / coast / hud, EconomyScene.js; battle.cpp: BattleScene.js + units/battleHost.js, godpower, stress.js: all ported) | `src/core/scenes/`, `BattleScene.js`, `EconomyScene.js` |
+| menu (main menu) | `game/menu/`: `menu.gd` (the piece, scene `menu`), `tile.gd`, `art.gd`, `options.gd`, `flow.gd` (screen flow, `AovArgs.override`), `logo.gdshader`, `menu_check.gd`; see "Main menu" | none | none (Godot-only) |
 
 ```
 godot/
@@ -184,7 +185,10 @@ godot --path godot -- --scene=town [--seed=N] [--mapsize=N] [--units=N] [--playe
   seconds (default 600) so a script error never hangs a capture.
 - Scenes: `skirmish town battle godpower coast economy hud stress` (same
   presets, seeds, map sizes and cameras as the JS registry) and the Godot-only
-  `models` (every exported model on one strip). Like main.js, main.gd turns
+  `models` (every exported model on one strip) and `menu` (the main menu,
+  below). **Without `--scene`** the game opens the main menu; a run with
+  `--out`, `--quit` or `--bench` and no `--scene` still gets the skirmish, as
+  before (so does the web build's `?scene=` query). Like main.js, main.gd turns
   the ENEMY AI and Victory on per scene (`ai`, `victory`) before the setup,
   sets the fog (`reveal_all`, `--fog`) after it, and pauses when the match is
   decided (`AovSim.is_paused()`). `--units=N` reaches the C++ setup through
@@ -322,6 +326,45 @@ colour (off by default now that `game/units/units.gd` exists);
 `--simdemo=1 [--simdemo_t=7]` spawns two armies at the first two starts and
 marches them onto each other, e.g.
 `node scripts/godot-shoot.mjs --scene skirmish --params "simdemo=1"`.
+
+## Main menu (game/menu)
+
+`game/menu/menu.gd` (a piece: in `PIECE_ORDER`, idle unless the scene is
+`menu`) is Retold's main menu in the HUD style (`hud_style.gd`, the panel
+shader, Cinzel / Alegreya): the coast town plays live behind it (the C++
+`coast` setup, no AI, no HUD, camera from the sea over the beach to the
+temple, drifting slowly), a top bar with the logo (`logo.gdshader`: white
+text shaded as cast gold) and tabs, the Skirmish tile, Campaign /
+Multiplayer / Load marked "COMING SOON" (dimmed, still focusable; pressing
+shows a notice), a feature carousel (Zeus, attack-move, the map), Options
+(`options.gd`: Graphics High / Medium / Low live + remembered like the gear
+card, window mode, F3 meter) and Quit (a notice on the web). Tiles are
+`tile.gd` Buttons (hover / pressed / focus states) with gold line art built
+as SVG in `art.gd`. Keyboard / joypad: the first arrow or D-pad press
+focuses Skirmish, arrows move, Enter / A presses, Esc / B closes Options; the
+focus ring only shows while the last input was not the mouse. Screen flow
+is `flow.gd`: `Flow.start_match(tree, opts)` / `Flow.to_main_menu(tree)` set
+`AovArgs.override` (parse() returns it instead of the command line, so Play
+Again replays the same match) and reload `main.tscn`. Skirmish opens the
+first existing script of `Flow.SETUP_SCREENS` (the "Setup screen contract"
+at the top of `menu.gd`), or starts the default skirmish without one.
+
+```
+node scripts/godot-shoot.mjs --scene menu --out shots/godot/menu.png
+     [--params "menu_hover=skirmish"]    # a tile hovered + focused: skirmish campaign multiplayer feature load options quit tab_play tab_options burger
+     [--params "menu_options=1"]         # the Options dialog open
+     [--params "menu_view=x,z,dist,pitch,yaw"]   # camera anchor; menu_intro=1 plays the fade-in (off in captures)
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 1280x720x24" \
+  godot --path godot --rendering-driver vulkan --audio-driver Dummy --resolution 1280x720 \
+  -s res://game/menu/menu_check.gd        # no --scene on purpose: "MENU ok|FAIL <step>", exit = failures
+```
+
+`menu_check.gd` launches with no scene argument and drives the menu through
+real key, joypad and mouse events: the menu opens with the HUD hidden,
+arrows / D-pad move the focus, Enter on an unavailable tile gives its
+notice, hover, Options (Graphics Low applies live and is remembered, then
+restored), Esc, world clicks blocked, Skirmish -> the setup screen -> a
+match with its HUD, then back to the menu.
 
 ## Match setup and match settings (game/menu/setup)
 

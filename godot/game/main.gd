@@ -13,7 +13,7 @@ extends Node3D
 ## exists, frame(dt, alpha) once per displayed frame (visual only). Pieces
 ## read sim state from `game.sim` (AovSim) through its packed-array getters.
 
-const PIECE_ORDER := ["lighting", "terrain", "buildings", "units", "economy", "combat", "godpowers", "ui", "perf"]
+const PIECE_ORDER := ["lighting", "terrain", "buildings", "units", "economy", "combat", "godpowers", "ui", "perf", "menu"]
 const SIM_DT := 1.0 / 30.0
 
 var args := {}
@@ -49,7 +49,10 @@ func _ready() -> void:
 			get_tree().quit(4))
 		add_child(dog)
 		dog.start()
-	var scene_name := str(args.get("scene", "skirmish"))
+	# no --scene: the main menu when launched to play (game/menu), the skirmish
+	# for a capture / bench / --quit run without one (as before the menu existed)
+	var headless_run := args.has("out") or AovArgs.flag(args, "quit", false) or AovArgs.flag(args, "bench", false)
+	var scene_name := str(args.get("scene", "skirmish" if headless_run else "menu"))
 	scene_def = AovScenes.get_def(scene_name)
 	if scene_def.is_empty():
 		_fail("Unknown scene \"%s\". Known: %s" % [scene_name, ", ".join(AovScenes.names())])

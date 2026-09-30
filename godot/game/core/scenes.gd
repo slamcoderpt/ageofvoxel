@@ -32,6 +32,10 @@ static var SCENES := {
 	"stress": {"preset": "stress", "seed": 23, "map_size": 256, "players": 6, "hud": true, "reveal_all": false, "ai": true, "live": true,
 		"prof": true, "fast_forward": 0.0, "units": 2000,
 		"camera": {"distance": 52.0, "pitch": 52.0}},
+	# Godot-only: the main menu (game/menu): the coast town live behind the menu,
+	# no AI, no HUD; the menu piece registers its setup and drives the camera.
+	"menu": {"preset": "coast", "seed": 5, "hud": false, "reveal_all": true, "live": true, "fast_forward": 20.0,
+		"camera": {"distance": 46.0, "pitch": 24.0, "yaw": 20.0}},
 	# Godot-only: the skirmish match setup screen (game/menu/setup) over a small
 	# still field (the screen is opaque); --players=2..6, --open=<picker>.
 	"setup": {"preset": "battle", "seed": 1, "map_size": 96, "hud": false, "reveal_all": true, "fast_forward": 0.0,
