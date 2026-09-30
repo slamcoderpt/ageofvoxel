@@ -7,6 +7,11 @@ extends SceneTree
 ##      from the front stops, fights back, then walks on and arrives;
 ##   2. a group on a plain move away from chasing cavalry keeps running (a
 ##      retreat: nobody turns round before arriving);
+##   3. an attack-move past a passive enemy group (leashed: they never start
+##      a fight) destroys it and then goes on to the destination, where a
+##      plain move over the same ground leaves it alone;
+##   4. target priority: with enemy soldiers and villagers both in sight
+##      (the villagers nearer), an attack-move engages the soldiers first.
 ##
 ##   godot --headless --path godot -s res://game/core/attackmove_check.gd -- --scene=skirmish
 ##
@@ -170,6 +175,70 @@ func _run() -> void:
 	n_alive = _alive(ours).size()
 	_check("2 plain move away from a chaser keeps running", turned == 0 and hp1 < hp0 and arrived == n_alive and n_alive > 0,
 		{"turned_ticks": turned, "hp_lost": snappedf(hp0 - hp1, 0.1), "alive": n_alive, "arrived": arrived})
+	_clear()
+
+	# 3. attack-move through a passive enemy group, a plain move as the control ----------
+	var runs := {}
+	for kind in ["move", "attack_move"]:
+		ours = _spawn("hoplite", 1, 6, c.x - 18, c.y - 1, 3)
+		dest = Vector2(c.x + 18, c.y)
+		foes = _spawn("hoplite", 2, 3, c.x, c.y + 4, 3)
+		for id in foes:
+			sim.set_unit_combat(id, {"leash": 0.5})  # passive: they only strike back at arm's length
+		sim.tick(1)
+		if kind == "move":
+			sim.order_move(PackedInt32Array(ours), dest.x, dest.y)
+		else:
+			sim.order_attack_move(PackedInt32Array(ours), dest.x, dest.y)
+		var first_order := str(sim.get_unit(ours[0]).order)
+		var engaged := 0
+		var dead_at := -1.0
+		var t_end := 0
+		for t in 30 * 60:
+			sim.tick(1)
+			t_end = t
+			for id in _alive(ours):
+				if int(sim.get_unit(id).resume) == 2: engaged = maxi(engaged, 1)
+			if dead_at < 0 and _alive(foes).is_empty(): dead_at = t / 30.0
+			if _near(ours, dest, 4.0) == _alive(ours).size():
+				break
+		runs[kind] = {"order": first_order, "engaged": engaged > 0, "foes_left": _alive(foes).size(), "foes_dead_at_s": dead_at,
+			"alive": _alive(ours).size(), "arrived": _near(ours, dest, 4.0), "s": snappedf(t_end / 30.0, 0.1)}
+		_clear()
+	var am: Dictionary = runs.attack_move
+	var mv: Dictionary = runs.move
+	_check("3 attack-move kills the group on the way, then arrives", am.order == "attack_move" and am.engaged and am.foes_left == 0 and am.alive > 0 and am.arrived == am.alive
+		and mv.foes_left == 3 and mv.arrived == mv.alive, runs)
+
+	# 4. priority: soldiers before villagers ------------------------------------------------
+	ours = _spawn("hoplite", 1, 4, c.x - 10, c.y - 0.5, 2)
+	dest = Vector2(c.x + 12, c.y)
+	var vills := _spawn("villager", 2, 3, c.x - 6.5, c.y - 1, 3)     # ~3.5 tiles ahead
+	var soldiers := _spawn("hoplite", 2, 2, c.x - 4.5, c.y + 3.5, 2)  # ~6.5 tiles ahead, to the side
+	for id in soldiers:
+		sim.set_unit_combat(id, {"leash": 0.5})
+	sim.tick(1)
+	sim.order_attack_move(PackedInt32Array(ours), dest.x, dest.y)
+	var first := {}
+	var soldiers_dead_at := -1.0
+	var vills_dead_at := -1.0
+	for t in 30 * 60:
+		sim.tick(1)
+		for id in _alive(ours):
+			var u: Dictionary = sim.get_unit(id)
+			if not first.has(id) and str(u.order) == "attack":
+				first[id] = int(u.target)
+		if soldiers_dead_at < 0 and _alive(soldiers).is_empty(): soldiers_dead_at = t / 30.0
+		if vills_dead_at < 0 and _alive(vills).is_empty(): vills_dead_at = t / 30.0
+		if vills_dead_at >= 0 and soldiers_dead_at >= 0 and _near(ours, dest, 4.0) == _alive(ours).size():
+			break
+	var on_soldiers := 0
+	for id in first:
+		if soldiers.has(first[id]): on_soldiers += 1
+	_check("4 priority: soldiers engaged before villagers", first.size() == ours.size() and on_soldiers == first.size() and soldiers_dead_at >= 0
+		and vills_dead_at >= soldiers_dead_at and _near(ours, dest, 4.0) == _alive(ours).size(),
+		{"engaged": first.size(), "first_on_soldiers": on_soldiers, "soldiers_dead_at_s": soldiers_dead_at, "villagers_dead_at_s": vills_dead_at,
+			"arrived": _near(ours, dest, 4.0), "alive": _alive(ours).size()})
 	_clear()
 
 	print("ATTACKMOVE_RESULT %s" % JSON.stringify({"passed": passes, "failed": fails, "cases": result}))

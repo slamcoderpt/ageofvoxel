@@ -24,6 +24,7 @@ void Combat::init(Sim *s) {
 	attackers_.clear();
 	touched_.clear();
 	s->commands.register_handler(O_ATTACK, [this](int r, const Order &o) { return start_attack(r, o); });
+	s->commands.register_handler(O_ATTACK_MOVE, [this](int r, const Order &o) { return start_attack_move(r, o); });
 }
 
 EnemyAI &Combat::add_ai(int owner) {
@@ -45,25 +46,105 @@ bool Combat::start_attack(int r, const Order &o) {
 	return true;
 }
 
-// ---- Godot-only: fight back while moving, then walk on (see combat.h) -----
+// ---- Godot-only: attack-move, fight back while moving (see combat.h) ------
+
+bool Combat::start_attack_move(int r, const Order &o) {
+	const UnitDef &d = unit_def(sim->entities.units.type[r]);
+	if (!d.has_attack || d.gatherer) sim->commands.set(r, Order::move(o.x, o.z)); // villagers just walk there
+	sim->movement.move_to(r, o.x, o.z);
+	return true;
+}
+
+int Combat::am_rank(int32_t id) const {
+	const Entities &E = sim->entities;
+	const int s = E.slot(id);
+	if (s < 0) return 3;
+	if (E.kind(id) == K_UNIT) return unit_def(E.units.type[s]).gatherer ? 1 : 0;
+	return E.kind(id) == K_BUILDING ? 2 : 3;
+}
+
+int32_t Combat::am_pick(int r, int *rank_out) {
+	CallTimer tm(&sim->prof, "amPick");
+	const Entities &E = sim->entities;
+	const UnitStore &U = E.units;
+	const double x = U.x[r], z = U.z[r], R = U.sight[r], R2 = R * R;
+	const int owner = U.owner[r];
+	int best = -1, brank = 3;
+	double bd = INFINITY;
+	sim->movement.hash.count_query(x, z, R);
+	sim->movement.hash.for_each_near(x, z, R, [&](int o) {
+		if (U.dead[o] || U.gp_state[o] == 1 || !Sim::is_enemy(owner, U.owner[o])) return;
+		const double dx = U.x[o] - x, dz = U.z[o] - z, d = dx * dx + dz * dz;
+		if (d > R2) return;
+		const int rank = unit_def(U.type[o]).gatherer ? 1 : 0;
+		if (rank < brank || (rank == brank && d < bd)) {
+			brank = rank;
+			bd = d;
+			best = o;
+		}
+	});
+	if (best >= 0) {
+		if (rank_out) *rank_out = brank;
+		return U.id[best];
+	}
+	const BuildingStore &B = E.buildings;
+	int bb = -1;
+	bd = INFINITY;
+	for (int b = 0; b < B.size(); b++) {
+		if (B.removed[b] || B.dead[b] || !Sim::is_enemy(owner, B.owner[b])) continue;
+		if (std::abs(B.x[b] - x) > R + B.w[b] || std::abs(B.z[b] - z) > R + B.h[b]) continue;
+		const double ex = std::max(std::max(B.tx[b] - x, 0.0), x - (B.tx[b] + B.w[b]));
+		const double ez = std::max(std::max(B.tz[b] - z, 0.0), z - (B.tz[b] + B.h[b]));
+		const double d = ex * ex + ez * ez;
+		if (d <= R2 && d < bd) {
+			bd = d;
+			bb = b;
+		}
+	}
+	if (rank_out) *rank_out = bb >= 0 ? 2 : 3;
+	return bb >= 0 ? B.id[bb] : 0;
+}
 
 void Combat::engage(int r, int32_t tid, uint8_t resume) {
 	UnitStore &U = sim->entities.units;
 	const double x = U.order_x[r], z = U.order_z[r];
+	const int32_t flags = U.order_b[r];
 	Order o = Order::with_target(O_ATTACK, tid);
-	o.b = ATK_AUTO;
+	o.b = resume == AMR_MOVE ? ATK_AUTO : 0;
 	if (!sim->commands.order(r, o)) { // (should not happen: the callers checked the target) walk on
-		sim->commands.order(r, Order::move(x, z));
+		Order back = Order::move(x, z);
+		if (resume == AMR_ATTACK_MOVE) {
+			back.type = O_ATTACK_MOVE;
+			back.b = flags;
+		}
+		sim->commands.order(r, back);
 		return;
 	}
 	U.am_resume[r] = resume;
 	U.am_x[r] = x;
 	U.am_z[r] = z;
+	U.am_flags[r] = flags;
 	U.am_lost[r] = 0;
 }
 
 void Combat::resume(int r) {
 	UnitStore &U = sim->entities.units;
+	if (U.am_resume[r] == AMR_ATTACK_MOVE) {
+		const int32_t e = am_pick(r);
+		if (e) { // the next foe in sight
+			U.order_target[r] = e;
+			U.order_a[r] = 0;
+			U.order_x[r] = 0;
+			U.am_lost[r] = 0;
+			approach(r, e);
+			return;
+		}
+		Order o = Order::move(U.am_x[r], U.am_z[r]);
+		o.type = O_ATTACK_MOVE;
+		o.b = U.am_flags[r];
+		sim->commands.order(r, o);
+		return;
+	}
 	// the fight goes on while an enemy close by (not behind, on the way to
 	// the destination) is fighting: the attacker's comrades
 	const double wx = U.am_x[r] - U.x[r], wz = U.am_z[r] - U.z[r];
@@ -80,6 +161,28 @@ void Combat::resume(int r) {
 		return;
 	}
 	sim->commands.order(r, Order::move(U.am_x[r], U.am_z[r]));
+}
+
+void Combat::update_attack_move(int r) {
+	UnitStore &U = sim->entities.units;
+	const bool arrived = !U.moving[r];
+	if (!arrived && (sim->tick_count + U.id[r]) % AM_SCAN_TICKS != 0) return;
+	const int32_t e = am_pick(r);
+	if (e) {
+		engage(r, e, AMR_ATTACK_MOVE);
+		return;
+	}
+	if (!arrived) return;
+	if (U.order_b[r] & AM_THEN_BUILDINGS) {
+		const int b = find_enemy_building_near(U.x[r], U.z[r], U.owner[r], 200);
+		if (b >= 0) {
+			Order o = Order::with_target(O_ATTACK, sim->entities.buildings.id[b]);
+			o.b = ATK_THEN_BUILDINGS;
+			sim->commands.order(r, o);
+			return;
+		}
+	}
+	sim->commands.idle(r);
 }
 
 // The men marching next to a unit that turns to fight back turn with it
@@ -302,7 +405,9 @@ void Combat::damage(int32_t tid, double amount, const Hitter &a, uint8_t kind) {
 			const bool godot = sim->godot_rules;
 			if (leashed) { /* holding the line: ignore distant attackers */ }
 			else if (ot == O_IDLE) sim->commands.order(t, o);
-			else if (godot && ot == O_MOVE && !td->gatherer) {
+			else if (ot == O_ATTACK_MOVE) {
+				if (a.kind == K_UNIT) engage(t, a.id, AMR_ATTACK_MOVE);
+			} else if (godot && ot == O_MOVE && !td->gatherer) {
 				// Godot-only: fight back unless hit from behind (a retreat), then walk on
 				if (a.kind == K_UNIT && jsm::hypot(ax - U.x[t], az - U.z[t]) <= U.sight[t] && hit_ahead(t, ax, az)) {
 					engage(t, a.id, AMR_MOVE);
@@ -478,11 +583,28 @@ void Combat::update(double dt) {
 			}
 			continue;
 		}
+		if (ot == O_ATTACK_MOVE) {
+			update_attack_move(r);
+			continue;
+		}
 		if (ot != O_ATTACK) continue;
 		int32_t tid = U.order_target[r];
 		int ts = E.slot(tid);
 		Kind tk = E.kind(tid);
 		if (ts >= 0 && tk != K_UNIT && tk != K_BUILDING) ts = -1;
+		// attack-move: a man busy with a villager or a building turns on soldiers that come into sight
+		if (U.am_resume[r] == AMR_ATTACK_MOVE && ts >= 0 && (sim->tick_count + U.id[r]) % AM_SCAN_TICKS == 0 && am_rank(tid) > 0) {
+			int rank = 3;
+			const int32_t e = am_pick(r, &rank);
+			if (e && rank < am_rank(tid)) {
+				U.order_target[r] = tid = e;
+				U.order_a[r] = 0;
+				U.am_lost[r] = 0;
+				ts = E.slot(e);
+				tk = E.kind(e);
+				approach(r, e);
+			}
+		}
 		// soldiers attacking a building switch to nearby enemy units
 		if (scan && ts >= 0 && tk == K_BUILDING && !def.gatherer) {
 			const int e = find_enemy_near(U.x[r], U.z[r], U.owner[r], 6);

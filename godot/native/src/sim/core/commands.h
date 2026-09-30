@@ -44,8 +44,10 @@ public:
 	// unit then goes idle) or no handler exists for the type.
 	bool order(int row, const Order &o);
 	bool idle(int row) { return order(row, Order::idle()); }
-	// Formation move: fan units out on a grid around the destination.
-	void move(const std::vector<int> &rows, double x, double z);
+	// Formation move: fan units out on a grid around the destination. `type`
+	// O_ATTACK_MOVE (Godot-only, order_b = b) gives the same slots and the
+	// same shared group path, as an attack-move.
+	void move(const std::vector<int> &rows, double x, double z, uint8_t type = O_MOVE, int32_t b = 0);
 	// Right-click semantics; target_id 0 = ground. Order types whose piece is
 	// not ported yet (no handler) fall back to moving there.
 	void smart(const std::vector<int> &rows, double x, double z, int32_t target_id);

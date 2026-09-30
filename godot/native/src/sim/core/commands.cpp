@@ -63,7 +63,7 @@ bool Commands::order(int r, const Order &o) {
 	return ok;
 }
 
-void Commands::move(const std::vector<int> &rows, double x, double z) {
+void Commands::move(const std::vector<int> &rows, double x, double z, uint8_t type, int32_t b) {
 	UnitStore &U = sim->entities.units;
 	std::vector<int> list;
 	list.reserve(rows.size());
@@ -96,7 +96,10 @@ void Commands::move(const std::vector<int> &rows, double x, double z) {
 		const double ox = (col - (cols - 1) / 2.0) * spacing * big;
 		const double oz = -(row - (nrows - 1) / 2) * spacing * big;
 		const double wx = x + ox * ca + oz * sa, wz = z - ox * sa + oz * ca;
-		order(r, Order::move(n == 1 ? x : wx, n == 1 ? z : wz));
+		Order o = Order::move(n == 1 ? x : wx, n == 1 ? z : wz);
+		o.type = type;
+		o.b = b;
+		order(r, o);
 	}
 	if (field) pf.end_group_field();
 }

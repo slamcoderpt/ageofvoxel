@@ -304,6 +304,75 @@ func _run() -> void:
 	await _key(KEY_ESCAPE)
 	_check("Esc leaves targeting", ui._mode.is_empty())
 
+	# attack-move: a small army by the Town Center (harness spawn), box
+	# selected; A enters the targeting mode, Esc leaves it, A + a left-click on
+	# the ground attack-moves the army there, A + a minimap click too
+	await _key(KEY_H)
+	await _frames(2)
+	var spot := Vector2(-1, -1)
+	for r in range(5, 12):
+		for a in 12:
+			var ang := a * TAU / 12.0
+			var sx: float = tc.tx + tc.w * 0.5 + cos(ang) * r
+			var sz: float = tc.tz + tc.h * 0.5 + sin(ang) * r
+			if spot.x < 0 and sim.find_path(tc.tx + tc.w * 0.5, tc.tz + tc.h + 1.0, sx, sz).size() > 0 and _on_screen(_screen(sx - 2, sz - 2)) and _on_screen(_screen(sx + 2, sz + 2)) \
+					and sim.units_near(sx, sz, 2.5).is_empty():
+				spot = Vector2(sx, sz)
+	var army: Array = Array(sim.spawn_block("hoplite", 1, 6, spot.x, spot.y, 3, 1.1, 0.0, 0.0))
+	await _frames(3)
+	lo = Vector2(1e9, 1e9)
+	hi = Vector2(-1e9, -1e9)
+	for id in army:
+		var u: Dictionary = sim.get_unit(id)
+		var p := _screen(u.x, u.z, 0.8)
+		lo = lo.min(p)
+		hi = hi.max(p)
+	await _drag(lo - Vector2(25, 25), hi + Vector2(25, 25))
+	await _frames(20)
+	var all_army: bool = ui.selected.size() == army.size()
+	for id in army:
+		all_army = all_army and ui.selected.has(id)
+	_check("box select the army", all_army and army.size() == 6, "%d selected, spot %s" % [ui.selected.size(), spot])
+	var am_tip := {}
+	for z in ui._back.zones + ui._front.zones:
+		if z.id == "cmd" and ui.commands[int(z.arg)] != null and str(ui.commands[int(z.arg)].action) == "attack_move":
+			am_tip = z.tip
+	_check("Attack-Move button with its key in the tooltip", str(am_tip.get("title", "")) == "Attack-Move (A)" and str(am_tip.get("hotkey", "")) == "A", str(am_tip))
+	await _key(KEY_A)
+	_check("A enters attack-move targeting", str(ui._mode.get("kind", "")) == "attack_move" and ui.selected.size() == army.size(), str(ui._mode))
+	await _key(KEY_ESCAPE)
+	await _frames(2)
+	var still_idle := true
+	for id in army:
+		still_idle = still_idle and str(sim.get_unit(id).order) == "idle"
+	_check("Esc cancels attack-move", ui._mode.is_empty() and still_idle)
+	await _key(KEY_A)
+	var gp := Vector2(spot.x, spot.y + 5.0)
+	for k in 8:  # a reachable, visible ground point a few tiles off
+		var ang := k * TAU / 8.0
+		var cand := spot + Vector2(cos(ang), sin(ang)) * 5.0
+		if sim.find_path(spot.x, spot.y, cand.x, cand.y).size() > 0 and _on_screen(_screen(cand.x, cand.y, 0.0)) and int(sim.entity_kind(ui.pick_entity(_screen(cand.x, cand.y, 0.0)))) == 0:
+			gp = cand
+			break
+	await _click(_screen(gp.x, gp.y, 0.0))
+	await _frames(2)
+	var am_n := 0
+	for id in army:
+		if str(sim.get_unit(id).order) == "attack_move": am_n += 1
+	_check("left-click ground issues attack_move", am_n == army.size() and ui._mode.is_empty() and ui.msg_text == "Attack-move", "%d/%d, '%s'" % [am_n, army.size(), ui.msg_text])
+	await _key(KEY_A)
+	var mz = _zone_center("minimap")
+	if mz != null:
+		await _click(mz)
+		await _frames(2)
+	var goal_far := 0
+	for id in army:
+		var u: Dictionary = sim.get_unit(id)
+		if str(u.order) == "attack_move" and u.has("goal") and (u.goal as Vector2).distance_to(gp) > 6.0: goal_far += 1
+	_check("A + minimap click attack-moves there", mz != null and goal_far == army.size() and ui._mode.is_empty(), "%d/%d" % [goal_far, army.size()])
+	await _key(KEY_X)
+	await _frames(2)
+
 	# camera: wheel zoom, [ turn, middle-drag pan, Home resets
 	var d0: float = cam.distance
 	await _button(root.get_visible_rect().get_center(), MOUSE_BUTTON_WHEEL_UP, true)

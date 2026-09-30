@@ -242,8 +242,9 @@ the browser). The separation loops read the hash's position mirror
 (`SpatialHash::for_each_near_xz`, kept exact with `sync()` / `moved()`).
 Wall times on this shared machine vary by +-30 %. Since the enemy AI casts
 god powers, every seat's storms and meteors thin the stress armies (2000
-units: about 1340 alive on average over the recorded ticks instead of 1926,
-0.75 ms/tick mean); `--params "godot_rules=0"` (the browser's map and rules)
+units: about 1310-1340 alive on average over the recorded ticks instead of
+1926, 0.75-0.9 ms/tick mean; attack-move scans (`amPick`) cost 0.01
+ms/tick there); `--params "godot_rules=0"` (the browser's map and rules)
 gives the workload of the table above (1.06-1.09 ms/tick mean on this
 machine today). The render numbers and
 their method are in `../docs/godot-stress-report.md`.
@@ -269,7 +270,9 @@ Skirmish playtest (the whole match through real input events: box select,
 right-click gather, control groups, house placement, train, advance age,
 double-click, stop, the god power hotkeys with villagers selected (no clash
 with a command key, the key in the tooltip, the "Not enough favor" message,
-targeting mode, Esc), camera zoom / turn / pan, a Bolt by hotkey + click, two
+targeting mode, Esc), attack-move (box-selected army, the button's tooltip
+"Attack-Move (A)", A enters the mode, Esc cancels it, A + a ground click and
+A + a minimap click give `attack_move`), camera zoom / turn / pan, a Bolt by hotkey + click, two
 minutes against the AI, the victory card and Play Again; ~12 min on lavapipe):
 
 ```
@@ -518,7 +521,7 @@ Per-frame state, one call each, parallel arrays (index i = one entity):
   (Byte: 0 idle, 1 walk, 2 gather, 3 build, 4 worship, 5 attack, 6 die),
   `anim_t`, `attack_t`, `die_t`, `hit_t` (-1 = never hit), `flash_t`,
   `order` (Byte: 0 idle, 1 move, 2 gather, 3 dropoff, 4 worship, 5 build,
-  6 attack), `target` (order target id), `flags` (Byte: 1 moving, 2 dead,
+  6 attack, 7 attack_move), `target` (order target id), `flags` (Byte: 1 moving, 2 dead,
   4 arrived, 8 carrying, 16 battle line), `carry` (Byte resource kind 0
   food 1 wood 2 gold, 255 none), `carry_amount`, `task` (Byte: the kind
   being gathered, u.econ.resType, 255 none), `load` (Byte, what drawLoads
@@ -541,7 +544,8 @@ Per-frame state, one call each, parallel arrays (index i = one entity):
   xform (5 each: x, z, rot, scale, y)}, the scenes' field dressing.
 
 Commands: `order(id, {type, target, x, z, a, b, c})`, `order_move(ids, x, z)`
-(formation move), `order_idle(ids)`, `smart(ids, x, z, target_id=0)`
+(formation move), `order_attack_move(ids, x, z)` (formation attack-move,
+Godot-only, see "Attack-move"), `order_idle(ids)`, `smart(ids, x, z, target_id=0)`
 (right-click; order types whose piece is not ported yet fall back to a
 move), `order_gather / order_build / order_worship / order_dropoff(ids,
 target)`, `move_to(id, x, z, range=0)`, `find_path(sx, sz, gx, gz)`
@@ -635,9 +639,46 @@ move fights back from any side, and stays) applies with the rules off.
 `godot --headless --path godot -s res://game/core/attackmove_check.gd -- --scene=skirmish`
 ("ATTACKMOVE PASS|FAIL <case>", `ATTACKMOVE_RESULT {json}`, exit = failures).
 
+**Attack-move** (Godot-only order `attack_move`, `O_ATTACK_MOVE` = 7 in
+`get_units().order`; `AovSim.order_attack_move(ids, x, z)` is the formation
+version: `Commands::move(rows, x, z, O_ATTACK_MOVE)`, the same slots and
+the same shared group path as a formation move; `order(id, {type:
+"attack_move", x, z})` for one unit): order_x / order_z = destination,
+order_b bit `AM_THEN_BUILDINGS`. The unit walks there and, every 8 ticks
+(staggered by id: `(tick + id) % 8`) and on arrival, looks within its sight
+through the spatial hash (`Combat::am_pick`): enemy military units first
+(myth units and heroes rank as military), then villagers, then buildings
+(a pass over the buildings only when no unit is in sight), nearest first.
+Found: an attack (`engage`, no ATK_AUTO, so the AI never redrafts the men
+into a new wave) that remembers the attack-move; ranged units keep their
+range (the attack order's own approach). While on a villager or a building
+it turns on a soldier that comes into sight; a hit from any side engages the
+attacker. When the foe dies (or stays beyond its sight for 2 s) it takes the
+next one in sight or walks on. On arrival with nothing in sight it goes
+idle, or with `AM_THEN_BUILDINGS` attacks the nearest enemy building with
+ATK_THEN_BUILDINGS (the browser's wave order). Villagers given one simply
+move. **The enemy AI's waves** (`EnemyAI::update`, rules on) attack-move to
+the target building's centre with `AM_THEN_BUILDINGS` instead of the
+browser's direct attack on it. Since waves now fight the enemy's waves on
+the way, two more Godot-only AI rules keep matches from stalling: idle
+soldiers more than 30 tiles from their Town Center (a Lightning Storm drops
+the men it throws idle) attack-move on to the target, and a wave overdue by
+a whole interval (120 s / aggression) leaves with at least 6 men even when
+the army cannot grow to `wave_size` (a starved economy). `get_unit(id).resume` 2 = fighting on an
+attack-move. UI (`ui.gd`): with soldiers selected the command grid has
+Attack-Move (slot 13, key **A**, tooltip "Attack-Move (A)"); A / the button
+enters the `attack_move` targeting mode (the god powers' mode machinery:
+cross cursor, an orange ring under it, Esc or right-click cancels), then a
+left-click on the ground or the minimap attack-moves the soldiers there (the
+rest of the selection moves; an orange marker and "Attack-move"), a
+left-click on an enemy is the normal attack. A is also the Town Center's
+Advance Age key: the two never share a command grid (buildings vs units),
+so they do not clash; the gear's hotkeys card lists both.
+`attackmove_check.gd` cases 3 and 4.
+
 `set_godot_rules(on)` (default on, kept across `new_game`): off = the
 browser's rules only (no AI god powers, no free villager, no fighting back
-while moving); `simcheck.gd`
+while moving, AI waves attack their target directly); `simcheck.gd`
 turns it off for `check-sim.mjs`, and `--godot_rules=0` does it for a run
 (A/B benches: the AI's storms thin the stress armies, so its numbers move).
 
@@ -787,4 +828,5 @@ Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
   Z / C / V. Checks: `aivai.gd`, `softlock_check.gd`, `playtest.gd`,
   `check-mapgen.mjs`.
 - Done (Godot-only combat): units on a plain move fight back unless struck
-  from behind, then walk on (`attackmove_check.gd`).
+  from behind, then walk on; attack-move (hotkey A; the AI's waves use it)
+  (`attackmove_check.gd`, `playtest.gd`, `aivai.gd`).

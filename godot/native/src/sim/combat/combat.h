@@ -17,17 +17,30 @@
 // ATK_THEN_BUILDINGS (thenBuildings), ATK_AUTO (auto).
 //
 // Godot-only (Sim::godot_rules; the browser is frozen):
+// - Attack-move, order O_ATTACK_MOVE: order_x / order_z = destination,
+//   order_b bits AM_*. The unit walks there (a formation move: same slots and
+//   group path as Commands::move); every AM_SCAN_TICKS ticks (staggered by id)
+//   and on arrival it looks for a foe within its sight: enemy military units
+//   first (myth units and heroes count as military), then villagers, then
+//   buildings, nearest first; if one is found it engages it (engage()).
+//   While it fights a villager or a building it turns on a soldier that
+//   comes into sight. A hit from any side engages the attacker. On arrival
+//   with nothing in sight it goes idle, or, with AM_THEN_BUILDINGS (the
+//   enemy AI's waves), attacks the nearest enemy building like the
+//   browser's wave order. Villagers given one simply move.
 // - A unit on a plain move (not a villager) that is hit by an enemy unit
 //   within its sight, ahead of it or beside it (dot(move dir, dir to the
 //   attacker) > RETALIATE_DOT), stops and fights back; one hit from behind
 //   (it is moving away: a retreat) is ignored and it keeps going. The men
 //   on a plain move within RALLY_RADIUS of it for whom the attacker is also
 //   ahead or beside turn with it (rally_to: one hash query per retaliation).
-// - engage(): an O_ATTACK (ATK_AUTO) that remembers what to resume
-//   (units.am_resume / am_x / am_z). The fight ends when the foe dies or has
-//   been beyond the unit's sight for AM_LOST_TIME s; then the unit takes on
-//   an enemy within NEXT_FOE_RADIUS that is fighting (the attacker's
-//   comrades) unless it is behind, else walks on to its destination. Any new order (Commands::set) forgets the resume.
+// - engage(): an O_ATTACK that remembers what to resume (units.am_resume /
+//   am_x / am_z / am_flags; ATK_AUTO only for a move, so the AI does not
+//   redraft the men of an attack-move into a new wave). The fight ends when
+//   the foe dies or has been beyond the unit's sight for AM_LOST_TIME s;
+//   then an attack-move picks its next foe in sight or walks on; a move
+//   takes on an enemy within NEXT_FOE_RADIUS that is fighting (the
+//   attacker's comrades) unless it is behind, else walks on. Any new order (Commands::set) forgets the resume.
 //
 // Visual-only parts of the JS stay with the renderer (game/combat): hit
 // sparks, dust, ground scars, dropped gear (BattleFX / Debris), health bars
@@ -52,7 +65,9 @@ constexpr double STUCK_TIME = 9;     // s an arrow stays stuck in the ground
 constexpr int STUCK_MAX = 400;
 
 enum AttackFlag : int32_t { ATK_THEN_BUILDINGS = 1, ATK_AUTO = 2 };
-enum AmResume : uint8_t { AMR_NONE = 0, AMR_MOVE = 1 };
+enum AttackMoveFlag : int32_t { AM_THEN_BUILDINGS = 1 };
+enum AmResume : uint8_t { AMR_NONE = 0, AMR_MOVE = 1, AMR_ATTACK_MOVE = 2 };
+constexpr int AM_SCAN_TICKS = 8;        // attack-move re-acquire period (ticks, staggered per unit)
 constexpr double AM_LOST_TIME = 2;      // s a foe may stay out of sight before the fight is dropped
 constexpr double RETALIATE_DOT = -0.25; // moving units fight back unless hit from behind
 constexpr double RALLY_RADIUS = 4;      // the men beside one who fights back join him
@@ -123,6 +138,11 @@ private:
 	void add_attacker(int32_t id);
 	void clear_attackers();
 	bool start_attack(int urow, const Order &o);
+	bool start_attack_move(int urow, const Order &o);
+	// attack-move target choice (see above): entity id or 0
+	int32_t am_pick(int urow, int *rank_out = nullptr);
+	int am_rank(int32_t id) const; // 0 military, 1 villager, 2 building, 3 none
+	void update_attack_move(int urow);
 	void engage(int urow, int32_t target_id, uint8_t resume);
 	void resume(int urow);
 	void rally_to(int urow, int32_t attacker_id, double ax, double az);

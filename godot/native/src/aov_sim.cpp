@@ -66,6 +66,7 @@ void AovSim::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("order", "id", "order"), &AovSim::order);
 	ClassDB::bind_method(D_METHOD("order_move", "ids", "x", "z"), &AovSim::order_move);
 	ClassDB::bind_method(D_METHOD("order_idle", "ids"), &AovSim::order_idle);
+	ClassDB::bind_method(D_METHOD("order_attack_move", "ids", "x", "z"), &AovSim::order_attack_move);
 	ClassDB::bind_method(D_METHOD("smart", "ids", "x", "z", "target_id"), &AovSim::smart, DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("move_to", "id", "x", "z", "range"), &AovSim::move_to, DEFVAL(0.0));
 	ClassDB::bind_method(D_METHOD("find_path", "sx", "sz", "gx", "gz"), &AovSim::find_path);
@@ -661,7 +662,7 @@ Dictionary AovSim::get_unit(int64_t id) const {
 	d["arrived"] = (bool)U.arrived[r];
 	d["order"] = aov::order_name(U.order_type[r]);
 	d["target"] = U.order_target[r];
-	d["resume"] = U.am_resume[r]; // Godot-only fight-then-walk-on (Combat::engage): 0 none, 1 move
+	d["resume"] = U.am_resume[r]; // Godot-only fight-then-walk-on (Combat::engage): 0 none, 1 move, 2 attack-move
 	d["anim"] = aov::anim_name(U.anim_state[r]);
 	d["repaths"] = U.repaths[r];
 	PackedVector2Array path;
@@ -728,6 +729,9 @@ bool AovSim::order(int64_t id, const Dictionary &o) {
 
 void AovSim::order_move(const PackedInt32Array &ids, double x, double z) { sim_.commands.move(rows_of(sim_.entities, ids), x, z); }
 void AovSim::order_idle(const PackedInt32Array &ids) { sim_.commands.stop(rows_of(sim_.entities, ids)); }
+void AovSim::order_attack_move(const PackedInt32Array &ids, double x, double z) {
+	sim_.commands.move(rows_of(sim_.entities, ids), x, z, aov::O_ATTACK_MOVE);
+}
 void AovSim::smart(const PackedInt32Array &ids, double x, double z, int64_t target_id) {
 	sim_.commands.smart(rows_of(sim_.entities, ids), x, z, (int32_t)target_id);
 }
