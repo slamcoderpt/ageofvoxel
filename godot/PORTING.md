@@ -39,7 +39,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | performance (6 teams, 2000 units) | `game/perf/perf.gd` (the render bench, `--renderbench`), and in the render paths of the stress scene: unit LOD + box shadow casters (`game/units`), coarse voxel twins `VoxelModels.coarse()` (tree shadow casters), tight resource / ground-detail buckets (`game/terrain`), economy props frustum culling (`AovEconView`); report in `../docs/godot-stress-report.md` | sim hot paths (with their owners); `native/src/unit_lod.cpp` (`AovUnitView.lod_mesh`) | `docs/stress-report.md` |
 | exports (Windows, macOS, Linux, web) | `export_presets.cfg`, `../scripts/godot-export.sh`, `../.github/workflows/godot.yml`, `native/SConstruct` + `native/aov.gdextension` (platform entries); see "Export" | none | `vite build` |
 | scenes | `AovScenes.set_setup()` from the owning piece, else the C++ setup | `scenes/` (helpers.js, skirmish / town / coast / hud, EconomyScene.js; battle.cpp: BattleScene.js + units/battleHost.js, godpower, stress.js: all ported) | `src/core/scenes/`, `BattleScene.js`, `EconomyScene.js` |
-| menu (main menu) | `game/menu/`: `menu.gd` (the piece, scene `menu`), `tile.gd`, `art.gd`, `options.gd`, `flow.gd` (screen flow, `AovArgs.override`), `logo.gdshader`, `menu_sky.gdshader`, `menu_check.gd`; see "Main menu" | none | none (Godot-only) |
+| menu (main menu) | `game/menu/`: `menu.gd` (the piece, scene `menu`), `tile.gd`, `art.gd`, `options.gd`, `flow.gd` (screen flow, `AovArgs.override`), `hero_art.gd` + `hero_sky.gdshader` + `hero_bolt.gdshader` (the feature card's rendered art), `logo.gdshader`, `menu_sky.gdshader`, `menu_check.gd`; see "Main menu" | none | none (Godot-only) |
 
 ```
 godot/
@@ -345,7 +345,16 @@ camera sways slowly round the anchor. Over it: a top bar with the logo
 (`logo.gdshader`: white text shaded as cast gold) and tabs, the Skirmish
 tile, Campaign / Multiplayer unavailable (softer gold line art, muted
 title, no label; on hover "Not available in this version.", pressing shows
-a notice), a feature carousel (Zeus, attack-move, the map), Quick Match
+a notice), a feature carousel (Zeus, attack-move, the map) whose card
+carries full-colour art rendered live in our own voxel render
+(`hero_art.gd`: a SubViewport with its own World3D, so nothing of it
+reaches the harbour or its light; exported models in rest pose on voxel
+ground: the golden hero before a hoplite phalanx, archers, minotaur,
+cyclops and cavalry, the temple on a hill, a crimson storm sky
+(`hero_sky.gdshader`) and Zeus's bolt (`hero_bolt.gdshader`, glow); one
+camera framing and mood per page, a slow sway and bolt flicker live, still
+in captures; drawn edge to edge inside the bronze frame, the title on a
+dark gradient, a one-line caption), Quick Match
 (the default skirmish at once; there is no Load until saved games exist),
 Options (`options.gd`: Graphics High / Medium / Low live + remembered like
 the gear card, window mode, F3 meter) and Quit (a notice on the web). Tiles are
@@ -364,6 +373,8 @@ toggle and world clicks cannot reach the town), and the menu and its capture
 do not depend on `game/ui/ui.gd` loading. A piece that fails to load is
 skipped and reported (main.gd), so one broken piece never leaves the menu
 scene with un-set-up pieces (the "Nil base 'sim' / 'camera'" errors).
+Behind the menu the shoals' leaping fish are hidden (economy's `Econ_fish`
+node, menu scene only): at that distance they read as specks.
 
 ```
 node scripts/godot-shoot.mjs --scene menu --out shots/godot/menu.png
@@ -371,6 +382,7 @@ node scripts/godot-shoot.mjs --scene menu --out shots/godot/menu.png
      [--params "menu_options=1"]         # the Options dialog open
      [--params "menu_view=x,z,dist,pitch,yaw"]   # camera anchor; menu_intro=1 plays the fade-in (off in captures)
      [--params "menu_hero=yaw,pitch,dist,left,fwd"]  # the hero framing (temple -> view target shift); fleet and light follow it
+     [--params "menu_page=1"]            # the feature card turned N pages (0 Zeus, 1 attack-move, 2 the voxel world)
 VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 1280x720x24" \
   godot --path godot --rendering-driver vulkan --audio-driver Dummy --resolution 1280x720 \
   -s res://game/menu/menu_check.gd        # no --scene on purpose: "MENU ok|FAIL <step>", exit = failures
@@ -379,7 +391,7 @@ VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 
 `menu_check.gd` launches with no scene argument and drives the menu through
 real key, joypad and mouse events: the menu opens with no in-game UI,
 arrows / D-pad move the focus, Enter on an unavailable tile gives its
-notice, hover, Options (Graphics Low applies live and is remembered, then
+notice, the feature card's rendered art (full colour, reframed on a page turn), hover, Options (Graphics Low applies live and is remembered, then
 restored), Esc, world clicks blocked, Skirmish -> the setup screen -> a
 match with its HUD, then back to the menu.
 

@@ -31,6 +31,7 @@ const Tile := preload("res://game/menu/tile.gd")
 const Art := preload("res://game/menu/art.gd")
 const Flow := preload("res://game/menu/flow.gd")
 const Options := preload("res://game/menu/options.gd")
+const HeroArt := preload("res://game/menu/hero_art.gd")
 const PANEL := preload("res://game/ui/panel.gdshader")
 const LOGO := preload("res://game/menu/logo.gdshader")
 const SKY := preload("res://game/menu/menu_sky.gdshader")
@@ -203,13 +204,22 @@ func _build() -> void:
 	mp.available = false
 	var fe := _add("feature", "feature", "", Rect2(26, 676, 296, 250))
 	fe.pages = [
-		{"title": "GREEKS · ZEUS", "text": "Call Lightning Storm, Bolt and\nMeteor down on your foes.", "icon": "zeus",
+		{"title": "GREEKS · ZEUS", "text": "Lightning Storm, Bolt and Meteor.", "icon": "zeus",
 			"colors": [Color("#6a2230"), Color("#2c0e18"), Color("#0b0508")], "glow": Color(1.0, 0.85, 0.45)},
-		{"title": "ATTACK-MOVE", "text": "Press A and click: your army\nfights its way to the spot.", "icon": "sword",
+		{"title": "ATTACK-MOVE", "text": "Press A and click to fight your way.", "icon": "sword",
 			"colors": [Color("#274a2a"), Color("#10220f"), Color("#050b05")], "glow": Color(1.0, 0.7, 0.4)},
-		{"title": "A VOXEL WORLD", "text": "Every map grows from a seed:\nforests, gold, shores and hills.", "icon": "terrain",
+		{"title": "A VOXEL WORLD", "text": "Every map grows from its own seed.", "icon": "terrain",
 			"colors": [Color("#1d4660"), Color("#0b2030"), Color("#040a10")], "glow": Color(0.7, 0.9, 1.0)},
 	]
+	# the card's art: the army of Zeus rendered live in our own voxel render
+	# (hero_art.gd, its own World3D), one framing per page; 2x the card's px
+	var hero := HeroArt.new(Vector2i(592, 500))
+	hero.still = capturing
+	add_child(hero)
+	fe.hero = hero
+	if game.args.has("menu_page"):
+		for _i in int(game.args.menu_page):
+			fe.next_page()
 	# (no Load: saved games do not exist yet, so the row is Quick Match)
 	_add("quick", "bar", "QUICK MATCH", Rect2(352, 676, 296, 68))
 	_add("options", "bar", "OPTIONS", Rect2(352, 767, 296, 68))
@@ -562,6 +572,11 @@ const MOOD_SKY_TOP := Color(0.36, 0.5, 0.7)
 ## Per frame after the lighting piece: the haze begins just past the temple
 ## and hides the map's far edge (lighting.frame() resets it from the distance).
 func _mood_frame() -> void:
+	# the shoals' leaping fish read as specks at this distance: the boats
+	# fish, but the fish themselves are not drawn behind the menu
+	var ep = game.pieces.get("economy")
+	if ep and ep.has_node("Econ_fish"):
+		(ep.get_node("Econ_fish") as Node3D).visible = false
 	if _light == null or not ("env" in _light) or _light.env == null:
 		return
 	var d: float = game.camera.distance

@@ -29,6 +29,7 @@ var available := true
 var selected := false         # "seg" / "tab": the current choice
 var pages: Array = []         # "feature": [{title, text, icon, colors: [c0, c1, c2]}]
 var page := 0
+var hero: SubViewport = null  # "feature": the rendered hero art (hero_art.gd), one framing per page
 var menu: Node = null         # the menu piece (kb_mode, time)
 
 var hover_k := 0.0
@@ -134,6 +135,8 @@ func next_page() -> void:
 	if pages.size() > 1:
 		page = (page + 1) % pages.size()
 		_page_k = 0.0
+		if hero:
+			hero.set_page(page)
 
 # ---- drawing -------------------------------------------------------------------
 
@@ -231,30 +234,32 @@ func _draw_feature(ci: Control, r: Rect2, hk: float, o: Vector2) -> void:
 		return
 	var pg: Dictionary = pages[page]
 	var a := _page_k
-	# the god / subject emblem, large, with a glow behind it
-	var ic := str(pg.get("icon", ""))
-	if ic != "":
-		var px := int(r.size.y * 0.56)
-		var c := Vector2(r.size.x * 0.5, r.size.y * 0.36) + o
-		ci.draw_texture_rect(_glow(), Rect2(c - Vector2(px, px) * 0.95, Vector2(px, px) * 1.9), false, Color(1, 1, 1, a * (0.9 + 0.5 * hk)))
-		var glow := S.icon_glow(ic, px, 6)
-		if glow:
-			var gs := Vector2(glow.get_size())
-			ci.draw_texture_rect(glow, Rect2(c - gs * 0.5, gs), false, Color(pg.get("glow", Color(1, 0.8, 0.4)), 0.55 * a))
-		var tex := S.icon(ic, px)
-		if tex:
-			ci.draw_texture_rect(tex, Rect2(c - Vector2(px, px) * 0.5, Vector2(px, px)), false, Color(1, 1, 1, a))
-	# a dark band under the title, like the portrait caption of Retold's promo tile
-	S.vgrad(ci, Rect2(3, r.size.y * 0.62, r.size.x - 6, r.size.y * 0.38 - 3), [[0.0, Color(0, 0, 0, 0)], [0.35, Color(0, 0, 0, 0.55)], [1.0, Color(0, 0, 0, 0.75)]])
+	if hero:
+		# the hero art, edge to edge inside the bronze frame (its chamfered
+		# corners), fading up from black when the page turns
+		hero.hover = hk
+		var i := 3.0
+		var ch := 8.0
+		var w := r.size.x
+		var h := r.size.y
+		var pts := PackedVector2Array([Vector2(i + ch, i), Vector2(w - i - ch, i), Vector2(w - i, i + ch), Vector2(w - i, h - i - ch),
+			Vector2(w - i - ch, h - i), Vector2(i + ch, h - i), Vector2(i, h - i - ch), Vector2(i, i + ch)])
+		var uvs := PackedVector2Array()
+		for p in pts:
+			uvs.append(p / r.size)
+		var k := 0.25 + 0.75 * a
+		ci.draw_polygon(pts, PackedColorArray([Color(k, k, k)]), uvs, hero.get_texture())
+		# the caption's shadow: a dark gradient under the title
+		S.vgrad(ci, Rect2(i, h * 0.55, w - 2.0 * i, h * 0.45 - i), [[0.0, Color(0, 0, 0, 0)], [0.45, Color(0.02, 0.01, 0.02, 0.62)], [1.0, Color(0.02, 0.01, 0.02, 0.9)]])
+		S.vgrad(ci, Rect2(i, i, w - 2.0 * i, 26), [[0.0, Color(0, 0, 0, 0.35)], [1.0, Color(0, 0, 0, 0)]])
+	else:
+		_draw_feature_icon(ci, r, hk, o, pg, a)
 	var f := S.font("title")
 	var col := S.INK.lerp(S.GOLD_HI, hk)
-	var ty := r.size.y - 76.0
-	S.text(ci, f, Vector2(18, ty) + o, str(pg.title), 21, Color(col, a), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.9, 0.8)
-	S.hgrad(ci, Rect2(16, ty + 9, r.size.x - 36, 1.3), [[0.0, Color(S.INK, 0.6 * a)], [1.0, Color(S.INK, 0.0)]])
-	var y := ty + 32.0
-	for line in str(pg.text).split("\n"):
-		S.text(ci, S.font("sans"), Vector2(19, y) + o, line, 16, Color(S.INK, 0.9 * a), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.8)
-		y += 19.0
+	var ty := r.size.y - 62.0
+	S.text(ci, f, Vector2(18, ty) + o, str(pg.title), 22, Color(col, a), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.9, 0.8)
+	S.hgrad(ci, Rect2(16, ty + 9, r.size.x - 36, 1.3), [[0.0, Color(S.GOLD, 0.75 * a)], [1.0, Color(S.GOLD, 0.0)]])
+	S.text(ci, S.font("sans"), Vector2(19, ty + 31) + o, str(pg.text).split("\n")[0], 16, Color(S.INK, 0.92 * a), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.8)
 	# page dots
 	var n := pages.size()
 	var cx := r.size.x * 0.5 - (n - 1) * 8.0
@@ -293,3 +298,20 @@ func _draw_burger(ci: Control, r: Rect2, hk: float, down: bool, focus_ring: bool
 		ci.draw_line(Vector2(c.x - 17, y), Vector2(c.x + 17, y), col, 4.0, true)
 	if focus_ring:
 		ci.draw_rect(r.grow(-2.0), Color(S.GOLD_HI, 0.7), false, 1.5)
+
+## Without hero art: the page's emblem, large, with a glow behind it.
+func _draw_feature_icon(ci: Control, r: Rect2, hk: float, o: Vector2, pg: Dictionary, a: float) -> void:
+	# the god / subject emblem, large, with a glow behind it
+	var ic := str(pg.get("icon", ""))
+	if ic != "":
+		var px := int(r.size.y * 0.56)
+		var c := Vector2(r.size.x * 0.5, r.size.y * 0.36) + o
+		ci.draw_texture_rect(_glow(), Rect2(c - Vector2(px, px) * 0.95, Vector2(px, px) * 1.9), false, Color(1, 1, 1, a * (0.9 + 0.5 * hk)))
+		var glow := S.icon_glow(ic, px, 6)
+		if glow:
+			var gs := Vector2(glow.get_size())
+			ci.draw_texture_rect(glow, Rect2(c - gs * 0.5, gs), false, Color(pg.get("glow", Color(1, 0.8, 0.4)), 0.55 * a))
+		var tex := S.icon(ic, px)
+		if tex:
+			ci.draw_texture_rect(tex, Rect2(c - Vector2(px, px) * 0.5, Vector2(px, px)), false, Color(1, 1, 1, a))
+	S.vgrad(ci, Rect2(3, r.size.y * 0.62, r.size.x - 6, r.size.y * 0.38 - 3), [[0.0, Color(0, 0, 0, 0)], [0.35, Color(0, 0, 0, 0.55)], [1.0, Color(0, 0, 0, 0.75)]])

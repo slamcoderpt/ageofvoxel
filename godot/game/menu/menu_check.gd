@@ -114,6 +114,26 @@ func _run() -> void:
 	_check("hero shot: the fleet is out", boats.size() >= 30, str(boats.size() / 10))
 	_check("no Load row: Quick Match instead", menu._tiles.has("quick") and not menu._tiles.has("load"))
 	await _frames(45)  # the intro
+	# the feature card carries rendered hero art (hero_art.gd), not a flat card
+	var fe: Node = menu._tiles.feature
+	var art_ok := false
+	var art_info := "no hero art"
+	if fe.hero != null:
+		var img: Image = fe.hero.get_texture().get_image()
+		var sat := 0.0
+		var n := 0
+		for y in range(0, img.get_height(), 25):
+			for x in range(0, img.get_width(), 25):
+				var c := img.get_pixel(x, y)
+				sat += c.s * c.v
+				n += 1
+		sat /= maxf(1.0, n)
+		art_info = "%dx%d, colour %.2f" % [img.get_width(), img.get_height(), sat]
+		art_ok = img.get_width() >= 400 and sat > 0.25
+	_check("feature card: rendered hero art in full colour", art_ok, art_info)
+	var p0: int = fe.page
+	fe.next_page()
+	_check("feature card: a page turn reframes the art", fe.hero != null and fe.hero.page == fe.page and fe.page != p0, "%d -> %d" % [p0, fe.page])
 
 	# keyboard: the first arrow focuses Skirmish, the next ones move between tiles
 	await _key(KEY_DOWN)
