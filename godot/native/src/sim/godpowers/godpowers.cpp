@@ -62,6 +62,7 @@ CastCheck GodPowers::can_cast(int owner, int id) const {
 bool GodPowers::cast(int owner, int id, double x, double z) {
 	if (!can_cast(owner, id).ok) return false;
 	Sim &S = *sim;
+	if (!S.map().clamp_to_map(x, z)) return false; // bounds: off-map target -> the edge tile, NaN refused (nothing paid)
 	const PowerDef &def = power_def(id);
 	S.players[owner].pay(def.cost);
 	cooldowns[owner][id] = S.time + def.cooldown;
@@ -192,6 +193,7 @@ void GodPowers::knock(int o, double x, double z, double power) {
 
 void GodPowers::strike(int owner, double x, double z, double damage, double splash, int target) {
 	Sim &S = *sim;
+	S.map().clamp_to_map(x, z); // (a storm by the map's edge strikes the edge tile, never off the map)
 	UnitStore &U = S.entities.units;
 	const double y = S.map().height_at(x, z);
 	const uint32_t seed = (uint32_t)(int64_t)(S.tick_count * 7919 + (int64_t)bolts.size() * 31 + js_int32(x * 13));
@@ -375,7 +377,7 @@ void GodPowers::update_airborne(double dt) {
 		}
 		U.air_y[u] += U.gp_vy[u] * dt;
 		const double nx = U.x[u] + U.gp_vx[u] * dt, nz = U.z[u] + U.gp_vz[u] * dt;
-		if (map.is_walkable((int)std::floor(nx), (int)std::floor(nz))) {
+		if (map.walkable_at(nx, nz)) {
 			U.x[u] = nx;
 			U.z[u] = nz;
 		} else {

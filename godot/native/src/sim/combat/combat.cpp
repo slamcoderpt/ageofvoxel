@@ -367,7 +367,7 @@ void Combat::damage(int32_t tid, double amount, const Hitter &a, uint8_t kind) {
 			if (d == 0 || std::isnan(d)) d = 1;
 			const double push = (ad->myth ? 0.45 : 0.05 + 0.12 * sim->rng.next()) * (td->cls == CLS_CAVALRY ? 0.4 : 1);
 			const double nx = U.x[t] + (dx / d) * push, nz = U.z[t] + (dz / d) * push;
-			if (sim->map().is_walkable((int)std::floor(nx), (int)std::floor(nz))) {
+			if (sim->map().walkable_at(nx, nz)) {
 				U.x[t] = nx;
 				U.z[t] = nz;
 			}
@@ -542,7 +542,7 @@ void Combat::hold_lines() {
 		const double d = (U.x[r] - U.line_cx[r]) * U.line_nx[r] + (U.z[r] - U.line_cz[r]) * U.line_nz[r];
 		if (d >= U.line_d0[r]) continue;
 		const double nx = U.x[r] + (U.line_d0[r] - d) * U.line_nx[r], nz = U.z[r] + (U.line_d0[r] - d) * U.line_nz[r];
-		if (map.is_walkable((int)std::floor(nx), (int)std::floor(nz))) {
+		if (map.walkable_at(nx, nz)) {
 			U.x[r] = nx;
 			U.z[r] = nz;
 		}

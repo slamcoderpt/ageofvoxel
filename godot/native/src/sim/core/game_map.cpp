@@ -26,13 +26,22 @@ int GameMap::level(int cx, int cz) const {
 	return heights[(size_t)cz * cols + cx];
 }
 
+int GameMap::level_at(double x, double z) const {
+	// (clamped in double: an off-map coordinate reads the edge column, as level() does)
+	return heights[(size_t)floor_clamp(z / VOXEL, 0, cols - 1) * cols + floor_clamp(x / VOXEL, 0, cols - 1)];
+}
+
 double GameMap::height_at(double x, double z) const {
-	int l = level((int)std::floor(x / VOXEL), (int)std::floor(z / VOXEL));
-	return std::max((double)l, water_level - 0.3) * VOXEL;
+	return std::max((double)level_at(x, z), water_level - 0.3) * VOXEL;
 }
 
 double GameMap::smooth_height_at(double x, double z) const {
 	double fx = x / VOXEL - 0.5, fz = z / VOXEL - 0.5;
+	// beyond one column off the map both neighbours read the edge column
+	// anyway: clamping there keeps the int casts in range (same result);
+	// NaN reads the corner
+	fx = std::isnan(fx) ? -1 : std::max(-1.0, std::min((double)cols, fx));
+	fz = std::isnan(fz) ? -1 : std::max(-1.0, std::min((double)cols, fz));
 	int x0 = (int)std::floor(fx), z0 = (int)std::floor(fz);
 	double ax = fx - x0, az = fz - z0;
 	auto h = [&](int a, int b) { return std::max((double)level(a, b), water_level - 0.3); };

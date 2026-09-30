@@ -27,7 +27,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 
 | Piece | GDScript (render / UI) | C++ sim (`native/src/sim/…`) | JS reference |
 |---|---|---|---|
-| core (foundation; skirmish builder: camera, fog pass, playtest) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck, `fog_view.gd` + `fog_of_war.gdshader` (fog-of-war shading, one full-screen pass), `playtest.gd` (scripted skirmish playthrough)) | `core/` (constants, rng, jsmath, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `sim.{h,cpp}` | `src/core/` |
+| core (foundation; skirmish builder: camera, fog pass, playtest) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck, `fog_view.gd` + `fog_of_war.gdshader` (fog-of-war shading, one full-screen pass), `playtest.gd` (scripted skirmish playthrough)) | `core/` (constants, rng, jsmath, bounds, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `sim.{h,cpp}` | `src/core/` |
 | terrain | `game/terrain/terrain.gd` + `terrain.gdshader` (chunks, paving cobbles / pale stone of MaterialPatches patchGround), `water.gdshader` (Water.js), `props.gdshader` (voxel.gdshader + MultiMesh instance tint, used by trees / gold / berries / ground details); mesher in `native/src/terrain_mesher.cpp` (TerrainMesh.js full port, water depth bake, GroundDetails.js scatter) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (sun + PCSS soft shadows, hemisphere = ambient colour + two unshadowed up/down lights, fill, depth haze following the camera, SSAO, MSAA, `--quality=high\|medium\|low`, `--post=high\|low\|off`), `grade_effect.gd` (CompositorEffect compute pass on the HDR buffer: exposure 2.1 + PBR Neutral + the PostFX.js grade; Godot's tonemap is LINEAR; Compatibility/web falls back to AgX), `sky.gdshader`. MaterialPatches.js canopy / foliage terms not ported yet | none | `src/lighting/` |
 | buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
@@ -47,7 +47,8 @@ godot/
   game/main.tscn|gd        entry: args, sim, pieces, loop, capture, bench
   game/core/               args.gd, scenes.gd, camera_rig.gd, voxel_models.gd,
                            voxel.gdshader, bench.gd, model_gallery.gd,
-                           fog_view.gd + fog_of_war.gdshader, playtest.gd
+                           fog_view.gd + fog_of_war.gdshader, playtest.gd,
+                           *_check.gd (headless rule checks)
   game/<piece>/<piece>.gd  one node per piece (see "Piece contract")
   assets/models/           exported voxel models (generated, committed)
   native/SConstruct        builds bin/libaov.<platform>.<target>.<arch>.so|dll|…
@@ -505,9 +506,10 @@ pop_cap, age, age_name, advancing, advance_t, advance_total}),
 {food, …})`, `set_player_age(owner, age)`.
 
 Entities: `unit_type_names()` (type index -> key), `get_unit_def(key)`,
-`spawn_unit(type, owner, x, z, rot=0)` -> id, `spawn_block(type, owner,
+`spawn_unit(type, owner, x, z, rot=0)` -> id (0 = refused off the map, -1
+unknown type; see "Map bounds"), `spawn_block(type, owner,
 count, x, z, cols=0, spacing=1, rot=0, jitter=0.15)` -> ids (helpers.js
-spawnBlock), `spawn_resource(type, tx, tz, variant=0)`, `remove_resource(id)`,
+spawnBlock; units that could not be placed are left out), `spawn_resource(type, tx, tz, variant=0)` (0 off the map), `remove_resource(id)`,
 `clear_rect(tx, tz, w, h)`, `kill_unit(id, killer=0)` (combat.kill: dead,
 idle, corpse hold, `entity:died`), `entity_kind(id)` (0
 none, 1 unit, 2 building, 3 resource), `get_unit_count()`, `get_unit(id)`
@@ -676,6 +678,45 @@ Advance Age key: the two never share a command grid (buildings vs units),
 so they do not clash; the gear's hotkeys card lists both.
 `attackmove_check.gd` cases 3 and 4.
 
+**Map bounds** (Godot-only safety; changes nothing for a point on the map, so
+parity holds): the world is `[0, size) x [0, size)` tiles. Every world
+position that becomes a grid or array index (map columns / tiles, fog,
+spatial hash, resource index, AI reach cells, A*) goes through
+`sim/core/bounds.h` (`floor_clamp`, `cell_span`: clamp in double before the
+cast) or `GameMap`'s `in_world`, `walkable_at`, `level_at`, `tile_clamp`,
+`clamp_to_map`, `rect_in_tiles`, so no coordinate (off the map, huge,
+infinite, NaN) indexes out of range or hits an undefined float -> int cast.
+The segfault this fixed: `SpatialHash::for_each_near_xz` clamped only one
+end of each cell range, so a query centred far off the map in x (a unit
+spawned at x = 1e9, z on the map, in the spread pass) read `start[]` far
+out of range. Policy per entry point:
+- unit spawns (`Units::spawn`, so `spawn_unit`, `spawn_block`, training): a
+  point on the map is used as given (walkable or not, as the browser); a
+  point off it is clamped onto the map and the unit goes to the nearest
+  walkable tile within 8 tiles of that edge point (the clamped point itself
+  when its tile is walkable); none there, or NaN: nothing spawns, no RNG
+  drawn, `spawn_unit` returns 0;
+- move / attack-move / formation / smart orders, `move_to`, rally points,
+  god power targets (and each storm strike), boats, shoals, herds: an
+  off-map point goes to the centre of the edge tile (`clamp_to_map`: 0.5 or
+  size - 0.5 on that axis); NaN refuses the command (the unit keeps its
+  order, a power is not paid for);
+- buildings and resources: a footprint not wholly on the map is refused
+  (`can_place` false, `place_building` / `spawn_building` /
+  `spawn_resource` 0; tiles range-checked in 64 bits);
+- nothing moves a unit off the map (movement's "escape if embedded" step,
+  knock-back, thrown units, spread, boats all stay on it); the accessors
+  (`height_at`, `smooth_height_at`, `is_explored`, `is_visible`,
+  `nearest_resource`, `units_near`, `find_path`) take any input;
+- UI: `pick_ground` returns null off the map, `minimap.to_world` clamps.
+Checked by
+`godot --headless --path godot -s res://game/core/bounds_check.gd -- --scene=skirmish`
+("BOUNDS PASS|FAIL <case>", `BOUNDS_RESULT {json}`, exit = failures): spawns
+at negative, beyond-size, huge, infinite and NaN points (and an edge of the
+coast map with no walkable tile, refused), orders, placements and every god
+power at off-map points, then 90 s of play with the AI on, no unit ever off
+the map.
+
 `set_godot_rules(on)` (default on, kept across `new_game`): off = the
 browser's rules only (no AI god powers, no free villager, no fighting back
 while moving, AI waves attack their target directly); `simcheck.gd`
@@ -830,3 +871,5 @@ Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
 - Done (Godot-only combat): units on a plain move fight back unless struck
   from behind, then walk on; attack-move (hotkey A; the AI's waves use it)
   (`attackmove_check.gd`, `playtest.gd`, `aivai.gd`).
+- Done (map bounds): off-map positions are safe everywhere, see "Map
+  bounds" (`bounds_check.gd`).

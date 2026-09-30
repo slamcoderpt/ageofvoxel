@@ -23,7 +23,7 @@ void Fishing::init(Sim *s) {
 
 bool Fishing::is_water(double x, double z) const {
 	const GameMap &m = sim->map();
-	return m.level((int)std::floor(x / VOXEL), (int)std::floor(z / VOXEL)) < m.water_level;
+	return m.level_at(x, z) < m.water_level; // (off the map: the edge column, as the JS level())
 }
 
 bool Fishing::is_open(double x, double z, double r) const {
@@ -198,7 +198,7 @@ bool Fishing::sail(Boat &b, double x, double z, double dt) {
 	b.rot += std::max(-2.5 * dt, std::min(2.5 * dt, dr));
 	const double sp = BOAT_SPEED * (0.4 + 0.6 * std::max(0.0, jsm::cos(dr)));
 	const double nx = b.x + jsm::sin(b.rot) * sp * dt, nz = b.z + jsm::cos(b.rot) * sp * dt;
-	if (is_water(nx, nz)) { b.x = nx; b.z = nz; }
+	if (is_water(nx, nz) && sim->map().in_world(nx, nz)) { b.x = nx; b.z = nz; } // (bounds: a boat never sails off the map)
 	return false;
 }
 

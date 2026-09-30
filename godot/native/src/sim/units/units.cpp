@@ -9,6 +9,18 @@
 namespace aov {
 
 int Units::spawn(int type, int owner, double x, double z, double rot) {
+	const GameMap &map = sim->map();
+	if (!map.in_world(x, z)) { // bounds policy (units.h)
+		if (!map.clamp_to_map(x, z)) return -1;
+		const int tx = map.tile_clamp(x), tz = map.tile_clamp(z);
+		int wx, wz;
+		if (!sim->pathfinder.nearest_walkable(tx, tz, SPAWN_SEARCH, wx, wz)) return -1;
+		if (wx != tx || wz != tz) {
+			x = wx + 0.5;
+			z = wz + 0.5;
+		}
+	}
+	if (!std::isfinite(rot)) rot = 0;
 	const UnitDef &def = unit_def(type);
 	const double anim_t = sim->rng.range(0, 10); // consumed like the JS object literal
 	Entities &E = sim->entities;
@@ -107,7 +119,7 @@ void Units::spread(double dt) {
 			vz *= max_step / m;
 		}
 		const double nx = U.x[r] + vx, nz = U.z[r] + vz;
-		if (map.is_walkable((int)std::floor(nx), (int)std::floor(nz))) {
+		if (map.walkable_at(nx, nz)) {
 			U.x[r] = nx;
 			U.z[r] = nz;
 			hash.moved(r, nx, nz);
@@ -140,7 +152,7 @@ void Units::clear_corpse(int r, double dt) {
 	if (sx == 0 && sz == 0) return;
 	const double m = jsm::hypot(sx, sz), step = std::min(m, 1.0) * CORPSE_CLEAR * dt;
 	const double nx = U.x[r] + (sx / m) * step, nz = U.z[r] + (sz / m) * step;
-	if (sim->map().is_walkable((int)std::floor(nx), (int)std::floor(nz))) {
+	if (sim->map().walkable_at(nx, nz)) {
 		U.prev_x[r] = U.x[r] = nx;
 		U.prev_z[r] = U.z[r] = nz;
 		sim->movement.hash.moved(r, nx, nz);

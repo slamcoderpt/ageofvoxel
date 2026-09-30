@@ -78,9 +78,7 @@ void Economy::index_add(int32_t id) {
 	if (s < 0) return;
 	const int kind = R.res_type[s];
 	if (kind > RES_GOLD) return;
-	const int cx = std::max(0, std::min(ncell - 1, (int)std::floor(R.x[s] / CELL)));
-	const int cz = std::max(0, std::min(ncell - 1, (int)std::floor(R.z[s] / CELL)));
-	const int c = cz * ncell + cx;
+	const int c = floor_clamp(R.z[s] / CELL, 0, ncell - 1) * ncell + floor_clamp(R.x[s] / CELL, 0, ncell - 1);
 	cells[kind][c].push_back(id);
 	if ((int)cell_of.size() <= id) cell_of.resize((size_t)id + 1, -1);
 	cell_of[id] = c;
@@ -200,8 +198,8 @@ int32_t Economy::nearest_resource(double x, double z, int res, double max_dist, 
 		}
 	};
 	if (res >= 0 && res <= RES_GOLD) {
-		const int c0x = std::max(0, (int)std::floor((x - max_dist) / CELL)), c1x = std::min(ncell - 1, (int)std::floor((x + max_dist) / CELL));
-		const int c0z = std::max(0, (int)std::floor((z - max_dist) / CELL)), c1z = std::min(ncell - 1, (int)std::floor((z + max_dist) / CELL));
+		int c0x, c1x, c0z, c1z; // (bounds: clipped to the grid, off it / NaN: no cell)
+		if (cell_span(x - max_dist, x + max_dist, CELL, ncell, c0x, c1x) && cell_span(z - max_dist, z + max_dist, CELL, ncell, c0z, c1z))
 		for (int cz = c0z; cz <= c1z; cz++)
 			for (int cx = c0x; cx <= c1x; cx++)
 				for (int32_t id : cells[res][cz * ncell + cx]) consider(id);
@@ -344,6 +342,7 @@ int Economy::spawn_from_building(int b, int type) {
 	const double rx = B.rally_x[b], rz = B.rally_z[b];
 	const int32_t rt = B.rally_target[b];
 	int u = sim->units.spawn(type, owner, tx + 0.5, tz + 0.5, 0);
+	if (u < 0) return -1; // (no walkable tile anywhere near a Town Center on the map's edge)
 	if (rally) {
 		const int ts = rt ? E.resource_slot(rt) : -1;
 		if (ts >= 0 && unit_def(type).gatherer) sim->commands.order(u, Order::with_target(O_GATHER, rt));

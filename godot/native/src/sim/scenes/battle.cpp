@@ -50,7 +50,7 @@ std::vector<AD> duel_slots(RNG &rng) {
 int place_unit(Sim &sim, int type, int owner, double x, double z, double rot) {
 	int wx, wz;
 	if (sim.pathfinder.nearest_walkable((int)std::floor(x), (int)std::floor(z), 6, wx, wz) &&
-			!sim.map().is_walkable((int)std::floor(x), (int)std::floor(z))) {
+			!sim.map().walkable_at(x, z)) {
 		x = wx + 0.5;
 		z = wz + 0.5;
 	}
@@ -160,7 +160,7 @@ std::vector<int32_t> field_heroes_and_myth(Sim &sim, int owner, double side, dou
 	UnitStore &U = sim.entities.units;
 	auto put = [&](int type, double a, double d, double leash = -1, double reach = -1) {
 		XZ p = P(cx, cz, a * side, d * side);
-		if (!sim.map().is_walkable((int)std::floor(p.x), (int)std::floor(p.z))) {
+		if (!sim.map().walkable_at(p.x, p.z)) {
 			int wx, wz;
 			if (sim.pathfinder.nearest_walkable((int)std::floor(p.x), (int)std::floor(p.z), 6, wx, wz)) {
 				p.x = wx + 0.5;
@@ -168,6 +168,7 @@ std::vector<int32_t> field_heroes_and_myth(Sim &sim, int owner, double side, dou
 			}
 		}
 		const int u = sim.units.spawn(type, owner, p.x, p.z, rot);
+		if (u < 0) return;
 		if (leash >= 0) U.combat_leash[u] = leash;
 		if (reach >= 0) U.combat_reach[u] = reach;
 		U.attack_cd[u] = sim.rng.range(0, unit_def(type).attack.cooldown);
@@ -569,7 +570,7 @@ std::vector<int32_t> spawn_army_block(Sim &sim, int owner, const std::vector<int
 		const double lateral = (col - (cols - 1) / 2.0) * sp + sim.rng.range(-0.15, 0.15);
 		const double back = gap + row * sp + sim.rng.range(-0.15, 0.15);
 		double x = front.tx + 0.5 + sx * lateral - dx * back, z = front.tz + 0.5 + sz * lateral - dz * back;
-		if (!sim.map().is_walkable((int)std::floor(x), (int)std::floor(z))) {
+		if (!sim.map().walkable_at(x, z)) {
 			int wx, wz;
 			if (sim.pathfinder.nearest_walkable((int)std::floor(x), (int)std::floor(z), 8, wx, wz)) {
 				x = wx + 0.5;
@@ -577,7 +578,7 @@ std::vector<int32_t> spawn_army_block(Sim &sim, int owner, const std::vector<int
 			}
 		}
 		const int u = sim.units.spawn(types[i], owner, x, z, rot);
-		out.push_back(sim.entities.units.id[u]);
+		if (u >= 0) out.push_back(sim.entities.units.id[u]);
 	}
 	return out;
 }

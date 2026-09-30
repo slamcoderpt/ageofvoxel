@@ -28,8 +28,16 @@ class Units {
 public:
 	Sim *sim = nullptr;
 	void init(Sim *s) { sim = s; }
-	// JS units.spawn(type, owner, x, z, {rot}); returns the row (id in units.id)
+	// JS units.spawn(type, owner, x, z, {rot}); returns the row (id in units.id).
+	// Bounds policy (Godot-only, PORTING.md "Map bounds"): a point on the map
+	// is used as given (walkable or not: the browser's spawns, bit-exact); a
+	// point off the map (negative, >= size, infinite) is clamped onto the map
+	// and moved to the nearest walkable tile within SPAWN_SEARCH tiles of that
+	// edge point (its centre; the clamped point itself when that tile is
+	// walkable). No walkable tile there, or x / z NaN: nothing is spawned, no
+	// RNG is drawn, and it returns -1 (AovSim.spawn_unit then returns id 0).
 	int spawn(int type, int owner, double x, double z, double rot = 0);
+	static constexpr int SPAWN_SEARCH = 8;
 	void update(double dt);
 	void spread(double dt);
 

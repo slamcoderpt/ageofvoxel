@@ -400,6 +400,11 @@ Dictionary AovSim::get_unit_def(const String &type) const {
 	return d;
 }
 
+// Map bounds (PORTING.md "Map bounds", aov::Units::spawn): a point on the
+// map spawns there as given; a point off the map (negative, >= map size,
+// infinite) is clamped onto the map and the unit goes to the nearest walkable
+// tile within 8 tiles of that edge point; when there is none, or x / z is
+// NaN, nothing spawns and the id is 0. -1 = unknown unit type.
 int64_t AovSim::spawn_unit(const String &type, int64_t owner, double x, double z, double rot) {
 	int t = aov::unit_type_of(type.utf8().get_data());
 	if (t < 0) {
@@ -407,9 +412,11 @@ int64_t AovSim::spawn_unit(const String &type, int64_t owner, double x, double z
 		return -1;
 	}
 	int r = sim_.units.spawn(t, (int)owner, x, z, rot);
-	return sim_.entities.units.id[r];
+	return r < 0 ? 0 : sim_.entities.units.id[r];
 }
 
+// (each unit of the block follows spawn_unit's bounds policy; a unit that
+// could not be placed is left out of the ids)
 PackedInt32Array AovSim::spawn_block(const String &type, int64_t owner, int64_t count, double x, double z, int64_t cols, double spacing, double rot, double jitter) {
 	PackedInt32Array out;
 	int t = aov::unit_type_of(type.utf8().get_data());
@@ -427,6 +434,8 @@ int64_t AovSim::spawn_resource(const String &type, int64_t tx, int64_t tz, int64
 		ERR_PRINT("AovSim.spawn_resource: unknown resource type " + type);
 		return -1;
 	}
+	const aov::ResourceDef &def = aov::resource_def(t);
+	if (!sim_.map().rect_in_tiles(tx, tz, def.w, def.h)) return 0; // (bounds: the node must lie on the map)
 	return sim_.spawn_resource(t, (int)tx, (int)tz, (int)variant);
 }
 
@@ -848,15 +857,23 @@ int64_t AovSim::spawn_building(const String &type, int64_t owner, int64_t tx, in
 		ERR_PRINT("AovSim.spawn_building: unknown building type " + type);
 		return 0;
 	}
+	// bounds: a footprint not wholly on the map is refused (0), like can_place
+	if (!sim_.map().rect_in_tiles(tx, tz, aov::building_def(t).w, aov::building_def(t).h)) return 0;
 	const int b = sim_.buildings.spawn(t, (int)owner, (int)tx, (int)tz, built, site);
 	return sim_.entities.buildings.id[b];
 }
 
+// (tile arguments are range-checked in 64 bits before the int casts: a
+// footprint off the map is never placeable)
+static bool tile_arg_ok(int64_t tx, int64_t tz) { return tx > -65536 && tz > -65536 && tx < 65536 && tz < 65536; }
+
 bool AovSim::can_place(const String &type, int64_t tx, int64_t tz) const {
+	if (!tile_arg_ok(tx, tz)) return false;
 	return sim_.buildings.can_place(aov::building_type_of(type.utf8().get_data()), (int)tx, (int)tz);
 }
 
 int64_t AovSim::place_building(const String &type, int64_t owner, int64_t tx, int64_t tz, const PackedInt32Array &builders) {
+	if (!tile_arg_ok(tx, tz)) return 0;
 	return sim_.buildings.place(aov::building_type_of(type.utf8().get_data()), (int)owner, (int)tx, (int)tz, rows_of(sim_.entities, builders));
 }
 
@@ -926,7 +943,7 @@ Dictionary AovSim::next_age_cost(int64_t owner) const {
 
 void AovSim::set_rally(int64_t building, double x, double z, int64_t target_id) {
 	const int b = sim_.entities.building_slot((int32_t)building);
-	if (b < 0) return;
+	if (b < 0 || !sim_.map().clamp_to_map(x, z)) return; // (bounds: an off-map point goes onto the edge; NaN is ignored)
 	aov::BuildingStore &B = sim_.entities.buildings;
 	B.rally[b] = 1;
 	B.rally_x[b] = x;
@@ -980,15 +997,18 @@ PackedInt32Array AovSim::spawn_herd(const String &type, double x, double z, int6
 		ERR_PRINT("AovSim.spawn_herd: not an animal: " + type);
 		return out;
 	}
+	if (!sim_.map().clamp_to_map(x, z)) return out; // (bounds: the herd centre goes onto the map; NaN spawns none)
 	for (int32_t id : sim_.economy.wildlife.spawn_herd(t, x, z, (int)n)) out.push_back(id);
 	return out;
 }
 
 int64_t AovSim::spawn_boat(int64_t owner, double x, double z, double rot) {
+	if (!sim_.map().clamp_to_map(x, z)) return 0; // (bounds: clamped onto the map, NaN refused)
 	return sim_.economy.fishing.boats[sim_.economy.fishing.spawn_boat((int)owner, x, z, rot)].id;
 }
 
 int64_t AovSim::spawn_shoal(double x, double z, double amount) {
+	if (!sim_.map().clamp_to_map(x, z)) return 0; // (bounds: clamped onto the map, NaN refused)
 	return sim_.economy.fishing.shoals[sim_.economy.fishing.spawn_shoal(x, z, amount)].id;
 }
 

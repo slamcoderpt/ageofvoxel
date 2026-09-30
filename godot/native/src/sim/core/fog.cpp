@@ -25,16 +25,14 @@ void FogOfWar::set_reveal_all(bool v) {
 
 bool FogOfWar::is_visible(double x, double z) const {
 	if (reveal_all) return true;
-	const int tx = (int)std::floor(x), tz = (int)std::floor(z);
-	if (tx < 0 || tz < 0 || tx >= n || tz >= n) return false;
-	return state[(size_t)tz * n + tx] == 2;
+	if (!(x >= 0 && z >= 0 && x < n && z < n)) return false; // off the map / NaN (checked before the cast)
+	return state[(size_t)z * n + (size_t)x] == 2;
 }
 
 bool FogOfWar::is_explored(double x, double z) const {
 	if (reveal_all) return true;
-	const int tx = (int)std::floor(x), tz = (int)std::floor(z);
-	if (tx < 0 || tz < 0 || tx >= n || tz >= n) return false;
-	return state[(size_t)tz * n + tx] >= 1;
+	if (!(x >= 0 && z >= 0 && x < n && z < n)) return false; // off the map / NaN (checked before the cast)
+	return state[(size_t)z * n + (size_t)x] >= 1;
 }
 
 void FogOfWar::update(double dt) {
@@ -54,6 +52,7 @@ void FogOfWar::recompute() {
 	}
 	auto stamp = [&](double x, double z, double sight) {
 		const double r = sight != 0 ? sight : 8;
+		if (!(x >= -r && z >= -r && x < n + r && z < n + r)) return; // reveals nothing on the map (or NaN)
 		const int cx = (int)std::floor(x), cz = (int)std::floor(z);
 		const double r2 = r * r;
 		const int ri = (int)std::floor(r);

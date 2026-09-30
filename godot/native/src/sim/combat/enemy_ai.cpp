@@ -190,8 +190,8 @@ void EnemyAI::use_powers(const std::vector<int> &army, const std::vector<int> &b
 	const int CELL = 4, M = (map.size + CELL - 1) / CELL;
 	reach_.assign((size_t)M * M, 0);
 	auto mark = [&](double x, double z, double r) {
-		const int c0x = std::max(0, (int)std::floor((x - r) / CELL)), c1x = std::min(M - 1, (int)std::floor((x + r) / CELL));
-		const int c0z = std::max(0, (int)std::floor((z - r) / CELL)), c1z = std::min(M - 1, (int)std::floor((z + r) / CELL));
+		int c0x, c1x, c0z, c1z;
+		if (!cell_span(x - r, x + r, CELL, M, c0x, c1x) || !cell_span(z - r, z + r, CELL, M, c0z, c1z)) return;
 		for (int cz = c0z; cz <= c1z; cz++)
 			for (int cx = c0x; cx <= c1x; cx++) {
 				const double dx = (cx + 0.5) * CELL - x, dz = (cz + 0.5) * CELL - z;
@@ -201,8 +201,8 @@ void EnemyAI::use_powers(const std::vector<int> &army, const std::vector<int> &b
 	for (int u : army) mark(U.x[u], U.z[u], REACH_ARMY);
 	for (int b : buildings) mark(B.x[b], B.z[b], REACH_BASE);
 	auto in_reach = [&](double x, double z) {
-		const int cx = (int)std::floor(x / CELL), cz = (int)std::floor(z / CELL);
-		return cx >= 0 && cz >= 0 && cx < M && cz < M && reach_[(size_t)cz * M + cx];
+		if (!(x >= 0 && z >= 0 && x < M * CELL && z < M * CELL)) return false; // (checked before the cast)
+		return reach_[(size_t)(int)(z / CELL) * M + (int)(x / CELL)] != 0;
 	};
 	// enemy units in reach (on the ground: men carried up a storm are spoken for)
 	std::vector<int> foes;

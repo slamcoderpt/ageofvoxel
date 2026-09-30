@@ -67,6 +67,9 @@ public:
 	void init(Sim *s);
 	double cooldown_left(int owner, int id) const;
 	CastCheck can_cast(int owner, int id) const;
+	// Bounds: a target off the map is clamped onto its edge tile
+	// (GameMap::clamp_to_map, a target on the map is untouched); a NaN target
+	// is refused (false, no favor paid, no cooldown).
 	bool cast(int owner, int id, double x, double z);
 	void update(double dt);
 

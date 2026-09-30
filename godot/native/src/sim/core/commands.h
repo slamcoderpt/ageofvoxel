@@ -41,7 +41,10 @@ public:
 	void set_idle_fields(int row) { set(row, Order::idle()); }
 
 	// Give one unit an order. Returns false if the handler rejected it (the
-	// unit then goes idle) or no handler exists for the type.
+	// unit then goes idle) or no handler exists for the type. Bounds: a move /
+	// attack-move destination off the map is clamped onto its edge tile
+	// (GameMap::clamp_to_map); a NaN one is refused (false, order unchanged).
+	// move() and smart() clamp their point the same way.
 	bool order(int row, const Order &o);
 	bool idle(int row) { return order(row, Order::idle()); }
 	// Formation move: fan units out on a grid around the destination. `type`
