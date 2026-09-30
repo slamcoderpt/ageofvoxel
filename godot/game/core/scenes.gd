@@ -32,6 +32,17 @@ static var SCENES := {
 	"stress": {"preset": "stress", "seed": 23, "map_size": 256, "players": 6, "hud": true, "reveal_all": false, "ai": true, "live": true,
 		"prof": true, "fast_forward": 0.0, "units": 2000,
 		"camera": {"distance": 52.0, "pitch": 52.0}},
+	# Godot-only: the main menu (game/menu): the coast town live behind the menu,
+	# no AI, no HUD; the menu piece registers its setup and drives the camera.
+	# skip_pieces: no in-game UI behind the menu (its hotkeys, F1 HUD, world
+	# clicks), and the menu does not depend on game/ui/ui.gd loading.
+	"menu": {"preset": "coast", "seed": 5, "hud": false, "reveal_all": true, "live": true, "fast_forward": 20.0,
+		"skip_pieces": ["ui"],
+		"camera": {"distance": 46.0, "pitch": 24.0, "yaw": 20.0}},
+	# Godot-only: the skirmish match setup screen (game/menu/setup) over a small
+	# still field (the screen is opaque); --players=2..6, --open=<picker>.
+	"setup": {"preset": "battle", "seed": 1, "map_size": 96, "hud": false, "reveal_all": true, "fast_forward": 0.0,
+		"screen": "res://game/menu/setup/setup.gd", "camera": {"distance": 40.0}},
 	# Godot-only: every exported model on a flat strip (checks scripts/export-models.mjs).
 	"models": {"preset": "battle", "seed": 1, "map_size": 96, "hud": false, "reveal_all": true, "fast_forward": 0.0,
 		"camera": {"distance": 34.0, "pitch": 38.0, "yaw": 0.0}},

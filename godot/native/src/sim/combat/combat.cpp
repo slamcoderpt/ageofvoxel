@@ -40,7 +40,7 @@ bool Combat::start_attack(int r, const Order &o) {
 	if (s < 0 || (k != K_UNIT && k != K_BUILDING)) return false;
 	const bool dead = k == K_UNIT ? U.dead[s] : E.buildings.dead[s];
 	const int owner = k == K_UNIT ? U.owner[s] : E.buildings.owner[s];
-	if (dead || !unit_def(U.type[r]).has_attack || !Sim::is_enemy(U.owner[r], owner)) return false;
+	if (dead || !unit_def(U.type[r]).has_attack || !sim->is_enemy(U.owner[r], owner)) return false;
 	U.order_x[r] = 0; // o.repath
 	approach(r, o.target);
 	return true;
@@ -73,7 +73,7 @@ int32_t Combat::am_pick(int r, int *rank_out) {
 	double bd = INFINITY;
 	sim->movement.hash.count_query(x, z, R);
 	sim->movement.hash.for_each_near(x, z, R, [&](int o) {
-		if (U.dead[o] || U.gp_state[o] == 1 || !Sim::is_enemy(owner, U.owner[o])) return;
+		if (U.dead[o] || U.gp_state[o] == 1 || !sim->is_enemy(owner, U.owner[o])) return;
 		const double dx = U.x[o] - x, dz = U.z[o] - z, d = dx * dx + dz * dz;
 		if (d > R2) return;
 		const int rank = unit_def(U.type[o]).gatherer ? 1 : 0;
@@ -91,7 +91,7 @@ int32_t Combat::am_pick(int r, int *rank_out) {
 	int bb = -1;
 	bd = INFINITY;
 	for (int b = 0; b < B.size(); b++) {
-		if (B.removed[b] || B.dead[b] || !Sim::is_enemy(owner, B.owner[b])) continue;
+		if (B.removed[b] || B.dead[b] || !sim->is_enemy(owner, B.owner[b])) continue;
 		if (std::abs(B.x[b] - x) > R + B.w[b] || std::abs(B.z[b] - z) > R + B.h[b]) continue;
 		const double ex = std::max(std::max(B.tx[b] - x, 0.0), x - (B.tx[b] + B.w[b]));
 		const double ez = std::max(std::max(B.tz[b] - z, 0.0), z - (B.tz[b] + B.h[b]));
@@ -265,7 +265,7 @@ int Combat::find_enemy_near(double x, double z, int owner, double radius, const 
 	double bd = radius * radius;
 	sim->movement.hash.count_query(x, z, radius);
 	sim->movement.hash.for_each_near(x, z, radius, [&](int o) {
-		if (U.dead[o] || !Sim::is_enemy(owner, U.owner[o])) return;
+		if (U.dead[o] || !sim->is_enemy(owner, U.owner[o])) return;
 		if (pred && !pred(o)) return;
 		const double dx = U.x[o] - x, dz = U.z[o] - z;
 		const double d = dx * dx + dz * dz;
@@ -291,7 +291,7 @@ int Combat::pick_target(int r, double radius) {
 	double bs = INFINITY;
 	sim->movement.hash.count_query(ux, uz, radius);
 	sim->movement.hash.for_each_near(ux, uz, radius, [&](int o) {
-		if (U.dead[o] || !Sim::is_enemy(owner, U.owner[o])) return;
+		if (U.dead[o] || !sim->is_enemy(owner, U.owner[o])) return;
 		const double d = jsm::hypot(U.x[o] - ux, U.z[o] - uz);
 		if (d > radius) return;
 		const UnitDef &od = unit_def(U.type[o]);
@@ -314,7 +314,7 @@ int Combat::find_enemy_building_near(double x, double z, int owner, double radiu
 	int best = -1;
 	double bd = radius * radius;
 	for (int b = 0; b < B.size(); b++) {
-		if (B.removed[b] || !Sim::is_enemy(owner, B.owner[b])) continue;
+		if (B.removed[b] || !sim->is_enemy(owner, B.owner[b])) continue;
 		const double dx = B.x[b] - x, dz = B.z[b] - z;
 		const double d = dx * dx + dz * dz;
 		if (d < bd) {
@@ -679,7 +679,7 @@ void Combat::update(double dt) {
 					sim->movement.hash.count_query(cx, cz, a.splash);
 					sim->movement.hash.for_each_near(cx, cz, a.splash, [&](int o) {
 						if (tk == K_UNIT && o == ts) return;
-						if (U.dead[o] || !Sim::is_enemy(owner, U.owner[o])) return;
+						if (U.dead[o] || !sim->is_enemy(owner, U.owner[o])) return;
 						if (jsm::hypot(U.x[o] - cx, U.z[o] - cz) < a.splash) damage(U.id[o], a.damage * 0.5, h);
 					});
 				}

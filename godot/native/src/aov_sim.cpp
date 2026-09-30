@@ -1,6 +1,7 @@
 #include "aov_sim.h"
 
 #include <algorithm>
+#include <cctype>
 
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
@@ -44,6 +45,11 @@ void AovSim::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("add_player", "id", "name", "is_ai"), &AovSim::add_player, DEFVAL(""), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("get_player", "id"), &AovSim::get_player);
 	ClassDB::bind_method(D_METHOD("get_player_ids"), &AovSim::get_player_ids);
+	ClassDB::bind_method(D_METHOD("is_ally", "a", "b"), &AovSim::is_ally);
+	ClassDB::bind_method(D_METHOD("get_team", "id"), &AovSim::get_team);
+	ClassDB::bind_method(D_METHOD("get_local_player"), &AovSim::get_local_player);
+	ClassDB::bind_method(D_METHOD("setup_match", "cfg"), &AovSim::setup_match);
+	ClassDB::bind_method(D_METHOD("start_match", "cfg"), &AovSim::start_match);
 	ClassDB::bind_method(D_METHOD("is_enemy", "a", "b"), &AovSim::is_enemy);
 	// entities
 	ClassDB::bind_method(D_METHOD("unit_type_names"), &AovSim::unit_type_names);
@@ -182,6 +188,7 @@ Dictionary AovSim::get_mapgen_info() const {
 	d["felled"] = sim_.world.felled;
 	d["graded"] = sim_.world.graded;
 	d["woodline"] = sim_.world.woodline;
+	d["balanced"] = sim_.world.balanced;
 	return d;
 }
 
@@ -345,7 +352,65 @@ Dictionary AovSim::get_player(int64_t id) const {
 	d["advancing"] = p.advancing;
 	d["advance_t"] = p.advancing_t;
 	d["advance_total"] = p.advancing_total;
+	d["team"] = sim_.team_of((int)id);
+	d["human"] = p.human;
+	d["difficulty"] = String(aov::ai_difficulty_name(p.difficulty));
+	d["gather_mult"] = p.gather_mult;
 	return d;
+}
+
+// ---- match setup -----------------------------------------------------------
+
+static aov::MatchConfig match_config(const Dictionary &cfg) {
+	aov::MatchConfig c;
+	c.seed = (uint32_t)(int64_t)cfg.get("seed", 1);
+	c.map_size = (int)(int64_t)cfg.get("map_size", 128);
+	c.preset = std::string(String(cfg.get("preset", "skirmish")).utf8().get_data());
+	c.resources = std::string(String(cfg.get("resources", "standard")).utf8().get_data());
+	c.villagers = (int)(int64_t)cfg.get("villagers", 5);
+	const Array ps = cfg.get("players", Array());
+	for (int64_t i = 0; i < ps.size(); i++) {
+		const Dictionary p = ps[i];
+		aov::MatchPlayer mp;
+		mp.id = (int)(int64_t)p.get("id", 0);
+		mp.name = std::string(String(p.get("name", "")).utf8().get_data());
+		mp.human = (bool)p.get("human", false);
+		const Variant ai = p.get("ai", "moderate");
+		if (ai.get_type() == Variant::STRING || ai.get_type() == Variant::STRING_NAME) {
+			const int d = aov::ai_difficulty_of(String(ai).utf8().get_data());
+			mp.difficulty = d < 0 ? aov::AI_MODERATE : d;
+		} else mp.difficulty = (int)(int64_t)ai;
+		mp.team = (int)(int64_t)p.get("team", 0);
+		mp.color = (int64_t)p.get("color", -1);
+		mp.god = std::string(String(p.get("god", "Zeus")).utf8().get_data());
+		if (!mp.god.empty()) mp.god[0] = (char)std::toupper((unsigned char)mp.god[0]);
+		c.players.push_back(mp);
+	}
+	return c;
+}
+
+static Dictionary match_result(const aov::MatchResult &r) {
+	Dictionary d;
+	d["ok"] = r.ok;
+	d["error"] = String(r.error.c_str());
+	d["local"] = r.local;
+	d["focus"] = Vector2((real_t)r.focus_x, (real_t)r.focus_z);
+	PackedInt32Array tcs, slots;
+	for (int32_t t : r.tcs) tcs.push_back(t);
+	for (int s : r.slot) slots.push_back(s);
+	d["tcs"] = tcs;
+	d["slots"] = slots;
+	return d;
+}
+
+Dictionary AovSim::setup_match(const Dictionary &cfg) {
+	return match_result(sim_.setup_match(match_config(cfg)));
+}
+
+Dictionary AovSim::start_match(const Dictionary &cfg) {
+	const aov::MatchConfig c = match_config(cfg);
+	sim_.new_game(c.seed, c.map_size, c.preset, (int)c.players.size());
+	return match_result(sim_.setup_match(c));
 }
 
 PackedInt32Array AovSim::get_player_ids() const {
@@ -1203,6 +1268,7 @@ Dictionary AovSim::get_ai(int64_t owner) const {
 		d["wave_size"] = ai.wave_size;
 		d["next_wave_at"] = ai.next_wave_at;
 		d["aggression"] = ai.aggression;
+		d["difficulty"] = String(aov::ai_difficulty_name(ai.difficulty));
 		Array waves;
 		for (const aov::WaveLog &w : ai.waves) {
 			Dictionary wd;
@@ -1231,6 +1297,13 @@ void AovSim::set_ai(int64_t owner, const Dictionary &d) {
 		if (d.has("wave_size")) ai.wave_size = (int)(int64_t)d["wave_size"];
 		if (d.has("next_wave_at")) ai.next_wave_at = d["next_wave_at"];
 		if (d.has("aggression")) ai.aggression = d["aggression"];
+		if (d.has("difficulty")) {
+			const int df = aov::ai_difficulty_of(String(d["difficulty"]).utf8().get_data());
+			ai.set_difficulty(df);
+			aov::Player &p = sim_.players[owner];
+			p.difficulty = df;
+			p.gather_mult = aov::ai_params(df).gather_mult;
+		}
 		return;
 	}
 }
@@ -1396,6 +1469,7 @@ Dictionary AovSim::get_victory() const {
 	d["decided"] = v.decided;
 	d["winner"] = v.winner;
 	d["loser"] = v.loser;
+	d["winner_team"] = v.winner_team ? v.winner_team : (v.winner ? sim_.team_of(v.winner) : 0);
 	d["time"] = v.at;
 	return d;
 }

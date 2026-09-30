@@ -4,7 +4,15 @@ extends RefCounted
 ## params:  godot --path godot -- --scene=town --seed=7 --out=shots/town.png
 ## Both "--key=value" and "--key value" work; a bare "--flag" is "1".
 
+## Args for the next main-scene load, set by the main menu / match setup
+## (game/menu/flow.gd) before it reloads game/main.tscn: when not empty,
+## parse() returns a copy of it instead of the command line (so the result
+## card's Play Again replays the same match).
+static var override := {}
+
 static func parse(argv: PackedStringArray = OS.get_cmdline_user_args()) -> Dictionary:
+	if not override.is_empty():
+		return override.duplicate(true)
 	var out := {}
 	# Web export: the page's query string, like the browser build
 	# (index.html?scene=town&seed=7); command-line args still win.

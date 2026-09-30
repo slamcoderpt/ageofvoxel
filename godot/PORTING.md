@@ -27,7 +27,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 
 | Piece | GDScript (render / UI) | C++ sim (`native/src/sim/…`) | JS reference |
 |---|---|---|---|
-| core (foundation; skirmish builder: camera, fog pass, playtest) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck, `fog_view.gd` + `fog_of_war.gdshader` (fog-of-war shading, one full-screen pass), `playtest.gd` (scripted skirmish playthrough)) | `core/` (constants, rng, jsmath, bounds, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `sim.{h,cpp}` | `src/core/` |
+| core (foundation; skirmish builder: camera, fog pass, playtest) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck, `fog_view.gd` + `fog_of_war.gdshader` (fog-of-war shading, one full-screen pass), `playtest.gd` (scripted skirmish playthrough), `menu_playtest.gd` (the screen flow through real input: menu -> setup -> loading -> match -> Esc menu -> menu, see "Screen flow"), `match_rules.gd` + `match_check.gd` (match settings -> the sim, see "Match rules")) | `core/` (constants, rng, jsmath, bounds, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `match/` (the match setup: seats, teams, difficulty, stockpiles), `sim.{h,cpp}` | `src/core/` |
 | terrain | `game/terrain/terrain.gd` + `terrain.gdshader` (chunks, paving cobbles / pale stone of MaterialPatches patchGround), `water.gdshader` (Water.js), `props.gdshader` (voxel.gdshader + MultiMesh instance tint, used by trees / gold / berries / ground details); mesher in `native/src/terrain_mesher.cpp` (TerrainMesh.js full port, water depth bake, GroundDetails.js scatter) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (sun + PCSS soft shadows, hemisphere = ambient colour + two unshadowed up/down lights, fill, depth haze following the camera, SSAO, MSAA, `--quality=high\|medium\|low`, `--post=high\|low\|off`), `grade_effect.gd` (CompositorEffect compute pass on the HDR buffer: exposure 2.1 + PBR Neutral + the PostFX.js grade; Godot's tonemap is LINEAR; Compatibility/web falls back to AgX), `sky.gdshader`. MaterialPatches.js canopy / foliage terms not ported yet | none | `src/lighting/` |
 | buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
@@ -39,6 +39,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | performance (6 teams, 2000 units) | `game/perf/perf.gd` (the render bench, `--renderbench`), and in the render paths of the stress scene: unit LOD + box shadow casters (`game/units`), coarse voxel twins `VoxelModels.coarse()` (tree shadow casters), tight resource / ground-detail buckets (`game/terrain`), economy props frustum culling (`AovEconView`); report in `../docs/godot-stress-report.md` | sim hot paths (with their owners); `native/src/unit_lod.cpp` (`AovUnitView.lod_mesh`) | `docs/stress-report.md` |
 | exports (Windows, macOS, Linux, web) | `export_presets.cfg`, `../scripts/godot-export.sh`, `../.github/workflows/godot.yml`, `native/SConstruct` + `native/aov.gdextension` (platform entries); see "Export" | none | `vite build` |
 | scenes | `AovScenes.set_setup()` from the owning piece, else the C++ setup | `scenes/` (helpers.js, skirmish / town / coast / hud, EconomyScene.js; battle.cpp: BattleScene.js + units/battleHost.js, godpower, stress.js: all ported) | `src/core/scenes/`, `BattleScene.js`, `EconomyScene.js` |
+| menu (main menu) | `game/menu/`: `menu.gd` (the piece, scene `menu`), `tile.gd`, `art.gd`, `options.gd`, `flow.gd` (screen flow, `AovArgs.override`), `loading.gd` (the loading screen), `game_menu.gd` (the in-game Esc menu), `hero_art.gd` + `hero_sky.gdshader` + `hero_bolt.gdshader` (the feature card's rendered art), `logo.gdshader`, `menu_sky.gdshader`, `menu_check.gd`; see "Main menu" | none | none (Godot-only) |
 
 ```
 godot/
@@ -184,7 +185,10 @@ godot --path godot -- --scene=town [--seed=N] [--mapsize=N] [--units=N] [--playe
   seconds (default 600) so a script error never hangs a capture.
 - Scenes: `skirmish town battle godpower coast economy hud stress` (same
   presets, seeds, map sizes and cameras as the JS registry) and the Godot-only
-  `models` (every exported model on one strip). Like main.js, main.gd turns
+  `models` (every exported model on one strip) and `menu` (the main menu,
+  below). **Without `--scene`** the game opens the main menu; a run with
+  `--out`, `--quit` or `--bench` and no `--scene` still gets the skirmish, as
+  before (so does the web build's `?scene=` query). Like main.js, main.gd turns
   the ENEMY AI and Victory on per scene (`ai`, `victory`) before the setup,
   sets the fog (`reveal_all`, `--fog`) after it, and pauses when the match is
   decided (`AovSim.is_paused()`). `--units=N` reaches the C++ setup through
@@ -323,6 +327,307 @@ colour (off by default now that `game/units/units.gd` exists);
 marches them onto each other, e.g.
 `node scripts/godot-shoot.mjs --scene skirmish --params "simdemo=1"`.
 
+## Main menu (game/menu)
+
+`game/menu/menu.gd` (a piece: in `PIECE_ORDER`, idle unless the scene is
+`menu`) is Retold's main menu in the HUD style (`hud_style.gd`, the panel
+shader, Cinzel / Alegreya): the coast town plays live behind it (the C++
+`coast` setup, no AI, no HUD) as an evening hero shot through a long lens
+(fov 25, pitch 7.5, from the sea): an acropolis, a temple the menu raises
+on the headland at the harbour mouth (`_raise_acropolis`, `ACRO`), fills
+the right-centre third, backlit by the setting sun that sits just past its
+roof (`SUN_AT`, a frame point: the sky's sun, the additive bloom and the
+sea's glitter path all aim at it; the key light comes from that side,
+higher); three fishing boats lie in the mid-ground on a diagonal leading to
+it (placed where their frame points meet the sea, each on its own rich
+shoal so they stay and fish); the trees that would wall the frame's middle
+on this side of the temple are felled (`_clear_view`, `CLEAR_FRAME`) so
+the eye runs past the beach to the town; depth haze begins just past the
+temple (`FOG_NEAR` / `FOG_FAR` x the camera distance) so the woods and the
+old town step back in value; the sea is graded from the play map's cyan to
+an evening teal (`_grade_water`, the terrain's water material, menu scene
+only); `menu_sky.gdshader` (gold horizon to dusky blue, cloud streaks) and
+golden haze hide the map edge, set on the lighting piece's nodes for this
+scene only (`_apply_mood` / `_aim_mood`, `_mood_frame` after lighting's frame), plus a
+warm additive sun bloomplus a
+warm additive sun bloom and a shadow gradient under the menu column. The
+camera sways slowly round the anchor. Over it: a top bar with the logo
+(`logo.gdshader`: white text shaded as cast gold) and tabs, the Skirmish
+tile, Campaign / Multiplayer unavailable (each carries a full-bleed
+engraving from `art.gd`, drawn edge to edge inside the frame at about 45%
+over a soft gold glow, bleeding under the label's dark gradient: Campaign a
+hoplite hero charging past a burning trireme under a rain of arrows,
+Multiplayer Zeus rising from storm clouds with his thunderbolt; hatched
+shading via SVG clip paths; a muted title, on hover "Not available in this
+version.", pressing shows a notice), a feature carousel (Zeus, attack-move, the map) whose card
+carries full-colour art rendered live in our own voxel render
+(`hero_art.gd`: a SubViewport with its own World3D, so nothing of it
+reaches the harbour or its light; exported models in rest pose on voxel
+ground: the golden hero before a hoplite phalanx, archers, minotaur,
+cyclops and cavalry, the temple on a hill, a crimson storm sky
+(`hero_sky.gdshader`) and Zeus's bolt (`hero_bolt.gdshader`, glow); one
+camera framing and mood per page, a slow sway and bolt flicker live, still
+in captures; drawn edge to edge inside the bronze frame, the title on a
+dark gradient, a one-line caption), Quick Match
+(the default skirmish at once; there is no Load until saved games exist),
+How to Play (`guide.gd`: the goal and the mouse / camera / hotkeys, the
+same framed sheet as Options) and Quit (a notice on the web). Options
+(`options.gd`: Graphics High / Medium / Low live + remembered like the gear
+card, window mode, F3 meter) opens from the top bar's OPTIONS tab or the
+burger, so it appears once. The bottom-left plate (Retold's chat bar) shows
+one gameplay tip at a time, turning every 9 s (the first in captures). Tiles are
+`tile.gd` Buttons (hover / pressed / focus states) with gold line art built
+as SVG in `art.gd`. Keyboard / joypad: the first arrow or D-pad press
+focuses Skirmish, arrows move, Enter / A presses, Esc / B closes Options; the
+focus ring only shows while the last input was not the mouse. Screen flow
+is `flow.gd`: `Flow.start_match(tree, opts)` / `Flow.to_main_menu(tree)` set
+`AovArgs.override` (parse() returns it instead of the command line, so Play
+Again replays the same match) and reload `main.tscn`. Skirmish opens the
+first existing script of `Flow.SETUP_SCREENS` (the "Setup screen contract"
+at the top of `menu.gd`), or starts the default skirmish without one.
+The `menu` scene lists `skip_pieces: ["ui"]` (scenes.gd; main.gd does not
+load a skipped piece): no in-game UI behind the menu (its hotkeys, F1 HUD
+toggle and world clicks cannot reach the town), and the menu and its capture
+do not depend on `game/ui/ui.gd` loading. A piece that fails to load is
+skipped and reported (main.gd), so one broken piece never leaves the menu
+scene with un-set-up pieces (the "Nil base 'sim' / 'camera'" errors).
+Behind the menu the shoals' leaping fish are hidden (economy's `Econ_fish`
+node, menu scene only): at that distance they read as specks.
+
+```
+node scripts/godot-shoot.mjs --scene menu --out shots/godot/menu.png
+     [--params "menu_hover=skirmish"]    # a tile hovered + focused: skirmish campaign multiplayer feature quick guide quit tab_play tab_options burger
+     [--params "menu_options=1"]         # the Options dialog open
+     [--params "menu_guide=1"]           # the How to Play sheet open
+     [--params "menu_view=x,z,dist,pitch,yaw"]   # camera anchor; menu_intro=1 plays the fade-in (off in captures)
+     [--params "menu_hero=yaw,pitch,dist,left,fwd,fov"]  # the hero framing (temple -> view target shift, lens); fleet, felled trees and light follow it
+     [--params "menu_acro=tx,tz"]        # where the acropolis temple is raised (tile corner)
+     [--params "menu_look=sx,sy,near,far"]  # the sun's frame point (1920x1080) and the haze start / end (x camera distance)
+     [--params "menu_page=1"]            # the feature card turned N pages (0 Zeus, 1 attack-move, 2 the voxel world)
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 1280x720x24" \
+  godot --path godot --rendering-driver vulkan --audio-driver Dummy --resolution 1280x720 \
+  -s res://game/menu/menu_check.gd        # no --scene on purpose: "MENU ok|FAIL <step>", exit = failures
+```
+
+`menu_check.gd` launches with no scene argument and drives the menu through
+real key, joypad and mouse events: the menu opens with no in-game UI,
+arrows / D-pad move the focus, Enter on an unavailable tile gives its
+notice, the feature card's rendered art (full colour, reframed on a page turn),
+Options only in the top bar, the hero shot (the acropolis in the
+right-centre third, the fleet before it, the sea graded down), Campaign / Multiplayer art filling the tile,
+hover, the Options tab (Graphics Low applies live and is remembered, then
+restored), Esc, How to Play open / Esc, world clicks blocked, Skirmish -> the setup screen -> a
+match with its HUD, then back to the menu.
+
+## Screen flow: menu, setup, loading, match, game menu (game/menu/flow.gd)
+
+A plain launch (no `--scene`, the web build without `?scene=`) opens the main
+menu; Skirmish opens the setup screen; its Play (and the menu's Quick Match)
+calls `Flow.start_match(tree, M.to_args(settings))`; the in-game menu's Quit
+to Main Menu and the result card's Main Menu call `Flow.to_main_menu`; the
+result card's Play Again calls `Flow.restart` (the current run's args again:
+exactly the same match, setup settings or command line). Every switch sets
+`AovArgs.override` and goes through **the loading screen**
+(`game/menu/loading.gd`, a CanvasLayer at 128 under the tree *root*, so it
+survives the scene change): it is drawn first (the map's name, kicker and
+blurb, the map preview from the setup screen's cache in a bronze frame, the
+players by team with their voxel portraits, colour tags, god and
+difficulty, a cast-bronze bar with the stage being built, a tip), then
+`main.tscn` reloads under it. main.gd finds it (`loading`, node
+`AovLoading`) and builds in stages, one drawn frame each (`_stage`: new_game,
+each piece's `setup()`, the match seating, the fast-forward), with its own
+process mode disabled until the last `setup()` ran (no piece `frame()` or
+input half set up; `building` is true meanwhile), advances the bar, marks the
+Town Centers in the players' colours once `MatchRules.apply` seated them
+(`loading.seat(sim)`), then `loading.finish()` fades it out. The root
+viewport's 3D is off under the opaque card (a stage then costs ~70 ms instead
+of a full lavapipe frame), except for the two frames that draw the portraits
+(SubViewports rendered while a scene world exists under a root with
+`disable_3d` come out as flat close-ups). A command-line run (captures,
+checks, `--scene=...`) has no loading screen and builds synchronously as
+before; `time_scale` is set before the build so checks that wait a few frames
+after Play still read it.
+
+**In-game menu** (`game/menu/game_menu.gd`, hosted by main.gd as
+`game_menu` in every scene with the in-game UI, a CanvasLayer at 60): Esc
+with nothing to cancel (no placement / targeting mode, no hotkey card: ui.gd
+`_key` calls `game.open_game_menu()`) or F10 opens it; the match pauses
+under a dim veil (restored on close, a decided match stays paused); Resume,
+Options (the main menu's Options dialog: graphics live, display, F3 meter)
+and Quit to Main Menu, in the HUD style (panel.gdshader, `tile.gd` bars),
+keyboard / joypad navigable; Esc closes Options, then the menu; no hotkey
+reaches the HUD while it is open. The result card (hud.gd) has Play Again
+and Main Menu.
+
+```
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 1280x720x24" \
+  godot --path godot --rendering-driver vulkan --audio-driver Dummy --resolution 1280x720 \
+  -s res://game/core/menu_playtest.gd [-- --shots=/abs/dir]    # no --scene on purpose: "FLOW ok|FAIL <step>", exit = failures
+```
+
+`menu_playtest.gd` drives it all with real input events (mouse moves and
+clicks at the widgets' centres, checked to be the control under the mouse;
+keys): plain launch -> the menu -> Skirmish -> setup: 6 players, teams 3 v 3,
+one AI per difficulty (Easy, Moderate, Hard, Titan, Moderate), your colour
+changed to 7 (cyan), map size Large -> Play -> the loading screen -> the
+match, then from the sim: players 1..6, teams (and `is_ally` / `is_enemy`),
+the one human, each seat's difficulty and its AI's, the colours, the map
+size, a Town Center each, the HUD; Esc -> the game menu (the tick stops, H
+does not reach the HUD) -> Resume (the tick runs) -> Esc -> Options -> Esc ->
+Esc -> Esc -> Quit to Main Menu -> the menu -> Skirmish (the setup remembers
+the match) -> Play -> the same match; the enemy team's Town Centers razed
+(harness shortcut) -> the result card -> Play Again (the same match, from
+tick 0) -> the card again -> Main Menu. It prints the clicks it took: 24 from
+the main menu to that match (Skirmish 1, count 2, teams 10, difficulties 6,
+colour 2, map size 2, Play 1; a default skirmish is 2: Skirmish, Play), and
+each load's frames / ms (~2-4 s on lavapipe). `--shots` saves the setup, the
+loading screen, the game menu, its Options and the result card.
+
+## Match setup and match settings (game/menu/setup)
+
+The skirmish setup screen (`game/menu/setup/setup.gd`, after Retold's
+lobby; widgets in `widgets.gd`, backdrop `setup_bg.gdshader`, preview
+`map_preview.gd`) opens from the main menu's Skirmish tile (the menu's
+"Setup screen contract", `Flow.SETUP_SCREENS`) or on its own as the scene
+`setup` (a scene entry with `"screen": <script>`: main.gd puts it on a
+CanvasLayer over the scene's world; the screen is opaque and scales itself
+by the window height like the HUD). Leave = back to the menu (hosted:
+`menu.close_screen()`, standalone: `Flow.to_main_menu`); Play =
+`menu.start_match(M.to_args(settings))` / `Flow.start_match`.
+
+```
+node scripts/godot-shoot.mjs --scene setup --params "players=5"          # 2..6 players
+node scripts/godot-shoot.mjs --scene setup --params "players=2&open=team" # an open picker:
+     # open=team|color|difficulty|count|size|resources|speed (dropdowns of row 1 / the map panel), god, map (the modals)
+     # also map=<key>, seed=N, mapsize=N
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 1280x720x24" \
+  godot --path godot --rendering-driver vulkan --audio-driver Dummy --resolution 1280x720 \
+  -s res://game/menu/setup/setup_check.gd -- --scene=setup   # "SETUP ok|FAIL <step>", exit = failures
+```
+
+`setup_check.gd` drives the screen through real mouse / key events at the
+drawn widgets' hit zones (count, colour swap, team, difficulty, resources,
+speed, size, seed, free for all, the pantheon picker, the map chooser,
+remove / add, Esc, Play -> the match loads with the settings, setup again
+remembers them, Leave -> menu). It needs a display (headless windows are
+64x64).
+
+**The match-settings Dictionary** (`game/menu/setup/match_settings.gd`,
+preloaded as `M`; the one hand-off between the setup screen and the match
+rules):
+
+```
+{ version: 1, game_type: "standard", victory: "conquest",
+  map: "aegean_hills" | "ionian_coast" | "marathon" | "circle_of_poleis",   # M.MAPS ("random" is rolled before Play)
+  preset: "skirmish" | "coast" | "battle" | "stress",                       # M.MAPS[map].preset, for AovSim.new_game
+  seed: int, map_size: 96 | 128 | 160 | 192 | 256,
+  visibility: "standard" | "revealed", resources: "low" | "standard" | "high" | "deathmatch",   # M.RESOURCES[..].res
+  speed: 0.75 | 1.0 | 1.5 | 2.0, free_for_all: bool, lock_teams: bool (UI only),
+  players: [ {id: 1..6 (= owner, = start index + 1), name, human: bool, ai: "" | "easy" | "moderate" | "hard" | "titan",
+              god: "zeus", color: 1..8 (M.COLORS, 1..6 = the sim's PLAYER_COLORS), team: 1..6}, ... ] }   # 2..6, [0] = the human
+```
+
+`M.team_of(settings, i)` gives the team the rules should use (free for all:
+a team per player); `M.DIFFICULTIES[..].ai` was a hint for
+the rules (unused: they take the difficulty key, see "Match rules");
+`M.RESOURCES[..].res` the `set_player_resources` stockpile (`{}` = the
+default). Play passes main.gd args (strings): `scene=skirmish`, `seed`,
+`mapsize`, `players`, `preset`, `timescale` (speed), `fog=0` (revealed), and
+`match` = the whole Dictionary as JSON; `M.from_args(game.args)` reads it
+back ({} for a run without one). main.gd honours seed, mapsize,
+timescale and fog, and hands the rest to the match rules (below). Which
+player counts a map takes is asked of the generator (`M.starts_for`: the
+starts `new_game` places): Aegean Hills, Marathon and Circle of Poleis take
+2-6, Ionian Coast 2. Only Zeus is playable: Hades and Poseidon
+are shown locked in the pantheon picker. The map preview is the real
+generator's output for the chosen preset / seed / size / player count
+(tiles coloured like the minimap, trees / gold / berries, Town Center
+markers in the players' colours).
+
+## Match rules (native/src/sim/match, game/core/match_rules.gd)
+
+A run with a `match` arg (the setup screen's Play) is a real match:
+main.gd reads it with `MatchRules.settings(args)`
+(`game/core/match_rules.gd`), calls `new_game(seed, mapsize,
+MatchRules.preset(m), player count)` and, in place of the scene setup,
+`MatchRules.apply(sim, m)` -> `AovSim.setup_match(MatchRules.sim_config(m))`
+-> `Sim::setup_match` (`sim/match/match.{h,cpp}`). `AovSim.start_match(cfg)`
+does `new_game` + `setup_match` in one call (checks, tools). The sim config:
+
+```
+{ seed, map_size, preset, resources: "low" | "standard" | "high" | "deathmatch", villagers: 5,
+  players: [ {id: 1..6, name, human: bool, ai: "easy" | "moderate" | "hard" | "titan",
+              team: int (<= 0: his own; free for all sends 0), color: 0xRRGGBB, god: "zeus"}, ... ] }
+-> {ok, error, local, focus: Vector2 (the local Town Center), tcs, slots (start index per player)}
+```
+
+- **Seats**: team mates side by side round the ring (teams in order of
+  first appearance, players in order within one); `get_starts()` is then
+  renumbered so `starts[i].owner == i + 1`. The local player is the first
+  human (fog owner). Each player gets the standard start (Town Center + 5
+  villagers), his stockpile (low 150/150/100/0, standard 300/300/200/20,
+  high 1000/1000/750/50, deathmatch 10000/10000/10000/100), and each AI seat
+  an `EnemyAI` with its difficulty (`combat.ai()` stays the ENEMY's: a
+  disabled placeholder when player 2 is human). Victory is turned on.
+- **Teams** (`Sim::team`, `team_of`, `is_enemy`, `is_ally`; `new_game`
+  gives every player a team of his own, the browser's rule): `is_enemy` is
+  no longer static and every enemy test goes through it, so allies are never
+  auto-targeted, attacked by a right-click / attack order, hit by splash,
+  Town Center arrows, a Lightning Storm, Bolt or Meteor, nor aimed at by the
+  AI's waves and god powers. The fog stamps the sight of the fog owner's
+  allies too (shared vision). Victory is per team (see `victory.h`): a player
+  is out when his last Town Center falls (`player:defeated`), a team when
+  all its players are; the match is decided when one team is left (it
+  wins) or the local player's team is out (defeat). `get_victory()` has
+  `winner_team`. HUD: the score list is grouped by team ("TEAM 1" headers
+  with the team's total, the local team first) whenever a team has two
+  players; the feed says "<name> has been defeated.", the result card
+  "Every enemy Town Center has fallen." / "Your team's last Town Center has fallen.".
+- **Maps**: `skirmish` and `battle` place 3..6 players on a ring (radius
+  0.35 x size, evenly spaced, Godot passes only; 2 players keep the
+  browser's diagonal), `stress` already did. A Godot-only pass,
+  `balance_starts` (after connect_starts, before the woodlines), gives any
+  start the generator shortchanged (a neighbour's forest or a lake on the
+  spot) its gold mine (11-14 tiles out) and berry patch (9-12 out);
+  `get_mapgen_info().balanced` counts what it added.
+- **AI difficulty** (`AIParams` / `ai_params(d)` in `combat/enemy_ai.h`;
+  Moderate = the browser's EnemyAI unchanged): Easy thinks every 2 s, stops
+  at 14 villagers, one academy queue slot, waves of 5 (+2) from 7 min every
+  200 s, one worshipper, a god power decision every 30 s, no Classical Age
+  before 12 min. Hard: 30 villagers, academy at 8, a second academy at 20,
+  queue 4, waves of 8 (+5) every 104 s, 4 worshippers, storms on 5+ men,
+  food-heavy gathering that stops banking gold, houses built earlier, keeps
+  training while saving for the age. Titan: all of Hard and faster (thinks
+  every 0.75 s, 34 villagers, 3 villager slots, second academy at 16, waves
+  of 10 (+6) every 92 s, 5 worshippers, a power decision every second,
+  storms on 4+) plus **+20 % gather rate** (`Player::gather_mult`) and +150
+  food / wood / gold. `set_ai(owner, {difficulty: "hard"})` switches one;
+  `get_ai(owner).difficulty`, `get_player(id)` {team, human, difficulty,
+  gather_mult}.
+- Game speed and visibility stay main.gd's (`timescale`, `fog` args).
+
+```
+godot --headless --path godot -s res://game/core/match_check.gd [-- --only=maps,vision,victory,teams,difficulty,main] [--seeds=6]
+```
+
+`match_check.gd` ("MATCH PASS|FAIL <case>", `MATCH_RESULT {json}`, exit =
+failures, ~50 s): **teams** (two 20-minute 2v2s of Hard AIs: no damage
+event from an ally, no attack order on one, thousands of hits on enemies),
+**vision** (the ally's town and men visible, the enemy's not), **victory**
+(2v2: one enemy down goes on, both = won; my TC down with the ally standing
+goes on, both = lost; FFA of 3; an AI 2v2 plays to a team result),
+**maps** (195 maps: 2-6 players x 96..256 x skirmish / battle / stress x
+seeds: the start count, each start's mine, berries and woodline, all
+reachable, spacing even), **difficulty** (AI vs AI, seats swapped every
+other seed: Hard beats Easy, Titan beats Moderate, Hard beats Moderate,
+Moderate beats Easy in most seeds; peaceful villagers at 6 min /
+population at 9, wave men per minute and casts per minute ordered Easy <
+Moderate < Hard < Titan), **main** (the setup screen's settings through
+main.gd: players, teams, difficulty, colours, resources, speed, fog, the
+team score list). Today: Hard 6/6 over Easy, Titan 5/6 over Moderate (one
+undecided), Hard 4/6 over Moderate, Moderate 3/3 over Easy; peaceful
+villagers at 6 min 14 / 22 / 30 / 35.
+
 ## Conventions
 
 - **World units**: 1 tile = 1 world unit, terrain voxel `VOXEL = 0.5` (2x2
@@ -371,7 +676,7 @@ marches them onto each other, e.g.
   that would cut any tile off; its own RNG, so the rest of the map is
   untouched). The planned towns (`layout_town`: town, hud, coast, stress)
   clear trees from their streets and lots, so there the plan decides what is
-  left of it. `AovSim.get_mapgen_info()` = {felled, graded, woodline};
+  left of it. `AovSim.get_mapgen_info()` = {felled, graded, woodline, balanced};
   `set_godot_rules(false)` before `new_game` gives the browser's map. The whole core
   (entities, units update / spread, pathfinding, movement, commands) is
   bit-exact with the browser (`check-mapgen.mjs`, `check-sim.mjs`); extend
@@ -502,7 +807,9 @@ full TerrainMesh.js: smoothed shore, talus, cliff relief), `get_water_depth()`
 Players: `add_player(id, name="", is_ai=true)` (owners 3..6),
 `get_player(id)` ({id, name, is_ai, god, color, food, wood, gold, favor, pop,
 pop_cap, age, age_name, advancing, advance_t, advance_total}),
-`get_player_ids()`, `is_enemy(a, b)`, `set_player_resources(owner,
+`get_player_ids()`, `is_enemy(a, b)`, `is_ally(a, b)`, `get_team(id)`,
+`get_local_player()`, `setup_match(cfg)` / `start_match(cfg)` (see "Match
+rules"), `set_player_resources(owner,
 {food, …})`, `set_player_age(owner, age)`.
 
 Entities: `unit_type_names()` (type index -> key), `get_unit_def(key)`,
@@ -589,7 +896,7 @@ attacker=0)`, `order(id, {type: "attack", target, auto, then_buildings})`,
 `set_unit_combat(id, {leash, reach, kit, line: {cx, cz, nx, nz, d0} | null})`,
 `set_ai_enabled(on)` (the ENEMY's EnemyAI), `add_ai(owner)`, `get_ai(owner)`
 ({enabled, wave_size, next_wave_at, aggression, waves: [{t, target, x, z,
-units}], casts: {power: n}}) / `set_ai(owner, {enabled, next_wave_at, wave_size, aggression})`,
+units}], casts: {power: n}, difficulty}) / `set_ai(owner, {enabled, next_wave_at, wave_size, aggression, difficulty})`,
 `get_combat()` ({projectiles: 16 floats each (x, y, z, px, py, pz, sx, sy,
 sz, tx, ty, tz, t, dur, arc, dist), projectile_info: 2 ints (target, has
 target pos), stuck: 7 (x, y, z, dx, dy, dz, t), scars: 5 (x, z, radius,
@@ -723,11 +1030,11 @@ while moving, AI waves attack their target directly); `simcheck.gd`
 turns it off for `check-sim.mjs`, and `--godot_rules=0` does it for a run
 (A/B benches: the AI's storms thin the stress armies, so its numbers move).
 
-Fog of war (player 1) and victory: `set_fog_reveal_all(on)`,
+Fog of war (player 1 and his allies) and victory: `set_fog_reveal_all(on)`,
 `fog_recompute()`, `get_fog()` (size*size bytes: 0 unexplored, 128
 explored, 255 visible), `fog_version()`, `is_explored(x, z)`,
 `is_visible(x, z)`, `set_victory_enabled(on)`, `get_victory()` ({enabled,
-decided, winner, loser, time}), `is_paused()`, `set_paused(on)`.
+decided, winner, loser, winner_team, time}), `is_paused()`, `set_paused(on)`.
 
 Events (`game.events`, drained by main.gd): [{type, id, kind, other, owner,
 a, x, z, amount}], type one of `entity:added` (a = type index),
@@ -738,7 +1045,8 @@ owner = attacker's owner, amount = damage after bonus and armor, x, z),
 `resources:changed`, `godpower:cast` (owner, a = power index in
 `power_names()`, x, z), `command:smart` (other = target, a =
 unit count), `game:over` (owner = winner, a = loser, amount = time), `villager:free`
-(owner, id = the Town Center: see "Free villager" below);
+(owner, id = the Town Center: see "Free villager" below), `player:defeated`
+(owner, amount = time; Godot-only, see "Match rules");
 `set_record_events(on)`. C++ systems subscribe
 with `sim.events.on(EV_…, fn)`.
 

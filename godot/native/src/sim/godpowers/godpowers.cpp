@@ -113,7 +113,7 @@ std::vector<int> GodPowers::near(double x, double z, double r, int owner, int32_
 	sim->movement.hash.count_query(x, z, r);
 	sim->movement.hash.for_each_near(x, z, r, [&](int o) {
 		const double dx = U.x[o] - x, dz = U.z[o] - z;
-		if (dx * dx + dz * dz <= r2 && !U.dead[o] && U.id[o] != exclude_id && Sim::is_enemy(owner, U.owner[o])) out.push_back(o);
+		if (dx * dx + dz * dz <= r2 && !U.dead[o] && U.id[o] != exclude_id && sim->is_enemy(owner, U.owner[o])) out.push_back(o);
 	});
 	return out;
 }
@@ -229,7 +229,7 @@ void GodPowers::impact_meteor(const Meteor &m) {
 	BuildingStore &B = S.entities.buildings;
 	const int nb = B.size();
 	for (int b = 0; b < nb; b++) {
-		if (B.removed[b] || B.dead[b] || !Sim::is_enemy(m.owner, B.owner[b])) continue;
+		if (B.removed[b] || B.dead[b] || !sim->is_enemy(m.owner, B.owner[b])) continue;
 		const double d = jsm::hypot(B.x[b] - x, B.z[b] - z);
 		const BuildingDef &bd = building_def(B.type[b]);
 		if (d < m.radius + std::max(bd.w, bd.h) / 2.0) S.combat.damage(B.id[b], def.damage * 1.5, Hitter::pseudo(m.owner, true));

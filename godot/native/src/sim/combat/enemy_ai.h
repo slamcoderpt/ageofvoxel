@@ -20,6 +20,46 @@ struct WaveLog {
 	std::vector<int32_t> units;
 };
 
+// AI difficulty (Godot-only, set by the match setup: AovSim.setup_match /
+// set_ai {difficulty}). MODERATE is the browser's EnemyAI unchanged (the
+// defaults below); the others change how fast it grows and fights:
+// villager cap and training rate, when it builds its academy / temple /
+// a second academy, the academy queue, the first wave, wave size and
+// growth, the interval between waves (aggression), how often and how
+// eagerly it casts god powers, when it advances; Titan also gathers 20 %
+// faster and starts with a bonus stockpile (Player::gather_mult, the
+// match setup). All deterministic: the same seeded RNG, no extra draws.
+enum AIDifficulty : int8_t { AI_DEFAULT = -1, AI_EASY = 0, AI_MODERATE = 1, AI_HARD = 2, AI_TITAN = 3 };
+const char *ai_difficulty_name(int d);
+int ai_difficulty_of(const char *name); // "easy" .. "titan"; anything else: AI_DEFAULT
+
+struct AIParams {
+	double think = 1;         // s between decisions
+	int max_villagers = 22;   // trains villagers up to this many
+	int villager_queue = 2;   // at the Town Center
+	int academy_at = 10;      // villagers before the military academy
+	int temple_at = 14;       // ... the temple
+	int academy2_at = 0;      // ... a second academy (0: never)
+	int army_queue = 3;       // per academy
+	int wave_size = 8;        // first wave
+	int wave_grow = 4;        // men added per wave
+	int wave_max = 40;
+	double first_wave = 240;  // s
+	double aggression = 1;    // waves every 120 / aggression s
+	double power_every = 2;   // s between god power decisions (0: never casts)
+	int storm_min = 6;        // enemy men a Lightning Storm must catch
+	double age_after = 0;     // earliest time it advances to the Classical Age
+	int worshippers = 3;      // villagers kept worshipping at the temple (favor)
+	int house_margin = 4;     // builds a house when the free population is below this
+	bool army_while_saving = false; // keeps training soldiers while it saves for the next age
+	double food_share = 0;    // workers on food (0: the browser's 0.5 / 0.3 / 0.2 split)
+	double gold_share = 0.2;  // ... on gold (with food_share)
+	double bank_cap = 1e9;    // gold / wood beyond this: fewer workers on it
+	double gather_mult = 1;   // Titan's economy bonus (Player::gather_mult)
+	double bonus_res = 0;     // Titan: added to each starting resource (food, wood, gold)
+};
+AIParams ai_params(int difficulty);
+
 class EnemyAI {
 public:
 	Sim *sim = nullptr;
@@ -32,6 +72,11 @@ public:
 	std::vector<WaveLog> waves; // every wave launched (AovSim.get_ai().waves)
 	double power_timer = 0;     // s until the next god power decision
 	int casts[3] = { 0, 0, 0 }; // powers cast, by PowerId (AovSim.get_ai().casts)
+	int difficulty = AI_DEFAULT;
+	AIParams par;               // ai_params(difficulty)
+	// set the difficulty (params, wave size / timing, aggression); the
+	// player's gather bonus is the match setup's (it owns the Player)
+	void set_difficulty(int d);
 
 	EnemyAI() = default;
 	EnemyAI(Sim *s, int owner_) : sim(s), owner(owner_) {}

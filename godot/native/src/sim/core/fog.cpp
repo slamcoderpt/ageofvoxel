@@ -68,10 +68,10 @@ void FogOfWar::recompute() {
 	};
 	const UnitStore &U = sim->entities.units;
 	for (int r = 0; r < U.size(); r++)
-		if (!U.removed[r] && U.owner[r] == owner && !U.dead[r]) stamp(U.x[r], U.z[r], U.sight[r]);
+		if (!U.removed[r] && sim->is_ally(owner, U.owner[r]) && !U.dead[r]) stamp(U.x[r], U.z[r], U.sight[r]);
 	const BuildingStore &B = sim->entities.buildings;
 	for (int b = 0; b < B.size(); b++)
-		if (!B.removed[b] && B.owner[b] == owner && !B.dead[b]) stamp(B.x[b], B.z[b], B.sight[b]);
+		if (!B.removed[b] && sim->is_ally(owner, B.owner[b]) && !B.dead[b]) stamp(B.x[b], B.z[b], B.sight[b]);
 }
 
 } // namespace aov
