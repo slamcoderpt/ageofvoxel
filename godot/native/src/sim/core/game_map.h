@@ -10,6 +10,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "bounds.h"
+
 namespace aov {
 
 enum Ground : uint8_t { GRASS = 0, DIRT = 1, SAND = 2, ROCK = 3, PAVED = 4, FARM = 5, DRYGRASS = 6 };
@@ -40,6 +42,34 @@ public:
 	bool in_cols(int cx, int cz) const { return cx >= 0 && cz >= 0 && cx < cols && cz < cols; }
 	bool in_tiles(int tx, int tz) const { return tx >= 0 && tz >= 0 && tx < size && tz < size; }
 	int level(int cx, int cz) const;
+	// ---- bounds (see core/bounds.h and PORTING.md "Map bounds"): the world
+	// is [0, size) x [0, size); these never index out of range, whatever the
+	// coordinate (off-map, huge, infinite, NaN).
+	// inside the map (NaN: false)
+	bool in_world(double x, double z) const { return x >= 0 && z >= 0 && x < size && z < size; }
+	// a world coordinate's tile, clamped onto the map (NaN -> 0)
+	int tile_clamp(double v) const { return floor_clamp(v, 0, size - 1); }
+	// is_walkable(floor(x), floor(z)) for a world point (off-map / NaN: false)
+	bool walkable_at(double x, double z) const {
+		if (!in_world(x, z)) return false;
+		const int i = (int)z * size + (int)x;
+		return passable[i] == 1 && blocked[i] == 0;
+	}
+	// the column level under a world point (clamped to the edge column, like level())
+	int level_at(double x, double z) const;
+	// Move a world point onto the map: a point inside is left exactly as is,
+	// a coordinate off the map goes to the centre of the edge tile (0.5 or
+	// size - 0.5). false (point untouched) when x or z is NaN: callers reject.
+	bool clamp_to_map(double &x, double &z) const {
+		if (std::isnan(x) || std::isnan(z)) return false;
+		if (!(x >= 0 && x < size)) x = x < 0 ? 0.5 : size - 0.5;
+		if (!(z >= 0 && z < size)) z = z < 0 ? 0.5 : size - 0.5;
+		return true;
+	}
+	// a w x h tile rect lies wholly on the map (overflow-safe)
+	bool rect_in_tiles(long long tx, long long tz, int w, int h) const {
+		return tx >= 0 && tz >= 0 && tx + w <= size && tz + h <= size;
+	}
 	double height_at(double x, double z) const;
 	double smooth_height_at(double x, double z) const;
 	double water_y() const;

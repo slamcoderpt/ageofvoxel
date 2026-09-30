@@ -26,6 +26,12 @@ void Movement::release_path(int r) {
 
 bool Movement::move_to(int r, double x, double z, const GoalRect *rect, double range) {
 	UnitStore &U = sim->entities.units;
+	// bounds: a goal off the map is moved onto its edge tile (a goal on the
+	// map is untouched: the browser's paths); NaN is no goal at all
+	if (!sim->map().clamp_to_map(x, z)) {
+		stop(r);
+		return false;
+	}
 	if (U.path[r] < 0) U.path[r] = sim->paths.alloc();
 	auto &path = sim->paths.at(U.path[r]);
 	sim->pathfinder.find_path(U.x[r], U.z[r], x, z, rect, path);
@@ -193,10 +199,10 @@ void Movement::update(double dt) {
 		vz += sz * 4;
 		if (vx == 0 && vz == 0) continue;
 		const double nx = U.x[r] + vx * dt, nz = U.z[r] + vz * dt;
-		if (map.is_walkable((int)std::floor(nx), (int)std::floor(nz))) { U.x[r] = nx; U.z[r] = nz; }
-		else if (map.is_walkable((int)std::floor(nx), (int)std::floor(U.z[r]))) U.x[r] = nx;
-		else if (map.is_walkable((int)std::floor(U.x[r]), (int)std::floor(nz))) U.z[r] = nz;
-		else if (!map.is_walkable((int)std::floor(U.x[r]), (int)std::floor(U.z[r]))) { U.x[r] = nx; U.z[r] = nz; } // escape if embedded
+		if (map.walkable_at(nx, nz)) { U.x[r] = nx; U.z[r] = nz; }
+		else if (map.walkable_at(nx, U.z[r])) U.x[r] = nx;
+		else if (map.walkable_at(U.x[r], nz)) U.z[r] = nz;
+		else if (!map.walkable_at(U.x[r], U.z[r]) && map.in_world(nx, nz)) { U.x[r] = nx; U.z[r] = nz; } // escape if embedded (never off the map)
 		hash.moved(r, U.x[r], U.z[r]);
 		if (U.moving[r]) {
 			const double want = jsm::atan2(vx, vz);

@@ -5,11 +5,19 @@
 // It holds unit ROWS (not ids): valid until the next rebuild, since the
 // entity store only compacts right before it. Positions are read live, like
 // the JS hash that held object references.
+//
+// Bounds: a point off the map hashes into the nearest edge cell, and a query
+// square is clipped to the grid (core/bounds.h cell_span); a query wholly off
+// the grid visits nothing. (Before, for_each_near_xz clamped only one end of
+// each range, so a query centre far off the map in x read start[] far out of
+// range: the segfault of a unit spawned at x = 1e9.)
 #pragma once
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <vector>
+
+#include "bounds.h"
 
 namespace aov {
 
@@ -32,9 +40,7 @@ public:
 		items.clear();
 	}
 	int cell_of(double x, double z) const {
-		int cx = std::max(0, std::min(n - 1, (int)std::floor(x / cell)));
-		int cz = std::max(0, std::min(n - 1, (int)std::floor(z / cell)));
-		return cz * n + cx;
+		return floor_clamp(z / cell, 0, n - 1) * n + floor_clamp(x / cell, 0, n - 1);
 	}
 	// rows: candidate rows in order; include(row) filters; X/Z arrays give positions.
 	template <class Inc>
@@ -84,9 +90,8 @@ public:
 	// square, from the mirror (same units, same order as for_each_near)
 	template <class F>
 	void for_each_near_xz(double x, double z, double r, F fn) const {
-		const double c = cell;
-		int x0 = std::max(0, (int)std::floor((x - r) / c)), x1 = std::min(n - 1, (int)std::floor((x + r) / c));
-		int z0 = std::max(0, (int)std::floor((z - r) / c)), z1 = std::min(n - 1, (int)std::floor((z + r) / c));
+		int x0, x1, z0, z1;
+		if (!cell_span(x - r, x + r, cell, n, x0, x1) || !cell_span(z - r, z + r, cell, n, z0, z1)) return;
 		const int32_t *it = items.data();
 		const double *X = px.data(), *Z = pz.data(), *R = pr.data();
 		for (int cz = z0; cz <= z1; cz++)
@@ -95,9 +100,8 @@ public:
 	// fn(row) for every unit whose cell overlaps the query square (JS forEachNear)
 	template <class F>
 	void for_each_near(double x, double z, double r, F fn) const {
-		const double c = cell;
-		int x0 = std::max(0, (int)std::floor((x - r) / c)), x1 = std::min(n - 1, (int)std::floor((x + r) / c));
-		int z0 = std::max(0, (int)std::floor((z - r) / c)), z1 = std::min(n - 1, (int)std::floor((z + r) / c));
+		int x0, x1, z0, z1;
+		if (!cell_span(x - r, x + r, cell, n, x0, x1) || !cell_span(z - r, z + r, cell, n, z0, z1)) return;
 		for (int cz = z0; cz <= z1; cz++)
 			for (int cx = x0; cx <= x1; cx++) {
 				int ci = cz * n + cx;
@@ -107,9 +111,8 @@ public:
 	void count_query(double x, double z, double r) {
 		if (!census) return;
 		queries++;
-		const double c = cell;
-		int x0 = std::max(0, (int)std::floor((x - r) / c)), x1 = std::min(n - 1, (int)std::floor((x + r) / c));
-		int z0 = std::max(0, (int)std::floor((z - r) / c)), z1 = std::min(n - 1, (int)std::floor((z + r) / c));
+		int x0, x1, z0, z1;
+		if (!cell_span(x - r, x + r, cell, n, x0, x1) || !cell_span(z - r, z + r, cell, n, z0, z1)) return;
 		for (int cz = z0; cz <= z1; cz++)
 			for (int cx = x0; cx <= x1; cx++) {
 				cells_scanned++;

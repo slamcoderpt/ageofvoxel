@@ -45,12 +45,18 @@ void Commands::set(int r, const Order &o) {
 	U.order_a[r] = o.a;
 	U.order_b[r] = o.b;
 	U.order_c[r] = o.c;
+	U.am_resume[r] = 0; // (a new order ends any fight-then-resume, see Combat::engage)
 }
 
-bool Commands::order(int r, const Order &o) {
+bool Commands::order(int r, const Order &o_in) {
 	UnitStore &U = sim->entities.units;
 	if (r < 0 || U.removed[r] || U.dead[r]) return false;
-	if (!has_handler(o.type)) return false; // JS: console.warn('No handler for order')
+	if (!has_handler(o_in.type)) return false; // JS: console.warn('No handler for order')
+	Order o = o_in;
+	// bounds: a move / attack-move destination off the map goes onto its edge
+	// tile (on the map: untouched); a NaN destination is refused, the unit
+	// keeps its current order
+	if ((o.type == O_MOVE || o.type == O_ATTACK_MOVE) && !sim->map().clamp_to_map(o.x, o.z)) return false;
 	const Order prev = get(r);
 	set(r, o);
 	if (prev.type != o.type && cancel_[prev.type]) cancel_[prev.type](r, prev);
@@ -62,13 +68,15 @@ bool Commands::order(int r, const Order &o) {
 	return ok;
 }
 
-void Commands::move(const std::vector<int> &rows, double x, double z) {
+void Commands::move(const std::vector<int> &rows, double x, double z, uint8_t type, int32_t b) {
 	UnitStore &U = sim->entities.units;
 	std::vector<int> list;
 	list.reserve(rows.size());
 	for (int r : rows)
 		if (r >= 0 && !U.removed[r] && !U.dead[r]) list.push_back(r);
-	if (list.empty()) return;
+	// bounds: the formation centres on the destination moved onto the map
+	// (slots that still fall off it near an edge are clamped by order())
+	if (list.empty() || !sim->map().clamp_to_map(x, z)) return;
 	const int n = (int)list.size();
 	const int cols = (int)std::ceil(std::sqrt((double)n));
 	const double spacing = 1.15;
@@ -95,7 +103,10 @@ void Commands::move(const std::vector<int> &rows, double x, double z) {
 		const double ox = (col - (cols - 1) / 2.0) * spacing * big;
 		const double oz = -(row - (nrows - 1) / 2) * spacing * big;
 		const double wx = x + ox * ca + oz * sa, wz = z - ox * sa + oz * ca;
-		order(r, Order::move(n == 1 ? x : wx, n == 1 ? z : wz));
+		Order o = Order::move(n == 1 ? x : wx, n == 1 ? z : wz);
+		o.type = type;
+		o.b = b;
+		order(r, o);
 	}
 	if (field) pf.end_group_field();
 }
@@ -118,6 +129,7 @@ void Commands::smart(const std::vector<int> &rows, double x, double z, int32_t t
 		order(r, Order::with_target(t, target_id));
 		return true;
 	};
+	if (!sim->map().clamp_to_map(x, z)) return; // (bounds: NaN is no command; off-map goes onto the edge)
 	int owner = -1;
 	for (int r : rows) {
 		if (r < 0 || U.removed[r] || U.dead[r]) continue;

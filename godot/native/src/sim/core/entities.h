@@ -34,9 +34,11 @@ using TrainQueue = std::vector<TrainItem>;
 enum Kind : uint8_t { K_NONE = 0, K_UNIT = 1, K_BUILDING = 2, K_RESOURCE = 3 };
 
 // Order types (u.order.type). Handlers are registered in Commands.
-enum OrderType : uint8_t { O_IDLE, O_MOVE, O_GATHER, O_DROPOFF, O_WORSHIP, O_BUILD, O_ATTACK, O_TYPE_COUNT };
+// O_ATTACK_MOVE is Godot-only (combat.h: walk to order_x / order_z, fighting
+// what comes into sight on the way).
+enum OrderType : uint8_t { O_IDLE, O_MOVE, O_GATHER, O_DROPOFF, O_WORSHIP, O_BUILD, O_ATTACK, O_ATTACK_MOVE, O_TYPE_COUNT };
 inline const char *order_name(int t) {
-	static const char *n[] = { "idle", "move", "gather", "dropoff", "worship", "build", "attack" };
+	static const char *n[] = { "idle", "move", "gather", "dropoff", "worship", "build", "attack", "attack_move" };
 	return t >= 0 && t < O_TYPE_COUNT ? n[t] : "?";
 }
 
@@ -123,6 +125,13 @@ enum UnitFlag : uint8_t { UF_MOVING = 1, UF_DEAD = 2, UF_ARRIVED = 4, UF_CARRY =
 	X(double, stag_k, 1)          /* combat_stagK */                           \
 	X(double, melee_t, NAN)       /* combat_meleeT (last melee blow taken) */  \
 	X(uint8_t, kit, 255)          /* units_kit (battle scene), 255 = unset */  \
+	/* combat, Godot-only: an attack that resumes a move / attack-move when */ \
+	/* the fight is over (Combat::engage); cleared by every Commands::set */   \
+	X(uint8_t, am_resume, 0)      /* AmResume: 0 none, 1 move, 2 attack-move */ \
+	X(double, am_x, 0)            /* the destination to resume */             \
+	X(double, am_z, 0)                                                         \
+	X(int32_t, am_flags, 0)       /* the attack-move's order_b */              \
+	X(double, am_lost, 0)         /* s the foe has been out of sight */        \
 	/* god powers (sim/godpowers): thrown units, u.gp_air + airY / airRx / airRz */ \
 	X(double, air_y, 0)                                                        \
 	X(double, air_rx, 0)                                                       \

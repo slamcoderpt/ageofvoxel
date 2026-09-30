@@ -163,7 +163,7 @@ void Wildlife::update(double dt) {
 		}
 		const AnimalDef &def = animal_def(R.type[a]);
 		// settle out of anything placed on top of us
-		if (!map.is_walkable((int)std::floor(R.x[a]), (int)std::floor(R.z[a]))) {
+		if (!map.walkable_at(R.x[a], R.z[a])) {
 			double px, pz;
 			if (walkable_near(R.x[a], R.z[a], px, pz)) {
 				R.x[a] = R.prev_x[a] = px;
@@ -214,7 +214,7 @@ void Wildlife::update(double dt) {
 			if (d > 0.01) {
 				const double step = std::min(d, speed * dt);
 				const double nx = R.x[a] + (dx / d) * step, nz = R.z[a] + (dz / d) * step;
-				if (map.is_walkable((int)std::floor(nx), (int)std::floor(nz))) {
+				if (map.walkable_at(nx, nz)) {
 					R.x[a] = nx;
 					R.z[a] = nz;
 				} else {

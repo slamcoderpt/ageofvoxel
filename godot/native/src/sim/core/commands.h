@@ -41,11 +41,16 @@ public:
 	void set_idle_fields(int row) { set(row, Order::idle()); }
 
 	// Give one unit an order. Returns false if the handler rejected it (the
-	// unit then goes idle) or no handler exists for the type.
+	// unit then goes idle) or no handler exists for the type. Bounds: a move /
+	// attack-move destination off the map is clamped onto its edge tile
+	// (GameMap::clamp_to_map); a NaN one is refused (false, order unchanged).
+	// move() and smart() clamp their point the same way.
 	bool order(int row, const Order &o);
 	bool idle(int row) { return order(row, Order::idle()); }
-	// Formation move: fan units out on a grid around the destination.
-	void move(const std::vector<int> &rows, double x, double z);
+	// Formation move: fan units out on a grid around the destination. `type`
+	// O_ATTACK_MOVE (Godot-only, order_b = b) gives the same slots and the
+	// same shared group path, as an attack-move.
+	void move(const std::vector<int> &rows, double x, double z, uint8_t type = O_MOVE, int32_t b = 0);
 	// Right-click semantics; target_id 0 = ground. Order types whose piece is
 	// not ported yet (no handler) fall back to moving there.
 	void smart(const std::vector<int> &rows, double x, double z, int32_t target_id);

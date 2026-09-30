@@ -165,8 +165,15 @@ workflow) and download the `aov-godot-*` artifacts from its Summary page
 executable bit in the artifact zip: `chmod +x AgeOfVoxel.x86_64` after unzipping.
 
 The controls are the browser's, plus god power hotkeys that work whatever is selected: **Z** Lightning
-Storm, **C** Bolt, **V** Meteor (then click the target; Esc cancels). A player left with no villager, none in training and less food
+Storm, **C** Bolt, **V** Meteor (then click the target; Esc cancels), and **attack-move**: with soldiers
+selected press **A** (or the Attack-Move button), then left-click the ground or the minimap: they march
+there and fight every enemy that comes into sight on the way (soldiers first, then villagers, then
+buildings), then carry on; left-clicking an enemy attacks it; Esc or right-click cancels. (With a Town
+Center selected, A still advances the age.) The enemy AI's attack waves attack-move too. A player left with no villager, none in training and less food
 than one costs is never stuck: their Town Center trains one villager for free (the AI's too).
+Soldiers on a plain right-click move fight back when an enemy strikes them from the front or
+the side (the men marching beside them join in), then carry on to where they were sent; struck
+from behind they keep going, so moving away from a fight is a retreat.
 **F3** shows the performance meter; the gear (top right) opens the
 hotkeys card with the **Graphics** row: High / Medium / Low, where Medium and Low also render the 3D
 world at 75% / 60% resolution (FSR upscale), the big saving on Retina screens. Both choices are

@@ -83,6 +83,8 @@ bool Pathfinder::nearest_walkable(int tx, int tz, int max_r, int &ox, int &oz) c
 	const GameMap &m = *map;
 	CallTimer ct(prof, "nearestWalkable");
 	if (m.is_walkable(tx, tz)) { ox = tx; oz = tz; return true; }
+	// no ring within max_r reaches the map (also keeps tx + dx from overflowing)
+	if (tx < -max_r || tz < -max_r || tx >= m.size + max_r || tz >= m.size + max_r) return false;
 	for (int r = 1; r <= max_r; r++) {
 		bool any = false;
 		int bx = 0, bz = 0, bd = 1000000000;
@@ -194,9 +196,8 @@ void Pathfinder::smooth(const std::vector<int32_t> &tiles, std::vector<int32_t> 
 
 bool Pathfinder::start_tile(double sx, double sz, int &stx, int &stz) const {
 	const GameMap &m = *map;
-	const int N = m.size;
-	stx = std::max(0, std::min(N - 1, (int)std::floor(sx / TILE)));
-	stz = std::max(0, std::min(N - 1, (int)std::floor(sz / TILE)));
+	stx = m.tile_clamp(sx / TILE);
+	stz = m.tile_clamp(sz / TILE);
 	if (!m.is_walkable(stx, stz)) {
 		int wx, wz;
 		if (nearest_walkable(stx, stz, 4, wx, wz)) { stx = wx; stz = wz; }
@@ -255,8 +256,8 @@ void Pathfinder::begin_group_field(double gx, double gz, const std::vector<Vec2d
 	field_shift_x_ = field_shift_z_ = 0;
 	const GameMap &m = *map;
 	const int N = m.size;
-	int gtx = std::max(0, std::min(N - 1, (int)std::floor(gx / TILE)));
-	int gtz = std::max(0, std::min(N - 1, (int)std::floor(gz / TILE)));
+	int gtx = m.tile_clamp(gx / TILE);
+	int gtz = m.tile_clamp(gz / TILE);
 	if (!m.is_walkable(gtx, gtz)) {
 		int wx, wz;
 		if (!nearest_walkable(gtx, gtz, 16, wx, wz)) return;
@@ -326,8 +327,8 @@ bool Pathfinder::field_path(double sx, double sz, double gx, double gz, std::vec
 	// the unit's own slot (moved with the destination when that was replaced)
 	gx += field_shift_x_;
 	gz += field_shift_z_;
-	int gtx = std::max(0, std::min(N - 1, (int)std::floor(gx / TILE)));
-	int gtz = std::max(0, std::min(N - 1, (int)std::floor(gz / TILE)));
+	int gtx = m.tile_clamp(gx / TILE);
+	int gtz = m.tile_clamp(gz / TILE);
 	if (!m.is_walkable(gtx, gtz)) {
 		int wx, wz;
 		if (!nearest_walkable(gtx, gtz, 16, wx, wz)) return false;
@@ -385,9 +386,7 @@ void Pathfinder::find_path(double sx, double sz, double gx, double gz, const Goa
 	}
 	const GameMap &m = *map;
 	const int N = m.size;
-	int stx = (int)std::floor(sx / TILE), stz = (int)std::floor(sz / TILE);
-	stx = std::max(0, std::min(N - 1, stx));
-	stz = std::max(0, std::min(N - 1, stz));
+	int stx = m.tile_clamp(sx / TILE), stz = m.tile_clamp(sz / TILE);
 	if (!m.is_walkable(stx, stz)) {
 		int wx, wz;
 		if (nearest_walkable(stx, stz, 4, wx, wz)) { stx = wx; stz = wz; }
@@ -398,10 +397,10 @@ void Pathfinder::find_path(double sx, double sz, double gx, double gz, const Goa
 		gtx = (int)std::floor(rect->tx + rect->w / 2);
 		gtz = (int)std::floor(rect->tz + rect->h / 2);
 	} else {
-		gtx = (int)std::floor(gx / TILE);
-		gtz = (int)std::floor(gz / TILE);
-		gtx = std::max(0, std::min(N - 1, gtx));
-		gtz = std::max(0, std::min(N - 1, gtz));
+		// bounds: a goal off the map ends the path on the edge tile, not off it; NaN: no path
+		if (!m.clamp_to_map(gx, gz)) ok = false;
+		gtx = m.tile_clamp(gx / TILE);
+		gtz = m.tile_clamp(gz / TILE);
 		if (!m.is_walkable(gtx, gtz)) {
 			int wx, wz;
 			if (!nearest_walkable(gtx, gtz, 16, wx, wz)) ok = false;

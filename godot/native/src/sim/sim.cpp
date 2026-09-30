@@ -131,13 +131,15 @@ std::vector<int32_t> Sim::spawn_block(int type, int owner, int count, double x, 
 		const double oz = (row - (rows - 1) / 2) * spacing + rng.range(-jitter, jitter);
 		double wx = x + ox * c + oz * s, wz = z - ox * s + oz * c;
 		int wtx, wtz;
-		const int ftx = (int)std::floor(wx), ftz = (int)std::floor(wz);
-		if (pathfinder.nearest_walkable(ftx, ftz, 6, wtx, wtz) && !map().is_walkable(ftx, ftz)) {
-			wx = wtx + 0.5;
-			wz = wtz + 0.5;
+		if (map().in_world(wx, wz)) { // (off the map: units.spawn's bounds policy)
+			const int ftx = (int)std::floor(wx), ftz = (int)std::floor(wz);
+			if (pathfinder.nearest_walkable(ftx, ftz, 6, wtx, wtz) && !map().is_walkable(ftx, ftz)) {
+				wx = wtx + 0.5;
+				wz = wtz + 0.5;
+			}
 		}
 		int r = units.spawn(type, owner, wx, wz, rot);
-		out.push_back(entities.units.id[r]);
+		if (r >= 0) out.push_back(entities.units.id[r]);
 	}
 	return out;
 }

@@ -544,6 +544,7 @@ void economy_after(Sim &sim, const SceneCtx &ctx) {
 		double wx, wz;
 		if (!open_ground(sim, t.res.x + (ex - t.res.x) * t.k + t.dx, t.res.z + (ez - t.res.z) * t.k + t.dz, wx, wz)) continue;
 		const int u = sim.units.spawn(U_VILLAGER, PLAYER, wx, wz, 0);
+		if (u < 0) continue;
 		// (set up by hand: a farm already has its farmer, so a gather order
 		// onto it would be refused)
 		const int res_type = t.res.farm ? RES_FOOD : t.res.res_type;

@@ -87,6 +87,7 @@ public:
 	bool order(int64_t id, const Dictionary &order); // {type: "idle"|"move"|..., target, x, z}
 	void order_move(const PackedInt32Array &ids, double x, double z); // formation move
 	void order_idle(const PackedInt32Array &ids);
+	void order_attack_move(const PackedInt32Array &ids, double x, double z); // formation attack-move (Godot-only)
 	void smart(const PackedInt32Array &ids, double x, double z, int64_t target_id);
 	bool move_to(int64_t id, double x, double z, double range);
 	PackedVector2Array find_path(double sx, double sz, double gx, double gz);

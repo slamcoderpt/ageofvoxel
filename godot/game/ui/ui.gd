@@ -27,7 +27,8 @@ const Settings := preload("res://game/ui/settings.gd")
 const AGES := ["Archaic", "Classical", "Heroic", "Mythic"]
 const ROMAN := ["I", "II", "III", "IV"]
 const BUILD_MENU := ["house", "farm", "storehouse", "temple", "barracks", "town_center"]
-const ORDER_NAMES := {1: "Moving", 2: "Gathering", 3: "Returning", 4: "Worshipping", 5: "Building", 6: "Attacking"}
+const ORDER_NAMES := {1: "Moving", 2: "Gathering", 3: "Returning", 4: "Worshipping", 5: "Building", 6: "Attacking", 7: "Attack-moving"}
+const AM_COLOR := Color("#ff7a30")   # attack-move: cursor ring and order marker
 const RES_NAMES := ["food", "wood", "gold"]
 const POWER_ICONS := {"lightning_storm": "storm", "bolt": "bolt", "meteor": "meteor"}
 const HEIGHT := {"villager": 2.0, "hoplite": 2.25, "toxotes": 2.05, "hippikon": 2.75, "minotaur": 3.4, "hero": 3.7, "cyclops": 5.0, "centaur": 2.9, "medusa": 2.6}
@@ -80,11 +81,12 @@ var _cmd_sig := ""
 var _first := true
 var _scale := 1.0
 var _fog_on := false
-var _mode := {}                  # {} | {kind: "power", id} | {kind: "place", type, builders}
+var _mode := {}                  # {} | {kind: "power", id} | {kind: "place", type, builders} | {kind: "attack_move"}
 var _ghost: MeshInstance3D
 var _ghost_ok := false
 var _ghost_tile := Vector2i.ZERO
 var _range_ring: MeshInstance3D
+var _am_ring: MeshInstance3D     # attack-move targeting: a ring under the cursor
 var _rings: MultiMeshInstance3D
 var _markers: Array = []         # [{mi, t}]
 var _drag := {}                  # {start, shift, active}
@@ -181,6 +183,12 @@ func setup(g: Node) -> void:
 	_range_ring.visible = false
 	_range_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_range_ring)
+	_am_ring = MeshInstance3D.new()
+	_am_ring.mesh = _ring_mesh(0.7, 1.0, 40)
+	_am_ring.material_override = _flat_material(Color(AM_COLOR, 0.85), false)
+	_am_ring.visible = false
+	_am_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_am_ring)
 	_set_hud_visible(hud_visible)
 	_refresh_all()
 
@@ -383,7 +391,7 @@ func _show_result(winner: int, time: float) -> void:
 	result = {"won": won, "kicker": "%s  ·  %s Age  ·  %02d:%02d" % [p.get("god", "Zeus"), AGES[clampi(int(p.get("age", 0)), 0, 3)], s / 60, s % 60],
 		"text": "The enemy Town Center has fallen." if won else "Your last Town Center has fallen."}
 	result_shown = true
-	_mode = {}
+	_cancel_mode()
 	_redraw()
 
 # ---- stats (twice a second) -------------------------------------------------------
@@ -598,6 +606,8 @@ func _commands_for() -> Array:
 				list.append({"key": str(d.hotkey), "tex": _portraits.building(t, me), "title": "Build %s" % d.name, "cost": d.cost,
 					"enabled": ok_age and _can_afford(d.cost), "action": "build", "arg": t,
 					"warn": "" if ok_age else "Requires the %s Age" % AGES[int(d.min_age)]})
+		if not _military(us).is_empty():
+			list.append({"key": "A", "svg": "attack", "title": "Attack-Move (A)", "enabled": true, "action": "attack_move", "slot": 13})
 		list.append({"key": "X", "svg": "stop", "title": "Stop", "enabled": true, "action": "stop", "slot": 14})
 	else:
 		var b: Dictionary = sel[0]
@@ -623,6 +633,10 @@ func _commands_for() -> Array:
 			if i < 15:
 				slots[i] = c
 	return slots
+
+## Soldiers among unit dicts / ids (not villagers, with an attack): the ones an attack-move moves.
+func _military(us: Array) -> Array:
+	return us.filter(func(e): var d: Dictionary = _defs[e.type]; return not bool(d.get("gatherer", false)) and float(d.attack.get("damage", 0)) > 0)
 
 func _owner_fields(d: Dictionary, owner: int) -> void:
 	var p: Dictionary = sim.get_player(owner)
@@ -1020,7 +1034,10 @@ func _set_hover(z: Dictionary) -> void:
 
 func _minimap_click(p: Vector2, button: int) -> void:
 	var w: Vector2 = minimap.to_world(p - _back.dia_center())
-	if button == MOUSE_BUTTON_LEFT:
+	if button == MOUSE_BUTTON_LEFT and _mode.get("kind", "") == "attack_move":
+		_attack_move_at(w.x, w.y, 0)
+		_mm_drag = false
+	elif button == MOUSE_BUTTON_LEFT:
 		game.camera.target.x = w.x
 		game.camera.target.z = w.y
 	elif button == MOUSE_BUTTON_RIGHT:
@@ -1083,7 +1100,7 @@ func _click_zone(id: String, arg) -> void:
 		"mb:menu":
 			menu_open = not menu_open
 			tooltip = {} if not menu_open else {"title": "Hotkeys", "lines": [". idle villager  ·  H Town Center", "Ctrl+1..9 assign group  ·  1..9 recall",
-				"Q/E/F/S/R/B build  ·  X stop", "Space / arrows: pan  ·  wheel: zoom", "F1 HUD  ·  F3 performance meter"], "menu": true, "anchor": Rect2(_back.menubar_rect().position + Vector2(0, 50), Vector2(10, 1))}
+				"Q/E/F/S/R/B build  ·  X stop", "A attack-move (army)  ·  A age (Town Center)", "Space / arrows: pan  ·  wheel: zoom", "F1 HUD  ·  F3 performance meter"], "menu": true, "anchor": Rect2(_back.menubar_rect().position + Vector2(0, 50), Vector2(10, 1))}
 		"rb:idle":
 			_cycle_idle()
 		"rb:army":
@@ -1113,6 +1130,11 @@ func _run_command(c: Dictionary) -> void:
 			_begin_place(str(c.arg), builders)
 		"stop":
 			sim.order_idle(PackedInt32Array(_own_units()))
+		"attack_move":
+			_cancel_mode()
+			_mode = {"kind": "attack_move"}
+			Input.set_default_cursor_shape(Input.CURSOR_CROSS)
+			message("Attack-move: click the ground or the minimap (Esc cancels)")
 		"train":
 			var r: Dictionary = sim.train(sel[0].id, str(c.arg))
 			if not r.ok: message(r.reason)
@@ -1139,6 +1161,11 @@ func _unhandled_input(e: InputEvent) -> void:
 		if e.button_index == MOUSE_BUTTON_LEFT:
 			if _mode.get("kind", "") == "place":
 				_confirm_place(e.shift_pressed)
+				return
+			if _mode.get("kind", "") == "attack_move":
+				var g = pick_ground(e.position)
+				if g != null:
+					_attack_move_at(g.x, g.y, pick_entity(e.position))
 				return
 			if _mode.get("kind", "") == "power":
 				var g = pick_ground(e.position)
@@ -1256,6 +1283,29 @@ func _order_at(x: float, z: float, target: int) -> void:
 	if any:
 		_marker(x, z, Color("#ffd84a"))
 
+## Attack-move targeting click: an enemy under the cursor is attacked (the
+## right-click order), anywhere else the soldiers attack-move there (the
+## rest of the selection just moves).
+func _attack_move_at(x: float, z: float, target: int) -> void:
+	_cancel_mode()
+	var own := _own_units()
+	if own.is_empty():
+		return
+	if target != 0 and sim.is_enemy(me, _owner_of(target)):
+		_order_at(x, z, target)
+		return
+	var mil := []
+	var rest := []
+	for id in own:
+		var d: Dictionary = _defs[str(sim.get_unit(id).get("type", "villager"))]
+		(rest if bool(d.get("gatherer", false)) or float(d.attack.get("damage", 0)) <= 0 else mil).append(id)
+	if not mil.is_empty():
+		sim.order_attack_move(PackedInt32Array(mil), x, z)
+	if not rest.is_empty():
+		sim.order_move(PackedInt32Array(rest), x, z)
+	_marker(x, z, AM_COLOR)
+	message("Attack-move")
+
 func _marker(x: float, z: float, c: Color) -> void:
 	var mi := MeshInstance3D.new()
 	mi.mesh = _ring_mesh(0.5 / 0.7, 1.0, 24)
@@ -1315,8 +1365,10 @@ func _key(e: InputEventKey) -> void:
 	if ch.length() != 1:
 		return
 	# god power hotkeys (Z / C / V, from the power defs): letters no command
-	# grid slot uses (units Q/W/E/R/T, buildings T/E/S/F/R/B, A age, X stop),
-	# so they work whatever is selected; same path as clicking the button
+	# grid slot uses (units Q/W/E/R/T, buildings T/E/S/F/R/B, X stop, A: age
+	# with a Town Center selected, attack-move with soldiers selected; the two
+	# never share a grid), so they work whatever is selected; same path as
+	# clicking the button
 	for p in powers:
 		if str(p.def.get("hotkey", "")) == ch:
 			_click_zone("power", p.key)
@@ -1418,17 +1470,28 @@ func _cancel_mode() -> void:
 	if _ghost:
 		_ghost.queue_free()
 		_ghost = null
+	if _mode.get("kind", "") == "attack_move":
+		Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 	_mode = {}
 	_range_ring.visible = false
+	_am_ring.visible = false
 	_hud_t = 0.0
 
 func _update_ghost() -> void:
 	var kind: String = _mode.get("kind", "")
 	if kind == "" :
 		_range_ring.visible = false
+		_am_ring.visible = false
 		return
 	var mp := get_viewport().get_mouse_position()
 	var g = pick_ground(mp)
+	if kind == "attack_move":
+		_am_ring.visible = g != null
+		if g != null:
+			var pulse := 0.85 + 0.15 * sin(Time.get_ticks_msec() * 0.008)
+			_am_ring.position = Vector3(g.x, sim.height_at(g.x, g.y) + 0.1, g.y)
+			_am_ring.scale = Vector3(pulse, 1, pulse)
+		return
 	if kind == "power":
 		if g == null:
 			_range_ring.visible = false

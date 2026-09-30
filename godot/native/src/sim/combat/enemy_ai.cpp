@@ -20,6 +20,8 @@ static const int METEOR_BUILDINGS = 2;    // enemy buildings a Meteor must hit
 static const int METEOR_UNITS = 8;        // ... or enemy units
 static const double BOLT_SPARE_FAVOR = 70; // Bolt a plain (non-myth) unit only with this much favor
 static const int MAX_CENTRES = 64;        // candidate strike points tried per power
+static const double STRAY_DIST = 30;      // idle soldiers this far from our Town Center rejoin the attack
+static const int OVERDUE_MIN = 6;         // men an overdue wave needs at least
 
 void EnemyAI::update(double dt) {
 	if (!enabled) return;
@@ -135,21 +137,35 @@ void EnemyAI::update(double dt) {
 	std::vector<int> idle_army;
 	for (int u : army)
 		if (U.order_type[u] == O_IDLE || (U.order_type[u] == O_ATTACK && (U.order_b[u] & ATK_AUTO))) idle_army.push_back(u);
-	if (S.time >= next_wave_at && (int)idle_army.size() >= wave_size) {
+	// Godot-only: a wave overdue by a whole interval (the army cannot grow to
+	// wave_size: a starved economy, a population cap) goes with what there is
+	const bool overdue = S.godot_rules && S.time >= next_wave_at + 120 / aggression && (int)idle_army.size() >= OVERDUE_MIN;
+	if (S.time >= next_wave_at && ((int)idle_army.size() >= wave_size || overdue)) {
 		const int t = find_target(tc);
 		if (t >= 0) {
 			const int32_t tid = B.id[t];
 			WaveLog w{ S.time, tid, B.x[t], B.z[t], {} };
 			for (int u : idle_army) w.units.push_back(U.id[u]);
 			waves.push_back(std::move(w));
-			for (int u : idle_army) {
-				Order o = Order::with_target(O_ATTACK, tid);
-				o.b = ATK_THEN_BUILDINGS;
-				S.commands.order(u, o);
-			}
+			if (S.godot_rules) // Godot-only: attack-move there, fighting what they meet on the way
+				S.commands.move(idle_army, B.x[t], B.z[t], O_ATTACK_MOVE, AM_THEN_BUILDINGS);
+			else
+				for (int u : idle_army) {
+					Order o = Order::with_target(O_ATTACK, tid);
+					o.b = ATK_THEN_BUILDINGS;
+					S.commands.order(u, o);
+				}
 			wave_size = std::min(40, wave_size + 4);
 			next_wave_at = S.time + 120 / aggression;
 		}
+	} else if (S.godot_rules) {
+		// Godot-only: men of a wave left idle far from home (a Lightning Storm
+		// drops the men it throws idle) press on instead of standing about
+		std::vector<int> strays;
+		for (int u : idle_army)
+			if (U.order_type[u] == O_IDLE && jsm::hypot(U.x[u] - B.x[tc], U.z[u] - B.z[tc]) > STRAY_DIST) strays.push_back(u);
+		const int t = strays.empty() ? -1 : find_target(tc);
+		if (t >= 0) S.commands.move(strays, B.x[t], B.z[t], O_ATTACK_MOVE, AM_THEN_BUILDINGS);
 	}
 }
 
@@ -174,8 +190,8 @@ void EnemyAI::use_powers(const std::vector<int> &army, const std::vector<int> &b
 	const int CELL = 4, M = (map.size + CELL - 1) / CELL;
 	reach_.assign((size_t)M * M, 0);
 	auto mark = [&](double x, double z, double r) {
-		const int c0x = std::max(0, (int)std::floor((x - r) / CELL)), c1x = std::min(M - 1, (int)std::floor((x + r) / CELL));
-		const int c0z = std::max(0, (int)std::floor((z - r) / CELL)), c1z = std::min(M - 1, (int)std::floor((z + r) / CELL));
+		int c0x, c1x, c0z, c1z;
+		if (!cell_span(x - r, x + r, CELL, M, c0x, c1x) || !cell_span(z - r, z + r, CELL, M, c0z, c1z)) return;
 		for (int cz = c0z; cz <= c1z; cz++)
 			for (int cx = c0x; cx <= c1x; cx++) {
 				const double dx = (cx + 0.5) * CELL - x, dz = (cz + 0.5) * CELL - z;
@@ -185,8 +201,8 @@ void EnemyAI::use_powers(const std::vector<int> &army, const std::vector<int> &b
 	for (int u : army) mark(U.x[u], U.z[u], REACH_ARMY);
 	for (int b : buildings) mark(B.x[b], B.z[b], REACH_BASE);
 	auto in_reach = [&](double x, double z) {
-		const int cx = (int)std::floor(x / CELL), cz = (int)std::floor(z / CELL);
-		return cx >= 0 && cz >= 0 && cx < M && cz < M && reach_[(size_t)cz * M + cx];
+		if (!(x >= 0 && z >= 0 && x < M * CELL && z < M * CELL)) return false; // (checked before the cast)
+		return reach_[(size_t)(int)(z / CELL) * M + (int)(x / CELL)] != 0;
 	};
 	// enemy units in reach (on the ground: men carried up a storm are spoken for)
 	std::vector<int> foes;

@@ -263,7 +263,10 @@ func _pcol(o: int) -> Color:
 		_pcols[o] = Color8((c >> 16) & 255, (c >> 8) & 255, c & 255)
 	return _pcols[o]
 
-## HUD-local point (relative to the diamond centre, in HUD px) -> world x/z.
+## HUD-local point (relative to the diamond centre, in HUD px) -> world x/z,
+## clamped onto the map (a click on the diamond's rim or its button ring can
+## fall just outside it; the sim clamps orders too: PORTING.md "Map bounds").
 func to_world(local: Vector2) -> Vector2:
 	var r := local.rotated(-rotation)
-	return (r / px + Vector2(0.5, 0.5)) * float(N)
+	var w := (r / px + Vector2(0.5, 0.5)) * float(N)
+	return w.clamp(Vector2.ZERO, Vector2(N - 0.01, N - 0.01))

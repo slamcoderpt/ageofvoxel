@@ -292,7 +292,7 @@ func _draw_topright() -> void:
 		["pause", "play" if ui.user_paused else "pause", {"title": "Pause", "lines": ["Pause or resume the game"]}],
 		["obj", "scroll", {"title": "Objectives", "lines": ["Destroy the enemy Town Center"]}],
 		["menu", "gear", {"title": "Hotkeys", "lines": [". idle villager  ·  H Town Center", "Ctrl+1..9 assign group  ·  1..9 recall", "Q/E/F/S/R/B build  ·  X stop",
-			_power_keys_line()]}],
+			"A attack-move (army)  ·  A age (Town Center)", _power_keys_line()]}],
 	]
 	for i in btns.size():
 		var c := Vector2(bx + 15 + i * 42, 4 + 4 + 15)
