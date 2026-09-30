@@ -16,6 +16,19 @@
 // order_x = repath timer, order_a = buildingId (0 = undefined), order_b bits:
 // ATK_THEN_BUILDINGS (thenBuildings), ATK_AUTO (auto).
 //
+// Godot-only (Sim::godot_rules; the browser is frozen):
+// - A unit on a plain move (not a villager) that is hit by an enemy unit
+//   within its sight, ahead of it or beside it (dot(move dir, dir to the
+//   attacker) > RETALIATE_DOT), stops and fights back; one hit from behind
+//   (it is moving away: a retreat) is ignored and it keeps going. The men
+//   on a plain move within RALLY_RADIUS of it for whom the attacker is also
+//   ahead or beside turn with it (rally_to: one hash query per retaliation).
+// - engage(): an O_ATTACK (ATK_AUTO) that remembers what to resume
+//   (units.am_resume / am_x / am_z). The fight ends when the foe dies or has
+//   been beyond the unit's sight for AM_LOST_TIME s; then the unit takes on
+//   an enemy within NEXT_FOE_RADIUS that is fighting (the attacker's
+//   comrades) unless it is behind, else walks on to its destination. Any new order (Commands::set) forgets the resume.
+//
 // Visual-only parts of the JS stay with the renderer (game/combat): hit
 // sparks, dust, ground scars, dropped gear (BattleFX / Debris), health bars
 // and selection rings (Overlays), and the stagger lean (combat.lean), which
@@ -39,6 +52,11 @@ constexpr double STUCK_TIME = 9;     // s an arrow stays stuck in the ground
 constexpr int STUCK_MAX = 400;
 
 enum AttackFlag : int32_t { ATK_THEN_BUILDINGS = 1, ATK_AUTO = 2 };
+enum AmResume : uint8_t { AMR_NONE = 0, AMR_MOVE = 1 };
+constexpr double AM_LOST_TIME = 2;      // s a foe may stay out of sight before the fight is dropped
+constexpr double RETALIATE_DOT = -0.25; // moving units fight back unless hit from behind
+constexpr double RALLY_RADIUS = 4;      // the men beside one who fights back join him
+constexpr double NEXT_FOE_RADIUS = 4;   // a fighting enemy this close keeps a man in the fight
 enum DamageKind : uint8_t { DK_DEFAULT = 0, DK_ARROW = 1, DK_MELEE = 2 };
 
 // The JS `attacker` argument of combat.damage: a unit, a building, or a
@@ -105,6 +123,12 @@ private:
 	void add_attacker(int32_t id);
 	void clear_attackers();
 	bool start_attack(int urow, const Order &o);
+	void engage(int urow, int32_t target_id, uint8_t resume);
+	void resume(int urow);
+	void rally_to(int urow, int32_t attacker_id, double ax, double az);
+	std::vector<int> rally_;
+	bool hit_ahead(int urow, double ax, double az) const;
+	static bool ahead(double mx, double mz, double tx, double tz);
 };
 
 } // namespace aov

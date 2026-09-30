@@ -661,6 +661,7 @@ Dictionary AovSim::get_unit(int64_t id) const {
 	d["arrived"] = (bool)U.arrived[r];
 	d["order"] = aov::order_name(U.order_type[r]);
 	d["target"] = U.order_target[r];
+	d["resume"] = U.am_resume[r]; // Godot-only fight-then-walk-on (Combat::engage): 0 none, 1 move
 	d["anim"] = aov::anim_name(U.anim_state[r]);
 	d["repaths"] = U.repaths[r];
 	PackedVector2Array path;

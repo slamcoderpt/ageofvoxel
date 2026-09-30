@@ -45,6 +45,7 @@ void Commands::set(int r, const Order &o) {
 	U.order_a[r] = o.a;
 	U.order_b[r] = o.b;
 	U.order_c[r] = o.c;
+	U.am_resume[r] = 0; // (a new order ends any fight-then-resume, see Combat::engage)
 }
 
 bool Commands::order(int r, const Order &o) {

@@ -167,6 +167,9 @@ executable bit in the artifact zip: `chmod +x AgeOfVoxel.x86_64` after unzipping
 The controls are the browser's, plus god power hotkeys that work whatever is selected: **Z** Lightning
 Storm, **C** Bolt, **V** Meteor (then click the target; Esc cancels). A player left with no villager, none in training and less food
 than one costs is never stuck: their Town Center trains one villager for free (the AI's too).
+Soldiers on a plain right-click move fight back when an enemy strikes them from the front or
+the side (the men marching beside them join in), then carry on to where they were sent; struck
+from behind they keep going, so moving away from a fight is a retreat.
 **F3** shows the performance meter; the gear (top right) opens the
 hotkeys card with the **Graphics** row: High / Medium / Low, where Medium and Low also render the 3D
 world at 75% / 60% resolution (FSR upscale), the big saving on Retina screens. Both choices are

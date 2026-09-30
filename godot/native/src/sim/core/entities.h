@@ -123,6 +123,12 @@ enum UnitFlag : uint8_t { UF_MOVING = 1, UF_DEAD = 2, UF_ARRIVED = 4, UF_CARRY =
 	X(double, stag_k, 1)          /* combat_stagK */                           \
 	X(double, melee_t, NAN)       /* combat_meleeT (last melee blow taken) */  \
 	X(uint8_t, kit, 255)          /* units_kit (battle scene), 255 = unset */  \
+	/* combat, Godot-only: an attack that resumes a move when the fight is */ \
+	/* over (Combat::engage); cleared by every Commands::set */               \
+	X(uint8_t, am_resume, 0)      /* AmResume: 0 none, 1 move */               \
+	X(double, am_x, 0)            /* the destination to resume */             \
+	X(double, am_z, 0)                                                         \
+	X(double, am_lost, 0)         /* s the foe has been out of sight */        \
 	/* god powers (sim/godpowers): thrown units, u.gp_air + airY / airRx / airRz */ \
 	X(double, air_y, 0)                                                        \
 	X(double, air_rx, 0)                                                       \

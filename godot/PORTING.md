@@ -616,8 +616,28 @@ favor to spare; never a villager). No random draws: ties go to the first
 candidate in row order. The HUD feeds "<name> uses the <power> God Power!"
 when an enemy casts.
 
+**Fight back while moving** (Godot-only, `Combat::damage` / `engage`,
+event-driven: nothing runs for a unit that is not hit): a unit on a plain
+`move` (not a villager, not leashed) struck by an enemy *unit* within its
+sight, ahead of it or beside it (dot(direction of travel = towards its
+current waypoint, direction to the attacker) > -0.25), stops and attacks it;
+the men of the same owner on a plain move within 4 tiles for whom the
+attacker is also ahead or beside turn with it (one hash query per
+retaliation). The attack remembers the move (`am_resume` / `am_x` / `am_z`
+unit columns; any new order clears them in `Commands::set`): when the foe
+dies the man takes on an enemy within 4 tiles that is fighting and not
+behind him (the attacker's comrades), else walks on to his destination; a
+foe beyond his sight for 2 s is dropped the same way. Struck from behind
+(moving away from the fight) he keeps going: a move away is a retreat.
+Town Center arrows never stop a move. The browser's rule (an AI unit on a
+move fights back from any side, and stays) applies with the rules off.
+`get_unit(id).resume` (0 none, 1 move). Checked by
+`godot --headless --path godot -s res://game/core/attackmove_check.gd -- --scene=skirmish`
+("ATTACKMOVE PASS|FAIL <case>", `ATTACKMOVE_RESULT {json}`, exit = failures).
+
 `set_godot_rules(on)` (default on, kept across `new_game`): off = the
-browser's rules only (no AI god powers, no free villager); `simcheck.gd`
+browser's rules only (no AI god powers, no free villager, no fighting back
+while moving); `simcheck.gd`
 turns it off for `check-sim.mjs`, and `--godot_rules=0` does it for a run
 (A/B benches: the AI's storms thin the stress armies, so its numbers move).
 
@@ -766,3 +786,5 @@ Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
   Center, the free villager, the enemy AI's god powers, god power hotkeys
   Z / C / V. Checks: `aivai.gd`, `softlock_check.gd`, `playtest.gd`,
   `check-mapgen.mjs`.
+- Done (Godot-only combat): units on a plain move fight back unless struck
+  from behind, then walk on (`attackmove_check.gd`).
