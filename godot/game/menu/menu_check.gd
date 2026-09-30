@@ -108,6 +108,11 @@ func _run() -> void:
 	var ui: Node = main.pieces.get("ui")
 	_check("no in-game UI behind the menu (no HUD, hotkeys or world clicks)", ui == null)
 	_check("camera is the menu's", not main.camera.user_control)
+	# the hero shot: low evening camera, the fleet off the beach, the evening sky
+	_check("hero shot: low camera", rad_to_deg(main.camera.pitch) < 20.0, "%.1f" % rad_to_deg(main.camera.pitch))
+	var boats: PackedFloat32Array = main.sim.get_economy().get("boats", PackedFloat32Array())
+	_check("hero shot: the fleet is out", boats.size() >= 30, str(boats.size() / 10))
+	_check("no Load row: Quick Match instead", menu._tiles.has("quick") and not menu._tiles.has("load"))
 	await _frames(45)  # the intro
 
 	# keyboard: the first arrow focuses Skirmish, the next ones move between tiles

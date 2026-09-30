@@ -11,9 +11,9 @@ extends Button
 ##
 ## States: hover (eased `hover_k`), pressed (draw mode), keyboard / joypad
 ## focus (a pulsing gold ring, only while the menu is in keyboard mode:
-## `menu.kb_mode`), unavailable (`available = false`: dimmed art, muted
-## title, a "COMING SOON" plate; still focusable and pressable, the menu
-## answers with a notice).
+## `menu.kb_mode`), unavailable (`available = false`: softer art, a muted
+## title, no label; on hover a quiet "Not available in this version." line;
+## still focusable and pressable, the menu answers with a notice).
 
 const S := preload("res://game/ui/hud_style.gd")
 const Art := preload("res://game/menu/art.gd")
@@ -158,7 +158,7 @@ func draw_face(ci: Control) -> void:
 		var ar := _art_rect(r)
 		var tex := Art.texture(art, Vector2i(ar.size))
 		if tex:
-			var a := (0.46 + 0.4 * hk) if available else (0.17 + 0.08 * hk)
+			var a := (0.46 + 0.4 * hk) if available else (0.3 + 0.1 * hk)
 			var dst := Rect2(ar.position + (ar.size - Vector2(tex.get_size())) * 0.5 + o, tex.get_size())
 			ci.draw_texture_rect(tex, dst, false, Color(1, 1, 1, a))
 	if style == "feature":
@@ -185,13 +185,10 @@ func draw_face(ci: Control) -> void:
 					S.text(ci, S.font("sans"), Vector2(24, by) + o, line, 20, Color(S.INK, 0.92), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.8)
 					by += 25.0
 			if not available:
-				_draw_soon(ci, Vector2(r.size.x - 22, 20))
 				if hk > 0.05 and blurb == "":
 					S.text(ci, S.font("sans"), Vector2(22, ty - 36), "Not available in this version.", 17, Color(S.MUTED, hk), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.8)
 		"bar":
 			S.text(ci, f, Vector2(36, r.size.y * 0.5 + 8) + o, title, 22, col, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.9, 0.8)
-			if not available:
-				_draw_soon(ci, Vector2(r.size.x - 18, r.size.y * 0.5 - 12))
 		"seg":
 			var sc := S.GOLD if selected else col
 			S.text(ci, f, Vector2(0, r.size.y * 0.5 + 6) + o, title, 16, sc, HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 0.9, 0.6)
@@ -207,7 +204,7 @@ func draw_face(ci: Control) -> void:
 func _art_rect(r: Rect2) -> Rect2:
 	if art == "skirmish":
 		return Rect2(4, 4, r.size.x - 8, r.size.y - 8)
-	return Rect2(r.size.x * 0.05, 2, r.size.x * 0.9, r.size.y * 0.7)
+	return Rect2(r.size.x * 0.04, 8, r.size.x * 0.92, r.size.y - 88)
 
 ## Retold's frames end in small cast scrolls at the corners.
 func _draw_corners(ci: Control, r: Rect2, hk: float) -> void:
@@ -228,17 +225,6 @@ func _draw_corners(ci: Control, r: Rect2, hk: float) -> void:
 			ci.draw_arc(p + d + Vector2(sx * (L + 2.5), sy * 2.5), 2.5, 0, TAU, 12, cc, 1.0, true)
 			ci.draw_arc(p + d + Vector2(sx * 2.5, sy * (L + 2.5)), 2.5, 0, TAU, 12, cc, 1.0, true)
 		S.boss(ci, p + Vector2(sx, sy) * 1.5, 2.6)
-
-func _draw_soon(ci: Control, right_top: Vector2) -> void:
-	var f := S.font("title7")
-	var s := "COMING SOON"
-	var w := S.text_width(f, s, 11, 1.6) + 22.0
-	var rr := Rect2(right_top - Vector2(w, 0), Vector2(w, 24))
-	ci.draw_rect(rr.grow(1), Color(0, 0, 0, 0.6))
-	ci.draw_rect(rr, Color("#0b1a1f"))
-	ci.draw_rect(rr, Color(S.BRONZE, 0.9), false, 1.0)
-	ci.draw_rect(rr.grow(-2), Color(S.BRONZE_DK, 0.9), false, 1.0)
-	S.text(ci, f, Vector2(rr.position.x + 11, rr.position.y + 16.5), s, 11, S.MUTED, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.8, 1.6)
 
 func _draw_feature(ci: Control, r: Rect2, hk: float, o: Vector2) -> void:
 	if pages.is_empty():

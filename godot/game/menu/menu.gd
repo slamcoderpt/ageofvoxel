@@ -3,8 +3,9 @@ extends Node
 ## Mythology: Retold's main menu in our HUD style. The coast town plays live
 ## behind it (the C++ "coast" setup, no AI, no HUD) under a slow drifting
 ## camera; over it: the top bar with the logo and tabs, the Skirmish tile,
-## Campaign / Multiplayer (coming soon), a feature carousel, Load (coming
-## soon) / Options / Quit, a status plate and notices.
+## Campaign / Multiplayer (unavailable: softer art, a notice when pressed),
+## a feature carousel, Quick Match / Options / Quit, a status plate and
+## notices.
 ##
 ## Loaded as a piece in every scene (main.gd PIECE_ORDER) and does nothing
 ## unless the scene is "menu".
@@ -32,6 +33,7 @@ const Flow := preload("res://game/menu/flow.gd")
 const Options := preload("res://game/menu/options.gd")
 const PANEL := preload("res://game/ui/panel.gdshader")
 const LOGO := preload("res://game/menu/logo.gdshader")
+const SKY := preload("res://game/menu/menu_sky.gdshader")
 
 const VERSION := "Age of Voxel · Godot build"
 
@@ -46,6 +48,7 @@ var _layer: CanvasLayer
 var _root: Control         # CSS px, scaled
 var _ui: Control           # the menu's own controls (hidden under a screen)
 var _shade: Control
+var _sunglow: Control
 var _topbar: ColorRect
 var _top: Control
 var _logo: Control
@@ -64,7 +67,46 @@ var _anchor := {}          # camera anchor: x, z, distance, pitch, yaw
 
 ## The scene setup: the coast town (C++), as the "coast" scene builds it.
 static func scene_setup(g: Node) -> Dictionary:
-	return g.sim.setup_scene("coast", g.scene_opts())
+	var ctx: Dictionary = g.sim.setup_scene("coast", g.scene_opts())
+	var m: Node = g.pieces.get("menu")
+	if m and m.has_method("_spawn_fleet"):
+		m._spawn_fleet()
+	return ctx
+
+## The fleet: [screen x, screen y (1920x1080 frame at the anchor), heading]
+const FLEET := [Vector3(1180, 880, 0.15), Vector3(1450, 925, -0.35), Vector3(1730, 870, 0.3)]
+
+## A small fleet fishes off the beach, below the temple: each boat
+## goes where its screen point's ray meets the sea (the anchor's camera), or
+## is pushed out to sea until it floats.
+func _spawn_fleet() -> void:
+	var sim: Object = game.sim
+	var an := _hero_anchor()
+	var yr := deg_to_rad(float(an.yaw))
+	var pr := deg_to_rad(float(an.pitch))
+	var tgt := Vector3(an.x, sim.smooth_height_at(an.x, an.z), an.z)
+	var pos := tgt + Vector3(sin(yr) * cos(pr), sin(pr), cos(yr) * cos(pr)) * float(an.distance)
+	var fwd := (tgt - pos).normalized()
+	var right := Vector3(cos(yr), 0.0, -sin(yr))
+	var up := right.cross(fwd)
+	var ty := tan(deg_to_rad(17.0))
+	var tx := ty * 16.0 / 9.0
+	var wl: float = sim.get_water_level()
+	for b: Vector3 in FLEET:
+		var ray: Vector3 = fwd + right * (b.x / 960.0 - 1.0) * tx + up * (1.0 - b.y / 540.0) * ty
+		if ray.y >= -0.01:
+			continue
+		var p: Vector3 = pos + ray * ((wl - pos.y) / ray.y)
+		var out := Vector3(sin(yr), 0.0, cos(yr))   # towards the camera: out to sea
+		var n := 0
+		while n < 40 and sim.height_at(p.x, p.z) >= wl - 0.5:
+			p += out * 0.5
+			n += 1
+		# each boat gets its own rich shoal where it stands: the boats keep
+		# fishing there (they sail to the nearest free shoal) instead of
+		# wandering off to the scene's own shoals
+		sim.spawn_shoal(p.x, p.z, 1.0e6)
+		sim.spawn_boat(1, p.x, p.z, yr + PI * 0.5 + b.z)
 
 func setup(g: Node) -> void:
 	game = g
@@ -77,6 +119,10 @@ func setup(g: Node) -> void:
 	capturing = g.args.has("out") or AovArgs.flag(g.args, "quit", false)
 	g.camera.user_control = false
 	g.camera.edge_scroll = false
+	if g.args.has("menu_hero"):
+		var hc := str(g.args.menu_hero).split(",")
+		HERO_YAW = float(hc[0]); HERO_PITCH = float(hc[1]); HERO_DIST = float(hc[2]); HERO_SHIFT = Vector2(float(hc[3]), float(hc[4]))
+	_apply_mood()
 	_build()
 	if not AovArgs.flag(g.args, "menu_intro", not capturing):
 		_fade = 0.0
@@ -109,6 +155,15 @@ func _build() -> void:
 	_shade = Control.new()
 	_shade.mouse_filter = Control.MOUSE_FILTER_STOP
 	_shade.draw.connect(_draw_shade)
+	# the evening sun's light in the air, added over the world (under the
+	# shade): a warm bloom from the sun low behind the town on the right
+	_sunglow = Control.new()
+	_sunglow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var gm := CanvasItemMaterial.new()
+	gm.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	_sunglow.material = gm
+	_sunglow.draw.connect(_draw_sunglow)
+	_root.add_child(_sunglow)
 	_root.add_child(_shade)
 	_ui = Control.new()
 	_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -155,13 +210,13 @@ func _build() -> void:
 		{"title": "A VOXEL WORLD", "text": "Every map grows from a seed:\nforests, gold, shores and hills.", "icon": "terrain",
 			"colors": [Color("#1d4660"), Color("#0b2030"), Color("#040a10")], "glow": Color(0.7, 0.9, 1.0)},
 	]
-	var ld := _add("load", "bar", "LOAD", Rect2(352, 676, 296, 68))
-	ld.available = false
+	# (no Load: saved games do not exist yet, so the row is Quick Match)
+	_add("quick", "bar", "QUICK MATCH", Rect2(352, 676, 296, 68))
 	_add("options", "bar", "OPTIONS", Rect2(352, 767, 296, 68))
 	var q := _add("quit", "bar", "QUIT", Rect2(352, 858, 296, 68))
 	if OS.has_feature("web"):
 		q.available = false
-	_order = [_tiles.skirmish, _tiles.campaign, _tiles.multiplayer, _tiles.feature, _tiles.load, _tiles.options, _tiles.quit]
+	_order = [_tiles.skirmish, _tiles.campaign, _tiles.multiplayer, _tiles.feature, _tiles.quick, _tiles.options, _tiles.quit]
 	for n in _tiles:
 		_tiles[n].pressed.connect(_on_pressed.bind(n))
 	# explicit focus paths for arrows / D-pad (the grid is irregular)
@@ -171,10 +226,10 @@ func _build() -> void:
 		"burger": {"left": "tab_options", "down": "skirmish"},
 		"skirmish": {"up": "tab_play", "down": "campaign", "right": "multiplayer"},
 		"campaign": {"up": "skirmish", "right": "multiplayer", "down": "feature"},
-		"multiplayer": {"up": "skirmish", "left": "campaign", "down": "load"},
-		"feature": {"up": "campaign", "right": "load"},
-		"load": {"up": "multiplayer", "left": "feature", "down": "options"},
-		"options": {"up": "load", "left": "feature", "down": "quit"},
+		"multiplayer": {"up": "skirmish", "left": "campaign", "down": "quick"},
+		"feature": {"up": "campaign", "right": "quick"},
+		"quick": {"up": "multiplayer", "left": "feature", "down": "options"},
+		"options": {"up": "quick", "left": "feature", "down": "quit"},
 		"quit": {"up": "options", "left": "feature"},
 	}
 	var props := {"up": "focus_neighbor_top", "down": "focus_neighbor_bottom", "left": "focus_neighbor_left", "right": "focus_neighbor_right"}
@@ -249,7 +304,7 @@ func _layout() -> void:
 	_scale = clampf(vs.y / 1080.0, 0.5, 3.0)
 	_layer.transform = Transform2D().scaled(Vector2(_scale, _scale))
 	_css = vs / _scale
-	for c in [_root, _shade, _ui, _top, _logo, _options, _toast, _veil]:
+	for c in [_root, _sunglow, _shade, _ui, _top, _logo, _options, _toast, _veil]:
 		c.position = Vector2.ZERO
 		c.size = _css
 	_set_panel_rect(_topbar, Rect2(22, -4, _css.x - 44, 100))
@@ -269,8 +324,9 @@ func _on_pressed(n: String) -> void:
 			notice("Campaign", "The Greek campaign is still being carved.\nTry a Skirmish against the AI meanwhile.")
 		"multiplayer":
 			notice("Multiplayer", "Multiplayer is not available in this version.")
-		"load":
-			notice("Load", "Saved games are not available yet.")
+		"quick":
+			# a default skirmish at once: Greeks against one AI on the default map
+			start_match({})
 		"options", "tab_options", "burger":
 			_open_options()
 		"tab_play":
@@ -365,6 +421,7 @@ func frame(dt: float, _alpha: float) -> void:
 		return
 	t += dt
 	_drive_camera()
+	_mood_frame()
 	# intro: fade in from black, tiles slide in one after another
 	if not _leaving:
 		_fade = move_toward(_fade, 0.0, dt * 1.4)
@@ -387,40 +444,152 @@ func frame(dt: float, _alpha: float) -> void:
 	(_logo.material as ShaderMaterial).set_shader_parameter("shine_x", -200.0 + ph * 260.0)
 	_logo.queue_redraw()
 
-## The camera floats slowly over the harbour: a gentle swing of the yaw, a
-## breathing distance and a drift along the shore; the anchor sits left of
-## the screen centre, so the town shows in the free right part of the frame.
+## The hero shot: a low three-quarter view from the sea, the temple on the
+## right-third line (it stands out against the evening haze), the harbour and
+## its fishing boats in the foreground; the camera breathes and sways slowly
+## round that anchor.
 func _drive_camera() -> void:
 	var cam: AovCameraRig = game.camera
 	if _anchor.is_empty():
-		var f: Vector2 = game.ctx.get("focus", Vector2(64, 64))
-		# from the sea, over the beach, up to the temple and the Town Center
-		_anchor = {"x": f.x + 0.25, "z": f.y + 1.5, "distance": 50.0, "pitch": 19.0, "yaw": 82.0}
+		_anchor = _hero_anchor()
 		if game.args.has("menu_view"):
 			var c := str(game.args.menu_view).split(",")
 			var keys := ["x", "z", "distance", "pitch", "yaw"]
 			for i in mini(c.size(), 5):
 				_anchor[keys[i]] = float(c[i])
 	var s := t
-	var yaw: float = _anchor.yaw + 6.0 * sin(s * TAU / 80.0)
-	var dist: float = _anchor.distance + 3.0 * sin(s * TAU / 53.0)
-	var pitch: float = _anchor.pitch + 1.5 * sin(s * TAU / 61.0)
+	var yaw: float = _anchor.yaw + 3.0 * sin(s * TAU / 90.0)
+	var dist: float = _anchor.distance + 2.0 * sin(s * TAU / 53.0)
+	var pitch: float = _anchor.pitch + 1.0 * sin(s * TAU / 61.0)
 	var y := deg_to_rad(yaw)
 	# drift along the view's right axis
-	var side := 2.5 * sin(s * TAU / 97.0)
+	var side := 1.5 * sin(s * TAU / 97.0)
 	var x: float = _anchor.x + cos(y) * side
 	var z: float = _anchor.z - sin(y) * side
 	cam.set_view({"x": x, "z": z, "distance": dist, "pitch": pitch, "yaw": yaw})
+
+## Where the temple stands (world x, z), or the scene focus without one.
+func _hero_pos() -> Vector2:
+	var f: Vector2 = game.ctx.get("focus", Vector2(64, 64))
+	var b: Dictionary = game.sim.get_buildings()
+	var names: PackedStringArray = b.get("type_names", PackedStringArray())
+	var ti := names.find("temple")
+	var types: PackedByteArray = b.get("type", PackedByteArray())
+	var rect: PackedInt32Array = b.get("rect", PackedInt32Array())
+	for i in types.size():
+		if int(types[i]) == ti:
+			return Vector2(rect[i * 4] + rect[i * 4 + 2] * 0.5, rect[i * 4 + 1] + rect[i * 4 + 3] * 0.5)
+	return f
+
+## The camera anchor for the hero shot: the view looks past the temple so
+## it sits right of the frame centre (the menu column fills the left).
+func _hero_anchor() -> Dictionary:
+	var h := _hero_pos()
+	var yaw := HERO_YAW
+	var yr := deg_to_rad(yaw)
+	var right := Vector2(cos(yr), -sin(yr))     # the view's right axis (x, z)
+	var fwd := Vector2(-sin(yr), -cos(yr))      # into the screen
+	var p := h - right * HERO_SHIFT.x + fwd * HERO_SHIFT.y
+	return {"x": p.x, "z": p.y, "distance": HERO_DIST, "pitch": HERO_PITCH, "yaw": yaw}
+
+var HERO_YAW := 82.0
+var HERO_PITCH := 9.0
+var HERO_DIST := 66.0
+var HERO_SHIFT := Vector2(7.0, -4.0)   # temple -> view target: left, forward
+
+# ---- the mood: a warm, low evening sun and haze (menu scene only) --------------
+
+var _light: Node = null
+
+## Evening light for the hero shot, set on the lighting piece's nodes (the
+## menu scene only; the lighting piece stays the owner, nothing else changes):
+## a low warm key from the right, a warm sky gradient with the sun's glow
+## sitting behind the town, deep golden haze that swallows the map edge, a
+## warm top haze and a vignette in the grade.
+func _apply_mood() -> void:
+	_light = game.pieces.get("lighting")
+	if _light == null or not ("sun" in _light) or _light.sun == null:
+		return
+	var yr := deg_to_rad(HERO_YAW)
+	var right := Vector3(cos(yr), 0.0, -sin(yr))
+	var fwd := Vector3(-sin(yr), 0.0, -cos(yr))
+	var to_sun := (right * 0.85 + fwd * 0.55).normalized()
+	to_sun.y = 0.36
+	to_sun = to_sun.normalized()
+	var sun: DirectionalLight3D = _light.sun
+	sun.light_color = Color(1.0, 0.68, 0.4)
+	sun.light_energy = 7.6 / PI
+	sun.basis = Basis.looking_at(-to_sun, Vector3.UP)
+	sun.shadow_opacity = 0.86
+	var fill: DirectionalLight3D = _light.fill
+	if fill:
+		fill.light_color = Color(0.55, 0.66, 0.9)
+		fill.light_energy = 0.5 / PI
+		var fd := (-right * 0.8 - fwd * 0.2).normalized()
+		fd.y = 0.45
+		fill.basis = Basis.looking_at(-fd.normalized(), Vector3.UP)
+	# the sky: the glow of the setting sun low behind the temple, off the key's
+	# real direction on purpose (the frame wants the glow, the town the side light)
+	var sky_sun := (fwd * 0.96 + right * 0.26).normalized()
+	sky_sun.y = 0.07
+	var env: Environment = _light.env
+	var sm := ShaderMaterial.new()
+	sm.shader = SKY
+	sm.set_shader_parameter("sun_dir", sky_sun.normalized())
+	sm.set_shader_parameter("horizon_color", MOOD_HAZE)
+	if env.sky:
+		env.sky.sky_material = sm
+	env.background_mode = Environment.BG_SKY
+	env.fog_light_color = MOOD_HAZE
+	env.fog_density = 1.0
+	env.fog_sun_scatter = 0.0
+	env.fog_depth_curve = 1.6
+	env.ambient_light_color = Color(0.6, 0.6, 0.7)
+	env.ambient_light_energy *= 0.8
+	for h in _light.get("hemi_lights"):
+		(h as DirectionalLight3D).light_energy *= 0.75
+	var gr = _light.get("grade")
+	if gr:
+		gr.top_haze = 0.12
+		gr.top_haze_color = Vector3(MOOD_HAZE.r, MOOD_HAZE.g, MOOD_HAZE.b)
+		gr.vignette = 0.7
+		gr.saturation = 0.86
+	_mood_frame()
+
+const MOOD_HAZE := Color(0.93, 0.79, 0.62)      # golden evening air
+const MOOD_SKY_TOP := Color(0.36, 0.5, 0.7)
+
+## Per frame after the lighting piece: the haze begins just past the temple
+## and hides the map's far edge (lighting.frame() resets it from the distance).
+func _mood_frame() -> void:
+	if _light == null or not ("env" in _light) or _light.env == null:
+		return
+	var d: float = game.camera.distance
+	_light.env.fog_depth_begin = d * 1.05
+	_light.env.fog_depth_end = d * 3.4
+	_light.sun.directional_shadow_max_distance = d * 3.0
 
 # ---- drawing ---------------------------------------------------------------------
 
 func _draw_shade() -> void:
 	var w := _css.x
 	var h := _css.y
-	# a soft darkening behind the tiles and a light mist rolling in at the bottom
-	S.hgrad(_shade, Rect2(0, 0, 900, h), [[0.0, Color(0.01, 0.03, 0.04, 0.55)], [0.55, Color(0.01, 0.03, 0.04, 0.28)], [1.0, Color(0.01, 0.03, 0.04, 0.0)]])
-	S.vgrad(_shade, Rect2(0, h * 0.72, w, h * 0.28), [[0.0, Color(0.92, 0.94, 0.95, 0.0)], [0.6, Color(0.9, 0.92, 0.93, 0.12)], [1.0, Color(0.88, 0.9, 0.92, 0.26)]])
+	# the menu column sits on shadow: a deep gradient from the left edge that
+	# is gone by the middle of the frame, darker still at the bottom left
+	S.hgrad(_shade, Rect2(0, 0, 1000, h), [[0.0, Color(0.01, 0.03, 0.04, 0.82)], [0.45, Color(0.01, 0.03, 0.04, 0.62)], [0.7, Color(0.01, 0.03, 0.04, 0.22)], [1.0, Color(0.01, 0.03, 0.04, 0.0)]])
+	# a light sea mist rolling in along the bottom
+	S.vgrad(_shade, Rect2(0, h * 0.84, w, h * 0.16), [[0.0, Color(0.95, 0.88, 0.8, 0.0)], [1.0, Color(0.95, 0.86, 0.76, 0.14)]])
 	S.vgrad(_shade, Rect2(0, 0, w, 220), [[0.0, Color(0, 0, 0, 0.35)], [1.0, Color(0, 0, 0, 0.0)]])
+
+static var _sun_tex: Texture2D
+
+func _draw_sunglow() -> void:
+	if _sun_tex == null:
+		_sun_tex = S.radial_tex([[0.0, Color(1.0, 0.8, 0.52, 0.34)], [0.25, Color(1.0, 0.7, 0.42, 0.16)], [0.6, Color(0.9, 0.55, 0.3, 0.05)], [1.0, Color(0.9, 0.5, 0.3, 0.0)]], Vector2(0.5, 0.5), 0.5, 256)
+	var w := _css.x
+	var c := Vector2(w - 470.0, 150.0)
+	var sz := Vector2(1900, 1300)
+	_sunglow.draw_texture_rect(_sun_tex, Rect2(c - sz * 0.5, sz), false)
 
 func _draw_logo() -> void:
 	var x := 70.0

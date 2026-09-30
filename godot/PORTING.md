@@ -39,7 +39,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | performance (6 teams, 2000 units) | `game/perf/perf.gd` (the render bench, `--renderbench`), and in the render paths of the stress scene: unit LOD + box shadow casters (`game/units`), coarse voxel twins `VoxelModels.coarse()` (tree shadow casters), tight resource / ground-detail buckets (`game/terrain`), economy props frustum culling (`AovEconView`); report in `../docs/godot-stress-report.md` | sim hot paths (with their owners); `native/src/unit_lod.cpp` (`AovUnitView.lod_mesh`) | `docs/stress-report.md` |
 | exports (Windows, macOS, Linux, web) | `export_presets.cfg`, `../scripts/godot-export.sh`, `../.github/workflows/godot.yml`, `native/SConstruct` + `native/aov.gdextension` (platform entries); see "Export" | none | `vite build` |
 | scenes | `AovScenes.set_setup()` from the owning piece, else the C++ setup | `scenes/` (helpers.js, skirmish / town / coast / hud, EconomyScene.js; battle.cpp: BattleScene.js + units/battleHost.js, godpower, stress.js: all ported) | `src/core/scenes/`, `BattleScene.js`, `EconomyScene.js` |
-| menu (main menu) | `game/menu/`: `menu.gd` (the piece, scene `menu`), `tile.gd`, `art.gd`, `options.gd`, `flow.gd` (screen flow, `AovArgs.override`), `logo.gdshader`, `menu_check.gd`; see "Main menu" | none | none (Godot-only) |
+| menu (main menu) | `game/menu/`: `menu.gd` (the piece, scene `menu`), `tile.gd`, `art.gd`, `options.gd`, `flow.gd` (screen flow, `AovArgs.override`), `logo.gdshader`, `menu_sky.gdshader`, `menu_check.gd`; see "Main menu" | none | none (Godot-only) |
 
 ```
 godot/
@@ -332,13 +332,23 @@ marches them onto each other, e.g.
 `game/menu/menu.gd` (a piece: in `PIECE_ORDER`, idle unless the scene is
 `menu`) is Retold's main menu in the HUD style (`hud_style.gd`, the panel
 shader, Cinzel / Alegreya): the coast town plays live behind it (the C++
-`coast` setup, no AI, no HUD, camera from the sea over the beach to the
-temple, drifting slowly), a top bar with the logo (`logo.gdshader`: white
-text shaded as cast gold) and tabs, the Skirmish tile, Campaign /
-Multiplayer / Load marked "COMING SOON" (dimmed, still focusable; pressing
-shows a notice), a feature carousel (Zeus, attack-move, the map), Options
-(`options.gd`: Graphics High / Medium / Low live + remembered like the gear
-card, window mode, F3 meter) and Quit (a notice on the web). Tiles are
+`coast` setup, no AI, no HUD) as an evening hero shot: a low camera (pitch
+9, from the sea) with the temple on the right-third line against the sky,
+a fishing fleet off the beach below it (three boats placed where their
+screen points meet the sea, each on its own rich shoal so they stay and
+fish), a warm low sun from the right, `menu_sky.gdshader` (gold horizon to
+dusky blue, the sun's glow low behind the town, cloud streaks) and golden
+haze that hides the map edge, set on the lighting piece's nodes for this
+scene only (`_apply_mood`, `_mood_frame` after lighting's frame), plus a
+warm additive sun bloom and a shadow gradient under the menu column. The
+camera sways slowly round the anchor. Over it: a top bar with the logo
+(`logo.gdshader`: white text shaded as cast gold) and tabs, the Skirmish
+tile, Campaign / Multiplayer unavailable (softer gold line art, muted
+title, no label; on hover "Not available in this version.", pressing shows
+a notice), a feature carousel (Zeus, attack-move, the map), Quick Match
+(the default skirmish at once; there is no Load until saved games exist),
+Options (`options.gd`: Graphics High / Medium / Low live + remembered like
+the gear card, window mode, F3 meter) and Quit (a notice on the web). Tiles are
 `tile.gd` Buttons (hover / pressed / focus states) with gold line art built
 as SVG in `art.gd`. Keyboard / joypad: the first arrow or D-pad press
 focuses Skirmish, arrows move, Enter / A presses, Esc / B closes Options; the
@@ -357,9 +367,10 @@ scene with un-set-up pieces (the "Nil base 'sim' / 'camera'" errors).
 
 ```
 node scripts/godot-shoot.mjs --scene menu --out shots/godot/menu.png
-     [--params "menu_hover=skirmish"]    # a tile hovered + focused: skirmish campaign multiplayer feature load options quit tab_play tab_options burger
+     [--params "menu_hover=skirmish"]    # a tile hovered + focused: skirmish campaign multiplayer feature quick options quit tab_play tab_options burger
      [--params "menu_options=1"]         # the Options dialog open
      [--params "menu_view=x,z,dist,pitch,yaw"]   # camera anchor; menu_intro=1 plays the fade-in (off in captures)
+     [--params "menu_hero=yaw,pitch,dist,left,fwd"]  # the hero framing (temple -> view target shift); fleet and light follow it
 VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 1280x720x24" \
   godot --path godot --rendering-driver vulkan --audio-driver Dummy --resolution 1280x720 \
   -s res://game/menu/menu_check.gd        # no --scene on purpose: "MENU ok|FAIL <step>", exit = failures
