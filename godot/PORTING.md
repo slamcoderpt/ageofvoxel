@@ -348,6 +348,12 @@ is `flow.gd`: `Flow.start_match(tree, opts)` / `Flow.to_main_menu(tree)` set
 Again replays the same match) and reload `main.tscn`. Skirmish opens the
 first existing script of `Flow.SETUP_SCREENS` (the "Setup screen contract"
 at the top of `menu.gd`), or starts the default skirmish without one.
+The `menu` scene lists `skip_pieces: ["ui"]` (scenes.gd; main.gd does not
+load a skipped piece): no in-game UI behind the menu (its hotkeys, F1 HUD
+toggle and world clicks cannot reach the town), and the menu and its capture
+do not depend on `game/ui/ui.gd` loading. A piece that fails to load is
+skipped and reported (main.gd), so one broken piece never leaves the menu
+scene with un-set-up pieces (the "Nil base 'sim' / 'camera'" errors).
 
 ```
 node scripts/godot-shoot.mjs --scene menu --out shots/godot/menu.png
@@ -360,7 +366,7 @@ VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 
 ```
 
 `menu_check.gd` launches with no scene argument and drives the menu through
-real key, joypad and mouse events: the menu opens with the HUD hidden,
+real key, joypad and mouse events: the menu opens with no in-game UI,
 arrows / D-pad move the focus, Enter on an unavailable tile gives its
 notice, hover, Options (Graphics Low applies live and is remembered, then
 restored), Esc, world clicks blocked, Skirmish -> the setup screen -> a

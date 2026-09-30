@@ -106,8 +106,8 @@ func _ready() -> void:
 
 	for p in PIECE_ORDER:
 		var path := "res://game/%s/%s.gd" % [p, p]
-		if not ResourceLoader.exists(path):
-			continue
+		if not ResourceLoader.exists(path) or p in scene_def.get("skip_pieces", []):
+			continue  # (skip_pieces: a scene without some pieces, the menu has no in-game UI)
 		var script: Script = load(path)
 		# a piece whose script fails to load (a parse error) is skipped and reported,
 		# so it cannot take every other piece and the scene's screen down with it

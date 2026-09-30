@@ -106,7 +106,7 @@ func _run() -> void:
 		_finish()
 		return
 	var ui: Node = main.pieces.get("ui")
-	_check("HUD hidden behind the menu", ui == null or not ui.hud_visible)
+	_check("no in-game UI behind the menu (no HUD, hotkeys or world clicks)", ui == null)
 	_check("camera is the menu's", not main.camera.user_control)
 	await _frames(45)  # the intro
 

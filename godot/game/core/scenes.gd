@@ -34,7 +34,10 @@ static var SCENES := {
 		"camera": {"distance": 52.0, "pitch": 52.0}},
 	# Godot-only: the main menu (game/menu): the coast town live behind the menu,
 	# no AI, no HUD; the menu piece registers its setup and drives the camera.
+	# skip_pieces: no in-game UI behind the menu (its hotkeys, F1 HUD, world
+	# clicks), and the menu does not depend on game/ui/ui.gd loading.
 	"menu": {"preset": "coast", "seed": 5, "hud": false, "reveal_all": true, "live": true, "fast_forward": 20.0,
+		"skip_pieces": ["ui"],
 		"camera": {"distance": 46.0, "pitch": 24.0, "yaw": 20.0}},
 	# Godot-only: the skirmish match setup screen (game/menu/setup) over a small
 	# still field (the screen is opaque); --players=2..6, --open=<picker>.
