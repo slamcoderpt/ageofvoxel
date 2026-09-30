@@ -323,6 +323,69 @@ colour (off by default now that `game/units/units.gd` exists);
 marches them onto each other, e.g.
 `node scripts/godot-shoot.mjs --scene skirmish --params "simdemo=1"`.
 
+## Match setup and match settings (game/menu/setup)
+
+The skirmish setup screen (`game/menu/setup/setup.gd`, after Retold's
+lobby; widgets in `widgets.gd`, backdrop `setup_bg.gdshader`, preview
+`map_preview.gd`) opens from the main menu's Skirmish tile (the menu's
+"Setup screen contract", `Flow.SETUP_SCREENS`) or on its own as the scene
+`setup` (a scene entry with `"screen": <script>`: main.gd puts it on a
+CanvasLayer over the scene's world; the screen is opaque and scales itself
+by the window height like the HUD). Leave = back to the menu (hosted:
+`menu.close_screen()`, standalone: `Flow.to_main_menu`); Play =
+`menu.start_match(M.to_args(settings))` / `Flow.start_match`.
+
+```
+node scripts/godot-shoot.mjs --scene setup --params "players=5"          # 2..6 players
+node scripts/godot-shoot.mjs --scene setup --params "players=2&open=team" # an open picker:
+     # open=team|color|difficulty|count|size|resources|speed (dropdowns of row 1 / the map panel), god, map (the modals)
+     # also map=<key>, seed=N, mapsize=N
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 1280x720x24" \
+  godot --path godot --rendering-driver vulkan --audio-driver Dummy --resolution 1280x720 \
+  -s res://game/menu/setup/setup_check.gd -- --scene=setup   # "SETUP ok|FAIL <step>", exit = failures
+```
+
+`setup_check.gd` drives the screen through real mouse / key events at the
+drawn widgets' hit zones (count, colour swap, team, difficulty, resources,
+speed, size, seed, free for all, the pantheon picker, the map chooser,
+remove / add, Esc, Play -> the match loads with the settings, setup again
+remembers them, Leave -> menu). It needs a display (headless windows are
+64x64).
+
+**The match-settings Dictionary** (`game/menu/setup/match_settings.gd`,
+preloaded as `M`; the one hand-off between the setup screen and the match
+rules):
+
+```
+{ version: 1, game_type: "standard", victory: "conquest",
+  map: "aegean_hills" | "ionian_coast" | "marathon" | "circle_of_poleis",   # M.MAPS ("random" is rolled before Play)
+  preset: "skirmish" | "coast" | "battle" | "stress",                       # M.MAPS[map].preset, for AovSim.new_game
+  seed: int, map_size: 96 | 128 | 160 | 192 | 256,
+  visibility: "standard" | "revealed", resources: "low" | "standard" | "high" | "deathmatch",   # M.RESOURCES[..].res
+  speed: 0.75 | 1.0 | 1.5 | 2.0, free_for_all: bool, lock_teams: bool (UI only),
+  players: [ {id: 1..6 (= owner, = start index + 1), name, human: bool, ai: "" | "easy" | "moderate" | "hard" | "titan",
+              god: "zeus", color: 1..8 (M.COLORS, 1..6 = the sim's PLAYER_COLORS), team: 1..6}, ... ] }   # 2..6, [0] = the human
+```
+
+`M.team_of(settings, i)` gives the team the rules should use (free for all:
+a team per player); `M.DIFFICULTIES[..].ai` is the suggested
+`AovSim.set_ai` override per difficulty (`{}` = the current AI);
+`M.RESOURCES[..].res` the `set_player_resources` stockpile (`{}` = the
+default). Play passes main.gd args (strings): `scene=skirmish`, `seed`,
+`mapsize`, `players`, `preset`, `timescale` (speed), `fog=0` (revealed), and
+`match` = the whole Dictionary as JSON; `M.from_args(game.args)` reads it
+back ({} for a run without one). main.gd itself honours seed, mapsize,
+timescale and fog today; players, preset, teams, colours, difficulty and
+resources are for the rules to apply. Which player counts a map takes is
+asked of the generator (`M.starts_for`: the starts `new_game` places), so the
+screen offers the 2-player presets only for 2 players and switches to
+Circle of Poleis (`stress`, a ring of 2-6 starts) above that; a preset that
+learns more starts unlocks itself. Only Zeus is playable: Hades and Poseidon
+are shown locked in the pantheon picker. The map preview is the real
+generator's output for the chosen preset / seed / size / player count
+(tiles coloured like the minimap, trees / gold / berries, Town Center
+markers in the players' colours).
+
 ## Conventions
 
 - **World units**: 1 tile = 1 world unit, terrain voxel `VOXEL = 0.5` (2x2

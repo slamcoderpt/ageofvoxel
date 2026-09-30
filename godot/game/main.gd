@@ -112,6 +112,12 @@ func _ready() -> void:
 	for p in pieces:
 		if pieces[p].has_method("setup"):
 			pieces[p].setup(self)
+	# a scene's "screen": that UI over the world, on its own layer (--scene=setup)
+	if scene_def.has("screen"):
+		var screen_layer := CanvasLayer.new()
+		screen_layer.layer = 20
+		add_child(screen_layer)
+		screen_layer.add_child(load(str(scene_def.screen)).new())
 
 	var setup := AovScenes.get_setup(scene_name)
 	if setup.is_valid():
