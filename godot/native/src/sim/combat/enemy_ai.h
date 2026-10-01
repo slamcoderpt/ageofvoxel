@@ -87,6 +87,13 @@ struct AIFortStats {
 	int reopened = 0;     // own ring found closed and reopened
 	int patched = 0;      // ring tiles walled later (where trees / berries stood)
 	int dropped = 0;      // ring foundations nobody could reach, pulled down
+	int sieges = 0;       // groups of our men found walled off from their target and set on one wall piece
+	int sieged = 0;       // ... men so ordered
+	int breached = 0;     // wall pieces a siege picked that fell
+	int retargets = 0;    // walled-off groups with no piece to get at sent at another enemy building they can reach
+	int regroups = 0;     // walled-off groups of bowmen alone sent home (to march with the next wave)
+	int storehouses = 0;  // storehouses placed by a far wood line / mine (Godot AI economy)
+	int upgrade_holds = 0; // thinks the academies waited for a fortification tech's wood / gold
 	double ring_at = -1, ring_done_at = -1;
 };
 
@@ -96,6 +103,7 @@ struct AIGateGap {
 	int tx0, tz0, tx1, tz1; // the gap's tiles (a line of 3)
 	int state = 0;          // 0 open, 1 filled (segment rising), 2 gate, 3 given up (left open), 4 walled (no gate fits)
 	int32_t seg = 0;        // the filling segment
+	double retry_t = 0;     // state 3: when the opening is tried again (Godot AI: no hole left in the ring for good)
 };
 
 class EnemyAI {
@@ -141,6 +149,8 @@ private:
 	bool gap_ok(int tx, int tz, int w, int h) const;
 	void use_powers(const std::vector<int> &army, const std::vector<int> &buildings);
 	std::vector<uint8_t> reach_; // scratch: cells in reach of our army / base
+	void storehouses(int tc, const std::vector<int> &vills, const std::vector<int> &buildings); // Godot-only
+	double store_t_ = 0;        // s until the next storehouse check
 	std::vector<std::pair<int32_t, double>> farm_tries_; // Godot-only: farm foundation -> first time a villager was sent to finish it
 
 	// fortifications (Godot-only, enemy_ai_fort.cpp)
@@ -155,6 +165,15 @@ private:
 	void repair(const std::vector<int> &vills, const std::vector<int> &buildings);
 	void upgrade(const std::vector<int> &buildings, bool saving);
 	void focus_breach(const std::vector<int> &army);
+	void siege(const std::vector<int> &army, int tc);
+	double siege_t_ = 0;          // s until the next siege check
+	std::vector<int32_t> siege_picks_; // wall pieces a siege set our men on (kept till they fall)
+	struct SiegeWatch { int32_t id; double hp, since; };
+	std::vector<SiegeWatch> siege_watch_; // ... their hp and since when it has not gone down
+	std::vector<std::pair<int32_t, double>> siege_ban_; // pieces given up (no man could get at them) -> until
+	bool hole_wait_ = false;      // a hole in the ring waits for wood / gold (the academies wait)
+	bool upgrade_wait_ = false;   // a fortification tech waits for wood / gold (the academies wait)
+	double upgrade_wait_t_ = 0;   // s it has waited for the current tech
 	void avoid_towers();
 	int towers_covering(double x, double z, double margin) const; // enemy towers in range of a point
 	bool reserved(int tx, int tz, int w, int h) const; // a rect on a gate opening or its approach

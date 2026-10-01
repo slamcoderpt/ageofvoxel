@@ -11,6 +11,8 @@
 namespace aov {
 
 static const double PI = 3.141592653589793;
+static const double WALLED_REPATH = 2;          // Godot-only (fortify): s between searches of a man walled off from his target (a unit)
+static const double WALLED_REPATH_BUILDING = 4; // ... from a building (it does not move: only a wall falling changes the answer)
 
 void Combat::init(Sim *s) {
 	sim = s;
@@ -616,7 +618,18 @@ void Combat::update(double dt) {
 		}
 		// soldiers attacking a building switch to nearby enemy units
 		if (scan && ts >= 0 && tk == K_BUILDING && !def.gatherer) {
-			const int e = find_enemy_near(U.x[r], U.z[r], U.owner[r], 6);
+			int e = find_enemy_near(U.x[r], U.z[r], U.owner[r], 6);
+			// (Godot-only, fortify: a man breaking a wall does not turn on a
+			// foe behind it, a villager repairing it: he cannot reach him)
+			if (e >= 0 && (U.order_b[r] & ATK_BREACH) && is_wall_piece(B.type[ts])) {
+				Pathfinder &pf = sim->pathfinder;
+				const int N = sim->map().size, keep = pf.pass_owner;
+				const int ax = sim->map().tile_clamp(U.x[r]), az = sim->map().tile_clamp(U.z[r]);
+				const int bx = sim->map().tile_clamp(U.x[e]), bz = sim->map().tile_clamp(U.z[e]);
+				pf.pass_owner = U.owner[r];
+				if (sim->map().walkable_for(ax, az, U.owner[r]) && !pf.line_walkable(az * N + ax, bz * N + bx)) e = -1;
+				pf.pass_owner = keep;
+			}
 			if (e >= 0) {
 				// (remember the building, so the attack goes back to it afterwards;
 				// a man breaking a wall keeps his real target, Godot-only fortify)
@@ -708,9 +721,13 @@ void Combat::update(double dt) {
 				}
 			}
 			U.order_x[r] -= dt; // o.repath
-			if (!U.moving[r] || U.order_x[r] <= 0) {
+			// (Godot-only: a man walled off from his target searches again
+			// every WALLED_REPATH s, not every tick at the end of his path /
+			// every 0.6 s on his way to the wall: the answer is the same)
+			const bool walled = sim->godot_rules && U.path_blocked[r];
+			if ((!U.moving[r] && !walled) || U.order_x[r] <= 0) {
 				approach(r, tid);
-				U.order_x[r] = 0.6;
+				U.order_x[r] = sim->godot_rules && U.path_blocked[r] ? (tk == K_BUILDING ? WALLED_REPATH_BUILDING : WALLED_REPATH) : 0.6;
 			}
 			continue;
 		}

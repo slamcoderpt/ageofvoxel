@@ -23,6 +23,10 @@ extends SceneTree
 ##   determinism two identical Hard-vs-Titan runs end bit-equal
 ##   matches  AI vs AI with walls (Hard vs Hard, Titan vs Hard) end within
 ##            the cap (no stalemate behind walls)
+##   siege    Titan vs Titan with favor held at 0 (no Meteor): the armies that
+##            find a ring closed break through it themselves (sieges > 0, a
+##            wall / pillar / gate piece destroyed by soldiers, its last hit
+##            from a unit) and the match ends
 ##
 ##   godot --headless --path godot -s res://game/core/aifort_check.gd [-- --only=build,breach,... --seed=1 --minutes=50]
 ##
@@ -72,6 +76,8 @@ func _run() -> void:
 		_case_determinism()
 	if _want("matches"):
 		_case_matches()
+	if _want("siege"):
+		_case_siege()
 	result["passes"] = passes
 	result["fails"] = fails
 	result["wall_s"] = (Time.get_ticks_msec() - t0) / 1000.0
@@ -377,3 +383,34 @@ func _case_matches() -> void:
 		print("AIFORT   match %s" % JSON.stringify(det.back()))
 		ok = ok and bool(v.decided)
 	_check("matches", ok, {"matches": det})
+
+# ---- AI vs AI: soldiers break the walls (no god powers) ------------------------------------
+
+func _case_siege() -> void:
+	var sim := _sim(["titan", "titan"], seed_arg + 6)
+	var ticks := int(max_minutes * 60 * FPS)
+	var kind := {}       # wall piece id -> kind (0 pillar, 1 wall, 2 gate)
+	var last := {}       # piece id -> true when its last hit came from a unit
+	var by_men := 0
+	var by_other := 0
+	while sim.get_tick() < ticks and not sim.get_victory().decided:
+		for o in [1, 2]:
+			sim.set_player_resources(o, {"favor": 0})
+		sim.tick(30)
+		var W: Dictionary = sim.get_walls()
+		for i in int(W.count):
+			if int(W.kind[i]) != 3: kind[int(W.ids[i])] = int(W.kind[i])
+		for e in sim.take_events():
+			var id := int(e.id)
+			if not kind.has(id): continue
+			if str(e.type) == "unit:damaged":
+				last[id] = int(e.other) > 0 and not sim.get_unit(int(e.other)).is_empty()
+			elif str(e.type) == "entity:died":
+				if bool(last.get(id, false)): by_men += 1
+				else: by_other += 1
+	var v: Dictionary = sim.get_victory()
+	var f1 := _fort(sim, 1)
+	var f2 := _fort(sim, 2)
+	var det := {"seed": seed_arg + 6, "decided": v.decided, "minutes": snappedf(sim.get_time() / 60.0, 0.1), "pieces_by_soldiers": by_men, "pieces_by_other": by_other,
+		"sieges": [f1.sieges, f2.sieges], "breached": [f1.breached, f2.breached], "storehouses": [f1.storehouses, f2.storehouses]}
+	_check("siege", bool(v.decided) and by_men >= 1 and int(f1.sieges) + int(f2.sieges) > 0, det)

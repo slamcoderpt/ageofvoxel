@@ -39,6 +39,25 @@ static const double FEAR_UNTIL = 1500;         // s: tower fear ends (no stalema
 static const double FOCUS_CLUSTER = 16;        // breakers this close form one group
 static const double FOCUS_REACH = 12;          // ... and are turned onto its piece from this close
 static const double RING_CHECK_EVERY = 20;     // s between walk-out checks
+static const double UPGRADE_KEEP_WOOD = 30;    // wood / gold left over after a fortification tech
+static const double UPGRADE_KEEP_GOLD = 20;
+static const double UPGRADE_WAIT = 90;         // s the academies wait for each tech's wood / gold
+static const int PATCH_HOLE = 12;              // a patch of up to this many tiles is a hole (no reserve kept, the academies wait)
+static const double PATCH_SAFE = 8;            // no foe this close to a hole when it is walled up
+static const double GAP_RETRY = 60;            // s before an opening left open is tried again
+static const double SIEGE_EVERY = 2;           // s between siege checks
+static const double SIEGE_CLUSTER = 14;        // our men this close form one group
+static const double SIEGE_SCAN = 40;           // enemy wall pieces this close to a walled-off group are weighed
+static const double SIEGE_FAR = 90;            // ... pieces this close are tried for one they can walk up to
+static const size_t SIEGE_TRIES = 48;          // pieces tried, best first (most of a ring backed by a forest fails at once: a region cut)
+static const int64_t SIEGE_BUDGET = 24000;     // A* expansions the tries may spend per check
+static const int SIEGE_NODES = 40000;          // A* expansions of a siege's search for a piece
+static const double SIEGE_STALL = 30;          // s a picked piece may go unhurt before it is given up
+static const double SIEGE_BAN = 120;           // ... for this long
+static const size_t SIEGE_ALT_TRIES = 8;       // other buildings tried when no piece can be got at
+static const int SIEGE_ON = 12;                // men set on one piece at most (a pillar has room for about that many)
+static const double SIEGE_COVER = 9;           // bowmen at a breach shoot the foes this close to the piece
+static const double SIEGE_HOME = 25;           // men this close to our Town Center are at home
 
 namespace {
 // the corners' cut (a square ring with its corners clipped by a short
@@ -50,6 +69,22 @@ double box_dist(const BuildingStore &B, int b, double x, double z) {
 	const double ex = std::max(std::max(B.tx[b] - x, 0.0), x - (B.tx[b] + B.w[b]));
 	const double ez = std::max(std::max(B.tz[b] - z, 0.0), z - (B.tz[b] + B.h[b]));
 	return std::sqrt(ex * ex + ez * ez);
+}
+// Would breaking piece b open a way through (open ground on both faces,
+// across the wall)? A piece of a staircase (a ring's clipped corner, a
+// diagonal line) only leaves a corner gap no one walks through.
+bool breach_opens(const Sim &S, int b, int owner) {
+	const BuildingStore &B = S.entities.buildings;
+	const GameMap &map = S.map();
+	auto open = [&](int x, int z) { return map.in_tiles(x, z) && map.walkable_for(x, z, owner); };
+	const int tx = B.tx[b], tz = B.tz[b], w = B.w[b], h = B.h[b];
+	if (w >= h)
+		for (int x = tx; x < tx + w; x++)
+			if (open(x, tz - 1) && open(x, tz + h)) return true;
+	if (h >= w)
+		for (int z = tz; z < tz + h; z++)
+			if (open(tx - 1, z) && open(tx + w, z)) return true;
+	return false;
 }
 } // namespace
 
@@ -125,6 +160,26 @@ void EnemyAI::fortify(int tc, const std::vector<int> &vills, const std::vector<i
 			if (done) ring_state_ = 2;
 		}
 	}
+	if (ring_state_ == 3) {
+		// an opening left open (its segment broken, ground taken) is tried
+		// again a while later, once no foe is at it
+		for (AIGateGap &g : gaps_) {
+			if (g.state == 2) { // (its gate broken: built again later)
+				const int b = S.entities.building_slot(g.seg);
+				if (b < 0 || B.dead[b] || B.type[b] != B_GATE) {
+					g.state = 3;
+					g.retry_t = S.time + GAP_RETRY;
+				}
+			}
+			if (g.state == 3 && S.time >= g.retry_t) {
+				g.retry_t = S.time + GAP_RETRY;
+				if (S.combat.find_enemy_near((g.tx0 + g.tx1) * 0.5 + 0.5, (g.tz0 + g.tz1) * 0.5 + 0.5, owner, 14) < 0) {
+					g.state = 0;
+					ring_state_ = 2;
+				}
+			}
+		}
+	}
 	if (ring_state_ == 2) ring_gates(false);
 	if (ring_state_ >= 2) patch_ring(); // (a line a think)
 	if (ring_state_ >= 1 && !ring_ids_.empty()) {
@@ -138,6 +193,7 @@ void EnemyAI::fortify(int tc, const std::vector<int> &vills, const std::vector<i
 	upgrade(buildings, saving);
 	repair(vills, buildings);
 	if (par.breach_focus) focus_breach(army);
+	siege(army, tc);
 	avoid_towers();
 }
 
@@ -467,6 +523,7 @@ void EnemyAI::ring_gates(bool instant) {
 			const int b = S.entities.building_slot(g.seg);
 			if (b < 0 || B.dead[b] || B.type[b] != B_WALL) {
 				g.state = 3; // broken before it became a gate: left open
+				g.retry_t = S.time + GAP_RETRY;
 				continue;
 			}
 			if (!B.built[b]) {
@@ -509,6 +566,7 @@ void EnemyAI::ring_gates(bool instant) {
 		const WallPlan plan = S.fortify.plan_wall(owner, fx0, fz0, fx1, fz1);
 		if (plan.pieces.empty()) {
 			g.state = 3; // (nothing can stand there: left open)
+			g.retry_t = S.time + GAP_RETRY;
 			continue;
 		}
 		if (p.res[RES_WOOD] < plan.cost.v[RES_WOOD] + gc.v[RES_WOOD] || p.res[RES_GOLD] < plan.cost.v[RES_GOLD] + gc.v[RES_GOLD]) continue;
@@ -516,6 +574,7 @@ void EnemyAI::ring_gates(bool instant) {
 		const std::vector<int32_t> ids = S.fortify.place_wall(owner, fx0, fz0, fx1, fz1, {}, res);
 		if (!res.ok || ids.empty()) {
 			g.state = 3;
+			g.retry_t = S.time + GAP_RETRY;
 			continue;
 		}
 		fort.wall_tiles += plan.new_tiles;
@@ -544,6 +603,7 @@ void EnemyAI::ring_gates(bool instant) {
 // and built; place_wall skips the standing pieces).
 void EnemyAI::patch_ring() {
 	Sim &S = *sim;
+	hole_wait_ = false;
 	if (ring_plan_.empty()) return;
 	Player &p = S.players[owner];
 	for (size_t k = 0; k < ring_plan_.size(); k++) {
@@ -551,11 +611,19 @@ void EnemyAI::patch_ring() {
 		patch_next_++;
 		const WallPlan plan = S.fortify.plan_wall(owner, l[0], l[1], l[2], l[3]);
 		if (plan.pieces.empty() || plan.new_tiles == 0) continue;
-		// (not under the enemy's nose: a breach is walled up once the fight has moved on)
-		const double mx = (l[0] + l[2]) * 0.5 + 0.5, mz = (l[1] + l[3]) * 0.5 + 0.5;
-		const double half = std::max(std::abs(l[2] - l[0]), std::abs(l[3] - l[1])) * 0.5;
-		if (S.combat.find_enemy_near(mx, mz, owner, half + 8) >= 0) continue;
-		if (p.res[RES_WOOD] < plan.cost.v[RES_WOOD] + 40 || p.res[RES_GOLD] < plan.cost.v[RES_GOLD] + 15) return;
+		// (not under the enemy's nose: a breach is walled up once the fight
+		// at it has moved on; foes elsewhere along the line do not matter)
+		bool foe = false;
+		for (size_t t = 0; t < plan.state.size() && !foe; t++)
+			if (plan.state[t] == WT_NEW) foe = S.combat.find_enemy_near(plan.tiles[t * 2] + 0.5, plan.tiles[t * 2 + 1] + 0.5, owner, PATCH_SAFE) >= 0;
+		if (foe) continue;
+		// (a hole of a few tiles (a broken segment, a felled tree) is closed
+		// with the last wood / gold)
+		const bool hole = plan.new_tiles <= PATCH_HOLE;
+		if (p.res[RES_WOOD] < plan.cost.v[RES_WOOD] + (hole ? 0 : 40) || p.res[RES_GOLD] < plan.cost.v[RES_GOLD] + (hole ? 0 : 15)) {
+			hole_wait_ = hole; // (the academies wait for the few logs a hole takes)
+			return;
+		}
 		FortResult res;
 		const UnitStore &U = S.entities.units;
 		std::vector<int> vills;
@@ -622,7 +690,7 @@ void EnemyAI::check_ring_open(int tc) {
 bool EnemyAI::wall_saving(int army) const {
 	// (whether it is short or not: the academies would spend it before the
 	// line is laid later in the same think)
-	return army >= 8 && (tower_wait_ || (ring_state_ == 1 && !ring_lines_.empty() && line_wood_ > 0));
+	return hole_wait_ || (army >= 8 && (tower_wait_ || upgrade_wait_ || (ring_state_ == 1 && !ring_lines_.empty() && line_wood_ > 0)));
 }
 
 int EnemyAI::ring_unbuilt() const {
@@ -641,6 +709,7 @@ void EnemyAI::upgrade(const std::vector<int> &buildings, bool saving) {
 	Sim &S = *sim;
 	const BuildingStore &B = S.entities.buildings;
 	Player &p = S.players[owner];
+	upgrade_wait_ = false;
 	if (saving) return;
 	for (int line = 1; line >= 0; line--) {
 		if (line == 1 ? !par.tower_upgrade : !par.wall_upgrade) continue;
@@ -648,13 +717,27 @@ void EnemyAI::upgrade(const std::vector<int> &buildings, bool saving) {
 		for (int t = 1; t < FT_COUNT && !tech; t++)
 			if (fort_tech_def(t).line == line && S.fortify.tech_state(owner, t) == 1) tech = t;
 		if (!tech) continue;
+		int at = -1;
+		for (int b : buildings)
+			if (B.built[b] && !B.fort_tech[b] && (line == 1 ? B.type[b] == B_TOWER : is_wall_piece(B.type[b]))) { at = b; break; }
+		if (at < 0) continue;
 		const Cost &c = fort_tech_def(tech).cost;
-		if (p.res[RES_WOOD] < c.v[RES_WOOD] + 150 || p.res[RES_GOLD] < c.v[RES_GOLD] + 60) continue;
-		for (int b : buildings) {
-			if (!B.built[b] || B.fort_tech[b] || (line == 1 ? B.type[b] != B_TOWER : !is_wall_piece(B.type[b]))) continue;
-			if (S.fortify.research(B.id[b], tech).ok) fort.upgrades++;
-			break;
+		if (p.res[RES_WOOD] < c.v[RES_WOOD] + UPGRADE_KEEP_WOOD || p.res[RES_GOLD] < c.v[RES_GOLD] + UPGRADE_KEEP_GOLD) {
+			// (Godot AI: the academies wait a while for it, more hands on
+			// gold; then it is bought whenever there is enough to spare)
+			if (upgrade_wait_t_ < UPGRADE_WAIT) {
+				upgrade_wait_ = true;
+				upgrade_wait_t_ += par.think;
+				fort.upgrade_holds++;
+				want_gold_ = want_gold_ || p.res[RES_GOLD] < c.v[RES_GOLD] + UPGRADE_KEEP_GOLD;
+			}
+			return; // (one tech at a time: the tower's first)
 		}
+		if (S.fortify.research(B.id[at], tech).ok) {
+			fort.upgrades++;
+			upgrade_wait_t_ = 0;
+		}
+		return;
 	}
 }
 
@@ -846,6 +929,279 @@ void EnemyAI::focus_breach(const std::vector<int> &army) {
 			S.combat.approach(u, pick);
 			U.order_x[u] = 0.6;
 			fort.focus++;
+		}
+	}
+}
+
+// Our men out attacking (not at home) are grouped (SIEGE_CLUSTER); a group
+// whose nearest enemy building cannot be walked to (pass_owner = us: enemy
+// gates closed, our allies' open) and that stands by an enemy wall is set on
+// one piece of it: the weakest, closest to the group and to that building,
+// one they can walk up to (the piece picked before stays the group's till it
+// falls). Each man keeps the building as his real target (order_a,
+// ATK_BREACH): the sim sends him back to it once the piece is down, through
+// the hole. A man fighting an enemy unit at hand keeps fighting. A group
+// with an open way (a gap, an allied gate) is left to walk it.
+void EnemyAI::siege(const std::vector<int> &army, int tc) {
+	Sim &S = *sim;
+	UnitStore &U = S.entities.units;
+	const BuildingStore &B = S.entities.buildings;
+	// forget the pieces that fell (and count the ones that fell to us)
+	siege_picks_.erase(std::remove_if(siege_picks_.begin(), siege_picks_.end(), [&](int32_t id) {
+		const int b = S.entities.building_slot(id);
+		if (b < 0 || B.dead[b]) fort.breached++;
+		return b < 0 || B.dead[b];
+	}), siege_picks_.end());
+	siege_t_ -= par.think;
+	if (siege_t_ > 0 || S.fortify.walls == 0) return;
+	siege_t_ = SIEGE_EVERY;
+	// a picked piece whose hp has not gone down for SIEGE_STALL s (our men
+	// cannot get at it: crowded out, ground taken round it) is given up for
+	// SIEGE_BAN s; the next check picks another
+	siege_ban_.erase(std::remove_if(siege_ban_.begin(), siege_ban_.end(), [&](const std::pair<int32_t, double> &kv) { return S.time >= kv.second; }), siege_ban_.end());
+	auto banned = [&](int32_t id) {
+		for (const auto &kv : siege_ban_)
+			if (kv.first == id) return true;
+		return false;
+	};
+	siege_watch_.erase(std::remove_if(siege_watch_.begin(), siege_watch_.end(), [&](const SiegeWatch &w) {
+		return std::find(siege_picks_.begin(), siege_picks_.end(), w.id) == siege_picks_.end();
+	}), siege_watch_.end());
+	for (int32_t id : siege_picks_) {
+		const int b = S.entities.building_slot(id);
+		if (b < 0) continue;
+		bool seen = false;
+		for (SiegeWatch &w : siege_watch_) {
+			if (w.id != id) continue;
+			seen = true;
+			if (B.hp[b] < w.hp - 1) {
+				w.hp = B.hp[b];
+				w.since = S.time;
+			} else if (S.time - w.since > SIEGE_STALL && !banned(id))
+				siege_ban_.push_back({ id, S.time + SIEGE_BAN });
+		}
+		if (!seen) siege_watch_.push_back({ id, B.hp[b], S.time });
+	}
+	siege_picks_.erase(std::remove_if(siege_picks_.begin(), siege_picks_.end(), [&](int32_t id) { return banned(id); }), siege_picks_.end());
+	breach_picks_.erase(std::remove_if(breach_picks_.begin(), breach_picks_.end(), [&](int32_t id) { return banned(id); }), breach_picks_.end());
+	std::vector<int> men;
+	for (int u : army) {
+		if (U.order_type[u] != O_ATTACK && U.order_type[u] != O_ATTACK_MOVE) continue;
+		if (jsm::hypot(U.x[u] - B.x[tc], U.z[u] - B.z[tc]) < SIEGE_HOME) continue;
+		men.push_back(u);
+	}
+	if (men.empty()) return;
+	ScopedTimer tm(S.prof.enabled ? &S.prof.sub["ai.siege"] : nullptr);
+	Pathfinder &pf = S.pathfinder;
+	const int keep = pf.pass_owner;
+	const GameMap &map = S.map();
+	// can man u walk straight to unit e (no wall between them)?
+	auto in_line = [&](int u, int e) {
+		const int ax = map.tile_clamp(U.x[u]), az = map.tile_clamp(U.z[u]), bx = map.tile_clamp(U.x[e]), bz = map.tile_clamp(U.z[e]);
+		if (!map.walkable_for(ax, az, owner)) return true;
+		pf.pass_owner = owner;
+		const bool ok = pf.line_walkable(az * map.size + ax, bz * map.size + bx);
+		pf.pass_owner = keep;
+		return ok;
+	};
+	std::vector<uint8_t> done(men.size(), 0);
+	std::vector<int> group;
+	std::vector<Vec2d> path;
+	struct Cand { int b; double score; };
+	std::vector<Cand> cands;
+	bool searched = false, searched_alt = false;
+	for (size_t i = 0; i < men.size(); i++) {
+		if (done[i]) continue;
+		group.clear();
+		double sx = 0, sz = 0;
+		for (size_t j = i; j < men.size(); j++) {
+			if (done[j] || jsm::hypot(U.x[men[j]] - U.x[men[i]], U.z[men[j]] - U.z[men[i]]) > SIEGE_CLUSTER) continue;
+			done[j] = 1;
+			group.push_back(men[j]);
+			sx += U.x[men[j]];
+			sz += U.z[men[j]];
+		}
+		if (group.size() < 2) continue;
+		const double mx = sx / group.size(), mz = sz / group.size();
+		// (only a group held up by a wall: one of them walled off from his
+		// target, or at a wall piece; marching men need no search)
+		bool held = false;
+		for (int u : group) {
+			const int32_t cur = U.order_type[u] == O_ATTACK ? U.order_target[u] : 0;
+			const int cb = cur && S.entities.kind(cur) == K_BUILDING ? S.entities.building_slot(cur) : -1;
+			held = held || U.path_blocked[u] || (cb >= 0 && is_wall_piece(B.type[cb]));
+		}
+		if (!held) continue;
+		// an enemy wall about?
+		bool wall_near = false;
+		for (int b = 0; b < B.size() && !wall_near; b++)
+			wall_near = !B.removed[b] && !B.dead[b] && is_wall_piece(B.type[b]) && sim->is_enemy(owner, B.owner[b]) && box_dist(B, b, mx, mz) <= SIEGE_SCAN;
+		if (!wall_near) continue;
+		// the building they are after: the one most of them are attacking
+		// (a breaker's real target), else the nearest enemy one (not a wall)
+		int tb = -1, votes = 0;
+		for (int u : group) {
+			int32_t id = U.order_type[u] == O_ATTACK ? U.order_target[u] : 0;
+			if (id && (U.order_b[u] & ATK_BREACH)) id = U.order_a[u];
+			const int b = id && S.entities.kind(id) == K_BUILDING ? S.entities.building_slot(id) : -1;
+			if (b < 0 || B.dead[b] || is_wall_piece(B.type[b]) || b == tb) continue;
+			int n = 0;
+			for (int v : group) {
+				int32_t vid = U.order_type[v] == O_ATTACK ? U.order_target[v] : 0;
+				if (vid && (U.order_b[v] & ATK_BREACH)) vid = U.order_a[v];
+				n += vid == id;
+			}
+			if (n > votes) {
+				votes = n;
+				tb = b;
+			}
+		}
+		double td = INFINITY;
+		const bool voted = tb >= 0;
+		for (int b = 0; b < B.size() && !voted; b++) {
+			if (B.removed[b] || B.dead[b] || is_wall_piece(B.type[b]) || !sim->is_enemy(owner, B.owner[b])) continue;
+			const double d = box_dist(B, b, mx, mz);
+			if (d < td) {
+				td = d;
+				tb = b;
+			}
+		}
+		if (tb < 0) continue;
+		int stx, stz;
+		if (!pf.nearest_walkable((int)std::floor(mx), (int)std::floor(mz), 4, stx, stz)) continue;
+		pf.pass_owner = owner;
+		const GoalRect tr{ (double)B.tx[tb], (double)B.tz[tb], (double)B.w[tb], (double)B.h[tb] };
+		pf.find_path(stx + 0.5, stz + 0.5, B.x[tb], B.z[tb], &tr, path);
+		const bool open = pf.last_found;
+		pf.pass_owner = keep;
+		if (open) continue; // (a way in: they walk it)
+		// (bowmen alone cannot break a wall, and it is repaired under their
+		// arrows: they go home to march with the next wave)
+		int melee = 0;
+		for (int u : group) melee += !unit_def(U.type[u]).attack.projectile;
+		if (melee == 0) {
+			S.commands.move(group, B.x[tc] + 4, B.z[tc] + 4, O_MOVE);
+			fort.regroups++;
+			continue;
+		}
+		// most of them on a piece picked before, still standing: keep it (no search)
+		int pick = -1;
+		for (int32_t id : siege_picks_) {
+			int on = 0;
+			for (int u : group) on += U.order_type[u] == O_ATTACK && U.order_target[u] == id;
+			const int b = S.entities.building_slot(id);
+			if (on * 2 >= (int)group.size() && b >= 0 && !B.dead[b]) {
+				pick = b;
+				break;
+			}
+		}
+		if (pick < 0) {
+			// (one group's search per check: the others wait for the next)
+			if (searched) continue;
+			searched = true;
+			// the pieces about them: weakest, closest to them and to the building
+			cands.clear();
+			for (int b = 0; b < B.size(); b++) {
+				if (B.removed[b] || B.dead[b] || !is_wall_piece(B.type[b]) || !sim->is_enemy(owner, B.owner[b])) continue;
+				const double d = box_dist(B, b, mx, mz);
+				if (d > SIEGE_FAR || !breach_opens(S, b, owner) || banned(B.id[b])) continue;
+				double score = B.hp[b] * (1 + d / 6) + 25 * box_dist(B, tb, B.x[b], B.z[b]);
+				for (int32_t id : siege_picks_)
+					if (id == B.id[b]) score *= 0.4; // (stick to the piece already under attack)
+				cands.push_back({ b, score });
+			}
+			std::stable_sort(cands.begin(), cands.end(), [](const Cand &a, const Cand &b) { return a.score < b.score; });
+			// the first they can walk up to (a wide search: the way round a
+			// forest to the wall's outer face can be long; most of a ring
+			// backed by a forest fails at once, a region cut)
+			pf.pass_owner = owner;
+			const int keep_nodes = pf.max_nodes;
+			pf.max_nodes = std::max(keep_nodes, SIEGE_NODES);
+			const int64_t exp0 = pf.expanded_total;
+			for (size_t k = 0; k < cands.size() && k < SIEGE_TRIES && pick < 0 && pf.expanded_total - exp0 < SIEGE_BUDGET; k++) {
+				const int b = cands[k].b;
+				const GoalRect r{ (double)B.tx[b], (double)B.tz[b], (double)B.w[b], (double)B.h[b] };
+				pf.find_path(stx + 0.5, stz + 0.5, B.x[b], B.z[b], &r, path);
+				if (pf.last_found) pick = b;
+			}
+			pf.max_nodes = keep_nodes;
+			pf.pass_owner = keep;
+		}
+		if (pick < 0) {
+			// no piece they can get at (a ring backed by forest, crowded,
+			// repaired under their blows): another enemy building they can
+			// walk to, the Town Center first, the nearest after it (no
+			// stalemate before an unreachable barracks)
+			if (searched_alt) continue;
+			searched_alt = true;
+			cands.clear();
+			for (int b = 0; b < B.size(); b++) {
+				if (B.removed[b] || B.dead[b] || is_wall_piece(B.type[b]) || b == tb || !sim->is_enemy(owner, B.owner[b])) continue;
+				cands.push_back({ b, (B.type[b] == B_TOWN_CENTER ? 0 : 1000) + box_dist(B, b, mx, mz) });
+			}
+			std::stable_sort(cands.begin(), cands.end(), [](const Cand &a, const Cand &b) { return a.score < b.score; });
+			int alt = -1;
+			pf.pass_owner = owner;
+			const int64_t exp0 = pf.expanded_total;
+			for (size_t k = 0; k < cands.size() && k < SIEGE_ALT_TRIES && alt < 0 && pf.expanded_total - exp0 < SIEGE_BUDGET; k++) {
+				const int b = cands[k].b;
+				const GoalRect r{ (double)B.tx[b], (double)B.tz[b], (double)B.w[b], (double)B.h[b] };
+				pf.find_path(stx + 0.5, stz + 0.5, B.x[b], B.z[b], &r, path);
+				if (pf.last_found) alt = b;
+			}
+			pf.pass_owner = keep;
+			if (alt < 0) continue;
+			int turned = 0;
+			for (int u : group) {
+				if (!U.path_blocked[u] && !(U.order_type[u] == O_ATTACK && U.order_target[u] == B.id[tb])) continue;
+				Order o = Order::with_target(O_ATTACK, B.id[alt]);
+				o.b = ATK_THEN_BUILDINGS;
+				turned += S.commands.order(u, o);
+			}
+			fort.retargets += turned > 0;
+			continue;
+		}
+		const int32_t pid = B.id[pick];
+		if (std::find(siege_picks_.begin(), siege_picks_.end(), pid) == siege_picks_.end()) siege_picks_.push_back(pid);
+		if (std::find(breach_picks_.begin(), breach_picks_.end(), pid) == breach_picks_.end()) breach_picks_.push_back(pid);
+		// the archers shoot the foes at the piece (its repairers, men behind
+		// it: arrows go over a wall) or the piece itself; the rest break it
+		const int foe = S.combat.find_enemy_near(B.x[pick], B.z[pick], owner, SIEGE_COVER);
+		const int32_t foe_id = foe >= 0 ? U.id[foe] : 0;
+		// (at most SIEGE_ON men on the piece: the others are left to what
+		// they are doing; a man is turned only if he is stuck at the wall:
+		// walled off, or on another piece / a building behind it)
+		int on = 0;
+		for (int u : group) on += U.order_type[u] == O_ATTACK && U.order_target[u] == pid;
+		int turned = 0;
+		for (int u : group) {
+			const bool archer = unit_def(U.type[u]).attack.projectile;
+			// (a foe in bow range now: no walk after a man behind the wall)
+			const bool shoot = archer && foe_id && jsm::hypot(U.x[foe] - U.x[u], U.z[foe] - U.z[u]) <= S.combat.range_of(u) + 0.5;
+			const int32_t want = shoot ? foe_id : pid;
+			if (U.order_type[u] == O_ATTACK && (U.order_target[u] == pid || U.order_target[u] == want)) continue;
+			const int32_t cur = U.order_type[u] == O_ATTACK ? U.order_target[u] : 0;
+			const int cb = cur && S.entities.kind(cur) == K_BUILDING ? S.entities.building_slot(cur) : -1;
+			const bool stuck = U.path_blocked[u] || (cb >= 0 && (is_wall_piece(B.type[cb]) || cur == B.id[tb]));
+			if (!stuck) continue;
+			if (want == pid && on >= SIEGE_ON) continue;
+			// (a man fighting an enemy unit he can get at keeps fighting)
+			if (U.order_type[u] == O_ATTACK && S.entities.kind(U.order_target[u]) == K_UNIT) {
+				const int e = S.entities.unit_slot(U.order_target[u]);
+				if (e >= 0 && !U.dead[e] && jsm::hypot(U.x[e] - U.x[u], U.z[e] - U.z[u]) < S.combat.range_of(u) + 3 && (archer || in_line(u, e))) continue;
+			}
+			on += want == pid;
+			Order o = Order::with_target(O_ATTACK, want);
+			if (want == pid) {
+				o.a = B.id[tb];
+				o.b = ATK_BREACH | ATK_THEN_BUILDINGS;
+			} else
+				o.b = ATK_THEN_BUILDINGS;
+			if (S.commands.order(u, o)) turned++;
+		}
+		if (turned) {
+			fort.sieges++;
+			fort.sieged += turned;
 		}
 	}
 }

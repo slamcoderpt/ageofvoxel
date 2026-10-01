@@ -260,11 +260,12 @@ own square ring with clipped corners and a gate in each straight side,
 finished, plus two towers by the Town Center; ~600 buildings instead of
 ~130), so the bench measures pathing round walls, breaches and tower fire;
 `--params "fort=0"` (`setup_scene(..., {fort: false})`) leaves them out.
-2000 units, three interleaved runs today: 0.74-0.89 ms/tick mean (p95
-1.44-1.64) walled, 0.67-0.77 (p95 0.98-1.32) with `fort=0`, 0.69-0.81 for
-the previous commit; `findPath` 0.18-0.20 ms/tick walled (0.07 without;
-`pathCut` / `pathFail` / `pathFlood` are its region rows, see "Walls,
-gates, towers"). The render numbers and
+2000 units, three interleaved runs today (round 2, the AI's siege on):
+0.75-0.85 ms/tick mean (p95 1.43-1.69, max 2.7-4.0) walled, 0.69-0.90
+(p95 1.00-1.40) with `fort=0` (round 1 walled: 0.85-0.94, p95 1.55-1.90,
+single ticks of 10-14 ms); combat 0.17-0.20 ms/tick walled, 0.15-0.20
+without; `pathCut` / `pathFail` / `pathFlood` are the region rows of
+`findPath`, see "Walls, gates, towers". The render numbers and
 their method are in `../docs/godot-stress-report.md`.
 
 Render bench (xvfb + lavapipe, the counterpart of `scripts/bench.mjs`;
@@ -1401,21 +1402,51 @@ every loop in row order):
   side) are kept free of the AI's own farms / houses (`reserved`). Once the
   ring stands each opening is filled from pillar to pillar (one segment)
   and turned into a gate, several at once but never the last way out while
-  others are rising. Every think one ring line is laid again (`patch_ring`:
-  tiles that were trees, berries or a farm, and pieces the enemy broke once
-  no foe is within 8). Every 20 s a path from the Town Center to outside
-  the ring (its own gates open) must exist, else a straight segment becomes
-  a gate (or, short of gold, is pulled down).
+  others are rising; an opening left open (its segment broken, ground
+  taken) or a gate broken is tried again every 60 s once no foe is within
+  14. Every think one ring line is laid again (`patch_ring`: tiles that
+  were trees, berries or a farm, and pieces the enemy broke, once no foe is
+  within 8 of the new tiles); a hole of up to 12 tiles keeps no reserve and
+  holds the academies until it is paid. Every 20 s a path from the Town
+  Center to outside the ring (its own gates open) must exist, else a
+  straight segment becomes a gate (or, short of gold, is pulled down).
 - **Upkeep**: tower / wall stages researched as the age allows (Watch
-  Tower from Moderate, Stone Wall at Hard / Titan; +150 wood +60 gold
-  kept); the most damaged piece or building (fortifications and the Town
-  Center first) under 70 % hp with no foe within 8 gets `repairers`
-  villagers (Easy 1, Moderate 2, Hard / Titan 3; free, Fortify's repair).
+  Tower from Moderate, Stone Wall at Hard / Titan; the tower's first, +30
+  wood +20 gold kept; while one waits the academies of an army of 8+ at
+  home wait too, up to 90 s per tech, `upgrade_holds`); the most damaged
+  piece or building (fortifications and the Town Center first) under 70 %
+  hp with no foe within 8 gets `repairers` villagers (Easy 1, Moderate 2,
+  Hard / Titan 3; free, Fortify's repair).
 - **Attacking walls**: the sim's breach rule sends each walled-off man at
   the wall piece nearest to him; the AI turns each group of breakers (16
   tiles) onto one of the pieces they picked, the least hp x (1 + distance /
   4), kept until it falls (`breach_picks_`), for the men within 12 of it.
-  An open gap needs nothing: the path goes through it.
+  On top of that, every 2 s, the **siege** (`siege`, `fort.sieges` /
+  `sieged` / `breached`): our men out of the town (25+ tiles) in groups of
+  14 tiles, a group held up by a wall (one walled off, or at a piece)
+  whose target building (the one most of them attack, else the nearest)
+  cannot be walked to (enemy gates closed) is set on one piece: among the
+  enemy pieces within 90 whose fall opens a way (open ground on both
+  faces: no staircase piece of a clipped corner), the least hp x (1 +
+  distance / 6) + 25 x its distance to the building, the first of 48 they
+  can walk up to (a 40000-node search, 24000 expansions per check, one
+  group's search per check; a ring backed by a forest is skipped at once
+  by the region cut); at most 12 men on it, only men stuck at the wall are
+  turned, a man fighting a foe he can reach keeps fighting; bowmen shoot
+  the foes within 9 of the piece that are in bow range (repairers, men
+  behind it), else the piece; a group of bowmen alone goes home to march
+  with the next wave (`regroups`). Each man keeps the building as his real
+  target (`order_a`, `ATK_BREACH`): the sim sends him through the hole once
+  the piece is down. A piece unhurt for 30 s (crowded out, repaired under
+  their blows) is given up for 120 s; a group with no piece to get at is
+  sent at another enemy building it can reach, the Town Center first
+  (`retargets`). An open gap needs nothing: the path goes through it.
+  Combat (Godot rules): a man breaking a wall does not turn on a foe behind
+  it (no straight walk to him, `line_walkable`); a man walled off from his
+  target searches again every 4 s (a building) / 2 s (a unit), not every
+  tick (`WALLED_REPATH`).
+- **Meteor**: wall pieces do not count in the AI's clump of enemy
+  buildings (a Meteor is cast on the town; the men break the wall).
 - **Tower fear** (Moderate and up, until 25 min): a wave needs 4 + 2 x
   stage men per enemy tower covering its target; short of that it takes
   the nearest target out of their range, or waits for more men (never past
@@ -1426,12 +1457,17 @@ every loop in row order):
   rules (Godot rules, they stalled matches behind towers): at most a quarter
   of the villagers worship, gold / wood are looked for up to 80 tiles once
   the near ones are worked out, a farm foundation left unbuilt is finished
-  by the next food villager or, after 90 s, pulled down and paid back.
+  by the next food villager or, after 90 s, pulled down and paid back; and
+  (round 2) a storehouse goes up by a wood line / mine being worked by 3+
+  villagers 16+ tiles from every drop-off (every 5 s, one at a time, at
+  most 4, `storehouses`), and with food over 1500 and wood or gold under
+  300 the workers go 20 / 40 / 40 % food / wood / gold (AI-vs-AI matches
+  had ended with 9000 food, no wood, no gold, no army).
 - `fortify_now(towers)` (stress scene, `set_ai {fortify_now}`): the ring
   and openings placed finished and paid, gates converted, the towers built.
 
 ```
-godot --headless --path godot -s res://game/core/aifort_check.gd [-- --only=build,upgrade,repair,breach,gap,fear,determinism,matches --seed=1 --minutes=50]
+godot --headless --path godot -s res://game/core/aifort_check.gd [-- --only=build,upgrade,repair,breach,gap,fear,determinism,matches,siege --seed=1 --minutes=50]
 node scripts/godot-shoot.mjs --scene aifort --out shots/godot/aifort.png [--seed 2]
      [--params "aifort_ai=hard,titan&aifort_t=16&aifort_focus=breach|town&aifort_owner=2"]
 ```
@@ -1448,7 +1484,9 @@ more than each man on his nearest piece, or only one or two are hit), **gap**
 (that piece pulled down first: in through the opening, nothing destroyed,
 sooner), **fear** (6 men facing three towers are held or sent elsewhere, lose
 <= 2), **determinism**, **matches** (Hard v Hard, Titan v Hard, Hard v Titan
-decided). Capture scene `aifort`: a two-AI match played `aifort_t` minutes in
+decided), **siege** (Titan v Titan, seed + 6, favor held at 0 so no Meteor:
+sieges > 0, a wall / pillar / gate piece destroyed with its last hit from a
+soldier, the match decided; ~30 s). Capture scene `aifort`: a two-AI match played `aifort_t` minutes in
 the setup, the camera on the wall piece hit most in the last minute (else
 `aifort_owner`'s Town Center).
 

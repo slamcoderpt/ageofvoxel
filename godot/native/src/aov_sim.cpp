@@ -1465,6 +1465,13 @@ Dictionary AovSim::get_ai(int64_t owner) const {
 		f["reopened"] = ai.fort.reopened;
 		f["patched"] = ai.fort.patched;
 		f["dropped"] = ai.fort.dropped;
+		f["sieges"] = ai.fort.sieges;
+		f["sieged"] = ai.fort.sieged;
+		f["breached"] = ai.fort.breached;
+		f["upgrade_holds"] = ai.fort.upgrade_holds;
+		f["storehouses"] = ai.fort.storehouses;
+		f["regroups"] = ai.fort.regroups;
+		f["retargets"] = ai.fort.retargets;
 		f["ring_at"] = ai.fort.ring_at;
 		f["ring_done_at"] = ai.fort.ring_done_at;
 		f["ring_state"] = ai.ring_state();
