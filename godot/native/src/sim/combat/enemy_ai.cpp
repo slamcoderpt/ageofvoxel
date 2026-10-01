@@ -95,6 +95,23 @@ AIParams ai_params(int d) {
 		p.gather_mult = 1.2;
 		p.bonus_res = 150;
 	}
+	// fortifications (Godot-only; Moderate = the defaults: a tower, Watch Tower)
+	if (d == AI_EASY) {
+		p.towers_max = 1;
+		p.tower_at = 13;
+		p.tower_upgrade = false;
+		p.repairers = 1;
+		p.tower_fear = false;
+	} else if (d == AI_HARD || d == AI_TITAN) {
+		const bool titan = d == AI_TITAN;
+		p.towers_max = titan ? 4 : 3;
+		p.tower_at = titan ? 12 : 14;
+		p.walls = true;
+		p.wall_at = titan ? 360 : 540;
+		p.wall_builders = titan ? 5 : 4;
+		p.wall_upgrade = true;
+		p.repairers = 3;
+	}
 	return p;
 }
 
@@ -158,6 +175,8 @@ void EnemyAI::update(double dt) {
 	if (par.food_share > 0) {
 		sh[RES_FOOD] = par.food_share;
 		sh[RES_GOLD] = p.res[RES_GOLD] > par.bank_cap ? 0.08 : par.gold_share;
+		// (Godot-only: the wall ring or a tower waits for gold: more hands on it)
+		if (S.godot_rules && (line_gold_ > p.res[RES_GOLD] || want_gold_)) sh[RES_GOLD] = std::max(sh[RES_GOLD], 0.3);
 		if (p.res[RES_WOOD] > par.bank_cap) sh[RES_WOOD] = 0.15;
 		sh[RES_WOOD] = std::min(sh[RES_WOOD], 1 - sh[RES_FOOD] - sh[RES_GOLD]);
 		sh[RES_FOOD] = 1 - sh[RES_WOOD] - sh[RES_GOLD];
@@ -211,16 +230,31 @@ void EnemyAI::update(double dt) {
 	if (par.academy2_at > 0 && academy >= 0 && academy2 < 0 && temple_any >= 0 && nv >= par.academy2_at && !building(B_BARRACKS))
 		try_build(B_BARRACKS, pick_builder(vills), tc);
 	static const int PICK[4] = { U_HOPLITE, U_TOXOTES, U_HOPLITE, U_HIPPIKON };
-	if (academy >= 0 && B.built[academy] && (int)B.queue[academy].size() < par.army_queue && (!saving || par.army_while_saving))
+	// (Godot-only: with an army at home, the wood for the next stretch of wall / the next tower comes first)
+	int home = 0; // (soldiers by the Town Center: a wave out does not count)
+	if (S.godot_rules)
+		for (int u : army) home += jsm::hypot(U.x[u] - B.x[tc], U.z[u] - B.z[tc]) < STRAY_DIST;
+	const bool walls_first = S.godot_rules && wall_saving(home);
+	if (academy >= 0 && B.built[academy] && (int)B.queue[academy].size() < par.army_queue && (!saving || par.army_while_saving) && !walls_first)
 		S.economy.train(academy, PICK[(int64_t)std::floor(S.time / 7) % 4]);
-	if (academy2 >= 0 && B.built[academy2] && (int)B.queue[academy2].size() < par.army_queue && (!saving || par.army_while_saving))
+	if (academy2 >= 0 && B.built[academy2] && (int)B.queue[academy2].size() < par.army_queue && (!saving || par.army_while_saving) && !walls_first)
 		S.economy.train(academy2, PICK[((int64_t)std::floor(S.time / 7) + 1) % 4]);
 	if (temple >= 0 && p.age >= 1 && B.queue[temple].size() < 1) S.economy.train(temple, U_MINOTAUR);
 	// worshippers
 	if (temple >= 0) {
 		int worshipping = 0;
 		for (int v : vills) worshipping += U.order_type[v] == O_WORSHIP;
-		if (worshipping < par.worshippers) {
+		// Godot-only: never more than a quarter of the villagers at prayer (a
+		// town worn down to a handful of men must feed itself again: with
+		// every last villager worshipping an AI-vs-AI match could never end)
+		const int want = S.godot_rules ? std::min(par.worshippers, nv / 4) : par.worshippers;
+		if (S.godot_rules && worshipping > want)
+			for (int v : vills)
+				if (worshipping > want && U.order_type[v] == O_WORSHIP) {
+					S.commands.idle(v);
+					worshipping--;
+				}
+		if (worshipping < want) {
 			for (int v : vills)
 				if (U.order_type[v] == O_GATHER && U.econ_phase[v] != EP_NONE && U.econ_res_type[v] == RES_GOLD) {
 					S.commands.order(v, Order::with_target(O_WORSHIP, B.id[temple]));
@@ -231,6 +265,12 @@ void EnemyAI::update(double dt) {
 	// 4. age up
 	if (!p.advancing && p.age < 1 && has_age_cost && S.time >= par.age_after && (p.res[RES_FOOD] > 500 || (nv >= 16 && p.can_afford(age_cost)))) S.economy.advance_age(owner);
 
+	// Godot-only: towers, the wall ring, upgrades, repairs; breaking enemy walls, tower fear
+	if (S.godot_rules) {
+		ScopedTimer ft(S.prof.enabled ? &S.prof.sub["ai.fortify"] : nullptr);
+		fortify(tc, vills, army, buildings, saving);
+	}
+
 	// 5. attack waves
 	std::vector<int> idle_army;
 	for (int u : army)
@@ -239,7 +279,8 @@ void EnemyAI::update(double dt) {
 	// wave_size: a starved economy, a population cap) goes with what there is
 	const bool overdue = S.godot_rules && S.time >= next_wave_at + 120 / aggression && (int)idle_army.size() >= OVERDUE_MIN;
 	if (S.time >= next_wave_at && ((int)idle_army.size() >= wave_size || overdue)) {
-		const int t = find_target(tc);
+		// (Godot-only: a weak wave keeps clear of enemy towers, see enemy_ai_fort.cpp)
+		const int t = S.godot_rules ? pick_target(tc, (int)idle_army.size(), overdue) : find_target(tc);
 		if (t >= 0) {
 			const int32_t tid = B.id[t];
 			WaveLog w{ S.time, tid, B.x[t], B.z[t], {} };
@@ -399,7 +440,10 @@ bool EnemyAI::assign(int v, int res, int tc, const std::vector<int> &buildings) 
 	Sim &S = *sim;
 	Entities &E = S.entities;
 	const BuildingStore &B = E.buildings;
-	const int32_t r = S.economy.nearest_resource(B.x[tc], B.z[tc], res, res == RES_GOLD ? 45 : 34);
+	int32_t r = S.economy.nearest_resource(B.x[tc], B.z[tc], res, res == RES_GOLD ? 45 : 34);
+	// Godot-only: the mines and woods by the town worked out, go farther (a
+	// late game without gold or wood within reach would starve and stall)
+	if (!r && S.godot_rules && res != RES_FOOD) r = S.economy.nearest_resource(B.x[tc], B.z[tc], res, 80);
 	if (r) return S.commands.order(v, Order::with_target(O_GATHER, r));
 	if (res != RES_FOOD) return false;
 	for (int b : buildings) {
@@ -408,8 +452,28 @@ bool EnemyAI::assign(int v, int res, int tc, const std::vector<int> &buildings) 
 		if (fs >= 0 && E.units.order_target[fs] == B.id[b]) continue;
 		return S.commands.order(v, Order::with_target(O_GATHER, B.id[b]));
 	}
-	for (int b : buildings)
-		if (building_def(B.type[b]).farm && !B.built[b]) return false;
+	for (int b : buildings) {
+		if (!building_def(B.type[b]).farm || B.built[b]) continue;
+		if (!S.godot_rules) return false;
+		// Godot-only: a farm foundation left without a builder (its villager
+		// died or was called away) is built by this one; one that stays unbuilt
+		// for a minute and a half of tries is pulled down and paid back, so
+		// food can come in again (an AI with no farm going up starved for good)
+		const int32_t fid = B.id[b];
+		double first = -1;
+		for (const auto &kv : farm_tries_)
+			if (kv.first == fid) first = kv.second;
+		if (first < 0) farm_tries_.push_back({ fid, first = S.time });
+		if (S.time - first > 90) {
+			S.players[owner].refund(building_def(B_FARM).cost);
+			S.buildings.destroy(fid);
+			farm_tries_.erase(std::remove_if(farm_tries_.begin(), farm_tries_.end(), [&](const std::pair<int32_t, double> &kv) { return kv.first == fid; }), farm_tries_.end());
+			return false;
+		}
+		for (int u = 0; u < E.units.size(); u++)
+			if (!E.units.removed[u] && !E.units.dead[u] && E.units.owner[u] == owner && E.units.order_type[u] == O_BUILD && E.units.order_target[u] == fid) return false;
+		return S.commands.order(v, Order::with_target(O_BUILD, fid));
+	}
 	return try_build(B_FARM, v, tc);
 }
 
@@ -462,7 +526,8 @@ bool EnemyAI::find_spot(int type, int tc, int &otx, int &otz) {
 			const double a = S.rng.range(0, PI * 2);
 			const int tx = (int)js_round(cx + jsm::cos(a) * r - def.w / 2.0), tz = (int)js_round(cz + jsm::sin(a) * r - def.h / 2.0);
 			// leave a one-tile gap around buildings so paths stay open
-			if (S.buildings.can_place(type, tx, tz) && gap_ok(tx, tz, def.w, def.h)) {
+			// (Godot-only: never on an opening of our wall ring)
+			if (S.buildings.can_place(type, tx, tz) && gap_ok(tx, tz, def.w, def.h) && !(S.godot_rules && reserved(tx, tz, def.w, def.h))) {
 				otx = tx;
 				otz = tz;
 				return true;

@@ -570,7 +570,7 @@ bool has(const std::string &n) {
 SceneCtx setup(Sim &sim, const std::string &name, const SceneOpts &opts) {
 	if (name == "battle") return battle_setup(sim);
 	if (name == "godpower") return godpower_setup(sim);
-	if (name == "stress") return stress_setup(sim, opts.units);
+	if (name == "stress") return stress_setup(sim, opts.units, opts.fort);
 	SceneCtx ctx;
 	const auto &starts = sim.world.starts;
 	if (starts.size() < 2) return ctx;

@@ -589,7 +589,7 @@ std::vector<int32_t> spawn_army_block(Sim &sim, int owner, const std::vector<int
 // and an army split over the two fronts it shares with its ring neighbours,
 // every soldier ordered onto a man of the opposing block; every player runs
 // an EnemyAI. `total` units across players, 30 % villagers (at least 5 each).
-SceneCtx stress_setup(Sim &sim, int units) {
+SceneCtx stress_setup(Sim &sim, int units, bool fort) {
 	const int total = std::max(12, units);
 	const std::vector<Start> starts = sim.world.starts;
 	const int P = (int)starts.size();
@@ -613,6 +613,10 @@ SceneCtx stress_setup(Sim &sim, int units) {
 		build_town(sim, starts[i].owner, starts[i], vill, 0);
 		army_n[i] = std::max(0, per - vill);
 	}
+	// Godot-only: every town walled in (an AI ring with gates) and two towers,
+	// so the bench measures walls in the pathing and towers firing
+	if (sim.godot_rules && fort)
+		for (EnemyAI &ai : sim.combat.ais) ai.fortify_now(2);
 	// armies: half of each army on each of its two fronts
 	const std::vector<Front> fronts = stress_fronts(starts);
 	std::vector<int> block_order;                              // Map insertion order of front indices

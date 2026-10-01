@@ -32,6 +32,15 @@ public:
 	std::unordered_map<int, int> blockers; // tile index -> entity id
 	std::vector<MapChange> changes; // dirty column rects since the renderer last drained them
 	uint32_t pass_version = 0; // bumped whenever walkability may change (block / passability): path cache key
+	// the tile rects (inclusive) of the latest walkability changes, each with
+	// the pass_version it made (Godot-only: Pathfinder's region floods use it
+	// to keep a flood that no change touched)
+	struct PassChange { uint32_t ver; int x0, z0, x1, z1; };
+	std::vector<PassChange> pass_log;
+	void log_pass(int x0, int z0, int x1, int z1) {
+		if (pass_log.size() >= 1024) pass_log.erase(pass_log.begin(), pass_log.begin() + 512);
+		pass_log.push_back({ pass_version, x0, z0, x1, z1 });
+	}
 	// Gates (sim/fortify, Godot-only): a gate's tiles are blocked like any
 	// building, and gate_pass[i] has bit o set for each owner o allowed
 	// through (the gate owner and his allies; 0 when locked). Only the
@@ -66,6 +75,7 @@ public:
 				gate_tiles += (mask != 0) - (m != 0);
 				m = mask;
 				pass_version++;
+				log_pass(x, z, x, z);
 			}
 	}
 

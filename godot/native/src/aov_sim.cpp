@@ -1349,6 +1349,7 @@ static PackedInt32Array ids_of(const std::vector<int32_t> &v) {
 Dictionary AovSim::setup_scene(const String &name, const Dictionary &opts) {
 	aov::scenes::SceneOpts so;
 	if (opts.has("units")) so.units = (int)(int64_t)opts["units"];
+	if (opts.has("fort")) so.fort = opts["fort"];
 	sim_.scene = aov::scenes::setup(sim_, name.utf8().get_data(), so);
 	const aov::SceneCtx &c = sim_.scene;
 	Dictionary d;
@@ -1450,6 +1451,38 @@ Dictionary AovSim::get_ai(int64_t owner) const {
 		Dictionary casts;
 		for (int k = 0; k < aov::GP_COUNT; k++) casts[aov::power_def(k).key] = ai.casts[k];
 		d["casts"] = casts;
+		// Godot-only: what it did with fortifications (combat/enemy_ai_fort.cpp)
+		Dictionary f;
+		f["towers"] = ai.fort.towers;
+		f["wall_lines"] = ai.fort.wall_lines;
+		f["wall_tiles"] = ai.fort.wall_tiles;
+		f["gates"] = ai.fort.gates;
+		f["upgrades"] = ai.fort.upgrades;
+		f["repairs"] = ai.fort.repairs;
+		f["focus"] = ai.fort.focus;
+		f["avoided"] = ai.fort.avoided;
+		f["retreats"] = ai.fort.retreats;
+		f["reopened"] = ai.fort.reopened;
+		f["patched"] = ai.fort.patched;
+		f["dropped"] = ai.fort.dropped;
+		f["ring_at"] = ai.fort.ring_at;
+		f["ring_done_at"] = ai.fort.ring_done_at;
+		f["ring_state"] = ai.ring_state();
+		f["ring_r"] = ai.ring_radius();
+		f["lines_left"] = ai.ring_lines_left();
+		f["line_cost"] = Vector2(ai.ring_line_wood(), ai.ring_line_gold());
+		f["unbuilt"] = ai.ring_unbuilt();
+		Array gaps;
+		for (const aov::AIGateGap &g : ai.gate_gaps()) {
+			Dictionary gd;
+			gd["a"] = Vector2i(g.tx0, g.tz0);
+			gd["b"] = Vector2i(g.tx1, g.tz1);
+			gd["state"] = g.state;
+			gd["seg"] = g.seg;
+			gaps.push_back(gd);
+		}
+		f["gaps"] = gaps;
+		d["fort"] = f;
 		break;
 	}
 	return d;
@@ -1469,6 +1502,21 @@ void AovSim::set_ai(int64_t owner, const Dictionary &d) {
 			p.difficulty = df;
 			p.gather_mult = aov::ai_params(df).gather_mult;
 		}
+		// Godot-only fortification knobs (checks): wall ring from this time, a fortified town now
+		if (d.has("wall_at")) {
+			ai.par.walls = true;
+			ai.par.wall_at = d["wall_at"];
+			if (ai.par.wall_builders <= 0) ai.par.wall_builders = 3;
+		}
+		if (d.has("towers_max")) ai.par.towers_max = (int)(int64_t)d["towers_max"];
+		if (d.has("breach_focus")) ai.par.breach_focus = d["breach_focus"];
+		if (d.has("fort") && !(bool)d["fort"]) { // no fortifications at all (A/B checks)
+			ai.par.towers_max = 0;
+			ai.par.walls = false;
+			ai.par.repairers = 0;
+			ai.par.tower_upgrade = ai.par.wall_upgrade = false;
+		}
+		if (d.has("fortify_now")) ai.fortify_now((int)(int64_t)d["fortify_now"]);
 		return;
 	}
 }

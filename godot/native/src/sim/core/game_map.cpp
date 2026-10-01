@@ -64,6 +64,7 @@ bool GameMap::is_terrain_passable(int tx, int tz) const {
 
 void GameMap::block(int tx, int tz, int w, int h, int id, int delta) {
 	pass_version++;
+	log_pass(tx, tz, tx + w - 1, tz + h - 1);
 	for (int z = tz; z < tz + h; z++)
 		for (int x = tx; x < tx + w; x++) {
 			if (!in_tiles(x, z)) continue;
@@ -76,6 +77,7 @@ void GameMap::block(int tx, int tz, int w, int h, int id, int delta) {
 
 void GameMap::compute_passability(int tx0, int tz0, int tx1, int tz1) {
 	pass_version++;
+	log_pass(tx0, tz0, tx1 - 1, tz1 - 1);
 	int c = cps;
 	for (int tz = std::max(0, tz0); tz < std::min(size, tz1); tz++)
 		for (int tx = std::max(0, tx0); tx < std::min(size, tx1); tx++) {

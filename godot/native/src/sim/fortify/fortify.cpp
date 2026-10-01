@@ -567,6 +567,7 @@ void Fortify::update(double dt) {
 			B.fort_open[b] = want ? std::min(1.0, B.fort_open[b] + step) : std::max(0.0, B.fort_open[b] - step);
 		}
 	}
+	sim->pathfinder.regions = walls > 0; // (walled-off goals fail fast, pathfinding.h)
 }
 
 } // namespace aov
