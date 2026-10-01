@@ -6,6 +6,7 @@
 // player (Combat::ais).
 #pragma once
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <utility>
 #include <vector>
