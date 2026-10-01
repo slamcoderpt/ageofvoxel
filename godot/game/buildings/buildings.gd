@@ -42,6 +42,7 @@ func setup(g: Node) -> void:
 	add_child(walls)
 	walls.setup(game, PLAYER_COLORS)
 	AovScenes.set_setup("walls", Walls.scene_setup)
+	AovScenes.set_setup("wall_angles", preload("res://game/buildings/wall_angles_scene.gd").scene_setup)
 	towers = Towers.new()
 	towers.name = "towers"
 	add_child(towers)

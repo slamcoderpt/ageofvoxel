@@ -683,10 +683,18 @@ it); every model is pivoted at its tile centre, walls run along +x.
   variants by tile hash). Pillar tiles: the sim's `wall_pillar` pieces,
   every end, corner and junction (so each run ends flush inside a pillar,
   never butting into the next run), and for static walls with `auto` one
-  every <= 5 tiles of a run; beside a gate a pillar is a gate tower. Only a
-  corner right next to a pillar (a 1-tile jog, a staircase line) and
-  diagonal joins are built from an `arm` per link round a `core` (a
-  diagonal arm is the arm turned 45 degrees and stretched by sqrt 2).
+  every <= 5 tiles of a run; beside a gate a pillar is a gate tower.
+  **Stepped runs** (a line dragged at an angle is a staircase of tiles):
+  the chain of tiles between two anchors (pillars, ends, junctions) that is
+  not one straight row is drawn as a straight curtain at its true angle,
+  pillar centre to pillar centre (the tile centres simplified to within 0.75
+  tiles, Douglas-Peucker; a `core` at a bend left over): round(length)
+  `seg` pieces turned to the line and stretched to fill it, the parapet
+  away from the town, each in the state of the run tile nearest it (so a
+  diagonal reads as a long wall, not a row of little towers). Only a corner
+  right next to a pillar outside such a run and diagonal joins are built
+  from an `arm` per link round a `core` (a diagonal arm is the arm turned
+  45 degrees and stretched by sqrt 2).
 - **Gates** (`gate<L>`, L = 1..5 tiles along the axis: the paved threshold
   and a sill between the two gate towers, which overhang it by 3 voxels):
   two door leaves (`gate<L>/leaf`: planks, iron bands and studs, the team
@@ -720,6 +728,11 @@ placed last and only begun: foundations and the three scaffold stages; the
 east side north of the open gate damaged to d1 and d2), the camera outside
 the south-east corner like `walls_02`. `--walls_static=1` (or a sim without
 `place_wall`) draws the same ring as static walls.
+
+Capture scene `wall_angles` (`game/buildings/wall_angles_scene.gd`): sim
+walls dragged out from a point of open ground at 0, 22.5, 45 and 67.5
+degrees off the grid and built, and a line across a house (refused); for
+checking that diagonal walls read as long curtains.
 
 ```
 node scripts/godot-shoot.mjs --scene walls --out shots/godot/walls.png
@@ -818,7 +831,7 @@ age. Portraits of wall pieces, gates and towers are composed from the
   tile; left press starts a line, dragging shows what `plan_wall` would lay,
   one ghost per tile (the pillar / segment model, turned along the line):
   green where it can go, red where a tile is blocked or unexplored (or every
-  new tile when the line is unaffordable), gold on tiles of the player's wall
+  new tile when the line is unaffordable or crosses a building), gold on tiles of the player's wall
   it joins. A box by the cursor gives the tiles, the total wood / gold (red
   when short) and why it cannot be built. An end on one of his wall tiles, or
   within one tile of one of his pillars (an end or corner), snaps onto it, so
@@ -1293,9 +1306,16 @@ systems'. Stone does not exist here: everything costs wood + gold.
 - **Walls**: `place_wall(owner, a, b, builders)` (a, b world points; their
   tiles are the line's ends) lays a 4-connected line (one step in x or z at a
   time: no diagonal gap), joins the owner's existing pieces (those tiles are
-  skipped) and leaves a gap at blocked tiles; each run of new tiles gets a
+  skipped) and leaves a gap at blocked tiles (trees, water, steep ground);
+  a line across a building (any, a foundation too, not the owner's wall it
+  joins) is refused whole, "A building is in the way" (`plan_wall` counts
+  them, `on_building`; the AI's ring, laid round its own town, passes
+  `through_buildings` and keeps the gap instead); each run of new tiles gets a
   pillar at both ends (none next to a joint), at corners with two 2+ tile
-  arms and evenly so no segment exceeds 4 tiles, segments in between. 4 wood
+  arms and evenly so no two pillars stand more than 5 tiles apart as the
+  crow flies (a straight run: segments of at most 4; a line at an angle is a
+  staircase of tiles, spaced by its length, not its tile count), segments
+  in between. 4 wood
   + 2 gold and 3 s (one builder) per tile, paid at once; foundations block
   at once. `plan_wall(owner, a, b)` is the same without placing (the UI
   ghost). Every piece blocks its tiles for everyone (A*, group fields,

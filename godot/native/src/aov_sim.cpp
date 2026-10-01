@@ -1031,6 +1031,7 @@ Dictionary AovSim::plan_wall(int64_t owner, const Vector2 &a, const Vector2 &b) 
 	d["state"] = state;   // per tile: 0 blocked, 1 new wall, 2 joins an existing piece of his
 	d["pieces"] = pieces; // 5 each: building type index (wall / wall_pillar), tx, tz, w, h
 	d["new_tiles"] = P.new_tiles;
+	d["on_building"] = P.on_building; // tiles under a building (refused: "A building is in the way")
 	d["cost"] = cost_dict(P.cost);
 	return d;
 }

@@ -11,10 +11,12 @@
 // - Walls: place_wall(owner, a, b) lays a 4-connected line of tiles from tile
 //   a to tile b (no diagonal gap a unit could slip through), skipping tiles
 //   already holding the owner's wall (joints) and stopping at blocked tiles
-//   (each blocked stretch is a gap). Every run of new tiles gets a pillar
-//   (B_WALL_PILLAR, 1x1) at both ends (not next to an existing joint), at
-//   corners whose both arms are 2+ tiles long and every WALL_PILLAR_EVERY
-//   tiles; the tiles between pillars become straight segments (B_WALL, a 1 x
+//   (each blocked stretch is a gap); a line across a building is refused
+//   (plan_wall's through_buildings: the AI keeps the gap). Every run of new
+//   tiles gets a pillar (B_WALL_PILLAR, 1x1) at both ends (not next to an
+//   existing joint), at corners whose both arms are 2+ tiles long and so no
+//   two stand more than WALL_SEGMENT_MAX + 1 tiles apart as the crow flies
+//   (a staircase line is spaced by its length); the tiles between pillars become straight segments (B_WALL, a 1 x
 //   n rect, n <= WALL_SEGMENT_MAX). A piece blocks its tiles like any
 //   building, for everyone, so every pathing mode (single A*, the group
 //   fields of formation moves, attack-move, the movement step) goes round
@@ -99,6 +101,7 @@ struct WallPlan {
 	std::vector<uint8_t> state;    // WallTileState per tile
 	std::vector<WallPiece> pieces; // what place_wall would spawn
 	int new_tiles = 0;
+	int on_building = 0;           // tiles of the line under a building (not the owner's wall it joins)
 	Cost cost;
 	bool valid = false;
 	std::string reason;
@@ -114,10 +117,13 @@ public:
 	void init(Sim *s);
 	void update(double dt);
 
-	WallPlan plan_wall(int owner, int tx0, int tz0, int tx1, int tz1) const;
+	// through_buildings: a line crossing a building leaves those tiles out
+	// (the AI's ring, laid round its own town); else (a player's drag) the
+	// whole line is refused, "A building is in the way"
+	WallPlan plan_wall(int owner, int tx0, int tz0, int tx1, int tz1, bool through_buildings = false) const;
 	// pay, spawn the foundations, send the builders (rows) to the first piece;
 	// ids of the new pieces (empty + reason when refused)
-	std::vector<int32_t> place_wall(int owner, int tx0, int tz0, int tx1, int tz1, const std::vector<int> &builders, FortResult &res);
+	std::vector<int32_t> place_wall(int owner, int tx0, int tz0, int tx1, int tz1, const std::vector<int> &builders, FortResult &res, bool through_buildings = false);
 	FortResult convert_to_gate(int32_t id);
 	FortResult set_gate_locked(int32_t id, bool locked);
 	FortResult research(int32_t building_id, int tech);

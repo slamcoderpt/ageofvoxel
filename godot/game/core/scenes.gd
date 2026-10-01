@@ -48,6 +48,10 @@ static var SCENES := {
 	# damage; the camera looks along the south wall like reference/walls/walls_02.
 	"walls": {"preset": "skirmish", "seed": 7, "hud": false, "reveal_all": true, "fast_forward": 0.0,
 		"camera": {"distance": 27.0, "pitch": 37.0, "yaw": 44.0}},
+	# Godot-only: sim walls dragged at 0 / 22 / 45 / 67 degrees and across a
+	# house (game/buildings/wall_angles_scene.gd): how diagonal walls read.
+	"wall_angles": {"preset": "skirmish", "seed": 7, "hud": false, "reveal_all": true, "fast_forward": 0.0,
+		"camera": {"distance": 34.0, "pitch": 48.0, "yaw": 20.0}},
 	# Godot-only: Greek towers (game/buildings/towers.gd, game/combat/tower_fire.gd):
 	# the town with a row of towers at every upgrade stage, an enemy squad in
 	# front of them under fire (the setup steps the sim until arrows fly).

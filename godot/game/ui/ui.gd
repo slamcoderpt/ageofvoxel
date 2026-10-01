@@ -1820,7 +1820,8 @@ func _confirm_place(shift: bool) -> void:
 # the line AovSim.plan_wall() would lay (4-connected tiles; pillars at ends,
 # corners and every few tiles, segments between) as ghost pieces, green
 # where they can go, red where a tile is blocked, unexplored or the whole
-# line unaffordable, gold on tiles of the player's wall it joins; the total
+# line unaffordable or refused (a building on it: a wall never goes over
+# one), gold on tiles of the player's wall it joins; the total
 # cost follows the cursor. An end within one tile of one of his pillars (a
 # wall end or corner) snaps onto it, so lines join. Release places the
 # foundations (AovSim.place_wall) and the selected villagers go and build
@@ -1946,6 +1947,7 @@ func _update_wall_ghost(g: Vector2) -> void:
 		add_child(mi)
 		_wall_ghosts.append(mi)
 	var good := GHOST_OK
+	var in_way := int(P.get("on_building", 0)) > 0   # (a building on the line: the whole line is refused)
 	for i in _wall_ghosts.size():
 		var mi: MeshInstance3D = _wall_ghosts[i]
 		if i >= n:
@@ -1960,7 +1962,7 @@ func _update_wall_ghost(g: Vector2) -> void:
 		var yaw := 0.0
 		if st[i] == 1:
 			model = "pillar" if pillar.has(Vector2i(tx, tz)) else "seg/0"
-			col = good if afford else GHOST_BAD
+			col = good if afford and not in_way else GHOST_BAD
 			# a segment runs along the line (x or z) at that tile
 			var j0 := maxi(i - 1, 0)
 			var j1 := mini(i + 1, n - 1)

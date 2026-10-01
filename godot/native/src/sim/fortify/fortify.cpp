@@ -113,7 +113,7 @@ int Fortify::own_piece_at(int tx, int tz, int owner) const {
 	return b;
 }
 
-WallPlan Fortify::plan_wall(int owner, int tx0, int tz0, int tx1, int tz1) const {
+WallPlan Fortify::plan_wall(int owner, int tx0, int tz0, int tx1, int tz1, bool through_buildings) const {
 	WallPlan P;
 	const GameMap &map = sim->map();
 	if (owner < 1 || owner >= MAX_PLAYERS || !sim->players[owner].exists) {
@@ -144,6 +144,7 @@ WallPlan Fortify::plan_wall(int owner, int tx0, int tz0, int tx1, int tz1) const
 		const int x = P.tiles[i * 2], z = P.tiles[i * 2 + 1];
 		P.state[i] = own_piece_at(x, z, owner) >= 0 ? WT_JOINT : tile_ok(x, z) ? WT_NEW : WT_BAD;
 		if (P.state[i] == WT_NEW) P.new_tiles++;
+		else if (P.state[i] == WT_BAD && sim->buildings.in_footprint(x, z)) P.on_building++;
 	}
 	// runs of new tiles -> pillars and straight segments
 	auto tx = [&](int i) { return P.tiles[i * 2]; };
@@ -168,7 +169,11 @@ WallPlan Fortify::plan_wall(int owner, int tx0, int tz0, int tx1, int tz1) const
 			for (int j = i + 1; j < k - 1 && dir(a + j, a + j + 1) == dout; j++) arm_out++;
 			if (arm_in >= 2 && arm_out >= 2) pil[i] = 1;
 		}
-		// even spacing between fixed pillars (or joints): segments of <= WALL_SEGMENT_MAX
+		// even spacing between fixed pillars (or joints): at most
+		// WALL_SEGMENT_MAX + 1 tiles apart as the crow flies (a straight run:
+		// segments of <= WALL_SEGMENT_MAX; a line dragged at an angle is a
+		// staircase of tiles, and counting its tiles would stud it with a
+		// pillar every 3.5 tiles of wall)
 		{
 			std::vector<int> fixed;
 			fixed.push_back(joint0 ? -1 : 0);
@@ -178,8 +183,11 @@ WallPlan Fortify::plan_wall(int owner, int tx0, int tz0, int tx1, int tz1) const
 			if (last > fixed.back()) fixed.push_back(last);
 			for (size_t f = 0; f + 1 < fixed.size(); f++) {
 				const int p0 = fixed[f], g = fixed[f + 1] - p0 - 1;
-				if (g <= WALL_SEGMENT_MAX) continue;
-				const int m = (g - WALL_SEGMENT_MAX + WALL_PILLAR_EVERY - 1) / WALL_PILLAR_EVERY;
+				const int t0 = a + p0, t1 = a + fixed[f + 1]; // (a joint: the owner's piece just outside the run)
+				const double span = std::sqrt((double)(tx(t1) - tx(t0)) * (tx(t1) - tx(t0)) + (double)(tz(t1) - tz(t0)) * (tz(t1) - tz(t0)));
+				const int gs = (int)std::ceil(span - 1e-9) - 1; // (a straight run: span = g + 1)
+				if (gs <= WALL_SEGMENT_MAX) continue;
+				const int m = (gs - WALL_SEGMENT_MAX + WALL_PILLAR_EVERY - 1) / WALL_PILLAR_EVERY;
 				for (int q = 1; q <= m; q++) {
 					const int at = p0 + (int)js_round((double)q * (g + 1) / (m + 1));
 					if (at >= 0 && at < k) pil[at] = 1;
@@ -215,7 +223,8 @@ WallPlan Fortify::plan_wall(int owner, int tx0, int tz0, int tx1, int tz1) const
 	}
 	const Cost &tc = building_def(B_WALL).cost;
 	P.cost = Cost(0, tc.v[RES_WOOD] * P.new_tiles, tc.v[RES_GOLD] * P.new_tiles, 0);
-	if (P.pieces.empty()) P.reason = "Cannot build a wall there";
+	if (P.on_building > 0 && !through_buildings) P.reason = "A building is in the way";
+	else if (P.pieces.empty()) P.reason = "Cannot build a wall there";
 	else if (!sim->players[owner].can_afford(P.cost)) P.reason = "Not enough resources";
 	else P.valid = true;
 	return P;
@@ -269,14 +278,14 @@ int Fortify::spawn_piece(int type, int owner, int tx, int tz, int w, int h) {
 	return b;
 }
 
-std::vector<int32_t> Fortify::place_wall(int owner, int tx0, int tz0, int tx1, int tz1, const std::vector<int> &builders, FortResult &res) {
+std::vector<int32_t> Fortify::place_wall(int owner, int tx0, int tz0, int tx1, int tz1, const std::vector<int> &builders, FortResult &res, bool through_buildings) {
 	std::vector<int32_t> ids;
 	res = FortResult();
 	if (!sim->godot_rules) {
 		res.reason = "Walls need the Godot rules";
 		return ids;
 	}
-	WallPlan P = plan_wall(owner, tx0, tz0, tx1, tz1);
+	WallPlan P = plan_wall(owner, tx0, tz0, tx1, tz1, through_buildings);
 	if (!P.valid) {
 		res.reason = P.reason;
 		return ids;

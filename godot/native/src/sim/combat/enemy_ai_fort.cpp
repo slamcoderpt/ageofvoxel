@@ -415,7 +415,7 @@ bool EnemyAI::place_ring_line(bool instant, const std::vector<int> &builders) {
 	Player &p = S.players[owner];
 	while (!ring_lines_.empty()) {
 		const std::array<int, 4> l = ring_lines_.front();
-		const WallPlan plan = S.fortify.plan_wall(owner, l[0], l[1], l[2], l[3]);
+		const WallPlan plan = S.fortify.plan_wall(owner, l[0], l[1], l[2], l[3], true);
 		if (plan.pieces.empty() || plan.new_tiles == 0) {
 			ring_lines_.erase(ring_lines_.begin()); // nothing to lay there (blocked ground, already walled)
 			continue;
@@ -430,7 +430,7 @@ bool EnemyAI::place_ring_line(bool instant, const std::vector<int> &builders) {
 		line_wood_ = line_gold_ = 0;
 		line_wait_since_ = -1;
 		FortResult res;
-		const std::vector<int32_t> ids = S.fortify.place_wall(owner, l[0], l[1], l[2], l[3], builders, res);
+		const std::vector<int32_t> ids = S.fortify.place_wall(owner, l[0], l[1], l[2], l[3], builders, res, true);
 		ring_lines_.erase(ring_lines_.begin());
 		if (!res.ok) continue;
 		fort.wall_lines++;
@@ -568,7 +568,7 @@ void EnemyAI::ring_gates(bool instant) {
 		// not come up to it, pillars close the ends)
 		const int sx = (g.tx1 > g.tx0) - (g.tx1 < g.tx0), sz = (g.tz1 > g.tz0) - (g.tz1 < g.tz0);
 		const int fx0 = g.tx0 - sx, fz0 = g.tz0 - sz, fx1 = g.tx1 + sx, fz1 = g.tz1 + sz;
-		const WallPlan plan = S.fortify.plan_wall(owner, fx0, fz0, fx1, fz1);
+		const WallPlan plan = S.fortify.plan_wall(owner, fx0, fz0, fx1, fz1, true);
 		if (plan.pieces.empty()) {
 			g.state = 3; // (nothing can stand there: left open)
 			g.retry_t = S.time + GAP_RETRY;
@@ -576,7 +576,7 @@ void EnemyAI::ring_gates(bool instant) {
 		}
 		if (p.res[RES_WOOD] < plan.cost.v[RES_WOOD] + gc.v[RES_WOOD] || p.res[RES_GOLD] < plan.cost.v[RES_GOLD] + gc.v[RES_GOLD]) continue;
 		FortResult res;
-		const std::vector<int32_t> ids = S.fortify.place_wall(owner, fx0, fz0, fx1, fz1, {}, res);
+		const std::vector<int32_t> ids = S.fortify.place_wall(owner, fx0, fz0, fx1, fz1, {}, res, true);
 		if (!res.ok || ids.empty()) {
 			g.state = 3;
 			g.retry_t = S.time + GAP_RETRY;
@@ -614,7 +614,7 @@ void EnemyAI::patch_ring() {
 	for (size_t k = 0; k < ring_plan_.size(); k++) {
 		const std::array<int, 4> &l = ring_plan_[patch_next_ % ring_plan_.size()];
 		patch_next_++;
-		const WallPlan plan = S.fortify.plan_wall(owner, l[0], l[1], l[2], l[3]);
+		const WallPlan plan = S.fortify.plan_wall(owner, l[0], l[1], l[2], l[3], true);
 		if (plan.pieces.empty() || plan.new_tiles == 0) continue;
 		// (not under the enemy's nose: a breach is walled up once the fight
 		// at it has moved on; foes elsewhere along the line do not matter)
@@ -637,7 +637,7 @@ void EnemyAI::patch_ring() {
 		const int v = pick_builder(vills);
 		std::vector<int> builders;
 		if (v >= 0) builders.push_back(v);
-		const std::vector<int32_t> ids = S.fortify.place_wall(owner, l[0], l[1], l[2], l[3], builders, res);
+		const std::vector<int32_t> ids = S.fortify.place_wall(owner, l[0], l[1], l[2], l[3], builders, res, true);
 		if (!res.ok) return;
 		fort.wall_tiles += plan.new_tiles;
 		fort.patched += plan.new_tiles;

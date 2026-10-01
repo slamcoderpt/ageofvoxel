@@ -289,12 +289,21 @@ func _rebuild(entries: Array) -> void:
 				run_pillars.append(run[idx])
 	for L in run_pillars:
 		L.pillar = true
+	# stepped runs (a line dragged at an angle is a staircase of tiles):
+	# drawn as straight curtains at their true angle between the pillars that
+	# bound them, not tile by tile (a staircase tile is a corner, and corners
+	# would make a diagonal a row of little towers)
+	var bent := _bent_runs(links)
+	var drawn := {}
+	for run in bent:
+		for k in run.tiles:
+			drawn[k] = true
 	# every end, corner and junction is capped by a pillar (the curtain ends
 	# flush inside it), but for a tile right next to one (a 1-tile jog or a
 	# staircase): that joins on arms, so a stepped line is not a row of pillars
 	for k in links:
 		var L: Dictionary = links[k]
-		if L.pillar or L.straight or int(L.links) == 0:
+		if L.pillar or L.straight or int(L.links) == 0 or drawn.has(k):
 			continue
 		if L.d[0] or L.d[1] or L.d[2] or L.d[3]:
 			continue
@@ -308,7 +317,11 @@ func _rebuild(entries: Array) -> void:
 			L.pillar = true
 	var towns := _towns()
 	# pieces
+	for run in bent:
+		_add_run(items, run, links, towns)
 	for k in links:
+		if drawn.has(k):
+			continue
 		var L: Dictionary = links[k]
 		var e: Dictionary = L.e
 		var sfx := _suffix(_state_code(e))
@@ -437,6 +450,148 @@ static func _dump(links: Dictionary, occ: Dictionary) -> void:
 			else:
 				s += "+"
 		print("walls: %4d %s" % [z, s])
+
+## The stepped runs: chains of 2-link tiles between two anchors (pillars,
+## ends, junctions, diagonal joins) that are not one straight row. Each is
+## {tiles: [tile keys between the anchors], pts: [anchor, ..., anchor] the
+## polyline it is drawn along (the tile centres, simplified to within
+## BENT_TOL), corners: [tile keys at the polyline's inner vertices]}.
+const BENT_TOL := 0.75
+
+static func _bent_runs(links: Dictionary) -> Array:
+	var anchor := func(L: Dictionary) -> bool:
+		return L.pillar or int(L.links) != 2 or L.d[0] or L.d[1] or L.d[2] or L.d[3]
+	var out := []
+	var seen := {}
+	for k in links:
+		var A: Dictionary = links[k]
+		if not anchor.call(A):
+			continue
+		for i in 4:
+			if not A.o[i]:
+				continue
+			var nk := _tk(A.tx + ORTH[i][0], A.tz + ORTH[i][1])
+			if seen.has(nk) or not links.has(nk) or anchor.call(links[nk]):
+				continue
+			# walk to the next anchor
+			var tiles := [nk]
+			var prev: int = k
+			var cur: int = nk
+			var end := -1
+			while true:
+				var C: Dictionary = links[cur]
+				var nxt := -1
+				for j in 4:
+					if not C.o[j]:
+						continue
+					var jk := _tk(C.tx + ORTH[j][0], C.tz + ORTH[j][1])
+					if jk != prev and links.has(jk):
+						nxt = jk
+						break
+				if nxt < 0:
+					break
+				if anchor.call(links[nxt]):
+					end = nxt
+					break
+				if tiles.size() > 4096 or nxt == nk:
+					break
+				tiles.append(nxt)
+				prev = cur
+				cur = nxt
+			for t in tiles:
+				seen[t] = true
+			if end < 0:
+				continue
+			var straight := true
+			for t in tiles:
+				if not links[t].straight:
+					straight = false
+					break
+			if straight:
+				continue
+			var pts := [_centre(links[k])]
+			for t in tiles:
+				pts.append(_centre(links[t]))
+			pts.append(_centre(links[end]))
+			var keep := _simplify(pts, BENT_TOL)
+			var corners := []
+			for q in range(1, keep.size() - 1):
+				corners.append(tiles[keep[q] - 1])
+			var poly := []
+			for q in keep:
+				poly.append(pts[q])
+			out.append({"tiles": tiles, "pts": poly, "corners": corners})
+	return out
+
+static func _centre(L: Dictionary) -> Vector2:
+	return Vector2(L.tx + 0.5, L.tz + 0.5)
+
+## Douglas-Peucker: the indices of pts kept (first and last always).
+static func _simplify(pts: Array, tol: float) -> Array:
+	var keep := [0, pts.size() - 1]
+	var stack := [[0, pts.size() - 1]]
+	while not stack.is_empty():
+		var r: Array = stack.pop_back()
+		var a: Vector2 = pts[r[0]]
+		var b: Vector2 = pts[r[1]]
+		var best := -1.0
+		var bi := -1
+		for q in range(r[0] + 1, r[1]):
+			var p: Vector2 = pts[q]
+			var d := Geometry2D.get_closest_point_to_segment(p, a, b).distance_to(p)
+			if d > best:
+				best = d
+				bi = q
+		if bi >= 0 and best > tol:
+			keep.append(bi)
+			stack.append([r[0], bi])
+			stack.append([bi, r[1]])
+	keep.sort()
+	return keep
+
+## A stepped run's curtain: along each polyline edge, round(length) `seg`
+## pieces turned to the edge and stretched to fill it end to end (the ends
+## go into the pillars), the parapet away from the town; a `core` at an inner
+## vertex. Each piece takes the state of the run tile nearest it.
+func _add_run(items: Dictionary, run: Dictionary, links: Dictionary, towns: Dictionary) -> void:
+	var sim = game.sim
+	var pts: Array = run.pts
+	for q in pts.size() - 1:
+		var a: Vector2 = pts[q]
+		var b: Vector2 = pts[q + 1]
+		var d := b - a
+		var len := d.length()
+		if len < 0.01:
+			continue
+		var m := maxi(1, int(round(len)))
+		var step := len / m
+		var dir := d / len
+		var yaw := _yaw_of(dir.x, dir.y)
+		for i in m:
+			var c := a + dir * (step * (i + 0.5))
+			var best := INF
+			var e: Dictionary = {}
+			for t in run.tiles:
+				var tc := _centre(links[t])
+				var dd := tc.distance_squared_to(c)
+				if dd < best:
+					best = dd
+					e = links[t].e
+			var owner: int = int(e.owner)
+			var sfx := _suffix(_state_code(e))
+			var out := _outward(towns, owner, c)
+			var y := yaw
+			if sin(y) * out.x + cos(y) * out.y < 0.0:
+				y += PI
+			var v := _h(int(floor(c.x * 2.0)), int(floor(c.y * 2.0)), 41) % 3
+			var key := ("seg/0" + sfx) if sfx.begins_with("/s") else ("seg/%d%s" % [v, sfx])
+			var bas := Basis(Vector3.UP, y) * Basis.from_scale(Vector3(step, 1.0, 1.0))
+			_add(items, key, Transform3D(bas, Vector3(c.x, sim.height_at(c.x, c.y), c.y)), owner)
+	for k in run.corners:
+		var L: Dictionary = links[k]
+		var x: float = L.tx + 0.5
+		var z: float = L.tz + 0.5
+		_add(items, "core" + _suffix(_state_code(L.e)), Transform3D(Basis(), Vector3(x, sim.height_at(x, z), z)), int(L.e.owner))
 
 static func _add(items: Dictionary, key: String, xf: Transform3D, owner: int) -> void:
 	if not items.has(key):

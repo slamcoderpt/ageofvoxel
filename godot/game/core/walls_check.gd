@@ -282,9 +282,24 @@ func _case_plan() -> void:
 	# an L: a pillar on the corner
 	var l1: Dictionary = S.plan_wall(1, a, a + Vector2(6, 0))
 	var cost: Dictionary = q.cost
+	# a 45-degree line of 12 (24 tiles of staircase): pillars spaced as the
+	# crow flies (every 5 tiles or so of wall), not every 5 tiles of the staircase
+	var dg: Dictionary = S.plan_wall(1, a, a + Vector2(12, 12))
+	var dpc: PackedInt32Array = dg.pieces
+	var dpil := 0
+	for i in dpc.size() / 5:
+		dpil += int(names[dpc[i * 5]] == "wall_pillar")
+	# a line across a building (the Town Center) is refused, the building's tiles counted
+	var tc := _tc(S, 1)
+	var thr: Dictionary = S.plan_wall(1, Vector2(float(tc.x) - 7.0, float(tc.z)), Vector2(float(tc.x) + 7.0, float(tc.z)))
+	var thr_r: Dictionary = S.place_wall(1, Vector2(float(tc.x) - 7.0, float(tc.z)), Vector2(float(tc.x) + 7.0, float(tc.z)))
+	var refused: bool = not bool(thr.valid) and int(thr.get("on_building", 0)) > 0 and str(thr.reason) == "A building is in the way" \
+		and not bool(thr_r.get("ok", true))
 	_check("plan", conn and t.size() / 2 == 13 and ends and max_seg <= 4 and max_seg >= 2 and covered == 14
-			and int(q.new_tiles) == 14 and int(cost.get("wood", 0)) == 14 * 4 and int(cost.get("gold", 0)) == 14 * 2 and bool(q.valid) and bool(l1.valid),
-		{"diag_tiles": t.size() / 2, "four_connected": conn, "kinds": kinds, "max_segment": max_seg, "cost": cost})
+			and int(q.new_tiles) == 14 and int(cost.get("wood", 0)) == 14 * 4 and int(cost.get("gold", 0)) == 14 * 2 and bool(q.valid) and bool(l1.valid)
+			and dpil >= 3 and dpil <= 5 and refused,
+		{"diag_tiles": t.size() / 2, "four_connected": conn, "kinds": kinds, "max_segment": max_seg, "cost": cost,
+			"diag45_pillars": dpil, "across_building": {"valid": thr.valid, "on_building": thr.get("on_building"), "reason": thr.reason}})
 
 # build --------------------------------------------------------------------------
 
