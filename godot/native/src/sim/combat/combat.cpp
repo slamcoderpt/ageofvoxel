@@ -618,7 +618,9 @@ void Combat::update(double dt) {
 		if (scan && ts >= 0 && tk == K_BUILDING && !def.gatherer) {
 			const int e = find_enemy_near(U.x[r], U.z[r], U.owner[r], 6);
 			if (e >= 0) {
-				U.order_a[r] = tid; // (remember the building, so the attack goes back to it afterwards)
+				// (remember the building, so the attack goes back to it afterwards;
+				// a man breaking a wall keeps his real target, Godot-only fortify)
+				if (!(is_wall_piece(B.type[ts]) && (U.order_b[r] & ATK_BREACH))) U.order_a[r] = tid;
 				tid = U.order_target[r] = U.id[e];
 				ts = e;
 				tk = K_UNIT;
@@ -630,19 +632,43 @@ void Combat::update(double dt) {
 			continue;
 		}
 		if (tdead) {
-			const int e = !def.gatherer ? pick_target(r, U.combat_leash[r] != 0 ? U.combat_leash[r] : U.sight[r]) : -1;
 			const int32_t back_id = U.order_a[r];
-			const int bs = back_id ? E.building_slot(back_id) : -1;
-			if (e >= 0) {
+			// (order_a is a building id, or, Godot-only, the unit a wall breaker
+			// was sent to kill)
+			const Kind bk = back_id ? E.kind(back_id) : K_NONE;
+			const int bs = bk == K_BUILDING || bk == K_UNIT ? E.slot(back_id) : -1;
+			const bool back_alive = bs >= 0 && (bk == K_UNIT ? !U.dead[bs] : !B.dead[bs]);
+			const bool breach_back = (U.order_b[r] & ATK_BREACH) && back_alive;
+			const int e = !def.gatherer && !breach_back ? pick_target(r, U.combat_leash[r] != 0 ? U.combat_leash[r] : U.sight[r]) : -1;
+			if (breach_back) {
+				// Godot-only (fortify): the wall is down: back to the real target
+				U.order_b[r] &= ~ATK_BREACH;
+				if (bk == K_UNIT) U.order_a[r] = 0;
+				U.order_target[r] = back_id;
+				U.order_x[r] = 0;
+				approach(r, back_id);
+			} else if (e >= 0) {
 				U.order_target[r] = U.id[e];
 				approach(r, U.id[e]);
-			} else if (bs >= 0 && !B.dead[bs]) {
+			} else if (back_alive) {
+				if (bk == K_UNIT) U.order_a[r] = 0;
+				U.order_b[r] &= ~ATK_BREACH;
 				U.order_target[r] = back_id;
 				approach(r, back_id);
 			} else if (U.order_b[r] & ATK_THEN_BUILDINGS) {
 				const int b = find_enemy_building_near(U.x[r], U.z[r], U.owner[r], 200);
 				if (b >= 0) {
 					U.order_target[r] = B.id[b];
+					approach(r, B.id[b]);
+				} else
+					sim->commands.idle(r);
+			} else if (U.order_b[r] & ATK_BROKE_IN) {
+				// Godot-only (fortify): men sent into a walled town that have
+				// nothing left to kill turn on its buildings close by
+				const int b = find_enemy_building_near(U.x[r], U.z[r], U.owner[r], U.sight[r] * 2);
+				if (b >= 0) {
+					U.order_target[r] = B.id[b];
+					U.order_a[r] = 0;
 					approach(r, B.id[b]);
 				} else
 					sim->commands.idle(r);
@@ -665,10 +691,15 @@ void Combat::update(double dt) {
 		if (dist > range + 0.25) {
 			// Godot-only (fortify): the target is walled off and the man has
 			// stopped at the end of his path: break through the nearest enemy wall
+			if (sim->godot_rules && sim->fortify.walls > 0 && U.path_blocked[r]) U.order_b[r] |= ATK_BROKE_IN; // (walled off)
 			if (sim->godot_rules && sim->fortify.walls > 0 && !U.moving[r] && U.path_blocked[r]) {
 				const int32_t w = sim->fortify.breach_target(r);
 				if (w && w != tid) {
-					if (tk == K_BUILDING && !is_wall_piece(B.type[ts])) U.order_a[r] = tid; // (back to it afterwards)
+					// (back to the real target afterwards: a building or a unit;
+					// a man already at a wall, or one that left his building for
+					// a unit close by, keeps the target he had)
+					if (tk == K_BUILDING ? !is_wall_piece(B.type[ts]) : U.order_a[r] == 0) U.order_a[r] = tid;
+					U.order_b[r] |= ATK_BREACH;
 					U.order_target[r] = w;
 					U.am_lost[r] = 0;
 					approach(r, w);

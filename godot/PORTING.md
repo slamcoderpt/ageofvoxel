@@ -1225,7 +1225,14 @@ systems'. Stone does not exist here: everything costs wood + gold.
   or the "then buildings" sweep; a unit whose attack target is walled off
   (its last path search did not reach: `units.path_blocked`) attacks the
   nearest enemy wall piece within 6 tiles, then goes back to its target
-  (the AI's waves breach a ring this way).
+  (the AI's waves breach a ring this way). The real target, a building or a
+  unit, is kept in `order_a` with the `ATK_BREACH` bit (combat.h) while the
+  man breaks the wall: switching to an enemy unit near the piece (a
+  repairer) or to the next piece keeps it, and when the piece falls he heads
+  for that target before any other foe in sight. A man whose target was
+  walled off on this order (`ATK_BROKE_IN`) that finds the target dead and
+  no foe in sight attacks the nearest enemy building (not a wall) within
+  twice his sight instead of standing idle in the hole.
 - **Repair** (rules on, any building): a build order (right-click) on a
   damaged finished building of one's own heals it for free at half the
   build rate x builders^0.75 (`REPAIR_RATE`).
@@ -1246,7 +1253,9 @@ plan, build (a 13 x 13 ring by 8 villagers; 4 builders > 1), keepout (single
 A*, formation, group field, attack-move, right-click: nobody inside),
 gate (owner and ally in, enemy out, leaves open for them only, locked keeps
 the owner out), repair (free, 4 hands faster), breach (soldiers break a piece
-to reach a house inside; its tiles walkable again), towers (kill an enemy in
+to reach a house inside; its tiles walkable again; the whole army goes in and
+razes the house, none idle outside; the same with a villager as the target in
+a fresh ring: they break in and kill him), towers (kill an enemy in
 range, never an ally / own unit; Town Center arrows never hit an ally),
 upgrades (each stage's age, range / damage / hp up, arrow damage measured;
 Stone Wall hp x2.25), determinism (two runs bit-equal), rules_off.

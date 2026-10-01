@@ -64,7 +64,11 @@ constexpr double STAGGER = 0.5;      // s a man struck reels back (renderer)
 constexpr double STUCK_TIME = 9;     // s an arrow stays stuck in the ground
 constexpr int STUCK_MAX = 400;
 
-enum AttackFlag : int32_t { ATK_THEN_BUILDINGS = 1, ATK_AUTO = 2 };
+enum AttackFlag : int32_t { ATK_THEN_BUILDINGS = 1, ATK_AUTO = 2, ATK_BREACH = 4, ATK_BROKE_IN = 8 };
+// (Godot-only, fortify: ATK_BREACH = breaking a wall now, order_a = the real
+// target, a building or a unit; ATK_BROKE_IN = the target was walled off on this order: when it is dead
+// and no foe is in sight, the man attacks the nearest enemy building within
+// twice his sight)
 enum AttackMoveFlag : int32_t { AM_THEN_BUILDINGS = 1 };
 enum AmResume : uint8_t { AMR_NONE = 0, AMR_MOVE = 1, AMR_ATTACK_MOVE = 2 };
 constexpr int AM_SCAN_TICKS = 8;        // attack-move re-acquire period (ticks, staggered per unit)

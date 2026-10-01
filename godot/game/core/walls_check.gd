@@ -15,7 +15,9 @@ extends SceneTree
 ##   repair     villagers repair a damaged wall for free, more hands faster
 ##   breach     enemy soldiers attacking a house inside the ring break a wall
 ##              piece; the broken piece's tiles are walkable again and the
-##              enemy walks in
+##              whole army walks in and razes the house (none waits idle
+##              outside); the same with a villager inside a fresh ring as
+##              the target: they break in and kill him
 ##   towers     a tower built by villagers shoots enemies in range, never an ally
 ##              or its owner's units; Town Center arrows never hit an ally
 ##   upgrades   Watch / Guard / Ballista Tower (each needs its age) raise range,
@@ -523,54 +525,96 @@ func _case_repair() -> void:
 # breach -------------------------------------------------------------------------
 
 func _case_breach() -> void:
-	# a house inside the ring; enemy soldiers told to attack it break through
+	# (1) a house inside the ring; enemy soldiers told to attack it break a
+	# piece and then the whole army goes in and razes the house
 	var house := int(S.spawn_building("house", 1, C.x - 1, C.y - 1, true, false))
-	var foes := _spawn(S, "hoplite", 2, 12, C.x - 3, C.y - R - 6, 6)
-	S.tick(1)
-	for id in foes:
-		S.order(id, {"type": "attack", "target": house})
-	var n0 := int(_walls(S).count)
-	var broke_t := -1.0
-	var house_hit := false
-	var inside := 0
-	var reopened := false
-	var walk_ok := false
 	var pieces_before := {}
 	var W0 := _walls(S)
 	for i in int(W0.count):
 		pieces_before[int(W0.ids[i])] = [int(W0.rect[i * 4]), int(W0.rect[i * 4 + 1]), int(W0.rect[i * 4 + 2]), int(W0.rect[i * 4 + 3])]
-	for t in 240 * FPS:
-		S.tick(1)
-		if broke_t < 0 and int(_walls(S).count) < n0:
-			broke_t = t / float(FPS)
-			# the broken piece's tiles are walkable again
-			var W := _walls(S)
-			var alive := {}
-			for i in int(W.count):
-				alive[int(W.ids[i])] = true
-			var walk: PackedByteArray = S.get_walkable()
-			var n := int(S.get_map_size())
-			walk_ok = true
-			for id in pieces_before:
-				if alive.has(id):
-					continue
-				var rc: Array = pieces_before[id]
-				for z in range(rc[1], rc[1] + rc[3]):
-					for x in range(rc[0], rc[0] + rc[2]):
-						if walk[z * n + x] == 0:
-							walk_ok = false
-		if t % 30 == 0:
-			var hb: Dictionary = S.get_building(house)
-			if hb.is_empty() or float(hb.hp) < float(hb.max_hp):
-				house_hit = true
-			inside = maxi(inside, _inside(S, foes, C, R))
-			if house_hit and inside > 0:
-				break
-	reopened = inside > 0
+	var foes := _spawn(S, "hoplite", 2, 12, C.x - 3, C.y - R - 6, 6)
+	S.tick(1)
+	for id in foes:
+		S.order(id, {"type": "attack", "target": house})
+	var rb := _breach_run(S, C, R, foes, house, false)
+	# the broken piece's tiles are walkable again
+	var W := _walls(S)
+	var alive := {}
+	for i in int(W.count):
+		alive[int(W.ids[i])] = true
+	var walk: PackedByteArray = S.get_walkable()
+	var n := int(S.get_map_size())
+	var walk_ok: bool = rb.broke_at_s > 0
+	for id in pieces_before:
+		if alive.has(id):
+			continue
+		var rc: Array = pieces_before[id]
+		for z in range(rc[1], rc[1] + rc[3]):
+			for x in range(rc[0], rc[0] + rc[2]):
+				if walk[z * n + x] == 0:
+					walk_ok = false
 	_kill(S, foes)
 	S.tick(2)
-	_check("breach", broke_t > 0 and walk_ok and reopened and house_hit, {"broke_at_s": broke_t, "tiles_walkable": walk_ok,
-		"enemies_inside": inside, "house_hit": house_hit})
+	rb["tiles_walkable"] = walk_ok
+	# (2) the target is a unit: a villager inside a fresh closed ring; the
+	# army breaks a piece, goes in to him and kills him (nobody waits outside)
+	var ru := {}
+	var sim := _new_sim(seed_arg + 9)
+	var c := _open_area(sim, 30, 26.0)
+	var bv := _spawn(sim, "villager", 1, 8, c.x - 3, c.y - R - 4, 8)
+	sim.tick(1)
+	for ln in _ring_lines(c, R):
+		sim.place_wall(1, _w(ln[0]), _w(ln[1]), PackedInt32Array(bv))
+	var built := _build_all(sim, 1, bv, 400.0)
+	_kill(sim, bv)
+	var victim := _spawn(sim, "villager", 1, 1, c.x + 0.5, c.y + 0.5)
+	var ufoes := _spawn(sim, "hoplite", 2, 12, c.x - 3, c.y - R - 6, 6)
+	sim.tick(1)
+	for id in ufoes:
+		sim.order(id, {"type": "attack", "target": victim[0]})
+	ru = _breach_run(sim, c, R, ufoes, victim[0], true)
+	ru["ring_built_s"] = built
+	var ok_b: bool = rb.broke_at_s > 0 and walk_ok and rb.target_dead and rb.idle_outside_max == 0 and rb.inside_at_end * 4 >= rb.alive_at_end * 3
+	var ok_u: bool = built > 0 and ru.broke_at_s > 0 and ru.target_dead and ru.idle_outside_max == 0 and ru.went_for_target * 4 >= ru.alive_at_break * 3
+	_check("breach", ok_b and ok_u, {"building": rb, "unit": ru})
+
+## Steps the breach scenario until the target is dead (240 s at most).
+## idle_outside_max: most attackers idle outside the ring at one time while
+## the target lived (the bar: 0); went_for_target: attackers that, after the
+## first piece fell, attacked the target itself (or were inside); inside /
+## alive at the end.
+func _breach_run(sim: Object, c: Vector2i, r: int, foes: Array, target: int, is_unit: bool) -> Dictionary:
+	var n0 := int(_walls(sim).count)
+	var broke_t := -1.0
+	var idle_out := 0
+	var went := {}
+	var alive_at_break := 0
+	var dead := false
+	var t_dead := -1.0
+	for t in 240 * FPS:
+		sim.tick(1)
+		if t % 15 != 0:
+			continue
+		if broke_t < 0 and int(_walls(sim).count) < n0:
+			broke_t = t / float(FPS)
+			alive_at_break = _alive(sim, foes).size()
+		var tg: Dictionary = sim.get_unit(target) if is_unit else sim.get_building(target)
+		dead = tg.is_empty() or bool(tg.get("dead", false))
+		if dead:
+			t_dead = t / float(FPS)
+			break
+		var io := 0
+		for id in _alive(sim, foes):
+			var u: Dictionary = sim.get_unit(id)
+			var ins: bool = u.x >= c.x - r + 1 and u.x < c.x + r and u.z >= c.y - r + 1 and u.z < c.y + r
+			if str(u.order) == "idle" and not ins:
+				io += 1
+			if broke_t > 0 and (ins or int(u.get("target", 0)) == target):
+				went[id] = true
+		idle_out = maxi(idle_out, io)
+	var left := _alive(sim, foes)
+	return {"broke_at_s": broke_t, "target_dead": dead, "dead_at_s": t_dead, "idle_outside_max": idle_out,
+		"went_for_target": went.size(), "alive_at_break": alive_at_break, "alive_at_end": left.size(), "inside_at_end": _inside(sim, foes, c, r)}
 
 # towers + upgrades --------------------------------------------------------------
 
