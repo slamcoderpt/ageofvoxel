@@ -79,10 +79,11 @@ size_t Pathfinder::KeyHash::operator()(const Key &k) const {
 	return (size_t)(h ^ (h >> 29));
 }
 
-bool Pathfinder::nearest_walkable(int tx, int tz, int max_r, int &ox, int &oz) const {
+bool Pathfinder::nearest_impl(int tx, int tz, int max_r, int &ox, int &oz, bool gates) const {
 	const GameMap &m = *map;
 	CallTimer ct(prof, "nearestWalkable");
-	if (m.is_walkable(tx, tz)) { ox = tx; oz = tz; return true; }
+	auto ok = [&](int x, int z) { return gates ? walk(x, z) : m.is_walkable(x, z); };
+	if (ok(tx, tz)) { ox = tx; oz = tz; return true; }
 	// no ring within max_r reaches the map (also keeps tx + dx from overflowing)
 	if (tx < -max_r || tz < -max_r || tx >= m.size + max_r || tz >= m.size + max_r) return false;
 	for (int r = 1; r <= max_r; r++) {
@@ -91,7 +92,7 @@ bool Pathfinder::nearest_walkable(int tx, int tz, int max_r, int &ox, int &oz) c
 		for (int dz = -r; dz <= r; dz++)
 			for (int dx = -r; dx <= r; dx++) {
 				if (std::max(std::abs(dx), std::abs(dz)) != r) continue;
-				if (m.is_walkable(tx + dx, tz + dz)) {
+				if (ok(tx + dx, tz + dz)) {
 					int d = dx * dx + dz * dz;
 					if (d < bd) { bd = d; bx = tx + dx; bz = tz + dz; any = true; }
 				}
@@ -110,11 +111,11 @@ bool Pathfinder::line_walkable(int a, int b) const {
 	const int sx = x0 < x1 ? 1 : -1, sz = z0 < z1 ? 1 : -1;
 	int err = dx - dz;
 	while (true) {
-		if (!m.is_walkable(x0, z0)) return false;
+		if (!walk(x0, z0)) return false;
 		if (x0 == x1 && z0 == z1) return true;
 		int e2 = 2 * err;
 		if (e2 > -dz && e2 < dx) {
-			if (!m.is_walkable(x0 + sx, z0) || !m.is_walkable(x0, z0 + sz)) return false;
+			if (!walk(x0 + sx, z0) || !walk(x0, z0 + sz)) return false;
 		}
 		if (e2 > -dz) { err -= dz; x0 += sx; }
 		if (e2 < dx) { err += dx; z0 += sz; }
@@ -160,8 +161,8 @@ void Pathfinder::search(int stx, int stz, int gtx, int gtz, const GoalRect *rect
 		for (int d = 0; d < 8; d++) {
 			const int dx = DX[d], dz = DZ[d];
 			const int nx = cx + dx, nz = cz + dz;
-			if (!m.is_walkable(nx, nz)) continue;
-			if (dx && dz && (!m.is_walkable(cx + dx, cz) || !m.is_walkable(cx, cz + dz))) continue;
+			if (!walk(nx, nz)) continue;
+			if (dx && dz && (!walk(cx + dx, cz) || !walk(cx, cz + dz))) continue;
 			const int ni = nz * N + nx;
 			if (closed[ni] == stamp) continue;
 			const double ng = (double)g[cur] + COST[d];
@@ -198,11 +199,11 @@ bool Pathfinder::start_tile(double sx, double sz, int &stx, int &stz) const {
 	const GameMap &m = *map;
 	stx = m.tile_clamp(sx / TILE);
 	stz = m.tile_clamp(sz / TILE);
-	if (!m.is_walkable(stx, stz)) {
+	if (!walk(stx, stz)) {
 		int wx, wz;
-		if (nearest_walkable(stx, stz, 4, wx, wz)) { stx = wx; stz = wz; }
+		if (nearest_impl(stx, stz, 4, wx, wz, true)) { stx = wx; stz = wz; }
 	}
-	return m.is_walkable(stx, stz);
+	return walk(stx, stz);
 }
 
 // Dijkstra from `goal` (8-connected, no corner cutting, the A* step costs)
@@ -234,8 +235,8 @@ int Pathfinder::run_field(int goal, const std::vector<int32_t> &want) {
 		for (int d = 0; d < 8; d++) {
 			const int dx = DX[d], dz = DZ[d];
 			const int nx = cx + dx, nz = cz + dz;
-			if (!m.is_walkable(nx, nz)) continue;
-			if (dx && dz && (!m.is_walkable(cx + dx, cz) || !m.is_walkable(cx, cz + dz))) continue;
+			if (!walk(nx, nz)) continue;
+			if (dx && dz && (!walk(cx + dx, cz) || !walk(cx, cz + dz))) continue;
 			const int ni = nz * N + nx;
 			if (closed[ni] == stamp) continue;
 			const double nd = dist[cur] + COST[d];
@@ -258,9 +259,9 @@ void Pathfinder::begin_group_field(double gx, double gz, const std::vector<Vec2d
 	const int N = m.size;
 	int gtx = m.tile_clamp(gx / TILE);
 	int gtz = m.tile_clamp(gz / TILE);
-	if (!m.is_walkable(gtx, gtz)) {
+	if (!walk(gtx, gtz)) {
 		int wx, wz;
-		if (!nearest_walkable(gtx, gtz, 16, wx, wz)) return;
+		if (!nearest_impl(gtx, gtz, 16, wx, wz, true)) return;
 		gtx = wx;
 		gtz = wz;
 	}
@@ -300,8 +301,8 @@ void Pathfinder::begin_group_field(double gx, double gz, const std::vector<Vec2d
 				for (int dx = -1; dx <= 1; dx++) {
 					if (!dx && !dz) continue;
 					const int nx = cx + dx, nz = cz + dz;
-					if (!m.is_walkable(nx, nz)) continue;
-					if (dx && dz && (!m.is_walkable(cx + dx, cz) || !m.is_walkable(cx, cz + dz))) continue;
+					if (!walk(nx, nz)) continue;
+					if (dx && dz && (!walk(cx + dx, cz) || !walk(cx, cz + dz))) continue;
 					const int ni = nz * N + nx;
 					if (closed[ni] == stamp) continue;
 					closed[ni] = stamp;
@@ -329,9 +330,9 @@ bool Pathfinder::field_path(double sx, double sz, double gx, double gz, std::vec
 	gz += field_shift_z_;
 	int gtx = m.tile_clamp(gx / TILE);
 	int gtz = m.tile_clamp(gz / TILE);
-	if (!m.is_walkable(gtx, gtz)) {
+	if (!walk(gtx, gtz)) {
 		int wx, wz;
-		if (!nearest_walkable(gtx, gtz, 16, wx, wz)) return false;
+		if (!nearest_impl(gtx, gtz, 16, wx, wz, true)) return false;
 		gtx = wx;
 		gtz = wz;
 		gx = (gtx + 0.5) * TILE;
@@ -377,6 +378,7 @@ void Pathfinder::find_path(double sx, double sz, double gx, double gz, const Goa
 	if (timed) t0 = Clock::now();
 	calls++;
 	out.clear();
+	last_found = true;
 	if (field_active_ && !rect) {
 		if (field_path(sx, sz, gx, gz, out)) {
 			if (timed) prof->add_call("findPath", ms_since(t0));
@@ -387,9 +389,9 @@ void Pathfinder::find_path(double sx, double sz, double gx, double gz, const Goa
 	const GameMap &m = *map;
 	const int N = m.size;
 	int stx = m.tile_clamp(sx / TILE), stz = m.tile_clamp(sz / TILE);
-	if (!m.is_walkable(stx, stz)) {
+	if (!walk(stx, stz)) {
 		int wx, wz;
-		if (nearest_walkable(stx, stz, 4, wx, wz)) { stx = wx; stz = wz; }
+		if (nearest_impl(stx, stz, 4, wx, wz, true)) { stx = wx; stz = wz; }
 	}
 	int gtx, gtz;
 	bool ok = true;
@@ -401,9 +403,9 @@ void Pathfinder::find_path(double sx, double sz, double gx, double gz, const Goa
 		if (!m.clamp_to_map(gx, gz)) ok = false;
 		gtx = m.tile_clamp(gx / TILE);
 		gtz = m.tile_clamp(gz / TILE);
-		if (!m.is_walkable(gtx, gtz)) {
+		if (!walk(gtx, gtz)) {
 			int wx, wz;
-			if (!nearest_walkable(gtx, gtz, 16, wx, wz)) ok = false;
+			if (!nearest_impl(gtx, gtz, 16, wx, wz, true)) ok = false;
 			else {
 				gtx = wx;
 				gtz = wz;
@@ -425,7 +427,7 @@ void Pathfinder::find_path(double sx, double sz, double gx, double gz, const Goa
 					cache_.clear();
 					cache_version_ = m.pass_version;
 				}
-				Key k{ stz * N + stx, gtz * N + gtx, (uint8_t)(rect ? 1 : 0), rect ? rect->tx : 0, rect ? rect->tz : 0, rect ? rect->w : 0, rect ? rect->h : 0 };
+				Key k{ stz * N + stx, gtz * N + gtx, (uint8_t)(rect ? 1 : 0), (int8_t)(m.gate_tiles > 0 ? pass_owner : -1), rect ? rect->tx : 0, rect ? rect->tz : 0, rect ? rect->w : 0, rect ? rect->h : 0 };
 				auto it = cache_.find(k);
 				if (it != cache_.end()) {
 					cache_hits++;
@@ -442,8 +444,10 @@ void Pathfinder::find_path(double sx, double sz, double gx, double gz, const Goa
 			out.reserve(r->pts.size());
 			for (int32_t i : r->pts) out.push_back({ (i % N + 0.5) * TILE, (i / N + 0.5) * TILE });
 			if (r->found && !rect && !out.empty()) out.back() = { gx, gz };
+			last_found = r->found;
 		}
-	}
+	} else
+		last_found = false;
 	if (timed) prof->add_call("findPath", ms_since(t0));
 }
 

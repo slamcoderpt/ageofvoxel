@@ -88,6 +88,7 @@ enum UnitFlag : uint8_t { UF_MOVING = 1, UF_DEAD = 2, UF_ARRIVED = 4, UF_CARRY =
 	X(double, stuck_t, 0)                                                      \
 	X(int32_t, repaths, 0)                                                     \
 	X(uint8_t, repath_pending, 0) /* deferred by the re-path budget */        \
+	X(uint8_t, path_blocked, 0)   /* the last search did not reach the goal (fortify breach rule) */ \
 	/* order (core/commands): generic fields, meaning per order type */       \
 	X(uint8_t, order_type, O_IDLE)                                             \
 	X(int32_t, order_target, 0)   /* targetId */                               \
@@ -205,7 +206,14 @@ enum UnitFlag : uint8_t { UF_MOVING = 1, UF_DEAD = 2, UF_ARRIVED = 4, UF_CARRY =
 	X(double, stock_meat, 0)                                                   \
 	X(double, stock_fish, 0)                                                   \
 	X(double, stock_wood, 0)                                                   \
-	X(double, stock_gold, 0)
+	X(double, stock_gold, 0)                                                   \
+	/* fortify (sim/fortify, Godot-only): walls, gates, towers */             \
+	X(double, fort_build_time, 0) /* s to build this row, 0 = the def's (walls scale with length) */ \
+	X(uint8_t, fort_locked, 0)    /* gate locked: nobody passes */            \
+	X(double, fort_open, 0)       /* gate leaves 0 closed .. 1 open (renderer) */ \
+	X(uint8_t, fort_tech, 0)      /* research in progress here: FortTech, 0 none */ \
+	X(double, fort_tech_t, 0)                                                  \
+	X(double, fort_tech_total, 0)
 
 enum BuildingDefFlag : uint8_t { BF_WORSHIP = 1, BF_FARM = 2, BF_DROPOFF = 4 };
 enum EconPhase : uint8_t { EP_NONE, EP_TO_RES, EP_GATHERING, EP_TO_DROP, EP_TO_TEMPLE };

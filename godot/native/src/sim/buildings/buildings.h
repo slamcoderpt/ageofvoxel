@@ -25,6 +25,10 @@ namespace aov {
 class Sim;
 struct Start;
 
+// Godot-only repair (a build order on a damaged finished building of one's
+// own): hp per second = max_hp / build time * REPAIR_RATE * builders^0.75, free.
+constexpr double REPAIR_RATE = 0.5;
+
 class Buildings {
 public:
 	Sim *sim = nullptr;

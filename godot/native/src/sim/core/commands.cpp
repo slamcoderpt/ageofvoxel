@@ -94,6 +94,7 @@ void Commands::move(const std::vector<int> &rows, double x, double z, uint8_t ty
 		std::vector<Vec2d> starts;
 		starts.reserve(n);
 		for (int r : list) starts.push_back({ U.x[r], U.z[r] });
+		pf.pass_owner = U.owner[list[0]]; // (gates: the field is for the first mover's side)
 		pf.begin_group_field(x, z, starts);
 	}
 	for (int i = 0; i < n; i++) {
@@ -144,6 +145,7 @@ void Commands::smart(const std::vector<int> &rows, double x, double z, int32_t t
 				else if (B.def_flags[ts] & BF_WORSHIP) { if (try_order(r, O_WORSHIP)) continue; }
 				else if (B.def_flags[ts] & BF_FARM) { if (try_order(r, O_GATHER)) continue; }
 				else if (U.carry_amount[r] > 0 && (B.def_flags[ts] & BF_DROPOFF)) { if (try_order(r, O_DROPOFF)) continue; }
+				else if (sim->godot_rules && B.hp[ts] < B.max_hp[ts]) { if (try_order(r, O_BUILD)) continue; } // repair (Godot-only)
 			}
 		}
 		movers.push_back(r);

@@ -87,6 +87,16 @@ void AovSim::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("place_building", "type", "owner", "tx", "tz", "builders"), &AovSim::place_building, DEFVAL(PackedInt32Array()));
 	ClassDB::bind_method(D_METHOD("destroy_building", "id"), &AovSim::destroy_building);
 	ClassDB::bind_method(D_METHOD("get_building", "id"), &AovSim::get_building);
+	// fortifications (Godot-only)
+	ClassDB::bind_method(D_METHOD("plan_wall", "owner", "a", "b"), &AovSim::plan_wall);
+	ClassDB::bind_method(D_METHOD("place_wall", "owner", "a", "b", "builders"), &AovSim::place_wall, DEFVAL(PackedInt32Array()));
+	ClassDB::bind_method(D_METHOD("convert_to_gate", "id"), &AovSim::convert_to_gate);
+	ClassDB::bind_method(D_METHOD("set_gate_locked", "id", "locked"), &AovSim::set_gate_locked);
+	ClassDB::bind_method(D_METHOD("research", "building", "tech"), &AovSim::research);
+	ClassDB::bind_method(D_METHOD("cancel_research", "building"), &AovSim::cancel_research);
+	ClassDB::bind_method(D_METHOD("fort_tech_names"), &AovSim::fort_tech_names);
+	ClassDB::bind_method(D_METHOD("get_walls"), &AovSim::get_walls);
+	ClassDB::bind_method(D_METHOD("get_fortify", "owner"), &AovSim::get_fortify);
 	// economy
 	ClassDB::bind_method(D_METHOD("train", "building", "unit_type"), &AovSim::train);
 	ClassDB::bind_method(D_METHOD("cancel_train", "building", "index"), &AovSim::cancel_train);
@@ -676,6 +686,9 @@ Dictionary AovSim::get_buildings() const {
 	d["yaw"] = packed_rows<double, PackedFloat32Array>(B.removed, B.bld_yaw);
 	d["setback"] = packed_rows<double, PackedFloat32Array>(B.removed, B.bld_setback);
 	d["farm_rows"] = packed_rows<double, PackedFloat32Array>(B.removed, B.econ_rows);
+	// fortify (Godot-only): gate leaves 0 closed .. 1 open, gate locked (get_walls() has the rest)
+	d["fort_open"] = packed_rows<double, PackedFloat32Array>(B.removed, B.fort_open);
+	d["fort_locked"] = packed_rows<uint8_t, PackedByteArray>(B.removed, B.fort_locked);
 	PackedFloat32Array stock, rally;
 	PackedByteArray qlen;
 	for (int r = 0; r < B.size(); r++) {
@@ -818,6 +831,7 @@ bool AovSim::move_to(int64_t id, double x, double z, double range) {
 
 PackedVector2Array AovSim::find_path(double sx, double sz, double gx, double gz) {
 	std::vector<aov::Vec2d> pts;
+	sim_.pathfinder.pass_owner = -1; // (nobody's gates open)
 	sim_.pathfinder.find_path(sx, sz, gx, gz, nullptr, pts);
 	PackedVector2Array out;
 	for (const auto &p : pts) out.push_back(Vector2((real_t)p.x, (real_t)p.z));
@@ -982,6 +996,157 @@ Dictionary AovSim::get_building(int64_t id) const {
 	}
 	d["farm_rows"] = B.econ_rows[b];
 	d["farmer"] = B.farmer[b];
+	return d;
+}
+
+// ---- fortifications (sim/fortify, Godot-only) -------------------------------
+
+static Dictionary fort_result(const aov::FortResult &r) {
+	Dictionary d;
+	d["ok"] = r.ok;
+	d["reason"] = String(r.reason.c_str());
+	return d;
+}
+
+// a world coordinate's tile, NaN / huge values clamped (plan_wall clamps onto the map)
+static int fort_tile(double v) { return std::isnan(v) ? 0 : (int)std::floor(std::max(-1e6, std::min(1e6, v))); }
+
+Dictionary AovSim::plan_wall(int64_t owner, const Vector2 &a, const Vector2 &b) const {
+	const aov::WallPlan P = sim_.fortify.plan_wall((int)owner, fort_tile(a.x), fort_tile(a.y), fort_tile(b.x), fort_tile(b.y));
+	Dictionary d;
+	d["valid"] = P.valid;
+	d["reason"] = String(P.reason.c_str());
+	PackedInt32Array tiles, pieces;
+	PackedByteArray state;
+	for (int v : P.tiles) tiles.push_back(v);
+	for (uint8_t v : P.state) state.push_back(v);
+	for (const aov::WallPiece &w : P.pieces) {
+		pieces.push_back(w.type);
+		pieces.push_back(w.tx);
+		pieces.push_back(w.tz);
+		pieces.push_back(w.w);
+		pieces.push_back(w.h);
+	}
+	d["tiles"] = tiles;   // tx, tz pairs in line order
+	d["state"] = state;   // per tile: 0 blocked, 1 new wall, 2 joins an existing piece of his
+	d["pieces"] = pieces; // 5 each: building type index (wall / wall_pillar), tx, tz, w, h
+	d["new_tiles"] = P.new_tiles;
+	d["cost"] = cost_dict(P.cost);
+	return d;
+}
+
+Dictionary AovSim::place_wall(int64_t owner, const Vector2 &a, const Vector2 &b, const PackedInt32Array &builders) {
+	aov::FortResult r;
+	const std::vector<int32_t> ids = sim_.fortify.place_wall((int)owner, fort_tile(a.x), fort_tile(a.y), fort_tile(b.x), fort_tile(b.y),
+			rows_of(sim_.entities, builders), r);
+	Dictionary d = fort_result(r);
+	PackedInt32Array out;
+	for (int32_t id : ids) out.push_back(id);
+	d["ids"] = out;
+	return d;
+}
+
+Dictionary AovSim::convert_to_gate(int64_t id) { return fort_result(sim_.fortify.convert_to_gate((int32_t)id)); }
+Dictionary AovSim::set_gate_locked(int64_t id, bool locked) { return fort_result(sim_.fortify.set_gate_locked((int32_t)id, locked)); }
+
+Dictionary AovSim::research(int64_t building, const String &tech) {
+	const int t = aov::fort_tech_of(tech.utf8().get_data());
+	if (!t) return fort_result({ false, "Unknown technology" });
+	return fort_result(sim_.fortify.research((int32_t)building, t));
+}
+
+bool AovSim::cancel_research(int64_t building) { return sim_.fortify.cancel_research((int32_t)building); }
+
+PackedStringArray AovSim::fort_tech_names() const {
+	PackedStringArray out;
+	for (int t = 1; t < aov::FT_COUNT; t++) out.push_back(aov::fort_tech_def(t).key);
+	return out;
+}
+
+Dictionary AovSim::get_walls() const {
+	const aov::BuildingStore &B = sim_.entities.buildings;
+	const aov::Fortify &F = sim_.fortify;
+	PackedInt32Array ids, rect;
+	PackedByteArray kind, owner, built, axis, conn, level, locked, tech;
+	PackedFloat32Array hp, max_hp, progress, open, tech_t;
+	for (int b = 0; b < B.size(); b++) {
+		if (B.removed[b] || !aov::is_fort_type(B.type[b])) continue;
+		const int t = B.type[b], o = B.owner[b];
+		ids.push_back(B.id[b]);
+		kind.push_back(t == aov::B_WALL_PILLAR ? 0 : t == aov::B_WALL ? 1 : t == aov::B_GATE ? 2 : 3);
+		owner.push_back(o);
+		rect.push_back(B.tx[b]);
+		rect.push_back(B.tz[b]);
+		rect.push_back(B.w[b]);
+		rect.push_back(B.h[b]);
+		hp.push_back((float)B.hp[b]);
+		max_hp.push_back((float)B.max_hp[b]);
+		built.push_back(B.built[b]);
+		progress.push_back((float)B.progress[b]);
+		axis.push_back(F.axis(b));
+		conn.push_back(F.connections(b));
+		level.push_back((uint8_t)(t == aov::B_TOWER ? F.tower_level[o] : F.wall_level[o]));
+		open.push_back((float)B.fort_open[b]);
+		locked.push_back(B.fort_locked[b]);
+		tech.push_back(B.fort_tech[b]);
+		tech_t.push_back(B.fort_tech_total[b] > 0 ? (float)(B.fort_tech_t[b] / B.fort_tech_total[b]) : 0.f);
+	}
+	Dictionary d;
+	d["count"] = ids.size();
+	d["ids"] = ids;
+	d["kind"] = kind;         // 0 pillar, 1 wall segment, 2 gate, 3 tower
+	d["owner"] = owner;
+	d["rect"] = rect;         // 4 each: tx, tz, w, h
+	d["hp"] = hp;
+	d["max_hp"] = max_hp;
+	d["built"] = built;
+	d["progress"] = progress;
+	d["axis"] = axis;         // 0 runs along x, 1 along z
+	d["conn"] = conn;         // bits: 1 -z, 2 +x, 4 +z, 8 -x neighbour is his wall piece
+	d["level"] = level;       // the owner's wall / tower stage 0..3
+	d["open"] = open;         // gates: leaves 0 closed .. 1 open
+	d["locked"] = locked;     // gates
+	d["tech"] = tech;         // research in progress: index into fort_tech_names() + 1, 0 none
+	d["tech_t"] = tech_t;     // its progress 0..1
+	return d;
+}
+
+Dictionary AovSim::get_fortify(int64_t owner) const {
+	const aov::Fortify &F = sim_.fortify;
+	const int o = owner >= 0 && owner < aov::MAX_PLAYERS ? (int)owner : 0;
+	Dictionary d;
+	d["wall_level"] = F.wall_level[o];
+	d["wall_name"] = aov::wall_stage(F.wall_level[o]).name;
+	d["wall_tile_hp"] = aov::wall_stage(F.wall_level[o]).tile_hp;
+	d["tower_level"] = F.tower_level[o];
+	d["tower_name"] = aov::tower_stage(F.tower_level[o]).name;
+	const aov::TowerStage &ts = aov::tower_stage(F.tower_level[o]);
+	Dictionary tw;
+	tw["hp"] = ts.hp;
+	tw["range"] = ts.range;
+	tw["damage"] = ts.damage;
+	tw["cooldown"] = ts.cooldown;
+	tw["sight"] = ts.sight;
+	d["tower"] = tw;
+	Array techs;
+	static const char *STATES[] = { "done", "available", "needs_previous", "needs_age", "researching" };
+	for (int t = 1; t < aov::FT_COUNT; t++) {
+		const aov::FortTechDef &td = aov::fort_tech_def(t);
+		Dictionary e;
+		e["key"] = td.key;
+		e["name"] = td.name;
+		e["line"] = td.line ? "tower" : "wall";
+		e["level"] = td.level;
+		e["min_age"] = td.min_age;
+		e["time"] = td.time;
+		e["cost"] = cost_dict(td.cost);
+		e["state"] = STATES[F.tech_state(o, t)];
+		techs.push_back(e);
+	}
+	d["techs"] = techs;
+	d["walls"] = F.walls;
+	d["gates"] = F.gates;
+	d["towers"] = F.towers;
 	return d;
 }
 

@@ -428,6 +428,7 @@ int EnemyAI::find_target(int tc) const {
 	double bd = INFINITY;
 	for (int b = 0; b < B.size(); b++) {
 		if (B.removed[b] || !sim->is_enemy(owner, B.owner[b])) continue;
+		if (is_wall_piece(B.type[b])) continue; // (Godot-only pieces: waves breach them on the way)
 		const double dx = B.x[b] - B.x[tc], dz = B.z[b] - B.z[tc];
 		const double d = dx * dx + dz * dz;
 		if (d < bd) {

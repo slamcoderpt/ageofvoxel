@@ -92,6 +92,7 @@ int32_t Combat::am_pick(int r, int *rank_out) {
 	bd = INFINITY;
 	for (int b = 0; b < B.size(); b++) {
 		if (B.removed[b] || B.dead[b] || !sim->is_enemy(owner, B.owner[b])) continue;
+		if (is_wall_piece(B.type[b])) continue; // (walls are only attacked when they block the way: fortify breach rule)
 		if (std::abs(B.x[b] - x) > R + B.w[b] || std::abs(B.z[b] - z) > R + B.h[b]) continue;
 		const double ex = std::max(std::max(B.tx[b] - x, 0.0), x - (B.tx[b] + B.w[b]));
 		const double ez = std::max(std::max(B.tz[b] - z, 0.0), z - (B.tz[b] + B.h[b]));
@@ -315,6 +316,7 @@ int Combat::find_enemy_building_near(double x, double z, int owner, double radiu
 	double bd = radius * radius;
 	for (int b = 0; b < B.size(); b++) {
 		if (B.removed[b] || !sim->is_enemy(owner, B.owner[b])) continue;
+		if (is_wall_piece(B.type[b])) continue; // (Godot-only pieces: not a wave's target)
 		const double dx = B.x[b] - x, dz = B.z[b] - z;
 		const double d = dx * dx + dz * dz;
 		if (d < bd) {
@@ -350,6 +352,13 @@ void Combat::damage(int32_t tid, double amount, const Hitter &a, uint8_t kind) {
 	double dmg = amount;
 	if (ad && td && ad->bonus[td->cls] != 0) dmg *= ad->bonus[td->cls];
 	if (tk == K_BUILDING) dmg *= (ad && ad->cls == CLS_MYTH) || a.myth_class ? 1.2 : 0.35;
+	if (sim->godot_rules) {
+		// Godot-only: a building's arrows (Town Center, towers) never hurt a
+		// friend, whatever happened in flight; walls / towers have their own armor
+		const int towner = tk == K_UNIT ? U.owner[t] : B.owner[t];
+		if (a.kind == K_BUILDING && !sim->is_enemy(a.owner, towner)) return;
+		if (tk == K_BUILDING && is_fort_type(B.type[t])) dmg *= sim->fortify.armor_mult(t, a, kind);
+	}
 	dmg *= 1 - (td ? td->armor : 0);
 	const double time = sim->time;
 	if (tk == K_UNIT) {
@@ -654,6 +663,19 @@ void Combat::update(double dt) {
 				U.am_lost[r] = 0;
 		}
 		if (dist > range + 0.25) {
+			// Godot-only (fortify): the target is walled off and the man has
+			// stopped at the end of his path: break through the nearest enemy wall
+			if (sim->godot_rules && sim->fortify.walls > 0 && !U.moving[r] && U.path_blocked[r]) {
+				const int32_t w = sim->fortify.breach_target(r);
+				if (w && w != tid) {
+					if (tk == K_BUILDING && !is_wall_piece(B.type[ts])) U.order_a[r] = tid; // (back to it afterwards)
+					U.order_target[r] = w;
+					U.am_lost[r] = 0;
+					approach(r, w);
+					U.order_x[r] = 0.6;
+					continue;
+				}
+			}
 			U.order_x[r] -= dt; // o.repath
 			if (!U.moving[r] || U.order_x[r] <= 0) {
 				approach(r, tid);

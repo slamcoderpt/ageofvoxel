@@ -15,7 +15,8 @@ void Buildings::init(Sim *s) {
 		Entities &E = sim->entities;
 		const int b = E.building_slot(o.target);
 		const BuildingStore &B = E.buildings;
-		if (b < 0 || B.built[b] || B.owner[b] != E.units.owner[r]) return false;
+		if (b < 0 || B.owner[b] != E.units.owner[r]) return false;
+		if (B.built[b] && !(sim->godot_rules && !B.dead[b] && B.hp[b] < B.max_hp[b])) return false; // (Godot-only: repair)
 		GoalRect g{ (double)B.tx[b], (double)B.tz[b], (double)B.w[b], (double)B.h[b] };
 		sim->movement.move_to(r, B.x[b], B.z[b], &g);
 		return true;
@@ -279,6 +280,7 @@ int32_t Buildings::place(int type, int owner, int tx, int tz, const std::vector<
 	const BuildingDef &def = building_def(type);
 	Player &p = sim->players[owner];
 	if (!can_place(type, tx, tz) || !p.can_afford(def.cost)) return 0;
+	if (sim->godot_rules && p.age < def.min_age) return 0; // (Godot-only: the fortifications' ages)
 	if (!p.pay(def.cost)) return 0;
 	const int b = spawn(type, owner, tx, tz, false);
 	const int32_t id = sim->entities.buildings.id[b];
@@ -309,6 +311,7 @@ void Buildings::destroy(int32_t id) {
 	const int b = E.building_slot(id);
 	if (b < 0) return;
 	const BuildingStore &B = E.buildings;
+	sim->fortify.on_destroy(b); // (gates: clear the pass mask; Godot-only pieces)
 	if (!building_def(B.type[b]).walkable) sim->map().unblock(B.tx[b], B.tz[b], B.w[b], B.h[b]);
 	// dust clouds (game.fx.emit): visual, but they draw from game.rng, so the
 	// draws are consumed here to keep the stream in step with the browser
@@ -327,13 +330,15 @@ void Buildings::update(double dt) {
 	BuildingStore &B = E.buildings;
 	Movement &mv = sim->movement;
 	// tally builders per site, in first-seen order (the JS Map)
-	std::vector<std::pair<int32_t, int>> builders;
+	std::vector<std::pair<int32_t, int>> builders, repairs;
 	const int n = U.size();
 	for (int u = 0; u < n; u++) {
 		if (U.removed[u] || U.dead[u] || U.order_type[u] != O_BUILD) continue;
 		const int32_t bid = U.order_target[u];
 		const int b = E.building_slot(bid);
-		if (b < 0 || B.built[b]) {
+		// Godot-only: a build order on a damaged finished building repairs it
+		const bool repair = b >= 0 && B.built[b] && sim->godot_rules && !B.dead[b] && B.hp[b] < B.max_hp[b];
+		if (b < 0 || (B.built[b] && !repair)) {
 			sim->commands.idle(u);
 			continue;
 		}
@@ -345,15 +350,25 @@ void Buildings::update(double dt) {
 		}
 		U.rot[u] = jsm::atan2(B.x[b] - U.x[u], B.z[b] - U.z[u]);
 		U.anim_want[u] = A_BUILD;
+		auto &list = repair ? repairs : builders;
 		bool found = false;
-		for (auto &kv : builders)
+		for (auto &kv : list)
 			if (kv.first == bid) { kv.second++; found = true; break; }
-		if (!found) builders.push_back({ bid, 1 });
+		if (!found) list.push_back({ bid, 1 });
+	}
+	// repair (Godot-only): free, half the build rate, more hands faster (the same n^0.75)
+	for (const auto &kv : repairs) {
+		const int b = E.building_slot(kv.first);
+		if (b < 0) continue;
+		const double bt = B.fort_build_time[b] > 0 ? B.fort_build_time[b] : building_def(B.type[b]).build_time;
+		B.hp[b] = std::min(B.max_hp[b], B.hp[b] + B.max_hp[b] / std::max(1.0, bt) * REPAIR_RATE * jsm::pow(kv.second, 0.75) * dt);
 	}
 	for (const auto &kv : builders) {
 		const int b = E.building_slot(kv.first);
 		if (b < 0) continue;
-		const double rate = (1 / building_def(B.type[b]).build_time) * jsm::pow(kv.second, 0.75);
+		// (fortify: a wall piece's time scales with its length; 0 = the def's)
+		const double bt = B.fort_build_time[b] > 0 ? B.fort_build_time[b] : building_def(B.type[b]).build_time;
+		const double rate = (1 / bt) * jsm::pow(kv.second, 0.75);
 		const double before = B.progress[b];
 		B.progress[b] = std::min(1.0, B.progress[b] + rate * dt);
 		B.hp[b] = std::min(B.max_hp[b], B.hp[b] + (B.progress[b] - before) * B.max_hp[b] * 0.9);

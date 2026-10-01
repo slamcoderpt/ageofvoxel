@@ -72,8 +72,17 @@ public:
 	int64_t calls = 0, searches = 0, cache_hits = 0, expanded_total = 0;
 
 	void init(GameMap *m, Profile *p);
-	// JS nearestWalkable: returns false if none within maxR
-	bool nearest_walkable(int tx, int tz, int max_r, int &ox, int &oz) const;
+	// Gates (Godot-only, sim/fortify): the owner whose units the next
+	// find_path / begin_group_field is for; that owner's (and his allies')
+	// gate tiles are walkable for it (GameMap::walkable_for). -1 = nobody
+	// passes gates. Callers set it before each search (Movement: the unit's
+	// owner); with no gate on the map it changes nothing.
+	int pass_owner = -1;
+	// did the last find_path reach its goal (or stand on it)? false when the
+	// goal is cut off (a wall ring, an island): the fortify breach rule.
+	bool last_found = true;
+	// JS nearestWalkable: returns false if none within maxR (gates count as blocked)
+	bool nearest_walkable(int tx, int tz, int max_r, int &ox, int &oz) const { return nearest_impl(tx, tz, max_r, ox, oz, false); }
 	// JS findPath: fills `out` with world waypoints (excluding the start);
 	// empty if already there / unreachable goal.
 	void find_path(double sx, double sz, double gx, double gz, const GoalRect *rect, std::vector<Vec2d> &out);
@@ -100,9 +109,10 @@ private:
 	struct Key {
 		int32_t st, gt;
 		uint8_t has_rect;
+		int8_t po; // pass_owner while the map has gates, else -1
 		double rtx, rtz, rw, rh;
 		bool operator==(const Key &o) const {
-			return st == o.st && gt == o.gt && has_rect == o.has_rect && rtx == o.rtx && rtz == o.rtz && rw == o.rw && rh == o.rh;
+			return st == o.st && gt == o.gt && has_rect == o.has_rect && po == o.po && rtx == o.rtx && rtz == o.rtz && rw == o.rw && rh == o.rh;
 		}
 	};
 	struct KeyHash {
@@ -121,6 +131,9 @@ private:
 	std::unordered_map<Key, Result, KeyHash> cache_;
 	uint32_t cache_version_ = 0xffffffffu;
 
+	// walkability for the current search: gates open to pass_owner
+	bool walk(int x, int z) const { return pass_owner < 0 || map->gate_tiles == 0 ? map->is_walkable(x, z) : map->walkable_for(x, z, pass_owner); }
+	bool nearest_impl(int tx, int tz, int max_r, int &ox, int &oz, bool gates) const;
 	void search(int stx, int stz, int gtx, int gtz, const GoalRect *rect, Result &res);
 	void smooth(const std::vector<int32_t> &tiles, std::vector<int32_t> &pts) const;
 	bool start_tile(double sx, double sz, int &stx, int &stz) const;

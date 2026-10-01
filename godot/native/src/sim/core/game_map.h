@@ -32,6 +32,42 @@ public:
 	std::unordered_map<int, int> blockers; // tile index -> entity id
 	std::vector<MapChange> changes; // dirty column rects since the renderer last drained them
 	uint32_t pass_version = 0; // bumped whenever walkability may change (block / passability): path cache key
+	// Gates (sim/fortify, Godot-only): a gate's tiles are blocked like any
+	// building, and gate_pass[i] has bit o set for each owner o allowed
+	// through (the gate owner and his allies; 0 when locked). Only the
+	// owner-aware tests below read it; everything else sees a gate as a wall.
+	std::vector<uint8_t> gate_pass; // size*size once the first gate exists, else empty
+	int gate_tiles = 0;             // tiles with a non-zero mask (0: the owner-aware tests are the plain ones)
+	bool gate_lets(int i, int owner) const {
+		return gate_tiles > 0 && owner >= 0 && owner < 8 && !gate_pass.empty() && passable[i] == 1 && ((gate_pass[i] >> owner) & 1);
+	}
+	// is_walkable for a unit of `owner` (owner < 0: nobody passes gates)
+	bool walkable_for(int tx, int tz, int owner) const {
+		if (!in_tiles(tx, tz)) return false;
+		const int i = tz * size + tx;
+		return (passable[i] == 1 && blocked[i] == 0) || gate_lets(i, owner);
+	}
+	bool walkable_at_for(double x, double z, int owner) const {
+		if (!in_world(x, z)) return false;
+		const int i = (int)z * size + (int)x;
+		return (passable[i] == 1 && blocked[i] == 0) || gate_lets(i, owner);
+	}
+	// set the pass mask of a tile rect (bumps pass_version when it changes)
+	void set_gate_mask(int tx, int tz, int w, int h, uint8_t mask) {
+		if (gate_pass.empty()) {
+			if (!mask) return;
+			gate_pass.assign((size_t)size * size, 0);
+		}
+		for (int z = tz; z < tz + h; z++)
+			for (int x = tx; x < tx + w; x++) {
+				if (!in_tiles(x, z)) continue;
+				uint8_t &m = gate_pass[(size_t)z * size + x];
+				if (m == mask) continue;
+				gate_tiles += (mask != 0) - (m != 0);
+				m = mask;
+				pass_version++;
+			}
+	}
 
 	GameMap() = default;
 	GameMap(int size_tiles, uint32_t seed);

@@ -16,6 +16,8 @@
 //   game:over        EV_GAME_OVER         owner = winner, a = loser, amount = time
 //   villager:free    EV_FREE_VILLAGER     owner, id = the Town Center (Godot-only: Economy::rescue)
 //   player:defeated  EV_PLAYER_DEFEATED   owner, amount = time (Godot-only: Victory, team rules)
+//   tech:researched  EV_TECH_RESEARCHED   owner, id = building, a = FortTech (Godot-only: sim/fortify)
+//   gate:changed     EV_GATE_CHANGED      owner, id = gate, a = 0 converted / 1 locked / 2 unlocked (Godot-only)
 #pragma once
 #include <cstdint>
 #include <functional>
@@ -26,13 +28,13 @@ namespace aov {
 enum EventType : uint8_t {
 	EV_ENTITY_ADDED, EV_ENTITY_REMOVED, EV_ENTITY_DIED, EV_UNIT_DAMAGED, EV_BUILDING_PLACED,
 	EV_BUILDING_COMPLETED, EV_UNIT_TRAINED, EV_AGE_ADVANCED, EV_RESOURCES_CHANGED, EV_GODPOWER_CAST,
-	EV_COMMAND_SMART, EV_GAME_OVER, EV_FREE_VILLAGER, EV_PLAYER_DEFEATED, EV_COUNT
+	EV_COMMAND_SMART, EV_GAME_OVER, EV_FREE_VILLAGER, EV_PLAYER_DEFEATED, EV_TECH_RESEARCHED, EV_GATE_CHANGED, EV_COUNT
 };
 
 inline const char *event_name(int t) {
 	static const char *names[] = { "entity:added", "entity:removed", "entity:died", "unit:damaged", "building:placed",
 		"building:completed", "unit:trained", "age:advanced", "resources:changed", "godpower:cast", "command:smart",
-		"game:over", "villager:free", "player:defeated" };
+		"game:over", "villager:free", "player:defeated", "tech:researched", "gate:changed" };
 	return t >= 0 && t < EV_COUNT ? names[t] : "?";
 }
 
