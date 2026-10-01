@@ -39,6 +39,7 @@ static const double FEAR_UNTIL = 1500;         // s: tower fear ends (no stalema
 static const double FOCUS_CLUSTER = 16;        // breakers this close form one group
 static const double FOCUS_REACH = 12;          // ... and are turned onto its piece from this close
 static const double RING_CHECK_EVERY = 20;     // s between walk-out checks
+static const double LINE_PATIENCE = 40;        // s a ring line waits for wood before the academies wait for it
 static const double UPGRADE_KEEP_WOOD = 30;    // wood / gold left over after a fortification tech
 static const double UPGRADE_KEEP_GOLD = 20;
 static const double UPGRADE_WAIT = 90;         // s the academies wait for each tech's wood / gold
@@ -422,8 +423,12 @@ bool EnemyAI::place_ring_line(bool instant, const std::vector<int> &builders) {
 		const double rw = instant ? 0 : 40, rg = instant ? 0 : 15; // keep something for the army
 		line_wood_ = plan.cost.v[RES_WOOD] + rw;
 		line_gold_ = plan.cost.v[RES_GOLD] + rg;
-		if (p.res[RES_WOOD] < line_wood_ || p.res[RES_GOLD] < line_gold_) return false;
+		if (p.res[RES_WOOD] < line_wood_ || p.res[RES_GOLD] < line_gold_) {
+			if (line_wait_since_ < 0) line_wait_since_ = S.time;
+			return false;
+		}
 		line_wood_ = line_gold_ = 0;
+		line_wait_since_ = -1;
 		FortResult res;
 		const std::vector<int32_t> ids = S.fortify.place_wall(owner, l[0], l[1], l[2], l[3], builders, res);
 		ring_lines_.erase(ring_lines_.begin());
@@ -690,7 +695,12 @@ void EnemyAI::check_ring_open(int tc) {
 bool EnemyAI::wall_saving(int army) const {
 	// (whether it is short or not: the academies would spend it before the
 	// line is laid later in the same think)
-	return hole_wait_ || (army >= 8 && (tower_wait_ || upgrade_wait_ || (ring_state_ == 1 && !ring_lines_.empty() && line_wood_ > 0)));
+	const bool line_wait = ring_state_ == 1 && !ring_lines_.empty() && line_wood_ > 0;
+	// a line kept waiting LINE_PATIENCE s: the academies wait for it with
+	// any army (a wave out leaves few men at home, and the ring would wait
+	// for good while every log goes into soldiers)
+	const bool overdue = line_wait && line_wait_since_ >= 0 && sim->time - line_wait_since_ >= LINE_PATIENCE;
+	return hole_wait_ || overdue || (army >= 8 && (tower_wait_ || upgrade_wait_ || line_wait));
 }
 
 int EnemyAI::ring_unbuilt() const {

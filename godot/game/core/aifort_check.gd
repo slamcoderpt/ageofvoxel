@@ -7,7 +7,9 @@ extends SceneTree
 ##            (2+ towers within 26 tiles of its Town Center), walls its town in
 ##            (a closed ring of its pieces round the Town Center) with gates
 ##            (1+, one per straight side the ground allows), its men still walk out (villagers gathering outside the
-##            ring); Moderate builds towers but no wall, Easy at most one tower
+##            ring); Moderate and Easy wall their towns in too (later: closed
+##            with gates by 18 / 25 min left in peace), Moderate with a tower or
+##            two, Easy one at most
 ##   upgrade  in the Classical Age it researches Watch Tower and Stone Wall
 ##   repair   a ring piece and a tower knocked down to 30 % are repaired
 ##   breach   a wave of 24 sent at a walled town (fortify_now) breaks in and
@@ -22,13 +24,14 @@ extends SceneTree
 ##            sent elsewhere (avoided > 0) and loses at most 2 men to them
 ##   determinism two identical Hard-vs-Titan runs end bit-equal
 ##   matches  AI vs AI with walls (Hard vs Hard, Titan vs Hard) end within
-##            the cap (no stalemate behind walls)
+##            the cap, 60 min (no stalemate behind walls; a Hard AI wearing down a
+##            walled-in Titan, seed 3, takes about 53)
 ##   siege    Titan vs Titan with favor held at 0 (no Meteor): the armies that
 ##            find a ring closed break through it themselves (sieges > 0, a
 ##            wall / pillar / gate piece destroyed by soldiers, its last hit
 ##            from a unit) and the match ends
 ##
-##   godot --headless --path godot -s res://game/core/aifort_check.gd [-- --only=build,breach,... --seed=1 --minutes=50]
+##   godot --headless --path godot -s res://game/core/aifort_check.gd [-- --only=build,breach,... --seed=1 --minutes=60]
 ##
 ## Prints "AIFORT PASS|FAIL <case> {detail}" and "AIFORT_RESULT {json}"; exit = failures.
 
@@ -39,7 +42,7 @@ var passes := 0
 var result := {}
 var only: Array = []
 var seed_arg := 1
-var max_minutes := 50.0
+var max_minutes := 60.0
 
 func _initialize() -> void:
 	for a in OS.get_cmdline_user_args():
@@ -219,17 +222,18 @@ func _case_build() -> void:
 		var st := float(ht.hp) / float(ht.max_hp) if not ht.is_empty() else 0.0
 		_check("repair", sw > 0.6 and st > 0.6 and int(_fort(sim, 1).repairs) > r0,
 			{"wall_hp": snappedf(sw, 0.01), "tower_hp": snappedf(st, 0.01), "repairs": int(_fort(sim, 1).repairs) - r0})
-	# Moderate: towers, no walls; Easy: one tower at most
+	# Moderate and Easy wall in too (later); Moderate 1-2 towers, Easy one at most
 	var ok2 := true
 	var det := {}
 	for d in ["moderate", "easy"]:
 		var s2 := _sim([d, "easy"])
 		s2.set_ai(2, {"enabled": false})
 		s2.set_victory_enabled(false)
-		s2.tick(14 * 60 * FPS)
+		s2.tick((18 if d == "moderate" else 25) * 60 * FPS)
 		var f2 := _fort(s2, 1)
-		det[d] = {"towers": f2.towers, "wall_tiles": f2.wall_tiles}
-		ok2 = ok2 and int(f2.wall_tiles) == 0 and (int(f2.towers) <= 1 if d == "easy" else int(f2.towers) >= 1)
+		var closed2 := _ring_closed(s2, 1, _tc(s2, 1), 40)
+		det[d] = {"towers": f2.towers, "wall_tiles": f2.wall_tiles, "gates": f2.gates, "closed": closed2, "ring_at": f2.ring_at}
+		ok2 = ok2 and int(f2.wall_tiles) > 0 and int(f2.gates) > 0 and closed2 and (int(f2.towers) <= 1 if d == "easy" else int(f2.towers) >= 1 and int(f2.towers) <= 2)
 	_check("difficulty", ok2, det)
 
 # ---- breach / gap -----------------------------------------------------------------

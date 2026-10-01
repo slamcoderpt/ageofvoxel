@@ -100,11 +100,16 @@ AIParams ai_params(int d) {
 		p.gather_mult = 1.2;
 		p.bonus_res = 150;
 	}
-	// fortifications (Godot-only; Moderate = the defaults: a tower, Watch Tower)
+	// fortifications (Godot-only): every difficulty towers and walls its
+	// town in, as the Retold AI does; the harder ones sooner, with more
+	// towers, more hands on the ring and the upgrades
 	if (d == AI_EASY) {
 		p.towers_max = 1;
 		p.tower_at = 13;
 		p.tower_upgrade = false;
+		p.walls = true;
+		p.wall_at = 720;
+		p.wall_builders = 2;
 		p.repairers = 1;
 		p.tower_fear = false;
 	} else if (d == AI_HARD || d == AI_TITAN) {
@@ -112,10 +117,16 @@ AIParams ai_params(int d) {
 		p.towers_max = titan ? 4 : 3;
 		p.tower_at = titan ? 12 : 14;
 		p.walls = true;
-		p.wall_at = titan ? 360 : 540;
+		p.wall_at = titan ? 360 : 420;
 		p.wall_builders = titan ? 5 : 4;
 		p.wall_upgrade = true;
 		p.repairers = 3;
+	} else { // Moderate (and the default AI): a tower or two, Watch Tower, the ring at 10 min
+		p.towers_max = 2;
+		p.walls = true;
+		p.wall_at = 600;
+		p.wall_builders = 3;
+		p.wall_upgrade = true;
 	}
 	return p;
 }
@@ -185,6 +196,14 @@ void EnemyAI::update(double dt) {
 		if (p.res[RES_WOOD] > par.bank_cap) sh[RES_WOOD] = 0.15;
 		sh[RES_WOOD] = std::min(sh[RES_WOOD], 1 - sh[RES_FOOD] - sh[RES_GOLD]);
 		sh[RES_FOOD] = 1 - sh[RES_WOOD] - sh[RES_GOLD];
+	}
+	// (Godot-only: the next stretch of the wall ring waits for wood: more
+	// hands in the woods, or the army's toxotes eat every log and the ring
+	// never rises)
+	if (S.godot_rules && line_wood_ > p.res[RES_WOOD] && sh[RES_WOOD] < 0.4) {
+		sh[RES_WOOD] = 0.4;
+		sh[RES_FOOD] = std::max(0.2, 1 - sh[RES_WOOD] - sh[RES_GOLD]);
+		sh[RES_GOLD] = 1 - sh[RES_WOOD] - sh[RES_FOOD];
 	}
 	// (Godot-only: a food pile it cannot spend, wood / gold short: the
 	// farmers go to the woods and the mines, or an AI-vs-AI match drags on

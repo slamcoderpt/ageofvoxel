@@ -181,6 +181,7 @@ private:
 	int pick_target(int tc, int men, bool overdue); // find_target with tower fear (-1: hold the wave)
 	bool wall_saving(int army) const; // the next ring line or tower waits for wood the army would spend
 	double line_wood_ = 0, line_gold_ = 0; // what the next ring line costs (0: none waiting)
+	double line_wait_since_ = -1; // when the next ring line started waiting for wood / gold (-1: not waiting)
 	bool want_gold_ = false;    // a tower waits for gold (more hands on gold)
 	bool tower_wait_ = false;   // a tower waits for wood / gold
 	int tower_fail_ = 0;        // thinks a tower was paid for but found no spot

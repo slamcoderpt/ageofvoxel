@@ -617,10 +617,11 @@ does `new_game` + `setup_match` in one call (checks, tools). The sim config:
   storms on 4+) plus **+20 % gather rate** (`Player::gather_mult`) and +150
   food / wood / gold. `set_ai(owner, {difficulty: "hard"})` switches one;
   `get_ai(owner).difficulty`, `get_player(id)` {team, human, difficulty,
-  gather_mult}. Fortifications scale too (Godot rules): Easy at most one
-  tower, Moderate one tower and Watch Tower, Hard three towers and a wall
-  ring from 9 min, Titan four towers and the ring from 6 min (see "Enemy
-  AI: fortifications").
+  gather_mult}. Fortifications scale too (Godot rules): every difficulty
+  walls its town in, Easy with at most one tower and the ring from 12 min,
+  Moderate two towers, Watch Tower, Stone Wall and the ring from 10 min,
+  Hard three towers and the ring from 7 min, Titan four towers and the ring
+  from 6 min (see "Enemy AI: fortifications").
 - Game speed and visibility stay main.gd's (`timescale`, `fog` args).
 
 ```
@@ -1387,7 +1388,8 @@ every loop in row order):
   `tower_at`: by the Town Center towards the nearest enemy, between the Town
   Center and its gold mine, at its wood line (within 22 / 20 tiles), then
   round the Town Center; 6 tiles apart, never on a ring line or opening.
-- **Wall ring** (Hard / Titan, from `wall_at`): a square with clipped
+- **Wall ring** (every difficulty, from `wall_at`: Easy 12 min, Moderate 10,
+  Hard 7, Titan 6; `wall_builders` 2 / 3 / 4 / 5): a square with clipped
   corners (`R / 8`) round the Town Center, half-width the smallest of 15..22
   that holds every building of its own with 2 tiles to spare (archers shoot
   12 over a wall), at most 0.36 of the way to the nearest other Town Center;
@@ -1395,8 +1397,11 @@ every loop in row order):
   a 3-tile opening slid to open ground. A line goes down when it can be paid
   (+40 wood, +15 gold kept); the first tower comes first; while a line or a
   tower waits, an army of 8+ at home stops the academies from spending the
-  wood and gold (`wall_saving`) and gold gets 30 % of the workers;
-  `wall_builders` villagers (Hard 4, Titan 5) are kept on the foundations;
+  wood and gold (`wall_saving`) and gold gets 30 % of the workers; a line
+  kept waiting 40 s (`LINE_PATIENCE`) holds them with any army at home (a
+  wave out would otherwise leave the ring waiting for good), and while it
+  waits for wood 40 % of the workers go to the woods; `wall_builders`
+  villagers are kept on the foundations;
   a foundation they stand short of for 6 thinks (water, trees round it) is
   pulled down and paid back. Planned lines and openings (+2 tiles each
   side) are kept free of the AI's own farms / houses (`reserved`). Once the
@@ -1411,7 +1416,7 @@ every loop in row order):
   Center to outside the ring (its own gates open) must exist, else a
   straight segment becomes a gate (or, short of gold, is pulled down).
 - **Upkeep**: tower / wall stages researched as the age allows (Watch
-  Tower from Moderate, Stone Wall at Hard / Titan; the tower's first, +30
+  Tower and Stone Wall from Moderate; the tower's first, +30
   wood +20 gold kept; while one waits the academies of an army of 8+ at
   home wait too, up to 90 s per tech, `upgrade_holds`); the most damaged
   piece or building (fortifications and the Town Center first) under 70 %
@@ -1477,7 +1482,8 @@ failures, ~10 s): **build** (a Hard AI in peace for 20 min: 2+ towers within
 26 tiles, a ring closed by its pieces (and trees) with a gate, villagers
 working outside it), **upgrade** (Watch Tower, Stone Wall in the Classical
 Age), **repair** (a ring piece and a tower at 30 % back over 60 %),
-**difficulty** (Moderate a tower and no wall, Easy at most one tower),
+**difficulty** (Moderate 1-2 towers and a closed ring with gates by 18 min,
+Easy at most one tower and its ring by 25 min),
 **breach** (24 hoplites at a walled town break in and hit the Town Center;
 with the focus the two most hit pieces take >= 50 % of the hits, 15 points
 more than each man on his nearest piece, or only one or two are hit), **gap**
@@ -1652,7 +1658,7 @@ Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
   stages, repair, the breach rule, see "Walls, gates, towers"
   (`walls_check.gd`).
 - Done (AI fortifications): the enemy AI builds towers, walls its town in
-  with gates (Hard / Titan), upgrades, repairs and patches them, breaks
+  with gates (every difficulty), upgrades, repairs and patches them, breaks
   enemy walls one piece per group, fears towers when weak; walled-off goals
   fail fast in the pathfinder; the stress scene is walled (`fort=0` off).
   See "Enemy AI: fortifications" (`aifort_check.gd`, scene `aifort`).
