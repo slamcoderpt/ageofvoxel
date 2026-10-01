@@ -420,7 +420,7 @@ func _draw_commands() -> void:
 			var kx := rr.end.x - 4 - S.text_width(f, c.key, 13)
 			draw_string_outline(f, Vector2(kx, rr.end.y - 4), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 4, Color(0, 0, 0, 0.75))
 			draw_string(f, Vector2(kx, rr.end.y - 4), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color.WHITE)
-		zone(cr, "cmd", i, {"title": c.title, "cost": c.get("cost", {}), "hotkey": c.key, "warn": c.get("warn", "")})
+		zone(cr, "cmd", i, {"title": c.title, "lines": c.get("lines", []), "cost": c.get("cost", {}), "hotkey": c.key, "warn": c.get("warn", "")})
 
 # selection card --------------------------------------------------------------------------------
 

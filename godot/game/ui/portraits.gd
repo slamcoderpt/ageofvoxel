@@ -27,6 +27,8 @@ func unit(type: String, owner: int) -> Texture2D:
 	return _cache[key]
 
 func building(type: String, owner: int) -> Texture2D:
+	if FORT.has(type):
+		return fort(type, owner)
 	var key := "b:%s:%d" % [type, owner]
 	if not _cache.has(key):
 		var mi := MeshInstance3D.new()
@@ -35,6 +37,44 @@ func building(type: String, owner: int) -> Texture2D:
 		var root := Node3D.new()
 		root.add_child(mi)
 		_cache[key] = _render(root)
+	return _cache[key]
+
+## Fortification portraits (Godot-only models, groups "walls" / "towers"):
+## a short run of wall between two pillars, a pillar, a closed gate between
+## its two gate towers, a tower at a stage (level 0..3).
+const FORT := {"wall": true, "wall_pillar": true, "gate": true, "tower": true}
+
+func fort(type: String, owner: int, level := 0) -> Texture2D:
+	var key := "f:%s:%d:%d" % [type, owner, level]
+	if _cache.has(key):
+		return _cache[key]
+	var root := Node3D.new()
+	var mat := _material(owner)
+	var put := func(group: String, model: String, xf: Transform3D) -> void:
+		if not VoxelModels.group(group).get("man", {}).get("models", {}).has(model):
+			return
+		var mi := MeshInstance3D.new()
+		mi.mesh = VoxelModels.mesh(group, model)
+		mi.material_override = mat
+		mi.transform = xf
+		root.add_child(mi)
+	match type:
+		"wall":
+			put.call("walls", "pillar", Transform3D(Basis(), Vector3(-1.5, 0, 0)))
+			put.call("walls", "seg/0", Transform3D(Basis(), Vector3(-0.5, 0, 0)))
+			put.call("walls", "seg/1", Transform3D(Basis(), Vector3(0.5, 0, 0)))
+			put.call("walls", "pillar", Transform3D(Basis(), Vector3(1.5, 0, 0)))
+		"wall_pillar":
+			put.call("walls", "pillar_flag", Transform3D())
+		"gate":
+			put.call("walls", "pillar_gate", Transform3D(Basis(Vector3.UP, PI), Vector3(-1.5, 0, 0)))
+			put.call("walls", "gate2", Transform3D())
+			put.call("walls", "gate2/leaf", Transform3D(Basis(), Vector3(-0.625, 0, 0)))
+			put.call("walls", "gate2/leaf", Transform3D(Basis(Vector3.UP, PI), Vector3(0.625, 0, 0)))
+			put.call("walls", "pillar_gate", Transform3D(Basis(), Vector3(1.5, 0, 0)))
+		_:
+			put.call("towers", str(clampi(level, 0, 3)), Transform3D())
+	_cache[key] = _render(root)
 	return _cache[key]
 
 func _material(owner: int) -> ShaderMaterial:

@@ -35,7 +35,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), `tower_fire.gd` + `tower_flash / tower_puff.gdshader` (tower arrows: loose flash, heavier arrow, tracer, strike; see "Towers: the look"), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported, plus god powers and a wave log, Godot-only) | `src/combat/` |
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor; Godot-only activity fx: axe / pick chips and dust, sickle chaff, stooks on cut rows, hoof dust, shoal ripples, fish splashes, net ripples, boat wakes; crops sway, `econ_voxel.gdshader`, `fx_chip / fx_puff / fx_ring.gdshader`), buffers built in C++ by `AovEconView` (`native/src/econ_view.{h,cpp}`, render side, reads the sim, never writes it) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
 | godpowers | `game/godpowers/godpowers.gd` (the whole BoltRenderer of effects.js: bolt / sky / zap ribbons, impact flash sprites and decals, scorches with ember cracks (hot orange / red, glowing as long as the scorch lasts), a charcoal ash edge and a hot rim, an expanding impact ring at every strike point (Godot-only; decals are pulled toward the camera so voxel bumps do not swallow them), crater debris, char rims, spark streaks, smoke and flames, the storm funnel (wall, cloud body, dust wall, ground shockwave, rain, energy bands, whirled debris), flyer trails / back lights / drop shadows, meteor fireball and fire, strike / storm point lights and the shadow spot, the full-frame storm grade with light pools; dims the lighting piece's sun / sky / grade while a storm plays), shaders beside it; buffers built in C++ by `AovGodpowerView` (`native/src/godpower_view.{h,cpp}`, render side, reads the sim, never writes it) | `godpowers/` (favor, cooldowns, Lightning Storm, Bolt, Meteor, thrown units: ported) | `src/godpowers/` |
-| ui (HUD, selection, input) | `game/ui/ui.gd` (selection, box / double-click select, smart orders, rally points, control groups, hotkeys, placement ghost, god-power targeting ring, move markers, selection rings (one MultiMesh) + bars, event feed, messages, result card; public: `pieces.ui.selected`, `hover_entity`, `message()`, `feed()`), `hud.gd` (the drawn HUD, two layers with hit zones), `hud_style.gd` (palette, Cinzel / Alegreya fonts in `fonts/`, SVG icons from `icons.gd` = `src/ui/icons.js` rasterised at runtime, draw helpers), `panel.gdshader` (the gilded teal panels), `minimap.gd` + `minimap_ground/units.gdshader` (terrain colours computed in the shader from `get_heights()` / `get_ground()` uploaded as textures, re-uploaded on `building:placed`; unit dots read straight from `get_units()` arrays as data textures: no per-unit script), `portraits.gd` + `portrait.gdshader` (one SubViewport per type / owner, rendered once, unshaded with the browser's three.js hemisphere + sun lighting, no tonemap) | none | `src/ui/` |
+| ui (HUD, selection, input) | `game/ui/ui.gd` (selection, box / double-click select, smart orders, rally points, control groups, hotkeys, placement ghost, wall drawing (click-drag line ghost, cost, snapping) and the wall / gate / tower commands (see "Walls, gates, towers: placement"), god-power targeting ring, move markers, selection rings (one MultiMesh) + bars, event feed, messages, result card; public: `pieces.ui.selected`, `hover_entity`, `message()`, `feed()`), `hud.gd` (the drawn HUD, two layers with hit zones), `hud_style.gd` (palette, Cinzel / Alegreya fonts in `fonts/`, SVG icons from `icons.gd` = `src/ui/icons.js` rasterised at runtime, draw helpers), `panel.gdshader` (the gilded teal panels), `minimap.gd` + `minimap_ground/units.gdshader` (terrain colours computed in the shader from `get_heights()` / `get_ground()` uploaded as textures, re-uploaded on `building:placed`; unit dots read straight from `get_units()` arrays as data textures: no per-unit script), `portraits.gd` + `portrait.gdshader` (one SubViewport per type / owner, rendered once, unshaded with the browser's three.js hemisphere + sun lighting, no tonemap) | none | `src/ui/` |
 | performance (6 teams, 2000 units) | `game/perf/perf.gd` (the render bench, `--renderbench`), and in the render paths of the stress scene: unit LOD + box shadow casters (`game/units`), coarse voxel twins `VoxelModels.coarse()` (tree shadow casters), tight resource / ground-detail buckets (`game/terrain`), economy props frustum culling (`AovEconView`); report in `../docs/godot-stress-report.md` | sim hot paths (with their owners); `native/src/unit_lod.cpp` (`AovUnitView.lod_mesh`) | `docs/stress-report.md` |
 | exports (Windows, macOS, Linux, web) | `export_presets.cfg`, `../scripts/godot-export.sh`, `../.github/workflows/godot.yml`, `native/SConstruct` + `native/aov.gdextension` (platform entries); see "Export" | none | `vite build` |
 | scenes | `AovScenes.set_setup()` from the owning piece, else the C++ setup | `scenes/` (helpers.js, skirmish / town / coast / hud, EconomyScene.js; battle.cpp: BattleScene.js + units/battleHost.js, godpower, stress.js: all ported) | `src/core/scenes/`, `BattleScene.js`, `EconomyScene.js` |
@@ -788,6 +788,61 @@ node scripts/godot-shoot.mjs --scene towers --out shots/godot/towers.png
      [--params "towers_states=1&cam=31,111,30,30,0"]   # a row of states: s0..s3, d1/d2, upgrade
 node scripts/export-towers.mjs            # re-export godot/assets/models/towers.*
 ```
+
+## Walls, gates, towers: placement (game/ui)
+
+With villagers selected the build grid has **Build Wall (W)** and the tower
+(**Y**, named after the owner's tower stage, its portrait the stage's model);
+tooltips give the cost (per tile for walls), the stage's hp / range and the
+age. Portraits of wall pieces, gates and towers are composed from the
+`walls` / `towers` models (`portraits.gd`, `fort()`).
+
+- **Wall mode** (`ui._mode.kind == "wall"`): the ghost follows the cursor
+  tile; left press starts a line, dragging shows what `plan_wall` would lay,
+  one ghost per tile (the pillar / segment model, turned along the line):
+  green where it can go, red where a tile is blocked or unexplored (or every
+  new tile when the line is unaffordable), gold on tiles of the player's wall
+  it joins. A box by the cursor gives the tiles, the total wood / gold (red
+  when short) and why it cannot be built. An end on one of his wall tiles, or
+  within one tile of one of his pillars (an end or corner), snaps onto it, so
+  lines join. Release calls `place_wall` with the selected villagers, who go
+  and build the foundations; Shift keeps the mode for the next line; Esc /
+  right-click cancels. `ui.wall_preview` = {a, b, tiles, state, new_tiles,
+  blocked, cost, ok, afford, reason, dragging}.
+- **Tower**: placed like any building; its ghost is the stage's model with
+  its range ring; a selected finished tower shows its range ring too.
+- **Commands** on a selected finished piece of one's own: a wall segment
+  **Convert to Gate (G)**; a gate **Lock / Unlock Gate (L)**; any wall piece
+  the next wall stage, a tower the next tower stage (**U**, disabled with
+  "Requires the <age> Age" until then); while one researches, **Cancel (X)**
+  (refund). The selection card shows the stage name (Wooden Wall, Watch
+  Tower, ...), a tower's damage and range, a gate's state and research
+  progress. The feed says "<stage> finished." once a player's last wall
+  foundation is done (not per piece) and "<tech> researched.".
+
+The real-input playtest (`game/core/walls_playtest.gd`, ~5 min on lavapipe;
+harness shortcuts: AI off, resources granted, enemy soldiers spawned and
+ordered by script, the sim stepped fast while frames render):
+
+```
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 1280x720x24" \
+  godot --path godot --rendering-driver vulkan --audio-driver Dummy --resolution 1280x720 \
+  -s res://game/core/walls_playtest.gd -- --scene=skirmish [--shots=/abs/dir]   # "WALLSPLAY ok|FAIL <step>", exit = failures
+```
+
+It box-selects the villagers, checks the Wall / tower buttons and tooltips,
+W, a drag across the Town Center (red blocked tiles) dropped with Esc, four
+Shift-drags of a closed 7 x 7 ring (each later line started a tile off the
+last corner: snapped and joined; green ghosts and the cost checked mid-drag;
+every line placed on exactly the dragged tiles and paid), the villagers
+building it all, a click on a segment + the Convert to Gate button, L locks
+and the Unlock button unlocks, enemy soldiers ordered into the ring stay
+out while the player's own (box select, right-click) walk in through the
+gate, Y + a click places a tower (ghost and range ring), its upgrade refused
+before the Classical Age (U), H + A advance the age, the Watch Tower button
+researches it (range up, card title), and the tower shoots an enemy.
+`--shots` saves the blocked drag, the green drag, the foundations, the
+gate, the tower ghost and the upgraded tower.
 
 ## Conventions
 

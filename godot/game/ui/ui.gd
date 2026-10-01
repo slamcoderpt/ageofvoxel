@@ -27,7 +27,11 @@ const Settings := preload("res://game/ui/settings.gd")
 const AGES := ["Archaic", "Classical", "Heroic", "Mythic"]
 const ROMAN := ["I", "II", "III", "IV"]
 const FLOW := "res://game/menu/flow.gd"   # screen flow (Play Again, Main Menu), when the menu piece is there
-const BUILD_MENU := ["house", "farm", "storehouse", "temple", "barracks", "town_center"]
+const BUILD_MENU := ["house", "farm", "storehouse", "temple", "barracks", "town_center", "wall", "tower"]
+const FORT_TYPES := {"wall": true, "wall_pillar": true, "gate": true, "tower": true}
+const GHOST_OK := Color(0.49, 1.0, 0.6, 0.45)
+const GHOST_BAD := Color(1.0, 0.35, 0.29, 0.45)
+const GHOST_JOIN := Color(1.0, 0.86, 0.4, 0.6)
 const ORDER_NAMES := {1: "Moving", 2: "Gathering", 3: "Returning", 4: "Worshipping", 5: "Building", 6: "Attacking", 7: "Attack-moving"}
 const AM_COLOR := Color("#ff7a30")   # attack-move: cursor ring and order marker
 const RES_NAMES := ["food", "wood", "gold"]
@@ -82,7 +86,17 @@ var _cmd_sig := ""
 var _first := true
 var _scale := 1.0
 var _fog_on := false
-var _mode := {}                  # {} | {kind: "power", id} | {kind: "place", type, builders} | {kind: "attack_move"}
+var _mode := {}                  # {} | {kind: "power", id} | {kind: "place", type, builders} | {kind: "attack_move"} | {kind: "wall", builders, start}
+## the wall line under the cursor while in wall mode (read by the overlay and
+## the walls playtest): {a, b (world points, snapped), tiles, state, new_tiles,
+## cost, ok, reason}
+var wall_preview := {}
+var _wall_ghosts: Array = []     # MeshInstance3D pool of the wall line ghost
+var _wall_mats := {}
+var _wall_sig := ""
+var _fort := {}                  # get_fortify(me), refreshed with the HUD
+var _walls_cache := {}           # get_walls(), refreshed with the HUD
+var _sel_tower := {}             # {x, z, range}: the selected tower's range ring
 var _ghost: MeshInstance3D
 var _ghost_ok := false
 var _ghost_tile := Vector2i.ZERO
@@ -336,13 +350,23 @@ func _handle_events(events: Array) -> void:
 	minimap.on_events(events)
 	var t := float(sim.get_time())
 	var batch := []
+	var wall_done := false
 	for e in events:
 		match str(e.type):
 			"building:completed":
 				if int(e.owner) == me and t > 0.0:
 					var b: Dictionary = sim.get_building(e.id)
-					if not b.is_empty():
-						batch.append(["%s built." % _bdefs.get(b.type, {}).get("name", b.type), false])
+					if not b.is_empty() and (b.type == "wall" or b.type == "wall_pillar" or b.type == "gate"):
+						wall_done = true  # one notice per finished line, below
+					elif not b.is_empty():
+						batch.append(["%s built." % _name_of({"kind": "building", "type": b.type}), false])
+			"tech:researched":
+				if int(e.owner) == me:
+					var names: PackedStringArray = sim.fort_tech_names()
+					var tk := int(e.a) - 1
+					if tk >= 0 and tk < names.size():
+						batch.append(["%s researched." % str(_tech_def(names[tk]).get("name", names[tk])), true])
+					_hud_t = 0.0
 			"unit:trained":
 				if int(e.owner) == me and t > 0.0:
 					var u: Dictionary = sim.get_unit(e.id)
@@ -368,6 +392,14 @@ func _handle_events(events: Array) -> void:
 				_show_result(int(e.owner), float(e.amount))
 	# notices from a fast-forward arrive together: keep the latest of a kind
 	# (the older ones would already have faded, as in the browser)
+	if wall_done:
+		var W: Dictionary = sim.get_walls()
+		var left := 0
+		for i in int(W.count):
+			if int(W.owner[i]) == me and int(W.kind[i]) != 3 and int(W.built[i]) == 0:
+				left += 1
+		if left == 0:
+			batch.append(["%s finished." % str(sim.get_fortify(me).get("wall_name", "Wall")), false])
 	if batch.size() > 1 and game.get("_frames") != null and int(game._frames) <= 1:
 		batch = [batch[batch.size() - 1]]
 	for b in batch:
@@ -607,6 +639,9 @@ func _refresh_hud(sig: String) -> void:
 			"active": _mode.get("kind", "") == "power" and _mode.get("id", "") == k})
 	if sig != _cmd_sig:
 		_cmd_sig = sig
+	_fort = sim.get_fortify(me)
+	_walls_cache = sim.get_walls()
+	_sel_tower = _tower_ring_of_selection()
 	commands = _commands_for()
 	info = _info_for()
 	_redraw()
@@ -648,11 +683,27 @@ func _commands_for() -> Array:
 		var builders := us.filter(func(e): return bool(_defs[e.type].get("builder", false)))
 		if not builders.is_empty():
 			for t in BUILD_MENU:
+				if not _bdefs.has(t):
+					continue
 				var d: Dictionary = _bdefs[t]
 				var ok_age := int(d.get("min_age", 0)) <= age
-				list.append({"key": str(d.hotkey), "tex": _portraits.building(t, me), "title": "Build %s" % d.name, "cost": d.cost,
+				var c := {"key": str(d.hotkey), "tex": _portraits.building(t, me), "title": "Build %s" % d.name, "cost": d.cost,
 					"enabled": ok_age and _can_afford(d.cost), "action": "build", "arg": t,
-					"warn": "" if ok_age else "Requires the %s Age" % AGES[int(d.min_age)]})
+					"warn": "" if ok_age else "Requires the %s Age" % AGES[int(d.min_age)]}
+				if t == "wall":
+					c.title = "Build Wall"
+					c.action = "wall"
+					c.lines = ["Click and drag on the ground to draw a line;", "it joins your walls it touches.",
+						"%s · %d hp per tile" % [str(_fort.get("wall_name", d.name)), int(_fort.get("wall_tile_hp", d.get("hp", 0)))],
+						"Cost per tile · %s Age" % AGES[int(d.get("min_age", 0))]]
+				elif t == "tower":
+					var lv := int(_fort.get("tower_level", 0))
+					var tw: Dictionary = _fort.get("tower", {})
+					c.tex = _portraits.fort("tower", me, lv)
+					c.title = "Build %s" % str(_fort.get("tower_name", d.name))
+					c.lines = ["Shoots arrows at enemies in range %s." % _num(tw.get("range", 10)),
+						"%d hp · %s Age" % [int(tw.get("hp", d.get("hp", 0))), AGES[int(d.get("min_age", 0))]]]
+				list.append(c)
 		if not _military(us).is_empty():
 			list.append({"key": "A", "svg": "attack", "title": "Attack-Move (A)", "enabled": true, "action": "attack_move", "slot": 13})
 		list.append({"key": "X", "svg": "stop", "title": "Stop", "enabled": true, "action": "stop", "slot": 14})
@@ -670,6 +721,8 @@ func _commands_for() -> Array:
 				var adv := bool(player.get("advancing", false))
 				list.append({"key": "A", "svg": "age", "title": ("Advancing to the %s Age..." if adv else "Advance to the %s Age") % AGES[age + 1],
 					"cost": cost, "enabled": not adv and _can_afford(cost), "action": "age", "slot": 4})
+			if FORT_TYPES.has(str(b.type)):
+				_fort_commands(b, list)
 	var i := 0
 	for c in list:
 		if c.has("slot") and slots[c.slot] == null:
@@ -680,6 +733,60 @@ func _commands_for() -> Array:
 			if i < 15:
 				slots[i] = c
 	return slots
+
+## A wall row of get_walls() (cached with the HUD) for a building id, or -1.
+func _wall_row(id: int) -> int:
+	if _walls_cache.is_empty():
+		return -1
+	var ids: PackedInt32Array = _walls_cache.ids
+	return ids.find(id)
+
+func _tech_def(key: String, owner := -1) -> Dictionary:
+	var F: Dictionary = _fort if owner < 0 or owner == me else sim.get_fortify(owner)
+	for te in F.get("techs", []):
+		if str(te.key) == key:
+			return te
+	return {}
+
+## Commands of a finished wall piece / gate / tower of the player: Convert
+## to Gate (G) on a segment, Lock / Unlock (L) on a gate, the next wall or
+## tower stage (U, researched for every piece of that line), cancel (X).
+func _fort_commands(b: Dictionary, list: Array) -> void:
+	var t := str(b.type)
+	var id := int(b.id)
+	var row := _wall_row(id)
+	var tech := int(_walls_cache.tech[row]) if row >= 0 else 0
+	if t == "wall" and _bdefs.has("gate"):
+		var gd: Dictionary = _bdefs["gate"]
+		list.append({"key": "G", "tex": _portraits.fort("gate", me), "title": "Convert to Gate", "cost": gd.cost,
+			"lines": ["Opens for you and your allies,", "stays shut to your enemies."], "enabled": _can_afford(gd.cost), "action": "gate", "arg": id})
+	elif t == "gate":
+		var locked := row >= 0 and int(_walls_cache.locked[row]) != 0
+		list.append({"key": "L", "svg": "unlock" if locked else "lock", "title": "Unlock Gate" if locked else "Lock Gate",
+			"lines": ["Let your units and your allies' through again."] if locked else ["Nobody passes, not even your own units."],
+			"enabled": true, "action": "lock", "arg": id, "on": not locked})
+	var line := "tower" if t == "tower" else "wall"
+	if tech > 0:
+		var names: PackedStringArray = sim.fort_tech_names()
+		var te := _tech_def(names[tech - 1]) if tech - 1 < names.size() else {}
+		list.append({"key": "X", "svg": "stop", "title": "Cancel %s" % str(te.get("name", "research")), "lines": ["Refunds its cost."],
+			"enabled": true, "action": "cancel_research", "arg": id, "slot": 14})
+		return
+	for te in _fort.get("techs", []):
+		var st := str(te.state)
+		if str(te.line) != line or st == "done" or st == "needs_previous":
+			continue
+		var ok_age := st != "needs_age"
+		var c := {"key": "U", "title": "Upgrade to %s" % te.name, "cost": te.cost, "action": "research", "arg": [id, str(te.key)],
+			"lines": ["Every %s of yours gains its strength." % ("tower" if line == "tower" else "wall piece"), "%s Age · %ds" % [AGES[clampi(int(te.min_age), 0, 3)], int(te.time)]],
+			"enabled": st == "available" and _can_afford(te.cost),
+			"warn": "Requires the %s Age" % AGES[clampi(int(te.min_age), 0, 3)] if not ok_age else ("Being researched elsewhere" if st == "researching" else "")}
+		if line == "tower":
+			c.tex = _portraits.fort("tower", me, int(te.level))
+		else:
+			c.svg = "upgrade"
+		list.append(c)
+		break
 
 ## Soldiers among unit dicts / ids (not villagers, with an attack): the ones an attack-move moves.
 func _military(us: Array) -> Array:
@@ -752,6 +859,8 @@ func _info_for() -> Dictionary:
 		d["hp"] = float(e.hp)
 		d["max_hp"] = float(e.max_hp)
 		d["tex"] = _portraits.building(e.type, int(e.owner))
+		if FORT_TYPES.has(str(e.type)):
+			_fort_info(e, d)
 		if not bool(e.built):
 			d.tasks.append("Under construction · %d%%" % int(floor(float(e.progress) * 100)))
 		if bool(bd.get("age_up", false)) and bool(player.get("advancing", false)) and int(e.owner) == me:
@@ -780,12 +889,42 @@ func _info_for() -> Dictionary:
 			d.stats.append([rk, str(int(ceil(float(r.amount[i])))), rk])
 	return d
 
+## The selection card of a wall piece, gate or tower: its stage's name and
+## portrait, a tower's damage and range, gate state, research progress.
+func _fort_info(e: Dictionary, d: Dictionary) -> void:
+	var owner := int(e.owner)
+	var F: Dictionary = _fort if owner == me else sim.get_fortify(owner)
+	var t := str(e.type)
+	var row := _wall_row(int(e.id))
+	d["cls"] = "Fortification"
+	if t == "tower":
+		var lv := int(F.get("tower_level", 0))
+		d["title"] = str(F.get("tower_name", d.title))
+		d["tex"] = _portraits.fort("tower", owner, lv)
+		var tw: Dictionary = F.get("tower", {})
+		d.stats.append(["sword", _num(tw.get("damage", 0)), "ranged"])
+		d.stats.append(["eye", _num(tw.get("range", 0)), "range"])
+	elif t == "gate":
+		d["title"] = "Gate"
+		var locked := row >= 0 and int(_walls_cache.locked[row]) != 0
+		if bool(e.built):
+			d.tasks.append("Locked: nobody passes" if locked else "Open to you and your allies")
+	else:
+		d["title"] = str(F.get("wall_name", d.title)) + (" Pillar" if t == "wall_pillar" else "")
+	if row >= 0 and int(_walls_cache.tech[row]) > 0:
+		var names: PackedStringArray = sim.fort_tech_names()
+		var tk := int(_walls_cache.tech[row]) - 1
+		var te := _tech_def(names[tk], owner) if tk < names.size() else {}
+		d.tasks.append("Researching %s · %d%%" % [str(te.get("name", "")), int(floor(float(_walls_cache.tech_t[row]) * 100))])
+
 static func _num(v) -> String:
 	var f := float(v)
 	return str(int(f)) if f == floor(f) else "%.1f" % f
 
 func _name_of(e: Dictionary) -> String:
 	if e.kind == "unit": return str(_defs[e.type].name)
+	if e.kind == "building" and (e.type == "wall" or e.type == "wall_pillar"): return str(_fort.get("wall_name", _bdefs[e.type].name))
+	if e.kind == "building" and e.type == "tower": return str(_fort.get("tower_name", _bdefs[e.type].name))
 	if e.kind == "building": return str(_bdefs[e.type].name)
 	return "Resource"
 
@@ -1045,6 +1184,8 @@ func hud_input(ctrl: Control, e: InputEvent) -> void:
 		mouse_down = e.pressed
 		if not e.pressed:
 			_mm_drag = false
+			if _mode.get("kind", "") == "wall" and _mode.get("start") != null:
+				_confirm_wall(e.shift_pressed)
 			_redraw()
 			return
 	if not e.pressed:
@@ -1147,7 +1288,7 @@ func _click_zone(id: String, arg) -> void:
 		"mb:menu":
 			menu_open = not menu_open
 			tooltip = {} if not menu_open else {"title": "Hotkeys", "lines": [". idle villager  ·  H Town Center", "Ctrl+1..9 assign group  ·  1..9 recall",
-				"Q/E/F/S/R/B build  ·  X stop", "A attack-move (army)  ·  A age (Town Center)", "Space / arrows: pan  ·  wheel: zoom", "F1 HUD  ·  F3 performance meter"], "menu": true, "anchor": Rect2(_back.menubar_rect().position + Vector2(0, 50), Vector2(10, 1))}
+				"Q/E/F/S/R/B build  ·  W wall  ·  Y tower", "G gate  ·  L lock gate  ·  U upgrade  ·  X stop", "A attack-move (army)  ·  A age (Town Center)", "Space / arrows: pan  ·  wheel: zoom", "F1 HUD  ·  F3 performance meter"], "menu": true, "anchor": Rect2(_back.menubar_rect().position + Vector2(0, 50), Vector2(10, 1))}
 		"rb:idle":
 			_cycle_idle()
 		"rb:army":
@@ -1182,6 +1323,23 @@ func _run_command(c: Dictionary) -> void:
 				if e.kind == "unit" and bool(_defs[e.type].get("builder", false)) and int(e.owner) == me:
 					builders.append(e.id)
 			_begin_place(str(c.arg), builders)
+		"wall":
+			var builders := []
+			for e in sel:
+				if e.kind == "unit" and bool(_defs[e.type].get("builder", false)) and int(e.owner) == me:
+					builders.append(e.id)
+			_begin_wall(builders)
+		"gate":
+			var r: Dictionary = sim.convert_to_gate(int(c.arg))
+			message("Gate: open to you and your allies" if r.ok else str(r.reason))
+		"lock":
+			var r: Dictionary = sim.set_gate_locked(int(c.arg), bool(c.on))
+			message(("Gate locked" if bool(c.on) else "Gate unlocked") if r.ok else str(r.reason))
+		"research":
+			var r: Dictionary = sim.research(int(c.arg[0]), str(c.arg[1]))
+			if not r.ok: message(r.reason)
+		"cancel_research":
+			sim.cancel_research(int(c.arg))
 		"stop":
 			sim.order_idle(PackedInt32Array(_own_units()))
 		"attack_move":
@@ -1216,6 +1374,13 @@ func _unhandled_input(e: InputEvent) -> void:
 			if _mode.get("kind", "") == "place":
 				_confirm_place(e.shift_pressed)
 				return
+			if _mode.get("kind", "") == "wall":
+				var gw = pick_ground(e.position)
+				if gw != null:
+					_mode["start"] = _snap_wall(gw)
+					_wall_sig = ""
+					_update_ghost()
+				return
 			if _mode.get("kind", "") == "attack_move":
 				var g = pick_ground(e.position)
 				if g != null:
@@ -1238,6 +1403,8 @@ func _unhandled_input(e: InputEvent) -> void:
 			var g = pick_ground(e.position)
 			if g != null:
 				_order_at(g.x, g.y, pick_entity(e.position))
+	elif e is InputEventMouseButton and not e.pressed and e.button_index == MOUSE_BUTTON_LEFT and _mode.get("kind", "") == "wall" and _mode.get("start") != null:
+		_confirm_wall(e.shift_pressed)
 	elif e is InputEventMouseButton and not e.pressed and e.button_index == MOUSE_BUTTON_LEFT and not _drag.is_empty():
 		_finish_drag(e.position)
 	elif e is InputEventKey and e.pressed and not e.echo:
@@ -1511,11 +1678,14 @@ func _begin_place(type: String, builders: Array) -> void:
 	_cancel_mode()
 	_mode = {"kind": "place", "type": type, "builders": builders}
 	_ghost = MeshInstance3D.new()
-	_ghost.mesh = VoxelModels.mesh("buildings", "%s/0" % type)
+	if type == "tower":
+		_ghost.mesh = VoxelModels.mesh("towers", str(clampi(int(_fort.get("tower_level", 0)), 0, 3)))
+	else:
+		_ghost.mesh = VoxelModels.mesh("buildings", "%s/0" % type)
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.albedo_color = Color(0.49, 1.0, 0.6, 0.45)
+	m.albedo_color = GHOST_OK
 	m.no_depth_test = false
 	m.render_priority = 3
 	_ghost.material_override = m
@@ -1530,6 +1700,10 @@ func _cancel_mode() -> void:
 	if _mode.get("kind", "") == "attack_move":
 		Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 	_mode = {}
+	wall_preview = {}
+	_wall_sig = ""
+	for gm in _wall_ghosts:
+		gm.visible = false
 	_range_ring.visible = false
 	_am_ring.visible = false
 	_hud_t = 0.0
@@ -1537,11 +1711,21 @@ func _cancel_mode() -> void:
 func _update_ghost() -> void:
 	var kind: String = _mode.get("kind", "")
 	if kind == "" :
-		_range_ring.visible = false
+		# a selected tower shows its range
+		_range_ring.visible = not _sel_tower.is_empty()
+		if _range_ring.visible:
+			var r0 := float(_sel_tower.range)
+			_range_ring.position = Vector3(_sel_tower.x, sim.height_at(_sel_tower.x, _sel_tower.z) + 0.1, _sel_tower.z)
+			_range_ring.scale = Vector3(r0, 1, r0)
 		_am_ring.visible = false
 		return
 	var mp := get_viewport().get_mouse_position()
 	var g = pick_ground(mp)
+	if kind == "wall":
+		_range_ring.visible = false
+		if g != null:
+			_update_wall_ghost(g)
+		return
 	if kind == "attack_move":
 		_am_ring.visible = g != null
 		if g != null:
@@ -1568,7 +1752,13 @@ func _update_ghost() -> void:
 	var x := tx + float(d.w) * 0.5
 	var z := tz + float(d.h) * 0.5
 	_ghost.position = Vector3(x, sim.height_at(x, z), z)
-	(_ghost.material_override as StandardMaterial3D).albedo_color = Color(0.49, 1.0, 0.6, 0.45) if _ghost_ok else Color(1.0, 0.35, 0.29, 0.45)
+	(_ghost.material_override as StandardMaterial3D).albedo_color = GHOST_OK if _ghost_ok else GHOST_BAD
+	# a tower shows the range it will cover
+	_range_ring.visible = _mode.type == "tower"
+	if _range_ring.visible:
+		var tr := float(_fort.get("tower", {}).get("range", 10))
+		_range_ring.position = Vector3(x, sim.height_at(x, z) + 0.1, z)
+		_range_ring.scale = Vector3(tr, 1, tr)
 
 func _confirm_place(shift: bool) -> void:
 	_update_ghost()
@@ -1587,6 +1777,251 @@ func _confirm_place(shift: bool) -> void:
 	_stat_t = 0.0
 	_hud_t = 0.0
 
+# ---- walls: click-drag a line ------------------------------------------------------------
+#
+# Wall mode (W, or the Build Wall button, with villagers selected): the ghost
+# follows the cursor tile; press on the ground starts a line, dragging shows
+# the line AovSim.plan_wall() would lay (4-connected tiles; pillars at ends,
+# corners and every few tiles, segments between) as ghost pieces, green
+# where they can go, red where a tile is blocked, unexplored or the whole
+# line unaffordable, gold on tiles of the player's wall it joins; the total
+# cost follows the cursor. An end within one tile of one of his pillars (a
+# wall end or corner) snaps onto it, so lines join. Release places the
+# foundations (AovSim.place_wall) and the selected villagers go and build
+# them; Shift keeps the mode for the next line; Esc / right-click cancels.
+
+func _begin_wall(builders: Array) -> void:
+	_cancel_mode()
+	_mode = {"kind": "wall", "builders": builders, "start": null}
+	_walls_cache = sim.get_walls()
+	message("Wall: drag a line on the ground (Shift: keep drawing, Esc: cancel)")
+	_update_ghost()
+
+## A ground point as the centre of its tile, snapped onto the player's wall:
+## the tile itself when it is his wall, else a pillar of his within one tile.
+func _snap_wall(g: Vector2) -> Vector2:
+	var tx := int(floor(g.x))
+	var tz := int(floor(g.y))
+	var W := _walls_cache
+	var best := Vector2i(tx, tz)
+	var bd := 1e9
+	var rect: PackedInt32Array = W.get("rect", PackedInt32Array())
+	for i in int(W.get("count", 0)):
+		var k := int(W.kind[i])
+		if int(W.owner[i]) != me or k == 3:
+			continue
+		var rx := rect[i * 4]
+		var rz := rect[i * 4 + 1]
+		var rw := rect[i * 4 + 2]
+		var rh := rect[i * 4 + 3]
+		var reach := 1 if k == 0 else 0
+		if tx < rx - reach or tx >= rx + rw + reach or tz < rz - reach or tz >= rz + rh + reach:
+			continue
+		for z in range(rz, rz + rh):
+			for x in range(rx, rx + rw):
+				var dx := x - tx
+				var dz := z - tz
+				if maxi(absi(dx), absi(dz)) > reach:
+					continue
+				var dd := float(dx * dx + dz * dz)
+				if dd < bd:
+					bd = dd
+					best = Vector2i(x, z)
+	return Vector2(best.x + 0.5, best.y + 0.5)
+
+## Ghost materials: wall pieces lit (so pillars, merlons and the wall-walk
+## read through the tint), tile markers flat and drawn over whatever stands
+## on the tile (a blocked tile under a house still shows red).
+func _wall_mat(c: Color, marker := false) -> StandardMaterial3D:
+	var key := c.to_html() + ("m" if marker else "")
+	if not _wall_mats.has(key):
+		var m := StandardMaterial3D.new()
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.albedo_color = c
+		m.render_priority = 3
+		if marker:
+			m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			m.no_depth_test = true
+			m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		else:
+			m.albedo_color.a = 0.6
+			m.emission_enabled = true
+			m.emission = Color(c.r, c.g, c.b) * 0.45
+			m.roughness = 1.0
+		_wall_mats[key] = m
+	return _wall_mats[key]
+
+func _wall_mesh(model: String) -> Mesh:
+	var key := "mesh:" + model
+	if not _wall_mats.has(key):
+		var m: Mesh = null
+		if model != "tile" and VoxelModels.group("walls").get("man", {}).get("models", {}).has(model):
+			m = VoxelModels.mesh("walls", model)
+		if m == null:
+			var pm := PlaneMesh.new()
+			pm.size = Vector2(0.9, 0.9)
+			m = pm
+		_wall_mats[key] = m
+	return _wall_mats[key]
+
+func _update_wall_ghost(g: Vector2) -> void:
+	var b := _snap_wall(g)
+	var a: Vector2 = _mode.start if _mode.get("start") != null else b
+	var sig := "%s|%s|%d|%d" % [a, b, int(player.get("wood", 0)), int(player.get("gold", 0))]
+	if sig == _wall_sig:
+		return
+	_wall_sig = sig
+	var P: Dictionary = sim.plan_wall(me, a, b)
+	var tiles: PackedInt32Array = P.get("tiles", PackedInt32Array())
+	var state: PackedByteArray = P.get("state", PackedByteArray())
+	var n := state.size()
+	var pillar := {}
+	var pieces: PackedInt32Array = P.get("pieces", PackedInt32Array())
+	var tnames: PackedStringArray = sim.building_type_names()
+	for i in range(0, pieces.size(), 5):
+		if tnames[pieces[i]] == "wall_pillar":
+			pillar[Vector2i(pieces[i + 1], pieces[i + 2])] = true
+	var cost: Dictionary = P.get("cost", {})
+	var afford := _can_afford(cost)
+	var hidden := 0
+	var st := PackedByteArray(state)
+	for i in n:
+		if st[i] == 1 and _fog_on and not sim.is_explored(tiles[i * 2] + 0.5, tiles[i * 2 + 1] + 0.5):
+			st[i] = 0
+			hidden += 1
+	var ok: bool = bool(P.get("valid", false)) and int(P.get("new_tiles", 0)) > 0 and afford and hidden == 0
+	var reason := ""
+	if not bool(P.get("valid", false)) or int(P.get("new_tiles", 0)) == 0:
+		reason = str(P.get("reason", "")) if str(P.get("reason", "")) != "" else "Cannot build a wall there"
+	elif hidden > 0:
+		reason = "Unexplored ground"
+	elif not afford:
+		reason = "Not enough resources"
+	var blocked := 0
+	for i in n:
+		if st[i] == 0:
+			blocked += 1
+	wall_preview = {"a": a, "b": b, "tiles": tiles, "state": st, "new_tiles": int(P.get("new_tiles", 0)), "blocked": blocked,
+		"cost": cost, "ok": ok, "afford": afford, "reason": reason, "dragging": _mode.get("start") != null}
+	# ghost pieces, one per tile
+	while _wall_ghosts.size() < n:
+		var mi := MeshInstance3D.new()
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(mi)
+		_wall_ghosts.append(mi)
+	var good := GHOST_OK
+	for i in _wall_ghosts.size():
+		var mi: MeshInstance3D = _wall_ghosts[i]
+		if i >= n:
+			mi.visible = false
+			continue
+		var tx := tiles[i * 2]
+		var tz := tiles[i * 2 + 1]
+		var x := tx + 0.5
+		var z := tz + 0.5
+		var model := "tile"
+		var col := GHOST_BAD
+		var yaw := 0.0
+		if st[i] == 1:
+			model = "pillar" if pillar.has(Vector2i(tx, tz)) else "seg/0"
+			col = good if afford else GHOST_BAD
+			# a segment runs along the line (x or z) at that tile
+			var j0 := maxi(i - 1, 0)
+			var j1 := mini(i + 1, n - 1)
+			if tiles[j1 * 2] == tiles[j0 * 2] and j1 != j0:
+				yaw = PI * 0.5
+		elif st[i] == 2:
+			col = GHOST_JOIN
+		mi.mesh = _wall_mesh(model)
+		mi.material_override = _wall_mat(col, model == "tile")
+		var y: float = sim.height_at(x, z) + (0.08 if model == "tile" else 0.0)
+		mi.transform = Transform3D(Basis(Vector3.UP, yaw), Vector3(x, y, z))
+		mi.visible = true
+
+func _confirm_wall(shift: bool) -> void:
+	if _mode.get("kind", "") != "wall" or _mode.get("start") == null:
+		return
+	_wall_sig = ""
+	_update_ghost()
+	var pv := wall_preview
+	if not bool(pv.get("ok", false)):
+		message(str(pv.get("reason", "")) if str(pv.get("reason", "")) != "" else "Cannot build a wall there")
+		_mode["start"] = null
+		_wall_sig = ""
+		return
+	var r: Dictionary = sim.place_wall(me, pv.a, pv.b, PackedInt32Array(_mode.builders))
+	if not bool(r.ok):
+		message(str(r.reason))
+		_mode["start"] = null
+		_wall_sig = ""
+		return
+	_walls_cache = sim.get_walls()
+	if shift:
+		_mode["start"] = null
+		_wall_sig = ""
+	else:
+		_cancel_mode()
+	_stat_t = 0.0
+	_hud_t = 0.0
+
+## {x, z, range} of the one selected tower (finished), else {}.
+func _tower_ring_of_selection() -> Dictionary:
+	if selected.size() != 1 or int(sim.entity_kind(selected[0])) != 2:
+		return {}
+	var b: Dictionary = sim.get_building(selected[0])
+	if b.is_empty() or str(b.get("type", "")) != "tower" or not bool(b.get("built", false)):
+		return {}
+	var F: Dictionary = _fort if int(b.owner) == me else sim.get_fortify(int(b.owner))
+	return {"x": float(b.x), "z": float(b.z), "range": float(F.get("tower", {}).get("range", 10))}
+
+## The wall line's cost by the cursor: tiles, wood / gold (red when short),
+## and why it cannot be built.
+func _draw_wall_cost(ci: Control) -> void:
+	var pv := wall_preview
+	if pv.is_empty() or _mode.get("kind", "") != "wall":
+		return
+	var bold := S.font("bold")
+	var sans := S.font("sans")
+	var n := int(pv.new_tiles)
+	var head := "Wall · %d tile%s" % [n, "" if n == 1 else "s"]
+	if int(pv.blocked) > 0:
+		head += " · %d blocked" % int(pv.blocked)
+	var cost: Dictionary = pv.cost
+	var w := S.text_width(bold, head, 14) + 20
+	var cw := 0.0
+	for k in cost:
+		if float(cost[k]) > 0:
+			cw += 18 + S.text_width(bold, str(int(cost[k])), 14) + 10
+	var reason: String = "" if bool(pv.ok) else str(pv.reason)
+	w = maxf(w, cw + 20)
+	if reason != "":
+		w = maxf(w, S.text_width(sans, reason, 13) + 20)
+	var h := 26.0 + (20.0 if cw > 0 else 0.0) + (18.0 if reason != "" else 0.0) + 6.0
+	var p := _css(_mouse) + Vector2(20, 22)
+	var vs := ci.size
+	p.x = minf(p.x, vs.x - w - 6)
+	p.y = minf(p.y, vs.y - h - 6)
+	var r := Rect2(p, Vector2(w, h))
+	ci.draw_rect(r.grow(1), Color.BLACK)
+	ci.draw_rect(r, Color(4 / 255.0, 17 / 255.0, 22 / 255.0, 0.92))
+	ci.draw_rect(r, S.BRONZE_HI, false, 1.0)
+	var cy := r.position.y + 19
+	S.text(ci, bold, Vector2(r.position.x + 10, cy), head, 14, S.GOLD if bool(pv.ok) else Color("#ff8a70"), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
+	if cw > 0:
+		cy += 20
+		var cx := r.position.x + 10
+		for k in cost:
+			if float(cost[k]) <= 0:
+				continue
+			S.draw_icon(ci, k, Rect2(cx, cy - 13, 15, 15))
+			cx += 18
+			var v := str(int(cost[k]))
+			S.text(ci, bold, Vector2(cx, cy), v, 14, S.INK if float(player.get(k, 0.0)) >= float(cost[k]) else Color("#ff8a70"), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
+			cx += S.text_width(bold, v, 14) + 10
+	if reason != "":
+		cy += 18
+		S.text(ci, sans, Vector2(r.position.x + 10, cy), reason, 13, Color("#ff8a70"), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
+
 # ================================================================================
 # world overlay: drag box + health bars over selected units
 
@@ -1600,6 +2035,7 @@ func _draw_world(ci: Control) -> void:
 		var r := Rect2(_css(_drag.start), Vector2.ZERO).expand(_css(_mouse))
 		ci.draw_rect(r, Color(140 / 255.0, 1.0, 140 / 255.0, 0.12))
 		ci.draw_rect(r, Color("#b8ffb0"), false, 1.0)
+	_draw_wall_cost(ci)
 	if selected.is_empty():
 		return
 	var u := units()

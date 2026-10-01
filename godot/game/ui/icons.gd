@@ -33,4 +33,8 @@ const SVG := {
 	"fast": '<svg viewBox="0 0 24 24"><path d="M2 5l9 7-9 7zM12 5l9 7-9 7z" fill="#f3e3b8"/></svg>',
 	"scroll": '<svg viewBox="0 0 24 24"><path d="M6 3h11a3 3 0 0 1 0 6h-1v10a2 2 0 0 1-2 2H5a3 3 0 0 1 0-6h1z" fill="#e9dcc0" stroke="#7a5a2c" stroke-width="1"/><path d="M9 8h5M9 11h5M9 14h4" stroke="#7a5a2c" stroke-width="1.2"/></svg>',
 	"gear": '<svg viewBox="0 0 24 24"><path d="M10.3 2h3.4l.5 2.6 2 .9 2.2-1.5 2.4 2.4-1.5 2.2.9 2 2.6.5v3.4l-2.6.5-.9 2 1.5 2.2-2.4 2.4-2.2-1.5-2 .9-.5 2.6h-3.4l-.5-2.6-2-.9-2.2 1.5-2.4-2.4 1.5-2.2-.9-2L2 13.7v-3.4l2.6-.5.9-2L4 5.6 6.4 3.2l2.2 1.5 2-.9z" fill="#d8c08a" stroke="#4a3514" stroke-width=".8"/><circle cx="12" cy="12" r="3.4" fill="#16323a" stroke="#4a3514"/></svg>',
+	# Godot-only (no icons.js counterpart): gate lock / unlock, research upgrade
+	"lock": '<svg viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0 1 10 0v3" stroke="#cfd6dc" stroke-width="2.6" fill="none"/><rect x="4" y="11" width="16" height="11" rx="2" fill="#c9a24c" stroke="#fff0c0" stroke-width="1"/><circle cx="12" cy="15.5" r="1.8" fill="#3b2a12"/><path d="M12 16v3" stroke="#3b2a12" stroke-width="1.6"/></svg>',
+	"unlock": '<svg viewBox="0 0 24 24"><path d="M7 11V7a5 5 0 0 1 9.6-2" stroke="#cfd6dc" stroke-width="2.6" fill="none"/><rect x="4" y="11" width="16" height="11" rx="2" fill="#7fae5a" stroke="#e9f2d0" stroke-width="1"/><circle cx="12" cy="15.5" r="1.8" fill="#1d3412"/><path d="M12 16v3" stroke="#1d3412" stroke-width="1.6"/></svg>',
+	"upgrade": '<svg viewBox="0 0 24 24"><path d="M12 2l8 9h-5v5H9v-5H4z" fill="#f2c14e" stroke="#fff3c4" stroke-width="1"/><rect x="9" y="18" width="6" height="2" fill="#f2c14e"/><rect x="9" y="21" width="6" height="1.6" fill="#f2c14e"/></svg>',
 }
