@@ -213,6 +213,49 @@ func _res() -> Vector2:
 	return Vector2(float(p.wood), float(p.gold))
 
 ## centre of the drawn command button running `action` (and optional arg check)
+## a real left click on a wall piece or tower, on a footprint spot no unit's
+## body covers (ui.pick_entity only chooses the spot; the click is real input).
+## Retried, since the main loop keeps the sim running between frames and a
+## unit may walk onto the spot before the click lands.
+func _select_piece(id: int) -> bool:
+	for attempt in 8:
+		if ui.selected.size() == 1 and int(ui.selected[0]) == id:
+			return true
+		var pc := _piece(id)
+		if pc.is_empty():
+			return false
+		var hit = null
+		var n := 6
+		for k in n * n:
+			var q := Vector2(pc.tx + (k % n + 0.5) / n * pc.w, pc.tz + (k / n + 0.5) / n * pc.h)
+			var sp := _screen(q.x, q.y)
+			if _on_screen(sp) and ui.pick_entity(sp) == id:
+				hit = sp
+				break
+		if hit == null:
+			await _frames(4)
+			continue
+		await _click(hit)
+		await _frames(4)
+	return ui.selected.size() == 1 and int(ui.selected[0]) == id
+
+## the builders step off a finished building: a real right-click on a free,
+## reachable spot `dist` tiles from it on the side away from `from`
+func _walk_off(c: Vector2, from: Vector2, dist: float) -> Vector2:
+	var base := (c - from).angle()
+	for a in 16:
+		var off := (a + 1) / 2 * (1 if a % 2 == 1 else -1)   # 0, +1, -1, +2, -2 ...
+		var ang := base + off * TAU / 16.0
+		var t := c + Vector2(cos(ang), sin(ang)) * dist
+		var sp := _screen(t.x, t.y)
+		if not _on_screen(sp) or _wall_tiles().get(Vector2i(int(t.x), int(t.y))) != null:
+			continue
+		if sim.find_path(t.x, t.y, t.x + 0.1, t.y).size() == 0 or ui.pick_entity(sp) != 0:
+			continue
+		await _click(sp, MOUSE_BUTTON_RIGHT)
+		return t
+	return Vector2(-1, -1)
+
 func _cmd_center(action: String) -> Variant:
 	for layer in [ui._front, ui._back]:
 		for z in layer.zones:
@@ -489,11 +532,7 @@ func _run() -> void:
 			seg = p
 	var gate_id := int(seg.get("id", 0))
 	if gate_id != 0:
-		for i in seg.w:
-			await _click(_tile_screen(Vector2i(seg.tx + i, seg.tz)))
-			await _frames(3)
-			if ui.selected.size() == 1 and int(ui.selected[0]) == gate_id:
-				break
+		await _select_piece(gate_id)
 	_check("click selects a wall segment", gate_id != 0 and ui.selected.size() == 1 and int(ui.selected[0]) == gate_id, "segment %s" % seg)
 	await _frames(8)
 	var gc = _cmd_center("gate")
@@ -587,12 +626,19 @@ func _run() -> void:
 	var tb_t: float = await _step_until(200.0, func() -> bool: return tower_id != 0 and int(_piece(tower_id).get("built", 0)) == 1)
 	_check("villagers build the tower", tb_t >= 0.0, "%.0f s" % tb_t)
 
-	# 10. upgrades: refused before the Classical Age, then researched
-	await _click(_screen(placed_at.x + 1.0, placed_at.y + 1.0))
+	# 10. upgrades: refused before the Classical Age, then researched. The
+	# builders stand around the finished tower, so they are walked off it first
+	# (group 1, right-click away from the ring) and the tower is clicked on a
+	# footprint spot no villager covers.
+	var tmid := Vector2(placed_at.x + td.w * 0.5, placed_at.y + td.h * 0.5)
+	await _key(KEY_1)
+	await _frames(4)
+	var off_to: Vector2 = await _walk_off(tmid, Vector2(C.x + 0.5, C.y + 0.5), 5.0)
+	var off_t: float = await _step_until(20.0, func() -> bool:
+		return _units(ME, "villager").all(func(u): return Vector2(u.x, u.z).distance_to(tmid) > 2.5))
+	_check("right-click walks the builders off the tower", off_to.x >= 0.0 and off_t >= 0.0, "to %s after %.0f s" % [off_to, off_t])
+	await _select_piece(tower_id)
 	await _frames(8)
-	if not (ui.selected.size() == 1 and int(ui.selected[0]) == tower_id):
-		await _click(_screen(placed_at.x + 1.0, placed_at.y + 1.5))
-		await _frames(8)
 	var up: Dictionary = _cmd("research")
 	_check("tower selected: Upgrade to Watch Tower (U), needs Classical", ui.selected.size() == 1 and int(ui.selected[0]) == tower_id
 		and str(up.get("key", "")) == "U" and not bool(up.get("enabled", true)) and str(up.get("warn", "")).contains("Classical"), "%s / %s" % [up.get("title", ""), up.get("warn", "")])
@@ -606,7 +652,7 @@ func _run() -> void:
 	var age_t: float = await _step_until(200.0, func() -> bool: return int(sim.get_player(ME).age) >= 1)
 	_check("Town Center advances to the Classical Age (H, A)", age_t >= 0.0, "%.0f s" % age_t)
 	await _look(C)
-	await _click(_screen(placed_at.x + 1.0, placed_at.y + 1.0))
+	await _select_piece(tower_id)
 	await _frames(8)
 	var range0 := float(sim.get_fortify(ME).tower.range)
 	var upc = _cmd_center("research")

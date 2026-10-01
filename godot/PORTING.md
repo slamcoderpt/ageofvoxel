@@ -835,7 +835,7 @@ age. Portraits of wall pieces, gates and towers are composed from the
   progress. The feed says "<stage> finished." once a player's last wall
   foundation is done (not per piece) and "<tech> researched.".
 
-The real-input playtest (`game/core/walls_playtest.gd`, ~5 min on lavapipe;
+The real-input playtest (`game/core/walls_playtest.gd`, ~5 min on lavapipe, ~15 at 0.4 FPS under load;
 harness shortcuts: AI off, resources granted, enemy soldiers spawned and
 ordered by script, the sim stepped fast while frames render):
 
@@ -853,7 +853,10 @@ every line placed on exactly the dragged tiles and paid), the villagers
 building it all, a click on a segment + the Convert to Gate button, L locks
 and the Unlock button unlocks, enemy soldiers ordered into the ring stay
 out while the player's own (box select, right-click) walk in through the
-gate, Y + a click places a tower (ghost and range ring), its upgrade refused
+gate, Y + a click places a tower (ghost and range ring), group 1 + a
+right-click walks the builders off it and a click on a footprint spot no unit
+covers selects it (units win picks, so a click on the crowd would select a
+villager; the click is retried as the sim runs between frames), its upgrade refused
 before the Classical Age (U), H + A advance the age, the Watch Tower button
 researches it (range up, card title), and the tower alone shoots an enemy
 (the player's units are removed first, the foe stands away from the Town
