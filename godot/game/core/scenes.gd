@@ -43,6 +43,11 @@ static var SCENES := {
 	# still field (the screen is opaque); --players=2..6, --open=<picker>.
 	"setup": {"preset": "battle", "seed": 1, "map_size": 96, "hud": false, "reveal_all": true, "fast_forward": 0.0,
 		"screen": "res://game/menu/setup/setup.gd", "camera": {"distance": 40.0}},
+	# Godot-only: Greek stone walls and gates (game/buildings/walls.gd): the town
+	# scene's town in a wall ring, a gate open and one closed, construction and
+	# damage; the camera looks along the south wall like reference/walls/walls_02.
+	"walls": {"preset": "skirmish", "seed": 7, "hud": false, "reveal_all": true, "fast_forward": 0.0,
+		"camera": {"distance": 27.0, "pitch": 37.0, "yaw": 44.0}},
 	# Godot-only: every exported model on a flat strip (checks scripts/export-models.mjs).
 	"models": {"preset": "battle", "seed": 1, "map_size": 96, "hud": false, "reveal_all": true, "fast_forward": 0.0,
 		"camera": {"distance": 34.0, "pitch": 38.0, "yaw": 0.0}},

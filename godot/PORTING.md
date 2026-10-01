@@ -30,7 +30,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | core (foundation; skirmish builder: camera, fog pass, playtest) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck, `fog_view.gd` + `fog_of_war.gdshader` (fog-of-war shading, one full-screen pass), `playtest.gd` (scripted skirmish playthrough), `menu_playtest.gd` (the screen flow through real input: menu -> setup -> loading -> match -> Esc menu -> menu, see "Screen flow"), `match_rules.gd` + `match_check.gd` (match settings -> the sim, see "Match rules")) | `core/` (constants, rng, jsmath, bounds, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `match/` (the match setup: seats, teams, difficulty, stockpiles), `fortify/` (walls, gates, towers, their stages: Godot-only, see "Walls, gates, towers"), `sim.{h,cpp}` | `src/core/` |
 | terrain | `game/terrain/terrain.gd` + `terrain.gdshader` (chunks, paving cobbles / pale stone of MaterialPatches patchGround), `water.gdshader` (Water.js), `props.gdshader` (voxel.gdshader + MultiMesh instance tint, used by trees / gold / berries / ground details); mesher in `native/src/terrain_mesher.cpp` (TerrainMesh.js full port, water depth bake, GroundDetails.js scatter) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (sun + PCSS soft shadows, hemisphere = ambient colour + two unshadowed up/down lights, fill, depth haze following the camera, SSAO, MSAA, `--quality=high\|medium\|low`, `--post=high\|low\|off`), `grade_effect.gd` (CompositorEffect compute pass on the HDR buffer: exposure 2.1 + PBR Neutral + the PostFX.js grade; Godot's tonemap is LINEAR; Compatibility/web falls back to AgX), `sky.gdshader`. MaterialPatches.js canopy / foliage terms not ported yet | none | `src/lighting/` |
-| buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
+| buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `walls.gd` (Greek walls, pillars and gates with swinging leaves, construction and damage states; models by `../scripts/export-walls.mjs`, see "Walls and gates: the look"), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
 | units | `game/units/units.gd` (rigs posed by the full anim.js port, conditional parts, crowd yaw / press / jitter, deaths and corpses, contact shadows), `unit.gdshader` (team lift + rim, hit flash, corpse drain, dithered fade) + `unit_outline.gdshader` (inverted hull, next pass); posing in C++: `native/src/unit_view.cpp` (`AovUnitView`) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
 | combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported, plus god powers and a wave log, Godot-only) | `src/combat/` |
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor; Godot-only activity fx: axe / pick chips and dust, sickle chaff, stooks on cut rows, hoof dust, shoal ripples, fish splashes, net ripples, boat wakes; crops sway, `econ_voxel.gdshader`, `fx_chip / fx_puff / fx_ring.gdshader`), buffers built in C++ by `AovEconView` (`native/src/econ_view.{h,cpp}`, render side, reads the sim, never writes it) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
@@ -185,7 +185,8 @@ godot --path godot -- --scene=town [--seed=N] [--mapsize=N] [--units=N] [--playe
   seconds (default 600) so a script error never hangs a capture.
 - Scenes: `skirmish town battle godpower coast economy hud stress` (same
   presets, seeds, map sizes and cameras as the JS registry) and the Godot-only
-  `models` (every exported model on one strip) and `menu` (the main menu,
+  `models` (every exported model on one strip), `walls` (a walled Greek town,
+  see "Walls and gates: the look") and `menu` (the main menu,
   below). **Without `--scene`** the game opens the main menu; a run with
   `--out`, `--quit` or `--bench` and no `--scene` still gets the skirmish, as
   before (so does the web build's `?scene=` query). Like main.js, main.gd turns
@@ -628,6 +629,79 @@ team score list). Today: Hard 6/6 over Easy, Titan 5/6 over Moderate (one
 undecided), Hard 4/6 over Moderate, Moderate 3/3 over Easy; peaceful
 villagers at 6 min 14 / 22 / 30 / 35.
 
+## Walls and gates: the look (game/buildings/walls.gd)
+
+Greek stone walls and gates after Age of Mythology: Retold
+(`reference/walls/walls_01`, `walls_02`, `gate_01..04`, `combat_01`,
+`place_01`), drawn by `game/buildings/walls.gd` (a child of the buildings
+piece; `buildings.gd` hands it every building whose type name contains
+`wall` or `gate` and skips them itself, as it skips any type with no
+exported model). Models: the Godot-only `walls` group, authored in JS in
+the buildings' style and palette and meshed by the browser's mesher
+(`node scripts/export-walls.mjs`, ~5 s, deterministic; re-run it after
+changing the script, never hand-edit `assets/models/walls.*`). Voxel = 1/8
+tile (twice the buildings' resolution: crenels, the meander and dentils need
+it); every model is pivoted at its tile centre, walls run along +x.
+
+- **Profile**: a stone skirt hanging 0.75 below the ground (slopes), a
+  plinth with a team ledge, ashlar in running bond, a gilt fillet, the
+  **team-colour meander** on a dark band (period 8 = one tile, the back face
+  mirrored, so the key runs on unbroken across tiles, arms and turned
+  pieces), dentils, a projecting cornice that is the paved walkway, parapets
+  with merlons capped in the team colour on the outer edge. `pillar` (1.25
+  tiles, quoins, team stripes, gold palmettes between team fillets, a hollow
+  crenellated top), `pillar_flag` (with a pole and three team pennants, at
+  line ends), `pillar_gate` (the gate tower: 1.75 tiles, taller, the team
+  meander, a flag).
+- **Layout** per tile from an occupancy grid (works for 1 x 1 pieces and
+  1 x n segments alike): a tile links to its 4 neighbours of the same owner
+  (to a gate only along the gate's axis) and to a diagonal one when no
+  orthogonal tile joins the two. A straight tile is `seg/<v>` (3 stone
+  variants by tile hash); any other an `arm` per link round a `core` (a
+  diagonal arm is the arm turned 45 degrees and stretched by sqrt 2). Pillar
+  tiles: the sim's `wall_pillar` pieces (static walls with `auto`: ends,
+  corners, junctions, lone tiles and one every <= 5 tiles of a run); beside
+  a gate a pillar is a gate tower.
+- **Gates** (`gate<L>`, L = 1..5 tiles along the axis: the paved threshold
+  and a sill between the two gate towers, which overhang it by 3 voxels):
+  two door leaves (`gate<L>/leaf`: planks, iron bands and studs, the team
+  meander trim) are MeshInstances that swing 90 degrees inward (towards the
+  owner's nearest Town Center) in 0.7 s, as far as the sim's
+  `get_buildings().fort_open` (0..1); without it (static walls) open while a
+  unit of the owner or an ally is within 2 tiles.
+- **States**: under construction `/s0..s3` (floor(progress * 4): 0 = the
+  staked-out foundation, stakes with team pennants and a rope; 1..3 = the
+  courses rising inside a timber scaffold with ledgers, braces and a
+  pennant; the leaves appear once the gate is finished); damage `/d1` below
+  2/3 hp (merlons knocked off, cracks, chipped arrises, split planks on the
+  leaves), `/d2` below 1/3 (the top broken in a jagged line, open cracks,
+  rubble at the foot, the leaves half gone).
+- One MultiMesh per model (team colour per instance, AO baked once per model
+  by `building_ao.gd`), laid out again only when the set of pieces, a state
+  or what is explored changes (~3 ms for a 180-tile ring; the first wall of
+  a run loads and bakes the models, ~0.2 s). `walls.set_static(entries)`
+  draws render-only walls (`{kind: wall|pillar|gate, owner, tx, tz, w, h,
+  built, progress, hp, max_hp, open, auto}`). `AOV_WALLS_DEBUG=1` prints
+  the pieces per model and the rebuild time.
+- Not yet: the Wooden Wall stage (level 0 in `get_walls().level`) is drawn
+  in stone like the later stages (Retold's Archaic palisade, `walls_03`).
+
+Capture scene `walls`: the `town` scene's town ringed by the sim's own
+walls (`place_wall` lines built by 40 villagers, stepped in the setup; two
+segments turned into gates with `convert_to_gate`: the south one closed,
+the east one open with villagers walking through it; the south-west stretch
+placed last and only begun: foundations and the three scaffold stages; the
+east side north of the open gate damaged to d1 and d2), the camera outside
+the south-east corner like `walls_02`. `--walls_static=1` (or a sim without
+`place_wall`) draws the same ring as static walls.
+
+```
+node scripts/godot-shoot.mjs --scene walls --out shots/godot/walls.png
+     [--params "cam=48,100,44,52,45"]      # the same ring at the skirmish camera's distance
+     [--params "walls_static=1"]           # render-only walls (no sim pieces)
+node scripts/export-walls.mjs             # re-export godot/assets/models/walls.*
+```
+
 ## Conventions
 
 - **World units**: 1 tile = 1 world unit, terrain voxel `VOXEL = 0.5` (2x2
@@ -749,7 +823,9 @@ villagers at 6 min 14 / 22 / 30 / 35.
   `construction/<type>/<variant>/<stage 0..7>`, `props/<kind>`,
   `resources/tree0..9|gold|berry` (+ `_shape` shadow-only twins),
   `details/tuft0..4|flowers0..3|pebbles0..2`, `economy/<key>` (the
-  EconomyView keys), `combat/arrow|debris_*`.
+  EconomyView keys), `combat/arrow|debris_*`. Godot-only models (no JS
+  builder) are authored in the same format by their own scripts:
+  `walls/*` by `scripts/export-walls.mjs` (see "Walls and gates: the look").
 - **Unit rigs**: `VoxelModels.rig(type)` = `{voxel, anim, style, euler: "XYZ",
   parts: [{name, anim (channel), joint, parent, parentIdx, coat, portrait,
   conditional, mesh}]}`, parents first. Part world transform =

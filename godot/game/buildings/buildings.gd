@@ -16,6 +16,7 @@ extends Node3D
 const PLAYER_COLORS := [0xbbbbbb, 0x2f6bff, 0xe0282e, 0x2fb04a, 0xf2c21b, 0x8e44d8, 0xf07818]
 const STAGES := 8
 const BuildingAO = preload("res://game/buildings/building_ao.gd")
+const Walls = preload("res://game/buildings/walls.gd")
 
 var game: Node = null
 var _nodes := {}      # id -> {mi: MeshInstance3D, key: String}
@@ -24,6 +25,7 @@ var _names: PackedStringArray
 var _props: Node3D = null
 var _sig := -1          # buildings signature (ids + built), props re-layout on change
 var _fog_version := -1
+var walls: Node3D = null   # walls.gd: walls and gates (sim types "*wall*" / "*gate*", or walls.set_static())
 
 func setup(g: Node) -> void:
 	game = g
@@ -32,6 +34,11 @@ func setup(g: Node) -> void:
 	_props.name = "props"
 	add_child(_props)
 	_props.setup(game, PLAYER_COLORS)
+	walls = Walls.new()
+	walls.name = "walls"
+	add_child(walls)
+	walls.setup(game, PLAYER_COLORS)
+	AovScenes.set_setup("walls", Walls.scene_setup)
 
 func _material(owner: int) -> ShaderMaterial:
 	if not _mats.has(owner):
@@ -40,7 +47,7 @@ func _material(owner: int) -> ShaderMaterial:
 		_mats[owner] = m
 	return _mats[owner]
 
-func frame(_dt: float, _alpha: float) -> void:
+func frame(dt: float, _alpha: float) -> void:
 	var B: Dictionary = game.sim.get_buildings()
 	var n: int = B.count
 	var ids: PackedInt32Array = B.ids
@@ -70,7 +77,11 @@ func frame(_dt: float, _alpha: float) -> void:
 		if not built[i]:
 			key = "%s/%d/%d" % [type, v, mini(STAGES - 1, floori(progress[i] * STAGES))]
 			group = "construction"
+		if Walls.handles(type):
+			continue   # walls.gd
 		var e: Dictionary = _nodes.get(id, {})
+		if e.is_empty() and VoxelModels.info(group, key).is_empty():
+			continue   # a type with no exported model (yet)
 		if e.is_empty():
 			var mi := MeshInstance3D.new()
 			mi.name = "B%d_%s" % [id, type]
@@ -94,6 +105,8 @@ func frame(_dt: float, _alpha: float) -> void:
 		if not seen.has(id):
 			_nodes[id].mi.queue_free()
 			_nodes.erase(id)
+	walls.from_buildings(B, _names)
+	walls.frame(dt)
 	if sig != _sig:
 		_sig = sig
 		_props.rebuild(_prop_buildings(B))
