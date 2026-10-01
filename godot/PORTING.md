@@ -727,18 +727,33 @@ buildings' fronts). One model per stage, chosen by the owner's tower level
   stone pads, X braces and girts, a ladder, a plank platform at 4 world
   units with a boarded railing (loopholes) and a **team rail**, posts to a
   stepped plank roof with team eaves, a team pennant.
-- `1` **Watch Tower** (`tower_02`): stone shaft, quoined corner pilasters on
-  dark base blocks with **team bands**, recessed ashlar panels, ivy, a door
-  with a marble frame and lintel, a ledge; a dentilled cornice; the lantern
-  room (each face an arcade of two tall arched openings, dark inside); a red
-  tile gable roof with marble pediments and the **team ridge**.
-- `2` **Guard Tower** (`tower_03`): taller, deep panels with dark slots (the
-  open frame), a second ledge, the walls' **team meander** frieze under the
-  cornice, a flared terracotta roof, **team banners** (gilt emblem, cream
-  border) on the lantern's two sides.
-- `3` **Ballista Tower** (`tower_01`): the guard tower in bronze-green roof
-  tiles, a green door, gilt acroteria and a gilt lion medallion, a ballista
-  on the front sill.
+Each stone stage has its own silhouette on the same 12 x 12 shaft (quoined
+corner pilasters on dark base blocks with **team bands**, a door with a
+marble frame and lintel):
+
+- `1` **Watch Tower** (`tower_02`): a slim warm limestone shaft, ivy, a
+  dentilled cornice, a lantern room of paired arched windows, a red tile
+  gable roof with marble pediments and the **team ridge**.
+- `2` **Guard Tower** (`tower_03`): grey stone, deep panels with arrow
+  slits, two ledges; **corbelled machicolations** (a bracket every 3 voxels
+  stepping out 3) carry a crenellated gallery (parapet with a **team
+  band**, merlons), two **archers** (team tunics, bronze helmets, bows) on
+  the walk; a set-back lantern under a terracotta **pyramid roof** with team
+  hips; **team banners** hung from the gallery.
+- `3` **Ballista Tower** (`tower_01`): pale dressed stone, an **open-frame**
+  shaft (the pilasters clear of a deep dark slot, a vine inside), the
+  walls' **team meander** under heavy two-tier brackets that carry a broad
+  **fighting platform** (20 x 20, gilt-capped merlons), three archers and the
+  **ballista** through the front crenel, a columned pavilion with a brazier
+  under a bronze-green pedimented roof (gilt lion, acroteria).
+- Stone and windows: dark mortar beds every course, darker head joints, a
+  worn pale top arris per course (`masonry(..., arris)`), then `weather()`:
+  convex vertical edges worn light (here and there chipped dark), ledge
+  tops lighter, the undersides of every overhang darker. Lantern windows
+  are 2 voxels deep with a gallery behind and a dark cella core whose face
+  behind each window is lamp-lit (low glow: the grade turns strong emission
+  pastel), so a window shows depth and warm light, not a flat void or the
+  sky.
 - States: `<L>/s0..s3` under construction (floor(progress * 4): 0 = the
   staked foundation with team pennants and a rope, 1..3 = rising in a timber
   scaffold), `<L>/d1` below 2/3 hp (chips, cracks), `<L>/d2` below 1/3 (the
@@ -752,13 +767,17 @@ closed form in the sim time; the sim's projectiles whose start is a
 tower's centre, `Combat::fire` at `TOWER_ARROW_Y`): a warm flash at the
 lantern window / platform rail on the target's side and a puff of bow dust
 for 0.45 s after the loose; the tower's arrow drawn heavier over the sim's
-(x1.45 sentry .. x2.1 ballista bolt) with a warm tracer of glow dots along
-its arc; at the strike (`unit:damaged` with `other` = the tower) a short
+(x1.45 sentry .. x2.1 ballista bolt) with a **trail** along the last 30% of
+its arc (`tower_streak.gdshader`: six camera-facing ribbon segments, an
+amber edge round a hot core, widening to the head, >= 4.5 px wide at
+1080p) and a glint on the head; at the strike (`unit:damaged` with `other` = the tower) a short
 flash and a puff of kicked-up earth (the hit spark is AovUnitView's).
 
 Capture scene `towers`: the `town` scene's town with four towers in a row
 on its south side, Sentry, Watch, Guard, Ballista from the camera outwards
-(`level_override`), an enemy squad of hoplites attack-moving on them; the
+(`level_override`), an enemy squad of hoplites attack-moving on them, the
+camera low (distance 25, pitch 19) and focused just behind the row so the
+tower tops are in frame; the
 setup steps the sim (>= `towers_t` s, default 3) until an arrow has just
 left a tower while another is in mid flight, so the paused frame shows the
 loose, an arrow in the air and a strike.

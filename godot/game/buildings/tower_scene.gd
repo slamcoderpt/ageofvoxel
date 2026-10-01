@@ -82,9 +82,9 @@ static func scene_setup(game: Node) -> Dictionary:
 		var P: PackedFloat32Array = sim.get_combat().projectiles
 		for k in P.size() / 16:
 			print("  arrow from %.1f,%.1f,%.1f at %.1f,%.1f,%.1f t %.2f / %.2f" % [P[k * 16 + 6], P[k * 16 + 7], P[k * 16 + 8], P[k * 16], P[k * 16 + 1], P[k * 16 + 2], P[k * 16 + 12], P[k * 16 + 13]])
-	ctx["focus"] = Vector2(cx + 0.5, row + 2.0)
+	ctx["focus"] = Vector2(cx, row - 1.0)   # behind the row: the low camera frames the tower tops
 	ctx["towers"] = ids
-	print("towers: %d towers at row %d, %d enemies, %.1f s of fire" % [ids.size(), row, squad.size(), ticks / float(FPS)])
+	print("towers: %d towers at row %d (x %d, gap %d), %d enemies, %.1f s of fire" % [ids.size(), row, cx - 2 * spacing, spacing, squad.size(), ticks / float(FPS)])
 	return ctx
 
 ## True when an arrow left one of the towers in the last tick or two and

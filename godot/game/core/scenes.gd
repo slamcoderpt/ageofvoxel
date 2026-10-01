@@ -52,7 +52,7 @@ static var SCENES := {
 	# the town with a row of towers at every upgrade stage, an enemy squad in
 	# front of them under fire (the setup steps the sim until arrows fly).
 	"towers": {"preset": "skirmish", "seed": 7, "hud": false, "reveal_all": true, "fast_forward": 0.0,
-		"camera": {"distance": 32.0, "pitch": 27.0, "yaw": -50.0}},
+		"camera": {"distance": 25.0, "pitch": 19.0, "yaw": -40.0}},
 	# Godot-only: every exported model on a flat strip (checks scripts/export-models.mjs).
 	"models": {"preset": "battle", "seed": 1, "map_size": 96, "hud": false, "reveal_all": true, "fast_forward": 0.0,
 		"camera": {"distance": 34.0, "pitch": 38.0, "yaw": 0.0}},

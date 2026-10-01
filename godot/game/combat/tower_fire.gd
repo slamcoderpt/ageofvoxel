@@ -6,7 +6,9 @@ extends Node3D
 ## starts a building's arrow there, at TOWER_ARROW_Y):
 ##   - the loose: a warm flash at the lantern window (or the sentry
 ##     platform's rail) on the side of the target, and a puff of pale dust;
-##   - a glint riding on the arrow head, so its arc is seen against grass;
+##   - a trail (tower_streak.gdshader): an amber ribbon with a hot core along
+##     the last 30% of the arc behind the head, and a glint on the head, so
+##     the shot reads against grass;
 ##   - the strike: a flash and a dust puff where the tower's arrow lands
 ##     (the sim's `unit:damaged` with `other` = the tower).
 ## All closed form in the sim time (paused captures show the frame as it is).
@@ -17,13 +19,16 @@ const STRIDE := 20
 const LOOSE_T := 0.45       # how long a loose shows (s)
 const HIT_T := 0.6
 const ARROW_SCALE := [1.45, 1.5, 1.6, 2.1]   # per tower level
-const TRACE := 10          # tracer dots per tower arrow
+const TRAIL_SEG := 6       # trail segments per tower arrow
+const TRAIL_K := 0.3       # trail length, as a fraction of the flight
 
 var game: Node = null
 var _flash_mm: MultiMesh
 var _arrow_mm: MultiMesh
 var _ar := PackedFloat32Array()
 var _puff_mm: MultiMesh
+var _streak_mm: MultiMesh
+var _st := PackedFloat32Array()
 var _hits: Array = []       # [{x, y, z, t0, seed}]
 var _towers := {}           # tower id -> Vector3 centre (ground), refreshed with the walls list
 var _tower_sig := -1
@@ -37,6 +42,7 @@ func setup(g: Node) -> void:
 	var quad := QuadMesh.new()
 	quad.size = Vector2(1, 1)
 	_puff_mm = _add(quad, "res://game/combat/tower_puff.gdshader", 1, "TowerPuffs", aabb)
+	_streak_mm = _add(quad, "res://game/combat/tower_streak.gdshader", 4, "TowerTrails", aabb)
 	_flash_mm = _add(quad, "res://game/combat/tower_flash.gdshader", 5, "TowerFlashes", aabb)
 	# the tower's heavier arrow, drawn over the sim's plain one (combat/arrow
 	# scaled up: a war arrow from the sentry and watch towers, a bolt from the
@@ -110,6 +116,7 @@ func frame(_dt: float, _alpha: float) -> void:
 	_fl.clear()
 	_pf.clear()
 	_ar.clear()
+	_st.clear()
 	if not _towers.is_empty():
 		var tv = _towers_view()
 		var C: Dictionary = game.sim.get_combat()
@@ -142,13 +149,20 @@ func frame(_dt: float, _alpha: float) -> void:
 				var b := Basis.looking_at(-vel.normalized(), Vector3.UP if absf(vel.normalized().y) < 0.99 else Vector3.RIGHT).scaled(Vector3(sc, sc, sc))
 				_ar.append_array(PackedFloat32Array([b.x.x, b.y.x, b.z.x, head.x, b.x.y, b.y.y, b.z.y, head.y, b.x.z, b.y.z, b.z.z, head.z,
 					1, 1, 1, 1, 1, 1, 1, 0]))
-			for j in TRACE:
-				var kj := kk - float(j) * 0.022
-				if kj < 0.04:
-					break
+			# the trail: a ribbon along the arc behind the head (the arc as
+			# AovUnitView draws it: lerp + sin(k pi) * arc), widest and
+			# hottest at the head, a glint on the head itself
+			var wide: float = 0.1 if lvl < 3 else 0.13
+			var k0 := maxf(0.0, kk - TRAIL_K)
+			var prev := head
+			for j in TRAIL_SEG:
+				var kj := kk - (kk - k0) * float(j + 1) / float(TRAIL_SEG)
 				var pj := s.lerp(tgt, kj) + Vector3(0.0, sin(kj * PI) * arc, 0.0)
-				var f := 1.0 - float(j) / float(TRACE)
-				_push(false, pj if j > 0 else head, Color(1.0, 0.62, 0.26, 0.9 * f), 0.1 + 0.1 * f, 4.0 + 8.0 * f, seed, -1.0)
+				if prev.distance_squared_to(pj) > 1e-6:
+					_st.append_array(PackedFloat32Array([1, 0, 0, prev.x, 0, 1, 0, prev.y, 0, 0, 1, prev.z,
+						pj.x, pj.y, pj.z, 1.0, 1.0 - float(j + 1) / float(TRAIL_SEG), 1.0 - float(j) / float(TRAIL_SEG), wide, 4.5]))
+				prev = pj
+			_push(false, head, Color(1.0, 0.7, 0.32, 1.0), 0.14, 9.0, seed, -1.0)
 			if t < LOOSE_T:
 				var lv := 1
 				if tv != null:
@@ -180,6 +194,7 @@ func frame(_dt: float, _alpha: float) -> void:
 	_upload(_flash_mm, _fl)
 	_upload(_puff_mm, _pf)
 	_upload(_arrow_mm, _ar)
+	_upload(_streak_mm, _st)
 
 func _tower_at(s: Vector3) -> int:
 	for id in _towers:

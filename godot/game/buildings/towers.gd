@@ -5,9 +5,11 @@ extends Node3D
 ## centre, door to +z), one per upgrade stage = the owner's tower level
 ## (`get_walls().level` for kind 3, else `get_fortify(owner).tower_level`):
 ##   0 Sentry Tower    wooden stilted lookout, team rail and roof trim (tower_05)
-##   1 Watch Tower     stone, red tile gable roof, team ridge (tower_02)
-##   2 Guard Tower     taller, terracotta flared roof, team-bordered banners (tower_03)
-##   3 Ballista Tower  bronze-green roof, green door, gilt lion and acroteria (tower_01)
+##   1 Watch Tower     slim stone shaft, lamp-lit lantern, red gable roof, team ridge (tower_02)
+##   2 Guard Tower     corbelled machicolations, crenellated gallery with archers,
+##                     terracotta pyramid roof, team banners (tower_03)
+##   3 Ballista Tower  open-frame shaft, overhanging fighting platform with archers and
+##                     a ballista, columned pavilion, bronze-green pedimented roof (tower_01)
 ## States: under construction `<L>/s<k>` (k = floor(progress * 4)), damaged
 ## `<L>/d1` below 2/3 hp and `<L>/d2` below 1/3; while a tower stage is being
 ## researched at a tower the `upgrade` scaffold stands round its top. The
