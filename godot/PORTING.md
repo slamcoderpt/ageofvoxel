@@ -30,9 +30,9 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | core (foundation; skirmish builder: camera, fog pass, playtest) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck, `fog_view.gd` + `fog_of_war.gdshader` (fog-of-war shading, one full-screen pass), `playtest.gd` (scripted skirmish playthrough), `menu_playtest.gd` (the screen flow through real input: menu -> setup -> loading -> match -> Esc menu -> menu, see "Screen flow"), `match_rules.gd` + `match_check.gd` (match settings -> the sim, see "Match rules")) | `core/` (constants, rng, jsmath, bounds, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `match/` (the match setup: seats, teams, difficulty, stockpiles), `fortify/` (walls, gates, towers, their stages: Godot-only, see "Walls, gates, towers"), `sim.{h,cpp}` | `src/core/` |
 | terrain | `game/terrain/terrain.gd` + `terrain.gdshader` (chunks, paving cobbles / pale stone of MaterialPatches patchGround), `water.gdshader` (Water.js), `props.gdshader` (voxel.gdshader + MultiMesh instance tint, used by trees / gold / berries / ground details); mesher in `native/src/terrain_mesher.cpp` (TerrainMesh.js full port, water depth bake, GroundDetails.js scatter) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (sun + PCSS soft shadows, hemisphere = ambient colour + two unshadowed up/down lights, fill, depth haze following the camera, SSAO, MSAA, `--quality=high\|medium\|low`, `--post=high\|low\|off`), `grade_effect.gd` (CompositorEffect compute pass on the HDR buffer: exposure 2.1 + PBR Neutral + the PostFX.js grade; Godot's tonemap is LINEAR; Compatibility/web falls back to AgX), `sky.gdshader`. MaterialPatches.js canopy / foliage terms not ported yet | none | `src/lighting/` |
-| buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `walls.gd` (Greek walls, pillars and gates with swinging leaves, construction and damage states; models by `../scripts/export-walls.mjs`, see "Walls and gates: the look"), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
+| buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `walls.gd` (Greek walls, pillars and gates with swinging leaves, construction and damage states; models by `../scripts/export-walls.mjs`, see "Walls and gates: the look"), `towers.gd` + `tower_scene.gd` (Greek towers, a model per upgrade stage, construction / damage / upgrade states, the `towers` capture scene; models by `../scripts/export-towers.mjs`, see "Towers: the look"), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
 | units | `game/units/units.gd` (rigs posed by the full anim.js port, conditional parts, crowd yaw / press / jitter, deaths and corpses, contact shadows), `unit.gdshader` (team lift + rim, hit flash, corpse drain, dithered fade) + `unit_outline.gdshader` (inverted hull, next pass); posing in C++: `native/src/unit_view.cpp` (`AovUnitView`) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
-| combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported, plus god powers and a wave log, Godot-only) | `src/combat/` |
+| combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), `tower_fire.gd` + `tower_flash / tower_puff.gdshader` (tower arrows: loose flash, heavier arrow, tracer, strike; see "Towers: the look"), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported, plus god powers and a wave log, Godot-only) | `src/combat/` |
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor; Godot-only activity fx: axe / pick chips and dust, sickle chaff, stooks on cut rows, hoof dust, shoal ripples, fish splashes, net ripples, boat wakes; crops sway, `econ_voxel.gdshader`, `fx_chip / fx_puff / fx_ring.gdshader`), buffers built in C++ by `AovEconView` (`native/src/econ_view.{h,cpp}`, render side, reads the sim, never writes it) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
 | godpowers | `game/godpowers/godpowers.gd` (the whole BoltRenderer of effects.js: bolt / sky / zap ribbons, impact flash sprites and decals, scorches with ember cracks (hot orange / red, glowing as long as the scorch lasts), a charcoal ash edge and a hot rim, an expanding impact ring at every strike point (Godot-only; decals are pulled toward the camera so voxel bumps do not swallow them), crater debris, char rims, spark streaks, smoke and flames, the storm funnel (wall, cloud body, dust wall, ground shockwave, rain, energy bands, whirled debris), flyer trails / back lights / drop shadows, meteor fireball and fire, strike / storm point lights and the shadow spot, the full-frame storm grade with light pools; dims the lighting piece's sun / sky / grade while a storm plays), shaders beside it; buffers built in C++ by `AovGodpowerView` (`native/src/godpower_view.{h,cpp}`, render side, reads the sim, never writes it) | `godpowers/` (favor, cooldowns, Lightning Storm, Bolt, Meteor, thrown units: ported) | `src/godpowers/` |
 | ui (HUD, selection, input) | `game/ui/ui.gd` (selection, box / double-click select, smart orders, rally points, control groups, hotkeys, placement ghost, god-power targeting ring, move markers, selection rings (one MultiMesh) + bars, event feed, messages, result card; public: `pieces.ui.selected`, `hover_entity`, `message()`, `feed()`), `hud.gd` (the drawn HUD, two layers with hit zones), `hud_style.gd` (palette, Cinzel / Alegreya fonts in `fonts/`, SVG icons from `icons.gd` = `src/ui/icons.js` rasterised at runtime, draw helpers), `panel.gdshader` (the gilded teal panels), `minimap.gd` + `minimap_ground/units.gdshader` (terrain colours computed in the shader from `get_heights()` / `get_ground()` uploaded as textures, re-uploaded on `building:placed`; unit dots read straight from `get_units()` arrays as data textures: no per-unit script), `portraits.gd` + `portrait.gdshader` (one SubViewport per type / owner, rendered once, unshaded with the browser's three.js hemisphere + sun lighting, no tonemap) | none | `src/ui/` |
@@ -702,6 +702,65 @@ node scripts/godot-shoot.mjs --scene walls --out shots/godot/walls.png
 node scripts/export-walls.mjs             # re-export godot/assets/models/walls.*
 ```
 
+## Towers: the look (game/buildings/towers.gd, game/combat/tower_fire.gd)
+
+Greek towers after Age of Mythology: Retold (`reference/walls/tower_01..05`),
+drawn by `game/buildings/towers.gd` (a child of the buildings piece;
+`buildings.gd` hands it the `tower` rows and skips them itself). Models: the
+Godot-only `towers` group (`node scripts/export-towers.mjs`, ~3 s,
+deterministic; re-run it after changing the script, never hand-edit
+`assets/models/towers.*`), the walls' voxel (1/8 tile), palette and team
+trims; pivot at the 2 x 2 footprint centre, the door to +z (like the
+buildings' fronts). One model per stage, chosen by the owner's tower level
+(`get_walls().level` of the tower, else `get_fortify(owner).tower_level`):
+
+- `0` **Sentry Tower** (`tower_05`): a wooden stilted lookout: four logs on
+  stone pads, X braces and girts, a ladder, a plank platform at 4 world
+  units with a boarded railing (loopholes) and a **team rail**, posts to a
+  stepped plank roof with team eaves, a team pennant.
+- `1` **Watch Tower** (`tower_02`): stone shaft, quoined corner pilasters on
+  dark base blocks with **team bands**, recessed ashlar panels, ivy, a door
+  with a marble frame and lintel, a ledge; a dentilled cornice; the lantern
+  room (each face an arcade of two tall arched openings, dark inside); a red
+  tile gable roof with marble pediments and the **team ridge**.
+- `2` **Guard Tower** (`tower_03`): taller, deep panels with dark slots (the
+  open frame), a second ledge, the walls' **team meander** frieze under the
+  cornice, a flared terracotta roof, **team banners** (gilt emblem, cream
+  border) on the lantern's two sides.
+- `3` **Ballista Tower** (`tower_01`): the guard tower in bronze-green roof
+  tiles, a green door, gilt acroteria and a gilt lion medallion, a ballista
+  on the front sill.
+- States: `<L>/s0..s3` under construction (floor(progress * 4): 0 = the
+  staked foundation with team pennants and a rope, 1..3 = rising in a timber
+  scaffold), `<L>/d1` below 2/3 hp (chips, cracks), `<L>/d2` below 1/3 (the
+  roof broken off in a jagged line, rubble); `upgrade` (a scaffold round the
+  upper tower) stands while a tower stage is being researched at it
+  (`get_walls().tech`). `towers.level_override[id]` / `model_override[id]`
+  (`"2/s1"`, `"1+upgrade"`) draw one tower in another state (scenes).
+
+**Tower fire** (`game/combat/tower_fire.gd`, child of the combat piece,
+closed form in the sim time; the sim's projectiles whose start is a
+tower's centre, `Combat::fire` at `TOWER_ARROW_Y`): a warm flash at the
+lantern window / platform rail on the target's side and a puff of bow dust
+for 0.45 s after the loose; the tower's arrow drawn heavier over the sim's
+(x1.45 sentry .. x2.1 ballista bolt) with a warm tracer of glow dots along
+its arc; at the strike (`unit:damaged` with `other` = the tower) a short
+flash and a puff of kicked-up earth (the hit spark is AovUnitView's).
+
+Capture scene `towers`: the `town` scene's town with four towers in a row
+on its south side, Sentry, Watch, Guard, Ballista from the camera outwards
+(`level_override`), an enemy squad of hoplites attack-moving on them; the
+setup steps the sim (>= `towers_t` s, default 3) until an arrow has just
+left a tower while another is in mid flight, so the paused frame shows the
+loose, an arrow in the air and a strike.
+
+```
+node scripts/godot-shoot.mjs --scene towers --out shots/godot/towers.png
+     [--params "towers_t=6"]               # fight longer before the frame is chosen
+     [--params "towers_states=1&cam=31,111,30,30,0"]   # a row of states: s0..s3, d1/d2, upgrade
+node scripts/export-towers.mjs            # re-export godot/assets/models/towers.*
+```
+
 ## Conventions
 
 - **World units**: 1 tile = 1 world unit, terrain voxel `VOXEL = 0.5` (2x2
@@ -825,7 +884,8 @@ node scripts/export-walls.mjs             # re-export godot/assets/models/walls.
   `details/tuft0..4|flowers0..3|pebbles0..2`, `economy/<key>` (the
   EconomyView keys), `combat/arrow|debris_*`. Godot-only models (no JS
   builder) are authored in the same format by their own scripts:
-  `walls/*` by `scripts/export-walls.mjs` (see "Walls and gates: the look").
+  `walls/*` by `scripts/export-walls.mjs` (see "Walls and gates: the look"),
+  `towers/*` by `scripts/export-towers.mjs` (see "Towers: the look").
 - **Unit rigs**: `VoxelModels.rig(type)` = `{voxel, anim, style, euler: "XYZ",
   parts: [{name, anim (channel), joint, parent, parentIdx, coat, portrait,
   conditional, mesh}]}`, parents first. Part world transform =

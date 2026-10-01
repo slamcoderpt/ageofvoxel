@@ -17,6 +17,8 @@ const PLAYER_COLORS := [0xbbbbbb, 0x2f6bff, 0xe0282e, 0x2fb04a, 0xf2c21b, 0x8e44
 const STAGES := 8
 const BuildingAO = preload("res://game/buildings/building_ao.gd")
 const Walls = preload("res://game/buildings/walls.gd")
+const Towers = preload("res://game/buildings/towers.gd")
+const TowerScene = preload("res://game/buildings/tower_scene.gd")
 
 var game: Node = null
 var _nodes := {}      # id -> {mi: MeshInstance3D, key: String}
@@ -26,6 +28,7 @@ var _props: Node3D = null
 var _sig := -1          # buildings signature (ids + built), props re-layout on change
 var _fog_version := -1
 var walls: Node3D = null   # walls.gd: walls and gates (sim types "*wall*" / "*gate*", or walls.set_static())
+var towers: Node3D = null  # towers.gd: the sim's "tower" rows, one model per upgrade stage
 
 func setup(g: Node) -> void:
 	game = g
@@ -39,6 +42,11 @@ func setup(g: Node) -> void:
 	add_child(walls)
 	walls.setup(game, PLAYER_COLORS)
 	AovScenes.set_setup("walls", Walls.scene_setup)
+	towers = Towers.new()
+	towers.name = "towers"
+	add_child(towers)
+	towers.setup(game, PLAYER_COLORS)
+	AovScenes.set_setup("towers", TowerScene.scene_setup)
 
 func _material(owner: int) -> ShaderMaterial:
 	if not _mats.has(owner):
@@ -79,6 +87,8 @@ func frame(dt: float, _alpha: float) -> void:
 			group = "construction"
 		if Walls.handles(type):
 			continue   # walls.gd
+		if Towers.handles(type):
+			continue   # towers.gd
 		var e: Dictionary = _nodes.get(id, {})
 		if e.is_empty() and VoxelModels.info(group, key).is_empty():
 			continue   # a type with no exported model (yet)
@@ -107,6 +117,7 @@ func frame(dt: float, _alpha: float) -> void:
 			_nodes.erase(id)
 	walls.from_buildings(B, _names)
 	walls.frame(dt)
+	towers.from_buildings(B, _names)
 	if sig != _sig:
 		_sig = sig
 		_props.rebuild(_prop_buildings(B))
