@@ -647,21 +647,29 @@ it); every model is pivoted at its tile centre, walls run along +x.
   plinth with a team ledge, ashlar in running bond, a gilt fillet, the
   **team-colour meander** on a dark band (period 8 = one tile, the back face
   mirrored, so the key runs on unbroken across tiles, arms and turned
-  pieces), dentils, a projecting cornice that is the paved walkway, parapets
-  with merlons capped in the team colour on the outer edge. `pillar` (1.25
-  tiles, quoins, team stripes, gold palmettes between team fillets, a hollow
-  crenellated top), `pillar_flag` (with a pole and three team pennants, at
-  line ends), `pillar_gate` (the gate tower: 1.75 tiles, taller, the team
-  meander, a flag).
+  pieces), dentils, a projecting cornice that is the paved wall-walk, then a
+  single parapet on the **outer** side only (a team band under plain stone
+  merlons, period 4, continuous from tile to tile) and a low stone curb on
+  the inner side. Every curtain piece has this one section at one height,
+  so a run has one wall-walk and one row of merlons. Each piece is turned so
+  its parapet faces away from the owner's nearest Town Center (`arm_m` is
+  the arm with its parapet mirrored, for turned arms). `pillar` (1.5 tiles,
+  1.5x the wall's height: quoins, team stripes, the team meander between
+  gilt fillets, a hollow crenellated top in plain stone), `pillar_flag`
+  (with a pole and three team pennants, at line ends), `pillar_gate` (the
+  gate tower: 1.75 tiles, taller still, a flag). The team colour is in the
+  bands, the frieze and the flags, never on the merlons.
 - **Layout** per tile from an occupancy grid (works for 1 x 1 pieces and
   1 x n segments alike): a tile links to its 4 neighbours of the same owner
   (to a gate only along the gate's axis) and to a diagonal one when no
   orthogonal tile joins the two. A straight tile is `seg/<v>` (3 stone
-  variants by tile hash); any other an `arm` per link round a `core` (a
-  diagonal arm is the arm turned 45 degrees and stretched by sqrt 2). Pillar
-  tiles: the sim's `wall_pillar` pieces (static walls with `auto`: ends,
-  corners, junctions, lone tiles and one every <= 5 tiles of a run); beside
-  a gate a pillar is a gate tower.
+  variants by tile hash). Pillar tiles: the sim's `wall_pillar` pieces,
+  every end, corner and junction (so each run ends flush inside a pillar,
+  never butting into the next run), and for static walls with `auto` one
+  every <= 5 tiles of a run; beside a gate a pillar is a gate tower. Only a
+  corner right next to a pillar (a 1-tile jog, a staircase line) and
+  diagonal joins are built from an `arm` per link round a `core` (a
+  diagonal arm is the arm turned 45 degrees and stretched by sqrt 2).
 - **Gates** (`gate<L>`, L = 1..5 tiles along the axis: the paved threshold
   and a sill between the two gate towers, which overhang it by 3 voxels):
   two door leaves (`gate<L>/leaf`: planks, iron bands and studs, the team
@@ -674,8 +682,9 @@ it); every model is pivoted at its tile centre, walls run along +x.
   courses rising inside a timber scaffold with ledgers, braces and a
   pennant; the leaves appear once the gate is finished); damage `/d1` below
   2/3 hp (merlons knocked off, cracks, chipped arrises, split planks on the
-  leaves), `/d2` below 1/3 (the top broken in a jagged line, open cracks,
-  rubble at the foot, the leaves half gone).
+  leaves), `/d2` below 1/3 (the top broken in one jagged line, the same
+  through the wall's thickness, a tower's on a slant; open cracks, rubble at
+  the foot, the leaves half gone). Chips only along the break.
 - One MultiMesh per model (team colour per instance, AO baked once per model
   by `building_ao.gd`), laid out again only when the set of pieces, a state
   or what is explored changes (~3 ms for a 180-tile ring; the first wall of

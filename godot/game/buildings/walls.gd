@@ -10,12 +10,15 @@ extends Node3D
 ## segment): every tile of a wall, pillar or gate rect is a wall tile; it
 ## links to its four neighbours of the same owner (to a gate only along the
 ## gate's axis) and to a diagonal one when no orthogonal tile joins the two.
-## A straight tile is one `seg/<v>` piece (3 stone variants by tile hash);
-## any other tile gets an `arm` per link from its centre (a diagonal arm is
-## the same model turned 45 degrees and stretched by sqrt 2) round a `core`.
-## A pillar tile (the sim's `wall_pillar` pieces; for static walls with
-## `auto`: ends, corners, junctions, lone tiles and one at least every 5
-## tiles of a straight run) is a `pillar` (`pillar_flag`, with its pennants,
+## A straight tile is one `seg/<v>` piece (3 stone variants by tile hash),
+## turned so its one parapet (merlons, model +z) faces away from the owner's
+## nearest Town Center. Pillar tiles: the sim's `wall_pillar` pieces, every
+## end, corner, junction and lone tile (so each run ends flush inside a
+## pillar), and for static walls with `auto` one at least every 5 tiles of a
+## straight run. Only a corner next to a pillar (a 1-tile jog, a staircase)
+## or a diagonal join gets an `arm` / `arm_m` (parapet outside) per link
+## from its centre (a diagonal arm is the same model turned 45 degrees and
+## stretched by sqrt 2) round a `core`. A pillar tile is a `pillar` (`pillar_flag`, with its pennants,
 ## at a line end; `pillar_gate`, the taller gate tower with a flag, beside a
 ## gate). A gate (`gate<L>`, L = tiles along its axis, 1..5) is the paved
 ## threshold between two gate towers; its two door leaves are MeshInstances
@@ -286,6 +289,24 @@ func _rebuild(entries: Array) -> void:
 				run_pillars.append(run[idx])
 	for L in run_pillars:
 		L.pillar = true
+	# every end, corner and junction is capped by a pillar (the curtain ends
+	# flush inside it), but for a tile right next to one (a 1-tile jog or a
+	# staircase): that joins on arms, so a stepped line is not a row of pillars
+	for k in links:
+		var L: Dictionary = links[k]
+		if L.pillar or L.straight or int(L.links) == 0:
+			continue
+		if L.d[0] or L.d[1] or L.d[2] or L.d[3]:
+			continue
+		var near := false
+		for i in 4:
+			if L.o[i]:
+				var n = links.get(_tk(L.tx + ORTH[i][0], L.tz + ORTH[i][1]))
+				if n != null and n.pillar:
+					near = true
+		if not near:
+			L.pillar = true
+	var towns := _towns()
 	# pieces
 	for k in links:
 		var L: Dictionary = links[k]
@@ -295,6 +316,7 @@ func _rebuild(entries: Array) -> void:
 		var x: float = L.tx + 0.5
 		var z: float = L.tz + 0.5
 		var pos := Vector3(x, sim.height_at(x, z), z)
+		var out := _outward(towns, owner, Vector2(x, z))
 		if L.pillar:
 			var key := "pillar" + sfx
 			if L.gate:
@@ -311,19 +333,23 @@ func _rebuild(entries: Array) -> void:
 			_add(items, key, Transform3D(Basis(Vector3.UP, yaw), pos), owner)
 			for i in 4:
 				if L.d[i]:
-					_add(items, "arm" + sfx, _diag_xf(i, pos), owner)
+					var xp := _diag_xf(i, pos)
+					_add(items, _arm_key(xp, out) + sfx, xp, owner)
 			continue
 		if L.straight:
 			var v := _h(L.tx, L.tz, 41) % 3
 			var key2 := ("seg/0" + sfx) if sfx.begins_with("/s") else ("seg/%d%s" % [v, sfx])
-			var b := Basis() if L.o[0] else Basis(Vector3.UP, PI * 0.5)
-			_add(items, key2, Transform3D(b, pos), owner)
+			# the parapet (+z in the model) on the side away from the town
+			var yaw2 := (0.0 if out.y >= 0.0 else PI) if L.o[0] else (PI * 0.5 if out.x >= 0.0 else -PI * 0.5)
+			_add(items, key2, Transform3D(Basis(Vector3.UP, yaw2), pos), owner)
 			continue
 		for i in 4:
 			if L.o[i]:
-				_add(items, "arm" + sfx, Transform3D(Basis(Vector3.UP, _yaw_of(ORTH[i][0], ORTH[i][1])), pos), owner)
+				var xf := Transform3D(Basis(Vector3.UP, _yaw_of(ORTH[i][0], ORTH[i][1])), pos)
+				_add(items, _arm_key(xf, out) + sfx, xf, owner)
 			if L.d[i]:
-				_add(items, "arm" + sfx, _diag_xf(i, pos), owner)
+				var xd := _diag_xf(i, pos)
+				_add(items, _arm_key(xd, out) + sfx, xd, owner)
 		_add(items, "core" + sfx, Transform3D(Basis(), pos), owner)
 	# gates
 	var seen_gates := {}
@@ -355,6 +381,7 @@ func _rebuild(entries: Array) -> void:
 	if OS.get_environment("AOV_WALLS_DEBUG") != "":
 		for key in items:
 			print("walls: ", key, " x", items[key].size(), " ", items[key].map(func(it): return Vector2i(int(it[0].origin.x), int(it[0].origin.z))) if items[key].size() < 40 else "")
+		_dump(links, occ)
 	# multimeshes
 	for key in _batches.keys():
 		if not items.has(key):
@@ -383,6 +410,34 @@ func _rebuild(entries: Array) -> void:
 			mm2.set_instance_transform(i, list[i][0])
 			mm2.set_instance_custom_data(i, _team_lin.get(list[i][1], Color(1, 1, 1, 0)))
 
+## AOV_WALLS_DEBUG: the tiles as a map (P pillar, - | straight, + other, G gate).
+static func _dump(links: Dictionary, occ: Dictionary) -> void:
+	var x0 := 1 << 20
+	var z0 := 1 << 20
+	var x1 := -(1 << 20)
+	var z1 := -(1 << 20)
+	for k in occ:
+		var tz: int = int(k / 16384) - 4096
+		var tx: int = k % 16384 - 4096
+		x0 = mini(x0, tx); x1 = maxi(x1, tx); z0 = mini(z0, tz); z1 = maxi(z1, tz)
+	if x1 < x0:
+		return
+	print("walls: map x %d..%d z %d..%d" % [x0, x1, z0, z1])
+	for z in range(z0, z1 + 1):
+		var s := ""
+		for x in range(x0, x1 + 1):
+			var k := _tk(x, z)
+			var L = links.get(k)
+			if L == null:
+				s += "G" if occ.has(k) else "."
+			elif L.pillar:
+				s += "P"
+			elif L.straight:
+				s += "-" if L.o[0] else "|"
+			else:
+				s += "+"
+		print("walls: %4d %s" % [z, s])
+
 static func _add(items: Dictionary, key: String, xf: Transform3D, owner: int) -> void:
 	if not items.has(key):
 		items[key] = []
@@ -391,6 +446,38 @@ static func _add(items: Dictionary, key: String, xf: Transform3D, owner: int) ->
 static func _diag_xf(i: int, pos: Vector3) -> Transform3D:
 	var b := Basis(Vector3.UP, _yaw_of(DIAG[i][0], DIAG[i][1])) * Basis.from_scale(Vector3(SQRT2, 1.0, 1.0))
 	return Transform3D(b, pos)
+
+## An arm's parapet (model +z) goes on the outer side: `arm`, or `arm_m`
+## (parapet on -z) when the turned arm's +z faces the town.
+static func _arm_key(xf: Transform3D, out: Vector2) -> String:
+	var zl := xf.basis.z
+	return "arm" if zl.x * out.x + zl.z * out.y >= 0.0 else "arm_m"
+
+## Town Centres per owner (the inside of a wall is towards the nearest one).
+func _towns() -> Dictionary:
+	var res := {}
+	var B: Dictionary = game.sim.get_buildings()
+	var names: PackedStringArray = B.type_names
+	var rect: PackedInt32Array = B.rect
+	for i in int(B.count):
+		if names[B.type[i]] != "town_center":
+			continue
+		var o := int(B.owner[i])
+		if not res.has(o):
+			res[o] = []
+		res[o].append(Vector2(rect[i * 4] + rect[i * 4 + 2] * 0.5, rect[i * 4 + 1] + rect[i * 4 + 3] * 0.5))
+	return res
+
+## Away from the owner's nearest Town Centre (+z when he has none).
+static func _outward(towns: Dictionary, owner: int, p: Vector2) -> Vector2:
+	var best := INF
+	var o := Vector2(0.0, 1.0)
+	for c in towns.get(owner, []):
+		var d: float = p.distance_squared_to(c)
+		if d < best and d > 0.0:
+			best = d
+			o = p - c
+	return o
 
 static func _gate_uid(e: Dictionary) -> String:
 	return "%d_%d_%d" % [int(e.owner), int(e.tx), int(e.tz)]

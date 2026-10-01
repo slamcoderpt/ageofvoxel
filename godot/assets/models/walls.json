@@ -2,7 +2,7 @@
  "format": 2,
  "group": "walls",
  "bin": "walls.bin.gz",
- "bytes": 17719552,
+ "bytes": 19293968,
  "voxel": 0.125,
  "stages": 4,
  "wall": {
@@ -15,8 +15,8 @@
   "cornice": 19
  },
  "pillar": {
-  "half": 5,
-  "top": 30
+  "half": 6,
+  "top": 35
  },
  "gates": {
   "1": {
@@ -37,13 +37,13 @@
  },
  "gate_tower": {
   "half": 7,
-  "top": 34,
+  "top": 41,
   "over": 3
  },
  "models": {
   "seg/0": {
-   "vertices": 4368,
-   "indices": 6552,
+   "vertices": 4120,
+   "indices": 6180,
    "aabb": [
     -0.5,
     -0.75,
@@ -53,10 +53,10 @@
     0.5
    ],
    "position": 0,
-   "normal": 52416,
-   "color": 104832,
-   "extra": 122304,
-   "index": 139776
+   "normal": 49440,
+   "color": 98880,
+   "extra": 115360,
+   "index": 131840
   },
   "seg/0/s0": {
    "vertices": 2256,
@@ -69,11 +69,11 @@
     0.875,
     0.5
    ],
-   "position": 165984,
-   "normal": 193056,
-   "color": 220128,
-   "extra": 229152,
-   "index": 238176
+   "position": 156560,
+   "normal": 183632,
+   "color": 210704,
+   "extra": 219728,
+   "index": 228752
   },
   "seg/0/s1": {
    "vertices": 3480,
@@ -86,11 +86,11 @@
     1.5,
     0.875
    ],
-   "position": 251712,
-   "normal": 293472,
-   "color": 335232,
-   "extra": 349152,
-   "index": 363072
+   "position": 242288,
+   "normal": 284048,
+   "color": 325808,
+   "extra": 339728,
+   "index": 353648
   },
   "seg/0/s2": {
    "vertices": 4568,
@@ -103,11 +103,11 @@
     2,
     0.875
    ],
-   "position": 383952,
-   "normal": 438768,
-   "color": 493584,
-   "extra": 511856,
-   "index": 530128
+   "position": 374528,
+   "normal": 429344,
+   "color": 484160,
+   "extra": 502432,
+   "index": 520704
   },
   "seg/0/s3": {
    "vertices": 5360,
@@ -120,15 +120,15 @@
     2.375,
     0.875
    ],
-   "position": 557536,
-   "normal": 621856,
-   "color": 686176,
-   "extra": 707616,
-   "index": 729056
+   "position": 548112,
+   "normal": 612432,
+   "color": 676752,
+   "extra": 698192,
+   "index": 719632
   },
   "seg/0/d1": {
-   "vertices": 4304,
-   "indices": 6456,
+   "vertices": 4112,
+   "indices": 6168,
    "aabb": [
     -0.5,
     -0.75,
@@ -137,32 +137,32 @@
     3,
     0.5
    ],
-   "position": 761216,
-   "normal": 812864,
-   "color": 864512,
-   "extra": 881728,
-   "index": 898944
+   "position": 751792,
+   "normal": 801136,
+   "color": 850480,
+   "extra": 866928,
+   "index": 883376
   },
   "seg/0/d2": {
-   "vertices": 3952,
-   "indices": 5928,
+   "vertices": 3936,
+   "indices": 5904,
    "aabb": [
     -0.625,
     -0.75,
     -0.75,
     0.625,
-    2.375,
+    2.25,
     0.75
    ],
-   "position": 924768,
-   "normal": 972192,
-   "color": 1019616,
-   "extra": 1035424,
-   "index": 1051232
+   "position": 908048,
+   "normal": 955280,
+   "color": 1002512,
+   "extra": 1018256,
+   "index": 1034000
   },
   "seg/1": {
-   "vertices": 4368,
-   "indices": 6552,
+   "vertices": 4120,
+   "indices": 6180,
    "aabb": [
     -0.5,
     -0.75,
@@ -171,15 +171,15 @@
     3,
     0.5
    ],
-   "position": 1074944,
-   "normal": 1127360,
-   "color": 1179776,
-   "extra": 1197248,
-   "index": 1214720
+   "position": 1057616,
+   "normal": 1107056,
+   "color": 1156496,
+   "extra": 1172976,
+   "index": 1189456
   },
   "seg/1/d1": {
-   "vertices": 4600,
-   "indices": 6900,
+   "vertices": 4120,
+   "indices": 6180,
    "aabb": [
     -0.5,
     -0.75,
@@ -188,32 +188,32 @@
     3,
     0.5
    ],
-   "position": 1240928,
-   "normal": 1296128,
-   "color": 1351328,
-   "extra": 1369728,
-   "index": 1388128
+   "position": 1214176,
+   "normal": 1263616,
+   "color": 1313056,
+   "extra": 1329536,
+   "index": 1346016
   },
   "seg/1/d2": {
-   "vertices": 3992,
-   "indices": 5988,
+   "vertices": 3960,
+   "indices": 5940,
    "aabb": [
     -0.5,
     -0.75,
     -0.75,
     0.625,
-    2.375,
+    2.125,
     0.75
    ],
-   "position": 1415728,
-   "normal": 1463632,
-   "color": 1511536,
-   "extra": 1527504,
-   "index": 1543472
+   "position": 1370736,
+   "normal": 1418256,
+   "color": 1465776,
+   "extra": 1481616,
+   "index": 1497456
   },
   "seg/2": {
-   "vertices": 4368,
-   "indices": 6552,
+   "vertices": 4120,
+   "indices": 6180,
    "aabb": [
     -0.5,
     -0.75,
@@ -222,49 +222,49 @@
     3,
     0.5
    ],
-   "position": 1567424,
-   "normal": 1619840,
-   "color": 1672256,
-   "extra": 1689728,
-   "index": 1707200
+   "position": 1521216,
+   "normal": 1570656,
+   "color": 1620096,
+   "extra": 1636576,
+   "index": 1653056
   },
   "seg/2/d1": {
-   "vertices": 4456,
-   "indices": 6684,
+   "vertices": 3976,
+   "indices": 5964,
    "aabb": [
     -0.5,
     -0.75,
     -0.5,
     0.5,
-    3,
+    2.625,
     0.5
    ],
-   "position": 1733408,
-   "normal": 1786880,
-   "color": 1840352,
-   "extra": 1858176,
-   "index": 1876000
+   "position": 1677776,
+   "normal": 1725488,
+   "color": 1773200,
+   "extra": 1789104,
+   "index": 1805008
   },
   "seg/2/d2": {
-   "vertices": 4200,
-   "indices": 6300,
+   "vertices": 3288,
+   "indices": 4932,
    "aabb": [
     -0.625,
     -0.75,
     -0.75,
     0.625,
-    2.375,
+    1.75,
     0.75
    ],
-   "position": 1902736,
-   "normal": 1953136,
-   "color": 2003536,
-   "extra": 2020336,
-   "index": 2037136
+   "position": 1828864,
+   "normal": 1868320,
+   "color": 1907776,
+   "extra": 1920928,
+   "index": 1934080
   },
   "arm": {
-   "vertices": 2960,
-   "indices": 4440,
+   "vertices": 2808,
+   "indices": 4212,
    "aabb": [
     0,
     -0.75,
@@ -273,11 +273,11 @@
     3,
     0.5
    ],
-   "position": 2062336,
-   "normal": 2097856,
-   "color": 2133376,
-   "extra": 2145216,
-   "index": 2157056
+   "position": 1953808,
+   "normal": 1987504,
+   "color": 2021200,
+   "extra": 2032432,
+   "index": 2043664
   },
   "arm/s0": {
    "vertices": 1424,
@@ -290,11 +290,11 @@
     0.875,
     0.5
    ],
-   "position": 2174816,
-   "normal": 2191904,
-   "color": 2208992,
-   "extra": 2214688,
-   "index": 2220384
+   "position": 2060512,
+   "normal": 2077600,
+   "color": 2094688,
+   "extra": 2100384,
+   "index": 2106080
   },
   "arm/s1": {
    "vertices": 2344,
@@ -307,11 +307,11 @@
     1.5,
     0.875
    ],
-   "position": 2228928,
-   "normal": 2257056,
-   "color": 2285184,
-   "extra": 2294560,
-   "index": 2303936
+   "position": 2114624,
+   "normal": 2142752,
+   "color": 2170880,
+   "extra": 2180256,
+   "index": 2189632
   },
   "arm/s2": {
    "vertices": 3048,
@@ -324,11 +324,11 @@
     2,
     0.875
    ],
-   "position": 2318000,
-   "normal": 2354576,
-   "color": 2391152,
-   "extra": 2403344,
-   "index": 2415536
+   "position": 2203696,
+   "normal": 2240272,
+   "color": 2276848,
+   "extra": 2289040,
+   "index": 2301232
   },
   "arm/s3": {
    "vertices": 3592,
@@ -341,15 +341,15 @@
     2.375,
     0.875
    ],
-   "position": 2433824,
-   "normal": 2476928,
-   "color": 2520032,
-   "extra": 2534400,
-   "index": 2548768
+   "position": 2319520,
+   "normal": 2362624,
+   "color": 2405728,
+   "extra": 2420096,
+   "index": 2434464
   },
   "arm/d1": {
-   "vertices": 2896,
-   "indices": 4344,
+   "vertices": 2800,
+   "indices": 4200,
    "aabb": [
     0,
     -0.75,
@@ -358,300 +358,419 @@
     3,
     0.5
    ],
-   "position": 2570320,
-   "normal": 2605072,
-   "color": 2639824,
-   "extra": 2651408,
-   "index": 2662992
+   "position": 2456016,
+   "normal": 2489616,
+   "color": 2523216,
+   "extra": 2534416,
+   "index": 2545616
   },
   "arm/d2": {
-   "vertices": 2584,
-   "indices": 3876,
+   "vertices": 2624,
+   "indices": 3936,
    "aabb": [
     -0.125,
     -0.75,
     -0.75,
     0.625,
-    2.125,
+    2.25,
     0.75
    ],
-   "position": 2680368,
-   "normal": 2711376,
-   "color": 2742384,
-   "extra": 2752720,
-   "index": 2763056
+   "position": 2562416,
+   "normal": 2593904,
+   "color": 2625392,
+   "extra": 2635888,
+   "index": 2646384
   },
-  "core": {
-   "vertices": 3760,
-   "indices": 5640,
+  "arm_m": {
+   "vertices": 2808,
+   "indices": 4212,
    "aabb": [
-    -0.5,
+    0,
     -0.75,
     -0.5,
     0.5,
     3,
     0.5
    ],
-   "position": 2778560,
-   "normal": 2823680,
-   "color": 2868800,
-   "extra": 2883840,
-   "index": 2898880
+   "position": 2662128,
+   "normal": 2695824,
+   "color": 2729520,
+   "extra": 2740752,
+   "index": 2751984
   },
-  "core/s0": {
-   "vertices": 2016,
-   "indices": 3024,
+  "arm_m/s0": {
+   "vertices": 1424,
+   "indices": 2136,
    "aabb": [
-    -0.5,
+    0,
     -0.75,
     -0.5,
     0.5,
     0.875,
     0.5
    ],
-   "position": 2921440,
-   "normal": 2945632,
-   "color": 2969824,
-   "extra": 2977888,
-   "index": 2985952
+   "position": 2768832,
+   "normal": 2785920,
+   "color": 2803008,
+   "extra": 2808704,
+   "index": 2814400
   },
-  "core/s1": {
-   "vertices": 3080,
-   "indices": 4620,
+  "arm_m/s1": {
+   "vertices": 2344,
+   "indices": 3516,
    "aabb": [
-    -0.5,
+    -0.125,
     -0.75,
     -0.625,
-    0.5,
+    0.625,
     1.5,
     0.875
    ],
-   "position": 2998048,
-   "normal": 3035008,
-   "color": 3071968,
-   "extra": 3084288,
-   "index": 3096608
+   "position": 2822944,
+   "normal": 2851072,
+   "color": 2879200,
+   "extra": 2888576,
+   "index": 2897952
   },
-  "core/s2": {
-   "vertices": 3968,
-   "indices": 5952,
+  "arm_m/s2": {
+   "vertices": 3048,
+   "indices": 4572,
    "aabb": [
-    -0.5,
+    -0.125,
     -0.75,
     -0.625,
-    0.5,
+    0.625,
     2,
     0.875
    ],
-   "position": 3115088,
-   "normal": 3162704,
-   "color": 3210320,
-   "extra": 3226192,
-   "index": 3242064
+   "position": 2912016,
+   "normal": 2948592,
+   "color": 2985168,
+   "extra": 2997360,
+   "index": 3009552
   },
-  "core/s3": {
-   "vertices": 4624,
-   "indices": 6936,
+  "arm_m/s3": {
+   "vertices": 3592,
+   "indices": 5388,
    "aabb": [
-    -0.5,
+    -0.125,
     -0.75,
     -0.625,
-    0.5,
+    0.625,
     2.375,
     0.875
    ],
-   "position": 3265872,
-   "normal": 3321360,
-   "color": 3376848,
-   "extra": 3395344,
-   "index": 3413840
+   "position": 3027840,
+   "normal": 3070944,
+   "color": 3114048,
+   "extra": 3128416,
+   "index": 3142784
   },
-  "core/d1": {
-   "vertices": 3808,
-   "indices": 5712,
+  "arm_m/d1": {
+   "vertices": 2808,
+   "indices": 4212,
    "aabb": [
-    -0.5,
+    0,
     -0.75,
     -0.5,
     0.5,
     3,
     0.5
    ],
-   "position": 3441584,
-   "normal": 3487280,
-   "color": 3532976,
-   "extra": 3548208,
-   "index": 3563440
+   "position": 3164336,
+   "normal": 3198032,
+   "color": 3231728,
+   "extra": 3242960,
+   "index": 3254192
   },
-  "core/d2": {
-   "vertices": 3552,
-   "indices": 5328,
+  "arm_m/d2": {
+   "vertices": 2624,
+   "indices": 3936,
+   "aabb": [
+    -0.125,
+    -0.75,
+    -0.75,
+    0.625,
+    2.25,
+    0.75
+   ],
+   "position": 3271040,
+   "normal": 3302528,
+   "color": 3334016,
+   "extra": 3344512,
+   "index": 3355008
+  },
+  "core": {
+   "vertices": 3584,
+   "indices": 5376,
    "aabb": [
     -0.5,
     -0.75,
-    -0.75,
+    -0.5,
     0.5,
-    2.375,
+    2.5,
+    0.5
+   ],
+   "position": 3370752,
+   "normal": 3413760,
+   "color": 3456768,
+   "extra": 3471104,
+   "index": 3485440
+  },
+  "core/s0": {
+   "vertices": 2256,
+   "indices": 3384,
+   "aabb": [
+    -0.5,
+    -0.75,
+    -0.5,
+    0.5,
+    0.875,
+    0.5
+   ],
+   "position": 3506944,
+   "normal": 3534016,
+   "color": 3561088,
+   "extra": 3570112,
+   "index": 3579136
+  },
+  "core/s1": {
+   "vertices": 3224,
+   "indices": 4836,
+   "aabb": [
+    -0.625,
+    -0.75,
+    -0.625,
+    0.625,
+    1.375,
+    0.875
+   ],
+   "position": 3592672,
+   "normal": 3631360,
+   "color": 3670048,
+   "extra": 3682944,
+   "index": 3695840
+  },
+  "core/s2": {
+   "vertices": 3976,
+   "indices": 5964,
+   "aabb": [
+    -0.625,
+    -0.75,
+    -0.625,
+    0.625,
+    1.75,
+    0.875
+   ],
+   "position": 3715184,
+   "normal": 3762896,
+   "color": 3810608,
+   "extra": 3826512,
+   "index": 3842416
+  },
+  "core/s3": {
+   "vertices": 4440,
+   "indices": 6660,
+   "aabb": [
+    -0.625,
+    -0.75,
+    -0.625,
+    0.625,
+    2,
+    0.875
+   ],
+   "position": 3866272,
+   "normal": 3919552,
+   "color": 3972832,
+   "extra": 3990592,
+   "index": 4008352
+  },
+  "core/d1": {
+   "vertices": 3656,
+   "indices": 5484,
+   "aabb": [
+    -0.5,
+    -0.75,
+    -0.5,
+    0.5,
+    2.5,
+    0.5
+   ],
+   "position": 4034992,
+   "normal": 4078864,
+   "color": 4122736,
+   "extra": 4137360,
+   "index": 4151984
+  },
+  "core/d2": {
+   "vertices": 3216,
+   "indices": 4824,
+   "aabb": [
+    -0.625,
+    -0.75,
+    -0.75,
+    0.625,
+    1.75,
     0.75
    ],
-   "position": 3586288,
-   "normal": 3628912,
-   "color": 3671536,
-   "extra": 3685744,
-   "index": 3699952
+   "position": 4173920,
+   "normal": 4212512,
+   "color": 4251104,
+   "extra": 4263968,
+   "index": 4276832
   },
   "pillar": {
-   "vertices": 8224,
-   "indices": 12336,
+   "vertices": 10976,
+   "indices": 16464,
    "aabb": [
+    -0.875,
     -0.75,
-    -0.75,
-    -0.75,
-    0.75,
-    3.875,
-    0.75
+    -0.875,
+    0.875,
+    4.5,
+    0.875
    ],
-   "position": 3721264,
-   "normal": 3819952,
-   "color": 3918640,
-   "extra": 3951536,
-   "index": 3984432
+   "position": 4296128,
+   "normal": 4427840,
+   "color": 4559552,
+   "extra": 4603456,
+   "index": 4647360
   },
   "pillar/s0": {
-   "vertices": 3616,
-   "indices": 5424,
+   "vertices": 4352,
+   "indices": 6528,
    "aabb": [
+    -0.875,
     -0.75,
-    -0.75,
-    -0.75,
-    0.75,
+    -0.875,
     0.875,
-    0.75
+    0.875,
+    0.875
    ],
-   "position": 4033776,
-   "normal": 4077168,
-   "color": 4120560,
-   "extra": 4135024,
-   "index": 4149488
+   "position": 4713216,
+   "normal": 4765440,
+   "color": 4817664,
+   "extra": 4835072,
+   "index": 4852480
   },
   "pillar/s1": {
-   "vertices": 7928,
-   "indices": 11892,
+   "vertices": 10024,
+   "indices": 15036,
    "aabb": [
-    -0.875,
-    -0.75,
-    -0.875,
-    0.875,
-    1.75,
-    1.125
-   ],
-   "position": 4171184,
-   "normal": 4266320,
-   "color": 4361456,
-   "extra": 4393168,
-   "index": 4424880
-  },
-  "pillar/s2": {
-   "vertices": 10432,
-   "indices": 15648,
-   "aabb": [
-    -0.875,
-    -0.75,
-    -0.875,
-    0.875,
-    2.375,
-    1.125
-   ],
-   "position": 4472448,
-   "normal": 4597632,
-   "color": 4722816,
-   "extra": 4764544,
-   "index": 4806272
-  },
-  "pillar/s3": {
-   "vertices": 13272,
-   "indices": 19908,
-   "aabb": [
-    -0.875,
-    -0.75,
-    -0.875,
-    0.875,
-    3.125,
-    1.125
-   ],
-   "position": 4868864,
-   "normal": 5028128,
-   "color": 5187392,
-   "extra": 5240480,
-   "index": 5293568
-  },
-  "pillar/d1": {
-   "vertices": 8280,
-   "indices": 12420,
-   "aabb": [
-    -0.75,
-    -0.75,
-    -0.75,
-    0.75,
-    3.875,
-    0.75
-   ],
-   "position": 5373200,
-   "normal": 5472560,
-   "color": 5571920,
-   "extra": 5605040,
-   "index": 5638160
-  },
-  "pillar/d2": {
-   "vertices": 7744,
-   "indices": 11616,
-   "aabb": [
-    -0.875,
+    -1,
     -0.75,
     -1,
-    0.875,
-    3.25,
-    1
+    1,
+    1.875,
+    1.25
    ],
-   "position": 5687840,
-   "normal": 5780768,
-   "color": 5873696,
-   "extra": 5904672,
-   "index": 5935648
+   "position": 4878592,
+   "normal": 4998880,
+   "color": 5119168,
+   "extra": 5159264,
+   "index": 5199360
+  },
+  "pillar/s2": {
+   "vertices": 13984,
+   "indices": 20976,
+   "aabb": [
+    -1,
+    -0.75,
+    -1,
+    1,
+    2.75,
+    1.25
+   ],
+   "position": 5259504,
+   "normal": 5427312,
+   "color": 5595120,
+   "extra": 5651056,
+   "index": 5706992
+  },
+  "pillar/s3": {
+   "vertices": 17880,
+   "indices": 26820,
+   "aabb": [
+    -1,
+    -0.75,
+    -1,
+    1,
+    3.5,
+    1.25
+   ],
+   "position": 5790896,
+   "normal": 6005456,
+   "color": 6220016,
+   "extra": 6291536,
+   "index": 6363056
+  },
+  "pillar/d1": {
+   "vertices": 10928,
+   "indices": 16392,
+   "aabb": [
+    -0.875,
+    -0.75,
+    -0.875,
+    0.875,
+    4.5,
+    0.875
+   ],
+   "position": 6470336,
+   "normal": 6601472,
+   "color": 6732608,
+   "extra": 6776320,
+   "index": 6820032
+  },
+  "pillar/d2": {
+   "vertices": 9408,
+   "indices": 14112,
+   "aabb": [
+    -1,
+    -0.75,
+    -1.125,
+    1,
+    3.75,
+    1.125
+   ],
+   "position": 6885600,
+   "normal": 6998496,
+   "color": 7111392,
+   "extra": 7149024,
+   "index": 7186656
   },
   "pillar_flag": {
-   "vertices": 8928,
-   "indices": 13392,
+   "vertices": 11680,
+   "indices": 17520,
    "aabb": [
+    -0.875,
     -0.75,
-    -0.75,
-    -0.75,
-    1.25,
-    6.375,
-    0.75
+    -0.875,
+    1.375,
+    7,
+    0.875
    ],
-   "position": 5982112,
-   "normal": 6089248,
-   "color": 6196384,
-   "extra": 6232096,
-   "index": 6267808
+   "position": 7243104,
+   "normal": 7383264,
+   "color": 7523424,
+   "extra": 7570144,
+   "index": 7616864
   },
   "pillar_gate": {
-   "vertices": 13408,
-   "indices": 20112,
+   "vertices": 14976,
+   "indices": 22464,
    "aabb": [
     -1,
     -0.75,
     -1,
     1.5,
-    6.875,
+    7.75,
     1
    ],
-   "position": 6321376,
-   "normal": 6482272,
-   "color": 6643168,
-   "extra": 6696800,
-   "index": 6750432
+   "position": 7686944,
+   "normal": 7866656,
+   "color": 8046368,
+   "extra": 8106272,
+   "index": 8166176
   },
   "pillar_gate/s0": {
    "vertices": 6048,
@@ -664,96 +783,96 @@
     0.875,
     1
    ],
-   "position": 6830880,
-   "normal": 6903456,
-   "color": 6976032,
-   "extra": 7000224,
-   "index": 7024416
+   "position": 8256032,
+   "normal": 8328608,
+   "color": 8401184,
+   "extra": 8425376,
+   "index": 8449568
   },
   "pillar_gate/s1": {
-   "vertices": 15896,
-   "indices": 23844,
+   "vertices": 16480,
+   "indices": 24720,
    "aabb": [
     -1.125,
     -0.75,
     -1.125,
     1.625,
-    2.5,
+    2.625,
     1.375
    ],
-   "position": 7060704,
-   "normal": 7251456,
-   "color": 7442208,
-   "extra": 7505792,
-   "index": 7569376
+   "position": 8485856,
+   "normal": 8683616,
+   "color": 8881376,
+   "extra": 8947296,
+   "index": 9013216
   },
   "pillar_gate/s2": {
-   "vertices": 23616,
-   "indices": 35424,
+   "vertices": 26488,
+   "indices": 39732,
    "aabb": [
     -1.125,
     -0.75,
     -1.125,
     1.625,
-    3.875,
+    4.375,
     1.375
    ],
-   "position": 7664752,
-   "normal": 7948144,
-   "color": 8231536,
-   "extra": 8326000,
-   "index": 8420464
+   "position": 9112096,
+   "normal": 9429952,
+   "color": 9747808,
+   "extra": 9853760,
+   "index": 9959712
   },
   "pillar_gate/s3": {
-   "vertices": 32296,
-   "indices": 48444,
+   "vertices": 36464,
+   "indices": 54696,
    "aabb": [
     -1.125,
     -0.75,
     -1.125,
     1.625,
-    5.375,
+    6,
     1.375
    ],
-   "position": 8562160,
-   "normal": 8949712,
-   "color": 9337264,
-   "extra": 9466448,
-   "index": 9595632
+   "position": 10118640,
+   "normal": 10556208,
+   "color": 10993776,
+   "extra": 11139632,
+   "index": 11285488
   },
   "pillar_gate/d1": {
-   "vertices": 14488,
-   "indices": 21732,
+   "vertices": 14960,
+   "indices": 22440,
    "aabb": [
     -1,
     -0.75,
     -1,
-    1.5,
-    6.625,
+    1.375,
+    7.75,
     1
    ],
-   "position": 9789408,
-   "normal": 9963264,
-   "color": 10137120,
-   "extra": 10195072,
-   "index": 10253024
+   "position": 11504272,
+   "normal": 11683792,
+   "color": 11863312,
+   "extra": 11923152,
+   "index": 11982992
   },
   "pillar_gate/d2": {
-   "vertices": 15896,
-   "indices": 23844,
+   "vertices": 15264,
+   "indices": 22896,
    "aabb": [
     -1.125,
     -0.75,
     -1.25,
     1.625,
-    6.125,
+    6.5,
     1.25
    ],
-   "position": 10339952,
-   "normal": 10530704,
-   "color": 10721456,
-   "extra": 10785040,
-   "index": 10848624
+   "position": 12072752,
+   "normal": 12255920,
+   "color": 12439088,
+   "extra": 12500144,
+   "index": 12561200
   },
   "gate1": {
    "vertices": 1432,
@@ -766,11 +885,11 @@
     0.25,
     0.5
    ],
-   "position": 10944000,
-   "normal": 10961184,
-   "color": 10978368,
-   "extra": 10984096,
-   "index": 10989824
+   "position": 12652784,
+   "normal": 12669968,
+   "color": 12687152,
+   "extra": 12692880,
+   "index": 12698608
   },
   "gate1/s0": {
    "vertices": 2256,
@@ -783,11 +902,11 @@
     0.875,
     0.5
    ],
-   "position": 10998416,
-   "normal": 11025488,
-   "color": 11052560,
-   "extra": 11061584,
-   "index": 11070608
+   "position": 12707200,
+   "normal": 12734272,
+   "color": 12761344,
+   "extra": 12770368,
+   "index": 12779392
   },
   "gate1/s1": {
    "vertices": 2104,
@@ -800,11 +919,11 @@
     0.625,
     0.875
    ],
-   "position": 11084144,
-   "normal": 11109392,
-   "color": 11134640,
-   "extra": 11143056,
-   "index": 11151472
+   "position": 12792928,
+   "normal": 12818176,
+   "color": 12843424,
+   "extra": 12851840,
+   "index": 12860256
   },
   "gate1/s2": {
    "vertices": 1976,
@@ -817,11 +936,11 @@
     0.625,
     0.875
    ],
-   "position": 11164096,
-   "normal": 11187808,
-   "color": 11211520,
-   "extra": 11219424,
-   "index": 11227328
+   "position": 12872880,
+   "normal": 12896592,
+   "color": 12920304,
+   "extra": 12928208,
+   "index": 12936112
   },
   "gate1/s3": {
    "vertices": 1888,
@@ -834,15 +953,15 @@
     0.5,
     0.875
    ],
-   "position": 11239184,
-   "normal": 11261840,
-   "color": 11284496,
-   "extra": 11292048,
-   "index": 11299600
+   "position": 12947968,
+   "normal": 12970624,
+   "color": 12993280,
+   "extra": 13000832,
+   "index": 13008384
   },
   "gate1/d1": {
-   "vertices": 1496,
-   "indices": 2244,
+   "vertices": 1432,
+   "indices": 2148,
    "aabb": [
     -0.5,
     -0.75,
@@ -851,28 +970,28 @@
     0.25,
     0.5
    ],
-   "position": 11310928,
-   "normal": 11328880,
-   "color": 11346832,
-   "extra": 11352816,
-   "index": 11358800
+   "position": 13019712,
+   "normal": 13036896,
+   "color": 13054080,
+   "extra": 13059808,
+   "index": 13065536
   },
   "gate1/d2": {
-   "vertices": 656,
-   "indices": 984,
+   "vertices": 400,
+   "indices": 600,
    "aabb": [
     -0.625,
-    -0.75,
+    0,
     -0.75,
     0.625,
     0.25,
     0.75
    ],
-   "position": 11367776,
-   "normal": 11375648,
-   "color": 11383520,
-   "extra": 11386144,
-   "index": 11388768
+   "position": 13074128,
+   "normal": 13078928,
+   "color": 13083728,
+   "extra": 13085328,
+   "index": 13086928
   },
   "gate1/leaf": {
    "vertices": 496,
@@ -885,11 +1004,11 @@
     2.625,
     0.125
    ],
-   "position": 11392704,
-   "normal": 11398656,
-   "color": 11404608,
-   "extra": 11406592,
-   "index": 11408576
+   "position": 13089328,
+   "normal": 13095280,
+   "color": 13101232,
+   "extra": 13103216,
+   "index": 13105200
   },
   "gate1/leaf/d1": {
    "vertices": 496,
@@ -902,11 +1021,11 @@
     2.625,
     0.125
    ],
-   "position": 11411552,
-   "normal": 11417504,
-   "color": 11423456,
-   "extra": 11425440,
-   "index": 11427424
+   "position": 13108176,
+   "normal": 13114128,
+   "color": 13120080,
+   "extra": 13122064,
+   "index": 13124048
   },
   "gate1/leaf/d2": {
    "vertices": 296,
@@ -919,11 +1038,11 @@
     2.375,
     0.125
    ],
-   "position": 11430400,
-   "normal": 11433952,
-   "color": 11437504,
-   "extra": 11438688,
-   "index": 11439872
+   "position": 13127024,
+   "normal": 13130576,
+   "color": 13134128,
+   "extra": 13135312,
+   "index": 13136496
   },
   "gate2": {
    "vertices": 2456,
@@ -936,11 +1055,11 @@
     0.25,
     0.5
    ],
-   "position": 11441648,
-   "normal": 11471120,
-   "color": 11500592,
-   "extra": 11510416,
-   "index": 11520240
+   "position": 13138272,
+   "normal": 13167744,
+   "color": 13197216,
+   "extra": 13207040,
+   "index": 13216864
   },
   "gate2/s0": {
    "vertices": 3760,
@@ -953,11 +1072,11 @@
     0.875,
     0.5
    ],
-   "position": 11534976,
-   "normal": 11580096,
-   "color": 11625216,
-   "extra": 11640256,
-   "index": 11655296
+   "position": 13231600,
+   "normal": 13276720,
+   "color": 13321840,
+   "extra": 13336880,
+   "index": 13351920
   },
   "gate2/s1": {
    "vertices": 3944,
@@ -970,11 +1089,11 @@
     0.625,
     0.875
    ],
-   "position": 11677856,
-   "normal": 11725184,
-   "color": 11772512,
-   "extra": 11788288,
-   "index": 11804064
+   "position": 13374480,
+   "normal": 13421808,
+   "color": 13469136,
+   "extra": 13484912,
+   "index": 13500688
   },
   "gate2/s2": {
    "vertices": 3752,
@@ -987,11 +1106,11 @@
     0.625,
     0.875
    ],
-   "position": 11827728,
-   "normal": 11872752,
-   "color": 11917776,
-   "extra": 11932784,
-   "index": 11947792
+   "position": 13524352,
+   "normal": 13569376,
+   "color": 13614400,
+   "extra": 13629408,
+   "index": 13644416
   },
   "gate2/s3": {
    "vertices": 3536,
@@ -1004,15 +1123,15 @@
     0.5,
     0.875
    ],
-   "position": 11970304,
-   "normal": 12012736,
-   "color": 12055168,
-   "extra": 12069312,
-   "index": 12083456
+   "position": 13666928,
+   "normal": 13709360,
+   "color": 13751792,
+   "extra": 13765936,
+   "index": 13780080
   },
   "gate2/d1": {
-   "vertices": 2664,
-   "indices": 3996,
+   "vertices": 2440,
+   "indices": 3660,
    "aabb": [
     -1,
     -0.75,
@@ -1021,15 +1140,15 @@
     0.25,
     0.5
    ],
-   "position": 12104672,
-   "normal": 12136640,
-   "color": 12168608,
-   "extra": 12179264,
-   "index": 12189920
+   "position": 13801296,
+   "normal": 13830576,
+   "color": 13859856,
+   "extra": 13869616,
+   "index": 13879376
   },
   "gate2/d2": {
-   "vertices": 1448,
-   "indices": 2172,
+   "vertices": 1200,
+   "indices": 1800,
    "aabb": [
     -1.125,
     -0.75,
@@ -1038,11 +1157,11 @@
     0.25,
     0.75
    ],
-   "position": 12205904,
-   "normal": 12223280,
-   "color": 12240656,
-   "extra": 12246448,
-   "index": 12252240
+   "position": 13894016,
+   "normal": 13908416,
+   "color": 13922816,
+   "extra": 13927616,
+   "index": 13932416
   },
   "gate2/leaf": {
    "vertices": 1328,
@@ -1055,11 +1174,11 @@
     2.625,
     0.25
    ],
-   "position": 12260928,
-   "normal": 12276864,
-   "color": 12292800,
-   "extra": 12298112,
-   "index": 12303424
+   "position": 13939616,
+   "normal": 13955552,
+   "color": 13971488,
+   "extra": 13976800,
+   "index": 13982112
   },
   "gate2/leaf/d1": {
    "vertices": 1296,
@@ -1072,11 +1191,11 @@
     2.625,
     0.25
    ],
-   "position": 12311392,
-   "normal": 12326944,
-   "color": 12342496,
-   "extra": 12347680,
-   "index": 12352864
+   "position": 13990080,
+   "normal": 14005632,
+   "color": 14021184,
+   "extra": 14026368,
+   "index": 14031552
   },
   "gate2/leaf/d2": {
    "vertices": 1064,
@@ -1089,11 +1208,11 @@
     2.375,
     0.25
    ],
-   "position": 12360640,
-   "normal": 12373408,
-   "color": 12386176,
-   "extra": 12390432,
-   "index": 12394688
+   "position": 14039328,
+   "normal": 14052096,
+   "color": 14064864,
+   "extra": 14069120,
+   "index": 14073376
   },
   "gate3": {
    "vertices": 3480,
@@ -1106,11 +1225,11 @@
     0.25,
     0.5
    ],
-   "position": 12401072,
-   "normal": 12442832,
-   "color": 12484592,
-   "extra": 12498512,
-   "index": 12512432
+   "position": 14079760,
+   "normal": 14121520,
+   "color": 14163280,
+   "extra": 14177200,
+   "index": 14191120
   },
   "gate3/s0": {
    "vertices": 5264,
@@ -1123,11 +1242,11 @@
     0.875,
     0.5
    ],
-   "position": 12533312,
-   "normal": 12596480,
-   "color": 12659648,
-   "extra": 12680704,
-   "index": 12701760
+   "position": 14212000,
+   "normal": 14275168,
+   "color": 14338336,
+   "extra": 14359392,
+   "index": 14380448
   },
   "gate3/s1": {
    "vertices": 5352,
@@ -1140,11 +1259,11 @@
     0.625,
     0.875
    ],
-   "position": 12733344,
-   "normal": 12797568,
-   "color": 12861792,
-   "extra": 12883200,
-   "index": 12904608
+   "position": 14412032,
+   "normal": 14476256,
+   "color": 14540480,
+   "extra": 14561888,
+   "index": 14583296
   },
   "gate3/s2": {
    "vertices": 5096,
@@ -1157,11 +1276,11 @@
     0.625,
     0.875
    ],
-   "position": 12936720,
-   "normal": 12997872,
-   "color": 13059024,
-   "extra": 13079408,
-   "index": 13099792
+   "position": 14615408,
+   "normal": 14676560,
+   "color": 14737712,
+   "extra": 14758096,
+   "index": 14778480
   },
   "gate3/s3": {
    "vertices": 4816,
@@ -1174,15 +1293,15 @@
     0.5,
     0.875
    ],
-   "position": 13130368,
-   "normal": 13188160,
-   "color": 13245952,
-   "extra": 13265216,
-   "index": 13284480
+   "position": 14809056,
+   "normal": 14866848,
+   "color": 14924640,
+   "extra": 14943904,
+   "index": 14963168
   },
   "gate3/d1": {
-   "vertices": 3816,
-   "indices": 5724,
+   "vertices": 3480,
+   "indices": 5220,
    "aabb": [
     -1.5,
     -0.75,
@@ -1191,15 +1310,15 @@
     0.25,
     0.5
    ],
-   "position": 13313376,
-   "normal": 13359168,
-   "color": 13404960,
-   "extra": 13420224,
-   "index": 13435488
+   "position": 14992064,
+   "normal": 15033824,
+   "color": 15075584,
+   "extra": 15089504,
+   "index": 15103424
   },
   "gate3/d2": {
-   "vertices": 2224,
-   "indices": 3336,
+   "vertices": 1592,
+   "indices": 2388,
    "aabb": [
     -1.625,
     -0.75,
@@ -1208,11 +1327,11 @@
     0.25,
     0.75
    ],
-   "position": 13458384,
-   "normal": 13485072,
-   "color": 13511760,
-   "extra": 13520656,
-   "index": 13529552
+   "position": 15124304,
+   "normal": 15143408,
+   "color": 15162512,
+   "extra": 15168880,
+   "index": 15175248
   },
   "gate3/leaf": {
    "vertices": 2160,
@@ -1225,11 +1344,11 @@
     2.625,
     0.25
    ],
-   "position": 13542896,
-   "normal": 13568816,
-   "color": 13594736,
-   "extra": 13603376,
-   "index": 13612016
+   "position": 15184800,
+   "normal": 15210720,
+   "color": 15236640,
+   "extra": 15245280,
+   "index": 15253920
   },
   "gate3/leaf/d1": {
    "vertices": 2128,
@@ -1242,11 +1361,11 @@
     2.625,
     0.25
    ],
-   "position": 13624976,
-   "normal": 13650512,
-   "color": 13676048,
-   "extra": 13684560,
-   "index": 13693072
+   "position": 15266880,
+   "normal": 15292416,
+   "color": 15317952,
+   "extra": 15326464,
+   "index": 15334976
   },
   "gate3/leaf/d2": {
    "vertices": 1744,
@@ -1259,11 +1378,11 @@
     2.375,
     0.25
    ],
-   "position": 13705840,
-   "normal": 13726768,
-   "color": 13747696,
-   "extra": 13754672,
-   "index": 13761648
+   "position": 15347744,
+   "normal": 15368672,
+   "color": 15389600,
+   "extra": 15396576,
+   "index": 15403552
   },
   "gate4": {
    "vertices": 4504,
@@ -1276,11 +1395,11 @@
     0.25,
     0.5
    ],
-   "position": 13772112,
-   "normal": 13826160,
-   "color": 13880208,
-   "extra": 13898224,
-   "index": 13916240
+   "position": 15414016,
+   "normal": 15468064,
+   "color": 15522112,
+   "extra": 15540128,
+   "index": 15558144
   },
   "gate4/s0": {
    "vertices": 6768,
@@ -1293,11 +1412,11 @@
     0.875,
     0.5
    ],
-   "position": 13943264,
-   "normal": 14024480,
-   "color": 14105696,
-   "extra": 14132768,
-   "index": 14159840
+   "position": 15585168,
+   "normal": 15666384,
+   "color": 15747600,
+   "extra": 15774672,
+   "index": 15801744
   },
   "gate4/s1": {
    "vertices": 6760,
@@ -1310,11 +1429,11 @@
     0.625,
     0.875
    ],
-   "position": 14200448,
-   "normal": 14281568,
-   "color": 14362688,
-   "extra": 14389728,
-   "index": 14416768
+   "position": 15842352,
+   "normal": 15923472,
+   "color": 16004592,
+   "extra": 16031632,
+   "index": 16058672
   },
   "gate4/s2": {
    "vertices": 6440,
@@ -1327,11 +1446,11 @@
     0.625,
     0.875
    ],
-   "position": 14457328,
-   "normal": 14534608,
-   "color": 14611888,
-   "extra": 14637648,
-   "index": 14663408
+   "position": 16099232,
+   "normal": 16176512,
+   "color": 16253792,
+   "extra": 16279552,
+   "index": 16305312
   },
   "gate4/s3": {
    "vertices": 6096,
@@ -1344,15 +1463,15 @@
     0.5,
     0.875
    ],
-   "position": 14702048,
-   "normal": 14775200,
-   "color": 14848352,
-   "extra": 14872736,
-   "index": 14897120
+   "position": 16343952,
+   "normal": 16417104,
+   "color": 16490256,
+   "extra": 16514640,
+   "index": 16539024
   },
   "gate4/d1": {
-   "vertices": 4880,
-   "indices": 7320,
+   "vertices": 4400,
+   "indices": 6600,
    "aabb": [
     -2,
     -0.75,
@@ -1361,15 +1480,15 @@
     0.25,
     0.5
    ],
-   "position": 14933696,
-   "normal": 14992256,
-   "color": 15050816,
-   "extra": 15070336,
-   "index": 15089856
+   "position": 16575600,
+   "normal": 16628400,
+   "color": 16681200,
+   "extra": 16698800,
+   "index": 16716400
   },
   "gate4/d2": {
-   "vertices": 2704,
-   "indices": 4056,
+   "vertices": 2352,
+   "indices": 3528,
    "aabb": [
     -2.125,
     -0.75,
@@ -1378,11 +1497,11 @@
     0.25,
     0.75
    ],
-   "position": 15119136,
-   "normal": 15151584,
-   "color": 15184032,
-   "extra": 15194848,
-   "index": 15205664
+   "position": 16742800,
+   "normal": 16771024,
+   "color": 16799248,
+   "extra": 16808656,
+   "index": 16818064
   },
   "gate4/leaf": {
    "vertices": 2992,
@@ -1395,11 +1514,11 @@
     2.625,
     0.25
    ],
-   "position": 15221888,
-   "normal": 15257792,
-   "color": 15293696,
-   "extra": 15305664,
-   "index": 15317632
+   "position": 16832176,
+   "normal": 16868080,
+   "color": 16903984,
+   "extra": 16915952,
+   "index": 16927920
   },
   "gate4/leaf/d1": {
    "vertices": 2944,
@@ -1412,11 +1531,11 @@
     2.625,
     0.25
    ],
-   "position": 15335584,
-   "normal": 15370912,
-   "color": 15406240,
-   "extra": 15418016,
-   "index": 15429792
+   "position": 16945872,
+   "normal": 16981200,
+   "color": 17016528,
+   "extra": 17028304,
+   "index": 17040080
   },
   "gate4/leaf/d2": {
    "vertices": 2536,
@@ -1429,11 +1548,11 @@
     2.5,
     0.25
    ],
-   "position": 15447456,
-   "normal": 15477888,
-   "color": 15508320,
-   "extra": 15518464,
-   "index": 15528608
+   "position": 17057744,
+   "normal": 17088176,
+   "color": 17118608,
+   "extra": 17128752,
+   "index": 17138896
   },
   "gate5": {
    "vertices": 5528,
@@ -1446,11 +1565,11 @@
     0.25,
     0.5
    ],
-   "position": 15543824,
-   "normal": 15610160,
-   "color": 15676496,
-   "extra": 15698608,
-   "index": 15720720
+   "position": 17154112,
+   "normal": 17220448,
+   "color": 17286784,
+   "extra": 17308896,
+   "index": 17331008
   },
   "gate5/s0": {
    "vertices": 8272,
@@ -1463,11 +1582,11 @@
     0.875,
     0.5
    ],
-   "position": 15753888,
-   "normal": 15853152,
-   "color": 15952416,
-   "extra": 15985504,
-   "index": 16018592
+   "position": 17364176,
+   "normal": 17463440,
+   "color": 17562704,
+   "extra": 17595792,
+   "index": 17628880
   },
   "gate5/s1": {
    "vertices": 8168,
@@ -1480,11 +1599,11 @@
     0.625,
     0.875
    ],
-   "position": 16068224,
-   "normal": 16166240,
-   "color": 16264256,
-   "extra": 16296928,
-   "index": 16329600
+   "position": 17678512,
+   "normal": 17776528,
+   "color": 17874544,
+   "extra": 17907216,
+   "index": 17939888
   },
   "gate5/s2": {
    "vertices": 7784,
@@ -1497,11 +1616,11 @@
     0.625,
     0.875
    ],
-   "position": 16378608,
-   "normal": 16472016,
-   "color": 16565424,
-   "extra": 16596560,
-   "index": 16627696
+   "position": 17988896,
+   "normal": 18082304,
+   "color": 18175712,
+   "extra": 18206848,
+   "index": 18237984
   },
   "gate5/s3": {
    "vertices": 7376,
@@ -1514,15 +1633,15 @@
     0.5,
     0.875
    ],
-   "position": 16674400,
-   "normal": 16762912,
-   "color": 16851424,
-   "extra": 16880928,
-   "index": 16910432
+   "position": 18284688,
+   "normal": 18373200,
+   "color": 18461712,
+   "extra": 18491216,
+   "index": 18520720
   },
   "gate5/d1": {
-   "vertices": 5960,
-   "indices": 8940,
+   "vertices": 5328,
+   "indices": 7992,
    "aabb": [
     -2.5,
     -0.75,
@@ -1531,15 +1650,15 @@
     0.25,
     0.5
    ],
-   "position": 16954688,
-   "normal": 17026208,
-   "color": 17097728,
-   "extra": 17121568,
-   "index": 17145408
+   "position": 18564976,
+   "normal": 18628912,
+   "color": 18692848,
+   "extra": 18714160,
+   "index": 18735472
   },
   "gate5/d2": {
-   "vertices": 3248,
-   "indices": 4872,
+   "vertices": 2936,
+   "indices": 4404,
    "aabb": [
     -2.625,
     -0.75,
@@ -1548,11 +1667,11 @@
     0.25,
     0.75
    ],
-   "position": 17181168,
-   "normal": 17220144,
-   "color": 17259120,
-   "extra": 17272112,
-   "index": 17285104
+   "position": 18767440,
+   "normal": 18802672,
+   "color": 18837904,
+   "extra": 18849648,
+   "index": 18861392
   },
   "gate5/leaf": {
    "vertices": 3824,
@@ -1565,11 +1684,11 @@
     2.625,
     0.25
    ],
-   "position": 17304592,
-   "normal": 17350480,
-   "color": 17396368,
-   "extra": 17411664,
-   "index": 17426960
+   "position": 18879008,
+   "normal": 18924896,
+   "color": 18970784,
+   "extra": 18986080,
+   "index": 19001376
   },
   "gate5/leaf/d1": {
    "vertices": 3824,
@@ -1582,11 +1701,11 @@
     2.625,
     0.25
    ],
-   "position": 17449904,
-   "normal": 17495792,
-   "color": 17541680,
-   "extra": 17556976,
-   "index": 17572272
+   "position": 19024320,
+   "normal": 19070208,
+   "color": 19116096,
+   "extra": 19131392,
+   "index": 19146688
   },
   "gate5/leaf/d2": {
    "vertices": 3272,
@@ -1599,11 +1718,11 @@
     2.5,
     0.25
    ],
-   "position": 17595216,
-   "normal": 17634480,
-   "color": 17673744,
-   "extra": 17686832,
-   "index": 17699920
+   "position": 19169632,
+   "normal": 19208896,
+   "color": 19248160,
+   "extra": 19261248,
+   "index": 19274336
   }
  }
 }

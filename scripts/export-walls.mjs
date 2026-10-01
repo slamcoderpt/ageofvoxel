@@ -13,8 +13,10 @@
 // model is pivoted at the centre of its tile (x, z) on the ground (y = 0);
 // walls run along +x, the faces look +z / -z. Read by
 // godot/game/buildings/walls.gd. Names:
-//   seg/<v>[/s<k>|/d<k>]   one straight tile of wall (x in [-0.5, 0.5)), 3 variants
+//   seg/<v>[/s<k>|/d<k>]   one straight tile of wall (x in [-0.5, 0.5)), 3 variants;
+//                          the parapet and merlons on +z, the outer side
 //   arm[/s<k>|/d<k>]       half a tile, from the tile centre to +x (ends, corners, joins)
+//   arm_m[/s<k>|/d<k>]     the same with its parapet on -z (turned arms keep it outside)
 //   core[/s<k>|/d<k>]      the wall's cross-section round the tile centre (diagonal joins)
 //   pillar[/s<k>|/d<k>]    square pillar on a joint, an end or a run (1.5 tiles across)
 //   pillar_flag            the same with a flag pole and three pennants
@@ -117,11 +119,19 @@ const copyVox = (dst, v, x, y, z) => dst.set(x, y, z, v.team ? TEAM : v.c, v.glo
 // Profile (y): skirt -6..-1 (hangs into slopes), plinth 0..2 (8 thick, the
 // top course a team ledge), body 3..11 (6 thick), gilt fillet 12, meander
 // 13..17 (team on dark), dentils 18, cornice 19 (8 thick, the walkway floor),
-// parapets 20 (2 thick each side), merlons 21..23 with a team cap.
+// then one parapet on the OUTER side only (+z: the renderer turns every piece
+// so +z faces away from the owner's town): a team band (y 20) and plain stone
+// merlons (21..23), period 4 so the crenellation runs on unbroken from tile to
+// tile; the inner side a one-voxel stone curb. Every piece of the curtain has
+// this same section at the same height, so a run reads as one wall-walk and
+// one row of merlons; turns and ends are capped by pillars.
 export const WALL = { top: 24, body: [3, 11], frieze: 13, cornice: 19 };
-function wallSection(m, x0, x1, { seed = 3, merlonAt = null } = {}) {
+const merlon4 = (x) => { const k = ((x % 4) + 4) % 4; return k === 0 || k === 3; };
+function wallSection(m, x0, x1, { seed = 3, merlonAt = merlon4, outer = 1 } = {}) {
   const stone = ASHLAR(seed);
-  const isMerlon = merlonAt || ((x) => { const k = ((x % 4) + 4) % 4; return k === 0 || k === 3; });
+  // outer = 1: parapet on +z, -1: on -z (the mirrored arm)
+  const oz = outer > 0 ? [2, 3] : [-4, -3];
+  const iz = outer > 0 ? -4 : 3;
   for (let x = x0; x < x1; x++) {
     m.box(x, -6, -4, 1, 6, 8, BASE_STONE);
     m.box(x, 0, -4, 1, 2, 8, PLINTH);
@@ -142,29 +152,41 @@ function wallSection(m, x0, x1, { seed = 3, merlonAt = null } = {}) {
       m.set(x, 18, z, out ? (((x % 2) + 2) % 2 ? DENTIL_D : CORNICE(x, 18, z)) : stone(x, 18, z));
     }
     for (let z = -4; z < 4; z++) m.set(x, 19, z, z <= -3 || z >= 2 ? CORNICE : PAVE);
-    for (const z of [-4, -3, 2, 3]) m.set(x, 20, z, MARBLE);
-    if (isMerlon(x)) {
-      for (const z of [-4, -3, 2, 3]) {
-        m.set(x, 21, z, MARBLE); m.set(x, 22, z, MARBLE);
-        m.set(x, 23, z, z === -4 || z === 3 ? TEAM : MARBLE);   // team on the outer edge
-      }
-    }
+    // outer parapet: a team band (outer face) on a marble course, then merlons
+    for (const z of oz) m.set(x, 20, z, (z === 3 || z === -4) ? TEAM : MARBLE);
+    m.set(x, 20, iz, MARBLE);   // inner curb
+    if (merlonAt(x)) for (const z of oz) for (let y = 21; y < 24; y++) m.set(x, y, z, MARBLE);
   }
 }
-// the same cross-section round the tile centre, merlons at its two corners
+// the cross-section round the tile centre with no parapet direction (a join
+// of arms): plinth, body, frieze, walkway and a curb all round; the arms
+// that meet here bring their own parapets
 function core(m) {
-  wallSection(m, -3, 3, { merlonAt: (x) => x === -3 || x === 2 });
-  // and the same across z so a diagonal join has stone on every side
-  for (let z = -3; z < 3; z++) {
-    m.box(-4, -6, z, 8, 6, 1, BASE_STONE);
+  const stone = ASHLAR(3);
+  for (let x = -4; x < 4; x++) for (let z = -4; z < 4; z++) {
+    m.box(x, -6, z, 1, 6, 1, BASE_STONE);
+    m.box(x, 0, z, 1, 2, 1, PLINTH);
+    const edge = x === -4 || x === 3 || z === -4 || z === 3;
+    m.set(x, 2, z, edge ? TEAM : PLINTH(x, 2, z));
+    if (x >= -3 && x < 3 && z >= -3 && z < 3) {
+      const face = x === -3 || x === 2 || z === -3 || z === 2;
+      for (let y = 3; y < 18; y++) {
+        let c = stone(x, y, z);
+        if (face && y === 12) c = GILT;
+        if (face && y >= 13) c = meander(x + z + 64, y - 13) ? TEAM : FRIEZE_GROUND;
+        m.set(x, y, z, c);
+      }
+    }
+    m.set(x, 18, z, stone(x, 18, z));
+    m.set(x, 19, z, edge ? CORNICE(x, 19, z) : PAVE(x, 19, z));
   }
 }
 
 // ---- pillar -------------------------------------------------------------------
 // 12 x 12 (x, z in [-6, 6)), a stepped plinth, quoined corners, team stripes,
 // a palmette frieze, dentils and a projecting cornice, a hollow crenellated top.
-export const PILLAR = { half: 5, top: 30 };
-function pillar(m, { half = 5, seed = 7, top = 30, flag = false, frieze = 'palm' } = {}) {
+export const PILLAR = { half: 6, top: 35 };
+function pillar(m, { half = PILLAR.half, seed = 7, top = PILLAR.top, flag = false, frieze = 'palm' } = {}) {
   const stone = ASHLAR(seed);
   const H = half;
   const faceDist = (x, z) => Math.min(x + H, H - 1 - x, z + H, H - 1 - z);
@@ -209,7 +231,8 @@ function pillar(m, { half = 5, seed = 7, top = 30, flag = false, frieze = 'palm'
     m.set(x, dy + 1, z, CORNICE);
     m.set(x, dy + 2, z, out ? CORNICE : PAVE);
   }
-  // hollow parapet with merlons, team caps
+  // hollow parapet with merlons in plain stone (the team colour is in the
+  // stripes, the frieze and the flag, not on every merlon)
   const py = dy + 3;
   for (let x = -H - 1; x < H + 1; x++) for (let z = -H - 1; z < H + 1; z++) {
     const ring = Math.min(x + H + 1, H - x, z + H + 1, H - z);
@@ -217,7 +240,7 @@ function pillar(m, { half = 5, seed = 7, top = 30, flag = false, frieze = 'palm'
     m.set(x, py, z, MARBLE);
     const along = (x === -H - 1 || x === H || x === -H || x === H - 1) ? z : x;
     const k = (((along + H + 1) % 4) + 4) % 4;
-    if (k < 2) { m.set(x, py + 1, z, MARBLE); m.set(x, py + 2, z, TEAM); }
+    if (k < 2) { m.set(x, py + 1, z, MARBLE); m.set(x, py + 2, z, MARBLE); }
   }
   if (flag) {
     // a pole at the back corner, leaning a little, three team pennants
@@ -242,7 +265,7 @@ function pillar(m, { half = 5, seed = 7, top = 30, flag = false, frieze = 'palm'
 // by GATE_TOWER.over voxels, so the opening is L * 8 - 2 * over. The frame
 // is the paved threshold with a timber sill; the two door leaves are their
 // own model so they can swing.
-export const GATE_TOWER = { half: 7, top: 34, over: 3 };
+export const GATE_TOWER = { half: 7, top: 41, over: 3 };
 const gateOpening = (L) => L * 8 - 2 * GATE_TOWER.over;
 function gateFrame(m, L) {
   const R = L * 4;
@@ -355,32 +378,37 @@ function stage(full, k, { flags = true } = {}) {
   m.box(x0, 0, z1 + 2, 2, 1, 2, RUBBLE);
   return m;
 }
-// d1: merlons knocked off, cracks running down the faces, chipped arrises;
-// d2: the top broken in a jagged line, deep cracks, rubble at the foot.
+// d1: a few merlons knocked off, cracks running down the faces; d2: the top
+// broken in one clean jagged line (the same along the wall's thickness, so it
+// reads as a breach in one piece of masonry, not loose blocks), deep cracks,
+// rubble at the foot. Chips only along the break, never pocks over the faces.
+const vnoise = (t, period, seed) => {
+  const i = Math.floor(t / period), f = t / period - i;
+  const s = f * f * (3 - 2 * f);
+  return hash3(i, 0, 0, seed) * (1 - s) + hash3(i + 1, 0, 0, seed) * s;
+};
 function damage(full, d, seed = 5) {
   const b = bboxOf(full);
   const m = new VoxelModel();
-  const cutAt = new Map();
-  const colKey = (x, z) => `${x >> 1},${z >> 1}`;
-  for (const [x, y, z] of full.coords) {
-    const kk = colKey(x, z);
-    if (cutAt.has(kk)) continue;
-    let c = b.top;
-    const h = hash3(x >> 1, 7, z >> 1, seed + d);
-    if (d === 1 && h < 0.45) c = b.top - 3;
-    if (d === 2) {
-      const n = hash3(x >> 2, 9, z >> 2, seed) * 0.6 + h * 0.4;
-      c = Math.round(b.top - 4 - n * 11);
+  const wide = b.z1 - b.z0 > 9;   // a pillar / tower: square in plan
+  const cutOf = (x, z) => {
+    if (d === 1) {
+      // whole merlons (2 voxels on, 2 off: groups of 4) knocked off
+      const g = hash3(Math.floor((x + 1) / 4), 7, wide ? Math.floor((z + 1) / 4) : 0, seed + 1);
+      return g < 0.35 ? b.top - 3 : b.top;
     }
-    cutAt.set(kk, c);
-  }
+    if (!wide) return Math.round(b.top - 5 - vnoise(x + 64, 5, seed) * 9 - (hash3(x, 9, 0, seed) < 0.3 ? 1 : 0));
+    // a tower: broken off on a slant, one corner standing higher
+    const t = (x - b.x0 + z - b.z0) / Math.max(1, b.x1 - b.x0 + b.z1 - b.z0);
+    return Math.round(b.top - 4 - t * 10 - vnoise(x + z + 64, 4, seed) * 3);
+  };
   for (const [x, y, z] of full.coords) {
     const v = full.get(x, y, z);
     if (!v) continue;
-    if (y >= cutAt.get(colKey(x, z))) continue;
-    // chips: surface voxels on the arrises
-    const exposed = !full.has(x + 1, y, z) || !full.has(x - 1, y, z) || !full.has(x, y, z + 1) || !full.has(x, y, z - 1);
-    if (exposed && y > 3 && hash3(x, y, z, seed + 30) < (d === 1 ? 0.04 : 0.09)) continue;
+    const c = cutOf(x, z);
+    if (y >= c) continue;
+    // chips along the break
+    if (y >= c - 2 && y > 3 && hash3(x, y, z, seed + 30) < (d === 1 ? 0.08 : 0.22)) continue;
     copyVox(m, v, x, y, z);
   }
   // cracks: random walks down the faces from the broken top
@@ -388,8 +416,8 @@ function damage(full, d, seed = 5) {
   for (let i = 0; i < nCracks; i++) {
     let x = b.x0 + Math.floor(hash3(i, 1, d, seed) * (b.x1 - b.x0 + 1));
     const zFace = hash3(i, 2, d, seed) < 0.6 ? b.z1 - (b.z1 - b.z0 > 8 ? 0 : 1) : b.z0 + (b.z1 - b.z0 > 8 ? 0 : 1);
-    let y = Math.min(b.top - 2, cutAt.get(colKey(x, zFace)) - 1);
-    const len = d === 1 ? 7 : 12;
+    let y = Math.min(b.top - 2, cutOf(x, zFace) - 1);
+    const len = d === 1 ? 6 : 11;
     for (let s = 0; s < len && y > 2; s++) {
       for (const z of [zFace, zFace + (zFace > 0 ? 0 : 0)]) if (m.has(x, y, z)) m.set(x, y, z, CRACK);
       // a deep crack is open: remove the face voxel and darken the one behind
@@ -481,9 +509,10 @@ for (let v = 0; v < 3; v++) {
 // half a tile: the merlon pattern continues the straight tiles' (merlon at
 // local 0 and 3), so arms and segments line up wherever they meet
 addFamily('arm', (m) => { wallSection(m, 0, 4, { seed: 3 }); return m; });
+addFamily('arm_m', (m) => { wallSection(m, 0, 4, { seed: 3, outer: -1 }); return m; });
 addFamily('core', (m) => { core(m); return m; });
-addFamily('pillar', (m) => pillar(m, {}), { seed: 9 });
-g.add('pillar_flag', geo(pillar(new Rec(), { flag: true }), 9));
+addFamily('pillar', (m) => pillar(m, { frieze: 'key' }), { seed: 9 });
+g.add('pillar_flag', geo(pillar(new Rec(), { flag: true, frieze: 'key' }), 9));
 addFamily('pillar_gate', (m) => pillar(m, { half: GATE_TOWER.half, seed: 11, top: GATE_TOWER.top, flag: true, frieze: 'key' }), { seed: 11 });
 g.extra.gate_tower = GATE_TOWER;
 for (const L of [1, 2, 3, 4, 5]) {
