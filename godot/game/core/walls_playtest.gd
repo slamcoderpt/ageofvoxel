@@ -222,6 +222,21 @@ func _cmd_center(action: String) -> Variant:
 					return layer.get_global_transform_with_canvas() * z.rect.get_center()
 	return null
 
+## The mouse rests on a command button whose command just changed (an upgrade
+## finished, a segment became a gate, a gate was locked): the tooltip must
+## describe the command now in that slot, not the one that was there.
+func _check_hover_tip(name: String) -> void:
+	await _frames(3)
+	var slot := -1
+	if ui.hover_id.begins_with("cmd:"):
+		slot = int(ui.hover_id.substr(4))
+	var c = ui.commands[slot] if slot >= 0 and slot < ui.commands.size() else null
+	var want := str(c.get("title", "")) if c != null else ""
+	var got := str(ui.tooltip.get("title", ""))
+	_check(name, c != null and want != "" and got == want and ui.tooltip.get("cost", {}) == c.get("cost", {})
+		and ui.tooltip.get("lines", []) == c.get("lines", []),
+		"slot %d: button '%s', tooltip '%s'" % [slot, want, got])
+
 func _cmd(action: String) -> Dictionary:
 	for c in ui.commands:
 		if c != null and str(c.action) == action:
@@ -488,6 +503,7 @@ func _run() -> void:
 		await _click(gc)
 		await _frames(3)
 	_check("Convert to Gate button makes a gate", int(_piece(gate_id).get("kind", -1)) == 2 and r1 - _res() == Vector2(30, 20), "kind %d, paid %s" % [int(_piece(gate_id).get("kind", -1)), r1 - _res()])
+	await _check_hover_tip("tooltip under the mouse follows the slot (gate made)")
 	await _frames(8)
 
 	# 7. L locks, the Unlock button unlocks
@@ -501,6 +517,7 @@ func _run() -> void:
 		await _click(uc)
 		await _frames(2)
 	_check("Unlock button unlocks", int(_piece(gate_id).get("locked", 1)) == 0)
+	await _check_hover_tip("tooltip under the mouse follows the slot (Unlock -> Lock)")
 
 	# 8. enemies are kept out (harness: spawned and ordered by script), the
 	#    player's own soldiers walk in through the gate (box select, right-click)
@@ -603,25 +620,53 @@ func _run() -> void:
 	await _frames(8)
 	_check("tower upgraded: Watch Tower, longer range", up_t >= 0.0 and str(F.tower_name) == "Watch Tower" and float(F.tower.range) > range0
 		and str(ui.info.get("title", "")) == "Watch Tower", "%s range %s -> %s, card '%s'" % [F.tower_name, range0, F.tower.range, ui.info.get("title", "")])
+	await _check_hover_tip("tooltip under the mouse follows the slot (next stage after the upgrade)")
+	_check("upgrade tooltip names the next stage, not the finished one", not str(ui.tooltip.get("title", "")).contains("Watch Tower"), str(ui.tooltip.get("title", "")))
 	await _shot("tower")
 
 	# 11. the tower shoots an enemy that comes in range
 	var tcx := placed_at.x + 1.0
 	var tcz := placed_at.y + 1.0
+	var tcd := _town_center()
+	var tc_mid := Vector2(float(tcd.tx) + float(tcd.w) * 0.5, float(tcd.tz) + float(tcd.h) * 0.5)
 	var spot := Vector2(tcx + 5.0, tcz)
-	for a in 8:
-		var ang := a * TAU / 8.0
+	var far := -1.0
+	for a in 16:   # in tower range, as far from the Town Center (which also shoots) as possible
+		var ang := a * TAU / 16.0
 		var cand := Vector2(tcx + cos(ang) * 6.0, tcz + sin(ang) * 6.0)
-		if sim.find_path(cand.x, cand.y, cand.x + 0.1, cand.y).size() > 0 and _wall_tiles().get(Vector2i(int(cand.x), int(cand.y))) == null:
+		if sim.find_path(cand.x, cand.y, cand.x + 0.1, cand.y).size() > 0 and _wall_tiles().get(Vector2i(int(cand.x), int(cand.y))) == null \
+				and cand.distance_to(tc_mid) > far:
 			spot = cand
-			break
+			far = cand.distance_to(tc_mid)
+	# harness: the player's own units leave the field so the tower is the
+	# only thing that can hurt the foe; every hit is attributed from the sim's
+	# unit:damaged events (other = attacker)
+	var gone := 0
+	var names: PackedStringArray = sim.unit_type_names()
+	var ud: Dictionary = sim.get_units()
+	for i in int(ud.count):
+		if int(ud.owner[i]) == ME and not (ud.flags[i] & 2):
+			sim.kill_unit(int(ud.ids[i]))
+			gone += 1
+	await _frames(2)
 	var foe := int(sim.spawn_unit("hoplite", FOE, spot.x, spot.y, 0.0))
 	var hp0 := float(sim.get_unit(foe).hp)
-	for s in 8:
-		sim.tick(30)
+	var by := {}
+	for s in 9:
+		if s < 8:
+			sim.tick(30)
 		await _frames(1)
+		for e in main.events:
+			if str(e.type) == "unit:damaged" and int(e.id) == foe:
+				by[int(e.other)] = float(by.get(int(e.other), 0.0)) + float(e.amount)
 	var fu: Dictionary = sim.get_unit(foe)
-	_check("the tower shoots an enemy in range", fu.is_empty() or bool(fu.dead) or float(fu.hp) < hp0, "hp %.0f -> %s" % [hp0, "dead" if fu.is_empty() or bool(fu.dead) else str(fu.hp)])
+	var hp1 := 0.0 if fu.is_empty() or bool(fu.dead) else float(fu.hp)
+	var from_tower := float(by.get(tower_id, 0.0))
+	var total := 0.0
+	for k in by:
+		total += float(by[k])
+	_check("the tower alone shoots an enemy in range", gone > 0 and from_tower > 0.0 and is_equal_approx(from_tower, total) and absf((hp0 - hp1) - from_tower) < 0.5,
+		"%d units removed, foe %.0f tiles from the Town Center; hp %.0f -> %.1f; damage by attacker %s (tower %d)" % [gone, far, hp0, hp1, by, tower_id])
 	_finish()
 
 ## a ghost piece tinted c (alpha aside: pieces and tile markers differ)

@@ -855,7 +855,14 @@ and the Unlock button unlocks, enemy soldiers ordered into the ring stay
 out while the player's own (box select, right-click) walk in through the
 gate, Y + a click places a tower (ghost and range ring), its upgrade refused
 before the Classical Age (U), H + A advance the age, the Watch Tower button
-researches it (range up, card title), and the tower shoots an enemy.
+researches it (range up, card title), and the tower alone shoots an enemy
+(the player's units are removed first, the foe stands away from the Town
+Center, and every hit is attributed from the
+`unit:damaged` events). After the gate is made, the gate unlocked and the
+upgrade finished it also checks that the tooltip under the resting mouse
+describes the command now in that slot (the hud re-reads the zone under the
+cursor every frame, `ui._refresh_hover`, so a slot whose command changes
+without a mouse move never keeps the old tooltip).
 `--shots` saves the blocked drag, the green drag, the foundations, the
 gate, the tower ghost and the upgraded tower.
 

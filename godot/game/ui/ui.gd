@@ -1168,6 +1168,8 @@ func _css(p: Vector2) -> Vector2:
 func hud_input(ctrl: Control, e: InputEvent) -> void:
 	if e is InputEventMouseMotion:
 		_mouse = ctrl.get_global_mouse_position() * _scale
+		_hud_mouse = e.position
+		_hud_mouse_in = true
 		var z: Dictionary = _front.zone_at(e.position)
 		if z.is_empty():
 			z = _back.zone_at(e.position)
@@ -1204,11 +1206,43 @@ func hud_input(ctrl: Control, e: InputEvent) -> void:
 	_redraw()
 
 var _mm_drag := false
+var _hud_mouse := Vector2(-1, -1)
+var _hud_mouse_in := false   # the last mouse motion was over the hud (not the world)
 
-func _set_hover(z: Dictionary) -> void:
+## The hud zones are rebuilt every redraw, so the command under a resting
+## mouse can change without a mouse event (an upgrade finishes and the slot
+## becomes the next stage, a wall segment becomes a gate, a gate is locked).
+## Re-read the zone under the cursor and refresh the tooltip when its
+## content changed, so it never describes the command that was there before
+## (also when the slot was empty for a while, e.g. during a research).
+func _refresh_hover() -> void:
+	if not _hud_mouse_in or menu_open:
+		return
+	var z: Dictionary = _front.zone_at(_hud_mouse)
+	if z.is_empty():
+		z = _back.zone_at(_hud_mouse)
+	if _hover_key(z) != hover_id:
+		_set_hover(z)
+		return
+	if z.is_empty() or z.tip.is_empty():
+		if not tooltip.is_empty():
+			tooltip = {}
+			_redraw()
+		return
+	var t: Dictionary = z.tip.duplicate()
+	t["anchor"] = z.rect
+	if t != tooltip:
+		tooltip = t
+		_redraw()
+
+func _hover_key(z: Dictionary) -> String:
 	var id: String = z.get("id", "")
 	if id == "cmd" or id == "group" or id == "power" or id == "res" or id == "queue" or id == "multi" or id == "gfx":
 		id = "%s:%s" % [id, z.arg]
+	return id
+
+func _set_hover(z: Dictionary) -> void:
+	var id := _hover_key(z)
 	if id == hover_id:
 		return
 	hover_id = id
@@ -1361,6 +1395,7 @@ func _unhandled_input(e: InputEvent) -> void:
 		return
 	if e is InputEventMouseMotion:
 		_mouse = e.position
+		_hud_mouse_in = false
 		if hover_id != "":
 			_set_hover({})
 		if not _drag.is_empty():
@@ -1413,6 +1448,7 @@ func _unhandled_input(e: InputEvent) -> void:
 var _hover_pending := false
 
 func _process(_dt: float) -> void:
+	_refresh_hover()
 	if _hover_pending and game and game.camera:
 		_hover_pending = false
 		var h := pick_entity(_mouse) if hover_id == "" else 0
