@@ -407,10 +407,33 @@ func _draw_commands() -> void:
 		S.cell(self, rr, [[0.0, Color("#3d6f86")], [0.85, Color("#0f2d38")], [1.0, Color("#0f2d38")]], Vector2(0.5, 0.35))
 		var en: bool = c.enabled
 		var mod := Color.WHITE if en else Color(0.45, 0.47, 0.5)
-		if c.get("tex") != null:
+		if c.has("tech"):
+			# a tech: a bigger glyph on a darker field; locked ones greyed (Retold's
+			# frames: gold for the generic techs, purple for a god's)
+			var locked: bool = c.get("locked", false)
+			draw_rect(rr.grow(-3), Color(0.0, 0.05, 0.07, 0.35))
+			S.draw_icon(self, c.svg, Rect2(rr.get_center() - Vector2(20, 21), Vector2(40, 40)), true,
+				Color(0.42, 0.43, 0.46) if locked else (Color.WHITE if en else Color(0.78, 0.78, 0.8)))
+			if locked:
+				draw_rect(rr.grow(-3), Color(0.02, 0.06, 0.08, 0.35))
+		elif c.has("trade"):
+			# a market exchange: the resource, a green (buy) / red (sell) arrow, the price in gold
+			S.draw_icon(self, str(c.trade), Rect2(rr.position + Vector2(5, 4), Vector2(30, 30)), true, mod)
+			S.draw_icon(self, "t_buy" if c.dir == "buy" else "t_sell", Rect2(rr.position + Vector2(32, 5), Vector2(18, 18)), true, mod)
+			S.draw_icon(self, "gold", Rect2(rr.position + Vector2(3, 36), Vector2(14, 14)), false, mod)
+			var lb := str(c.get("label", ""))
+			draw_string_outline(bold, Vector2(rr.position.x + 18, rr.end.y - 4), lb, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 4, Color(0, 0, 0, 0.75))
+			draw_string(bold, Vector2(rr.position.x + 18, rr.end.y - 4), lb, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#ffe39a") if en else Color("#ff8a70"))
+		elif c.get("tex") != null:
 			_clip_tex(c.tex, Rect2(rr.grow(-2).position, Vector2(58, 58)), rr.grow(-2), mod)  # CSS: the oversized grid item sits at the content box origin, overflowing right / down
 		else:
 			S.draw_icon(self, c.svg, Rect2(rr.get_center() - Vector2(16, 16), Vector2(32, 32)), true, mod)
+		if c.has("frame"):
+			var fc := Color("#e8c050") if c.frame == "gold" else Color("#b45ae6")
+			if c.get("locked", false):
+				fc = fc.darkened(0.25).lerp(Color(0.55, 0.55, 0.58), 0.35)
+			draw_rect(rr.grow(-1), fc, false, 2.0)
+			draw_rect(rr.grow(-3), Color(fc, 0.35), false, 1.0)
 		if hover and en:
 			draw_rect(rr.grow(-2), S.GOLD_HI, false, 1.0)
 			for k in 3:
@@ -420,7 +443,11 @@ func _draw_commands() -> void:
 			var kx := rr.end.x - 4 - S.text_width(f, c.key, 13)
 			draw_string_outline(f, Vector2(kx, rr.end.y - 4), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 4, Color(0, 0, 0, 0.75))
 			draw_string(f, Vector2(kx, rr.end.y - 4), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color.WHITE)
-		zone(cr, "cmd", i, {"title": c.title, "lines": c.get("lines", []), "cost": c.get("cost", {}), "hotkey": c.key, "warn": c.get("warn", "")})
+		var tip := {"title": c.title, "lines": c.get("lines", []), "cost": c.get("cost", {}), "hotkey": c.key, "warn": c.get("warn", "")}
+		for k in ["time", "bullets", "foot", "wide", "gain"]:
+			if c.has(k):
+				tip[k] = c[k]
+		zone(cr, "cmd", i, tip)
 
 # selection card --------------------------------------------------------------------------------
 
@@ -513,16 +540,85 @@ func _draw_info() -> void:
 				S.text(self, title, Vector2(sx, ty + 14), str(t).to_upper(), 13, S.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.85, 0.8)
 				ty += 20
 			var qx := sx
-			for q in info.get("queue", []):
+			var qs: Array = info.get("queue", [])
+			for q in qs:
 				var qr := Rect2(qx, ty + 4, 38, 38)
 				draw_rect(qr, Color("#10303c"))
-				if q.tex:
+				if q.has("tech"):
+					S.draw_icon(self, q.svg, Rect2(qr.get_center() - Vector2(15, 16), Vector2(30, 30)), true)
+					draw_rect(qr.grow(-1), Color(S.GOLD, 0.5), false, 1.0)
+				elif q.tex:
 					_clip_tex(q.tex, Rect2(qr.get_center() - Vector2(24, 24), Vector2(48, 48)), qr.grow(-1))
 				draw_rect(qr, S.BRONZE, false, 1.0)
 				if q.p > 0.0:
+					draw_rect(Rect2(qr.position.x, qr.end.y - 4, qr.size.x, 4), Color(0, 0, 0, 0.6))
 					draw_rect(Rect2(qr.position.x, qr.end.y - 4, qr.size.x * q.p, 4), Color("#8ef07a"))
-				zone(qr, "queue", q.i, {"title": q.name, "lines": ["Click to cancel"]})
+				if q.has("tech"):
+					var ql := ["%s left" % _secs(float(q.left)) if q.p > 0.0 else "Queued", "Click to cancel (refunds its cost)"]
+					zone(qr, "rqueue", q.tech, {"title": q.name, "lines": ql})
+				else:
+					zone(qr, "queue", q.i, {"title": q.name, "lines": ["Click to cancel"]})
 				qx += 42
+			if not qs.is_empty():
+				ty += 46
+			# the techs researched here (small icons) and a Market's rates
+			var dts: Array = info.get("done_techs", [])
+			if not dts.is_empty() and ty + 24 <= r.end.y - 4:
+				S.text(self, title, Vector2(sx, ty + 16), "RESEARCHED", 11, S.MUTED, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.85, 0.8)
+				var dx := sx + S.text_width(title, "RESEARCHED", 11, 0.8) + 8
+				for dt in dts:
+					if dx + 22 > r.end.x - 12:
+						break
+					var dr := Rect2(dx, ty + 2, 22, 22)
+					draw_rect(dr, Color("#0b2630"))
+					S.draw_icon(self, dt.svg, dr.grow(-2), false)
+					draw_rect(dr, Color(S.GOLD, 0.6), false, 1.0)
+					zone(dr, "rdone", dt.tech, {"title": dt.name, "lines": [dt.text, "Researched"]})
+					dx += 25
+				ty += 28
+			if info.has("market"):
+				_draw_market_rates(Vector2(sx, ty), r.end.x - 14 - sx, info.market)
+
+static func _secs(t: float) -> String:
+	return "%ds" % int(ceil(maxf(t, 0.0)))
+
+## A Market's exchange on its card (Retold's trade readout): per resource the
+## gold a lot costs / brings now, how far its price is above or below the
+## base, and the fee.
+func _draw_market_rates(p: Vector2, _w: float, m: Dictionary) -> void:
+	var bold := S.font("bold")
+	var sans := S.font("sans")
+	var title := S.font("title")
+	var y := p.y
+	S.text(self, title, Vector2(p.x, y + 13), "EXCHANGE  ·  %d PER LOT  ·  FEE %s%%" % [int(m.get("lot", 100)), _num1(float(m.get("fee", 0.3)) * 100.0)], 11, S.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.85, 0.8)
+	y += 18
+	for res in ["food", "wood"]:
+		var e: Dictionary = m.get(res, {})
+		if not bool(e.get("tradable", false)):
+			continue
+		var x := p.x
+		S.draw_icon(self, res, Rect2(x, y + 1, 18, 18))
+		x += 24
+		S.text(self, sans, Vector2(x, y + 15), "Buy", 14, S.MUTED)
+		x += S.text_width(sans, "Buy", 14) + 5
+		S.text(self, bold, Vector2(x, y + 15), str(int(e.buy)), 15, S.INK)
+		x += S.text_width(bold, str(int(e.buy)), 15) + 3
+		S.draw_icon(self, "gold", Rect2(x, y + 3, 14, 14), false)
+		x += 24
+		S.text(self, sans, Vector2(x, y + 15), "Sell", 14, S.MUTED)
+		x += S.text_width(sans, "Sell", 14) + 5
+		S.text(self, bold, Vector2(x, y + 15), str(int(e.sell)), 15, S.INK)
+		x += S.text_width(bold, str(int(e.sell)), 15) + 3
+		S.draw_icon(self, "gold", Rect2(x, y + 3, 14, 14), false)
+		x += 22
+		var d := float(e.price) - float(m.get("base", 100.0))
+		if absf(d) >= 0.5:
+			S.draw_icon(self, "t_buy" if d > 0 else "t_sell", Rect2(x, y + 3, 14, 14), false)
+			S.text(self, sans, Vector2(x + 16, y + 15), "%+d" % int(round(d)), 13, Color("#9ef58a") if d > 0 else Color("#ff8a70"))
+		y += 22
+
+static func _num1(v: float) -> String:
+	return str(int(v)) if v == floor(v) else "%.1f" % v
 
 func _owner_line(p: Vector2, info: Dictionary) -> void:
 	var bold := S.font("bold")
@@ -711,6 +807,9 @@ func _draw_tooltip() -> void:
 	var t: Dictionary = ui.tooltip
 	if t.is_empty() or not t.has("anchor"):
 		return
+	if t.get("wide", false):
+		_draw_wide_tooltip(t)
+		return
 	var title := S.font("title")
 	var sans := S.font("sans")
 	var bold := S.font("bold")
@@ -783,6 +882,111 @@ func _draw_tooltip() -> void:
 			S.text(self, bold if on else sans, Vector2(br.position.x, cy), q[1], 13, S.INK if on else S.MUTED, HORIZONTAL_ALIGNMENT_CENTER, br.size.x, 0.6)
 			zone(br, "gfx", q[0])
 			bx += 62
+
+## Words of `s` in lines no wider than `w` at font size `px`.
+static func _wrap(f: Font, s: String, px: int, w: float) -> Array:
+	var out := []
+	var cur := ""
+	for word in s.split(" ", false):
+		var tryw: String = word if cur == "" else cur + " " + word
+		if cur != "" and S.text_width(f, tryw, px) > w:
+			out.append(cur)
+			cur = word
+		else:
+			cur = tryw
+	if cur != "":
+		out.append(cur)
+	return out
+
+## A tech / trade tooltip as Retold's (reference/techs/ui_03.jpg, ui_05.jpg):
+## the name and hotkey, "Cost: 100 [food], 10 [favor], 40s [hourglass]"
+## (red where short), the effect, per-class bullets, the lock's reason in
+## red, age / building / god.
+func _draw_wide_tooltip(t: Dictionary) -> void:
+	var title := S.font("title")
+	var sans := S.font("sans")
+	var bold := S.font("bold")
+	var maxw := 350.0
+	var rows := []   # [text, font, size, color, height]
+	for l in t.get("lines", []):
+		var wl := _wrap(sans, "• " + str(l), 15, maxw)
+		for k in wl.size():
+			rows.append([("    " if k > 0 else "") + str(wl[k]), sans, 15, S.INK, 19.0])
+	for l in t.get("bullets", []):
+		var wl := _wrap(sans, "• " + str(l), 14, maxw)
+		for k in wl.size():
+			rows.append([("    " if k > 0 else "") + str(wl[k]), sans, 14, Color("#e9d39a"), 18.0])
+	if str(t.get("warn", "")) != "":
+		for wl in _wrap(bold, str(t.warn), 13, maxw):
+			rows.append([str(wl), bold, 13, Color("#ff8a70"), 18.0])
+	for l in t.get("foot", []):
+		rows.append([str(l), sans, 12, S.MUTED, 16.0])
+	var head := str(t.get("title", ""))
+	var hk := str(t.get("hotkey", ""))
+	var w := S.text_width(title, head, 15, 0.5) + (6.0 + S.text_width(sans, "(%s)" % hk, 14) if hk != "" else 0.0)
+	var cost: Dictionary = t.get("cost", {})
+	var gain: Dictionary = t.get("gain", {})
+	var cw := S.text_width(sans, "Cost:", 14) + 6
+	for k in cost:
+		cw += S.text_width(bold, str(int(cost[k])), 14) + 3 + 16 + 10
+	if t.has("time"):
+		cw += S.text_width(bold, "%ds" % int(ceil(float(t.time))), 14) + 3 + 16
+	w = maxf(w, cw)
+	if not gain.is_empty():
+		w = maxf(w, S.text_width(sans, "Gives:", 14) + 6 + 60)
+	for row in rows:
+		w = maxf(w, S.text_width(row[1], row[0], row[2]))
+	w = minf(w, maxw + 10)
+	var h := 8.0 + 20.0 + (22.0 if not cost.is_empty() or t.has("time") else 0.0) + (20.0 if not gain.is_empty() else 0.0) + 4.0
+	for row in rows:
+		h += row[4]
+	h += 8.0
+	var ar: Rect2 = t.anchor
+	var x := clampf(ar.position.x, 4.0, W() - w - 30.0)
+	var y := ar.position.y - h - 8.0
+	if y < 4.0:
+		y = ar.end.y + 8.0
+	var r := Rect2(x, y, w + 22, h)
+	draw_rect(Rect2(r.position + Vector2(0, 4), r.size).grow(4), Color(0, 0, 0, 0.18))
+	draw_rect(Rect2(r.position + Vector2(0, 2), r.size).grow(2), Color(0, 0, 0, 0.25))
+	draw_rect(r.grow(1), Color.BLACK)
+	S.vgrad(self, r, [[0.0, Color(12 / 255.0, 40 / 255.0, 48 / 255.0, 0.97)], [1.0, Color(4 / 255.0, 17 / 255.0, 22 / 255.0, 0.97)]])
+	draw_rect(r, S.BRONZE_HI, false, 1.0)
+	var lx := r.position.x + 11
+	var cy := r.position.y + 8 + 15
+	S.text(self, title, Vector2(lx, cy), head, 15, S.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.8, 0.5)
+	if hk != "":
+		S.text(self, sans, Vector2(lx + S.text_width(title, head, 15, 0.5) + 6, cy), "(%s)" % hk, 14, S.MUTED)
+	if not cost.is_empty() or t.has("time"):
+		cy += 22
+		S.text(self, sans, Vector2(lx, cy), "Cost:", 14, S.INK, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
+		var cx := lx + S.text_width(sans, "Cost:", 14) + 6
+		for k in cost:
+			var v := str(int(cost[k]))
+			var have: float = ui.player.get(k, 0.0)
+			S.text(self, bold, Vector2(cx, cy), v, 14, S.INK if have >= float(cost[k]) else Color("#ff8a70"), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
+			cx += S.text_width(bold, v, 14) + 3
+			S.draw_icon(self, k, Rect2(cx, cy - 13, 16, 16))
+			cx += 16 + 10
+		if t.has("time"):
+			var ts := "%ds" % int(ceil(float(t.time)))
+			S.text(self, bold, Vector2(cx, cy), ts, 14, S.INK, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
+			cx += S.text_width(bold, ts, 14) + 3
+			S.draw_icon(self, "t_time", Rect2(cx, cy - 13, 16, 16))
+	if not gain.is_empty():
+		cy += 20
+		S.text(self, sans, Vector2(lx, cy), "Gives:", 14, S.INK, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
+		var gx := lx + S.text_width(sans, "Gives:", 14) + 6
+		for k in gain:
+			var v := str(int(gain[k]))
+			S.text(self, bold, Vector2(gx, cy), v, 14, Color("#9ef58a"), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
+			gx += S.text_width(bold, v, 14) + 3
+			S.draw_icon(self, k, Rect2(gx, cy - 13, 16, 16))
+			gx += 26
+	cy += 4
+	for row in rows:
+		cy += row[4]
+		S.text(self, row[1], Vector2(lx, cy), row[0], row[2], row[3], HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
 
 func _draw_result() -> void:
 	var res: Dictionary = ui.result

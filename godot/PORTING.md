@@ -35,7 +35,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), `tower_fire.gd` + `tower_flash / tower_puff.gdshader` (tower arrows: loose flash, heavier arrow, tracer, strike; see "Towers: the look"), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported, plus god powers and a wave log, Godot-only; enemy_ai_fort.cpp: the AI's walls, towers and breaches, Godot-only) | `src/combat/` |
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor; Godot-only activity fx: axe / pick chips and dust, sickle chaff, stooks on cut rows, hoof dust, shoal ripples, fish splashes, net ripples, boat wakes; crops sway, `econ_voxel.gdshader`, `fx_chip / fx_puff / fx_ring.gdshader`), buffers built in C++ by `AovEconView` (`native/src/econ_view.{h,cpp}`, render side, reads the sim, never writes it) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
 | godpowers | `game/godpowers/godpowers.gd` (the whole BoltRenderer of effects.js: bolt / sky / zap ribbons, impact flash sprites and decals, scorches with ember cracks (hot orange / red, glowing as long as the scorch lasts), a charcoal ash edge and a hot rim, an expanding impact ring at every strike point (Godot-only; decals are pulled toward the camera so voxel bumps do not swallow them), crater debris, char rims, spark streaks, smoke and flames, the storm funnel (wall, cloud body, dust wall, ground shockwave, rain, energy bands, whirled debris), flyer trails / back lights / drop shadows, meteor fireball and fire, strike / storm point lights and the shadow spot, the full-frame storm grade with light pools; dims the lighting piece's sun / sky / grade while a storm plays), shaders beside it; buffers built in C++ by `AovGodpowerView` (`native/src/godpower_view.{h,cpp}`, render side, reads the sim, never writes it) | `godpowers/` (favor, cooldowns, Lightning Storm, Bolt, Meteor, thrown units: ported) | `src/godpowers/` |
-| ui (HUD, selection, input) | `game/ui/ui.gd` (selection, box / double-click select, smart orders, rally points, control groups, hotkeys, placement ghost, wall drawing (click-drag line ghost, cost, snapping) and the wall / gate / tower commands (see "Walls, gates, towers: placement"), god-power targeting ring, move markers, selection rings (one MultiMesh) + bars, event feed, messages, result card; public: `pieces.ui.selected`, `hover_entity`, `message()`, `feed()`), `hud.gd` (the drawn HUD, two layers with hit zones), `hud_style.gd` (palette, Cinzel / Alegreya fonts in `fonts/`, SVG icons from `icons.gd` = `src/ui/icons.js` rasterised at runtime, draw helpers), `panel.gdshader` (the gilded teal panels), `minimap.gd` + `minimap_ground/units.gdshader` (terrain colours computed in the shader from `get_heights()` / `get_ground()` uploaded as textures, re-uploaded on `building:placed`; unit dots read straight from `get_units()` arrays as data textures: no per-unit script), `portraits.gd` + `portrait.gdshader` (one SubViewport per type / owner, rendered once, unshaded with the browser's three.js hemisphere + sun lighting, no tonemap) | none | `src/ui/` |
+| ui (HUD, selection, input) | `game/ui/ui.gd` (selection, box / double-click select, smart orders, rally points, control groups, hotkeys, placement ghost, wall drawing (click-drag line ghost, cost, snapping) and the wall / gate / tower commands (see "Walls, gates, towers: placement"), god-power targeting ring, move markers, selection rings (one MultiMesh) + bars, event feed, messages, result card; public: `pieces.ui.selected`, `hover_entity`, `message()`, `feed()`), `hud.gd` (the drawn HUD, two layers with hit zones), `hud_style.gd` (palette, Cinzel / Alegreya fonts in `fonts/`, SVG icons from `icons.gd` = `src/ui/icons.js` rasterised at runtime, draw helpers), `panel.gdshader` (the gilded teal panels), `minimap.gd` + `minimap_ground/units.gdshader` (terrain colours computed in the shader from `get_heights()` / `get_ground()` uploaded as textures, re-uploaded on `building:placed`; unit dots read straight from `get_units()` arrays as data textures: no per-unit script), `portraits.gd` + `portrait.gdshader` (one SubViewport per type / owner, rendered once, unshaded with the browser's three.js hemisphere + sun lighting, no tonemap), the research / market panel and tooltips with `tech_icons.gd` (see "Research panel, tooltips, market trade") | none | `src/ui/` |
 | performance (6 teams, 2000 units) | `game/perf/perf.gd` (the render bench, `--renderbench`), and in the render paths of the stress scene: unit LOD + box shadow casters (`game/units`), coarse voxel twins `VoxelModels.coarse()` (tree shadow casters), tight resource / ground-detail buckets (`game/terrain`), economy props frustum culling (`AovEconView`); report in `../docs/godot-stress-report.md` | sim hot paths (with their owners); `native/src/unit_lod.cpp` (`AovUnitView.lod_mesh`) | `docs/stress-report.md` |
 | exports (Windows, macOS, Linux, web) | `export_presets.cfg`, `../scripts/godot-export.sh`, `../.github/workflows/godot.yml`, `native/SConstruct` + `native/aov.gdextension` (platform entries); see "Export" | none | `vite build` |
 | scenes | `AovScenes.set_setup()` from the owning piece, else the C++ setup | `scenes/` (helpers.js, skirmish / town / coast / hud, EconomyScene.js; battle.cpp: BattleScene.js + units/battleHost.js, godpower, stress.js: all ported) | `src/core/scenes/`, `BattleScene.js`, `EconomyScene.js` |
@@ -189,7 +189,9 @@ godot --path godot -- --scene=town [--seed=N] [--mapsize=N] [--units=N] [--playe
   see "Walls and gates: the look"), `aifort` (two AIs play a match in the
   setup: their own walls, gates, towers and breaches, see "Enemy AI:
   fortifications"), `techbuildings` (the Greek Armory and Market, see
-  "Armory and Market: the look") and `menu` (the main menu,
+  "Armory and Market: the look"), `techui` (a selected Armory's tech
+  buttons, research queue and a tooltip, see "Research panel, tooltips,
+  market trade") and `menu` (the main menu,
   below). **Without `--scene`** the game opens the main menu; a run with
   `--out`, `--quit` or `--bench` and no `--scene` still gets the skirmish, as
   before (so does the web build's `?scene=` query). Like main.js, main.gd turns
@@ -1166,6 +1168,101 @@ an Armory / Market. Sun Ray: with the fog on, a spot 13 tiles past the
 target is seen only while the reveal lasts. `ai`: a Moderate AI (seed 3)
 builds its Armory at 22.5 min and finishes Copper Weapons at 24.5; Easy
 builds none.
+
+## Research panel, tooltips, market trade (game/ui)
+
+The Armory, the Market and the Temple's techs in the HUD, as Age of
+Mythology: Retold's command panel (`reference/techs/ui_01..05`).
+
+- **Build grid**: with villagers selected the grid now has **Armory (U)**
+  and **Market (K)** (after the Military Academy; their portraits are the
+  `techbuildings` models, `portraits.gd`), tooltips with the cost, Retold's
+  help line, hp and age; greyed before the Classical Age ("Requires the
+  Classical Age", also the message of a click / key). Their placement ghost
+  is the Classical model (`VoxelModels.mesh("techbuildings", "<type>/a1")`).
+- **Tech buttons** (`ui._tech_slots`, any finished building of the player
+  whose `get_techs()` is not empty: Armory, Market, Temple, and the techs the
+  Military Academy / Town Center also research): a button shows a tech that
+  is not done, not queued, not `unavailable` (its unit is not in this game)
+  and not `locked_god`; a line shows only its next tier (Bronze appears once
+  Copper is done, greyed until the Heroic Age); a god's techs appear from his
+  age on (Retold: with the god; every god's while no minor god is chosen).
+  The Armory's generic lines sit by column in the top row (weapons Q, armor
+  W, shields E, Ballistics R, Burning Pitch T, as `ui_02.jpg`), god techs in
+  rows 2-3; elsewhere techs fill the rows below the train buttons. Hotkeys
+  are the slot's letter, Q W E R T / A S D F G / **Y U I O P** (the third row
+  is not Retold's Z X C V B: Z / C / V are the god powers here), unless a
+  train / age button already has it. Frames: **gold** for generic techs,
+  **purple** for a god's; locked techs greyed with a duller frame. More techs
+  than free slots (a Mythic Temple with no minor god chosen): the last slot is
+  "More techs (n / m)" and pages.
+- **Icons**: `game/ui/tech_icons.gd`, 24-unit SVG glyphs in the HUD icon style
+  (read by `hud_style.icon()` after `icons.gd`), one per tech line: the
+  Armory's weapons (spear), armor (muscle cuirass) and shields (hoplon) in
+  the tier's metal (copper, bronze = gold, iron = silver), and Ballistics,
+  Burning Pitch, every Greek god tech, Omniscience, the Market techs, plus
+  `t_buy` / `t_sell` (trade arrows) and `t_time` (the tooltip's hourglass).
+- **Tooltips** (`hud._draw_wide_tooltip`, commands with `wide`): the name and
+  "(hotkey)", "Cost: 100 [food] 100 [gold] 30s [hourglass]" (red where short;
+  the time with Forge of Olympus at the Armory /1.5), Retold's effect text,
+  per-class bullets built from the effects ("Human Soldier: Attack +10%",
+  "Hero: Vulnerability to Hack attacks -15%", "Buildings: Attack +10%"), the
+  lock's reason in red ("Requires Heroic Age", "Requires Copper Weapons"),
+  then age, building, "Also researched at ..." and the god; lines wrap at
+  350 px. A disabled tech's click / key says its lock, else what is short
+  ("Not enough gold").
+- **Research queue on the card** (`ui._research_info`): "Researching <tech>
+  · n%", the queue as tech icons (the head with a progress bar; tooltip:
+  seconds left, click to cancel: `cancel_research(building, key)`, exact
+  refund), and **RESEARCHED**: small icons of the techs done at that
+  building. A building's training waits while it researches (sim). The feed
+  says "<tech> researched." (`tech:researched`, a = 100 + id).
+- **Market**: trade buttons in the second row, Buy Food (A), Sell Food (S),
+  Buy Wood (D), Sell Wood (F): the resource, a green / red arrow and the live
+  price in gold on the button (Retold's `ui_01.jpg`), tooltips "Cost: 134
+  [gold]" / "Gives: 72 [gold]"; a click / key trades a lot of 100
+  (`market_buy` / `market_sell`) and says "Bought 100 food for 134 gold". The
+  card shows the exchange: per resource Buy / Sell in gold and how far the
+  price is above / below 100, the lot and the fee (30 %, 22.5 % with Tax
+  Collectors, 15 % with Ambassadors). Market techs in the top row.
+- **Capture scene `techui`** (`ui._techui_setup`; hud on, 1920x1080): the
+  town scene's town in the Heroic Age with an Armory, a Market and its
+  Temple, Copper Weapons and Copper Armor done, Copper Shields (39 %) and
+  Ballistics in the Armory's queue, a few trades made; the Armory selected
+  with the tooltip of its first button (Bronze Weapons) open.
+
+```
+node scripts/godot-shoot.mjs --scene techui --width 1920 --height 1080 --out shots/godot/techui.png
+     [--params "techui_sel=market"]   # market | temple | armory
+     [--params "techui_tip=5"]        # the command slot whose tooltip is open (-1 none)
+```
+
+The real-input playtest (`game/core/techs_playtest.gd`; harness shortcuts:
+AI off, resources granted, a hoplite and a hero spawned to measure on, the
+sim stepped fast while frames render):
+
+```
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 1280x720x24" \
+  godot --path godot --rendering-driver vulkan --audio-driver Dummy --resolution 1280x720 \
+  -s res://game/core/techs_playtest.gd -- --scene=skirmish [--shots=/abs/dir]   # "TECHSPLAY ok|FAIL <step>", exit = failures
+```
+
+It box-selects the villagers, checks the Armory (U) / Market (K) buttons and
+the Armory tooltip's age lock (a click refused with "Requires the Classical
+Age"), H + A advance the age, R + a ground click places a Temple, the Armory
+button + a click an Armory, K + a click a Market (each built by the
+villagers), a click on the Armory: Copper Weapons on Q in a gold frame,
+Burning Pitch greyed "Requires Mythic Age", four or more god techs in purple,
+no Bronze tier; the hover tooltip (cost, 30 s, effect, "Human Soldier:
+Attack +10%"); a click on Copper Weapons pays 100 food + 100 gold and moves
+it to the card's queue; its key queues Copper Armor and a click on the queue
+icon cancels it (exact refund); when Copper Weapons is done: the feed
+notice, a hoplite's damage x1.1 (`get_unit_stats`), Bronze Weapons on Q
+greyed "Requires Heroic Age", Copper Weapons under Researched; a click on the
+Temple and Olympian Parentage's hotkey (100 food, 10 favor): the hero's hp
+x1.25; a click on the Market: its rates on the card and the buttons' prices;
+a click on Buy Food (+100 food for the shown price, the price and the label
+move) and S (sells 100 food, the price falls).
 
 ## Conventions
 
