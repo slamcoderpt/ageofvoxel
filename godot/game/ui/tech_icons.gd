@@ -163,7 +163,8 @@ static func tier_of(tech: String) -> int:
 # glyph embossed from its own silhouette (height = blurred alpha: key light
 # from the top left, a specular glint, darker inner edges), a rim light in the
 # family's glow colour on the far edges, a soft drop shadow and a halo on the
-# plate. The "locked" variant is the same tile desaturated and darkened.
+# plate. The "locked" variant is the same tile desaturated and darkened (an
+# Armory tier keeps 30% of its metal's hue on the glyph, the plate stays grey).
 
 ## family plates: [centre, middle, edge, glow]
 const PLATES := {
@@ -279,6 +280,8 @@ static func bake(name: String, n: int, locked := false) -> Image:
 	var c1 := Color(str(pl[1]))
 	var c2 := Color(str(pl[2]))
 	var gl := Color(str(pl[3]))
+	var nparts := name.split("_")
+	var tint := 0.3 if nparts.size() == 3 and TIERS.has(nparts[2]) else 0.0
 	var gs := int(round(n * 0.9))
 	var g := Image.new()
 	if g.load_svg_from_string(src, float(gs) / 24.0) != OK:
@@ -384,9 +387,20 @@ static func bake(name: String, n: int, locked := false) -> Image:
 			b += sheen
 			if locked:
 				var l := r * 0.3 + gg * 0.55 + b * 0.15
-				r = l * 0.56 + 0.02
-				gg = l * 0.58 + 0.025
-				b = l * 0.64 + 0.035
+				var lr := l * 0.56 + 0.02
+				var lg := l * 0.58 + 0.025
+				var lb := l * 0.64 + 0.035
+				if tint > 0.0 and a > 0.0:
+					# a tier's metal keeps a trace of its hue on the glyph only
+					# (copper rust, bronze ochre, iron slate), so the three tiers
+					# still read apart once locked; the plate stays grey
+					var w := tint * a
+					lr = lerpf(lr, r * 0.62, w)
+					lg = lerpf(lg, gg * 0.62, w)
+					lb = lerpf(lb, b * 0.62, w)
+				r = lr
+				gg = lg
+				b = lb
 			out[i * 4] = int(clampf(r, 0.0, 1.0) * 255.0)
 			out[i * 4 + 1] = int(clampf(gg, 0.0, 1.0) * 255.0)
 			out[i * 4 + 2] = int(clampf(b, 0.0, 1.0) * 255.0)

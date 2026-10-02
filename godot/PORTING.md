@@ -1214,7 +1214,8 @@ Mythology: Retold's command panel (`reference/techs/ui_01..05`).
   a top sheen; the glyph embossed from its own silhouette (height = blurred
   alpha, key light from the top left, a specular glint, darker inner edges), a
   rim light in the family's glow on its far edges, a soft drop shadow and a
-  halo on the plate. "locked" is the same tile desaturated and darkened. No
+  halo on the plate. "locked" is the same tile desaturated and darkened (a
+  tier glyph keeps a trace of its metal). No
   plate is red: red means "can't afford".
 - **Tooltips** (`hud._draw_wide_tooltip`, commands with `wide`): the name and
   "(hotkey)", "Cost: 100 [food] 100 [gold] 30s [hourglass]" (red where short;
@@ -1266,13 +1267,18 @@ coloured by state (`hud.status_color`).
 |---|---|---|
 | `available` | full-colour tile, bright bevelled frame (gold: generic tech, purple: god tech) | "Available · Click to research" (green) |
 | `unaffordable` (`short`: the missing resources) | the tile in full colour under a red wash deepening to the foot, a red inner line, the first missing resource in a red disc bottom-left; the frame keeps its colour | "Can't afford · Need 40 more gold, 5 more favor" (red); the cost's short numbers red |
-| `locked` (`age_req` when an age, else a prerequisite) | the tile desaturated and darkened (`tile(..., "locked")`, portraits greyed), a dim grey frame, a badge top-right: the required age's numeral (II / III / IV) or a padlock; the hotkey dimmed | "Locked · Requires Heroic Age" (tan) |
+| `locked` (`age_req` when an age, else a prerequisite) | the tile desaturated and darkened (`tile(..., "locked")`); a unit / building portrait the same: `hud.locked_portrait(tex)` reads the portrait back once, turns every pixel into the tiles' locked slate grey (luminance x 0.6-0.68) and caches it (a near-black tint for the frame or two before the portrait has rendered), on a grey cell plate (no team teal; mean saturation ~0.18, the same as a locked tech tile); a dim grey frame, a badge top-right: the required age's numeral (II / III / IV) or a padlock; the hotkey dimmed | "Locked · Requires Heroic Age" (tan) |
 | `researching` / `training` (`progress`, `count`) | a clockwise sweep from 12 o'clock darkens what is left, a green bar at the foot, the percentage on a tech, the count queued (green badge) on a train button | "Researching · 39% · 25s left · cancel it from the queue" (blue) |
 | `queued` (`count`: its place) | the tile dimmed, an hourglass, its place in the queue (amber badge) | "Queued · 2nd in the queue" (amber) |
 | researched | off the grid (the line's next tier takes the slot); on the card under RESEARCHED with a green check | |
 
+Every tooltip, narrow (train / build / age) or wide (techs, trades), opens
+with that state line right under the name, before the cost and the hotkey.
+
 Identity marks, top left: an Armory line's **tier pips** (1-3 diamonds in the
-tier's metal, `tier`), a god tech's **medallion** with its god's emblem
+tier's metal, `tier`; they keep their metal when locked, the one colour left on
+a locked tile, and a locked tier glyph keeps 30% of its metal's hue, rust /
+ochre / slate, on a grey plate, so copper, bronze and iron read apart greyed), a god tech's **medallion** with its god's emblem
 (`god`; `TechIcons.GODS`: Zeus' bolt, Athena's owl, Apollo's sun, Ares'
 helmet, ...: Greek gods share initials, so no letters). A click or key on a
 button that is not available says why (`_deny_text`: the lock, what is

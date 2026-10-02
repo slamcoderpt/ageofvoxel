@@ -374,6 +374,52 @@ func _draw_groups() -> void:
 		zone(r, "group", g.key, {"title": "Group %s" % g.key, "lines": ["%d × %s" % [g.count, g.name], "Press %s to select, twice to centre" % g.key]})
 		x += 55
 
+static var _grey := {}   # portrait texture RID -> its locked (greyscale, darkened) copy
+static var _grey_seen := {}   # portrait texture RID -> the frame it was first asked for
+
+## The "locked" copy of a portrait (a unit / building ViewportTexture): every
+## pixel's luminance in the tech tiles' locked grey (TechIcons.bake: l * 0.56
+## .. 0.64, a cold slate), alpha kept, so a locked train / build button has no
+## colour left, as a locked tech tile. Read back once per portrait and cached;
+## null while the portrait's viewport has not rendered yet (then retried).
+static func locked_portrait(tex: Texture2D) -> Texture2D:
+	if tex == null:
+		return null
+	var key := tex.get_rid()
+	if _grey.has(key):
+		return _grey[key]
+	# a portrait's viewport renders once, some frames after it is made: read it
+	# back only after it has been asked for over a few drawn frames
+	var f := Engine.get_frames_drawn()
+	if not _grey_seen.has(key):
+		_grey_seen[key] = f
+	if f - int(_grey_seen[key]) < 1:
+		return null
+	var img := tex.get_image()
+	if img == null or img.is_empty():
+		return null
+	img = img.duplicate()
+	if img.is_compressed():
+		img.decompress()
+	img.convert(Image.FORMAT_RGBA8)
+	var d := img.get_data()
+	var solid := 0
+	for i in range(0, d.size(), 4):
+		var a := d[i + 3]
+		if a == 0:
+			continue
+		if a > 200:
+			solid += 1
+		var l := (d[i] * 0.3 + d[i + 1] * 0.55 + d[i + 2] * 0.15) / 255.0
+		d[i] = int(clampf(l * 0.6 + 0.03, 0.0, 1.0) * 255.0)
+		d[i + 1] = int(clampf(l * 0.62 + 0.035, 0.0, 1.0) * 255.0)
+		d[i + 2] = int(clampf(l * 0.68 + 0.045, 0.0, 1.0) * 255.0)
+	if solid * 50 < d.size() / 4:
+		return null  # not rendered yet (under 2% of it opaque)
+	var out := ImageTexture.create_from_image(Image.create_from_data(img.get_width(), img.get_height(), false, Image.FORMAT_RGBA8, d))
+	_grey[key] = out
+	return out
+
 ## Draw `tex` into `dst`, clipped to `clip` (overflow: hidden).
 func _clip_tex(tex: Texture2D, dst: Rect2, clip: Rect2, mod := Color.WHITE) -> void:
 	var inter := dst.intersection(clip)
@@ -405,9 +451,16 @@ func _draw_commands() -> void:
 		var rr := cr
 		if pressed:
 			rr = cr.grow(-1)
-		S.cell(self, rr, [[0.0, Color("#3d6f86")], [0.85, Color("#0f2d38")], [1.0, Color("#0f2d38")]], Vector2(0.5, 0.35))
 		var en: bool = c.enabled
 		var st := str(c.get("state", ""))
+		if st == "locked" and not c.has("tech"):
+			# locked: the cell's plate goes grey with the portrait (no team-teal left)
+			S.cell(self, rr, [[0.0, Color("#3e4246")], [0.85, Color("#16181b")], [1.0, Color("#16181b")]], Vector2(0.5, 0.35))
+			# and its gold metal edge dims to the locked tech frame's grey
+			draw_rect(rr.grow(-1), Color("#5c5c62"), false, 2.0)
+			draw_rect(Rect2(rr.position + Vector2(0, 0), Vector2(rr.size.x, 1)), Color("#8a8a90"))
+		else:
+			S.cell(self, rr, [[0.0, Color("#3d6f86")], [0.85, Color("#0f2d38")], [1.0, Color("#0f2d38")]], Vector2(0.5, 0.35))
 		var mod := Color.WHITE if en or st == "unaffordable" or st == "training" else Color(0.45, 0.47, 0.5)
 		var ir := rr.grow(-3)
 		if c.has("tech"):
@@ -426,11 +479,19 @@ func _draw_commands() -> void:
 			draw_string_outline(bold, Vector2(rr.position.x + 18, rr.end.y - 4), lb, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 4, Color(0, 0, 0, 0.75))
 			draw_string(bold, Vector2(rr.position.x + 18, rr.end.y - 4), lb, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#ffe39a") if en else Color("#ff8a70"))
 		elif c.get("tex") != null:
+			var ptex: Texture2D = c.tex
 			if st == "locked":
-				mod = Color(0.34, 0.36, 0.4)
-			_clip_tex(c.tex, Rect2(rr.grow(-2).position, Vector2(58, 58)), rr.grow(-2), mod)  # CSS: the oversized grid item sits at the content box origin, overflowing right / down
+				# locked: the portrait's greyscale copy (the tech tiles' "locked"
+				# grey), else, until the portrait has rendered, a dark grey tint
+				var gt := locked_portrait(ptex)
+				if gt:
+					ptex = gt
+					mod = Color.WHITE
+				else:
+					mod = Color(0.2, 0.2, 0.22)
+			_clip_tex(ptex, Rect2(rr.grow(-2).position, Vector2(58, 58)), rr.grow(-2), mod)  # CSS: the oversized grid item sits at the content box origin, overflowing right / down
 			if st == "locked":
-				draw_rect(rr.grow(-2), Color(0.03, 0.06, 0.08, 0.3))
+				draw_rect(rr.grow(-2), Color(0.03, 0.05, 0.07, 0.22))
 		else:
 			S.draw_icon(self, c.svg, Rect2(rr.get_center() - Vector2(16, 16), Vector2(32, 32)), true, mod)
 		_draw_cmd_state(c, rr, ir, st, hover)
@@ -527,14 +588,17 @@ func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bo
 	var tier := int(c.get("tier", 0))
 	if tier > 0:
 		var tc: Color = [Color("#e07a40"), Color("#f0c040"), Color("#c8d6e2")][tier - 1]
+		# the pips keep their metal even when locked (the one colour left on a
+		# locked tile), so copper / bronze / iron still read apart by count and hue
 		if st == "locked":
-			tc = tc.lerp(Color(0.5, 0.5, 0.52), 0.6)
+			tc = tc.lerp(Color(0.6, 0.6, 0.62), 0.25)
 		for k in tier:
-			var pc := ir.position + Vector2(6 + k * 7, 6)
-			var dia := PackedVector2Array([pc + Vector2(0, -3.5), pc + Vector2(3.5, 0), pc + Vector2(0, 3.5), pc + Vector2(-3.5, 0)])
-			draw_colored_polygon(dia, Color(0, 0, 0, 0.85))
-			var din := PackedVector2Array([pc + Vector2(0, -2.5), pc + Vector2(2.5, 0), pc + Vector2(0, 2.5), pc + Vector2(-2.5, 0)])
+			var pc := ir.position + Vector2(7 + k * 9, 7)
+			var dia := PackedVector2Array([pc + Vector2(0, -4.5), pc + Vector2(4.5, 0), pc + Vector2(0, 4.5), pc + Vector2(-4.5, 0)])
+			draw_colored_polygon(dia, Color(0, 0, 0, 0.9))
+			var din := PackedVector2Array([pc + Vector2(0, -3.3), pc + Vector2(3.3, 0), pc + Vector2(0, 3.3), pc + Vector2(-3.3, 0)])
 			draw_colored_polygon(din, tc)
+			draw_colored_polygon(PackedVector2Array([pc + Vector2(0, -3.3), pc + Vector2(3.3, 0), pc, pc + Vector2(-3.3, 0)]), tc.lightened(0.35))
 	# state badge (top right): the age numeral or a padlock; the queue place / count
 	var bc2 := Vector2(ir.end.x - 8, ir.position.y + 8)
 	if st == "locked":
@@ -988,6 +1052,13 @@ func _draw_tooltip() -> void:
 	S.text(self, title, Vector2(r.position.x + 11, cy), str(t.get("title", "")), 14, S.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.8, 0.5)
 	if t.get("sub", "") != "":
 		S.text(self, sans, Vector2(r.position.x + 11 + S.text_width(title, str(t.title), 14, 0.5) + 5, cy), t.sub, 14, S.MUTED)
+	# the state and its reason open the tooltip, right under the name (as a tech's)
+	if t.has("status"):
+		cy += 18
+		S.text(self, bold, Vector2(r.position.x + 11, cy), str(t.status.text), 13, status_color(str(t.status.state)), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
+	elif t.get("warn", "") != "":
+		cy += 18
+		S.text(self, sans, Vector2(r.position.x + 11, cy), str(t.warn), 13, Color("#ff8a70"), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
 	for l in lines:
 		cy += 18
 		S.text(self, sans, Vector2(r.position.x + 11, cy), str(l), 14, S.INK, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
@@ -1004,12 +1075,6 @@ func _draw_tooltip() -> void:
 	if t.get("hotkey", "") != "":
 		cy += 18
 		S.text(self, sans, Vector2(r.position.x + 11, cy), "Hotkey: " + str(t.hotkey), 12, S.MUTED, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
-	if t.has("status"):
-		cy += 18
-		S.text(self, bold, Vector2(r.position.x + 11, cy), str(t.status.text), 13, status_color(str(t.status.state)), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
-	elif t.get("warn", "") != "":
-		cy += 18
-		S.text(self, sans, Vector2(r.position.x + 11, cy), str(t.warn), 13, Color("#ff8a70"), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
 	if menu:
 		# the graphics quality row of the pinned hotkey card (browser: gear card,
 		# Graphics High / Medium / Low; applies at once and is remembered)

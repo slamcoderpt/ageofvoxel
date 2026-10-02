@@ -495,6 +495,36 @@ func _run() -> void:
 	var op := _tech_cmd("olympian_parentage")
 	_check("click selects the Temple: its tech buttons with hotkeys", sel_ok and not op.is_empty() and str(op.key) != "" and bool(op.enabled)
 		and str(op.frame) == "purple", "Olympian Parentage on %s" % op.get("key", "?"))
+	# a locked train button (a myth unit of a later age): its portrait greyed, not
+	# only darkened (the same locked language as a tech tile: the slate grey keeps
+	# HSV saturation ~0.15-0.2 in its dark pixels, a colour portrait is ~0.55)
+	var lt: Dictionary = {}
+	for c in ui.commands:
+		if c != null and str(c.get("action", "")) == "train" and str(c.get("state", "")) == "locked" and c.get("tex") != null:
+			lt = c
+			break
+	var grey: Texture2D = null
+	for k in 10:
+		grey = load("res://game/ui/hud.gd").locked_portrait(lt.tex) if not lt.is_empty() else null
+		if grey:
+			break
+		await _frames(1)
+	var sat_of := func(img: Image) -> float:
+		var tot := 0.0
+		var n := 0
+		for y in range(0, img.get_height(), 2):
+			for x in range(0, img.get_width(), 2):
+				var px := img.get_pixel(x, y)
+				if px.a > 0.5:
+					tot += px.s
+					n += 1
+		return tot / maxf(1.0, n)
+	var s0: float = sat_of.call(lt.tex.get_image()) if not lt.is_empty() else -1.0
+	var s1: float = sat_of.call(grey.get_image()) if grey else -1.0
+	_check("a locked train button: its portrait greyed (saturation), the tooltip opens with the state",
+		not lt.is_empty() and grey != null and s1 >= 0.0 and s1 < 0.22 and s0 > s1 + 0.25
+		and str(Dictionary(lt.get("status", {})).get("text", "")).begins_with("Locked · Requires the "),
+		"%s: saturation %.2f -> %.2f, '%s'" % [lt.get("title", "?"), s0, s1, Dictionary(lt.get("status", {})).get("text", "")])
 	var r4 := _res()
 	if not op.is_empty():
 		await _key(OS.find_keycode_from_string(str(op.key)))
