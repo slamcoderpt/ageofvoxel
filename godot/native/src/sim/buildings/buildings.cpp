@@ -281,6 +281,7 @@ int32_t Buildings::place(int type, int owner, int tx, int tz, const std::vector<
 	Player &p = sim->players[owner];
 	if (!can_place(type, tx, tz) || !p.can_afford(def.cost)) return 0;
 	if (sim->godot_rules && p.age < def.min_age) return 0; // (Godot-only: the fortifications' ages)
+	if (!sim->godot_rules && is_tech_building(type)) return 0; // (Godot-only: Armory, Market)
 	if (!p.pay(def.cost)) return 0;
 	const int b = spawn(type, owner, tx, tz, false);
 	const int32_t id = sim->entities.buildings.id[b];

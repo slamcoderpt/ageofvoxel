@@ -321,6 +321,12 @@ Result Economy::advance_age(int owner) {
 	for (int b = 0; b < B.size() && !has_tc; b++)
 		if (!B.removed[b] && B.owner[b] == owner && B.built[b] && building_def(B.type[b]).age_up) has_tc = true;
 	if (!has_tc) return { false, "Need a Town Center" };
+	if (sim->godot_rules && sim->techs.heroic_needs_armory && p.age + 1 == 2) { // (Godot-only, Retold: sim/techs)
+		bool ok = false;
+		for (int b = 0; b < B.size() && !ok; b++)
+			if (!B.removed[b] && !B.dead[b] && B.owner[b] == owner && B.built[b] && is_tech_building(B.type[b])) ok = true;
+		if (!ok) return { false, "Requires an Armory or a Market" };
+	}
 	if (!p.pay(cost)) return { false, "Not enough resources" };
 	p.advancing = true;
 	p.advancing_t = 0;
@@ -423,13 +429,14 @@ void Economy::update(double dt) {
 		Player &p = sim->players[id];
 		if (!p.exists) continue;
 		const int k = worshippers[id];
-		if (k) p.res[RES_FAVOR] = std::min(200.0, p.res[RES_FAVOR] + 0.1 * jsm::pow(k, 0.85) * dt);
+		if (k) p.res[RES_FAVOR] = std::min(200.0, p.res[RES_FAVOR] + 0.1 * jsm::pow(k, 0.85) * dt * (sim->godot_rules ? sim->techs.favor_mult(id) : 1.0)); // (Godot-only: Golden Apples)
 	}
 	// training queues
 	BuildingStore &B = E.buildings;
 	const int nb = B.size();
 	for (int b = 0; b < nb; b++) {
 		if (B.removed[b] || !B.built[b] || B.queue[b].empty()) continue;
+		if (sim->techs.training_paused(b)) continue; // (Godot-only: researching here, sim/techs)
 		TrainItem &q = B.queue[b][0];
 		q.t += dt;
 		if (q.t >= q.total) {

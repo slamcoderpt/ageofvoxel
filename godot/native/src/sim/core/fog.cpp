@@ -66,12 +66,24 @@ void FogOfWar::recompute() {
 			}
 		}
 	};
+	// (Godot-only, sim/techs: Omniscience = every enemy's sight too, Oracle's
+	// building sight, Sun Ray's reveals)
+	const bool godot = sim->godot_rules;
+	const bool omni = godot && sim->techs.omniscient(owner);
 	const UnitStore &U = sim->entities.units;
 	for (int r = 0; r < U.size(); r++)
-		if (!U.removed[r] && sim->is_ally(owner, U.owner[r]) && !U.dead[r]) stamp(U.x[r], U.z[r], U.sight[r]);
+		if (!U.removed[r] && (sim->is_ally(owner, U.owner[r]) || (omni && sim->is_enemy(owner, U.owner[r]))) && !U.dead[r]) stamp(U.x[r], U.z[r], U.sight[r]);
 	const BuildingStore &B = sim->entities.buildings;
-	for (int b = 0; b < B.size(); b++)
-		if (!B.removed[b] && sim->is_ally(owner, B.owner[b]) && !B.dead[b]) stamp(B.x[b], B.z[b], B.sight[b]);
+	for (int b = 0; b < B.size(); b++) {
+		if (B.removed[b] || B.dead[b]) continue;
+		const bool ally = sim->is_ally(owner, B.owner[b]);
+		if (!ally && !(omni && sim->is_enemy(owner, B.owner[b]))) continue;
+		const double add = godot && ally ? sim->techs.building_sight_add(B.owner[b]) : 0;
+		stamp(B.x[b], B.z[b], add != 0 ? (B.sight[b] != 0 ? B.sight[b] : 8) + add : B.sight[b]);
+	}
+	if (godot)
+		for (const Reveal &v : sim->techs.reveals)
+			if (sim->is_ally(owner, v.owner)) stamp(v.x, v.z, v.r);
 }
 
 } // namespace aov

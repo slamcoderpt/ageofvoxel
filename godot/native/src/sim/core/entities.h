@@ -31,6 +31,16 @@ struct TrainItem {
 };
 using TrainQueue = std::vector<TrainItem>;
 
+// One queued technology of a building's research queue (Godot-only,
+// sim/techs: Armory, Market, Temple research). The cost actually paid is
+// kept so a cancel refunds exactly that (discounts, Omniscience's price).
+struct TechItem {
+	uint8_t tech = 0; // TechId (sim/techs/techs.h)
+	double t = 0, total = 0;
+	double paid[RES_COUNT] = { 0, 0, 0, 0 };
+};
+using TechQueue = std::vector<TechItem>;
+
 enum Kind : uint8_t { K_NONE = 0, K_UNIT = 1, K_BUILDING = 2, K_RESOURCE = 3 };
 
 // Order types (u.order.type). Handlers are registered in Commands.
@@ -164,7 +174,13 @@ enum UnitFlag : uint8_t { UF_MOVING = 1, UF_DEAD = 2, UF_ARRIVED = 4, UF_CARRY =
 	X(double, econ_throw_cd, 0)                                                \
 	X(uint8_t, econ_hunt, 0)      /* huntAt set */                             \
 	X(double, econ_hunt_x, 0)                                                  \
-	X(double, econ_hunt_z, 0)
+	X(double, econ_hunt_z, 0)                                                  \
+	/* techs (sim/techs, Godot-only): timed tech effects on this unit */      \
+	X(double, tech_poison_t, 0)   /* Shafts of Plague: s of poison left */     \
+	X(uint8_t, tech_poison_by, 0) /* the poisoner's owner */                   \
+	X(double, tech_frenzy_t, -1)  /* Harvest of Souls: game time it ends */    \
+	X(uint8_t, tech_pious_n, 0)   /* Pious Sacrifice stacks (0..5) */          \
+	X(double, tech_pious_t, -1)   /* game time the stacks end */
 
 #define AOV_BUILDING_COLUMNS(X)                                                \
 	X(int32_t, id, 0)                                                          \
@@ -213,7 +229,9 @@ enum UnitFlag : uint8_t { UF_MOVING = 1, UF_DEAD = 2, UF_ARRIVED = 4, UF_CARRY =
 	X(double, fort_open, 0)       /* gate leaves 0 closed .. 1 open (renderer) */ \
 	X(uint8_t, fort_tech, 0)      /* research in progress here: FortTech, 0 none */ \
 	X(double, fort_tech_t, 0)                                                  \
-	X(double, fort_tech_total, 0)
+	X(double, fort_tech_total, 0)                                              \
+	/* techs (sim/techs, Godot-only): the research queue (Armory, Market, Temple, ...) */ \
+	X(TechQueue, tech_queue, TechQueue())
 
 enum BuildingDefFlag : uint8_t { BF_WORSHIP = 1, BF_FARM = 2, BF_DROPOFF = 4 };
 enum EconPhase : uint8_t { EP_NONE, EP_TO_RES, EP_GATHERING, EP_TO_DROP, EP_TO_TEMPLE };

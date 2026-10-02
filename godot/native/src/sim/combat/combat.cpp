@@ -243,7 +243,8 @@ void Combat::clear_attackers() {
 double Combat::range_of(int r) const {
 	const UnitStore &U = sim->entities.units;
 	const UnitDef &d = unit_def(U.type[r]);
-	return (d.has_attack ? d.attack.range : 0.5) + U.combat_reach[r];
+	const double base = (d.has_attack ? d.attack.range : 0.5) + U.combat_reach[r];
+	return sim->godot_rules ? base + sim->techs.range_add(r) : base; // (Godot-only: Sarissa, Sylvan Lore, Face of the Gorgon)
 }
 
 void Combat::approach(int r, int32_t tid) {
@@ -353,6 +354,7 @@ void Combat::damage(int32_t tid, double amount, const Hitter &a, uint8_t kind) {
 	const UnitDef *td = tk == K_UNIT ? &unit_def(U.type[t]) : nullptr;
 	double dmg = amount;
 	if (ad && td && ad->bonus[td->cls] != 0) dmg *= ad->bonus[td->cls];
+	if (sim->godot_rules && ad) dmg *= sim->techs.vs_mult(a.row, tk, t); // (Godot-only: Burning Pitch, Olympian Weapons)
 	if (tk == K_BUILDING) dmg *= (ad && ad->cls == CLS_MYTH) || a.myth_class ? 1.2 : 0.35;
 	if (sim->godot_rules) {
 		// Godot-only: a building's arrows (Town Center, towers) never hurt a
@@ -361,7 +363,16 @@ void Combat::damage(int32_t tid, double amount, const Hitter &a, uint8_t kind) {
 		if (a.kind == K_BUILDING && !sim->is_enemy(a.owner, towner)) return;
 		if (tk == K_BUILDING && is_fort_type(B.type[t])) dmg *= sim->fortify.armor_mult(t, a, kind);
 	}
-	dmg *= 1 - (td ? td->armor : 0);
+	if (sim->godot_rules) {
+		// Godot-only (sim/techs): hack / pierce armor from the Armory, then
+		// divine damage, which no armor reduces (Phobos' Spear of Panic)
+		dmg *= 1 - (td ? sim->techs.unit_armor(t, a, kind) : 0);
+		if (ad) {
+			const double dv = sim->techs.divine(a.row);
+			if (dv != 0) dmg += dv * (tk == K_BUILDING ? 0.35 : 1);
+		}
+	} else
+		dmg *= 1 - (td ? td->armor : 0);
 	const double time = sim->time;
 	if (tk == K_UNIT) {
 		U.hp[t] -= dmg;
@@ -388,6 +399,7 @@ void Combat::damage(int32_t tid, double amount, const Hitter &a, uint8_t kind) {
 		// BattleFX.hit: the melee contact time (battle scene capture beat, hit pop)
 		const bool melee = kind == DK_MELEE || (kind == DK_DEFAULT && ad && !ad->attack.projectile);
 		if (melee) U.melee_t[t] = time;
+		if (sim->godot_rules && kind == DK_ARROW) sim->techs.on_arrow_hit(a, t); // (Godot-only: Shafts of Plague, Sun Ray)
 	} else {
 		B.hp[t] -= dmg;
 		B.hit_time[t] = time;
@@ -490,6 +502,20 @@ void Combat::fire(int32_t attacker_id, int32_t target_id, double dmg, double fro
 	p.t = 0;
 	p.dur = 0.4 + p.dist * 0.065;
 	p.arc = 0.6 + p.dist * 0.16;
+	if (sim->godot_rules) {
+		// Godot-only (sim/techs): building arrows get the Armory's weapons; arrow
+		// speed (Enyo's Bow); an arrow of a soldier or a building follows a
+		// moving target only `track` tiles from where it stood (Ballistics)
+		const Hitter h = hitter_of(attacker_id);
+		if (ab) p.damage *= sim->techs.building_attack(p.owner);
+		const double sp = sim->techs.arrow_speed(h);
+		if (sp != 1) p.dur = 0.4 + p.dist * 0.065 / sp;
+		if (!tb) {
+			p.track = sim->techs.arrow_track(h);
+			p.aim_x = tx;
+			p.aim_z = tz;
+		}
+	}
 	projectiles.push_back(p);
 }
 
@@ -509,6 +535,14 @@ void Combat::update_projectiles(double dt) {
 			const bool b = tk == K_BUILDING;
 			p.tx = b ? E.buildings.x[ts] : tk == K_UNIT ? E.units.x[ts] : E.resources.x[ts];
 			p.tz = b ? E.buildings.z[ts] : tk == K_UNIT ? E.units.z[ts] : E.resources.z[ts];
+			if (p.track >= 0) { // (Godot-only, sim/techs: the arrow follows the target only so far)
+				const double dx = p.tx - p.aim_x, dz = p.tz - p.aim_z, d = std::sqrt(dx * dx + dz * dz);
+				p.off = d > p.track + (tk == K_UNIT ? E.units.radius[ts] : 0); // (a body this wide still takes it)
+				if (p.off) {
+					p.tx = p.aim_x + dx * p.track / d;
+					p.tz = p.aim_z + dz * p.track / d;
+				}
+			}
 			p.ty = map.height_at(p.tx, p.tz) + (b ? 1.5 : 1.0);
 			p.has_t = true;
 		} else if (p.has_t && !p.lost) {
@@ -525,6 +559,11 @@ void Combat::update_projectiles(double dt) {
 		p.z = p.sz + (p.tz - p.sz) * k;
 		p.y = p.sy + (p.ty - p.sy) * k + jsm::sin(k * PI) * p.arc;
 		if (k >= 1) {
+			if (alive && p.off) { // (Godot-only: the target outran the arrow, which lands where it was aimed)
+				p.y = map.height_at(p.x, p.z) + 0.15;
+				if ((int)stuck.size() < STUCK_MAX) stuck.push_back({ p.x, p.y, p.z, p.x - p.px, p.y - p.py, p.z - p.pz, 0 });
+				continue;
+			}
 			if (alive) {
 				Hitter h = hitter_of(p.attacker);
 				if (!h.id) h = Hitter::pseudo(p.owner);
@@ -738,19 +777,24 @@ void Combat::update(double dt) {
 		if (U.attack_cd[r] <= 0) {
 			const UnitAttack &a = def.attack;
 			U.attack_cd[r] = a.cooldown * (0.85 + 0.3 * sim->rng.next());
+			// (Godot-only, sim/techs: the owner's upgrades on damage, reload, splash)
+			const bool tech = sim->godot_rules;
+			if (tech) U.attack_cd[r] *= sim->techs.reload_mult(r);
+			const double a_damage = tech ? sim->techs.unit_damage(r) : a.damage;
+			const double a_splash = tech ? a.splash + sim->techs.splash_add(r) : a.splash;
 			U.anim_attack_t[r] = 0;
-			if (a.projectile) fire(U.id[r], tid, a.damage, 1.3);
+			if (a.projectile) fire(U.id[r], tid, a_damage, 1.3);
 			else {
 				Hitter h = hitter_of(U.id[r]);
-				damage(tid, a.damage, h);
-				if (a.splash > 0) {
+				damage(tid, a_damage, h);
+				if (a_splash > 0) {
 					const double cx = tk == K_UNIT ? U.x[ts] : B.x[ts], cz = tk == K_UNIT ? U.z[ts] : B.z[ts];
 					const int owner = U.owner[r];
-					sim->movement.hash.count_query(cx, cz, a.splash);
-					sim->movement.hash.for_each_near(cx, cz, a.splash, [&](int o) {
+					sim->movement.hash.count_query(cx, cz, a_splash);
+					sim->movement.hash.for_each_near(cx, cz, a_splash, [&](int o) {
 						if (tk == K_UNIT && o == ts) return;
 						if (U.dead[o] || !sim->is_enemy(owner, U.owner[o])) return;
-						if (jsm::hypot(U.x[o] - cx, U.z[o] - cz) < a.splash) damage(U.id[o], a.damage * 0.5, h);
+						if (jsm::hypot(U.x[o] - cx, U.z[o] - cz) < a_splash) damage(U.id[o], a_damage * 0.5, h);
 					});
 				}
 			}
