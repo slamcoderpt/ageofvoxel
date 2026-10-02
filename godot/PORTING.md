@@ -1326,22 +1326,27 @@ node scripts/godot-shoot.mjs --scene techui --width 1920 --height 1080 --out sho
 `hud._draw_cmd_state`): every command carries `state`, the same language for
 techs, train, build and trade buttons at every building, plus `status`
 `{state, text}`, the state in words as the first line of its tooltip,
-coloured by state (`hud.status_color`).
+coloured by state (`hud.status_color`). **The frame's colour is the state**,
+read before anything else (`hud.frame_of`): gold / purple = buyable, red =
+can't afford, blue = in progress (researching, training, queued), grey =
+locked; the picture backs it (full colour, red cast, blue duotone, slate).
 
 | state | button | tooltip line |
 |---|---|---|
-| `available` | full-colour tile, bright bevelled frame (gold: generic tech, purple: god tech) | "Available · Click to research" (green) |
-| `unaffordable` (`short`: the missing resources) | the picture in full colour under a red cast (a gradient, clear at the top, 10% at the middle, 36% at the foot); the frame keeps its family's outer 2 px bevel (gold / purple) and its inner line turns bright red (#ff2a12 then #ff6a40, drawn last so nothing covers it) with a faint red glow on the tile's rim; no chip or badge on the picture (what is short is in the tooltip); a frameless portrait gets a 2 px red edge on the cell | "Can't afford · Need 40 more gold, 5 more favor" (red); the cost's short numbers red |
+| `available` | full-colour tile, bright bevelled frame (gold: generic tech, purple: god tech, the god's emblem on its top-left corner); a unit / building portrait keeps the cell's gold edge | "Available · Click to research" (green) |
+| `unaffordable` (`short`: the missing resources) | **the same on every button** (techs, train, build, trades): the whole 3 px bevel turns red (`hud.FRAMES.red`: #ffb4a0 / #ff2a12 / #800c04, inner line #ff6a40) with a red glow into the gap between cells, the picture in full colour under a red cast (8% at the top, 16% at the middle, 42% at the foot); a god tech keeps its emblem medallion, so it still reads as a god tech | "Can't afford · Need 40 more gold, 5 more favor" (red); the cost's short numbers red |
 | `locked` (`age_req` when an age, else a prerequisite) | the tile desaturated and darkened (`tile(..., "locked")`); a unit / building portrait the same: `hud.locked_portrait(tex)` reads the portrait back once, turns every pixel into the tiles' locked slate grey (luminance x 0.6-0.68) and caches it (a near-black tint for the frame or two before the portrait has rendered), on a grey cell plate (no team teal; mean saturation ~0.18, the same as a locked tech tile); a dim grey frame, a badge centred on the frame's top-right corner (7.5 px radius, mostly over the frame and the gap): the required age's numeral (II / III / IV) or, locked by a prerequisite, a padlock; the hotkey dimmed. A tech locked by a prerequisite is shown only while that prerequisite is researching / queued (`ui._tech_visible`'s `busy`: the line's next step, padlocked, after the buyable buttons), else hidden as in Retold | "Locked · Requires Heroic Age" / "Locked · Requires Copper Shields" (tan) |
-| `researching` / `training` (`progress`, `count`) | a clockwise sweep from 12 o'clock dims what is left (40%, the picture reads under it), a 3 px green bar on the frame's foot (the bevel, not the picture), no number on the tile (the tooltip and the card's queue say n%), the count queued (a small green badge on the frame's top-right corner) on a train button | "Researching · 39% · 25s left · cancel it from the queue" (blue) |
-| `queued` (`count`: its place) | the tile dimmed (40%), its place in the queue (a small amber badge on the frame's top-right corner) | "Queued · 2nd in the queue" (amber) |
+| `researching` / `training` (`progress`, `count`) | "busy", **the same on techs and train buttons**: the whole bevel blue (`hud.FRAMES.blue`: #d8f2ff / #2ea2ff / #0a3a80, inner #7ccaff) with a blue glow in the gap; the picture in the **busy duotone** (`TechIcons.tile(..., "busy")` / `hud.busy_portrait(tex)`, both `TechIcons.busy_image`: luminance mapped navy #06142c to ice #b4dcff, 8% of the hue kept), its full colour coming back clockwise from 12 o'clock as the work runs (`hud._reveal`, a textured fan; its leading edge an ice line), a thick 6 px progress bar on the tile's foot (blue to ice in a dark trough; the hotkey rides above it); a train button's queued count on a blue chip at the top-right corner | "Researching · 39% · 25s left · cancel it from the queue" (blue) |
+| `queued` (`count`: its place) | blue bevel and the busy duotone (no colour yet), its place in the queue **large on the picture** (a 26 px numeral in a dark ring) | "Queued · 2nd in the queue" (blue-amber) |
 | researched | off the grid (the line's next tier takes the slot); on the card under RESEARCHED with a green check | |
 
 Every tooltip, narrow (train / build / age) or wide (techs, trades), opens
 with that state line right under the name, before the cost and the hotkey.
 
-**Nothing covers the picture.** Every mark rides the frame (its 3 px bevel
-and the 5 px gap between cells), so the 48 px tile is whole in every state:
+**Nothing covers the picture** except the work in progress (a researching /
+training tile's 6 px bar and sweep edge, a queued tech's place numeral, both
+meant to read at a glance). Every other mark rides the frame (its 3 px bevel
+and the 5 px gap between cells):
 an Armory line's **tier notches** set into the frame's top edge (1-3 small
 5x4 px bars in the tier's metal, `tier`; the picture itself tells the tiers
 apart: one sword / two / two and an axe, copper / bronze / steel, and a

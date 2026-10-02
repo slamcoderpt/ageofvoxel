@@ -383,9 +383,17 @@ static var _grey_seen := {}   # portrait texture RID -> the frame it was first a
 ## colour left, as a locked tech tile. Read back once per portrait and cached;
 ## null while the portrait's viewport has not rendered yet (then retried).
 static func locked_portrait(tex: Texture2D) -> Texture2D:
+	return _portrait_variant(tex, "locked")
+
+## The "busy" copy of a portrait (a unit training): TechIcons.busy_image's
+## cold blue duotone, as a tech tile being researched; cached as above.
+static func busy_portrait(tex: Texture2D) -> Texture2D:
+	return _portrait_variant(tex, "busy")
+
+static func _portrait_variant(tex: Texture2D, mode: String) -> Texture2D:
 	if tex == null:
 		return null
-	var key := tex.get_rid()
+	var key := "%s:%s" % [tex.get_rid().get_id(), mode]
 	if _grey.has(key):
 		return _grey[key]
 	# a portrait's viewport renders once, some frames after it is made: read it
@@ -404,19 +412,23 @@ static func locked_portrait(tex: Texture2D) -> Texture2D:
 	img.convert(Image.FORMAT_RGBA8)
 	var d := img.get_data()
 	var solid := 0
-	for i in range(0, d.size(), 4):
-		var a := d[i + 3]
-		if a == 0:
-			continue
-		if a > 200:
+	for i in range(3, d.size(), 4):
+		if d[i] > 200:
 			solid += 1
-		var l := (d[i] * 0.3 + d[i + 1] * 0.55 + d[i + 2] * 0.15) / 255.0
-		d[i] = int(clampf(l * 0.6 + 0.03, 0.0, 1.0) * 255.0)
-		d[i + 1] = int(clampf(l * 0.62 + 0.035, 0.0, 1.0) * 255.0)
-		d[i + 2] = int(clampf(l * 0.68 + 0.045, 0.0, 1.0) * 255.0)
 	if solid * 50 < d.size() / 4:
 		return null  # not rendered yet (under 2% of it opaque)
-	var out := ImageTexture.create_from_image(Image.create_from_data(img.get_width(), img.get_height(), false, Image.FORMAT_RGBA8, d))
+	if mode == "busy":
+		TechIcons.busy_image(img)
+	else:
+		for i in range(0, d.size(), 4):
+			if d[i + 3] == 0:
+				continue
+			var l := (d[i] * 0.3 + d[i + 1] * 0.55 + d[i + 2] * 0.15) / 255.0
+			d[i] = int(clampf(l * 0.6 + 0.03, 0.0, 1.0) * 255.0)
+			d[i + 1] = int(clampf(l * 0.62 + 0.035, 0.0, 1.0) * 255.0)
+			d[i + 2] = int(clampf(l * 0.68 + 0.045, 0.0, 1.0) * 255.0)
+		img.set_data(img.get_width(), img.get_height(), false, Image.FORMAT_RGBA8, d)
+	var out := ImageTexture.create_from_image(img)
 	_grey[key] = out
 	return out
 
@@ -465,9 +477,13 @@ func _draw_commands() -> void:
 		var ir := rr.grow(-3)
 		if c.has("tech"):
 			# a tech: its painted tile (TechIcons.tile), greyed when locked
-			var tex := TechIcons.tile(str(c.svg), int(ir.size.x), "locked" if st == "locked" else "normal")  # 1:1, never rescaled (48 px)
+			var busy := st == "researching" or st == "queued"
+			var tex := TechIcons.tile(str(c.svg), int(ir.size.x), "locked" if st == "locked" else ("busy" if busy else "normal"))  # 1:1, never rescaled (48 px)
 			if tex:
 				draw_texture_rect(tex, ir, false)
+				if st == "researching":
+					# the colour comes back clockwise from 12 o'clock as it is researched
+					_reveal(TechIcons.tile(str(c.svg), int(ir.size.x), "normal"), ir, ir, float(c.get("progress", 0.0)))
 			else:
 				S.draw_icon(self, c.svg, Rect2(rr.get_center() - Vector2(20, 21), Vector2(40, 40)), true, mod)
 		elif c.has("trade"):
@@ -480,16 +496,20 @@ func _draw_commands() -> void:
 			draw_string(bold, Vector2(rr.position.x + 18, rr.end.y - 4), lb, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#ffe39a") if en else Color("#ff8a70"))
 		elif c.get("tex") != null:
 			var ptex: Texture2D = c.tex
-			if st == "locked":
+			var pdst := Rect2(rr.grow(-2).position, Vector2(58, 58))  # CSS: the oversized grid item sits at the content box origin, overflowing right / down
+			if st == "locked" or st == "training" or st == "queued":
 				# locked: the portrait's greyscale copy (the tech tiles' "locked"
-				# grey), else, until the portrait has rendered, a dark grey tint
-				var gt := locked_portrait(ptex)
+				# grey); training / queued: its blue "busy" copy, as a tech being
+				# researched; until the portrait has rendered, a dark tint
+				var gt := locked_portrait(ptex) if st == "locked" else busy_portrait(ptex)
 				if gt:
 					ptex = gt
 					mod = Color.WHITE
 				else:
-					mod = Color(0.2, 0.2, 0.22)
-			_clip_tex(ptex, Rect2(rr.grow(-2).position, Vector2(58, 58)), rr.grow(-2), mod)  # CSS: the oversized grid item sits at the content box origin, overflowing right / down
+					mod = Color(0.2, 0.2, 0.22) if st == "locked" else Color(0.3, 0.42, 0.6)
+			_clip_tex(ptex, pdst, rr.grow(-2), mod)
+			if st == "training" and ptex != c.tex:
+				_reveal(c.tex, pdst, rr.grow(-2), float(c.get("progress", 0.0)))
 			if st == "locked":
 				draw_rect(rr.grow(-2), Color(0.03, 0.05, 0.07, 0.22))
 		else:
@@ -503,8 +523,10 @@ func _draw_commands() -> void:
 		if c.key != "":
 			var f := bold
 			var kx := rr.end.x - 4 - S.text_width(f, c.key, 13)
-			draw_string_outline(f, Vector2(kx, rr.end.y - 4), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 4, Color(0, 0, 0, 0.75))
-			draw_string(f, Vector2(kx, rr.end.y - 4), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.62, 0.62, 0.64) if st == "locked" else Color.WHITE)
+			# over a progress bar (on the tile's foot) the key sits above it
+			var ky := rr.end.y - (12 if st == "researching" or st == "training" else 4)
+			draw_string_outline(f, Vector2(kx, ky), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 4, Color(0, 0, 0, 0.75))
+			draw_string(f, Vector2(kx, ky), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.62, 0.62, 0.64) if st == "locked" else Color.WHITE)
 		var tip := {"title": c.title, "lines": c.get("lines", []), "cost": c.get("cost", {}), "hotkey": c.key, "warn": c.get("warn", "")}
 		for k in ["time", "bullets", "foot", "wide", "gain", "status"]:
 			if c.has(k):
@@ -512,63 +534,80 @@ func _draw_commands() -> void:
 		zone(cr, "cmd", i, tip)
 
 ## The state layer of a command button (PORTING.md "Command button states").
-## Everything here rides the frame (its 3 px bevel and the 5 px gap between
-## cells), never the picture: the 48 px tile stays whole in every state.
-## available: the bright bevelled frame (gold generic / purple god); locked:
-## the greyed tile, a dim frame, the age numeral or a padlock on the top-right
-## corner; unaffordable: a red cast and the frame's bevel turned red;
-## researching / training: a clockwise sweep and a bar on the frame's foot;
-## queued: dimmed, its place on the corner. A god tech's emblem sits on the
-## frame's top-left corner, an Armory tier's notches on its top edge.
+## One language for every button (tech, train, build, trade), read from the
+## frame's colour first: available: the family's bright bevel (gold generic /
+## purple god, the god's emblem on its corner; a portrait keeps the cell's
+## edge); unaffordable: the whole bevel red plus a red cast (techs and
+## portraits alike); researching / training / queued: the whole bevel blue,
+## the picture in the blue "busy" duotone, its colour coming back clockwise
+## as the work runs, a thick bar on the tile's foot; a queued tech its place
+## in the queue, large, on the picture; locked: the greyed picture, a dim grey
+## bevel, the age numeral or a padlock on the corner.
+const FRAMES := {
+	"gold": ["#fff0b0", "#e2b340", "#7a5612", ""],
+	"purple": ["#f6dcff", "#b45ae6", "#4e1c86", ""],
+	"grey": ["#86868c", "#56565c", "#2a2a2e", ""],
+	"red": ["#ffb4a0", "#ff2a12", "#800c04", "#ff6a40"],
+	"blue": ["#d8f2ff", "#2ea2ff", "#0a3a80", "#7ccaff"],
+}
+
+## The frame colour a state draws (FRAMES), "" for none (a plain portrait).
+static func frame_of(fam: String, st: String) -> String:
+	match st:
+		"unaffordable": return "red"
+		"researching", "training", "queued": return "blue"
+		"locked": return "grey" if fam != "" else ""
+	return fam
+
 func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bool) -> void:
 	var bold := S.font("bold")
 	var title := S.font("title")
 	var p := clampf(float(c.get("progress", 0.0)), 0.0, 1.0)
-	if st == "researching" or st == "training":
-		# what is left of the work dimmed by a clockwise sweep (light, so the
-		# picture reads under it); no number on the tile (the tooltip and the
-		# card say n%)
-		_sweep(ir, p, Color(0.0, 0.02, 0.05, 0.4))
-	elif st == "queued":
-		draw_rect(ir, Color(0.0, 0.03, 0.05, 0.4))
-	elif st == "unaffordable":
+	if st == "unaffordable":
 		# Retold: the picture in full colour under a red cast, deepest at the foot
-		S.vgrad(self, ir, [[0.0, Color(0.8, 0.06, 0.02, 0.0)], [0.45, Color(0.8, 0.06, 0.02, 0.1)], [1.0, Color(0.9, 0.05, 0.02, 0.36)]])
+		S.vgrad(self, ir, [[0.0, Color(0.8, 0.06, 0.02, 0.08)], [0.45, Color(0.8, 0.06, 0.02, 0.16)], [1.0, Color(0.9, 0.05, 0.02, 0.42)]])
 	# the frame: a 3 px bevel, lit top / left, shaded bottom / right
 	var fam := str(c.get("frame", ""))
+	var sf := frame_of(fam, st)
 	var o := rr.grow(-1)
-	if fam != "":
-		var hi := Color("#fff0b0") if fam == "gold" else Color("#f6dcff")
-		var mid := Color("#e2b340") if fam == "gold" else Color("#b45ae6")
-		var lo := Color("#7a5612") if fam == "gold" else Color("#4e1c86")
-		if st == "locked":
-			hi = Color("#86868c")
-			mid = Color("#56565c")
-			lo = Color("#2a2a2e")
+	if sf != "":
+		var fc: Array = FRAMES[sf]
+		var hi := Color(str(fc[0]))
+		var mid := Color(str(fc[1]))
+		var lo := Color(str(fc[2]))
+		if sf == "red" or sf == "blue":
+			# a glow into the gap between cells: the state reads from afar
+			draw_rect(rr.grow(1), Color(mid, 0.45), false, 2.0)
 		draw_rect(o.grow(1), Color(0.03, 0.02, 0.0, 0.9), false, 1.0)
 		draw_rect(Rect2(o.position, Vector2(o.size.x, 2)), hi)
 		draw_rect(Rect2(o.position, Vector2(2, o.size.y)), hi.lerp(mid, 0.4))
 		draw_rect(Rect2(o.position.x, o.end.y - 2, o.size.x, 2), lo)
 		draw_rect(Rect2(o.end.x - 2, o.position.y, 2, o.size.y), lo.lerp(mid, 0.3))
 		draw_rect(o, mid, false, 1.0)
-		if st == "unaffordable":
-			# the family keeps its outer 2 px bevel; the inner line turns
-			# bright red (drawn last, so no frame line covers it)
-			draw_rect(o.grow(-2), Color("#ff2a12"), false, 1.0)
-			draw_rect(o.grow(-3), Color("#ff6a40"), false, 1.0)
-		else:
-			draw_rect(o.grow(-2), Color(0, 0, 0, 0.6), false, 1.0)
-	elif st == "unaffordable":
-		# a frameless portrait: the red edge on the cell's rim
-		draw_rect(rr.grow(-1), Color("#ff2a12"), false, 2.0)
-	if st == "unaffordable":
-		# a soft red glow just inside the edge (1 px, on the tile's own rim)
-		draw_rect(ir.grow(-1), Color(1.0, 0.22, 0.08, 0.35), false, 1.0)
+		draw_rect(o.grow(-2), Color(str(fc[3])) if str(fc[3]) != "" else Color(0, 0, 0, 0.6), false, 1.0)
 	if st == "researching" or st == "training":
-		# progress on the frame's foot (its bevel, not the picture)
-		var bar := Rect2(o.position.x, o.end.y - 3, o.size.x, 3)
-		draw_rect(bar, Color(0, 0, 0, 0.85))
-		S.hgrad(self, Rect2(bar.position, Vector2(bar.size.x * p, 3)), [[0.0, Color("#3fae3a")], [1.0, Color("#c8ffaa")]])
+		# where the colour stops: the sweep's leading edge on the picture
+		if p > 0.0 and p < 1.0:
+			_sweep_edge(ir, p)
+		# progress: a thick bar on the tile's foot (dark trough, blue to ice)
+		var bar := Rect2(ir.position.x + 1, ir.end.y - 7, ir.size.x - 2, 6)
+		draw_rect(bar.grow(1), Color(0, 0, 0, 0.9))
+		draw_rect(bar, Color("#0a1a30"))
+		var fr := Rect2(bar.position, Vector2(roundf(bar.size.x * p), bar.size.y))
+		if fr.size.x > 0:
+			S.hgrad(self, fr, [[0.0, Color("#1c78e0")], [1.0, Color("#a8e4ff")]])
+			draw_rect(Rect2(fr.position, Vector2(fr.size.x, 1)), Color(1, 1, 1, 0.55))
+	elif st == "queued" and c.has("tech"):
+		# a queued tech: its place in the queue, large, on the picture
+		var n := str(maxi(1, int(c.get("count", 1))))
+		var fs := 26
+		var tw := S.text_width(bold, n, fs)
+		var cc := ir.get_center()
+		var pos := Vector2(cc.x - tw * 0.5, cc.y + fs * 0.36)
+		draw_circle(cc, 13.0, Color(0.02, 0.06, 0.14, 0.7))
+		draw_arc(cc, 13.0, 0, TAU, 28, Color("#7ccaff"), 1.5, true)
+		draw_string_outline(bold, pos, n, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 5, Color(0, 0, 0, 0.85))
+		draw_string(bold, pos, n, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color("#eaf7ff"))
 	var lockd := st == "locked"
 	# identity: a god tech's emblem on the frame's top-left corner (a small gem
 	# centred on the corner, mostly over the frame and the gap)
@@ -611,13 +650,13 @@ func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bo
 			draw_string(title, Vector2(bc2.x - S.text_width(title, rn, fs) * 0.5, bc2.y + 3.5), rn, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color("#f4e0a8"))
 		else:
 			S.draw_icon(self, "lock", Rect2(bc2 - Vector2(4.5, 4.5), Vector2(9, 9)), false)
-	elif (st == "queued" or st == "training") and int(c.get("count", 0)) > 0:
+	elif (st == "training" or (st == "queued" and not c.has("tech"))) and int(c.get("count", 0)) > 0:
 		var n := str(int(c.count))
 		var bw := maxf(13.0, S.text_width(bold, n, 11) + 6)
 		var br := Rect2(rr.end.x - bw + 3, rr.position.y - 3, bw, 13)
 		draw_rect(br, Color(0, 0, 0, 0.9))
-		draw_rect(br.grow(-1), Color("#1e5a2a") if st == "training" else Color("#6a4a12"))
-		draw_rect(br.grow(-1), Color("#9ef58a") if st == "training" else Color("#ffd27a"), false, 1.0)
+		draw_rect(br.grow(-1), Color("#0e3a78"))
+		draw_rect(br.grow(-1), Color("#9fd8ff"), false, 1.0)
 		draw_string(bold, Vector2(br.position.x + (bw - S.text_width(bold, n, 11)) * 0.5, br.end.y - 3), n, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
 
 ## Darken the part of r a clockwise sweep from 12 o'clock has not reached at p.
@@ -641,6 +680,43 @@ func _sweep(r: Rect2, p: float, col: Color) -> void:
 		var d := Vector2(cos(a0), sin(a0))
 		var t := minf(r.size.x * 0.5 / maxf(absf(d.x), 0.001), r.size.y * 0.5 / maxf(absf(d.y), 0.001))
 		draw_line(c, c + d * t, Color(0.85, 1.0, 0.8, 0.3), 1.0, true)
+
+## The clockwise fan from 12 o'clock to p (0..1) round clip's centre, clipped to clip.
+func _fan(clip: Rect2, p: float) -> Array:
+	var c := clip.get_center()
+	var rad := clip.size.length() * 0.5 + 1.0
+	var pts := PackedVector2Array([c])
+	var a1 := -PI * 0.5 + TAU * p
+	var steps := maxi(2, int(ceil(p * 48)))
+	for k in steps + 1:
+		var a := lerpf(-PI * 0.5, a1, float(k) / steps)
+		pts.append(c + Vector2(cos(a), sin(a)) * rad)
+	return Geometry2D.intersect_polygons(pts, PackedVector2Array([clip.position, Vector2(clip.end.x, clip.position.y), clip.end, Vector2(clip.position.x, clip.end.y)]))
+
+## Draw tex (laid at dst) over the part of clip a clockwise sweep from
+## 12 o'clock has reached at p: the busy picture's colour coming back.
+func _reveal(tex: Texture2D, dst: Rect2, clip: Rect2, p: float) -> void:
+	if tex == null or p <= 0.0:
+		return
+	if p >= 1.0:
+		_clip_tex(tex, dst, clip)
+		return
+	for poly in _fan(clip, p):
+		var uv := PackedVector2Array()
+		for q in poly:
+			uv.append((q - dst.position) / dst.size)
+		draw_colored_polygon(poly, Color.WHITE, uv, tex)
+
+## The sweep's leading edge, centre to the rect's border, and its 12 o'clock start.
+func _sweep_edge(r: Rect2, p: float) -> void:
+	var c := r.get_center()
+	var a0 := -PI * 0.5 + TAU * p
+	var d := Vector2(cos(a0), sin(a0))
+	var t := minf(r.size.x * 0.5 / maxf(absf(d.x), 0.001), r.size.y * 0.5 / maxf(absf(d.y), 0.001))
+	draw_line(c, c + d * t, Color(0, 0, 0, 0.6), 3.0, true)
+	draw_line(c, c + d * t, Color("#c8ecff"), 1.0, true)
+	draw_line(c, Vector2(c.x, r.position.y), Color(0, 0, 0, 0.45), 2.0, true)
+	draw_circle(c, 2.0, Color("#c8ecff"))
 
 # selection card --------------------------------------------------------------------------------
 
@@ -750,7 +826,7 @@ func _draw_info() -> void:
 				draw_rect(qr, S.BRONZE, false, 1.0)
 				if q.p > 0.0:
 					draw_rect(Rect2(qr.position.x, qr.end.y - 4, qr.size.x, 4), Color(0, 0, 0, 0.6))
-					draw_rect(Rect2(qr.position.x, qr.end.y - 4, qr.size.x * q.p, 4), Color("#8ef07a"))
+					draw_rect(Rect2(qr.position.x, qr.end.y - 4, qr.size.x * q.p, 4), Color("#6cc4ff"))  # the busy blue of the grid's bars
 				if q.has("tech"):
 					var ql := ["%s left" % _secs(float(q.left)) if q.p > 0.0 else "Queued", "Click to cancel (refunds its cost)"]
 					zone(qr, "rqueue", q.tech, {"title": q.name, "lines": ql})

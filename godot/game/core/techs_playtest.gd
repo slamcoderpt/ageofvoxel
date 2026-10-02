@@ -559,6 +559,28 @@ func _run() -> void:
 		not lt.is_empty() and grey != null and s1 >= 0.0 and s1 < 0.22 and s0 > s1 + 0.25
 		and str(Dictionary(lt.get("status", {})).get("text", "")).begins_with("Locked · Requires the "),
 		"%s: saturation %.2f -> %.2f, '%s'" % [lt.get("title", "?"), s0, s1, Dictionary(lt.get("status", {})).get("text", "")])
+	# one state language on every button (hud.frame_of): the frame's colour is the
+	# state, the same for a gold / purple tech and a frameless portrait; the
+	# "busy" picture (researching / queued / training) a cold blue duotone
+	var Hc := load("res://game/ui/hud.gd")
+	var TIc := load("res://game/ui/tech_icons.gd")
+	var same_red: bool = ["gold", "purple", ""].all(func(f): return Hc.frame_of(f, "unaffordable") == "red")
+	var same_blue: bool = ["gold", "purple", ""].all(func(f): return ["researching", "queued", "training"].all(func(s): return Hc.frame_of(f, s) == "blue"))
+	var avail_kept: bool = Hc.frame_of("gold", "available") == "gold" and Hc.frame_of("purple", "available") == "purple"
+	var rgb_of := func(img: Image) -> Vector3:
+		var t := Vector3.ZERO
+		for y in img.get_height():
+			for x in img.get_width():
+				var px := img.get_pixel(x, y)
+				t += Vector3(px.r, px.g, px.b)
+		return t / float(img.get_width() * img.get_height())
+	var tn: Texture2D = TIc.tile("t_weapons_copper", 48, "normal")
+	var tbz: Texture2D = TIc.tile("t_weapons_copper", 48, "busy")
+	var cn: Vector3 = rgb_of.call(tn.get_image()) if tn else Vector3.ZERO
+	var cb: Vector3 = rgb_of.call(tbz.get_image()) if tbz else Vector3.ZERO
+	_check("one state language: red frame for can't-afford, blue for researching / queued / training, on techs and portraits; the busy tile a blue duotone",
+		same_red and same_blue and avail_kept and tbz != null and cb.z > cb.x + 0.08 and cn.x > cn.z,
+		"red %s blue %s avail %s; normal rgb %s busy rgb %s" % [same_red, same_blue, avail_kept, cn, cb])
 	var r4 := _res()
 	if not op.is_empty():
 		await _key(OS.find_keycode_from_string(str(op.key)))

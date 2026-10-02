@@ -222,15 +222,49 @@ static func plate_of(name: String) -> String:
 static func glow_of(name: String) -> Color:
 	return Color(str(PLATES[plate_of(name)][3]))
 
-## The baked tile of an icon at px x px; variant "normal" or "locked".
+## The baked tile of an icon at px x px; variant "normal", "locked" or
+## "busy" (researching / queued: the normal tile turned into a cold blue
+## duotone, see busy_image; hud reveals the normal tile over it as it fills).
 static func tile(name: String, px: int, variant := "normal") -> Texture2D:
 	var key := "%s@%d:%s" % [name, px, variant]
 	if _tiles.has(key):
 		return _tiles[key]
-	var img := bake(name, px, variant == "locked")
+	var img := _bake_variant(name, px, variant)
 	var tex: Texture2D = ImageTexture.create_from_image(img) if img else null
 	_tiles[key] = tex
 	return tex
+
+static func _bake_variant(name: String, px: int, variant: String) -> Image:
+	var img := bake(name, px, variant == "locked")
+	if img and variant == "busy":
+		busy_image(img)
+	return img
+
+## The "busy" look (a tech being researched or queued, a unit training), in
+## place on an RGBA8 image: its colour gone into a cold blue duotone (deep navy
+## shadows to ice-blue lights, 8% of the hue kept) and its value lowered to
+## ~70%, so at a glance the picture is "in progress", neither buyable (full
+## colour) nor locked (slate grey, darker, a badge). Alpha kept.
+static func busy_image(img: Image) -> void:
+	if img.is_compressed():
+		img.decompress()
+	img.convert(Image.FORMAT_RGBA8)
+	var d := img.get_data()
+	var lo := Color("#06142c")
+	var hi := Color("#b4dcff")
+	for i in range(0, d.size(), 4):
+		if d[i + 3] == 0:
+			continue
+		var r := d[i] / 255.0
+		var g := d[i + 1] / 255.0
+		var b := d[i + 2] / 255.0
+		var l := clampf((r * 0.3 + g * 0.55 + b * 0.15) * 0.86 + 0.04, 0.0, 1.0)
+		var t := l * l * (3.0 - 2.0 * l) * 0.35 + l * 0.65
+		var c := lo.lerp(hi, t)
+		d[i] = int(clampf(lerpf(c.r, r, 0.08), 0.0, 1.0) * 255.0)
+		d[i + 1] = int(clampf(lerpf(c.g, g, 0.08), 0.0, 1.0) * 255.0)
+		d[i + 2] = int(clampf(lerpf(c.b, b, 0.08), 0.0, 1.0) * 255.0)
+	img.set_data(img.get_width(), img.get_height(), false, Image.FORMAT_RGBA8, d)
 
 static var _warm: Array = []
 static var _warm_init := false
@@ -254,6 +288,8 @@ static func prewarm_step() -> bool:
 			_warm.append([nm, 48, "normal"])
 		for nm in names:
 			_warm.append([nm, 48, "locked"])
+		for nm in names:
+			_warm.append([nm, 48, "busy"])
 		for nm in names:
 			_warm.append([nm, 34, "normal"])
 		for nm in names:
@@ -414,7 +450,7 @@ static func studio_finish() -> int:
 		var nm := str(key).get_slice("@", 0)
 		if tex and _glyph3d.has(nm):
 			var px := int(str(key).get_slice("@", 1).get_slice(":", 0))
-			var img2 := bake(nm, px, str(key).ends_with(":locked"))
+			var img2 := _bake_variant(nm, px, str(key).get_slice(":", 1))
 			if img2:
 				tex.update(img2)
 	return _glyph3d.size()
