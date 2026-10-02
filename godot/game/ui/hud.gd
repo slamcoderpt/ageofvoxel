@@ -537,16 +537,10 @@ func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bo
 		draw_rect(ir, Color(0.0, 0.03, 0.05, 0.38))
 		S.draw_icon(self, "t_time", Rect2(ir.get_center() - Vector2(8, 9), Vector2(16, 16)), true)
 	elif st == "unaffordable":
-		# Retold: the picture stays in full colour under a light red cast; a red
-		# inner edge and, along the foot, a red strip with the missing resources
-		# (the hotkey shares it on the right), so nothing sits on the picture
-		draw_rect(ir, Color(0.75, 0.05, 0.02, 0.14))
-		draw_rect(ir.grow(-1), Color("#ff4a2a"), false, 1.5)
-		var strip := Rect2(ir.position.x, ir.end.y - 13, ir.size.x, 13)
-		S.vgrad(self, strip, [[0.0, Color(0.45, 0.02, 0.0, 0.0)], [0.35, Color(0.45, 0.03, 0.01, 0.82)], [1.0, Color(0.3, 0.0, 0.0, 0.92)]])
-		var sh: Array = c.get("short", [])
-		for k in mini(sh.size(), 2):
-			S.draw_icon(self, str(sh[k]), Rect2(strip.position + Vector2(2 + k * 12, 2), Vector2(11, 11)), false)
+		# Retold: the picture stays in full colour under a red cast (the edge
+		# and the foot strip are drawn after the frame, below, so no frame
+		# line covers them)
+		draw_rect(ir, Color(0.8, 0.06, 0.02, 0.2))
 	# the frame
 	var fam := str(c.get("frame", ""))
 	if fam != "":
@@ -566,9 +560,11 @@ func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bo
 		draw_rect(Rect2(o.end.x - 2, o.position.y, 2, o.size.y), lo.lerp(mid, 0.3))
 		draw_rect(o.grow(-2), mid, false, 1.0)
 		draw_rect(o.grow(-3), Color(0, 0, 0, 0.55), false, 1.0)
-		if st != "locked":
+		if st != "locked" and st != "unaffordable":
 			# the frame's glow on the tile's edge
 			draw_rect(o.grow(-4), Color(mid, 0.35), false, 1.0)
+	if st == "unaffordable":
+		_draw_unaffordable(c, rr, fam != "")
 	# identity: a god tech's medallion (the god's initial), an Armory line's tier pips
 	var god := str(c.get("god", ""))
 	if fam == "purple" and god != "":
@@ -593,13 +589,15 @@ func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bo
 		# locked tile), so copper / bronze / iron still read apart by count and hue
 		if st == "locked":
 			tc = tc.lerp(Color(0.6, 0.6, 0.62), 0.25)
+		# 11 px diamonds along the top edge, one per tier (copper 1 .. iron 3)
 		for k in tier:
-			var pc := rr.position + Vector2(9 + k * 8, 2.5)
-			var dia := PackedVector2Array([pc + Vector2(0, -4), pc + Vector2(4, 0), pc + Vector2(0, 4), pc + Vector2(-4, 0)])
-			draw_colored_polygon(dia, Color(0, 0, 0, 0.9))
-			var din := PackedVector2Array([pc + Vector2(0, -2.9), pc + Vector2(2.9, 0), pc + Vector2(0, 2.9), pc + Vector2(-2.9, 0)])
-			draw_colored_polygon(din, tc)
-			draw_colored_polygon(PackedVector2Array([pc + Vector2(0, -2.9), pc + Vector2(2.9, 0), pc, pc + Vector2(-2.9, 0)]), tc.lightened(0.35))
+			var pc := rr.position + Vector2(9 + k * 11, 3.5)
+			var dia := PackedVector2Array([pc + Vector2(0, -5.5), pc + Vector2(5.5, 0), pc + Vector2(0, 5.5), pc + Vector2(-5.5, 0)])
+			draw_colored_polygon(dia, Color(0, 0, 0, 0.92))
+			var din := PackedVector2Array([pc + Vector2(0, -4.2), pc + Vector2(4.2, 0), pc + Vector2(0, 4.2), pc + Vector2(-4.2, 0)])
+			draw_colored_polygon(din, tc.darkened(0.15))
+			draw_colored_polygon(PackedVector2Array([pc + Vector2(0, -4.2), pc + Vector2(4.2, 0), pc, pc + Vector2(-4.2, 0)]), tc.lightened(0.3))
+			draw_circle(pc + Vector2(-1.2, -1.4), 0.9, Color(1, 1, 1, 0.75))
 	# state badge (top right): the age numeral or a padlock; the queue place / count
 	# (riding the frame's top-right corner, as the god medallion the left one)
 	var bc2 := Vector2(rr.end.x - 6, rr.position.y + 6)
@@ -622,6 +620,25 @@ func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bo
 		draw_rect(br.grow(-1), Color("#1e5a2a") if st == "training" else Color("#6a4a12"))
 		draw_rect(br.grow(-1), Color("#9ef58a") if st == "training" else Color("#ffd27a"), false, 1.0)
 		draw_string(bold, Vector2(br.position.x + (bw - S.text_width(bold, n, 12)) * 0.5, br.end.y - 3), n, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
+
+## The unaffordable edge, drawn over the frame (PORTING.md "Command button
+## states"): a 2 px bright red ring on the frame's inner bevel (a gold / purple
+## frame keeps only its outer 2 px bevel, so its family still reads), a red
+## glow inside it, and a bright red strip along the foot with the missing
+## resources (the hotkey shares it on the right).
+func _draw_unaffordable(c: Dictionary, rr: Rect2, framed: bool) -> void:
+	var ring := rr.grow(-3) if framed else rr.grow(-2)
+	draw_rect(ring, Color("#ff2a12"), false, 1.0)
+	draw_rect(ring.grow(-1), Color("#ff5a32"), false, 1.0)
+	draw_rect(ring.grow(-2), Color(1.0, 0.2, 0.08, 0.38), false, 1.0)
+	draw_rect(ring.grow(-3), Color(1.0, 0.2, 0.08, 0.16), false, 1.0)
+	var inner := ring.grow(-2)
+	var strip := Rect2(inner.position.x, inner.end.y - 13, inner.size.x, 13)
+	S.vgrad(self, strip, [[0.0, Color("#e0280e")], [1.0, Color("#86100a")]])
+	draw_rect(Rect2(strip.position, Vector2(strip.size.x, 1)), Color("#ffb090"))
+	var sh: Array = c.get("short", [])
+	for k in mini(sh.size(), 2):
+		S.draw_icon(self, str(sh[k]), Rect2(strip.position + Vector2(1 + k * 13, 1), Vector2(12, 12)), true)
 
 ## Darken the part of r a clockwise sweep from 12 o'clock has not reached at p.
 func _sweep(r: Rect2, p: float, col: Color) -> void:

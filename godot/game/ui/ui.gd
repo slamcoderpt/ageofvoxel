@@ -364,7 +364,8 @@ func _pin_scene_tip() -> void:
 ## queue (the first one under way), two Minotaurs training at the Temple, a
 ## few trades made so the prices moved, and 14 favor left so most god techs
 ## are short of favor: every button state at once (available, unaffordable,
-## locked by age, researching, queued, training); the Armory selected with
+## locked by age, locked by a prerequisite: Bronze Shields padlocked behind
+## Copper Shields, researching, queued, training); the Armory selected with
 ## the tooltip of its first tech button open.
 ##   node scripts/godot-shoot.mjs --scene techui --width 1920 --height 1080
 ##     [--params "techui_sel=market"]   # market | temple | armory (default)
@@ -872,13 +873,17 @@ var _ptechs := {}               # get_player_techs(me), refreshed with the HUD
 ## done; greyed until its age); a god's techs appear in his age (Retold: with
 ## the god), all gods' while no minor god is chosen, only his once one is;
 ## a tech being researched or queued keeps its button (state "researching" /
-## "queued": a progress sweep, its place in the queue).
-func _tech_visible(te: Dictionary, done: Dictionary) -> bool:
+## "queued": a progress sweep, its place in the queue); the step after a tech
+## under way (`busy`: researching / queued) shows padlocked, "Requires <it>",
+## so the line's next step is seen waiting on the one in progress.
+func _tech_visible(te: Dictionary, done: Dictionary, busy := {}) -> bool:
 	var st := str(te.state)
 	if st == "unavailable" or st == "done" or st == "locked_god":
 		return false
 	if st == "researching" or st == "queued":
 		return true   # stays on its button with the progress sweep / queue badge
+	if st == "locked_prereq" and busy.has(str(te.requires)):
+		return true   # padlocked: waits on the tech under way
 	if str(te.requires) != "" and not done.has(str(te.requires)):
 		return false
 	if not bool(te.generic) and int(te.age) > int(player.get("age", 0)):
@@ -1081,10 +1086,14 @@ func _tech_slots(slots: Array, b: Dictionary) -> void:
 	var done := {}
 	for k in _ptechs.get("done", []):
 		done[str(k)] = true
+	var busy := {}
+	for te in techs:
+		if str(te.state) == "researching" or str(te.state) == "queued":
+			busy[str(te.key)] = true
 	var generic := []
 	var gods := []
 	for te in techs:
-		if not _tech_visible(te, done):
+		if not _tech_visible(te, done, busy):
 			continue
 		(generic if bool(te.generic) else gods).append(te)
 	var used := {}
@@ -1112,6 +1121,8 @@ func _tech_slots(slots: Array, b: Dictionary) -> void:
 		rest.append_array(gods)
 	else:
 		rest = generic + gods
+	# the padlocked next steps after every buyable / greyed-by-age button
+	rest = rest.filter(func(te): return str(te.state) != "locked_prereq") + rest.filter(func(te): return str(te.state) == "locked_prereq")
 	if rest.is_empty():
 		return
 	# free slots: below the top row when the building trains / ages up (or is the Armory), else from the top

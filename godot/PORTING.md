@@ -1202,7 +1202,10 @@ Mythology: Retold's command panel (`reference/techs/ui_01..05`).
   (the Armory's weapons / armor / shields as shaded gradient templates in the
   tier's metal: **copper** red-orange and plain, **bronze** yellow gold with a
   red tassel / gorgon boss / star blazon, **iron** blue steel with a bright
-  edge, rivets, pteruges), Ballistics, Burning Pitch, every Greek god tech,
+  edge, rivets, pteruges; the weapons line also differs by silhouette,
+  `WEAPON_BLADES`: copper one spear, bronze two crossed spears, iron the
+  crossed spears behind an upright xiphos), Ballistics, Burning Pitch, every
+  Greek god tech (Monstrous Rage: a raging bull's head),
   Omniscience, the Market techs, `t_buy` / `t_sell`, `t_time`, and `g_<god>`
   emblems. A button never shows the bare glyph: `TechIcons.tile(name, px,
   "normal"|"locked")` bakes a **painted tile** once (CPU, ~10 ms at 64 px,
@@ -1276,8 +1279,8 @@ coloured by state (`hud.status_color`).
 | state | button | tooltip line |
 |---|---|---|
 | `available` | full-colour tile, bright bevelled frame (gold: generic tech, purple: god tech) | "Available · Click to research" (green) |
-| `unaffordable` (`short`: the missing resources) | the picture in full colour under a light red cast (14%), a red inner line, and a dark red strip along the foot (13 px, shared with the hotkey) holding the missing resources' icons (up to two); nothing else on the picture; the frame keeps its colour | "Can't afford · Need 40 more gold, 5 more favor" (red); the cost's short numbers red |
-| `locked` (`age_req` when an age, else a prerequisite) | the tile desaturated and darkened (`tile(..., "locked")`); a unit / building portrait the same: `hud.locked_portrait(tex)` reads the portrait back once, turns every pixel into the tiles' locked slate grey (luminance x 0.6-0.68) and caches it (a near-black tint for the frame or two before the portrait has rendered), on a grey cell plate (no team teal; mean saturation ~0.18, the same as a locked tech tile); a dim grey frame, a badge riding the frame's top-right corner: the required age's numeral (II / III / IV) or a padlock; the hotkey dimmed | "Locked · Requires Heroic Age" (tan) |
+| `unaffordable` (`short`: the missing resources) | the picture in full colour under a red cast (20%); drawn **after** the frame (`hud._draw_unaffordable`, so no frame line covers it): a 2 px bright red ring on the frame's inner bevel (#ff2a12 / #ff5a32, a red glow inside it; a gold / purple frame keeps only its outer 2 px bevel, so the family still reads, and drops its own inner glow), and a bright red strip along the foot (13 px, #e0280e to #86100a, a light top line, shared with the hotkey) holding the missing resources' icons (up to two); on a frameless portrait the same ring sits on the cell's edge | "Can't afford · Need 40 more gold, 5 more favor" (red); the cost's short numbers red |
+| `locked` (`age_req` when an age, else a prerequisite) | the tile desaturated and darkened (`tile(..., "locked")`); a unit / building portrait the same: `hud.locked_portrait(tex)` reads the portrait back once, turns every pixel into the tiles' locked slate grey (luminance x 0.6-0.68) and caches it (a near-black tint for the frame or two before the portrait has rendered), on a grey cell plate (no team teal; mean saturation ~0.18, the same as a locked tech tile); a dim grey frame, a badge riding the frame's top-right corner: the required age's numeral (II / III / IV) or, locked by a prerequisite, a padlock; the hotkey dimmed. A tech locked by a prerequisite is shown only while that prerequisite is researching / queued (`ui._tech_visible`'s `busy`: the line's next step, padlocked, after the buyable buttons), else hidden as in Retold | "Locked · Requires Heroic Age" / "Locked · Requires Copper Shields" (tan) |
 | `researching` / `training` (`progress`, `count`) | a clockwise sweep from 12 o'clock dims what is left (46%, the picture still reads under it), a thin green bar at the foot, the percentage small in the bottom-left corner on a tech (no plate behind it), the count queued (green badge on the top-right corner) on a train button | "Researching · 39% · 25s left · cancel it from the queue" (blue) |
 | `queued` (`count`: its place) | the tile dimmed, an hourglass, its place in the queue (amber badge) | "Queued · 2nd in the queue" (amber) |
 | researched | off the grid (the line's next tier takes the slot); on the card under RESEARCHED with a green check | |
@@ -1285,7 +1288,7 @@ coloured by state (`hud.status_color`).
 Every tooltip, narrow (train / build / age) or wide (techs, trades), opens
 with that state line right under the name, before the cost and the hotkey.
 
-Identity marks ride the frame, not the picture (the badges cover the frame's corners and the gap between cells, so the picture keeps the whole tile): an Armory line's **tier pips** on the top edge (1-3 diamonds in the
+Identity marks ride the frame, not the picture (the badges cover the frame's corners and the gap between cells, so the picture keeps the whole tile): an Armory line's **tier pips** on the top edge (1-3 diamonds, 11 px, with a glint, in the
 tier's metal, `tier`; they keep their metal when locked, the one colour left on
 a locked tile, and a locked tier glyph keeps 30% of its metal's hue, rust /
 ochre / slate, on a grey plate, so copper, bronze and iron read apart greyed), a god tech's **medallion** on the top-left corner (8 px radius) with its god's emblem
@@ -1321,7 +1324,9 @@ queues Copper Armor (`queued`, "2nd in the queue") and a click on the queue
 icon cancels it (exact refund); when Copper Weapons is done: the feed
 notice, a hoplite's damage x1.1 (`get_unit_stats`), Bronze Weapons on Q
 `locked` "Requires Heroic Age" (tier 2), Copper Weapons off the grid and
-under Researched; a click on the
+under Researched; in the Heroic Age (harness) with Copper Shields under way,
+Bronze Shields `locked` with the padlock (no `age_req`), "Locked · Requires
+Copper Shields" (then cancelled, the age restored); a click on the
 Temple and Olympian Parentage's hotkey (100 food, 10 favor): the hero's hp
 x1.25; a click on the Market: its rates on the card and the buttons' prices;
 a click on Buy Food (+100 food for the shown price, the price and the label

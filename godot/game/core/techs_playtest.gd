@@ -486,6 +486,22 @@ func _run() -> void:
 		and _tech_cmd("copper_weapons").is_empty() and dts.any(func(e): return str(e.tech) == "copper_weapons"),
 		"Q=%s '%s', researched %s" % [bw.get("title", ""), bw.get("warn", ""), dts.map(func(e): return e.tech)])
 	await _shot("armory_done")
+	# locked by a prerequisite (the padlock, no age numeral): in the Heroic Age,
+	# with Copper Shields under way, Bronze Shields shows greyed and padlocked,
+	# "Requires Copper Shields", after the buyable buttons
+	var age0 := int(ui.player.get("age", 1))
+	sim.set_player_age(ME, 2)
+	var cs_ok := bool(Dictionary(sim.research(arm, "copper_shields")).get("ok", false))
+	await _frames(14)
+	var bsh := _tech_cmd("bronze_shields")
+	_check("padlock: Bronze Shields 'locked' by its prerequisite while Copper Shields researches (no age badge), the tooltip says why",
+		cs_ok and str(bsh.get("state", "")) == "locked" and not bsh.has("age_req") and not bool(bsh.get("enabled", true))
+		and str(Dictionary(bsh.get("status", {})).get("text", "")) == "Locked · Requires Copper Shields"
+		and str(_tech_cmd("copper_shields").get("state", "")) == "researching",
+		"research %s, bronze shields %s %s" % [cs_ok, bsh.get("state", "?"), bsh.get("status", {})])
+	sim.cancel_research(arm, "copper_shields")
+	sim.set_player_age(ME, age0)
+	await _frames(14)
 
 	# 7. the Temple: a click selects it, the hotkey of Olympian Parentage researches it
 	var tb: Dictionary = sim.get_building(ids.temple)
