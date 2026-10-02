@@ -836,30 +836,40 @@ match the other buildings'), the buildings' palette and weathering, the
 team colour in bands, cloth and shields. Both are 4 x 4 tiles (the sim's
 defs), pivoted at the footprint centre, the front to +z.
 
-- **Armory** (`armory/*`): a long whitewashed hall with a dark socle and a
-  **team band**, a terracotta gable roof crossed by two raised pedimented
-  gables, a timber porch with barrels, a door with a marble frame, an axe and
-  a ladder on the front wall and a team shield; a plank **lean-to smithy**
-  on the east end (forge hearth with glowing coals under a hood and flue,
-  bellows, anvil, grindstone, quench bucket, tool rack, team shields leaning
-  on its open end); in the yard the round **smelting furnace** (a stone
-  plinth, a smooth tapering lime-washed bottle kiln, soot round its lip,
-  coals glowing in the throat, a stone fire mouth with a glowing hearth,
-  tongs), a water trough, the **weapon rack** (spears with steel heads,
-  hung swords, team shields), an anvil, crates of ingots, charcoal.
+- **Armory** (`armory/*`): few, big, clearly modelled pieces so it reads
+  as a forge at game zoom, not a scatter of props. A long whitewashed hall
+  with a dark socle and a **team band**, a terracotta gable roof crossed by
+  two raised pedimented gables, its east gable end in dressed stone (not a
+  bare smooth triangle), a timber porch, a door in a marble frame; three
+  barrels in one group by the front; the open-fronted plank **lean-to
+  smithy** on the east end (a plank gable roof with battens on posts and
+  beams, a dark underside, rafters and an open king-post truss at the end,
+  a board back wall, the forge hearth with glowing coals and a **stone
+  chimney** standing up through the roof, one anvil); in the yard the round
+  **smelting furnace** (two smooth stone drums, a smooth tapering
+  lime-washed bottle kiln, coals glowing in the throat, a stone fire mouth),
+  a stone water trough, a **shield rack** with two hoplite shields (7 x 7
+  pixel-art aspides: bronze rim, team field, raised boss), and one
+  continuous **low yard wall** with a flat pale coping along the front and
+  east edges.
 - **Market** (`market/*`): a two-storey **stoa** (team band at the foot and
-  under the upper floor, windows, pedimented gable roof), a columned wing
-  with a pediment to the front, a terrace with an **iron balustrade** and an
-  outside stair, an open court of crates, painted amphorae, barrels and
+  under the upper floor, windows, pedimented gable roof with a palmette
+  cresting on the ridge), a low columned wing with a pediment to the front
+  whose ridge runs in under the stoa's **projecting first-floor cornice**
+  (the roof junction is hidden), a terrace with an **iron balustrade** and
+  an outside stair, an open court of crates, painted amphorae, barrels and
   sacks, and three **stalls** (two on the front, one on the east side): a
   plank counter with a team skirt and three heaped produce crates (red
-  fruit, greens, grapes, oranges, lemons) in front, posts, a small tile
-  gable at the back and the **team / white striped awning** sloping out
-  from under its eave, with a scalloped valance.
+  fruit, greens, grapes, oranges, lemons) in front, posts, a small plain
+  tile gable at the back and the **team / white striped awning** sloping
+  out from under its eave, with a scalloped valance.
+- **Roofs**: no antefixes along the eaves (at this size a row of them reads
+  as spikes); palmettes only on the stoa's ridge (`ridgeCrest`) and the
+  Mythic acroteria.
 - **Age looks**: `<type>/a1` (Archaic, Classical: terracotta roofs, red
   tympana), `a2` (Heroic: pale green glazed roofs, blue tympana, **team
-  finials** on the gables, the Armory's fence), `a3` (Mythic: marble roofs,
-  gilt acroteria, marble pilasters), chosen by the owner's
+  finials** on the gables), `a3` (Mythic: marble roofs,
+  gilt acroteria, marble pilasters, the smithy's marble tie beam), chosen by the owner's
   `get_player(owner).age`.
 - **Construction**: `<type>/s0..s7` (floor(progress * 8), cut from `a1`
   like `src/buildings/construction.js`: 0 = the staked lot with team

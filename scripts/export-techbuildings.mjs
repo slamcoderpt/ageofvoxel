@@ -17,20 +17,22 @@
 // sees the +z front and the +x side. Read by godot/game/buildings/tech_buildings.gd.
 // Names (T = armory | market, A = the owner's age look):
 //   T/a1       Classical (and Archaic): terracotta tile roofs
-//   T/a2       Heroic: pale green glazed tile roofs, team finials, a fence
+//   T/a2       Heroic: pale green glazed tile roofs, team finials
 //   T/a3       Mythic: marble tile roofs, team finials, gilt acroteria, marble trims
 //   T/s0..s7   construction (floor(progress * 8)), cut from T/a1: 0 = the
 //              staked-out foundation, 1..7 = the work rising in a timber scaffold
 // Armory: a long whitewashed hall with a team band and two cross gables,
-//   a timber porch, a plank lean-to smithy (forge hearth with glowing coals,
-//   anvil, grindstone, tool rack), the round stone smelting furnace in the
-//   yard (glowing mouth and throat), a water trough, a weapon rack (spears,
-//   swords), team hoplite shields, barrels, an axe and a ladder on the wall,
-//   an anvil and an ore pile.
-// Market: a two-storey stoa with a team band, a columned wing, a terrace
-//   with an iron balustrade and an outside stair, an open court with crates,
-//   painted amphorae and barrels, and three stalls with team-striped awnings
-//   over counters of red fruit, greens, lemons and grapes.
+//   a timber porch, the open-fronted plank lean-to smithy (rafters, a dark
+//   underside, an open truss, the hearth and its stone chimney, an anvil),
+//   the round stone smelting furnace in the yard (glowing mouth and throat),
+//   a stone trough, a shield rack with two team hoplite shields, three
+//   barrels, one continuous low yard wall: few, big pieces (no prop scatter).
+// Market: a two-storey stoa with a team band, a low columned wing tucked
+//   under a projecting cornice, a terrace with an iron balustrade and an
+//   outside stair, an open court with crates, painted amphorae and barrels,
+//   and three stalls with team-striped awnings over counters of red fruit,
+//   greens, lemons and grapes. No antefixes on the eaves (palmettes on the
+//   stoa's ridge only).
 import fs from 'node:fs';
 import zlib from 'node:zlib';
 import path from 'node:path';
@@ -129,15 +131,17 @@ const PROD = {
 
 // roof tiles at 1/8 voxel: the building palettes (shapes.js TILES) with their
 // course, tile and rib sizes doubled so tiles are the same size as the town's
-const dbl = (t, extra = {}) => ({ ...t, plane: { ribGap: 3, ribW: 0.68, ribH: 0.84, bandEvery: 0, weather: 0.3, lip: 0.4, antefixH: 0.6, fascia: 1.1, ...extra } });
+// no antefixes along the eaves (they read as a row of spikes at this size): the
+// palmettes sit only on the ridges (ridgeCrest)
+const dbl = (t, extra = {}) => ({ ...t, plane: { ribGap: 3, ribW: 0.68, ribH: 0.84, bandEvery: 0, weather: 0.3, lip: 0.4, antefix: null, fascia: 1.1, ...extra } });
 const ROOF = {
   a1: dbl(TILES.warm),
   a2: dbl({ tones: [0xa9c4ae, 0x9db9a2, 0xb6cfba, 0x93b098], butt: 0x5f7a66, fascia: 0xf1ece2, ridge: 0x7f9a86, soffit: 0x3f4640, antefix: 0xf3efe6 }, { weather: 0.2 }),
   a3: dbl({ tones: [0xe8e7de, 0xdcdcd2, 0xf1f0ea, 0xd0d4ca], butt: 0x8b918a, fascia: 0xf4f1ea, ridge: 0xb9bdb4, soffit: 0x57524c, antefix: 0xf7f4ec }, { weather: 0.15 }),
 };
 // wooden plank roofs (the armory's lean-to): boards running down the slope
-const PLANKS = { tones: [0x8a7862, 0x7f6d58, 0x96846c, 0x75644f, 0x9b8a72], butt: 0x4f4234, fascia: 0x5e4d3b, ridge: 0x6a5844, soffit: 0x3a3028, antefix: null,
-  plane: { ribGap: 0, bandEvery: 0, weather: 0.6, lip: 0.15, fascia: 0.9 } };
+const PLANKS = { tones: [0x86664a, 0x7e6044, 0x8d6c4e, 0x806246], butt: 0x4f3a28, fascia: 0x4a3626, ridge: 0x5e4630, soffit: 0x241c16, antefix: null,
+  plane: { ribGap: 2.6, ribW: 0.32, ribH: 0.36, bandEvery: 0, weather: 0.15, lip: 0.15, fascia: 0.9, antefix: null } };
 const roofOpts = { course: 2.2, tileW: 2.8 };
 
 // Records the coordinates it was given (construction stages are cut from it).
@@ -284,19 +288,25 @@ function windowOn(m, face, a, y, plane, w = 2, h = 3) {
 }
 
 // ---- the Armory ---------------------------------------------------------------
-// building_01..03. Lot x, z in [0, 32), front +z.
-//   hall      x 1..22 (walls x 5..22, a timber porch x 1..5), z 3..15, walls to y 17,
-//             a gable along x with two raised cross gables (ridge along z)
-//   lean-to   x 22..30, z 4..17: plank shed roof on posts, the smithy under it
-//   yard      z 16..31: the furnace, trough, rack, anvil, barrels, ore
+// building_01..03. Lot x, z in [0, 32), front +z. Few, big, clearly modelled
+// pieces so it reads as a forge at game zoom (no scatter of small props):
+//   hall      x 1..22 (walls x 5..22, a timber porch x 1..5), z 3..15, walls to y 20,
+//             a gable along x with two raised cross gables (ridge along z),
+//             its +x gable end in masonry
+//   lean-to   x 22..31, z 4..17: the open-fronted smithy, a plank gable roof
+//             (ridge along x) on posts, a dark underside and rafters, an open
+//             truss at the +x end; the hearth with a stone chimney through
+//             the roof, one anvil
+//   yard      z 16..31: the furnace, the trough, a shield rack with two
+//             hoplite shields, three barrels, one continuous low yard wall
 function armory(age, m = new Rec()) {
   const T = ROOF[`a${age}`];
-  const marbleRoof = age >= 3;
-  // ground: packed earth, gravel round the furnace, soot under the smithy
+  // ground: packed earth, a gravel ring round the furnace, soot under the smithy
+  const FX = 12, FZ = 24;
   for (let x = 0; x < N; x++) for (let z = 0; z < N; z++) {
-    const dfx = x + 0.5 - 16, dfz = z + 0.5 - 24;
+    const dfx = x + 0.5 - FX, dfz = z + 0.5 - FZ;
     let c = DIRT(x, 0, z);
-    if (dfx * dfx + dfz * dfz < 64) c = GRAVEL(x, 0, z);
+    if (dfx * dfx + dfz * dfz < 72) c = GRAVEL(x, 0, z);
     if (x >= 22 && z >= 4 && z < 17) c = SOOT_DIRT(x, 0, z);
     m.set(x, 0, z, c);
   }
@@ -308,18 +318,24 @@ function armory(age, m = new Rec()) {
   m.box(1, 1, 3, 4, 1, 12, BASE_STONE);
   for (const z of [3, 13]) { m.box(1, 2, z, 2, 1, 2, BASE_STONE); m.box(1, 3, z, 2, H - 4, 2, POST); m.box(1, H - 1, z, 2, 1, 2, DARKWOOD); }
   m.box(1, H - 1, 3, 2, 1, 12, DARKWOOD);
-  // front (+z, plane z 14): door, windows, the lintel
-  for (let x = 14; x < 18; x++) for (let y = 3; y < 13; y++) m.set(x, y, 14, y === 6 || y === 10 ? shade(DOOR(x, y, 14), 0.75) : DOOR(x, y, 14));
-  m.set(15, 8, 15, BRONZE); m.set(16, 8, 15, BRONZE);
+  // front (+z, plane z 14): a double door in a marble frame, windows
+  for (let x = 14; x < 18; x++) for (let y = 3; y < 13; y++) m.set(x, y, 14, y === 6 || y === 10 || x === 16 ? shade(DOOR(x, y, 14), 0.75) : DOOR(x, y, 14));
   for (let x = 13; x < 19; x++) { m.set(x, 13, 14, MARBLE); m.set(x, 13, 15, MARBLE_SHADE); }
   for (let y = 3; y < 13; y++) { m.set(13, y, 14, MARBLE_SHADE); m.set(18, y, 14, MARBLE_SHADE); }
-  windowOn(m, '+z', 7, 12, 14); windowOn(m, '+z', 20, 12, 14, 1, 3);
-  windowOn(m, '+x', 7, 12, 21); windowOn(m, '-z', 10, 12, 3); windowOn(m, '-z', 17, 12, 3);
+  windowOn(m, '+z', 8, 12, 14); windowOn(m, '-z', 10, 12, 3); windowOn(m, '-z', 17, 12, 3);
   // eave course: a marble cornice under the roof
   for (let x = 5; x < 22; x++) for (const z of [3, 14]) m.set(x, H - 1, z, MARBLE_SHADE);
   for (let z = 3; z < 15; z++) for (const x of [5, 21]) m.set(x, H - 1, z, MARBLE_SHADE);
   // main roof (ridge along x) over the porch and the hall
-  gableRoof(m, { wx0: 1, wx1: 22, wz0: 3, wz1: 15, top: H, axis: 'x', pitch: 0.55, ov: 1.5, ovG: 1, tiles: T, ends: 'wall', fill: 0xe2ddd1, seed: 71, ...roofOpts });
+  const main = gableRoof(m, { wx0: 1, wx1: 22, wz0: 3, wz1: 15, top: H, axis: 'x', pitch: 0.55, ov: 1.5, ovG: 1, tiles: T, ends: 'wall', fill: 0xe2ddd1, seed: 71, ...roofOpts });
+  // the +x gable end in dressed stone (one voxel proud of the smooth gable
+  // triangle, so it reads as wall, not as a pale plane), a dark vent in it
+  for (let z = 3; z < 15; z++) {
+    const yt = H + 0.55 * (6 - Math.abs(z + 0.5 - 9)) - 0.6;
+    for (let y = H - 1; y < yt; y++) m.set(22, y, z, y === H - 1 ? MARBLE_SHADE : ARM_WALL(22, y, z));
+  }
+  for (let z = 8; z < 10; z++) for (let y = H + 1; y < H + 3; y++) m.set(22, y, z, DARK);
+  void main;
   // two raised cross gables (ridge along z), pedimented front and back: a
   // clerestory course on the main walls, then the gable
   for (const [cx0, cx1, seed] of [[6, 13, 73], [14, 21, 75]]) {
@@ -335,55 +351,51 @@ function armory(age, m = new Rec()) {
       for (const z of [1, 16]) { m.set(mx, fy, z, TEAM); m.set(mx + 1, fy, z, TEAM); m.set(mx, fy + 1, z, TEAM); m.set(mx + 1, fy + 1, z, TEAM); m.set(mx, fy + 2, z, TEAM); }
     }
   }
-  // wall dressing: an axe and a ladder on the front
-  for (let y = 7; y < 14; y++) m.set(11, y, 15, 0x7a5230);
-  m.set(10, 13, 15, STEEL); m.set(10, 12, 15, STEEL); m.set(9, 13, 15, STEEL_L); m.set(9, 12, 15, STEEL);
-  for (let i = 0; i < 15; i++) {
-    const y = 1 + i, z = 17 - Math.floor(i / 5);
-    m.set(19, y, z, POLE); m.set(21, y, z, POLE);
-    if (i % 2 === 0) m.set(20, y, z, PLANK);
-  }
-  // team hoplite shields leaning on the hall front by the door
-  shield(m, 7, 1, 16, '+z', 3.6);
+  // three barrels in one group by the hall front (building_01)
+  for (const [x, z, h] of [[3.0, 17.6, 5], [6.2, 17.4, 5], [4.6, 20.4, 4]]) barrel(m, x, 1, z, h, 1.5);
 
-  // ---- the lean-to smithy (x 22..30, z 4..17)
-  m.box(22, 1, 4, 8, 13, 1, BOARD_G);                       // back wall of boards
-  for (let y = 1; y < 14; y += 4) m.box(22, y, 5, 8, 1, 1, DARKWOOD);
-  for (const z of [10, 16]) { m.box(29, 1, z, 1, 1, 1, BASE_STONE); m.box(29, 2, z, 1, 10, 1, POST); }
-  m.box(29, 11, 4, 1, 1, 13, DARKWOOD);                     // the eave beam on the posts
-  shedRoof(m, { wx0: 22, wx1: 30, wz0: 4, wz1: 17, top: 12, dir: '+x', pitch: 0.42, ov: 1.4, ovS: 0.8, tiles: PLANKS, seed: 77, fill: 0x8f7d66, course: 20, tileW: 1.6 });
-  if (age >= 3) {
-    // a marble gable end on the lean-to (building_03)
-    for (let z = 4; z < 17; z++) m.set(29, 12, z, MARBLE_SHADE);
+  // ---- the lean-to smithy (x 22..31, z 4..17): open to the front and the +x end
+  const LT = 11, LP = 0.55;                                 // eave-wall height, pitch
+  const lyRoof = (z) => LT + LP * (6.5 - Math.abs(z + 0.5 - 10.5));   // roof plane over cell z
+  m.box(23, 1, 4, 8, LT - 1, 1, BOARD_G);                   // back wall of boards
+  for (let y = 3; y < LT; y += 4) m.box(23, y, 5, 8, 1, 1, DARKWOOD);
+  // posts on stone bases (front row and the open end), the eave beams
+  for (const [x, z] of [[22, 16], [26, 16], [30, 16], [30, 4], [30, 10]]) { m.set(x, 1, z, BASE_STONE); m.box(x, 2, z, 1, LT - 2, 1, POST); }
+  m.box(22, LT - 1, 16, 9, 1, 1, DARKWOOD);                 // front beam
+  m.box(22, LT - 1, 4, 9, 1, 1, DARKWOOD);                  // back beam
+  // rafters under the roof (rising from both beams to the ridge) and the
+  // open truss at the +x end: tie beam, king post, raking rafters
+  for (const x of [23, 25, 27, 29, 30]) for (let z = 4; z < 17; z++) {
+    const y = Math.floor(lyRoof(z) - 1.6);
+    m.set(x, y, z, DARKWOOD);
+    if (x === 30) m.set(x, y - 1, z, POST(x, y - 1, z));
   }
-  // the forge hearth against the back wall: a stone block, glowing coals, a hood
+  m.box(30, LT - 1, 4, 1, 1, 13, DARKWOOD);
+  for (let y = LT; y < Math.floor(lyRoof(10) - 1.6); y++) m.set(30, y, 10, POST(30, y, 10));
+  gableRoof(m, { wx0: 22, wx1: 31, wz0: 4, wz1: 17, top: LT, axis: 'x', pitch: LP, ov: 1.4, ovG: 0.8, tiles: PLANKS, ends: 'open', seed: 77, course: 20, tileW: 1.6 });
+  // the forge hearth against the back wall: a stone block, glowing coals, and
+  // a stone chimney up through the roof (a clear silhouette above the lean-to)
   m.box(23, 1, 5, 5, 4, 4, DARK_BLOCK);
-  for (let x = 24; x < 27; x++) for (let z = 6; z < 8; z++) m.set(x, 5, z, hash3(x, 5, z, 3) < 0.5 ? FIRE[1] : FIRE[0], FG);
-  m.set(25, 6, 6, FIRE[3], FG);
-  m.box(23, 5, 8, 5, 1, 1, DARK_BLOCK);
-  for (let y = 9; y < 15; y++) m.box(24, y, 5, 3, 1, 2, y < 11 ? 0x6a6560 : 0x59544f);     // the hood and flue
-  m.box(24, 15, 5, 3, 3, 2, 0x4e4a46);
-  // bellows beside it
-  m.box(27, 2, 6, 2, 2, 2, 0x6a4a30); m.set(27, 4, 7, 0x4a3020);
-  // the anvil, a quench bucket, the grindstone, a tool rack on the back wall
-  anvil(m, 23, 1, 11, 'z');
-  barrel(m, 27.5, 1, 13.5, 3, 1.2); m.set(27, 4, 13, WATER, undefined);
-  for (let y = 2; y < 7; y++) for (let z = 15; z < 17; z++) { if (Math.hypot(y - 4, z - 16) < 2.4) m.set(25, y, z, 0xa39c8e); }
-  m.set(25, 4, 16, IRON); m.box(24, 1, 15, 1, 3, 1, WOOD); m.box(26, 1, 15, 1, 3, 1, WOOD);
-  for (const [x, len] of [[23, 4], [25, 3], [26, 5], [28, 3]]) { for (let y = 9; y > 9 - len; y--) m.set(x, y, 5, y === 10 - len ? IRON_L : 0x4a3020); m.set(x, 10, 5, IRON); }
-  // the hoplite shields leaning on the lean-to's open end, and a stack of them
-  shield(m, 31, 1, 7, '+x', 3.6);
-  shield(m, 31, 1, 13, '+x', 3.6);
-  shield(m, 30, 6, 10, '+x', 2.6);
+  m.box(23, 5, 8, 5, 1, 1, MARBLE_SHADE);
+  for (let x = 24; x < 27; x++) for (let z = 6; z < 8; z++) m.set(x, 5, z, hash3(x, 5, z, 3) < 0.5 ? FIRE[2] : FIRE[1], FG);
+  const CH = (x, y, z) => (y >= 19 ? shade(CLAY(x, y, z), 0.62) : y >= 17 ? shade(CLAY(x, y, z), 0.8) : CLAY(x, y, z));
+  m.box(24, 5, 5, 3, 15, 3, CH);
+  m.box(23, 20, 4, 5, 1, 5, MARBLE_SHADE);                  // the chimney cap
+  m.box(24, 21, 5, 3, 1, 3, 0x2a2420);
+  // one anvil on its stump in the open front
+  anvil(m, 25, 1, 11, 'x');
+  if (age >= 3) m.box(30, LT - 1, 4, 1, 1, 13, MARBLE_SHADE);   // a marble tie beam (building_03)
 
   // ---- the yard
   // the smelting furnace (building_01's centrepiece): a two-step stone plinth,
-  // a smooth tapering lime-washed bottle kiln with a collar and a lip, soot
-  // round its throat, glowing coals deep inside, a stone fire mouth to the
-  // front with a glowing hearth and a soot apron
-  const FX = 16, FZ = 24;
-  lathe(m, FX, FZ, 1, 3, () => 6.4, DARK_BLOCK);
-  lathe(m, FX, FZ, 3, 4, () => 5.6, (x, y, z) => shade(DARK_BLOCK(x, y, z), 1.18));
+  // a smooth tapering lime-washed bottle kiln with a collar and a lip, a dark
+  // throat with glowing coals deep inside, a stone fire mouth to the front
+  // the plinth: two smooth stone drums (big dressed blocks round the ring)
+  const PL = [0x6f695f, 0x625d54, 0x7a7468, 0x686258];
+  frustum(m, FX, FZ, 1, 3, 6.4, 6.4, (s, k) => pick(hash3(s, k, 3, 36), PL), { segs: 24, bands: 2 });
+  annulus(m, FX, FZ, 3, 6.4, 5.6, 0x8a8478, 24);
+  frustum(m, FX, FZ, 3, 4, 5.6, 5.6, (s) => shade(pick(hash3(s, 7, 4, 36), PL), 1.2), { segs: 24 });
+  annulus(m, FX, FZ, 4, 5.6, 4.0, 0x948d80, 24);
   const KILN = [0xe6d9c0, 0xdccdb2, 0xebe0ca, 0xd6c6aa];
   frustum(m, FX, FZ, 4, 9, 4.6, 4.0, (s, k) => shade(pick(hash3(s, k, 1, 35), KILN), 0.96));
   frustum(m, FX, FZ, 9, 15, 4.0, 2.5, (s, k) => shade(pick(hash3(s, k, 2, 35), KILN), k > 3 ? 0.78 - 0.06 * (k - 3) : 1), { bands: 5 });
@@ -396,60 +408,54 @@ function armory(age, m = new Rec()) {
     m.set(x, 13, z, hash3(x, 13, z, 9) < 0.5 ? FIRE[3] : FIRE[2], FG);
     m.set(x, 12, z, FIRE[1], FG);
   }
-  // the fire mouth: a stone arch on the +z face, glowing coals inside it
-  for (let x = FX - 3; x < FX + 3; x++) for (let y = 3; y < 10; y++) for (let z = FZ + 3; z < FZ + 6; z++) {
-    const open = x >= FX - 2 && x < FX + 2 && y >= 4 && y < 8 && !(y === 7 && (x === FX - 2 || x === FX + 1));
+  // the fire mouth: one stone block on the +z face with a marble lintel, coals inside
+  for (let x = FX - 3; x < FX + 3; x++) for (let y = 1; y < 10; y++) for (let z = FZ + 3; z < FZ + 6; z++) {
+    const open = x >= FX - 2 && x < FX + 2 && y >= 4 && y < 8;
     if (open) { if (z === FZ + 3) m.set(x, y, z, y < 6 ? FIRE[(x + y) & 1] : FIRE[0], y < 6 ? FG : COAL); continue; }
-    m.set(x, y, z, y === 9 || (y === 8 && (x === FX - 3 || x === FX + 2)) ? MARBLE_SHADE : DARK_BLOCK(x, y, z));
+    m.set(x, y, z, y === 9 ? MARBLE_SHADE : shade(DARK_BLOCK(x, y, z), 1.1));
   }
-  for (let x = FX - 2; x < FX + 2; x++) { m.set(x, 4, FZ + 6, 0x3a2a20); m.set(x, 3, FZ + 6, DARK_BLOCK(x, 3, FZ + 6)); }
-  for (let x = FX - 3; x < FX + 3; x++) for (let z = FZ + 6; z < FZ + 8; z++) m.set(x, 1, z, SOOT_DIRT);
-  // tongs and a poker leaning on the mouth
-  m.line(FX + 3, 1, FZ + 7, FX + 3, 8, FZ + 5, IRON); m.line(FX + 4, 1, FZ + 7, FX + 3, 7, FZ + 6, IRON_L);
-  // fuel: a heap of charcoal by the furnace
-  for (let x = 8; x < 13; x++) for (let z = 27; z < 32; z++) {
-    const d = Math.hypot(x + 0.5 - 10.5, z + 0.5 - 29.5);
-    if (d < 2.4) m.set(x, 1, z, hash3(x, 1, z, 5) < 0.25 ? 0x7a4a32 : 0x3a3430);
-    if (d < 1.4) m.set(x, 2, z, 0x34302d);
+  // the water trough: a stone trough with a plank rim (building_01, right of the furnace)
+  for (let x = 20; x < 27; x++) for (let z = 23; z < 27; z++) {
+    const rim = x === 20 || x === 26 || z === 23 || z === 26;
+    m.set(x, 1, z, BASE_STONE);
+    m.set(x, 2, z, rim ? 0xb4ab98 : WATER);
+    if (rim) m.set(x, 3, z, 0xc4bba5);
   }
-  // the water trough: plank rim, water
-  for (let x = 22; x < 27; x++) for (let z = 19; z < 23; z++) {
-    const rim = x === 22 || x === 26 || z === 19 || z === 22;
-    m.set(x, 1, z, PLANK);
-    m.set(x, 2, z, rim ? PLANK : WATER);
-    if (rim) m.set(x, 3, z, shade(PLANK(x, 3, z), 0.85)); else if (hash3(x, 3, z, 2) < 0.2) m.set(x, 2, z, WATER_L);
-  }
-  // the weapon rack along the yard's east edge (x 27..31, z 19..29): two
-  // trestles and a bar, spears leaning on it with steel heads above the bar,
-  // swords hung on it, team shields leaning on its front
-  for (const z of [19, 29]) { m.line(28, 1, z, 29, 9, z, POST); m.line(31, 1, z, 30, 9, z, POST); m.set(29, 10, z, DARKWOOD); m.set(30, 10, z, DARKWOOD); }
-  for (let z = 19; z < 30; z++) { m.set(29, 10, z, DARKWOOD); m.set(30, 4, z, DARKWOOD); }
-  for (const z of [20, 21, 23, 26, 28]) {
-    m.line(31, 1, z, 30, 12, z, (xx, yy, zz) => ((yy & 3) === 0 ? 0x6e4a2c : 0x8b6139));
-    m.set(30, 13, z, STEEL); m.set(30, 14, z, STEEL); m.set(30, 15, z, STEEL_L);
-    m.set(31, 1, z, BRONZE_D);
-  }
-  for (const z of [22, 25, 27]) { m.set(28, 10, z, DARKWOOD); sword(m, 28, 9, z); }
-  shield(m, 31, 1, 22, '+x', 2.7);
-  shield(m, 31, 2, 26, '+x', 2.7);
-  // a yard anvil by the furnace, quenching barrels, the hall's barrels
-  anvil(m, 4, 1, 26, 'x');
-  barrel(m, 24.5, 1, 29.5, 4, 1.4);
-  for (const [x, z, h] of [[5.5, 18.5, 5], [8.8, 17.8, 4], [3, 16.2, 4]]) barrel(m, x, 1, z, h, 1.5);
-  barrel(m, 2.5, 2, 6.5, 5, 1.5); barrel(m, 2.5, 2, 10, 5, 1.5);   // under the porch
-  crate(m, 1, 1, 28, 4, 3, 3); crate(m, 2, 4, 28, 3, 2, 3, 0xa27a48);
-  // ingots stacked on the crate
-  for (let i = 0; i < 2; i++) m.set(2 + i, 6, 29, 0xb8743a);
-  if (age >= 2) {
-    // a low fence along the yard's front edge (building_02)
-    for (let x = 18; x < 28; x += 3) m.box(x, 1, 31, 1, 5, 1, POST);
-    for (let x = 18; x < 28; x++) { m.set(x, 3, 31, PLANK); m.set(x, 5, 31, PLANK); }
-  }
+  // the shield rack: two posts and a bar along the smithy's front, two big
+  // hoplite shields hanging on it, faces to the front: a bronze rim, the team
+  // field, a raised bronze boss, a wooden back
+  for (const x of [17, 31]) { m.set(x, 1, 19, BASE_STONE); m.box(x, 2, 19, 1, 10, 1, POST); }
+  m.box(17, 11, 19, 15, 1, 1, DARKWOOD);
+  for (const x0 of [18, 25]) bigShield(m, x0, 4, 21);
+  // one continuous low yard wall along the front and the east edge: three
+  // courses of block, a flat pale coping, a gap for the cart track
+  const yardWall = (x, z) => {
+    for (let y = 1; y < 3; y++) m.set(x, y, z, shade(DARK_BLOCK(x, y, z), 1.15));
+    m.set(x, 3, z, 0xcfc8b8);
+  };
+  for (let x = 21; x < 32; x++) yardWall(x, 31);
+  for (let z = 21; z < 31; z++) yardWall(31, z);
   if (age >= 3) {
-    // marble trims: corner pilasters on the hall, a marble lintel round the door
+    // marble trims: corner pilasters on the hall
     for (const [x, z] of [[5, 14], [21, 14], [5, 3], [21, 3]]) for (let y = 2; y < 17; y++) if (y < 5 || y > 7) m.set(x, y, z, MARBLE);
   }
   return m;
+}
+// a hanging hoplite shield (aspis), 7 x 7 voxels drawn as pixel art so its
+// round outline stays clean: a bronze rim, the team field, a raised boss;
+// face +z at plane z, lower-left corner (x0, y0), a wooden back and a strap
+// up to the rack bar (y 11, plane z - 2)
+const ASPIS = ['..RRR..', '.RTTTR.', 'RTTTTTR', 'RTTBTTR', 'RTTTTTR', '.RTTTR.', '..RRR..'];
+function bigShield(m, x0, y0, z) {
+  ASPIS.forEach((row, j) => [...row].forEach((ch, i) => {
+    if (ch === '.') return;
+    const x = x0 + i, y = y0 + 6 - j;
+    m.set(x, y, z - 1, 0x5e3f26);
+    m.set(x, y, z, ch === 'R' ? 0xa8742c : ch === 'B' ? 0xc8962e : TEAM);
+    if (ch === 'B') m.set(x, y, z + 1, 0xc8962e);
+  }));
+  for (let y = y0 + 7; y < 11; y++) m.set(x0 + 3, y, z - 1, DARKWOOD);
+  m.set(x0 + 3, 10, z - 2, DARKWOOD);
 }
 
 // ---- the Market ---------------------------------------------------------------
@@ -475,7 +481,7 @@ function market(age, m = new Rec()) {
   m.box(0, 1, 0, 20, 1, 12, BASE_STONE);
   hall(m, 1, 1, 19, 11, 2, 27, { wall: LIME, band: [4, 6] });
   // the upper floor: a cornice and the second team band
-  for (let x = 1; x < 19; x++) for (const z of [0, 11]) { m.set(x, 14, z, MARBLE_SHADE); m.set(x, 15, z === 0 ? 0 : 11, MARBLE_SHADE); }
+  for (let x = 1; x < 19; x++) for (const z of [0, 11]) m.set(x, 14, z, MARBLE_SHADE);
   for (let z = 0; z < 12; z++) for (const x of [0, 19]) m.set(x, 14, z, MARBLE_SHADE);
   for (let x = 1; x < 19; x++) for (let z = 1; z < 11; z++) {
     const e = x === 1 || x === 18 || z === 1 || z === 10;
@@ -488,17 +494,22 @@ function market(age, m = new Rec()) {
   for (let x = 13; x < 16; x++) for (let y = 3; y < 7; y++) m.set(x, y, 10, DOOR(x, y, 10));
   for (const x of [3, 9, 15]) windowOn(m, '-z', x, 20, 1);
   for (let x = 1; x < 19; x++) for (const z of [1, 10]) m.set(x, 26, z, MARBLE_SHADE);
-  gableRoof(m, { wx0: 1, wx1: 19, wz0: 1, wz1: 11, top: 27, axis: 'x', pitch: 0.6, ov: 1.8, ovG: 1.2, tiles: T, ends: 'pediment',
+  const stoaRoof = gableRoof(m, { wx0: 1, wx1: 19, wz0: 1, wz1: 11, top: 27, axis: 'x', pitch: 0.6, ov: 1.8, ovG: 1.2, tiles: T, ends: 'pediment',
     tymp: age >= 2 ? 0x2f4570 : 0x8e3a2c, rakeH: 1.2, acro: age >= 3, acroK: 1.7, seed: 81, ...roofOpts });
-  // ---- wing (columned porch)
+  ridgeCrest(m, 2.5, 18, stoaRoof.ridgeY + 0.6, stoaRoof.um, T.antefix ?? 0xf3efe6);
+  // ---- wing (columned porch): low enough that its ridge runs in under the
+  // stoa's projecting first-floor cornice, which hides the roof junction
   m.box(0, 1, 11, 11, 1, 13, BASE_STONE);
   m.box(1, 2, 11, 9, 1, 12, MARBLE_SHADE);
-  for (let z = 11; z < 23; z++) for (let y = 3; y < 13; y++) m.set(1, y, z, y < 5 ? DARK_BLOCK(1, y, z) : y === 5 || y === 6 ? TEAM : LIME(1, y, z));
-  for (const x of [2.5, 8.5]) roundColumn(m, x, 3, 21.5, 1.0, 10);
-  roundColumn(m, 8.5, 3, 15.5, 1.0, 10);
-  m.box(1, 13, 11, 10, 1, 12, MARBLE_SHADE);
-  gableRoof(m, { wx0: 0, wx1: 11, wz0: 11, wz1: 23, top: 14, axis: 'z', pitch: 0.65, ov: 1.4, ovG: 1.2, tiles: T, ends: 'pediment',
-    tymp: age >= 2 ? 0x2f4570 : 0x8e3a2c, rakeH: 1.1, acro: age >= 3, acroK: 1.4, seed: 83, ...roofOpts });
+  for (let z = 11; z < 23; z++) for (let y = 3; y < 11; y++) m.set(1, y, z, y < 5 ? DARK_BLOCK(1, y, z) : y === 5 || y === 6 ? TEAM : LIME(1, y, z));
+  for (const x of [2.5, 8.5]) roundColumn(m, x, 3, 21.5, 1.0, 8);
+  roundColumn(m, 8.5, 3, 15.5, 1.0, 8);
+  m.box(1, 11, 11, 10, 1, 12, MARBLE_SHADE);
+  gableRoof(m, { wx0: 1, wx1: 11, wz0: 11, wz1: 23, top: 12, axis: 'z', pitch: 0.45, ov: 1.4, ovG: 1.2, tiles: T, ends: 'pediment',
+    tymp: age >= 2 ? 0x2f4570 : 0x8e3a2c, rakeH: 1.0, acro: age >= 3, acroK: 1.3, seed: 83, ...roofOpts });
+  // the projecting cornice over the junction: two voxels deep, the full front
+  for (let x = 0; x < 20; x++) for (const z of [11, 12]) { m.set(x, 15, z, z === 12 ? MARBLE_SHADE : MARBLE(x, 15, z)); }
+  for (let x = 0; x < 20; x++) m.set(x, 16, 11, MARBLE_SHADE);
   // goods under the porch
   barrel(m, 4, 3, 19, 4, 1.5); barrel(m, 4.5, 3, 15.5, 4, 1.5);
   amphora(m, 6.5, 3, 21.5, 0xe8e2d4, true);
@@ -552,7 +563,8 @@ function market(age, m = new Rec()) {
 // front at x = f). Back posts and a small tile gable over the back half, the
 // counter (a plank box with a team skirt) in front with three produce crates,
 // the striped team awning sloping out from the roof's front eave to past the counter.
-function stall(m, T, face, a0, a1, f, age, goods, seed) {
+function stall(m, T0, face, a0, a1, f, age, goods, seed) {
+  const T = { ...T0, plane: { ...T0.plane, ribGap: 0, lip: 0.22 } };   // plain tile courses on the small roofs (ribs read as teeth)
   const put = (a, y, d, c, o) => (face === 'z' ? m.set(a, y, f - d, c, o) : m.set(f - d, y, a, c, o));   // d = depth from the front edge
   const W = a1 - a0;
   // the stone base and the counter (depth -3..0, in front of the awning's lip)
@@ -578,14 +590,14 @@ function stall(m, T, face, a0, a1, f, age, goods, seed) {
   });
   // posts: two at the front of the counter, two at the back
   for (const a of [a0, a1 - 1]) {
-    for (let y = 6; y < 13; y++) put(a, y, -1, POST(a, y, -1));
-    for (let y = 2; y < 16; y++) put(a, y, 6, POST(a, y, 6));
+    for (let y = 6; y < 11; y++) put(a, y, -1, POST(a, y, -1));
+    for (let y = 2; y < 14; y++) put(a, y, 6, POST(a, y, 6));
   }
   // a back screen of boards with a shelf of jars
   for (let a = a0 + 1; a < a1 - 1; a++) for (let y = 2; y < 9; y++) put(a, y, 6, BOARD_G(a, y, 6));
   for (let a = a0 + 1; a < a1 - 1; a += 2) put(a, 9, 6, TERRA(a, 9, 6));
   // the small tile roof over the back half (smooth gable, ridge across the stall)
-  const ry = 16;
+  const ry = 14;
   if (face === 'z') {
     gableRoof(m, { wx0: a0, wx1: a1, wz0: f - 7, wz1: f - 4, top: ry, axis: 'x', pitch: 0.55, ov: 0.6, ovG: 0.4, tiles: T, ends: 'wall', fill: 0x8a6a48, seed, ...roofOpts });
   } else {
@@ -594,21 +606,33 @@ function stall(m, T, face, a0, a1, f, age, goods, seed) {
   for (let a = a0; a < a1; a++) for (const d of [4, 6]) put(a, ry - 1, d, DARKWOOD);
   for (let d = 4; d < 7; d++) for (const a of [a0, a1 - 1]) put(a, ry - 1, d, DARKWOOD);
   // the awning: team and white stripes across the stall, from under the
-  // roof's front eave (depth 2, y 13) sloping down past the front posts
-  // (depth -3, y 10), a scalloped valance hanging at its lip
+  // roof's front eave (depth 4, y 13) sloping down to its lip over the
+  // counter (depth -1, y 10), a scalloped valance hanging under the lip
   for (let a = a0 - 1; a <= a1; a++) {
     const stripe = ((a - a0 + 1) >> 1) & 1;
     const c = stripe ? TEAM : CLOTH(a, 0, 0);
     for (let s = 0; s < 6; s++) {
-      const d = 4 - s, y = 15 - Math.floor(s * 0.6 + 0.5);
+      const d = 4 - s, y = 13 - Math.floor(s * 0.6 + 0.5);
       put(a, y, d, c);
       if (s > 0 && Math.floor(s * 0.6 + 0.5) !== Math.floor((s - 1) * 0.6 + 0.5)) put(a, y + 1, d, c);
     }
-    put(a, 11, -1, c);
-    if ((a & 1) === 0) put(a, 10, -1, c);
+    if ((a & 1) === 0) put(a, 9, -1, c);          // a scalloped valance
   }
   // age 2+: a team finial on each gable end
   if (age >= 2) for (const a of [a0, a1 - 1]) { put(a, ry + 2, 4, TEAM); put(a, ry + 3, 4, TEAM); }
+}
+
+// palmette cresting along a ridge running along x from xa to xb at height y
+// over z = zc: small upright pointed tiles facing front and back, every 3 voxels
+function ridgeCrest(m, xa, xb, y, zc, color) {
+  for (let x = xa; x <= xb + 1e-6; x += 3) {
+    const w = 0.55, h = 0.75;
+    for (const s of [1, -1]) {
+      const z = zc + s * 0.06;
+      poly(m, [[x - w, y, z], [x + w, y, z], [x + w, y + h, z], [x - w, y + h, z]], s > 0 ? color : shade(color, 0.82), { out: [0, 0, s] });
+      poly(m, [[x - w, y + h, z], [x + w, y + h, z], [x, y + h + 0.6, z]], s > 0 ? color : shade(color, 0.82), { out: [0, 0, s] });
+    }
+  }
 }
 
 // ---- weathering, team cloth -------------------------------------------------

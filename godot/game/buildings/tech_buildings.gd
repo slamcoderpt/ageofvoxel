@@ -5,12 +5,12 @@ extends Node3D
 ## 1/8-tile voxels plus the town's smooth tile roofs, pivot at the 4 x 4
 ## footprint centre, front to +z), one look per owner's age:
 ##   <type>/a1   Archaic and Classical: terracotta roofs
-##   <type>/a2   Heroic: pale green glazed roofs, team finials (the armory a fence)
+##   <type>/a2   Heroic: pale green glazed roofs, team finials
 ##   <type>/a3   Mythic: marble roofs, team finials, gilt acroteria, marble trims
 ##   <type>/s<k> under construction, k = floor(progress * 8) (0 = staked lot)
-## <type> = "armory" (hall with a team band and cross gables, plank lean-to
-## smithy, round smelting furnace with a glowing mouth, weapon rack, shields,
-## trough, anvils) or "market" (two-storey stoa, columned wing, terrace with an
+## <type> = "armory" (hall with a team band and cross gables, open plank
+## lean-to smithy with a chimney, round smelting furnace with a glowing mouth,
+## a shield rack, trough, low yard wall) or "market" (two-storey stoa, columned wing, terrace with an
 ## iron balustrade and outside stair, a court of goods, three stalls with
 ## team-striped awnings and produce).
 ## buildings.gd hands it the sim's rows of those types (`from_buildings`, once

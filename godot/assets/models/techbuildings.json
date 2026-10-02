@@ -2,7 +2,7 @@
  "format": 2,
  "group": "techbuildings",
  "bin": "techbuildings.bin.gz",
- "bytes": 28926024,
+ "bytes": 27941952,
  "voxel": 0.125,
  "stages": 8,
  "types": {
@@ -17,8 +17,8 @@
  },
  "models": {
   "armory/a1": {
-   "vertices": 37114,
-   "indices": 53322,
+   "vertices": 34418,
+   "indices": 49458,
    "aabb": [
     -2.0125,
     0,
@@ -28,14 +28,14 @@
     2
    ],
    "position": 0,
-   "normal": 445368,
-   "color": 890736,
-   "extra": 1039192,
-   "index": 1187648
+   "normal": 413016,
+   "color": 826032,
+   "extra": 963704,
+   "index": 1101376
   },
   "armory/s0": {
-   "vertices": 12256,
-   "indices": 18384,
+   "vertices": 12224,
+   "indices": 18336,
    "aabb": [
     -2,
     0,
@@ -44,117 +44,117 @@
     0.875,
     2
    ],
-   "position": 1400936,
-   "normal": 1548008,
-   "color": 1695080,
-   "extra": 1744104,
-   "index": 1793128
+   "position": 1299208,
+   "normal": 1445896,
+   "color": 1592584,
+   "extra": 1641480,
+   "index": 1690376
   },
   "armory/s1": {
-   "vertices": 19680,
-   "indices": 29520,
+   "vertices": 18928,
+   "indices": 28032,
    "aabb": [
     -2,
     0,
     -2,
     2,
     2.125,
-    2.125
+    2
    ],
-   "position": 1866664,
-   "normal": 2102824,
-   "color": 2338984,
-   "extra": 2417704,
-   "index": 2496424
+   "position": 1763720,
+   "normal": 1990856,
+   "color": 2217992,
+   "extra": 2293704,
+   "index": 2369416
   },
   "armory/s2": {
-   "vertices": 24528,
-   "indices": 36792,
+   "vertices": 23064,
+   "indices": 34236,
    "aabb": [
     -2,
     0,
     -2,
     2,
     2.5,
-    2.125
+    2
    ],
-   "position": 2614504,
-   "normal": 2908840,
-   "color": 3203176,
-   "extra": 3301288,
-   "index": 3399400
+   "position": 2481544,
+   "normal": 2758312,
+   "color": 3035080,
+   "extra": 3127336,
+   "index": 3219592
   },
   "armory/s3": {
-   "vertices": 28992,
-   "indices": 43368,
+   "vertices": 27428,
+   "indices": 40656,
    "aabb": [
     -2,
     0,
     -2,
     2,
     2.875,
-    2.125
+    2
    ],
-   "position": 3546568,
-   "normal": 3894472,
-   "color": 4242376,
-   "extra": 4358344,
-   "index": 4474312
+   "position": 3356536,
+   "normal": 3685672,
+   "color": 4014808,
+   "extra": 4124520,
+   "index": 4234232
   },
   "armory/s4": {
-   "vertices": 31892,
-   "indices": 47460,
+   "vertices": 30380,
+   "indices": 44964,
    "aabb": [
     -2,
     0,
     -2,
     2,
     3.125,
-    2.125
+    2
    ],
-   "position": 4647784,
-   "normal": 5030488,
-   "color": 5413192,
-   "extra": 5540760,
-   "index": 5668328
+   "position": 4396856,
+   "normal": 4761416,
+   "color": 5125976,
+   "extra": 5247496,
+   "index": 5369016
   },
   "armory/s5": {
-   "vertices": 36844,
-   "indices": 54492,
+   "vertices": 34796,
+   "indices": 51276,
    "aabb": [
     -2,
     0,
     -2,
     2,
     3.5,
-    2.125
+    2
    ],
-   "position": 5858168,
-   "normal": 6300296,
-   "color": 6742424,
-   "extra": 6889800,
-   "index": 7037176
+   "position": 5548872,
+   "normal": 5966424,
+   "color": 6383976,
+   "extra": 6523160,
+   "index": 6662344
   },
   "armory/s6": {
-   "vertices": 39572,
-   "indices": 58404,
+   "vertices": 37516,
+   "indices": 55176,
    "aabb": [
     -2,
     0,
     -2,
     2,
     3.875,
-    2.125
+    2
    ],
-   "position": 7255144,
-   "normal": 7730008,
-   "color": 8204872,
-   "extra": 8363160,
-   "index": 8521448
+   "position": 6867448,
+   "normal": 7317640,
+   "color": 7767832,
+   "extra": 7917896,
+   "index": 8067960
   },
   "armory/s7": {
-   "vertices": 44290,
-   "indices": 64086,
+   "vertices": 41962,
+   "indices": 60774,
    "aabb": [
     -2.0125,
     0,
@@ -163,15 +163,15 @@
     3.4361,
     2
    ],
-   "position": 8755064,
-   "normal": 9286544,
-   "color": 9818024,
-   "extra": 9995184,
-   "index": 10172344
+   "position": 8288664,
+   "normal": 8792208,
+   "color": 9295752,
+   "extra": 9463600,
+   "index": 9631448
   },
   "armory/a2": {
-   "vertices": 37738,
-   "indices": 54258,
+   "vertices": 34738,
+   "indices": 49938,
    "aabb": [
     -2.0125,
     0,
@@ -180,15 +180,15 @@
     3.75,
     2
    ],
-   "position": 10428688,
-   "normal": 10881544,
-   "color": 11334400,
-   "extra": 11485352,
-   "index": 11636304
+   "position": 9874544,
+   "normal": 10291400,
+   "color": 10708256,
+   "extra": 10847208,
+   "index": 10986160
   },
   "armory/a3": {
-   "vertices": 41066,
-   "indices": 57630,
+   "vertices": 37978,
+   "indices": 53178,
    "aabb": [
     -2.0125,
     0,
@@ -197,28 +197,28 @@
     4.0019,
     2
    ],
-   "position": 11853336,
-   "normal": 12346128,
-   "color": 12838920,
-   "extra": 13003184,
-   "index": 13167448
+   "position": 11185912,
+   "normal": 11641648,
+   "color": 12097384,
+   "extra": 12249296,
+   "index": 12401208
   },
   "market/a1": {
-   "vertices": 42824,
-   "indices": 61464,
+   "vertices": 41268,
+   "indices": 59604,
    "aabb": [
-    -2.2486,
+    -2.1054,
     0,
     -2.1695,
     2,
-    3.8658,
+    3.9938,
     2
    ],
-   "position": 13397968,
-   "normal": 13911856,
-   "color": 14425744,
-   "extra": 14597040,
-   "index": 14768336
+   "position": 12613920,
+   "normal": 13109136,
+   "color": 13604352,
+   "extra": 13769424,
+   "index": 13934496
   },
   "market/s0": {
    "vertices": 12288,
@@ -231,11 +231,11 @@
     0.875,
     2
    ],
-   "position": 15014192,
-   "normal": 15161648,
-   "color": 15309104,
-   "extra": 15358256,
-   "index": 15407408
+   "position": 14172912,
+   "normal": 14320368,
+   "color": 14467824,
+   "extra": 14516976,
+   "index": 14566128
   },
   "market/s1": {
    "vertices": 19832,
@@ -248,15 +248,15 @@
     2.125,
     2.125
    ],
-   "position": 15481136,
-   "normal": 15719120,
-   "color": 15957104,
-   "extra": 16036432,
-   "index": 16115760
+   "position": 14639856,
+   "normal": 14877840,
+   "color": 15115824,
+   "extra": 15195152,
+   "index": 15274480
   },
   "market/s2": {
-   "vertices": 25192,
-   "indices": 37428,
+   "vertices": 25480,
+   "indices": 37716,
    "aabb": [
     -2,
     0,
@@ -265,130 +265,130 @@
     2.5,
     2.125
    ],
-   "position": 16233312,
-   "normal": 16535616,
-   "color": 16837920,
-   "extra": 16938688,
-   "index": 17039456
+   "position": 15392032,
+   "normal": 15697792,
+   "color": 16003552,
+   "extra": 16105472,
+   "index": 16207392
   },
   "market/s3": {
-   "vertices": 32976,
-   "indices": 48672,
+   "vertices": 35428,
+   "indices": 51828,
    "aabb": [
-    -2,
+    -2.0705,
     0,
     -2,
     2,
     3,
     2.125
    ],
-   "position": 17189168,
-   "normal": 17584880,
-   "color": 17980592,
-   "extra": 18112496,
-   "index": 18244400
+   "position": 16358256,
+   "normal": 16783392,
+   "color": 17208528,
+   "extra": 17350240,
+   "index": 17491952
   },
   "market/s4": {
-   "vertices": 41236,
-   "indices": 60444,
+   "vertices": 41788,
+   "indices": 61068,
    "aabb": [
-    -2.2022,
+    -2.1054,
     0,
     -2,
     2,
     3.375,
     2.125
    ],
-   "position": 18439088,
-   "normal": 18933920,
-   "color": 19428752,
-   "extra": 19593696,
-   "index": 19758640
+   "position": 17699264,
+   "normal": 18200720,
+   "color": 18702176,
+   "extra": 18869328,
+   "index": 19036480
   },
   "market/s5": {
-   "vertices": 45814,
-   "indices": 66606,
+   "vertices": 44632,
+   "indices": 65136,
    "aabb": [
-    -2.2486,
+    -2.1054,
     0,
     -2,
     2,
     3.75,
     2.125
    ],
-   "position": 20000416,
-   "normal": 20550184,
-   "color": 21099952,
-   "extra": 21283208,
-   "index": 21466464
+   "position": 19280752,
+   "normal": 19816336,
+   "color": 20351920,
+   "extra": 20530448,
+   "index": 20708976
   },
   "market/s6": {
-   "vertices": 48124,
-   "indices": 69972,
+   "vertices": 46752,
+   "indices": 68316,
    "aabb": [
-    -2.2486,
+    -2.1054,
     0,
     -2,
     2,
     4.125,
     2.125
    ],
-   "position": 21732888,
-   "normal": 22310376,
-   "color": 22887864,
-   "extra": 23080360,
-   "index": 23272856
+   "position": 20969520,
+   "normal": 21530544,
+   "color": 22091568,
+   "extra": 22278576,
+   "index": 22465584
   },
   "market/s7": {
-   "vertices": 53080,
-   "indices": 76848,
+   "vertices": 51564,
+   "indices": 75048,
    "aabb": [
-    -2.2486,
+    -2.1054,
     0,
     -2.1695,
     2,
-    3.8658,
+    3.9938,
     2
    ],
-   "position": 23552744,
-   "normal": 24189704,
-   "color": 24826664,
-   "extra": 25038984,
-   "index": 25251304
+   "position": 22738848,
+   "normal": 23357616,
+   "color": 23976384,
+   "extra": 24182640,
+   "index": 24388896
   },
   "market/a2": {
-   "vertices": 43064,
-   "indices": 61824,
+   "vertices": 41508,
+   "indices": 59964,
    "aabb": [
-    -2.2486,
+    -2.1054,
     0,
     -2.1695,
     2,
-    3.8658,
+    3.9938,
     2
    ],
-   "position": 25558696,
-   "normal": 26075464,
-   "color": 26592232,
-   "extra": 26764488,
-   "index": 26936744
+   "position": 24689088,
+   "normal": 25187184,
+   "color": 25685280,
+   "extra": 25851312,
+   "index": 26017344
   },
   "market/a3": {
-   "vertices": 46304,
-   "indices": 65064,
+   "vertices": 44748,
+   "indices": 63204,
    "aabb": [
-    -2.2486,
+    -2.1054,
     0,
     -2.1695,
     2,
     4.4631,
     2
    ],
-   "position": 27184040,
-   "normal": 27739688,
-   "color": 28295336,
-   "extra": 28480552,
-   "index": 28665768
+   "position": 26257200,
+   "normal": 26794176,
+   "color": 27331152,
+   "extra": 27510144,
+   "index": 27689136
   }
  }
 }
