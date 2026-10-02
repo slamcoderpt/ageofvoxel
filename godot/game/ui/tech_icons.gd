@@ -27,7 +27,7 @@ const TIER_RANK := {"copper": 1, "bronze": 2, "iron": 3}
 
 ## shaded tier templates (gradients: m metal, s wood, d dome)
 const TEMPLATES := {
-	"weapons": '<svg viewBox="0 0 24 24"><defs><linearGradient id="s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0a86a"/><stop offset=".5" stop-color="#8a5428"/><stop offset="1" stop-color="#3a1e0a"/></linearGradient><linearGradient id="m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="$B"/><stop offset=".42" stop-color="$A"/><stop offset="1" stop-color="$D"/></linearGradient></defs><path d="M2.4 21.6L12.6 11.4" stroke="$C" stroke-width="3.6" stroke-linecap="round"/><path d="M2.4 21.6L12.6 11.4" stroke="url(#s)" stroke-width="2.1" stroke-linecap="round"/><path d="M1.8 22.2l2-2" stroke="$C" stroke-width="3.2" stroke-linecap="round"/><path d="M1.8 22.2l2-2" stroke="$A" stroke-width="1.8" stroke-linecap="round"/><path d="M11.2 12.8C11.4 8.2 15.4 4 21.8 2.2 20 8.6 15.8 12.6 11.2 12.8z" fill="url(#m)" stroke="$C" stroke-width=".9"/><path d="M11.2 12.8C11.4 8.2 15.4 4 21.8 2.2L12.4 11.6z" fill="$B" opacity=".35"/><path d="M12.4 11.6L20.6 3.4" stroke="$D" stroke-width="1"/><path d="M12.9 11.1L20.4 3.6" stroke="$B" stroke-width=".45" opacity=".9"/><path d="M10 12.2l1.8 1.8" stroke="$C" stroke-width="3.4" stroke-linecap="round"/><path d="M10 12.2l1.8 1.8" stroke="url(#m)" stroke-width="2" stroke-linecap="round"/>$X</svg>',
+	"weapons": '<svg viewBox="0 0 24 24"><defs><linearGradient id="s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0a86a"/><stop offset=".5" stop-color="#8a5428"/><stop offset="1" stop-color="#3a1e0a"/></linearGradient><linearGradient id="m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="$B"/><stop offset=".42" stop-color="$A"/><stop offset="1" stop-color="$D"/></linearGradient></defs><path d="M2.4 21.6L12.6 11.4" stroke="$C" stroke-width="4.4" stroke-linecap="round"/><path d="M2.4 21.6L12.6 11.4" stroke="url(#s)" stroke-width="2.8" stroke-linecap="round"/><path d="M1.8 22.2l2-2" stroke="$C" stroke-width="3.2" stroke-linecap="round"/><path d="M1.8 22.2l2-2" stroke="$A" stroke-width="1.8" stroke-linecap="round"/><path d="M10.6 13.4C10.6 7.6 15 3 22 2 21 9 16.4 13.4 10.6 13.4z" fill="url(#m)" stroke="$C" stroke-width=".9"/><path d="M10.6 13.4C10.6 7.6 15 3 22 2L12.2 11.8z" fill="$B" opacity=".35"/><path d="M12.4 11.6L20.6 3.4" stroke="$D" stroke-width="1"/><path d="M12.9 11.1L20.4 3.6" stroke="$B" stroke-width=".45" opacity=".9"/><path d="M10 12.2l1.8 1.8" stroke="$C" stroke-width="3.4" stroke-linecap="round"/><path d="M10 12.2l1.8 1.8" stroke="url(#m)" stroke-width="2" stroke-linecap="round"/>$X</svg>',
 	"armor": '<svg viewBox="0 0 24 24"><defs><linearGradient id="m" x1="0" y1="0" x2="1" y2=".7"><stop offset="0" stop-color="$B"/><stop offset=".4" stop-color="$A"/><stop offset="1" stop-color="$D"/></linearGradient></defs>$Y<path d="M6.8 2.8h2.8c.8 1.4 1.6 2 2.4 2s1.6-.6 2.4-2h2.8l3 3.8-2.4 2.4v8.8c-1.6 1.8-3.8 2.8-5.8 2.8s-4.2-1-5.8-2.8V9l-2.4-2.4z" fill="url(#m)" stroke="$C" stroke-width="1.1"/><path d="M7.4 9.6c1.6 2 3.4 2 4.6.4 1.2 1.6 3 1.6 4.6-.4" stroke="$D" stroke-width="1.3" fill="none"/><path d="M7.6 9.2c1.4 1.5 2.8 1.6 3.9.6" stroke="$B" stroke-width=".7" fill="none"/><path d="M12 10.8v8.6" stroke="$D" stroke-width="1"/><path d="M9.4 13.8c1.6.5 3.6.5 5.2 0M9.6 16.6c1.5.5 3.3.5 4.8 0" stroke="$D" stroke-width=".9" fill="none"/><path d="M8 4.2l1.8 3.4M7.4 9.8v7" stroke="$B" stroke-width=".9" opacity=".8"/><path d="M6.8 2.8h2.8l.6 1.4H7.6zM14.6 2.8h2.8l-.8 1.4H14z" fill="#5a3418"/>$X</svg>',
 	"shields": '<svg viewBox="0 0 24 24"><defs><linearGradient id="m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="$B"/><stop offset=".45" stop-color="$A"/><stop offset="1" stop-color="$D"/></linearGradient><radialGradient id="d" cx=".36" cy=".32" r=".78"><stop offset="0" stop-color="$B"/><stop offset=".35" stop-color="$A"/><stop offset="1" stop-color="$D"/></radialGradient></defs><circle cx="12" cy="12" r="10.4" fill="$C"/><circle cx="12" cy="12" r="9.6" fill="url(#m)"/><circle cx="12" cy="12" r="7.6" fill="$C" opacity=".7"/><circle cx="12" cy="12" r="7.1" fill="url(#d)"/>$X<path d="M5.4 9.6a7.2 7.2 0 0 1 5-5.2" stroke="#fff" stroke-width="1.2" opacity=".6" fill="none" stroke-linecap="round"/><path d="M3.4 10.4a8.8 8.8 0 0 1 6-6.8" stroke="#fff" stroke-width=".6" opacity=".45" fill="none" stroke-linecap="round"/></svg>',
 }
@@ -55,13 +55,14 @@ const PTERUGES := '<g stroke="#1c0e06" stroke-width=".5"><path d="M6.6 17.4h2v5h
 
 const SVG := {
 	"t_ballistics": '<svg viewBox="0 0 24 24"><circle cx="15" cy="15" r="7" fill="#f3e6c8" stroke="#4a2410" stroke-width=".9"/><circle cx="15" cy="15" r="4.8" fill="#c8402c"/><circle cx="15" cy="15" r="2.7" fill="#f3e6c8"/><circle cx="15" cy="15" r="1.1" fill="#c8402c"/><path d="M2 9C4 4 9 2.4 13 4" stroke="#ffe27a" stroke-width=".9" stroke-dasharray="1.4 1.2" fill="none"/><path d="M3 3l10.4 10.4" stroke="#6a4a2a" stroke-width="1.7"/><path d="M14.6 14.6l-3.9-1.1 2.8-2.8z" fill="#dfe6ec" stroke="#5c6670" stroke-width=".5"/><path d="M3 3l3.4.5-1.5 1.5zM3 3l.5 3.4 1.5-1.5z" fill="#efe6cf" stroke="#7a6a50" stroke-width=".4"/></svg>',
-	"t_burning_pitch": '<svg viewBox="0 0 24 24"><path d="M2.8 21.2L14.2 9.8" stroke="#6a4a2a" stroke-width="1.8"/><path d="M2.8 21.2l3.4-.4-1.4-1.6zM2.8 21.2l.4-3.4 1.6 1.4z" fill="#efe6cf"/><path d="M13.4 10.6c-.6-3.2 1.4-6 4-7.6-.3 1.7.4 2.8 1.7 3.4 1.1.6 1.8 1.5 1.5 3-.3 2.6-3 4.3-5.6 3.7-.8-.2-1.2-.9-1.6-2.5z" fill="#e5601e" stroke="#7a2a0c" stroke-width=".6"/><path d="M15.2 10.6c0-1.9 1-3.4 2.5-4.2 0 1 .6 1.7 1.3 2.1.6.5.6 1.7 0 2.3-1 1.1-2.9 1.1-3.8-.2z" fill="#ffd27a"/><path d="M12.6 11.4l3.3-1.3-2 3.3z" fill="#3a3a3a"/></svg>',
-	"t_phobos": '<svg viewBox="0 0 24 24"><path d="M2.6 13.2A10 10 0 0 1 10.8 3M2 17.6A14.6 14.6 0 0 1 15.2 2.2" stroke="#e0402c" stroke-width="1.3" fill="none" opacity=".9"/><path d="M4 21.6A18 18 0 0 1 21.6 4" stroke="#e0402c" stroke-width="1" fill="none" opacity=".5"/><path d="M5 19L15.4 8.6" stroke="#3a220e" stroke-width="3" stroke-linecap="round"/><path d="M5 19L15.4 8.6" stroke="#b07a46" stroke-width="1.6" stroke-linecap="round"/><path d="M14 10C14.4 6.4 17.6 3.4 22 2 20.6 6.4 17.6 9.6 14 10z" fill="#dfe6ec" stroke="#5a1408" stroke-width=".9"/><path d="M14.8 9.2L21 3" stroke="#ff8a70" stroke-width=".9"/></svg>',
-	"t_enyo": '<svg viewBox="0 0 24 24"><circle cx="17.4" cy="6.6" r="3.6" fill="#e0402c" opacity=".35"/><path d="M5 2.6c7.4 1.8 13.4 8 15.4 16.4" stroke="#3a1a08" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M5 2.6c7.4 1.8 13.4 8 15.4 16.4" stroke="#9a4a20" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M5 2.6L20.4 19" stroke="#efe6cf" stroke-width=".7"/><path d="M3 16L17 6.8" stroke="#c9a24c" stroke-width="1.3"/><path d="M18.6 5.8l-3.6.4 1.8 2.6z" fill="#e0402c" stroke="#5a1408" stroke-width=".5"/><path d="M3 16l1.2-2.8.8 1.6zM3 16l3-.4-1.2-1.2z" fill="#e0402c"/></svg>',
-	"t_sarissa": '<svg viewBox="0 0 24 24"><path d="M1.6 18.4L19.4 2.6M5.6 22.4L21.4 6.6" stroke="#3a220e" stroke-width="2.4" stroke-linecap="round"/><path d="M1.6 18.4L19.4 2.6M5.6 22.4L21.4 6.6" stroke="#b07a46" stroke-width="1.1" stroke-linecap="round"/><path d="M18.6 3.4l3.8-2-2 3.8zM20.6 7.4l3-1.6-1.6 3z" fill="#dfe6ec" stroke="#4a5058" stroke-width=".5"/><circle cx="7.6" cy="15.6" r="5" fill="#2a4a8a" stroke="#0e1a34" stroke-width=".9"/><circle cx="7.6" cy="15.6" r="3.4" fill="none" stroke="#d9a83a" stroke-width="1"/><circle cx="7.6" cy="15.6" r="1.2" fill="#ffe9a0"/></svg>',
+	"t_burning_pitch": '<svg viewBox="0 0 24 24"><defs><radialGradient id="f" cx=".55" cy=".75" r=".8"><stop offset="0" stop-color="#fff6c0"/><stop offset=".3" stop-color="#ffc040"/><stop offset=".7" stop-color="#f05a1a"/><stop offset="1" stop-color="#8a1a06"/></radialGradient><linearGradient id="h" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#a8b6c2"/><stop offset="1" stop-color="#3c4650"/></linearGradient></defs><path d="M3.4 16.2C2 11.4 4.6 7.2 8 6c-.4 1.8.4 3 1.6 3.2-.2-3.2 2-6.4 5.6-8 -.8 2.4 0 4.2 1.4 5.2 1.8 1.4 2 4.4.4 6.6-2.4 3.4-9.6 6.6-13.6 3.2z" fill="url(#f)" stroke="#5a1404" stroke-width=".9"/><path d="M6.2 14.6C5.4 12.2 6.6 10.2 8.4 9.6c0 1.2.6 1.8 1.4 1.8.2-2 1.4-3.8 3.4-4.6-.4 1.4.2 2.4 1 3 1 .8 1 2.6 0 3.6-1.8 2-5.6 3.2-8 1.2z" fill="#fff6c0" opacity=".9"/><path d="M2.4 21.6L15.6 8.4" stroke="#2a1406" stroke-width="3.4" stroke-linecap="round"/><path d="M2.4 21.6L15.6 8.4" stroke="#b07c4a" stroke-width="1.9" stroke-linecap="round"/><path d="M22.6 1.4l-3.2 8.2-2-3-3-2z" fill="url(#h)" stroke="#1a1e22" stroke-width=".8"/><path d="M1.8 22.2l1-4.2 2.2 2.2zM1.8 22.2l4.2-1-2.2-2.2z" fill="#efe6cf" stroke="#4a3a2a" stroke-width=".5"/></svg>',
+	"t_phobos": '<svg viewBox="0 0 24 24"><defs><linearGradient id="b" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffd8b8"/><stop offset=".45" stop-color="#e8502c"/><stop offset="1" stop-color="#6a1008"/></linearGradient><linearGradient id="w" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e0a878"/><stop offset="1" stop-color="#5a3014"/></linearGradient></defs><path d="M6.4 3.6l2.8 2.2-1.8.9 2.6 2.4M17.6 3.6l-2.8 2.2 1.8.9-2.6 2.4M3.6 10.2l3.8.7-1.1 1.5 3.4.4M20.4 10.2l-3.8.7 1.1 1.5-3.4.4" stroke="#4a0804" stroke-width="2.6" fill="none" stroke-linejoin="round" stroke-linecap="round"/><path d="M6.4 3.6l2.8 2.2-1.8.9 2.6 2.4M17.6 3.6l-2.8 2.2 1.8.9-2.6 2.4M3.6 10.2l3.8.7-1.1 1.5 3.4.4M20.4 10.2l-3.8.7 1.1 1.5-3.4.4" stroke="#ff6a40" stroke-width="1.3" fill="none" stroke-linejoin="round" stroke-linecap="round"/><rect x="10.6" y="12" width="2.8" height="11.2" rx="1.1" fill="url(#w)" stroke="#2a1406" stroke-width=".8"/><path d="M10.6 16.4h2.8M10.6 18.2h2.8" stroke="#2a1406" stroke-width=".6"/><rect x="10" y="11.2" width="4" height="2.6" rx=".7" fill="#d8a040" stroke="#3a2008" stroke-width=".6"/><path d="M12 .6C14.8 3.8 16 7.4 15.2 10.4L13.6 12h-3.2L8.8 10.4C8 7.4 9.2 3.8 12 .6z" fill="url(#b)" stroke="#3a0804" stroke-width=".9"/><path d="M12 2.4v9.2" stroke="#7a1808" stroke-width=".9"/><path d="M11.2 3.4c-1.1 2.1-1.5 4.2-1.1 6.4" stroke="#fff0e0" stroke-width=".7" fill="none" opacity=".85"/></svg>',
+	"t_deimos": '<svg viewBox="0 0 24 24"><defs><linearGradient id="m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4f8fb"/><stop offset=".5" stop-color="#9aa8b4"/><stop offset="1" stop-color="#36404a"/></linearGradient></defs><path d="M2.6 9.4c2-3.2 5.2-2 6.2-4.4M14.6 21.4c3.2-.8 3.2-4 6.4-4.2" stroke="#b070e0" stroke-width="2.2" fill="none" stroke-linecap="round" opacity=".75"/><path d="M7.4 16.6C9 11 12.6 6 21 2.2 21.8 7.4 18.6 12.4 12.6 15.2 11 16 9.6 16.8 8.8 18z" fill="url(#m)" stroke="#141a20" stroke-width=".9"/><path d="M9.2 15.2C11.2 10.6 14.8 6.4 20.2 3.4" stroke="#fff" stroke-width=".7" fill="none" opacity=".85"/><path d="M5.2 15.4l5 4.4" stroke="#2a1406" stroke-width="3.2" stroke-linecap="round"/><path d="M5.2 15.4l5 4.4" stroke="#d8a040" stroke-width="1.9" stroke-linecap="round"/><path d="M7.4 18.6L3.4 22" stroke="#2a1406" stroke-width="3.4" stroke-linecap="round"/><path d="M7.4 18.6L3.4 22" stroke="#8a4220" stroke-width="2" stroke-linecap="round"/><circle cx="2.9" cy="22.3" r="1.5" fill="#d8a040" stroke="#2a1406" stroke-width=".6"/></svg>',
+	"t_enyo": '<svg viewBox="0 0 24 24"><defs><linearGradient id="w" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e8b07a"/><stop offset=".6" stop-color="#8a4a20"/><stop offset="1" stop-color="#3a1a08"/></linearGradient></defs><circle cx="20.6" cy="12" r="3.6" fill="#ff3a6a" opacity=".35"/><path d="M8.6 2C14.8 4.6 16.6 8.6 15.8 12 16.6 15.4 14.8 19.4 8.6 22M8.6 2C7.6 1.2 6.2 1.4 6.2 1.4M8.6 22C7.6 22.8 6.2 22.6 6.2 22.6" stroke="#2a1006" stroke-width="3.8" fill="none" stroke-linecap="round"/><path d="M8.6 2C14.8 4.6 16.6 8.6 15.8 12 16.6 15.4 14.8 19.4 8.6 22M8.6 2C7.6 1.2 6.2 1.4 6.2 1.4M8.6 22C7.6 22.8 6.2 22.6 6.2 22.6" stroke="url(#w)" stroke-width="2.3" fill="none" stroke-linecap="round"/><path d="M8.6 2L5 12l3.6 10" stroke="#f3e6c8" stroke-width=".8" fill="none"/><rect x="14.6" y="10.2" width="2.6" height="3.6" rx=".6" fill="#8a1a14" stroke="#2a0604" stroke-width=".5"/><path d="M4.8 12H20" stroke="#2a1006" stroke-width="2.2"/><path d="M4.8 12H20" stroke="#e0c090" stroke-width="1.1"/><path d="M23.6 12l-4.6-2.8v5.6z" fill="#ff4a3a" stroke="#4a0806" stroke-width=".6"/><path d="M5 12L2.2 9.2h2.8L7.4 12zM5 12l-2.8 2.8h2.8L7.4 12z" fill="#c03aa0" stroke="#3a0a30" stroke-width=".5"/></svg>',
+	"t_sarissa": '<svg viewBox="0 0 24 24"><defs><linearGradient id="h" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#a8b6c2"/><stop offset="1" stop-color="#3c4650"/></linearGradient></defs><g stroke-linecap="round"><path d="M10.4 23.2L4.8 6.2M12 23.2V5.4M13.6 23.2l5.6-17" stroke="#2a1406" stroke-width="2.8"/><path d="M10.4 23.2L4.8 6.2M12 23.2V5.4M13.6 23.2l5.6-17" stroke="#c08a52" stroke-width="1.4"/></g><g transform="translate(4.4 4.4) rotate(-18)"><path d="M0 -3.8C1.5 -1.8 1.8 .6 1 2.4H-1C-1.8 .6 -1.5 -1.8 0 -3.8z" fill="url(#h)" stroke="#20262c" stroke-width=".6"/><path d="M0 -2.8V2.2" stroke="#fff" stroke-width=".4" opacity=".8"/></g><g transform="translate(12 3.4) rotate(0)"><path d="M0 -3.8C1.5 -1.8 1.8 .6 1 2.4H-1C-1.8 .6 -1.5 -1.8 0 -3.8z" fill="url(#h)" stroke="#20262c" stroke-width=".6"/><path d="M0 -2.8V2.2" stroke="#fff" stroke-width=".4" opacity=".8"/></g><g transform="translate(19.6 4.4) rotate(18)"><path d="M0 -3.8C1.5 -1.8 1.8 .6 1 2.4H-1C-1.8 .6 -1.5 -1.8 0 -3.8z" fill="url(#h)" stroke="#20262c" stroke-width=".6"/><path d="M0 -2.8V2.2" stroke="#fff" stroke-width=".4" opacity=".8"/></g><path d="M7.6 16.2h8.8" stroke="#4a0806" stroke-width="3" stroke-linecap="round"/><path d="M7.6 16.2h8.8" stroke="#d8402a" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16.2" r="1.6" fill="#e0b040" stroke="#4a3008" stroke-width=".6"/></svg>',
 	"t_aegis": '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.6" fill="#4a3008"/><circle cx="12" cy="12" r="8.7" fill="#d9a83a"/><circle cx="12" cy="12" r="7.2" fill="none" stroke="#ffe9a0" stroke-width=".8"/><path d="M8.4 9C6.6 8 6.2 6 7.4 4.8M10 7.8c-.4-1.8.4-3.2 2-3.8M14 7.8c.4-1.8-.4-3.2-2-3.8M15.6 9c1.8-1 2.2-3 1-4.2M8.2 14.6c-1.8.8-2.4 2.6-1.4 4M15.8 14.6c1.8.8 2.4 2.6 1.4 4" stroke="#3d7a2a" stroke-width="1.3" fill="none" stroke-linecap="round"/><circle cx="12" cy="12.4" r="3.8" fill="#efd2a8" stroke="#6a4a20" stroke-width=".7"/><circle cx="10.6" cy="11.8" r=".7" fill="#1a1006"/><circle cx="13.4" cy="11.8" r=".7" fill="#1a1006"/><path d="M10.6 14.2q1.4.9 2.8 0" stroke="#6a1a10" stroke-width=".8" fill="none"/></svg>',
 	"t_sun_ray": '<svg viewBox="0 0 24 24"><path d="M12 .8l1.3 4.4h-2.6zM12 23.2l1.3-4.4h-2.6zM.8 12l4.4 1.3v-2.6zM23.2 12l-4.4 1.3v-2.6zM4.1 4.1l4 2.2-1.8 1.8zM19.9 19.9l-4-2.2 1.8-1.8zM19.9 4.1l-2.2 4-1.8-1.8zM4.1 19.9l2.2-4 1.8 1.8z" fill="#f2c14e" stroke="#8a5a10" stroke-width=".4"/><circle cx="12" cy="12" r="5.2" fill="#ffd970" stroke="#fff4c0" stroke-width="1"/><circle cx="10.6" cy="10.6" r="1.8" fill="#fff8dc" opacity=".8"/></svg>',
-	"t_shafts_of_plague": '<svg viewBox="0 0 24 24"><path d="M3 3l11.4 11.4" stroke="#6a4a2a" stroke-width="1.7"/><path d="M15.6 15.6l-3.9-1.1 2.8-2.8z" fill="#7cc84a" stroke="#1d4410" stroke-width=".5"/><path d="M3 3l3.4.5-1.5 1.5zM3 3l.5 3.4 1.5-1.5z" fill="#efe6cf"/><path d="M18 13.4c1.5 2.1 2.2 3.2 2.2 4.3a2.2 2.2 0 0 1-4.4 0c0-1.1.7-2.2 2.2-4.3zM13 17.4c1 1.4 1.5 2.2 1.5 2.9a1.5 1.5 0 0 1-3 0c0-.7.5-1.5 1.5-2.9zM19.4 5.4c1 1.4 1.5 2.2 1.5 2.9a1.5 1.5 0 0 1-3 0c0-.7.5-1.5 1.5-2.9z" fill="#7cc84a" stroke="#d8f0b0" stroke-width=".6"/></svg>',
+	"t_shafts_of_plague": '<svg viewBox="0 0 24 24"><path d="M2.6 2.6l11.6 11.6" stroke="#2a1406" stroke-width="3.2" stroke-linecap="round"/><path d="M2.6 2.6l11.6 11.6" stroke="#a87444" stroke-width="1.8" stroke-linecap="round"/><path d="M16.4 16.4l-5.4-1.4 4-4z" fill="#7cc84a" stroke="#1d4410" stroke-width=".7"/><path d="M2.2 2.2l4.6.6-2 2zM2.2 2.2l.6 4.6 2-2z" fill="#efe6cf" stroke="#4a3a2a" stroke-width=".5"/><path d="M18.6 13c1.7 2.4 2.5 3.6 2.5 4.8a2.5 2.5 0 0 1-5 0c0-1.2.8-2.4 2.5-4.8zM12.6 17.4c1.2 1.6 1.7 2.4 1.7 3.2a1.7 1.7 0 0 1-3.4 0c0-.8.5-1.6 1.7-3.2zM20 4.6c1.2 1.6 1.7 2.4 1.7 3.2a1.7 1.7 0 0 1-3.4 0c0-.8.5-1.6 1.7-3.2z" fill="#8ad85a" stroke="#1d4410" stroke-width=".7"/></svg>',
 	"t_forge_of_olympus": '<svg viewBox="0 0 24 24"><path d="M2.6 9.4h14.2c0 2.4-2 3.6-4.4 3.8v2.2h2.4v2H5.6v-2H8v-2.2c-2.4-.2-4-1.4-5.4-3.8z" fill="#5c6670" stroke="#d0d8de" stroke-width=".7"/><rect x="4.6" y="17.4" width="11.2" height="3.2" rx=".6" fill="#3e464e" stroke="#1a1e22" stroke-width=".5"/><path d="M6.4 9.4h7" stroke="#ff8a3a" stroke-width="1.4"/><path d="M13.6 3.2l6.4 6.4" stroke="#6a4a2a" stroke-width="1.9" stroke-linecap="round"/><path d="M17.2 1.2l3.4 3.4-2.4 2.4-3.4-3.4z" fill="#cfd6dc" stroke="#4a5058" stroke-width=".6"/><path d="M8.6 7l.8-2.4M11.4 7.2l.6-2.6M6 7.4l-1-2M9.8 3.4l.2-1.6" stroke="#ffb347" stroke-width="1" stroke-linecap="round"/></svg>',
 	"t_olympian_weapons": '<svg viewBox="0 0 24 24"><path d="M12 1.6l1.8 3.2v10.4h-3.6V4.8z" fill="#eef4f8" stroke="#6c7a86" stroke-width=".7"/><path d="M12 3v12" stroke="#b8c4cc" stroke-width=".6"/><rect x="7.2" y="15" width="9.6" height="2" rx=".9" fill="#e0b040" stroke="#5a3a10" stroke-width=".5"/><rect x="11.1" y="17" width="1.8" height="4" fill="#7a5230"/><circle cx="12" cy="21.8" r="1.3" fill="#e0b040"/><path d="M5.4 2.4L3 8h2.4L3.8 13l4.4-6.4H5.8L7.4 2.4zM18.6 2.4L21 8h-2.4l1.6 5-4.4-6.4h2.4l-1.6-4.2z" fill="#bfe3ff" stroke="#e8f6ff" stroke-width=".5"/></svg>',
 	"t_harvest_of_souls": '<svg viewBox="0 0 24 24"><path d="M5.6 21.4L13.4 7.6" stroke="#3a220e" stroke-width="2.6" stroke-linecap="round"/><path d="M5.6 21.4L13.4 7.6" stroke="#8a5a30" stroke-width="1.3" stroke-linecap="round"/><path d="M12.8 8.4c1.2-4.2 5.4-6 9.6-5.4-4.2 1-6.8 3.2-7.4 7z" fill="#cfd6dc" stroke="#4a5058" stroke-width=".6"/><path d="M5.4 12.6C3.2 10.6 4 7.4 6 6.4c-.6 1.6.4 2.6 1.4 3.2 1.1.8.8 2.6-.6 3.4zM17.6 18.4c-1.6-1.6-1-4 .6-4.8-.4 1.2.3 2 1 2.4.9.6.6 2-.4 2.6z" fill="#9fe0d0" stroke="#e0fff6" stroke-width=".5" opacity=".9"/><circle cx="6.2" cy="9.4" r=".5" fill="#1a3a34"/><circle cx="18.4" cy="16" r=".4" fill="#1a3a34"/></svg>',
@@ -76,7 +77,7 @@ const SVG := {
 	"t_golden_apples": '<svg viewBox="0 0 24 24"><circle cx="12" cy="14" r="7.2" fill="#f2c14e" stroke="#7a4a08" stroke-width=".9"/><path d="M12 7.6c-1 .2-1.4.4-1.6 1" stroke="#7a4a08" stroke-width=".8" fill="none"/><ellipse cx="9.4" cy="11.6" rx="1.6" ry="2.5" fill="#fff4c0" opacity=".8"/><path d="M12 7.4c0-2 1-3.4 2.4-4.2" stroke="#5b3a1d" stroke-width="1.3" fill="none"/><path d="M13.2 5.4c2-2 5-1.4 6-.4-2 1.8-4 1.8-6 .4z" fill="#5da83a"/></svg>',
 	"t_dionysia": '<svg viewBox="0 0 24 24"><path d="M12 6c0-2 1-3 2.6-3.6" stroke="#5b3a1d" stroke-width="1.2" fill="none"/><path d="M12.6 4.2c2.4-2 5.4-1 6.2 0-2.4 2-4.6 1.8-6.2 0z" fill="#5da83a"/><g fill="#7a3a9a" stroke="#2a0c3a" stroke-width=".5"><circle cx="8" cy="9" r="2.3"/><circle cx="12.4" cy="8.4" r="2.3"/><circle cx="16.6" cy="9" r="2.3"/><circle cx="10" cy="12.8" r="2.3"/><circle cx="14.6" cy="12.8" r="2.3"/><circle cx="12.2" cy="16.6" r="2.3"/><circle cx="12.4" cy="20.2" r="1.8"/></g><g fill="#d8a8f0" opacity=".8"><circle cx="7.2" cy="8.2" r=".7"/><circle cx="11.6" cy="7.6" r=".7"/><circle cx="9.2" cy="12" r=".7"/><circle cx="13.8" cy="12" r=".7"/><circle cx="11.4" cy="15.8" r=".7"/></g></svg>',
 	"t_face_of_the_gorgon": '<svg viewBox="0 0 24 24"><path d="M7.6 10C5 9 4 6 5.4 4M9.6 8.4C9 6 10 3.6 12 2.6M14.4 8.4C15 6 14 3.6 12.4 2.6M16.4 10C19 9 20 6 18.6 4M7.4 14.4C5 15.4 3.4 17.4 4 20M16.6 14.4c2.4 1 4 3 3.4 5.6" stroke="#2f5a1a" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M7.6 10C5 9 4 6 5.4 4M9.6 8.4C9 6 10 3.6 12 2.6M14.4 8.4C15 6 14 3.6 12.4 2.6M16.4 10C19 9 20 6 18.6 4M7.4 14.4C5 15.4 3.4 17.4 4 20M16.6 14.4c2.4 1 4 3 3.4 5.6" stroke="#6ab04a" stroke-width="1.2" fill="none" stroke-linecap="round"/><circle cx="12" cy="13" r="5.2" fill="#9cc88a" stroke="#2f5a1a" stroke-width=".8"/><circle cx="10.1" cy="12.4" r="1" fill="#ffe27a"/><circle cx="13.9" cy="12.4" r="1" fill="#ffe27a"/><path d="M10 16q2 1.1 4 0" stroke="#2f5a1a" stroke-width=".9" fill="none"/></svg>',
-	"t_monstrous_rage": '<svg viewBox="0 0 24 24"><path d="M4.6 3c2 6.2 5 12.2 10.2 18.4M9.8 2c1.6 6 4 11.2 9.2 16.4M15 2c1 4 3 8 6.4 11.2" stroke="#5a1408" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M4.6 3c2 6.2 5 12.2 10.2 18.4M9.8 2c1.6 6 4 11.2 9.2 16.4M15 2c1 4 3 8 6.4 11.2" stroke="#e0402c" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M5.4 4.4c1.4 4 3 7.6 5 10.8" stroke="#ffb0a0" stroke-width=".6" fill="none"/></svg>',
+	"t_monstrous_rage": '<svg viewBox="0 0 24 24"><path d="M4.4 2.6c2 6.2 5 12.2 10.2 18.6M9.8 1.8c1.6 6 4 11.2 9.2 16.6M15.2 1.8c1 4 3 8 6.4 11.2" stroke="#3a0804" stroke-width="4.6" fill="none" stroke-linecap="round"/><path d="M4.4 2.6c2 6.2 5 12.2 10.2 18.6M9.8 1.8c1.6 6 4 11.2 9.2 16.6M15.2 1.8c1 4 3 8 6.4 11.2" stroke="#e8402c" stroke-width="2.8" fill="none" stroke-linecap="round"/><path d="M5.2 4.2c1.4 4 3 7.6 5 10.8M10.6 3.4c1.2 4 2.8 7.6 5.4 10.4" stroke="#ffc0b0" stroke-width=".8" fill="none" stroke-linecap="round"/></svg>',
 	"t_pious_sacrifice": '<svg viewBox="0 0 24 24"><path d="M12 2.6c2.6 3 4.4 5 4.4 7.4A4.4 4.4 0 0 1 12 14.4 4.4 4.4 0 0 1 7.6 10c0-2.4 1.8-4.4 4.4-7.4z" fill="#e5601e" stroke="#7a2a0c" stroke-width=".6"/><path d="M12 6.8c1.4 1.8 2.2 3 2.2 4.2a2.2 2.2 0 0 1-4.4 0c0-1.2.8-2.4 2.2-4.2z" fill="#ffd27a"/><path d="M4.6 14h14.8v2.2H4.6z" fill="#efe2c4" stroke="#6a5a40" stroke-width=".6"/><path d="M6.6 16.2h10.8v5.2H6.6z" fill="#d8c8a4" stroke="#6a5a40" stroke-width=".6"/><path d="M8.4 18.8h7.2" stroke="#8a2a1a" stroke-width=".9"/></svg>',
 	"t_tax_collectors": '<svg viewBox="0 0 24 24"><path d="M6.6 3.4h7.6L12.4 6.2c3.8 1.9 5.6 5.6 5.6 8.4 0 2.8-2.8 4.6-7.4 4.6S3.2 17.4 3.2 14.6c0-2.8 1.8-6.5 5.4-8.4z" fill="#c09050" stroke="#f3dca4" stroke-width="1"/><path d="M8 6.4h5" stroke="#6a4a20" stroke-width="1.2"/><circle cx="17.4" cy="17.6" r="3.8" fill="#f2c14e" stroke="#7a4a08" stroke-width=".8"/><circle cx="17.4" cy="17.6" r="2.4" fill="none" stroke="#fff4c0" stroke-width=".6"/><circle cx="14" cy="20.4" r="2.8" fill="#e0a526" stroke="#7a4a08" stroke-width=".7"/></svg>',
 	"t_ambassadors": '<svg viewBox="0 0 24 24"><path d="M6 3h11a3 3 0 0 1 0 6h-1v10a2 2 0 0 1-2 2H5a3 3 0 0 1 0-6h1z" fill="#e9dcc0" stroke="#7a5a2c" stroke-width="1"/><path d="M9 7h5M9 10h5M9 13h3" stroke="#7a5a2c" stroke-width="1.1"/><path d="M14.6 16.4l-1.4 5.4 2.4-1.4 2.4 1.4-1.4-5.4z" fill="#2a5aa8"/><circle cx="16" cy="15.4" r="2.6" fill="#c8402c" stroke="#5a1408" stroke-width=".6"/></svg>',
@@ -117,7 +118,7 @@ static func god_emblem(god: String) -> String:
 ## tech key -> icon name
 const BY_TECH := {
 	"ballistics": "t_ballistics", "burning_pitch": "t_burning_pitch",
-	"phobos_spear_of_panic": "t_phobos", "deimos_sword_of_dread": "t_phobos", "enyo_bow_of_horror": "t_enyo",
+	"phobos_spear_of_panic": "t_phobos", "deimos_sword_of_dread": "t_deimos", "enyo_bow_of_horror": "t_enyo",
 	"sarissa": "t_sarissa", "aegis_shield": "t_aegis", "sun_ray": "t_sun_ray", "shafts_of_plague": "t_shafts_of_plague",
 	"forge_of_olympus": "t_forge_of_olympus", "olympian_weapons": "t_olympian_weapons", "harvest_of_souls": "t_harvest_of_souls",
 	"tax_collectors": "t_tax_collectors", "ambassadors": "t_ambassadors", "coinage": "t_coinage",
@@ -182,7 +183,7 @@ const PLATES := {
 const PLATE_OF := {
 	"t_weapons": "ember", "t_armor": "steel", "t_shields": "sea",
 	"t_ballistics": "amber", "t_burning_pitch": "amber", "t_forge_of_olympus": "amber",
-	"t_phobos": "dusk", "t_enyo": "dusk", "t_monstrous_rage": "dusk", "t_sarissa": "steel",
+	"t_phobos": "dusk", "t_deimos": "dusk", "t_enyo": "dusk", "t_monstrous_rage": "dusk", "t_sarissa": "steel",
 	"t_aegis": "bronze", "t_sun_ray": "sky", "t_shafts_of_plague": "verdant", "t_olympian_weapons": "violet",
 	"t_harvest_of_souls": "violet", "t_omniscience": "sky", "t_olympian_parentage": "violet",
 	"t_labyrinth": "amber", "t_sylvan_lore": "verdant", "t_will_of_kronos": "violet", "t_hymn": "verdant",
@@ -192,6 +193,8 @@ const PLATE_OF := {
 }
 
 static var _tiles := {}
+## the share of the tile a glyph's drawn bounds fill (its longer side)
+const FIT := 0.84
 
 static func plate_of(name: String) -> String:
 	if PLATE_OF.has(name):
@@ -282,13 +285,23 @@ static func bake(name: String, n: int, locked := false) -> Image:
 	var gl := Color(str(pl[3]))
 	var nparts := name.split("_")
 	var tint := 0.3 if nparts.size() == 3 and TIERS.has(nparts[2]) else 0.0
-	var gs := int(round(n * 0.9))
+	# fit the glyph's drawn bounds (not its 24-unit box) to FIT of the tile, so
+	# a thin diagonal glyph fills the button as a round one does
 	var g := Image.new()
-	if g.load_svg_from_string(src, float(gs) / 24.0) != OK:
+	var s0 := float(n) / 24.0
+	if g.load_svg_from_string(src, s0) != OK:
+		return null
+	var ur := g.get_used_rect()
+	if ur.size.x <= 0 or ur.size.y <= 0:
+		return null
+	var fit := FIT * n
+	var s1 := s0 * minf(minf(fit / ur.size.x, fit / ur.size.y), 1.6)
+	if g.load_svg_from_string(src, s1) != OK:
 		return null
 	g.convert(Image.FORMAT_RGBA8)
-	var ox := (n - g.get_width()) / 2
-	var oy := (n - g.get_height()) / 2 - int(n * 0.01)
+	ur = g.get_used_rect()
+	var ox := (n - ur.size.x) / 2 - ur.position.x
+	var oy := (n - ur.size.y) / 2 - ur.position.y
 	var gd := g.get_data()
 	var gw := g.get_width()
 	var gh := g.get_height()
@@ -318,6 +331,9 @@ static func bake(name: String, n: int, locked := false) -> Image:
 	var H := _blur(A, n, maxi(1, int(round(1.6 * u))))
 	var SH := _blur(A, n, maxi(1, int(round(2.4 * u))))
 	var GL := _blur(A, n, maxi(2, int(round(6.0 * u))))
+	# a dark sticker outline around the silhouette (dilated alpha), so the
+	# shape reads against any plate, greyed or not
+	var OL := _blur(A, n, maxi(1, int(round(1.0 * u))))
 	var sdx := int(round(1.4 * u))
 	var sdy := int(round(2.2 * u))
 	var L := Vector3(-0.55, -0.7, 0.62).normalized()
@@ -355,6 +371,10 @@ static func bake(name: String, n: int, locked := false) -> Image:
 				pr *= 1.0 - sh
 				pg *= 1.0 - sh
 				pb *= 1.0 - sh
+			var ol := clampf(OL[i] * 3.2, 0.0, 1.0) * 0.92
+			pr = lerpf(pr, 0.035, ol)
+			pg = lerpf(pg, 0.025, ol)
+			pb = lerpf(pb, 0.03, ol)
 			var a := A[i]
 			var r := pr
 			var gg := pg
@@ -386,18 +406,25 @@ static func bake(name: String, n: int, locked := false) -> Image:
 			gg += sheen
 			b += sheen
 			if locked:
+				# value split: the plate drops to a dark slate, the glyph keeps
+				# a lifted grey, so a locked tile is colourless but its picture
+				# still reads (outline dark, glyph light, plate in between)
 				var l := r * 0.3 + gg * 0.55 + b * 0.15
-				var lr := l * 0.56 + 0.02
-				var lg := l * 0.58 + 0.025
-				var lb := l * 0.64 + 0.035
+				var plum := pr * 0.3 + pg * 0.55 + pb * 0.15
+				var gl2 := l * 0.62 + 0.16
+				var pv := plum * 0.5 + 0.01
+				var v := lerpf(pv, gl2, a)
+				var lr := v * 0.94
+				var lg := v * 0.97
+				var lb := v * 1.06
 				if tint > 0.0 and a > 0.0:
 					# a tier's metal keeps a trace of its hue on the glyph only
 					# (copper rust, bronze ochre, iron slate), so the three tiers
 					# still read apart once locked; the plate stays grey
 					var w := tint * a
-					lr = lerpf(lr, r * 0.62, w)
-					lg = lerpf(lg, gg * 0.62, w)
-					lb = lerpf(lb, b * 0.62, w)
+					lr = lerpf(lr, r * 0.75, w)
+					lg = lerpf(lg, gg * 0.75, w)
+					lb = lerpf(lb, b * 0.75, w)
 				r = lr
 				gg = lg
 				b = lb

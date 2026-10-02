@@ -1214,8 +1214,18 @@ Mythology: Retold's command panel (`reference/techs/ui_01..05`).
   a top sheen; the glyph embossed from its own silhouette (height = blurred
   alpha, key light from the top left, a specular glint, darker inner edges), a
   rim light in the family's glow on its far edges, a soft drop shadow and a
-  halo on the plate. "locked" is the same tile desaturated and darkened (a
-  tier glyph keeps a trace of its metal). No
+  halo on the plate, and a dark sticker outline (dilated alpha) round the
+  silhouette so it reads against any plate. The glyph's drawn bounds (not
+  its 24-unit box) are fitted to 84% of the tile (`FIT`), so a thin diagonal
+  glyph fills the button as a round one does. Every glyph is a bold, distinct
+  silhouette at 48 px: Phobos' Spear upright with a broad red blade and
+  terror sparks, Deimos' Sword a curved kopis, Enyo's Bow a recurve with the
+  arrow drawn level, Sarissa a fan of three pikes, Burning Pitch a steel head
+  trailing fire. "locked" is the same tile with no colour and its values
+  split: the plate drops to a dark slate (luminance x 0.5), the glyph keeps a
+  lifted grey (x 0.62 + 0.16), the outline stays dark, so the picture still
+  reads greyed (a tier glyph keeps a trace of its metal). Iterate on the set
+  with a contact sheet: `TechIcons.bake(name, 64, locked)` for every name. No
   plate is red: red means "can't afford".
 - **Tooltips** (`hud._draw_wide_tooltip`, commands with `wide`): the name and
   "(hotkey)", "Cost: 100 [food] 100 [gold] 30s [hourglass]" (red where short;
@@ -1266,19 +1276,19 @@ coloured by state (`hud.status_color`).
 | state | button | tooltip line |
 |---|---|---|
 | `available` | full-colour tile, bright bevelled frame (gold: generic tech, purple: god tech) | "Available · Click to research" (green) |
-| `unaffordable` (`short`: the missing resources) | the tile in full colour under a red wash deepening to the foot, a red inner line, the first missing resource in a red disc bottom-left; the frame keeps its colour | "Can't afford · Need 40 more gold, 5 more favor" (red); the cost's short numbers red |
-| `locked` (`age_req` when an age, else a prerequisite) | the tile desaturated and darkened (`tile(..., "locked")`); a unit / building portrait the same: `hud.locked_portrait(tex)` reads the portrait back once, turns every pixel into the tiles' locked slate grey (luminance x 0.6-0.68) and caches it (a near-black tint for the frame or two before the portrait has rendered), on a grey cell plate (no team teal; mean saturation ~0.18, the same as a locked tech tile); a dim grey frame, a badge top-right: the required age's numeral (II / III / IV) or a padlock; the hotkey dimmed | "Locked · Requires Heroic Age" (tan) |
-| `researching` / `training` (`progress`, `count`) | a clockwise sweep from 12 o'clock darkens what is left, a green bar at the foot, the percentage on a tech, the count queued (green badge) on a train button | "Researching · 39% · 25s left · cancel it from the queue" (blue) |
+| `unaffordable` (`short`: the missing resources) | the picture in full colour under a light red cast (14%), a red inner line, and a dark red strip along the foot (13 px, shared with the hotkey) holding the missing resources' icons (up to two); nothing else on the picture; the frame keeps its colour | "Can't afford · Need 40 more gold, 5 more favor" (red); the cost's short numbers red |
+| `locked` (`age_req` when an age, else a prerequisite) | the tile desaturated and darkened (`tile(..., "locked")`); a unit / building portrait the same: `hud.locked_portrait(tex)` reads the portrait back once, turns every pixel into the tiles' locked slate grey (luminance x 0.6-0.68) and caches it (a near-black tint for the frame or two before the portrait has rendered), on a grey cell plate (no team teal; mean saturation ~0.18, the same as a locked tech tile); a dim grey frame, a badge riding the frame's top-right corner: the required age's numeral (II / III / IV) or a padlock; the hotkey dimmed | "Locked · Requires Heroic Age" (tan) |
+| `researching` / `training` (`progress`, `count`) | a clockwise sweep from 12 o'clock dims what is left (46%, the picture still reads under it), a thin green bar at the foot, the percentage small in the bottom-left corner on a tech (no plate behind it), the count queued (green badge on the top-right corner) on a train button | "Researching · 39% · 25s left · cancel it from the queue" (blue) |
 | `queued` (`count`: its place) | the tile dimmed, an hourglass, its place in the queue (amber badge) | "Queued · 2nd in the queue" (amber) |
 | researched | off the grid (the line's next tier takes the slot); on the card under RESEARCHED with a green check | |
 
 Every tooltip, narrow (train / build / age) or wide (techs, trades), opens
 with that state line right under the name, before the cost and the hotkey.
 
-Identity marks, top left: an Armory line's **tier pips** (1-3 diamonds in the
+Identity marks ride the frame, not the picture (the badges cover the frame's corners and the gap between cells, so the picture keeps the whole tile): an Armory line's **tier pips** on the top edge (1-3 diamonds in the
 tier's metal, `tier`; they keep their metal when locked, the one colour left on
 a locked tile, and a locked tier glyph keeps 30% of its metal's hue, rust /
-ochre / slate, on a grey plate, so copper, bronze and iron read apart greyed), a god tech's **medallion** with its god's emblem
+ochre / slate, on a grey plate, so copper, bronze and iron read apart greyed), a god tech's **medallion** on the top-left corner (8 px radius) with its god's emblem
 (`god`; `TechIcons.GODS`: Zeus' bolt, Athena's owl, Apollo's sun, Ares'
 helmet, ...: Greek gods share initials, so no letters). A click or key on a
 button that is not available says why (`_deny_text`: the lock, what is

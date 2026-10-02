@@ -520,34 +520,33 @@ func _draw_commands() -> void:
 func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bool) -> void:
 	var bold := S.font("bold")
 	var title := S.font("title")
-	# researching / training: a clockwise sweep darkens what is left, a bar at the foot
+	# researching / training: a clockwise sweep dims what is left (the picture
+	# stays readable under it), a bar at the foot, the percent in its corner
 	if st == "researching" or st == "training":
 		var p := clampf(float(c.get("progress", 0.0)), 0.0, 1.0)
-		_sweep(ir, p, Color(0.0, 0.03, 0.05, 0.58))
-		var bar := Rect2(ir.position.x, ir.end.y - 5, ir.size.x, 5)
-		draw_rect(bar, Color(0, 0, 0, 0.7))
-		S.hgrad(self, Rect2(bar.position + Vector2(0, 1), Vector2(bar.size.x * p, 3)), [[0.0, Color("#3fae3a")], [1.0, Color("#b8ff9a")]])
+		_sweep(ir, p, Color(0.0, 0.02, 0.04, 0.46))
+		var bar := Rect2(ir.position.x, ir.end.y - 4, ir.size.x, 4)
+		draw_rect(bar, Color(0, 0, 0, 0.75))
+		S.hgrad(self, Rect2(bar.position + Vector2(0, 1), Vector2(bar.size.x * p, 2)), [[0.0, Color("#3fae3a")], [1.0, Color("#b8ff9a")]])
 		var pc := "%d%%" % int(floor(p * 100)) if st == "researching" else ""
 		if pc != "":
-			var tw := S.text_width(bold, pc, 13)
-			var tp := Vector2(ir.get_center().x - tw * 0.5, ir.get_center().y + 5)
-			draw_string_outline(bold, tp, pc, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 4, Color(0, 0, 0, 0.85))
-			draw_string(bold, tp, pc, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#d8ffc8"))
+			var tp := Vector2(ir.position.x + 2, ir.end.y - 6)
+			draw_string_outline(bold, tp, pc, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, 4, Color(0, 0, 0, 0.9))
+			draw_string(bold, tp, pc, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#c8ffb8"))
 	elif st == "queued":
-		draw_rect(ir, Color(0.0, 0.03, 0.05, 0.5))
-		S.draw_icon(self, "t_time", Rect2(ir.get_center() - Vector2(10, 11), Vector2(20, 20)), true)
+		draw_rect(ir, Color(0.0, 0.03, 0.05, 0.38))
+		S.draw_icon(self, "t_time", Rect2(ir.get_center() - Vector2(8, 9), Vector2(16, 16)), true)
 	elif st == "unaffordable":
-		# Retold: a red wash; the first missing resource in a red badge
-		draw_rect(ir, Color(0.7, 0.04, 0.02, 0.26))
-		draw_rect(ir.grow(-2.5), Color("#ff4a2a"), false, 1.5)
-		S.vgrad(self, Rect2(ir.position.x, ir.get_center().y, ir.size.x, ir.size.y * 0.5), [[0.0, Color(0.8, 0.05, 0.02, 0.0)], [1.0, Color(0.85, 0.06, 0.02, 0.55)]])
+		# Retold: the picture stays in full colour under a light red cast; a red
+		# inner edge and, along the foot, a red strip with the missing resources
+		# (the hotkey shares it on the right), so nothing sits on the picture
+		draw_rect(ir, Color(0.75, 0.05, 0.02, 0.14))
+		draw_rect(ir.grow(-1), Color("#ff4a2a"), false, 1.5)
+		var strip := Rect2(ir.position.x, ir.end.y - 13, ir.size.x, 13)
+		S.vgrad(self, strip, [[0.0, Color(0.45, 0.02, 0.0, 0.0)], [0.35, Color(0.45, 0.03, 0.01, 0.82)], [1.0, Color(0.3, 0.0, 0.0, 0.92)]])
 		var sh: Array = c.get("short", [])
-		if not sh.is_empty():
-			var bc := Vector2(ir.position.x + 9, ir.end.y - 9)
-			draw_circle(bc, 9.0, Color(0.1, 0.0, 0.0, 0.9))
-			draw_circle(bc, 8.0, Color("#a8180e"))
-			draw_arc(bc, 8.5, 0, TAU, 20, Color("#ff9a80"), 1.0, true)
-			S.draw_icon(self, str(sh[0]), Rect2(bc - Vector2(6, 6), Vector2(12, 12)), false)
+		for k in mini(sh.size(), 2):
+			S.draw_icon(self, str(sh[k]), Rect2(strip.position + Vector2(2 + k * 12, 2), Vector2(11, 11)), false)
 	# the frame
 	var fam := str(c.get("frame", ""))
 	if fam != "":
@@ -573,18 +572,20 @@ func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bo
 	# identity: a god tech's medallion (the god's initial), an Armory line's tier pips
 	var god := str(c.get("god", ""))
 	if fam == "purple" and god != "":
-		var mc := ir.position + Vector2(9, 9)
+		# a small medallion riding the frame's top-left corner (mostly on the
+		# frame and the gap beside it, not on the picture)
+		var mc := rr.position + Vector2(6, 6)
 		var lockd := st == "locked"
-		draw_circle(mc, 9.0, Color(0.05, 0.0, 0.1, 0.95))
-		draw_circle(mc, 8.0, Color("#5a2a9a") if not lockd else Color("#3a3440"))
-		draw_arc(mc, 8.0, 0, TAU, 20, Color("#e8c8ff") if not lockd else Color("#8a8490"), 1.2, true)
+		draw_circle(mc, 8.0, Color(0.05, 0.0, 0.1, 0.95))
+		draw_circle(mc, 7.0, Color("#5a2a9a") if not lockd else Color("#3a3440"))
+		draw_arc(mc, 7.2, 0, TAU, 20, Color("#e8c8ff") if not lockd else Color("#8a8490"), 1.0, true)
 		var em := TechIcons.god_emblem(god)
 		if em != "":
-			S.draw_icon(self, em, Rect2(mc - Vector2(6, 6), Vector2(12, 12)), false, Color.WHITE if not lockd else Color(0.6, 0.6, 0.62))
+			S.draw_icon(self, em, Rect2(mc - Vector2(5.5, 5.5), Vector2(11, 11)), false, Color.WHITE if not lockd else Color(0.6, 0.6, 0.62))
 		else:
 			var ini := god.substr(0, 1).to_upper()
 			var iw := S.text_width(title, ini, 10)
-			draw_string(title, Vector2(mc.x - iw * 0.5, mc.y + 4), ini, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#fff4dc") if not lockd else Color("#b8b4bc"))
+			draw_string(title, Vector2(mc.x - iw * 0.5, mc.y + 3.5), ini, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#fff4dc") if not lockd else Color("#b8b4bc"))
 	var tier := int(c.get("tier", 0))
 	if tier > 0:
 		var tc: Color = [Color("#e07a40"), Color("#f0c040"), Color("#c8d6e2")][tier - 1]
@@ -593,29 +594,30 @@ func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bo
 		if st == "locked":
 			tc = tc.lerp(Color(0.6, 0.6, 0.62), 0.25)
 		for k in tier:
-			var pc := ir.position + Vector2(7 + k * 9, 7)
-			var dia := PackedVector2Array([pc + Vector2(0, -4.5), pc + Vector2(4.5, 0), pc + Vector2(0, 4.5), pc + Vector2(-4.5, 0)])
+			var pc := rr.position + Vector2(9 + k * 8, 2.5)
+			var dia := PackedVector2Array([pc + Vector2(0, -4), pc + Vector2(4, 0), pc + Vector2(0, 4), pc + Vector2(-4, 0)])
 			draw_colored_polygon(dia, Color(0, 0, 0, 0.9))
-			var din := PackedVector2Array([pc + Vector2(0, -3.3), pc + Vector2(3.3, 0), pc + Vector2(0, 3.3), pc + Vector2(-3.3, 0)])
+			var din := PackedVector2Array([pc + Vector2(0, -2.9), pc + Vector2(2.9, 0), pc + Vector2(0, 2.9), pc + Vector2(-2.9, 0)])
 			draw_colored_polygon(din, tc)
-			draw_colored_polygon(PackedVector2Array([pc + Vector2(0, -3.3), pc + Vector2(3.3, 0), pc, pc + Vector2(-3.3, 0)]), tc.lightened(0.35))
+			draw_colored_polygon(PackedVector2Array([pc + Vector2(0, -2.9), pc + Vector2(2.9, 0), pc, pc + Vector2(-2.9, 0)]), tc.lightened(0.35))
 	# state badge (top right): the age numeral or a padlock; the queue place / count
-	var bc2 := Vector2(ir.end.x - 8, ir.position.y + 8)
+	# (riding the frame's top-right corner, as the god medallion the left one)
+	var bc2 := Vector2(rr.end.x - 6, rr.position.y + 6)
 	if st == "locked":
-		draw_circle(bc2, 9.0, Color(0, 0, 0, 0.9))
-		draw_circle(bc2, 8.0, Color("#2a2c30"))
-		draw_arc(bc2, 8.0, 0, TAU, 20, Color("#b8a070"), 1.2, true)
+		draw_circle(bc2, 8.0, Color(0, 0, 0, 0.9))
+		draw_circle(bc2, 7.0, Color("#2a2c30"))
+		draw_arc(bc2, 7.0, 0, TAU, 20, Color("#b8a070"), 1.2, true)
 		if c.has("age_req"):
 			var rn: String = ["I", "II", "III", "IV"][clampi(int(c.age_req), 0, 3)]
-			var fs := 10 if rn.length() < 3 else 8
+			var fs := 9 if rn.length() < 3 else 8
 			var rw := S.text_width(title, rn, fs)
-			draw_string(title, Vector2(bc2.x - rw * 0.5, bc2.y + 4), rn, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color("#f0dca0"))
+			draw_string(title, Vector2(bc2.x - rw * 0.5, bc2.y + 3.5), rn, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color("#f0dca0"))
 		else:
-			S.draw_icon(self, "lock", Rect2(bc2 - Vector2(6, 6), Vector2(12, 12)), false)
+			S.draw_icon(self, "lock", Rect2(bc2 - Vector2(5, 5), Vector2(10, 10)), false)
 	elif (st == "queued" or st == "training") and int(c.get("count", 0)) > 0:
 		var n := str(int(c.count))
 		var bw := maxf(16.0, S.text_width(bold, n, 12) + 8)
-		var br := Rect2(ir.end.x - bw, ir.position.y, bw, 16)
+		var br := Rect2(rr.end.x - bw + 1, rr.position.y - 1, bw, 15)
 		draw_rect(br, Color(0, 0, 0, 0.85))
 		draw_rect(br.grow(-1), Color("#1e5a2a") if st == "training" else Color("#6a4a12"))
 		draw_rect(br.grow(-1), Color("#9ef58a") if st == "training" else Color("#ffd27a"), false, 1.0)
@@ -641,7 +643,7 @@ func _sweep(r: Rect2, p: float, col: Color) -> void:
 		# the sweep's leading edge, centre to the rect's border
 		var d := Vector2(cos(a0), sin(a0))
 		var t := minf(r.size.x * 0.5 / maxf(absf(d.x), 0.001), r.size.y * 0.5 / maxf(absf(d.y), 0.001))
-		draw_line(c, c + d * t, Color(0.85, 1.0, 0.8, 0.55), 1.0, true)
+		draw_line(c, c + d * t, Color(0.85, 1.0, 0.8, 0.3), 1.0, true)
 
 # selection card --------------------------------------------------------------------------------
 
