@@ -30,7 +30,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | core (foundation; skirmish builder: camera, fog pass, playtest) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck, `fog_view.gd` + `fog_of_war.gdshader` (fog-of-war shading, one full-screen pass), `playtest.gd` (scripted skirmish playthrough), `menu_playtest.gd` (the screen flow through real input: menu -> setup -> loading -> match -> Esc menu -> menu, see "Screen flow"), `match_rules.gd` + `match_check.gd` (match settings -> the sim, see "Match rules")) | `core/` (constants, rng, jsmath, bounds, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `match/` (the match setup: seats, teams, difficulty, stockpiles), `fortify/` (walls, gates, towers, their stages: Godot-only, see "Walls, gates, towers"), `sim.{h,cpp}` | `src/core/` |
 | terrain | `game/terrain/terrain.gd` + `terrain.gdshader` (chunks, paving cobbles / pale stone of MaterialPatches patchGround), `water.gdshader` (Water.js), `props.gdshader` (voxel.gdshader + MultiMesh instance tint, used by trees / gold / berries / ground details); mesher in `native/src/terrain_mesher.cpp` (TerrainMesh.js full port, water depth bake, GroundDetails.js scatter) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (sun + PCSS soft shadows, hemisphere = ambient colour + two unshadowed up/down lights, fill, depth haze following the camera, SSAO, MSAA, `--quality=high\|medium\|low`, `--post=high\|low\|off`), `grade_effect.gd` (CompositorEffect compute pass on the HDR buffer: exposure 2.1 + PBR Neutral + the PostFX.js grade; Godot's tonemap is LINEAR; Compatibility/web falls back to AgX), `sky.gdshader`. MaterialPatches.js canopy / foliage terms not ported yet | none | `src/lighting/` |
-| buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `walls.gd` (Greek walls, pillars and gates with swinging leaves, construction and damage states; models by `../scripts/export-walls.mjs`, see "Walls and gates: the look"), `towers.gd` + `tower_scene.gd` (Greek towers, a model per upgrade stage, construction / damage / upgrade states, the `towers` capture scene; models by `../scripts/export-towers.mjs`, see "Towers: the look"), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
+| buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `walls.gd` (Greek walls, pillars and gates with swinging leaves, construction and damage states; models by `../scripts/export-walls.mjs`, see "Walls and gates: the look"), `towers.gd` + `tower_scene.gd` (Greek towers, a model per upgrade stage, construction / damage / upgrade states, the `towers` capture scene; models by `../scripts/export-towers.mjs`, see "Towers: the look"), `tech_buildings.gd` + `techbuildings_scene.gd` (the Greek Armory and Market, a model per age look plus construction stages, the `techbuildings` capture scene; models by `../scripts/export-techbuildings.mjs`, see "Armory and Market: the look"), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
 | units | `game/units/units.gd` (rigs posed by the full anim.js port, conditional parts, crowd yaw / press / jitter, deaths and corpses, contact shadows), `unit.gdshader` (team lift + rim, hit flash, corpse drain, dithered fade) + `unit_outline.gdshader` (inverted hull, next pass); posing in C++: `native/src/unit_view.cpp` (`AovUnitView`) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
 | combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), `tower_fire.gd` + `tower_flash / tower_puff.gdshader` (tower arrows: loose flash, heavier arrow, tracer, strike; see "Towers: the look"), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported, plus god powers and a wave log, Godot-only; enemy_ai_fort.cpp: the AI's walls, towers and breaches, Godot-only) | `src/combat/` |
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor; Godot-only activity fx: axe / pick chips and dust, sickle chaff, stooks on cut rows, hoof dust, shoal ripples, fish splashes, net ripples, boat wakes; crops sway, `econ_voxel.gdshader`, `fx_chip / fx_puff / fx_ring.gdshader`), buffers built in C++ by `AovEconView` (`native/src/econ_view.{h,cpp}`, render side, reads the sim, never writes it) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
@@ -188,7 +188,8 @@ godot --path godot -- --scene=town [--seed=N] [--mapsize=N] [--units=N] [--playe
   `models` (every exported model on one strip), `walls` (a walled Greek town,
   see "Walls and gates: the look"), `aifort` (two AIs play a match in the
   setup: their own walls, gates, towers and breaches, see "Enemy AI:
-  fortifications") and `menu` (the main menu,
+  fortifications"), `techbuildings` (the Greek Armory and Market, see
+  "Armory and Market: the look") and `menu` (the main menu,
   below). **Without `--scene`** the game opens the main menu; a run with
   `--out`, `--quit` or `--bench` and no `--scene` still gets the skirmish, as
   before (so does the web build's `?scene=` query). Like main.js, main.gd turns
@@ -819,6 +820,71 @@ node scripts/godot-shoot.mjs --scene towers --out shots/godot/towers.png
 node scripts/export-towers.mjs            # re-export godot/assets/models/towers.*
 ```
 
+## Armory and Market: the look (game/buildings/tech_buildings.gd)
+
+The Greek Armory and Market after Age of Mythology: Retold
+(`reference/techs/building_01..03` the Armory, `building_04..06` the
+Market, one per age), drawn by `game/buildings/tech_buildings.gd` (a child
+of the buildings piece; `buildings.gd` hands it the sim's `armory` /
+`market` rows and skips them itself, like the towers). Models: the
+Godot-only `techbuildings` group (`node scripts/export-techbuildings.mjs`,
+~10 s, deterministic; re-run it after changing the script, never hand-edit
+`assets/models/techbuildings.*`): 1/8-tile voxels (the walls' and towers'
+resolution) plus the town's smooth tile roofs (`src/buildings/shapes.js`
+gableRoof / shedRoof / roundColumn with the tile sizes doubled, so tiles
+match the other buildings'), the buildings' palette and weathering, the
+team colour in bands, cloth and shields. Both are 4 x 4 tiles (the sim's
+defs), pivoted at the footprint centre, the front to +z.
+
+- **Armory** (`armory/*`): a long whitewashed hall with a dark socle and a
+  **team band**, a terracotta gable roof crossed by two raised pedimented
+  gables, a timber porch with barrels, a door with a marble frame, an axe and
+  a ladder on the front wall and a team shield; a plank **lean-to smithy**
+  on the east end (forge hearth with glowing coals under a hood and flue,
+  bellows, anvil, grindstone, quench bucket, tool rack, team shields leaning
+  on its open end); in the yard the round **smelting furnace** (a stone
+  plinth, a smooth tapering lime-washed bottle kiln, soot round its lip,
+  coals glowing in the throat, a stone fire mouth with a glowing hearth,
+  tongs), a water trough, the **weapon rack** (spears with steel heads,
+  hung swords, team shields), an anvil, crates of ingots, charcoal.
+- **Market** (`market/*`): a two-storey **stoa** (team band at the foot and
+  under the upper floor, windows, pedimented gable roof), a columned wing
+  with a pediment to the front, a terrace with an **iron balustrade** and an
+  outside stair, an open court of crates, painted amphorae, barrels and
+  sacks, and three **stalls** (two on the front, one on the east side): a
+  plank counter with a team skirt and three heaped produce crates (red
+  fruit, greens, grapes, oranges, lemons) in front, posts, a small tile
+  gable at the back and the **team / white striped awning** sloping out
+  from under its eave, with a scalloped valance.
+- **Age looks**: `<type>/a1` (Archaic, Classical: terracotta roofs, red
+  tympana), `a2` (Heroic: pale green glazed roofs, blue tympana, **team
+  finials** on the gables, the Armory's fence), `a3` (Mythic: marble roofs,
+  gilt acroteria, marble pilasters), chosen by the owner's
+  `get_player(owner).age`.
+- **Construction**: `<type>/s0..s7` (floor(progress * 8), cut from `a1`
+  like `src/buildings/construction.js`: 0 = the staked lot with team
+  pennants and a rope, 1..7 = the work rising inside a timber scaffold with
+  plank walks, braces, a hoist and stacked blocks; the roofs appear at s7).
+- `TechBuildings.model_key(type, built, progress, age)`, `mesh_for(type,
+  age)` (a finished mesh, for portraits and placement ghosts: the ui's
+  `buildings/<type>/0` lookups have no such model), `model_override[id]`
+  (one sim building in another look), `set_static(entries)` (render-only
+  buildings: `{type, owner, x, z, age | key}`).
+
+Capture scene `techbuildings` (`game/buildings/techbuildings_scene.gd`):
+the `town` scene's town with an Armory and a Market side by side on
+cleared lots just south of it, the camera close and high like the
+references. Spawned by the sim when it has the `armory` / `market` types,
+else drawn render-only on the same lots.
+
+```
+node scripts/godot-shoot.mjs --scene techbuildings --out shots/godot/techbuildings.png
+     [--params "techb_age=2"]          # the owner in the Heroic (2) / Mythic (3) age
+     [--params "techb_states=1&cam=40,112,30,42,15"]   # a row: a1 a2 a3 of each, s0, s3, s5
+     [--params "techb_static=1"]       # render-only even when the sim has the types
+node scripts/export-techbuildings.mjs   # re-export godot/assets/models/techbuildings.*
+```
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower
@@ -1008,7 +1074,9 @@ gate, the tower ghost and the upgraded tower.
   EconomyView keys), `combat/arrow|debris_*`. Godot-only models (no JS
   builder) are authored in the same format by their own scripts:
   `walls/*` by `scripts/export-walls.mjs` (see "Walls and gates: the look"),
-  `towers/*` by `scripts/export-towers.mjs` (see "Towers: the look").
+  `towers/*` by `scripts/export-towers.mjs` (see "Towers: the look"),
+  `techbuildings/*` by `scripts/export-techbuildings.mjs` (see "Armory and
+  Market: the look").
 - **Unit rigs**: `VoxelModels.rig(type)` = `{voxel, anim, style, euler: "XYZ",
   parts: [{name, anim (channel), joint, parent, parentIdx, coat, portrait,
   conditional, mesh}]}`, parents first. Part world transform =

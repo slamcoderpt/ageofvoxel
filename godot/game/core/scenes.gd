@@ -57,6 +57,11 @@ static var SCENES := {
 	# front of them under fire (the setup steps the sim until arrows fly).
 	"towers": {"preset": "skirmish", "seed": 7, "hud": false, "reveal_all": true, "fast_forward": 0.0,
 		"camera": {"distance": 25.0, "pitch": 19.0, "yaw": -40.0}},
+	# Godot-only: the Greek Armory and Market (game/buildings/tech_buildings.gd,
+	# techbuildings_scene.gd): the town with both on cleared lots at its edge,
+	# the camera close and high like reference/techs/building_01 / building_04.
+	"techbuildings": {"preset": "skirmish", "seed": 7, "hud": false, "reveal_all": true, "fast_forward": 0.0,
+		"camera": {"distance": 17.0, "pitch": 45.0, "yaw": 22.0, "focus_dx": -0.3, "focus_dz": -1.2}},
 	# Godot-only: the enemy AI's own fortifications (game/core/aifort_scene.gd):
 	# two AIs play aifort_t minutes in the setup (walls, gates, towers, breaches).
 	"aifort": {"preset": "skirmish", "seed": 2, "hud": false, "reveal_all": true, "fast_forward": 0.0,
