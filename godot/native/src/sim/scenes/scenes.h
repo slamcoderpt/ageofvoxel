@@ -55,6 +55,7 @@ TownResult build_town(Sim &sim, int owner, const Start &start, int villagers = 2
 // URL-style scene parameters (the stress scene's ?units=N)
 struct SceneOpts {
 	int units = 2000;
+	bool fort = true; // stress: every town walled in with towers (Godot rules only; ?fort=0 off)
 };
 
 bool has(const std::string &name);
@@ -67,7 +68,7 @@ void after(Sim &sim, const std::string &name, const SceneCtx &ctx);
 SceneCtx battle_setup(Sim &sim);
 void battle_after(Sim &sim, const SceneCtx &ctx);
 SceneCtx godpower_setup(Sim &sim);
-SceneCtx stress_setup(Sim &sim, int units);
+SceneCtx stress_setup(Sim &sim, int units, bool fort = true);
 
 } // namespace scenes
 } // namespace aov

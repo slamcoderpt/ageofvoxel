@@ -43,6 +43,24 @@ static var SCENES := {
 	# still field (the screen is opaque); --players=2..6, --open=<picker>.
 	"setup": {"preset": "battle", "seed": 1, "map_size": 96, "hud": false, "reveal_all": true, "fast_forward": 0.0,
 		"screen": "res://game/menu/setup/setup.gd", "camera": {"distance": 40.0}},
+	# Godot-only: Greek stone walls and gates (game/buildings/walls.gd): the town
+	# scene's town in a wall ring, a gate open and one closed, construction and
+	# damage; the camera looks along the south wall like reference/walls/walls_02.
+	"walls": {"preset": "skirmish", "seed": 7, "hud": false, "reveal_all": true, "fast_forward": 0.0,
+		"camera": {"distance": 27.0, "pitch": 37.0, "yaw": 44.0}},
+	# Godot-only: sim walls dragged at 0 / 22 / 45 / 67 degrees and across a
+	# house (game/buildings/wall_angles_scene.gd): how diagonal walls read.
+	"wall_angles": {"preset": "skirmish", "seed": 7, "hud": false, "reveal_all": true, "fast_forward": 0.0,
+		"camera": {"distance": 34.0, "pitch": 48.0, "yaw": 20.0}},
+	# Godot-only: Greek towers (game/buildings/towers.gd, game/combat/tower_fire.gd):
+	# the town with a row of towers at every upgrade stage, an enemy squad in
+	# front of them under fire (the setup steps the sim until arrows fly).
+	"towers": {"preset": "skirmish", "seed": 7, "hud": false, "reveal_all": true, "fast_forward": 0.0,
+		"camera": {"distance": 25.0, "pitch": 19.0, "yaw": -40.0}},
+	# Godot-only: the enemy AI's own fortifications (game/core/aifort_scene.gd):
+	# two AIs play aifort_t minutes in the setup (walls, gates, towers, breaches).
+	"aifort": {"preset": "skirmish", "seed": 2, "hud": false, "reveal_all": true, "fast_forward": 0.0,
+		"camera": {"distance": 46.0, "pitch": 50.0, "yaw": 30.0}},
 	# Godot-only: every exported model on a flat strip (checks scripts/export-models.mjs).
 	"models": {"preset": "battle", "seed": 1, "map_size": 96, "hud": false, "reveal_all": true, "fast_forward": 0.0,
 		"camera": {"distance": 34.0, "pitch": 38.0, "yaw": 0.0}},

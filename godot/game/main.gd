@@ -73,6 +73,7 @@ func _stage(key: String, text: String) -> void:
 
 func _ready() -> void:
 	AovScenes.set_setup("models", preload("res://game/core/model_gallery.gd").setup)
+	AovScenes.set_setup("aifort", preload("res://game/core/aifort_scene.gd").scene_setup)
 	args = AovArgs.parse()
 	if args.has("out") or AovArgs.flag(args, "quit", false) or AovArgs.flag(args, "bench", false):
 		# a script error leaves the engine running: never hang a capture / bench
@@ -259,7 +260,8 @@ func open_game_menu() -> void:
 
 ## URL-style parameters the C++ scene setups read (the stress scene's units=N).
 func scene_opts() -> Dictionary:
-	return {"units": maxi(12, int(round(float(args.get("units", scene_def.get("units", 2000))))))}
+	return {"units": maxi(12, int(round(float(args.get("units", scene_def.get("units", 2000)))))),
+		"fort": AovArgs.flag(args, "fort", true)}  # (stress: the towns' walls and towers, Godot rules only)
 
 ## Step the fixed-rate sim n seconds without rendering (scene fast-forward).
 func fast_forward(seconds: float) -> void:

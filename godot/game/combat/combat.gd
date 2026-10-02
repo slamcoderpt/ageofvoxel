@@ -29,6 +29,7 @@ var _chip_mm: MultiMesh
 var _drop_mms: Array[MultiMesh] = []
 var _bar_mat: ShaderMaterial
 var _scar_mm: MultiMesh
+var _tower_fire: Node3D = null   # tower_fire.gd: loose flashes, arrow glints, strikes of tower arrows
 
 func _add(mesh: Mesh, mat: Material, name_: String, shadows: bool, aabb: AABB) -> MultiMesh:
 	var mm := Units.make_mm(mesh, aabb)
@@ -65,8 +66,13 @@ func setup(g: Node) -> void:
 	_spark_mm = _add(quad, _shader("res://game/combat/spark.gdshader", 4), "Sparks", false, aabb)
 	_bar_mat = _shader("res://game/combat/health_bar.gdshader", 10)
 	_bar_mm = _add(quad, _bar_mat, "HealthBars", false, aabb)
+	_tower_fire = preload("res://game/combat/tower_fire.gd").new()
+	_tower_fire.name = "TowerFire"
+	add_child(_tower_fire)
+	_tower_fire.setup(game)
 
 func frame(_dt: float, _alpha: float) -> void:
+	_tower_fire.frame(_dt, _alpha)
 	var units = game.pieces.get("units")
 	if units == null or units.last.is_empty():
 		return

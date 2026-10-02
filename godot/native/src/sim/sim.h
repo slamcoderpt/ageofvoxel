@@ -31,6 +31,7 @@
 #include "core/victory.h"
 #include "buildings/buildings.h"
 #include "economy/economy.h"
+#include "fortify/fortify.h"
 #include "godpowers/godpowers.h"
 #include "match/match.h"
 #include "scenes/scenes.h"
@@ -69,6 +70,7 @@ public:
 	Buildings buildings;
 	Combat combat;
 	GodPowers godpowers;
+	Fortify fortify; // walls, gates, towers (Godot-only, fortify/fortify.h)
 	FogOfWar fog;
 	Victory victory;
 	SceneCtx scene; // the last scene setup's context (AovSim.setup_scene)

@@ -19,6 +19,10 @@ void Pathfinder::init(GameMap *m, Profile *p) {
 	stamp_.assign(n, 0);
 	closed_.assign(n, 0);
 	cur_stamp_ = 0;
+	regions = false;
+	for (auto &v : flood_marks_) v.clear();
+	flood_mark_ = nullptr;
+	floods_.clear();
 	cache_.clear();
 	cache_version_ = 0xffffffffu;
 	calls = searches = cache_hits = expanded_total = 0;
@@ -79,10 +83,11 @@ size_t Pathfinder::KeyHash::operator()(const Key &k) const {
 	return (size_t)(h ^ (h >> 29));
 }
 
-bool Pathfinder::nearest_walkable(int tx, int tz, int max_r, int &ox, int &oz) const {
+bool Pathfinder::nearest_impl(int tx, int tz, int max_r, int &ox, int &oz, bool gates) const {
 	const GameMap &m = *map;
 	CallTimer ct(prof, "nearestWalkable");
-	if (m.is_walkable(tx, tz)) { ox = tx; oz = tz; return true; }
+	auto ok = [&](int x, int z) { return gates ? walk(x, z) : m.is_walkable(x, z); };
+	if (ok(tx, tz)) { ox = tx; oz = tz; return true; }
 	// no ring within max_r reaches the map (also keeps tx + dx from overflowing)
 	if (tx < -max_r || tz < -max_r || tx >= m.size + max_r || tz >= m.size + max_r) return false;
 	for (int r = 1; r <= max_r; r++) {
@@ -91,7 +96,7 @@ bool Pathfinder::nearest_walkable(int tx, int tz, int max_r, int &ox, int &oz) c
 		for (int dz = -r; dz <= r; dz++)
 			for (int dx = -r; dx <= r; dx++) {
 				if (std::max(std::abs(dx), std::abs(dz)) != r) continue;
-				if (m.is_walkable(tx + dx, tz + dz)) {
+				if (ok(tx + dx, tz + dz)) {
 					int d = dx * dx + dz * dz;
 					if (d < bd) { bd = d; bx = tx + dx; bz = tz + dz; any = true; }
 				}
@@ -110,11 +115,11 @@ bool Pathfinder::line_walkable(int a, int b) const {
 	const int sx = x0 < x1 ? 1 : -1, sz = z0 < z1 ? 1 : -1;
 	int err = dx - dz;
 	while (true) {
-		if (!m.is_walkable(x0, z0)) return false;
+		if (!walk(x0, z0)) return false;
 		if (x0 == x1 && z0 == z1) return true;
 		int e2 = 2 * err;
 		if (e2 > -dz && e2 < dx) {
-			if (!m.is_walkable(x0 + sx, z0) || !m.is_walkable(x0, z0 + sz)) return false;
+			if (!walk(x0 + sx, z0) || !walk(x0, z0 + sz)) return false;
 		}
 		if (e2 > -dz) { err -= dz; x0 += sx; }
 		if (e2 < dx) { err += dx; z0 += sz; }
@@ -160,8 +165,8 @@ void Pathfinder::search(int stx, int stz, int gtx, int gtz, const GoalRect *rect
 		for (int d = 0; d < 8; d++) {
 			const int dx = DX[d], dz = DZ[d];
 			const int nx = cx + dx, nz = cz + dz;
-			if (!m.is_walkable(nx, nz)) continue;
-			if (dx && dz && (!m.is_walkable(cx + dx, cz) || !m.is_walkable(cx, cz + dz))) continue;
+			if (!walk(nx, nz)) continue;
+			if (dx && dz && (!walk(cx + dx, cz) || !walk(cx, cz + dz))) continue;
 			const int ni = nz * N + nx;
 			if (closed[ni] == stamp) continue;
 			const double ng = (double)g[cur] + COST[d];
@@ -182,6 +187,180 @@ void Pathfinder::search(int stx, int stz, int gtx, int gtz, const GoalRect *rect
 	res.found = found >= 0;
 }
 
+// ---- regions (Godot-only, see pathfinding.h) ----------------------------------
+
+static const int REGION_BUDGET = 4096; // tiles a goal's flood may cover before it counts as open ground
+
+void Pathfinder::flood_owner() {
+	const GameMap &m = *map;
+	const int po = m.gate_tiles > 0 && pass_owner >= 0 && pass_owner < 8 ? pass_owner : -1;
+	if (floods_.size() > 60000) {
+		for (auto &v : flood_marks_) v.clear();
+		floods_.clear();
+	}
+	std::vector<uint32_t> &v = flood_marks_[po + 1];
+	if (v.size() != (size_t)m.size * m.size) v.assign((size_t)m.size * m.size, 0u);
+	flood_mark_ = v.data();
+}
+
+int Pathfinder::flood_of(int tile, bool make) {
+	const GameMap &m = *map;
+	const int N = m.size;
+	const int po = m.gate_tiles > 0 && pass_owner >= 0 && pass_owner < 8 ? pass_owner : -1;
+	const uint32_t f = flood_mark_[tile];
+	if (f) {
+		Flood &fl = floods_[f - 1];
+		if (fl.valid && fl.ver != m.pass_version) {
+			// still good if no change since touched its box (or the ring round it)
+			const auto &L = m.pass_log;
+			if (L.empty() || L.front().ver > fl.ver + 1) fl.valid = false;
+			for (size_t i = L.size(); i-- > 0 && fl.valid && L[i].ver > fl.ver;)
+				if (L[i].x0 <= fl.x1 + 1 && L[i].x1 >= fl.x0 - 1 && L[i].z0 <= fl.z1 + 1 && L[i].z1 >= fl.z0 - 1) fl.valid = false;
+			if (fl.valid) fl.ver = m.pass_version;
+		}
+		if (fl.valid && fl.po == po) return (int)f - 1;
+		if (fl.closed) make = true; // (it was walled in a moment ago: flood it again, ~2000 tiles, not a failed A*)
+	}
+	if (!make) return -1;
+	const bool timed = prof && prof->enabled;
+	Clock::time_point t0;
+	if (timed) t0 = Clock::now();
+	region_floods++;
+	const int budget = REGION_BUDGET;
+	const uint32_t id = (uint32_t)floods_.size() + 1;
+	const int tx = tile % N, tz = tile / N;
+	Flood fl{ m.pass_version, po, true, true, tx, tz, tx, tz };
+	region_q_.clear();
+	region_q_.push_back(tile);
+	flood_mark_[tile] = id;
+	for (size_t q = 0; q < region_q_.size(); q++) {
+		if ((int)region_q_.size() > budget) {
+			fl.closed = false;
+			break;
+		}
+		const int c = region_q_[q], cx = c % N, cz = c / N;
+		fl.x0 = std::min(fl.x0, cx);
+		fl.x1 = std::max(fl.x1, cx);
+		fl.z0 = std::min(fl.z0, cz);
+		fl.z1 = std::max(fl.z1, cz);
+		const int nb[4] = { cx > 0 ? c - 1 : -1, cx < N - 1 ? c + 1 : -1, cz > 0 ? c - N : -1, cz < N - 1 ? c + N : -1 };
+		for (int i : nb)
+			if (i >= 0 && flood_mark_[i] != id && walk(i % N, i / N)) {
+				flood_mark_[i] = id;
+				region_q_.push_back(i);
+			}
+	}
+	if (!fl.closed) fl.valid = false; // (open ground: never used, its marks are just stale)
+	floods_.push_back(fl);
+	if (timed) prof->add_call("pathFlood", ms_since(t0));
+	return (int)id - 1;
+}
+
+// Is the goal (every walkable tile round the rect) in a closed region the
+// start is not in? Then (gtx, gtz) = the nearest walkable tile outside it.
+bool Pathfinder::region_cut(int stx, int stz, int &gtx, int &gtz, const GoalRect *rect, bool make) {
+	const GameMap &m = *map;
+	const int N = m.size;
+	if (!walk(stx, stz)) return false;
+	flood_owner();
+	int fid = -1;
+	auto enclosed = [&](int x, int z) { // the tile's flood is closed and holds no start
+		const int f = flood_of(z * N + x, make);
+		if (f < 0 || !floods_[f].closed || !floods_[f].valid || flood_mark_[stz * N + stx] == (uint32_t)f + 1) return false;
+		fid = f;
+		return true;
+	};
+	double cx = gtx + 0.5, cz = gtz + 0.5;
+	if (rect) {
+		const int x0 = std::max(0, (int)std::floor(rect->tx) - 1), z0 = std::max(0, (int)std::floor(rect->tz) - 1);
+		const int x1 = std::min(N - 1, (int)std::ceil(rect->tx + rect->w)), z1 = std::min(N - 1, (int)std::ceil(rect->tz + rect->h));
+		bool any = false;
+		for (int z = z0; z <= z1; z++)
+			for (int x = x0; x <= x1; x++) {
+				if (!walk(x, z)) continue;
+				if (!enclosed(x, z)) return false;
+				any = true;
+			}
+		if (!any) return false;
+		cx = rect->tx + rect->w / 2;
+		cz = rect->tz + rect->h / 2;
+	} else if (!walk(gtx, gtz) || !enclosed(gtx, gtz))
+		return false;
+	// the walkable tile outside it nearest the goal (rings round the goal, a
+	// few past the first holding one: a corner of ring r is farther than the
+	// middle of ring r * sqrt 2)
+	const int ox = gtx, oz = gtz;
+	int best = -1, r_end = 64;
+	double bd = INFINITY;
+	for (int r = 1; r <= r_end; r++) {
+		const int x0 = std::max(0, ox - r), x1 = std::min(N - 1, ox + r), z0 = std::max(0, oz - r), z1 = std::min(N - 1, oz + r);
+		for (int z = z0; z <= z1; z++) {
+			const bool edge = z == oz - r || z == oz + r;
+			for (int x = x0; x <= x1; x += edge ? 1 : std::max(1, x1 - x0)) {
+				if (!edge && x != ox - r && x != ox + r) continue;
+				const int i = z * N + x;
+				if (!walk(x, z) || flood_mark_[i] == (uint32_t)fid + 1) continue; // (inside the closed region)
+				const double gx = x + 0.5 - cx, gz = z + 0.5 - cz;
+				const double d = gx * gx + gz * gz;
+				if (d < bd) {
+					bd = d;
+					best = i;
+				}
+				if (r_end == 64) r_end = std::min(64, (int)std::ceil(r * 1.42) + 1);
+			}
+		}
+	}
+	if (best < 0) return false;
+	gtx = best % N;
+	gtz = best / N;
+	cut_fid_ = fid;
+	cut_cx_ = cx;
+	cut_cz_ = cz;
+	return true;
+}
+
+void Pathfinder::run_search(int stx, int stz, int gtx, int gtz, const GoalRect *rect, Result &res) {
+	const bool timed = prof && prof->enabled;
+	Clock::time_point t0;
+	if (timed) t0 = Clock::now();
+	int ax = gtx, az = gtz;
+	if (regions && region_cut(stx, stz, ax, az, rect, false)) {
+		region_cuts++;
+		// a short search to the gathering tile; if it is not in reach (round
+		// the far side, or cut off), the wall face on the line to the start
+		const int keep = max_nodes;
+		max_nodes = std::min(max_nodes, 6000);
+		search(stx, stz, ax, az, nullptr, res);
+		if (!res.found) {
+			const int N = map->size;
+			int x = (int)std::floor(cut_cx_), z = (int)std::floor(cut_cz_);
+			const int dx = std::abs(stx - x), dz = std::abs(stz - z), sx = x < stx ? 1 : -1, sz = z < stz ? 1 : -1;
+			int err = dx - dz, fx = -1, fz = -1;
+			for (int k = 0; k < dx + dz + 1; k++) {
+				if (walk(x, z) && flood_mark_[z * N + x] != (uint32_t)cut_fid_ + 1) {
+					fx = x;
+					fz = z;
+					break;
+				}
+				const int e2 = 2 * err;
+				if (e2 > -dz) { err -= dz; x += sx; }
+				if (e2 < dx) { err += dx; z += sz; }
+			}
+			max_nodes = keep; // (the face towards the start: in reach, a straight search)
+			if (fx >= 0 && (fx != ax || fz != az)) search(stx, stz, fx, fz, nullptr, res);
+		}
+		max_nodes = keep;
+		res.found = false;
+		if (timed) prof->add_call("pathCut", ms_since(t0)); // (the search to the near side of the wall)
+		return;
+	}
+	search(stx, stz, gtx, gtz, rect, res);
+	if (regions && !res.found) {
+		if (timed) prof->add_call("pathFail", ms_since(t0)); // (a full search that did not reach)
+		region_cut(stx, stz, ax, az, rect, true); // (flood the goal for the next ones)
+	}
+}
+
 void Pathfinder::smooth(const std::vector<int32_t> &tiles, std::vector<int32_t> &pts) const {
 	pts.clear();
 	int anchor = 0;
@@ -198,11 +377,11 @@ bool Pathfinder::start_tile(double sx, double sz, int &stx, int &stz) const {
 	const GameMap &m = *map;
 	stx = m.tile_clamp(sx / TILE);
 	stz = m.tile_clamp(sz / TILE);
-	if (!m.is_walkable(stx, stz)) {
+	if (!walk(stx, stz)) {
 		int wx, wz;
-		if (nearest_walkable(stx, stz, 4, wx, wz)) { stx = wx; stz = wz; }
+		if (nearest_impl(stx, stz, 4, wx, wz, true)) { stx = wx; stz = wz; }
 	}
-	return m.is_walkable(stx, stz);
+	return walk(stx, stz);
 }
 
 // Dijkstra from `goal` (8-connected, no corner cutting, the A* step costs)
@@ -234,8 +413,8 @@ int Pathfinder::run_field(int goal, const std::vector<int32_t> &want) {
 		for (int d = 0; d < 8; d++) {
 			const int dx = DX[d], dz = DZ[d];
 			const int nx = cx + dx, nz = cz + dz;
-			if (!m.is_walkable(nx, nz)) continue;
-			if (dx && dz && (!m.is_walkable(cx + dx, cz) || !m.is_walkable(cx, cz + dz))) continue;
+			if (!walk(nx, nz)) continue;
+			if (dx && dz && (!walk(cx + dx, cz) || !walk(cx, cz + dz))) continue;
 			const int ni = nz * N + nx;
 			if (closed[ni] == stamp) continue;
 			const double nd = dist[cur] + COST[d];
@@ -258,9 +437,9 @@ void Pathfinder::begin_group_field(double gx, double gz, const std::vector<Vec2d
 	const int N = m.size;
 	int gtx = m.tile_clamp(gx / TILE);
 	int gtz = m.tile_clamp(gz / TILE);
-	if (!m.is_walkable(gtx, gtz)) {
+	if (!walk(gtx, gtz)) {
 		int wx, wz;
-		if (!nearest_walkable(gtx, gtz, 16, wx, wz)) return;
+		if (!nearest_impl(gtx, gtz, 16, wx, wz, true)) return;
 		gtx = wx;
 		gtz = wz;
 	}
@@ -300,8 +479,8 @@ void Pathfinder::begin_group_field(double gx, double gz, const std::vector<Vec2d
 				for (int dx = -1; dx <= 1; dx++) {
 					if (!dx && !dz) continue;
 					const int nx = cx + dx, nz = cz + dz;
-					if (!m.is_walkable(nx, nz)) continue;
-					if (dx && dz && (!m.is_walkable(cx + dx, cz) || !m.is_walkable(cx, cz + dz))) continue;
+					if (!walk(nx, nz)) continue;
+					if (dx && dz && (!walk(cx + dx, cz) || !walk(cx, cz + dz))) continue;
 					const int ni = nz * N + nx;
 					if (closed[ni] == stamp) continue;
 					closed[ni] = stamp;
@@ -329,9 +508,9 @@ bool Pathfinder::field_path(double sx, double sz, double gx, double gz, std::vec
 	gz += field_shift_z_;
 	int gtx = m.tile_clamp(gx / TILE);
 	int gtz = m.tile_clamp(gz / TILE);
-	if (!m.is_walkable(gtx, gtz)) {
+	if (!walk(gtx, gtz)) {
 		int wx, wz;
-		if (!nearest_walkable(gtx, gtz, 16, wx, wz)) return false;
+		if (!nearest_impl(gtx, gtz, 16, wx, wz, true)) return false;
 		gtx = wx;
 		gtz = wz;
 		gx = (gtx + 0.5) * TILE;
@@ -377,6 +556,7 @@ void Pathfinder::find_path(double sx, double sz, double gx, double gz, const Goa
 	if (timed) t0 = Clock::now();
 	calls++;
 	out.clear();
+	last_found = true;
 	if (field_active_ && !rect) {
 		if (field_path(sx, sz, gx, gz, out)) {
 			if (timed) prof->add_call("findPath", ms_since(t0));
@@ -387,9 +567,9 @@ void Pathfinder::find_path(double sx, double sz, double gx, double gz, const Goa
 	const GameMap &m = *map;
 	const int N = m.size;
 	int stx = m.tile_clamp(sx / TILE), stz = m.tile_clamp(sz / TILE);
-	if (!m.is_walkable(stx, stz)) {
+	if (!walk(stx, stz)) {
 		int wx, wz;
-		if (nearest_walkable(stx, stz, 4, wx, wz)) { stx = wx; stz = wz; }
+		if (nearest_impl(stx, stz, 4, wx, wz, true)) { stx = wx; stz = wz; }
 	}
 	int gtx, gtz;
 	bool ok = true;
@@ -401,9 +581,9 @@ void Pathfinder::find_path(double sx, double sz, double gx, double gz, const Goa
 		if (!m.clamp_to_map(gx, gz)) ok = false;
 		gtx = m.tile_clamp(gx / TILE);
 		gtz = m.tile_clamp(gz / TILE);
-		if (!m.is_walkable(gtx, gtz)) {
+		if (!walk(gtx, gtz)) {
 			int wx, wz;
-			if (!nearest_walkable(gtx, gtz, 16, wx, wz)) ok = false;
+			if (!nearest_impl(gtx, gtz, 16, wx, wz, true)) ok = false;
 			else {
 				gtx = wx;
 				gtz = wz;
@@ -425,25 +605,27 @@ void Pathfinder::find_path(double sx, double sz, double gx, double gz, const Goa
 					cache_.clear();
 					cache_version_ = m.pass_version;
 				}
-				Key k{ stz * N + stx, gtz * N + gtx, (uint8_t)(rect ? 1 : 0), rect ? rect->tx : 0, rect ? rect->tz : 0, rect ? rect->w : 0, rect ? rect->h : 0 };
+				Key k{ stz * N + stx, gtz * N + gtx, (uint8_t)(rect ? 1 : 0), (int8_t)(m.gate_tiles > 0 ? pass_owner : -1), rect ? rect->tx : 0, rect ? rect->tz : 0, rect ? rect->w : 0, rect ? rect->h : 0 };
 				auto it = cache_.find(k);
 				if (it != cache_.end()) {
 					cache_hits++;
 					r = &it->second;
 				} else {
 					Result &slot = cache_[k];
-					search(stx, stz, gtx, gtz, rect, slot);
+					run_search(stx, stz, gtx, gtz, rect, slot);
 					r = &slot;
 				}
 			} else {
-				search(stx, stz, gtx, gtz, rect, local);
+				run_search(stx, stz, gtx, gtz, rect, local);
 				r = &local;
 			}
 			out.reserve(r->pts.size());
 			for (int32_t i : r->pts) out.push_back({ (i % N + 0.5) * TILE, (i / N + 0.5) * TILE });
 			if (r->found && !rect && !out.empty()) out.back() = { gx, gz };
+			last_found = r->found;
 		}
-	}
+	} else
+		last_found = false;
 	if (timed) prof->add_call("findPath", ms_since(t0));
 }
 

@@ -15,6 +15,7 @@
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
 #include <godot_cpp/variant/string.hpp>
+#include <godot_cpp/variant/vector2.hpp>
 
 #include "sim/sim.h"
 
@@ -113,6 +114,18 @@ public:
 	int64_t place_building(const String &type, int64_t owner, int64_t tx, int64_t tz, const PackedInt32Array &builders);
 	void destroy_building(int64_t id);
 	Dictionary get_building(int64_t id) const; // one building incl. its queue and rally point
+
+	// --- fortifications (sim/fortify, Godot-only; PORTING.md "Walls, gates, towers")
+	// a, b: world points (their tiles are the line's ends)
+	Dictionary plan_wall(int64_t owner, const Vector2 &a, const Vector2 &b) const; // ghost: {valid, reason, tiles, state, pieces, cost, new_tiles}
+	Dictionary place_wall(int64_t owner, const Vector2 &a, const Vector2 &b, const PackedInt32Array &builders); // {ok, reason, ids}
+	Dictionary convert_to_gate(int64_t id);               // {ok, reason}
+	Dictionary set_gate_locked(int64_t id, bool locked);  // {ok, reason}
+	Dictionary research(int64_t building, const String &tech); // {ok, reason}
+	bool cancel_research(int64_t building);
+	PackedStringArray fort_tech_names() const;
+	Dictionary get_walls() const;                // every wall piece, gate and tower (packed, see PORTING.md)
+	Dictionary get_fortify(int64_t owner) const; // stages, tower numbers, techs and their state
 
 	// --- economy (sim/economy)
 	Dictionary train(int64_t building, const String &unit_type);

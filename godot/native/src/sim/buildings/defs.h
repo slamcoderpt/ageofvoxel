@@ -15,7 +15,15 @@
 
 namespace aov {
 
-enum BuildingType : uint8_t { B_TOWN_CENTER, B_HOUSE, B_STOREHOUSE, B_FARM, B_TEMPLE, B_BARRACKS, B_TYPE_COUNT };
+// B_WALL .. B_TOWER are Godot-only fortifications (sim/fortify, Age of
+// Mythology: Retold): wall segments (a straight run of 1-4 tiles, rect w x h
+// set per piece), wall pillars (1x1, at ends, corners and every 5 tiles),
+// gates (a converted segment) and the sentry tower. Their hp, build time and
+// numbers depend on the owner's wall / tower stage (fortify.h); the values
+// here are stage 0, per tile for walls.
+enum BuildingType : uint8_t { B_TOWN_CENTER, B_HOUSE, B_STOREHOUSE, B_FARM, B_TEMPLE, B_BARRACKS, B_WALL, B_WALL_PILLAR, B_GATE, B_TOWER, B_TYPE_COUNT };
+inline bool is_wall_piece(int t) { return t == B_WALL || t == B_WALL_PILLAR || t == B_GATE; }
+inline bool is_fort_type(int t) { return t >= B_WALL && t <= B_TOWER; }
 
 constexpr double BUILDING_VOXEL = 0.25;
 constexpr int HOUSE_PLANS = 4;   // src/buildings/models.js
@@ -61,6 +69,15 @@ inline const BuildingDef *building_defs() {
 			false, 0, 0, 0, "R", 0, 1 },
 		{ "barracks", "Military Academy", 5, 5, 1500, Cost(0, 150, 0, 0), 30, 0, 8, 0, { U_HOPLITE, U_TOXOTES, U_HIPPIKON, -1 }, false, false, false, false,
 			false, 0, 0, 0, "B", 0, 1 },
+		// fortifications (Godot-only; costs per tile for walls; stone is gold here)
+		{ "wall", "Wooden Wall", 1, 1, 200, Cost(0, 4, 2, 0), 3, 0, 3, 0, { -1 }, false, false, false, false,
+			false, 0, 0, 0, "W", 0, 1 },
+		{ "wall_pillar", "Wall Pillar", 1, 1, 300, Cost(0, 4, 2, 0), 3, 0, 3, 0, { -1 }, false, false, false, false,
+			false, 0, 0, 0, "W", 0, 1 },
+		{ "gate", "Gate", 1, 1, 240, Cost(0, 30, 20, 0), 3, 0, 4, 0, { -1 }, false, false, false, false,
+			false, 0, 0, 0, "G", 0, 1 },
+		{ "tower", "Sentry Tower", 2, 2, 750, Cost(0, 120, 60, 0), 30, 0, 12, 0, { -1 }, false, false, false, false,
+			false, 0, 0, 0, "Y", 0, 1 },
 	};
 	// clang-format on
 	return D;

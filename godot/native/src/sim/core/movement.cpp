@@ -34,7 +34,9 @@ bool Movement::move_to(int r, double x, double z, const GoalRect *rect, double r
 	}
 	if (U.path[r] < 0) U.path[r] = sim->paths.alloc();
 	auto &path = sim->paths.at(U.path[r]);
+	sim->pathfinder.pass_owner = U.owner[r]; // (gates let their owner's side through)
 	sim->pathfinder.find_path(U.x[r], U.z[r], x, z, rect, path);
+	U.path_blocked[r] = !sim->pathfinder.last_found;
 	U.path_idx[r] = 0;
 	U.has_goal[r] = 1;
 	U.goal_x[r] = x;
@@ -113,7 +115,9 @@ void Movement::repath(int r) {
 	GoalRect gr{ U.goal_rtx[r], U.goal_rtz[r], U.goal_rw[r], U.goal_rh[r] };
 	if (U.path[r] < 0) U.path[r] = sim->paths.alloc();
 	auto &path = sim->paths.at(U.path[r]);
+	sim->pathfinder.pass_owner = U.owner[r];
 	sim->pathfinder.find_path(U.x[r], U.z[r], U.goal_x[r], U.goal_z[r], U.goal_has_rect[r] ? &gr : nullptr, path);
+	U.path_blocked[r] = !sim->pathfinder.last_found;
 	U.path_idx[r] = 0;
 	if (path.empty()) {
 		U.moving[r] = 0;
@@ -199,10 +203,13 @@ void Movement::update(double dt) {
 		vz += sz * 4;
 		if (vx == 0 && vz == 0) continue;
 		const double nx = U.x[r] + vx * dt, nz = U.z[r] + vz * dt;
-		if (map.walkable_at(nx, nz)) { U.x[r] = nx; U.z[r] = nz; }
-		else if (map.walkable_at(nx, U.z[r])) U.x[r] = nx;
-		else if (map.walkable_at(U.x[r], nz)) U.z[r] = nz;
-		else if (!map.walkable_at(U.x[r], U.z[r]) && map.in_world(nx, nz)) { U.x[r] = nx; U.z[r] = nz; } // escape if embedded (never off the map)
+		// (gates, Godot-only: open to their owner's side; without gates this is walkable_at)
+		const int wo = U.owner[r];
+		auto walk = [&](double x, double z) { return map.gate_tiles ? map.walkable_at_for(x, z, wo) : map.walkable_at(x, z); };
+		if (walk(nx, nz)) { U.x[r] = nx; U.z[r] = nz; }
+		else if (walk(nx, U.z[r])) U.x[r] = nx;
+		else if (walk(U.x[r], nz)) U.z[r] = nz;
+		else if (!walk(U.x[r], U.z[r]) && map.in_world(nx, nz)) { U.x[r] = nx; U.z[r] = nz; } // escape if embedded (never off the map)
 		hash.moved(r, U.x[r], U.z[r]);
 		if (U.moving[r]) {
 			const double want = jsm::atan2(vx, vz);

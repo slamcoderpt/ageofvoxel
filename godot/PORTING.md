@@ -27,15 +27,15 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 
 | Piece | GDScript (render / UI) | C++ sim (`native/src/sim/…`) | JS reference |
 |---|---|---|---|
-| core (foundation; skirmish builder: camera, fog pass, playtest) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck, `fog_view.gd` + `fog_of_war.gdshader` (fog-of-war shading, one full-screen pass), `playtest.gd` (scripted skirmish playthrough), `menu_playtest.gd` (the screen flow through real input: menu -> setup -> loading -> match -> Esc menu -> menu, see "Screen flow"), `match_rules.gd` + `match_check.gd` (match settings -> the sim, see "Match rules")) | `core/` (constants, rng, jsmath, bounds, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `match/` (the match setup: seats, teams, difficulty, stockpiles), `sim.{h,cpp}` | `src/core/` |
+| core (foundation; skirmish builder: camera, fog pass, playtest) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck, `fog_view.gd` + `fog_of_war.gdshader` (fog-of-war shading, one full-screen pass), `playtest.gd` (scripted skirmish playthrough), `menu_playtest.gd` (the screen flow through real input: menu -> setup -> loading -> match -> Esc menu -> menu, see "Screen flow"), `match_rules.gd` + `match_check.gd` (match settings -> the sim, see "Match rules")) | `core/` (constants, rng, jsmath, bounds, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `match/` (the match setup: seats, teams, difficulty, stockpiles), `fortify/` (walls, gates, towers, their stages: Godot-only, see "Walls, gates, towers"), `sim.{h,cpp}` | `src/core/` |
 | terrain | `game/terrain/terrain.gd` + `terrain.gdshader` (chunks, paving cobbles / pale stone of MaterialPatches patchGround), `water.gdshader` (Water.js), `props.gdshader` (voxel.gdshader + MultiMesh instance tint, used by trees / gold / berries / ground details); mesher in `native/src/terrain_mesher.cpp` (TerrainMesh.js full port, water depth bake, GroundDetails.js scatter) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (sun + PCSS soft shadows, hemisphere = ambient colour + two unshadowed up/down lights, fill, depth haze following the camera, SSAO, MSAA, `--quality=high\|medium\|low`, `--post=high\|low\|off`), `grade_effect.gd` (CompositorEffect compute pass on the HDR buffer: exposure 2.1 + PBR Neutral + the PostFX.js grade; Godot's tonemap is LINEAR; Compatibility/web falls back to AgX), `sky.gdshader`. MaterialPatches.js canopy / foliage terms not ported yet | none | `src/lighting/` |
-| buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
+| buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `walls.gd` (Greek walls, pillars and gates with swinging leaves, construction and damage states; models by `../scripts/export-walls.mjs`, see "Walls and gates: the look"), `towers.gd` + `tower_scene.gd` (Greek towers, a model per upgrade stage, construction / damage / upgrade states, the `towers` capture scene; models by `../scripts/export-towers.mjs`, see "Towers: the look"), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
 | units | `game/units/units.gd` (rigs posed by the full anim.js port, conditional parts, crowd yaw / press / jitter, deaths and corpses, contact shadows), `unit.gdshader` (team lift + rim, hit flash, corpse drain, dithered fade) + `unit_outline.gdshader` (inverted hull, next pass); posing in C++: `native/src/unit_view.cpp` (`AovUnitView`) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
-| combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported, plus god powers and a wave log, Godot-only) | `src/combat/` |
+| combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), `tower_fire.gd` + `tower_flash / tower_puff.gdshader` (tower arrows: loose flash, heavier arrow, tracer, strike; see "Towers: the look"), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported, plus god powers and a wave log, Godot-only; enemy_ai_fort.cpp: the AI's walls, towers and breaches, Godot-only) | `src/combat/` |
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor; Godot-only activity fx: axe / pick chips and dust, sickle chaff, stooks on cut rows, hoof dust, shoal ripples, fish splashes, net ripples, boat wakes; crops sway, `econ_voxel.gdshader`, `fx_chip / fx_puff / fx_ring.gdshader`), buffers built in C++ by `AovEconView` (`native/src/econ_view.{h,cpp}`, render side, reads the sim, never writes it) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
 | godpowers | `game/godpowers/godpowers.gd` (the whole BoltRenderer of effects.js: bolt / sky / zap ribbons, impact flash sprites and decals, scorches with ember cracks (hot orange / red, glowing as long as the scorch lasts), a charcoal ash edge and a hot rim, an expanding impact ring at every strike point (Godot-only; decals are pulled toward the camera so voxel bumps do not swallow them), crater debris, char rims, spark streaks, smoke and flames, the storm funnel (wall, cloud body, dust wall, ground shockwave, rain, energy bands, whirled debris), flyer trails / back lights / drop shadows, meteor fireball and fire, strike / storm point lights and the shadow spot, the full-frame storm grade with light pools; dims the lighting piece's sun / sky / grade while a storm plays), shaders beside it; buffers built in C++ by `AovGodpowerView` (`native/src/godpower_view.{h,cpp}`, render side, reads the sim, never writes it) | `godpowers/` (favor, cooldowns, Lightning Storm, Bolt, Meteor, thrown units: ported) | `src/godpowers/` |
-| ui (HUD, selection, input) | `game/ui/ui.gd` (selection, box / double-click select, smart orders, rally points, control groups, hotkeys, placement ghost, god-power targeting ring, move markers, selection rings (one MultiMesh) + bars, event feed, messages, result card; public: `pieces.ui.selected`, `hover_entity`, `message()`, `feed()`), `hud.gd` (the drawn HUD, two layers with hit zones), `hud_style.gd` (palette, Cinzel / Alegreya fonts in `fonts/`, SVG icons from `icons.gd` = `src/ui/icons.js` rasterised at runtime, draw helpers), `panel.gdshader` (the gilded teal panels), `minimap.gd` + `minimap_ground/units.gdshader` (terrain colours computed in the shader from `get_heights()` / `get_ground()` uploaded as textures, re-uploaded on `building:placed`; unit dots read straight from `get_units()` arrays as data textures: no per-unit script), `portraits.gd` + `portrait.gdshader` (one SubViewport per type / owner, rendered once, unshaded with the browser's three.js hemisphere + sun lighting, no tonemap) | none | `src/ui/` |
+| ui (HUD, selection, input) | `game/ui/ui.gd` (selection, box / double-click select, smart orders, rally points, control groups, hotkeys, placement ghost, wall drawing (click-drag line ghost, cost, snapping) and the wall / gate / tower commands (see "Walls, gates, towers: placement"), god-power targeting ring, move markers, selection rings (one MultiMesh) + bars, event feed, messages, result card; public: `pieces.ui.selected`, `hover_entity`, `message()`, `feed()`), `hud.gd` (the drawn HUD, two layers with hit zones), `hud_style.gd` (palette, Cinzel / Alegreya fonts in `fonts/`, SVG icons from `icons.gd` = `src/ui/icons.js` rasterised at runtime, draw helpers), `panel.gdshader` (the gilded teal panels), `minimap.gd` + `minimap_ground/units.gdshader` (terrain colours computed in the shader from `get_heights()` / `get_ground()` uploaded as textures, re-uploaded on `building:placed`; unit dots read straight from `get_units()` arrays as data textures: no per-unit script), `portraits.gd` + `portrait.gdshader` (one SubViewport per type / owner, rendered once, unshaded with the browser's three.js hemisphere + sun lighting, no tonemap) | none | `src/ui/` |
 | performance (6 teams, 2000 units) | `game/perf/perf.gd` (the render bench, `--renderbench`), and in the render paths of the stress scene: unit LOD + box shadow casters (`game/units`), coarse voxel twins `VoxelModels.coarse()` (tree shadow casters), tight resource / ground-detail buckets (`game/terrain`), economy props frustum culling (`AovEconView`); report in `../docs/godot-stress-report.md` | sim hot paths (with their owners); `native/src/unit_lod.cpp` (`AovUnitView.lod_mesh`) | `docs/stress-report.md` |
 | exports (Windows, macOS, Linux, web) | `export_presets.cfg`, `../scripts/godot-export.sh`, `../.github/workflows/godot.yml`, `native/SConstruct` + `native/aov.gdextension` (platform entries); see "Export" | none | `vite build` |
 | scenes | `AovScenes.set_setup()` from the owning piece, else the C++ setup | `scenes/` (helpers.js, skirmish / town / coast / hud, EconomyScene.js; battle.cpp: BattleScene.js + units/battleHost.js, godpower, stress.js: all ported) | `src/core/scenes/`, `BattleScene.js`, `EconomyScene.js` |
@@ -185,7 +185,10 @@ godot --path godot -- --scene=town [--seed=N] [--mapsize=N] [--units=N] [--playe
   seconds (default 600) so a script error never hangs a capture.
 - Scenes: `skirmish town battle godpower coast economy hud stress` (same
   presets, seeds, map sizes and cameras as the JS registry) and the Godot-only
-  `models` (every exported model on one strip) and `menu` (the main menu,
+  `models` (every exported model on one strip), `walls` (a walled Greek town,
+  see "Walls and gates: the look"), `aifort` (two AIs play a match in the
+  setup: their own walls, gates, towers and breaches, see "Enemy AI:
+  fortifications") and `menu` (the main menu,
   below). **Without `--scene`** the game opens the main menu; a run with
   `--out`, `--quit` or `--bench` and no `--scene` still gets the skirmish, as
   before (so does the web build's `?scene=` query). Like main.js, main.gd turns
@@ -251,7 +254,18 @@ units: about 1310-1340 alive on average over the recorded ticks instead of
 1926, 0.75-0.9 ms/tick mean; attack-move scans (`amPick`) cost 0.01
 ms/tick there); `--params "godot_rules=0"` (the browser's map and rules)
 gives the workload of the table above (1.06-1.09 ms/tick mean on this
-machine today). The render numbers and
+machine today). **Walls and towers in the stress scene** (rules on): every
+town is walled in by its EnemyAI at setup (`EnemyAI::fortify_now`: the AI's
+own square ring with clipped corners and a gate in each straight side,
+finished, plus two towers by the Town Center; ~600 buildings instead of
+~130), so the bench measures pathing round walls, breaches and tower fire;
+`--params "fort=0"` (`setup_scene(..., {fort: false})`) leaves them out.
+2000 units, three interleaved runs today (round 2, the AI's siege on):
+0.75-0.85 ms/tick mean (p95 1.43-1.69, max 2.7-4.0) walled, 0.69-0.90
+(p95 1.00-1.40) with `fort=0` (round 1 walled: 0.85-0.94, p95 1.55-1.90,
+single ticks of 10-14 ms); combat 0.17-0.20 ms/tick walled, 0.15-0.20
+without; `pathCut` / `pathFail` / `pathFlood` are the region rows of
+`findPath`, see "Walls, gates, towers". The render numbers and
 their method are in `../docs/godot-stress-report.md`.
 
 Render bench (xvfb + lavapipe, the counterpart of `scripts/bench.mjs`;
@@ -603,7 +617,11 @@ does `new_game` + `setup_match` in one call (checks, tools). The sim config:
   storms on 4+) plus **+20 % gather rate** (`Player::gather_mult`) and +150
   food / wood / gold. `set_ai(owner, {difficulty: "hard"})` switches one;
   `get_ai(owner).difficulty`, `get_player(id)` {team, human, difficulty,
-  gather_mult}.
+  gather_mult}. Fortifications scale too (Godot rules): every difficulty
+  walls its town in, Easy with at most one tower and the ring from 12 min,
+  Moderate two towers, Watch Tower, Stone Wall and the ring from 10 min,
+  Hard three towers and the ring from 7 min, Titan four towers and the ring
+  from 6 min (see "Enemy AI: fortifications").
 - Game speed and visibility stay main.gd's (`timescale`, `fog` args).
 
 ```
@@ -627,6 +645,244 @@ main.gd: players, teams, difficulty, colours, resources, speed, fog, the
 team score list). Today: Hard 6/6 over Easy, Titan 5/6 over Moderate (one
 undecided), Hard 4/6 over Moderate, Moderate 3/3 over Easy; peaceful
 villagers at 6 min 14 / 22 / 30 / 35.
+
+## Walls and gates: the look (game/buildings/walls.gd)
+
+Greek stone walls and gates after Age of Mythology: Retold
+(`reference/walls/walls_01`, `walls_02`, `gate_01..04`, `combat_01`,
+`place_01`), drawn by `game/buildings/walls.gd` (a child of the buildings
+piece; `buildings.gd` hands it every building whose type name contains
+`wall` or `gate` and skips them itself, as it skips any type with no
+exported model). Models: the Godot-only `walls` group, authored in JS in
+the buildings' style and palette and meshed by the browser's mesher
+(`node scripts/export-walls.mjs`, ~5 s, deterministic; re-run it after
+changing the script, never hand-edit `assets/models/walls.*`). Voxel = 1/8
+tile (twice the buildings' resolution: crenels, the meander and dentils need
+it); every model is pivoted at its tile centre, walls run along +x.
+
+- **Profile**: a stone skirt hanging 0.75 below the ground (slopes), a
+  plinth with a team ledge, ashlar in running bond, a gilt fillet, the
+  **team-colour meander** on a dark band (period 8 = one tile, the back face
+  mirrored, so the key runs on unbroken across tiles, arms and turned
+  pieces), dentils, a projecting cornice that is the paved wall-walk, then a
+  single parapet on the **outer** side only (a team band under plain stone
+  merlons, period 4, continuous from tile to tile) and a low stone curb on
+  the inner side. Every curtain piece has this one section at one height,
+  so a run has one wall-walk and one row of merlons. Each piece is turned so
+  its parapet faces away from the owner's nearest Town Center (`arm_m` is
+  the arm with its parapet mirrored, for turned arms). `pillar` (1.5 tiles,
+  1.5x the wall's height: quoins, team stripes, the team meander between
+  gilt fillets, a hollow crenellated top in plain stone), `pillar_flag`
+  (with a pole and three team pennants, at line ends), `pillar_gate` (the
+  gate tower: 1.75 tiles, taller still, a flag). The team colour is in the
+  bands, the frieze and the flags, never on the merlons.
+- **Layout** per tile from an occupancy grid (works for 1 x 1 pieces and
+  1 x n segments alike): a tile links to its 4 neighbours of the same owner
+  (to a gate only along the gate's axis) and to a diagonal one when no
+  orthogonal tile joins the two. A straight tile is `seg/<v>` (3 stone
+  variants by tile hash). Pillar tiles: the sim's `wall_pillar` pieces,
+  every end, corner and junction (so each run ends flush inside a pillar,
+  never butting into the next run), and for static walls with `auto` one
+  every <= 5 tiles of a run; beside a gate a pillar is a gate tower.
+  **Stepped runs** (a line dragged at an angle is a staircase of tiles):
+  the chain of tiles between two anchors (pillars, ends, junctions) that is
+  not one straight row is drawn as a straight curtain at its true angle,
+  pillar centre to pillar centre (the tile centres simplified to within 0.75
+  tiles, Douglas-Peucker; a `core` at a bend left over): round(length)
+  `seg` pieces turned to the line and stretched to fill it, the parapet
+  away from the town, each in the state of the run tile nearest it (so a
+  diagonal reads as a long wall, not a row of little towers). Only a corner
+  right next to a pillar outside such a run and diagonal joins are built
+  from an `arm` per link round a `core` (a diagonal arm is the arm turned
+  45 degrees and stretched by sqrt 2).
+- **Gates** (`gate<L>`, L = 1..5 tiles along the axis: the paved threshold
+  and a sill between the two gate towers, which overhang it by 3 voxels):
+  two door leaves (`gate<L>/leaf`: planks, iron bands and studs, the team
+  meander trim) are MeshInstances that swing 90 degrees inward (towards the
+  owner's nearest Town Center) in 0.7 s, as far as the sim's
+  `get_buildings().fort_open` (0..1); without it (static walls) open while a
+  unit of the owner or an ally is within 2 tiles.
+- **States**: under construction `/s0..s3` (floor(progress * 4): 0 = the
+  staked-out foundation, stakes with team pennants and a rope; 1..3 = the
+  courses rising inside a timber scaffold with ledgers, braces and a
+  pennant; the leaves appear once the gate is finished); damage `/d1` below
+  2/3 hp (merlons knocked off, cracks, chipped arrises, split planks on the
+  leaves), `/d2` below 1/3 (the top broken in one jagged line, the same
+  through the wall's thickness, a tower's on a slant; open cracks, rubble at
+  the foot, the leaves half gone). Chips only along the break.
+- One MultiMesh per model (team colour per instance, AO baked once per model
+  by `building_ao.gd`), laid out again only when the set of pieces, a state
+  or what is explored changes (~3 ms for a 180-tile ring; the first wall of
+  a run loads and bakes the models, ~0.2 s). `walls.set_static(entries)`
+  draws render-only walls (`{kind: wall|pillar|gate, owner, tx, tz, w, h,
+  built, progress, hp, max_hp, open, auto}`). `AOV_WALLS_DEBUG=1` prints
+  the pieces per model and the rebuild time.
+- Not yet: the Wooden Wall stage (level 0 in `get_walls().level`) is drawn
+  in stone like the later stages (Retold's Archaic palisade, `walls_03`).
+
+Capture scene `walls`: the `town` scene's town ringed by the sim's own
+walls (`place_wall` lines built by 40 villagers, stepped in the setup; two
+segments turned into gates with `convert_to_gate`: the south one closed,
+the east one open with villagers walking through it; the south-west stretch
+placed last and only begun: foundations and the three scaffold stages; the
+east side north of the open gate damaged to d1 and d2), the camera outside
+the south-east corner like `walls_02`. `--walls_static=1` (or a sim without
+`place_wall`) draws the same ring as static walls.
+
+Capture scene `wall_angles` (`game/buildings/wall_angles_scene.gd`): sim
+walls dragged out from a point of open ground at 0, 22.5, 45 and 67.5
+degrees off the grid and built, and a line across a house (refused); for
+checking that diagonal walls read as long curtains.
+
+```
+node scripts/godot-shoot.mjs --scene walls --out shots/godot/walls.png
+     [--params "cam=48,100,44,52,45"]      # the same ring at the skirmish camera's distance
+     [--params "walls_static=1"]           # render-only walls (no sim pieces)
+node scripts/export-walls.mjs             # re-export godot/assets/models/walls.*
+```
+
+## Towers: the look (game/buildings/towers.gd, game/combat/tower_fire.gd)
+
+Greek towers after Age of Mythology: Retold (`reference/walls/tower_01..05`),
+drawn by `game/buildings/towers.gd` (a child of the buildings piece;
+`buildings.gd` hands it the `tower` rows and skips them itself). Models: the
+Godot-only `towers` group (`node scripts/export-towers.mjs`, ~3 s,
+deterministic; re-run it after changing the script, never hand-edit
+`assets/models/towers.*`), the walls' voxel (1/8 tile), palette and team
+trims; pivot at the 2 x 2 footprint centre, the door to +z (like the
+buildings' fronts). One model per stage, chosen by the owner's tower level
+(`get_walls().level` of the tower, else `get_fortify(owner).tower_level`):
+
+- `0` **Sentry Tower** (`tower_05`): a wooden stilted lookout: four logs on
+  stone pads, X braces and girts, a ladder, a plank platform at 4 world
+  units with a boarded railing (loopholes) and a **team rail**, posts to a
+  stepped plank roof with team eaves, a team pennant.
+Each stone stage has its own silhouette on the same 12 x 12 shaft (quoined
+corner pilasters on dark base blocks with **team bands**, a door with a
+marble frame and lintel):
+
+- `1` **Watch Tower** (`tower_02`): a slim warm limestone shaft, ivy, a
+  dentilled cornice, a lantern room of paired arched windows, a red tile
+  gable roof with marble pediments and the **team ridge**.
+- `2` **Guard Tower** (`tower_03`): grey stone, deep panels with arrow
+  slits, two ledges; **corbelled machicolations** (a bracket every 3 voxels
+  stepping out 3) carry a crenellated gallery (parapet with a **team
+  band**, merlons), two **archers** (team tunics, bronze helmets, bows) on
+  the walk; a set-back lantern under a terracotta **pyramid roof** with team
+  hips; **team banners** hung from the gallery.
+- `3` **Ballista Tower** (`tower_01`): pale dressed stone, an **open-frame**
+  shaft (the pilasters clear of a deep dark slot, a vine inside), the
+  walls' **team meander** under heavy two-tier brackets that carry a broad
+  **fighting platform** (20 x 20, gilt-capped merlons), three archers and the
+  **ballista** through the front crenel, a columned pavilion with a brazier
+  under a bronze-green pedimented roof (gilt lion, acroteria).
+- Stone and windows: dark mortar beds every course, darker head joints, a
+  worn pale top arris per course (`masonry(..., arris)`), then `weather()`:
+  convex vertical edges worn light (here and there chipped dark), ledge
+  tops lighter, the undersides of every overhang darker. Lantern windows
+  are 2 voxels deep with a gallery behind and a dark cella core whose face
+  behind each window is lamp-lit (low glow: the grade turns strong emission
+  pastel), so a window shows depth and warm light, not a flat void or the
+  sky.
+- States: `<L>/s0..s3` under construction (floor(progress * 4): 0 = the
+  staked foundation with team pennants and a rope, 1..3 = rising in a timber
+  scaffold), `<L>/d1` below 2/3 hp (chips, cracks), `<L>/d2` below 1/3 (the
+  roof broken off in a jagged line, rubble); `upgrade` (a scaffold round the
+  upper tower) stands while a tower stage is being researched at it
+  (`get_walls().tech`). `towers.level_override[id]` / `model_override[id]`
+  (`"2/s1"`, `"1+upgrade"`) draw one tower in another state (scenes).
+
+**Tower fire** (`game/combat/tower_fire.gd`, child of the combat piece,
+closed form in the sim time; the sim's projectiles whose start is a
+tower's centre, `Combat::fire` at `TOWER_ARROW_Y`): a warm flash at the
+lantern window / platform rail on the target's side and a puff of bow dust
+for 0.45 s after the loose; the tower's arrow drawn heavier over the sim's
+(x1.45 sentry .. x2.1 ballista bolt) with a **trail** along the last 30% of
+its arc (`tower_streak.gdshader`: six camera-facing ribbon segments, an
+amber edge round a hot core, widening to the head, >= 4.5 px wide at
+1080p) and a glint on the head; at the strike (`unit:damaged` with `other` = the tower) a short
+flash and a puff of kicked-up earth (the hit spark is AovUnitView's).
+
+Capture scene `towers`: the `town` scene's town with four towers in a row
+on its south side, Sentry, Watch, Guard, Ballista from the camera outwards
+(`level_override`), an enemy squad of hoplites attack-moving on them, the
+camera low (distance 25, pitch 19) and focused just behind the row so the
+tower tops are in frame; the
+setup steps the sim (>= `towers_t` s, default 3) until an arrow has just
+left a tower while another is in mid flight, so the paused frame shows the
+loose, an arrow in the air and a strike.
+
+```
+node scripts/godot-shoot.mjs --scene towers --out shots/godot/towers.png
+     [--params "towers_t=6"]               # fight longer before the frame is chosen
+     [--params "towers_states=1&cam=31,111,30,30,0"]   # a row of states: s0..s3, d1/d2, upgrade
+node scripts/export-towers.mjs            # re-export godot/assets/models/towers.*
+```
+
+## Walls, gates, towers: placement (game/ui)
+
+With villagers selected the build grid has **Build Wall (W)** and the tower
+(**Y**, named after the owner's tower stage, its portrait the stage's model);
+tooltips give the cost (per tile for walls), the stage's hp / range and the
+age. Portraits of wall pieces, gates and towers are composed from the
+`walls` / `towers` models (`portraits.gd`, `fort()`).
+
+- **Wall mode** (`ui._mode.kind == "wall"`): the ghost follows the cursor
+  tile; left press starts a line, dragging shows what `plan_wall` would lay,
+  one ghost per tile (the pillar / segment model, turned along the line):
+  green where it can go, red where a tile is blocked or unexplored (or every
+  new tile when the line is unaffordable or crosses a building), gold on tiles of the player's wall
+  it joins. A box by the cursor gives the tiles, the total wood / gold (red
+  when short) and why it cannot be built. An end on one of his wall tiles, or
+  within one tile of one of his pillars (an end or corner), snaps onto it, so
+  lines join. Release calls `place_wall` with the selected villagers, who go
+  and build the foundations; Shift keeps the mode for the next line; Esc /
+  right-click cancels. `ui.wall_preview` = {a, b, tiles, state, new_tiles,
+  blocked, cost, ok, afford, reason, dragging}.
+- **Tower**: placed like any building; its ghost is the stage's model with
+  its range ring; a selected finished tower shows its range ring too.
+- **Commands** on a selected finished piece of one's own: a wall segment
+  **Convert to Gate (G)**; a gate **Lock / Unlock Gate (L)**; any wall piece
+  the next wall stage, a tower the next tower stage (**U**, disabled with
+  "Requires the <age> Age" until then); while one researches, **Cancel (X)**
+  (refund). The selection card shows the stage name (Wooden Wall, Watch
+  Tower, ...), a tower's damage and range, a gate's state and research
+  progress. The feed says "<stage> finished." once a player's last wall
+  foundation is done (not per piece) and "<tech> researched.".
+
+The real-input playtest (`game/core/walls_playtest.gd`, ~5 min on lavapipe, ~15 at 0.4 FPS under load;
+harness shortcuts: AI off, resources granted, enemy soldiers spawned and
+ordered by script, the sim stepped fast while frames render):
+
+```
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 1280x720x24" \
+  godot --path godot --rendering-driver vulkan --audio-driver Dummy --resolution 1280x720 \
+  -s res://game/core/walls_playtest.gd -- --scene=skirmish [--shots=/abs/dir]   # "WALLSPLAY ok|FAIL <step>", exit = failures
+```
+
+It box-selects the villagers, checks the Wall / tower buttons and tooltips,
+W, a drag across the Town Center (red blocked tiles) dropped with Esc, four
+Shift-drags of a closed 7 x 7 ring (each later line started a tile off the
+last corner: snapped and joined; green ghosts and the cost checked mid-drag;
+every line placed on exactly the dragged tiles and paid), the villagers
+building it all, a click on a segment + the Convert to Gate button, L locks
+and the Unlock button unlocks, enemy soldiers ordered into the ring stay
+out while the player's own (box select, right-click) walk in through the
+gate, Y + a click places a tower (ghost and range ring), group 1 + a
+right-click walks the builders off it and a click on a footprint spot no unit
+covers selects it (units win picks, so a click on the crowd would select a
+villager; the click is retried as the sim runs between frames), its upgrade refused
+before the Classical Age (U), H + A advance the age, the Watch Tower button
+researches it (range up, card title), and the tower alone shoots an enemy
+(the player's units are removed first, the foe stands away from the Town
+Center, and every hit is attributed from the
+`unit:damaged` events). After the gate is made, the gate unlocked and the
+upgrade finished it also checks that the tooltip under the resting mouse
+describes the command now in that slot (the hud re-reads the zone under the
+cursor every frame, `ui._refresh_hover`, so a slot whose command changes
+without a mouse move never keeps the old tooltip).
+`--shots` saves the blocked drag, the green drag, the foundations, the
+gate, the tower ghost and the upgraded tower.
 
 ## Conventions
 
@@ -749,7 +1005,10 @@ villagers at 6 min 14 / 22 / 30 / 35.
   `construction/<type>/<variant>/<stage 0..7>`, `props/<kind>`,
   `resources/tree0..9|gold|berry` (+ `_shape` shadow-only twins),
   `details/tuft0..4|flowers0..3|pebbles0..2`, `economy/<key>` (the
-  EconomyView keys), `combat/arrow|debris_*`.
+  EconomyView keys), `combat/arrow|debris_*`. Godot-only models (no JS
+  builder) are authored in the same format by their own scripts:
+  `walls/*` by `scripts/export-walls.mjs` (see "Walls and gates: the look"),
+  `towers/*` by `scripts/export-towers.mjs` (see "Towers: the look").
 - **Unit rigs**: `VoxelModels.rig(type)` = `{voxel, anim, style, euler: "XYZ",
   parts: [{name, anim (channel), joint, parent, parentIdx, coat, portrait,
   conditional, mesh}]}`, parents first. Part world transform =
@@ -869,6 +1128,12 @@ Buildings: `building_type_names()`, `get_building_def(key)`,
 resume their gather / worship afterwards), `destroy_building(id)`,
 `get_building(id)` (incl. `queue` [{type, t, total, free}], `rally`).
 
+Fortifications (Godot-only, see "Walls, gates, towers"): `plan_wall(owner,
+a, b)`, `place_wall(owner, a, b, builders=[])` -> {ok, reason, ids},
+`convert_to_gate(id)`, `set_gate_locked(id, on)`, `research(building, key)`,
+`cancel_research(building)`, `fort_tech_names()`, `get_walls()`,
+`get_fortify(owner)`; `get_buildings()` also has `fort_open`, `fort_locked`.
+
 **Free villager** (Godot-only rule, `Economy::rescue`, checked once a
 second for every player, AI included): a player who still owns a completed
 Town Center, has no living villager and none queued, and cannot afford one
@@ -896,7 +1161,13 @@ attacker=0)`, `order(id, {type: "attack", target, auto, then_buildings})`,
 `set_unit_combat(id, {leash, reach, kit, line: {cx, cz, nx, nz, d0} | null})`,
 `set_ai_enabled(on)` (the ENEMY's EnemyAI), `add_ai(owner)`, `get_ai(owner)`
 ({enabled, wave_size, next_wave_at, aggression, waves: [{t, target, x, z,
-units}], casts: {power: n}, difficulty}) / `set_ai(owner, {enabled, next_wave_at, wave_size, aggression, difficulty})`,
+units}], casts: {power: n}, difficulty, fort: {towers, wall_lines,
+wall_tiles, gates, upgrades, repairs, focus, avoided, retreats, reopened,
+patched, dropped, ring_at, ring_done_at, ring_state, ring_r, lines_left,
+line_cost, unbuilt, gaps: [{a, b, state, seg}]}}) / `set_ai(owner, {enabled, next_wave_at, wave_size, aggression, difficulty,
+wall_at, towers_max, breach_focus, fort: false, fortify_now: towers})` (the
+last five Godot-only: a ring from that time, the tower count, the breach
+focus, no fortifications at all, a finished fortified town now),
 `get_combat()` ({projectiles: 16 floats each (x, y, z, px, py, pz, sx, sy,
 sz, tx, ty, tz, t, dur, arc, dist), projectile_info: 2 ints (target, has
 target pos), stuck: 7 (x, y, z, dx, dy, dz, t), scars: 5 (x, z, radius,
@@ -1024,9 +1295,231 @@ coast map with no walkable tile, refused), orders, placements and every god
 power at off-map points, then 90 s of play with the AI on, no unit ever off
 the map.
 
+**Walls, gates, towers** (Godot-only, `native/src/sim/fortify/`, class
+`Fortify` = `Sim::fortify`; Age of Mythology: Retold's Greek fortifications,
+`reference/walls/`). Pieces are building rows of the types `wall` (a straight
+segment, 1 x n tiles, n <= 4), `wall_pillar` (1x1), `gate` and `tower` (2x2),
+appended to `building_type_names()`, so construction (villagers on O_BUILD,
+several builders faster: rate x n^0.75), damage, death, fog sight and the
+builders moving on to the next unfinished piece are the buildings / combat
+systems'. Stone does not exist here: everything costs wood + gold.
+- **Walls**: `place_wall(owner, a, b, builders)` (a, b world points; their
+  tiles are the line's ends) lays a 4-connected line (one step in x or z at a
+  time: no diagonal gap), joins the owner's existing pieces (those tiles are
+  skipped) and leaves a gap at blocked tiles (trees, water, steep ground);
+  a line across a building (any, a foundation too, not the owner's wall it
+  joins) is refused whole, "A building is in the way" (`plan_wall` counts
+  them, `on_building`; the AI's ring, laid round its own town, passes
+  `through_buildings` and keeps the gap instead); each run of new tiles gets a
+  pillar at both ends (none next to a joint), at corners with two 2+ tile
+  arms and evenly so no two pillars stand more than 5 tiles apart as the
+  crow flies (a straight run: segments of at most 4; a line at an angle is a
+  staircase of tiles, spaced by its length, not its tile count), segments
+  in between. 4 wood
+  + 2 gold and 3 s (one builder) per tile, paid at once; foundations block
+  at once. `plan_wall(owner, a, b)` is the same without placing (the UI
+  ghost). Every piece blocks its tiles for everyone (A*, group fields,
+  attack-move, the movement step all go round it); destroying one unblocks
+  them. Stages (player-wide, researched at any wall piece): Wooden Wall
+  (Archaic, 200 hp per tile), Stone Wall (Classical, 150 w + 100 g, 40 s,
+  450), Fortified Wall (Heroic, 250 + 200, 50 s, 700), Citadel Wall (Mythic,
+  400 + 300, 60 s, 1000); pillars x1.5. The map passes (connected starts,
+  woodlines) run at map generation, before any wall exists.
+- **Gates**: `convert_to_gate(segment)` (finished segment, 30 w + 20 g; same
+  id and rect, hp x1.25). Its tiles stay blocked and `GameMap::gate_pass`
+  (bit per owner) lets the gate owner and his allies through:
+  `Pathfinder::pass_owner` (set before each search: Movement uses the unit's
+  owner, `Commands::move` the first mover's for the group field;
+  `AovSim.find_path` -1) and the movement step (`GameMap::walkable_at_for`);
+  the path cache keys on it while gates exist. Every other walkability test
+  (placement, spawns, `nearest_walkable`, spread, knock-back) sees a gate as
+  a wall. `set_gate_locked(id, on)`: nobody passes. `fort_open` (0..1, in
+  `get_buildings()` and `get_walls().open`) is the leaves' state: open while
+  a unit allowed through is within 2.5 tiles, 0.4 s swing.
+- **Towers**: `tower` (2x2, 120 w + 60 g, 30 s) shoots homing arrows
+  (`Combat::fire`) at the nearest enemy unit in range, no garrison. Stages
+  researched at a tower, applied to all the owner's towers (hp scaled with
+  the new max): Sentry Tower (hp 750, range 10, damage 6 / 1.5 s, sight 12),
+  Watch Tower (Classical, 100 + 100, 30 s: 1000, 11, 8), Guard Tower
+  (Heroic, 200 + 200, 40 s: 1400, 12, 10 / 1.4 s), Ballista Tower (Mythic,
+  300 + 300, 50 s: 1800, 13, 16 / 2 s). `research(building, key)` ->
+  {ok, reason} ("Requires Classical Age", "Research the previous stage
+  first", ...), `cancel_research(building)` refunds, event `tech:researched`.
+- **Combat rules** (rules on): a building's arrows (Town Center, tower) never
+  damage a friend; pieces have their own armor on top of the 0.35 building
+  factor (walls: arrows x0.15, melee x0.6; towers x0.4 / x0.8; myth units and
+  god powers x1). Walls are never picked by attack-move scans, wave targets
+  or the "then buildings" sweep; a unit whose attack target is walled off
+  (its last path search did not reach: `units.path_blocked`) attacks the
+  nearest enemy wall piece within 6 tiles, then goes back to its target
+  (the AI's waves breach a ring this way). The real target, a building or a
+  unit, is kept in `order_a` with the `ATK_BREACH` bit (combat.h) while the
+  man breaks the wall: switching to an enemy unit near the piece (a
+  repairer) or to the next piece keeps it, and when the piece falls he heads
+  for that target before any other foe in sight. A man whose target was
+  walled off on this order (`ATK_BROKE_IN`) that finds the target dead and
+  no foe in sight attacks the nearest enemy building (not a wall) within
+  twice his sight instead of standing idle in the hole.
+- **Repair** (rules on, any building): a build order (right-click) on a
+  damaged finished building of one's own heals it for free at half the
+  build rate x builders^0.75 (`REPAIR_RATE`).
+- Render data: `get_walls()` = {count, ids, kind (0 pillar, 1 wall, 2 gate, 3
+  tower), owner, rect (4 each), hp, max_hp, built, progress, axis (0 along
+  x, 1 along z), conn (bits 1 -z, 2 +x, 4 +z, 8 -x: a neighbour tile is his
+  wall piece), level (the owner's stage), open, locked, tech (research in
+  progress: `fort_tech_names()` index + 1), tech_t (0..1)};
+  `get_fortify(owner)` = {wall_level, wall_name, wall_tile_hp, tower_level,
+  tower_name, tower {hp, range, damage, cooldown, sight}, techs [{key, name,
+  line, level, min_age, time, cost, state: done / available /
+  needs_previous / needs_age / researching}], walls, gates, towers}. Events
+  `gate:changed` (a = 0 converted, 1 locked, 2 unlocked), `tech:researched`.
+Checked by
+`godot --headless --path godot -s res://game/core/walls_check.gd [-- --seed=7 --only=...]`
+("WALLS PASS|FAIL <case>", `WALLS_RESULT {json}`, exit = failures, ~3 s):
+plan, build (a 13 x 13 ring by 8 villagers; 4 builders > 1), keepout (single
+A*, formation, group field, attack-move, right-click: nobody inside),
+gate (owner and ally in, enemy out, leaves open for them only, locked keeps
+the owner out), repair (free, 4 hands faster), breach (soldiers break a piece
+to reach a house inside; its tiles walkable again; the whole army goes in and
+razes the house, none idle outside; the same with a villager as the target in
+a fresh ring: they break in and kill him), towers (kill an enemy in
+range, never an ally / own unit; Town Center arrows never hit an ally),
+upgrades (each stage's age, range / damage / hp up, arrow damage measured;
+Stone Wall hp x2.25), determinism (two runs bit-equal), rules_off.
+
+- **Walled-off goals fail fast** (`Pathfinder::regions`, on while walls
+  stand): a search that does not reach its goal floods the goal's region
+  (4-connected, walkable for `pass_owner`, at most 4096 tiles); while that
+  region is closed and holds no start, later searches into it are not run
+  (a failed A* expands `max_nodes` = 12000 for nothing, ~1.5 ms): the path
+  goes to the walkable tile outside it nearest the goal (6000 nodes; else
+  the wall face on the line to the start), `last_found = false`, so the
+  breach rule works as before. A flood stays valid while no walkability
+  change (`GameMap::pass_log`, the tile rect of every block / unblock /
+  passability / gate mask change) touches its box; a closed one that was
+  touched is flooded again on the next search (~40 us) instead of failing
+  an A*. Profile rows `pathCut`, `pathFail`, `pathFlood`.
+
+**Enemy AI: fortifications** (Godot-only, `native/src/sim/combat/enemy_ai_fort.cpp`,
+`AIParams` towers_max .. breach_focus in `enemy_ai.h`; Retold's AI walls
+its town, towers its resources and breaks walls; deterministic, no rng draw,
+every loop in row order):
+- **Towers**: one at a time once the academy stands and the villagers are
+  `tower_at`: by the Town Center towards the nearest enemy, between the Town
+  Center and its gold mine, at its wood line (within 22 / 20 tiles), then
+  round the Town Center; 6 tiles apart, never on a ring line or opening.
+- **Wall ring** (every difficulty, from `wall_at`: Easy 12 min, Moderate 10,
+  Hard 7, Titan 6; `wall_builders` 2 / 3 / 4 / 5): a square with clipped
+  corners (`R / 8`) round the Town Center, half-width the smallest of 15..22
+  that holds every building of its own with 2 tiles to spare (archers shoot
+  12 over a wall), at most 0.36 of the way to the nearest other Town Center;
+  4 + 4 lines (the side facing the enemy first), each straight side leaving
+  a 3-tile opening slid to open ground. A line goes down when it can be paid
+  (+40 wood, +15 gold kept); the first tower comes first; while a line or a
+  tower waits, an army of 8+ at home stops the academies from spending the
+  wood and gold (`wall_saving`) and gold gets 30 % of the workers; a line
+  kept waiting 40 s (`LINE_PATIENCE`) holds them with any army at home (a
+  wave out would otherwise leave the ring waiting for good), and while it
+  waits for wood 40 % of the workers go to the woods; `wall_builders`
+  villagers are kept on the foundations;
+  a foundation they stand short of for 6 thinks (water, trees round it) is
+  pulled down and paid back. Planned lines and openings (+2 tiles each
+  side) are kept free of the AI's own farms / houses (`reserved`). Once the
+  ring stands each opening is filled from pillar to pillar (one segment)
+  and turned into a gate, several at once but never the last way out while
+  others are rising; an opening left open (its segment broken, ground
+  taken) or a gate broken is tried again every 60 s once no foe is within
+  14. Every think one ring line is laid again (`patch_ring`: tiles that
+  were trees, berries or a farm, and pieces the enemy broke, once no foe is
+  within 8 of the new tiles); a hole of up to 12 tiles keeps no reserve and
+  holds the academies until it is paid. Every 20 s a path from the Town
+  Center to outside the ring (its own gates open) must exist, else a
+  straight segment becomes a gate (or, short of gold, is pulled down).
+- **Upkeep**: tower / wall stages researched as the age allows (Watch
+  Tower and Stone Wall from Moderate; the tower's first, +30
+  wood +20 gold kept; while one waits the academies of an army of 8+ at
+  home wait too, up to 90 s per tech, `upgrade_holds`); the most damaged
+  piece or building (fortifications and the Town Center first) under 70 %
+  hp with no foe within 8 gets `repairers` villagers (Easy 1, Moderate 2,
+  Hard / Titan 3; free, Fortify's repair).
+- **Attacking walls**: the sim's breach rule sends each walled-off man at
+  the wall piece nearest to him; the AI turns each group of breakers (16
+  tiles) onto one of the pieces they picked, the least hp x (1 + distance /
+  4), kept until it falls (`breach_picks_`), for the men within 12 of it.
+  On top of that, every 2 s, the **siege** (`siege`, `fort.sieges` /
+  `sieged` / `breached`): our men out of the town (25+ tiles) in groups of
+  14 tiles, a group held up by a wall (one walled off, or at a piece)
+  whose target building (the one most of them attack, else the nearest)
+  cannot be walked to (enemy gates closed) is set on one piece: among the
+  enemy pieces within 90 whose fall opens a way (open ground on both
+  faces: no staircase piece of a clipped corner), the least hp x (1 +
+  distance / 6) + 25 x its distance to the building, the first of 48 they
+  can walk up to (a 40000-node search, 24000 expansions per check, one
+  group's search per check; a ring backed by a forest is skipped at once
+  by the region cut); at most 12 men on it, only men stuck at the wall are
+  turned, a man fighting a foe he can reach keeps fighting; bowmen shoot
+  the foes within 9 of the piece that are in bow range (repairers, men
+  behind it), else the piece; a group of bowmen alone goes home to march
+  with the next wave (`regroups`). Each man keeps the building as his real
+  target (`order_a`, `ATK_BREACH`): the sim sends him through the hole once
+  the piece is down. A piece unhurt for 30 s (crowded out, repaired under
+  their blows) is given up for 120 s; a group with no piece to get at is
+  sent at another enemy building it can reach, the Town Center first
+  (`retargets`). An open gap needs nothing: the path goes through it.
+  Combat (Godot rules): a man breaking a wall does not turn on a foe behind
+  it (no straight walk to him, `line_walkable`); a man walled off from his
+  target searches again every 4 s (a building) / 2 s (a unit), not every
+  tick (`WALLED_REPATH`).
+- **Meteor**: wall pieces do not count in the AI's clump of enemy
+  buildings (a Meteor is cast on the town; the men break the wall).
+- **Tower fear** (Moderate and up, until 25 min): a wave needs 4 + 2 x
+  stage men per enemy tower covering its target; short of that it takes
+  the nearest target out of their range, or waits for more men (never past
+  an overdue interval); a wave worn below half inside tower range, not at
+  its target, falls back home once (`retreats`).
+- **No stalemates** (AI vs AI): fear ends at 25 min, overdue waves go, a
+  breach is walled up only once the fight has left it; and three economy
+  rules (Godot rules, they stalled matches behind towers): at most a quarter
+  of the villagers worship, gold / wood are looked for up to 80 tiles once
+  the near ones are worked out, a farm foundation left unbuilt is finished
+  by the next food villager or, after 90 s, pulled down and paid back; and
+  (round 2) a storehouse goes up by a wood line / mine being worked by 3+
+  villagers 16+ tiles from every drop-off (every 5 s, one at a time, at
+  most 4, `storehouses`), and with food over 1500 and wood or gold under
+  300 the workers go 20 / 40 / 40 % food / wood / gold (AI-vs-AI matches
+  had ended with 9000 food, no wood, no gold, no army).
+- `fortify_now(towers)` (stress scene, `set_ai {fortify_now}`): the ring
+  and openings placed finished and paid, gates converted, the towers built.
+
+```
+godot --headless --path godot -s res://game/core/aifort_check.gd [-- --only=build,upgrade,repair,breach,gap,fear,determinism,matches,siege --seed=1 --minutes=50]
+node scripts/godot-shoot.mjs --scene aifort --out shots/godot/aifort.png [--seed 2]
+     [--params "aifort_ai=hard,titan&aifort_t=16&aifort_focus=breach|town&aifort_owner=2"]
+```
+
+`aifort_check.gd` ("AIFORT PASS|FAIL <case>", `AIFORT_RESULT {json}`, exit =
+failures, ~10 s): **build** (a Hard AI in peace for 20 min: 2+ towers within
+26 tiles, a ring closed by its pieces (and trees) with a gate, villagers
+working outside it), **upgrade** (Watch Tower, Stone Wall in the Classical
+Age), **repair** (a ring piece and a tower at 30 % back over 60 %),
+**difficulty** (Moderate 1-2 towers and a closed ring with gates by 18 min,
+Easy at most one tower and its ring by 25 min),
+**breach** (24 hoplites at a walled town break in and hit the Town Center;
+with the focus the two most hit pieces take >= 50 % of the hits, 15 points
+more than each man on his nearest piece, or only one or two are hit), **gap**
+(that piece pulled down first: in through the opening, nothing destroyed,
+sooner), **fear** (6 men facing three towers are held or sent elsewhere, lose
+<= 2), **determinism**, **matches** (Hard v Hard, Titan v Hard, Hard v Titan
+decided), **siege** (Titan v Titan, seed + 6, favor held at 0 so no Meteor:
+sieges > 0, a wall / pillar / gate piece destroyed with its last hit from a
+soldier, the match decided; ~30 s). Capture scene `aifort`: a two-AI match played `aifort_t` minutes in
+the setup, the camera on the wall piece hit most in the last minute (else
+`aifort_owner`'s Town Center).
+
 `set_godot_rules(on)` (default on, kept across `new_game`): off = the
 browser's rules only (no AI god powers, no free villager, no fighting back
-while moving, AI waves attack their target directly); `simcheck.gd`
+while moving, AI waves attack their target directly, no walls / gates /
+towers, no repair); `simcheck.gd`
 turns it off for `check-sim.mjs`, and `--godot_rules=0` does it for a run
 (A/B benches: the AI's storms thin the stress armies, so its numbers move).
 
@@ -1181,3 +1674,11 @@ Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
   (`attackmove_check.gd`, `playtest.gd`, `aivai.gd`).
 - Done (map bounds): off-map positions are safe everywhere, see "Map
   bounds" (`bounds_check.gd`).
+- Done (fortify sim): walls, gates for allies, towers that shoot, their
+  stages, repair, the breach rule, see "Walls, gates, towers"
+  (`walls_check.gd`).
+- Done (AI fortifications): the enemy AI builds towers, walls its town in
+  with gates (every difficulty), upgrades, repairs and patches them, breaks
+  enemy walls one piece per group, fears towers when weak; walled-off goals
+  fail fast in the pathfinder; the stress scene is walled (`fort=0` off).
+  See "Enemy AI: fortifications" (`aifort_check.gd`, scene `aifort`).
