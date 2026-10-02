@@ -1,28 +1,57 @@
 extends RefCounted
 ## Tech and market icons (ui piece, Godot-only; no icons.js counterpart): one
 ## glyph per tech line of the Greek Armory, Market and Temple (Age of
-## Mythology: Retold's command grid, reference/techs/ui_02.jpg), drawn in the
-## style of the HUD's icons (icons.gd: 24-unit viewBox, flat fills, a light
-## stroke on the lit edges, a dark outline). The Armory's three generic lines
-## (weapons: a spear, armor: a muscle cuirass, shields: a hoplon) come in the
-## tier's metal: copper, bronze (gold coloured) and iron (silver), as the
-## units' equipment does in Retold.
+## Mythology: Retold's command grid, reference/techs/ui_02.jpg) as 24-unit SVGs,
+## and the painted tile a command button shows (tile(): a background plate
+## per tech family, the glyph embossed and lit, see "painted tiles" below).
+## The Armory's three generic lines (weapons: a spear, armor: a muscle
+## cuirass, shields: a hoplon) are shaded templates in the tier's metal, each
+## tier with its own detail: copper plain, bronze (gold) with a red tassel /
+## gorgon boss / star blazon, iron (steel) with a bright edge, rivets and
+## pteruges. GODS: the gods' emblems for a god tech's frame medallion.
 ##
 ##   TechIcons.icon_for("bronze_weapons")  -> "t_weapons_bronze"
 ##   TechIcons.svg("t_weapons_bronze")     -> the SVG text (hud_style.icon() reads it)
+##   TechIcons.tile("t_weapons_bronze", 64, "locked") -> the baked button tile
+##   TechIcons.tier_of("bronze_weapons")   -> 2;  god_emblem("athena") -> "g_athena"
 
+## tier metals: $A body, $B highlight, $C outline, $D shade. Copper is a
+## warm red-orange, bronze a yellow gold, iron a cold blue steel, so the three
+## tiers read apart even greyed; each tier also adds its own detail ($X).
 const TIERS := {
-	"copper": ["#d27a3e", "#ffb47a", "#4a200c"],
-	"bronze": ["#d9a83a", "#ffe9a0", "#4a3008"],
-	"iron": ["#aeb9c2", "#f2f7fa", "#2c343a"],
+	"copper": ["#c8642e", "#ffc08a", "#3a1606", "#7e3412"],
+	"bronze": ["#d9a630", "#fff2b0", "#3e2a04", "#8e600c"],
+	"iron": ["#8e9eac", "#f4f8fb", "#141a20", "#46525e"],
+}
+const TIER_RANK := {"copper": 1, "bronze": 2, "iron": 3}
+
+## shaded tier templates (gradients: m metal, s wood, d dome)
+const TEMPLATES := {
+	"weapons": '<svg viewBox="0 0 24 24"><defs><linearGradient id="s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0a86a"/><stop offset=".5" stop-color="#8a5428"/><stop offset="1" stop-color="#3a1e0a"/></linearGradient><linearGradient id="m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="$B"/><stop offset=".42" stop-color="$A"/><stop offset="1" stop-color="$D"/></linearGradient></defs><path d="M2.4 21.6L12.6 11.4" stroke="$C" stroke-width="3.6" stroke-linecap="round"/><path d="M2.4 21.6L12.6 11.4" stroke="url(#s)" stroke-width="2.1" stroke-linecap="round"/><path d="M1.8 22.2l2-2" stroke="$C" stroke-width="3.2" stroke-linecap="round"/><path d="M1.8 22.2l2-2" stroke="$A" stroke-width="1.8" stroke-linecap="round"/><path d="M11.2 12.8C11.4 8.2 15.4 4 21.8 2.2 20 8.6 15.8 12.6 11.2 12.8z" fill="url(#m)" stroke="$C" stroke-width=".9"/><path d="M11.2 12.8C11.4 8.2 15.4 4 21.8 2.2L12.4 11.6z" fill="$B" opacity=".35"/><path d="M12.4 11.6L20.6 3.4" stroke="$D" stroke-width="1"/><path d="M12.9 11.1L20.4 3.6" stroke="$B" stroke-width=".45" opacity=".9"/><path d="M10 12.2l1.8 1.8" stroke="$C" stroke-width="3.4" stroke-linecap="round"/><path d="M10 12.2l1.8 1.8" stroke="url(#m)" stroke-width="2" stroke-linecap="round"/>$X</svg>',
+	"armor": '<svg viewBox="0 0 24 24"><defs><linearGradient id="m" x1="0" y1="0" x2="1" y2=".7"><stop offset="0" stop-color="$B"/><stop offset=".4" stop-color="$A"/><stop offset="1" stop-color="$D"/></linearGradient></defs>$Y<path d="M6.8 2.8h2.8c.8 1.4 1.6 2 2.4 2s1.6-.6 2.4-2h2.8l3 3.8-2.4 2.4v8.8c-1.6 1.8-3.8 2.8-5.8 2.8s-4.2-1-5.8-2.8V9l-2.4-2.4z" fill="url(#m)" stroke="$C" stroke-width="1.1"/><path d="M7.4 9.6c1.6 2 3.4 2 4.6.4 1.2 1.6 3 1.6 4.6-.4" stroke="$D" stroke-width="1.3" fill="none"/><path d="M7.6 9.2c1.4 1.5 2.8 1.6 3.9.6" stroke="$B" stroke-width=".7" fill="none"/><path d="M12 10.8v8.6" stroke="$D" stroke-width="1"/><path d="M9.4 13.8c1.6.5 3.6.5 5.2 0M9.6 16.6c1.5.5 3.3.5 4.8 0" stroke="$D" stroke-width=".9" fill="none"/><path d="M8 4.2l1.8 3.4M7.4 9.8v7" stroke="$B" stroke-width=".9" opacity=".8"/><path d="M6.8 2.8h2.8l.6 1.4H7.6zM14.6 2.8h2.8l-.8 1.4H14z" fill="#5a3418"/>$X</svg>',
+	"shields": '<svg viewBox="0 0 24 24"><defs><linearGradient id="m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="$B"/><stop offset=".45" stop-color="$A"/><stop offset="1" stop-color="$D"/></linearGradient><radialGradient id="d" cx=".36" cy=".32" r=".78"><stop offset="0" stop-color="$B"/><stop offset=".35" stop-color="$A"/><stop offset="1" stop-color="$D"/></radialGradient></defs><circle cx="12" cy="12" r="10.4" fill="$C"/><circle cx="12" cy="12" r="9.6" fill="url(#m)"/><circle cx="12" cy="12" r="7.6" fill="$C" opacity=".7"/><circle cx="12" cy="12" r="7.1" fill="url(#d)"/>$X<path d="M5.4 9.6a7.2 7.2 0 0 1 5-5.2" stroke="#fff" stroke-width="1.2" opacity=".6" fill="none" stroke-linecap="round"/><path d="M3.4 10.4a8.8 8.8 0 0 1 6-6.8" stroke="#fff" stroke-width=".6" opacity=".45" fill="none" stroke-linecap="round"/></svg>',
 }
 
-## tier templates: $A body, $B highlight, $C outline
-const TEMPLATES := {
-	"weapons": '<svg viewBox="0 0 24 24"><path d="M3.2 20.8L14 10" stroke="#3a220e" stroke-width="3.2" stroke-linecap="round"/><path d="M3.2 20.8L14 10" stroke="#b07a46" stroke-width="1.7" stroke-linecap="round"/><path d="M2.4 21.6l1.8-1.8" stroke="$A" stroke-width="2.2" stroke-linecap="round"/><path d="M12.4 11.6C12.8 7.6 16.4 4.2 21.2 2.8 19.8 7.6 16.4 11.2 12.4 11.6z" fill="$A" stroke="$C" stroke-width=".9"/><path d="M13.3 10.7L20.2 3.8" stroke="$B" stroke-width="1"/><path d="M11 11.6l1.4 1.4" stroke="$C" stroke-width="2.6"/><path d="M11 11.6l1.4 1.4" stroke="$A" stroke-width="1.2"/></svg>',
-	"armor": '<svg viewBox="0 0 24 24"><path d="M7 3.4h2.6c.8 1.4 1.6 2 2.4 2s1.6-.6 2.4-2H17l2.8 3.6-2.3 2.2V18c-1.6 1.6-3.6 2.6-5.5 2.6S8.1 19.6 6.5 18V9.2L4.2 7z" fill="$A" stroke="$C" stroke-width="1.1"/><path d="M8.4 10.2c1.3 1.3 2.6 1.3 3.6.2 1 1.1 2.3 1.1 3.6-.2" stroke="$B" stroke-width="1.1" fill="none"/><path d="M12 11.2v8.6M9.3 14.3h5.4M9.7 17.2h4.6" stroke="$C" stroke-width=".8"/><path d="M7.4 4.6l1.9 3.8M6.8 9.8v7.6" stroke="$B" stroke-width=".8" opacity=".8"/></svg>',
-	"shields": '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.6" fill="$C"/><circle cx="12" cy="12" r="8.7" fill="$A"/><circle cx="12" cy="12" r="6.3" fill="none" stroke="$B" stroke-width="1.1"/><circle cx="12" cy="12" r="6.3" fill="none" stroke="$C" stroke-width=".5" stroke-dasharray="1 1.4"/><circle cx="12" cy="12" r="2.3" fill="$B" stroke="$C" stroke-width=".8"/><path d="M5.6 8.4a7.6 7.6 0 0 1 5.2-4.4" stroke="#fff" stroke-width="1.1" opacity=".55" fill="none"/></svg>',
+## per tier details: $X drawn on top, $Y behind (armor's pteruges)
+const EXTRAS := {
+	"weapons": {
+		"copper": "",
+		"bronze": '<path d="M7.2 15.6l1.6 1.6M5.8 17l1.2 1.2" stroke="$B" stroke-width="1.2"/><path d="M9.4 13.4c-1.8 0-3 1.2-3.6 3.2 1.2-.6 2.4-.8 3.6 0 .2-1.2.4-2.2 0-3.2z" fill="#c8302a" stroke="#4a0a06" stroke-width=".5"/>',
+		"iron": '<path d="M11.4 12.4C11.8 8.6 15.6 4.6 21.2 2.8" stroke="#fff" stroke-width=".55" opacity=".85" fill="none"/><path d="M7 15.8l1.4 1.4M5.4 17.4l1.4 1.4M3.8 19l1.2 1.2" stroke="$A" stroke-width="1.1"/><circle cx="10.9" cy="13.1" r=".55" fill="$B"/>',
+	},
+	"armor": {
+		"copper": "",
+		"bronze": '<circle cx="12" cy="7.8" r="1.7" fill="$B" stroke="$C" stroke-width=".6"/><circle cx="12" cy="7.8" r=".7" fill="#c8302a"/><path d="M6.8 17.6c1.6 1.6 3.4 2.4 5.2 2.4s3.6-.8 5.2-2.4" stroke="$B" stroke-width=".8" fill="none"/>',
+		"iron": '<g fill="$B" stroke="$C" stroke-width=".3"><circle cx="8" cy="4" r=".6"/><circle cx="16" cy="4" r=".6"/><circle cx="7.6" cy="11" r=".5"/><circle cx="16.4" cy="11" r=".5"/><circle cx="7.6" cy="14.6" r=".5"/><circle cx="16.4" cy="14.6" r=".5"/></g><path d="M6.6 9.4l10.8 0" stroke="$C" stroke-width=".6" opacity=".6"/>',
+	},
+	"shields": {
+		"copper": '<circle cx="12" cy="12" r="5.2" fill="none" stroke="$D" stroke-width=".9"/><circle cx="12" cy="12" r="1.8" fill="url(#m)" stroke="$C" stroke-width=".7"/>',
+		"bronze": '<path d="M12 6.2l1.1 3.6 3.6-1.8-1.8 3.6 3.6 1.1-3.6 1.1 1.8 3.6-3.6-1.8L12 17.8l-1.1-3.6-3.6 1.8 1.8-3.6-3.6-1.1 3.6-1.1-1.8-3.6 3.6 1.8z" fill="$B" stroke="$C" stroke-width=".6"/><circle cx="12" cy="12" r="1.5" fill="#c8302a" stroke="$C" stroke-width=".5"/>',
+		"iron": '<g fill="$B" stroke="$C" stroke-width=".35"><circle cx="12" cy="3.4" r=".75"/><circle cx="12" cy="20.6" r=".75"/><circle cx="3.4" cy="12" r=".75"/><circle cx="20.6" cy="12" r=".75"/><circle cx="5.9" cy="5.9" r=".75"/><circle cx="18.1" cy="18.1" r=".75"/><circle cx="18.1" cy="5.9" r=".75"/><circle cx="5.9" cy="18.1" r=".75"/></g><circle cx="12" cy="12" r="3.4" fill="url(#m)" stroke="$C" stroke-width=".8"/><path d="M12 8.2l1 2.8 2.8 1-2.8 1-1 2.8-1-2.8-2.8-1 2.8-1z" fill="$B" stroke="$C" stroke-width=".5"/>',
+	},
 }
+## the iron cuirass's leather strips (pteruges), behind the body
+const PTERUGES := '<g stroke="#1c0e06" stroke-width=".5"><path d="M6.6 17.4h2v5h-2z" fill="#6a3c1c"/><path d="M8.8 18.6h2v4.4h-2z" fill="#86522a"/><path d="M11 19h2v4h-2z" fill="#6a3c1c"/><path d="M13.2 18.6h2V23h-2z" fill="#86522a"/><path d="M15.4 17.4h2v5h-2z" fill="#6a3c1c"/></g><g fill="$B"><circle cx="7.6" cy="21.6" r=".45"/><circle cx="9.8" cy="22.2" r=".45"/><circle cx="12" cy="22.2" r=".45"/><circle cx="14.2" cy="22.2" r=".45"/><circle cx="16.4" cy="21.6" r=".45"/></g>'
 
 const SVG := {
 	"t_ballistics": '<svg viewBox="0 0 24 24"><circle cx="15" cy="15" r="7" fill="#f3e6c8" stroke="#4a2410" stroke-width=".9"/><circle cx="15" cy="15" r="4.8" fill="#c8402c"/><circle cx="15" cy="15" r="2.7" fill="#f3e6c8"/><circle cx="15" cy="15" r="1.1" fill="#c8402c"/><path d="M2 9C4 4 9 2.4 13 4" stroke="#ffe27a" stroke-width=".9" stroke-dasharray="1.4 1.2" fill="none"/><path d="M3 3l10.4 10.4" stroke="#6a4a2a" stroke-width="1.7"/><path d="M14.6 14.6l-3.9-1.1 2.8-2.8z" fill="#dfe6ec" stroke="#5c6670" stroke-width=".5"/><path d="M3 3l3.4.5-1.5 1.5zM3 3l.5 3.4 1.5-1.5z" fill="#efe6cf" stroke="#7a6a50" stroke-width=".4"/></svg>',
@@ -59,6 +88,32 @@ const SVG := {
 	"t_time": '<svg viewBox="0 0 24 24"><path d="M5.6 2h12.8v2.4H5.6zM5.6 19.6h12.8V22H5.6z" fill="#c9a24c" stroke="#4a3008" stroke-width=".6"/><path d="M7 4.4h10c0 4-3.6 5.6-4.4 7.6.8 2 4.4 3.6 4.4 7.6H7c0-4 3.6-5.6 4.4-7.6C10.6 10 7 8.4 7 4.4z" fill="#f3e6c8" fill-opacity=".35" stroke="#efe6cf" stroke-width="1"/><path d="M9.4 6.8h5.2c-.8 1.4-2 2.4-2.6 3.8-.6-1.4-1.8-2.4-2.6-3.8zM8.8 19c.6-1.8 2.2-2.8 3.2-4.2 1 1.4 2.6 2.4 3.2 4.2z" fill="#e0a526"/></svg>',
 }
 
+## the gods' emblems for the medallion on a god tech's frame (one learnable
+## sign per god, readable at 12 px; Greek gods share initials, so no letters)
+const GODS := {
+	"g_zeus": '<svg viewBox="0 0 24 24"><path d="M14.5 1L5 13.5h6L8.5 23 19 9.5h-6L16 1z" fill="#ffe27a" stroke="#fff8d0" stroke-width="1"/></svg>',
+	"g_poseidon": '<svg viewBox="0 0 24 24"><path d="M12 6v17M5 3v5c0 3 3 4 7 4s7-1 7-4V3M5 3l-1.6 2.6M5 3l1.6 2.6M12 1v5M19 3l-1.6 2.6M19 3l1.6 2.6M12 1l-1.6 2.6M12 1l1.6 2.6" stroke="#bfe8ff" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>',
+	"g_hades": '<svg viewBox="0 0 24 24"><path d="M12 2C7 2 4 5.6 4 10c0 2.6 1.2 4.4 3 5.4V19h10v-3.6c1.8-1 3-2.8 3-5.4 0-4.4-3-8-8-8z" fill="#e8e0d0"/><circle cx="8.8" cy="10.4" r="2.2" fill="#2a0a3a"/><circle cx="15.2" cy="10.4" r="2.2" fill="#2a0a3a"/><path d="M9 19v3M12 19v3M15 19v3" stroke="#2a0a3a" stroke-width="1.2"/></svg>',
+	"g_ares": '<svg viewBox="0 0 24 24"><path d="M5 22v-9c0-5 3-8 7-8s7 3 7 8v9h-4v-6h-1.6v7h-2.8v-7H9v6z" fill="#ffd27a" stroke="#fff4c0" stroke-width=".8"/><path d="M6 6c2-4.6 10-4.6 12 0-2-1.4-4-2-6-2S8 4.6 6 6z" fill="#ff5a3a"/><path d="M12 1.2v5" stroke="#ff5a3a" stroke-width="2.4"/></svg>',
+	"g_athena": '<svg viewBox="0 0 24 24"><path d="M4 3l3.6 3.4h8.8L20 3v9.4c0 5.4-3.6 9.6-8 9.6s-8-4.2-8-9.6z" fill="#e8e0d0"/><circle cx="8.6" cy="11" r="3" fill="#ffd27a" stroke="#3a2a10" stroke-width="1"/><circle cx="15.4" cy="11" r="3" fill="#ffd27a" stroke="#3a2a10" stroke-width="1"/><circle cx="8.6" cy="11" r="1.2" fill="#1a1006"/><circle cx="15.4" cy="11" r="1.2" fill="#1a1006"/><path d="M12 13.4l-1.4 2.4h2.8z" fill="#c08a2a"/></svg>',
+	"g_hermes": '<svg viewBox="0 0 24 24"><path d="M2 14C6 6 13 3 22 3c-2 2-3.4 3-5 3.6 1.6.4 2.6.4 4-.2-1.6 2.4-3.4 3.4-5.4 3.8 1.2.6 2.4.6 3.6.2-2 2.8-5 4.6-9 5.6L6 20z" fill="#f4f8fb" stroke="#bfe8ff" stroke-width=".8"/></svg>',
+	"g_apollo": '<svg viewBox="0 0 24 24"><g stroke="#ffd970" stroke-width="2.2" stroke-linecap="round"><path d="M12 1.5v3.5M12 19v3.5M1.5 12H5M19 12h3.5M4.6 4.6l2.4 2.4M17 17l2.4 2.4M19.4 4.6L17 7M7 17l-2.4 2.4"/></g><circle cx="12" cy="12" r="5.4" fill="#ffe27a" stroke="#fff8d0" stroke-width="1"/></svg>',
+	"g_dionysus": '<svg viewBox="0 0 24 24"><g fill="#d8a8f0" stroke="#5a1a7a" stroke-width=".7"><circle cx="8" cy="8.5" r="3"/><circle cx="14" cy="8" r="3"/><circle cx="11" cy="13" r="3"/><circle cx="17" cy="12.6" r="2.6"/><circle cx="14" cy="17.6" r="2.8"/><circle cx="11.4" cy="21" r="2"/></g><path d="M11 5.4C10.6 3 12 1.6 14 1.2" stroke="#7fd05a" stroke-width="1.6" fill="none"/></svg>',
+	"g_aphrodite": '<svg viewBox="0 0 24 24"><path d="M12 22S2.4 15.6 2.4 8.6A5.4 5.4 0 0 1 12 5.4a5.4 5.4 0 0 1 9.6 3.2C21.6 15.6 12 22 12 22z" fill="#ff8aa8" stroke="#ffe0ea" stroke-width="1"/></svg>',
+	"g_hephaestus": '<svg viewBox="0 0 24 24"><path d="M4 3h11l2 2v4l-2 2H4z" fill="#d8e0e6" stroke="#fff" stroke-width=".8"/><path d="M9.5 11h3v11h-3z" fill="#c08a4a" stroke="#ffd8a0" stroke-width=".7"/><path d="M15 3l4-1v10l-4-1" fill="#ffa040"/></svg>',
+	"g_hera": '<svg viewBox="0 0 24 24"><path d="M2.5 8l4.2 4 5.3-8 5.3 8 4.2-4-2 12H4.5z" fill="#ffd970" stroke="#fff4c0" stroke-width="1"/><circle cx="12" cy="15.6" r="1.8" fill="#4ad0c0"/><circle cx="2.5" cy="8" r="1.4" fill="#ffd970"/><circle cx="21.5" cy="8" r="1.4" fill="#ffd970"/><circle cx="12" cy="3.4" r="1.4" fill="#ffd970"/></svg>',
+	"g_demeter": '<svg viewBox="0 0 24 24"><path d="M12 23V5" stroke="#e8c060" stroke-width="1.6"/><g fill="#ffd970" stroke="#8a5a10" stroke-width=".5"><ellipse cx="12" cy="3.6" rx="1.6" ry="2.6"/><ellipse cx="9.4" cy="7.6" rx="1.5" ry="2.6" transform="rotate(-30 9.4 7.6)"/><ellipse cx="14.6" cy="7.6" rx="1.5" ry="2.6" transform="rotate(30 14.6 7.6)"/><ellipse cx="9.4" cy="12" rx="1.5" ry="2.6" transform="rotate(-30 9.4 12)"/><ellipse cx="14.6" cy="12" rx="1.5" ry="2.6" transform="rotate(30 14.6 12)"/><ellipse cx="9.6" cy="16.4" rx="1.5" ry="2.6" transform="rotate(-30 9.6 16.4)"/><ellipse cx="14.4" cy="16.4" rx="1.5" ry="2.6" transform="rotate(30 14.4 16.4)"/></g></svg>',
+	"g_hestia": '<svg viewBox="0 0 24 24"><path d="M12 1.5c3.6 4 6 6.6 6 10a6 6 0 0 1-12 0c0-3.4 2.4-6 6-10z" fill="#ff9a3a" stroke="#ffe0a0" stroke-width="1"/><path d="M12 8c1.8 2 3 3.4 3 5a3 3 0 0 1-6 0c0-1.6 1.2-3 3-5z" fill="#fff0a0"/><path d="M4 19h16v3H4z" fill="#e8e0d0"/></svg>',
+	"g_pan": '<svg viewBox="0 0 24 24"><g fill="#e0b070" stroke="#5a3410" stroke-width=".7"><path d="M3 3h3.4v18H3z"/><path d="M7.2 3h3.4v15H7.2z"/><path d="M11.4 3h3.4v12h-3.4z"/><path d="M15.6 3H19v9h-3.4z"/></g><path d="M2.4 7h17.2" stroke="#7a4a20" stroke-width="1.6"/></svg>',
+	"g_persephone": '<svg viewBox="0 0 24 24"><circle cx="12" cy="14" r="8" fill="#d83a4a" stroke="#ffc0c8" stroke-width="1"/><path d="M9 6.4l1-3.4 2 2 2-2 1 3.4z" fill="#e85a6a" stroke="#ffc0c8" stroke-width=".7"/><ellipse cx="9.4" cy="11.6" rx="1.6" ry="2.4" fill="#fff" opacity=".45"/></svg>',
+	"g_artemis": '<svg viewBox="0 0 24 24"><path d="M15 2.4A9.8 9.8 0 1 0 21.6 18 8 8 0 1 1 15 2.4z" fill="#e8f0ff" stroke="#fff" stroke-width=".8"/></svg>',
+}
+
+## The emblem icon name of a god ("" when unknown).
+static func god_emblem(god: String) -> String:
+	var k := "g_" + god.to_lower()
+	return k if GODS.has(k) else ""
+
 ## tech key -> icon name
 const BY_TECH := {
 	"ballistics": "t_ballistics", "burning_pitch": "t_burning_pitch",
@@ -85,8 +140,255 @@ static func icon_for(tech: String) -> String:
 static func svg(name: String) -> String:
 	if SVG.has(name):
 		return SVG[name]
+	if GODS.has(name):
+		return GODS[name]
 	var parts := name.split("_")
 	if parts.size() == 3 and parts[0] == "t" and TEMPLATES.has(parts[1]) and TIERS.has(parts[2]):
 		var c: Array = TIERS[parts[2]]
-		return str(TEMPLATES[parts[1]]).replace("$A", c[0]).replace("$B", c[1]).replace("$C", c[2])
+		var t := str(TEMPLATES[parts[1]]).replace("$X", str(EXTRAS[parts[1]][parts[2]]))
+		t = t.replace("$Y", PTERUGES if parts[1] == "armor" and parts[2] == "iron" else "")
+		return t.replace("$A", c[0]).replace("$B", c[1]).replace("$C", c[2]).replace("$D", c[3])
 	return ""
+
+## The tier of an Armory line's tech (1 copper, 2 bronze, 3 iron), else 0.
+static func tier_of(tech: String) -> int:
+	var parts := tech.split("_")
+	if parts.size() == 2 and TEMPLATES.has(parts[1]):
+		return int(TIER_RANK.get(parts[0], 0))
+	return 0
+
+# ---- painted tiles ----------------------------------------------------------------
+# A command button's icon is a baked tile: a background plate per tech family
+# (a lit radial gradient with a vignette, like Retold's painted icons), the
+# glyph embossed from its own silhouette (height = blurred alpha: key light
+# from the top left, a specular glint, darker inner edges), a rim light in the
+# family's glow colour on the far edges, a soft drop shadow and a halo on the
+# plate. The "locked" variant is the same tile desaturated and darkened.
+
+## family plates: [centre, middle, edge, glow]
+const PLATES := {
+	"ember": ["#c8742a", "#46200a", "#0e0602", "#ffb060"],
+	"sea": ["#3c9c98", "#123e40", "#030e10", "#b0fff0"],
+	"steel": ["#6a9cc0", "#1e3c56", "#050c14", "#a8dcff"],
+	"bronze": ["#b8903c", "#4a3410", "#100a02", "#ffd890"],
+	"amber": ["#e8a030", "#6e3c0a", "#140802", "#ffc868"],
+	"violet": ["#9466dc", "#341862", "#0a0416", "#e0b4ff"],
+	"verdant": ["#6cb850", "#1e4c1a", "#040e04", "#c4f890"],
+	"treasury": ["#3fa088", "#14423a", "#03100c", "#ffe48a"],
+	"sky": ["#78b4ea", "#1c3c6e", "#040a18", "#d4ecff"],
+	"dusk": ["#a8508a", "#3c1234", "#0c0208", "#ffb8e0"],
+}
+const PLATE_OF := {
+	"t_weapons": "ember", "t_armor": "steel", "t_shields": "sea",
+	"t_ballistics": "amber", "t_burning_pitch": "amber", "t_forge_of_olympus": "amber",
+	"t_phobos": "dusk", "t_enyo": "dusk", "t_monstrous_rage": "dusk", "t_sarissa": "steel",
+	"t_aegis": "bronze", "t_sun_ray": "sky", "t_shafts_of_plague": "verdant", "t_olympian_weapons": "violet",
+	"t_harvest_of_souls": "violet", "t_omniscience": "sky", "t_olympian_parentage": "violet",
+	"t_labyrinth": "amber", "t_sylvan_lore": "verdant", "t_will_of_kronos": "violet", "t_hymn": "verdant",
+	"t_oracle": "sky", "t_temple_of_healing": "verdant", "t_golden_apples": "verdant", "t_dionysia": "violet",
+	"t_face_of_the_gorgon": "verdant", "t_pious_sacrifice": "ember",
+	"t_tax_collectors": "treasury", "t_ambassadors": "treasury", "t_coinage": "treasury", "t_scroll": "sky",
+}
+
+static var _tiles := {}
+
+static func plate_of(name: String) -> String:
+	if PLATE_OF.has(name):
+		return PLATE_OF[name]
+	var parts := name.split("_")
+	if parts.size() == 3 and PLATE_OF.has("t_" + parts[1]):
+		return PLATE_OF["t_" + parts[1]]
+	return "sky"
+
+## The plate's glow colour (frames and halos use it).
+static func glow_of(name: String) -> Color:
+	return Color(str(PLATES[plate_of(name)][3]))
+
+## The baked tile of an icon at px x px; variant "normal" or "locked".
+static func tile(name: String, px: int, variant := "normal") -> Texture2D:
+	var key := "%s@%d:%s" % [name, px, variant]
+	if _tiles.has(key):
+		return _tiles[key]
+	var img := bake(name, px, variant == "locked")
+	var tex: Texture2D = ImageTexture.create_from_image(img) if img else null
+	_tiles[key] = tex
+	return tex
+
+static var _warm: Array = []
+static var _warm_init := false
+
+## Bake one more tile of the warm-up list (every tech icon at the command
+## grid's 64 px, normal and locked, and the card's 32 px), so selecting a
+## building never stalls on ~10 ms per tile. Call once per frame; false when done.
+static func prewarm_step() -> bool:
+	if not _warm_init:
+		_warm_init = true
+		var names := []
+		for t in TIERS:
+			for l in TEMPLATES:
+				names.append("t_%s_%s" % [l, t])
+		for k in SVG:
+			if PLATE_OF.has(k):
+				names.append(k)
+		for nm in names:
+			_warm.append([nm, 64, "normal"])
+		for nm in names:
+			_warm.append([nm, 64, "locked"])
+		for nm in names:
+			_warm.append([nm, 32, "normal"])
+	if _warm.is_empty():
+		return false
+	var w: Array = _warm.pop_front()
+	tile(str(w[0]), int(w[1]), str(w[2]))
+	return true
+
+static func _blur(src: PackedFloat32Array, n: int, r: int) -> PackedFloat32Array:
+	# two box passes per axis (close to a gaussian), clamped edges
+	var a := src
+	for pass_ in 2:
+		var b := PackedFloat32Array()
+		b.resize(n * n)
+		var inv := 1.0 / float(2 * r + 1)
+		for y in n:
+			var row := y * n
+			var acc := 0.0
+			for k in range(-r, r + 1):
+				acc += a[row + clampi(k, 0, n - 1)]
+			for x in n:
+				b[row + x] = acc * inv
+				acc += a[row + mini(x + r + 1, n - 1)] - a[row + maxi(x - r, 0)]
+		var c := PackedFloat32Array()
+		c.resize(n * n)
+		for x in n:
+			var acc := 0.0
+			for k in range(-r, r + 1):
+				acc += b[clampi(k, 0, n - 1) * n + x]
+			for y in n:
+				c[y * n + x] = acc * inv
+				acc += b[mini(y + r + 1, n - 1) * n + x] - b[maxi(y - r, 0) * n + x]
+		a = c
+	return a
+
+## Bake a tile (see above). Pure Image work: safe on a worker thread.
+static func bake(name: String, n: int, locked := false) -> Image:
+	var src := svg(name)
+	if src.is_empty():
+		return null
+	var pl: Array = PLATES[plate_of(name)]
+	var c0 := Color(str(pl[0]))
+	var c1 := Color(str(pl[1]))
+	var c2 := Color(str(pl[2]))
+	var gl := Color(str(pl[3]))
+	var gs := int(round(n * 0.9))
+	var g := Image.new()
+	if g.load_svg_from_string(src, float(gs) / 24.0) != OK:
+		return null
+	g.convert(Image.FORMAT_RGBA8)
+	var ox := (n - g.get_width()) / 2
+	var oy := (n - g.get_height()) / 2 - int(n * 0.01)
+	var gd := g.get_data()
+	var gw := g.get_width()
+	var gh := g.get_height()
+	# the glyph's colour and alpha on the tile grid
+	var N := n * n
+	var A := PackedFloat32Array()
+	A.resize(N)
+	var R := PackedFloat32Array()
+	R.resize(N * 3)
+	for y in gh:
+		var ty := y + oy
+		if ty < 0 or ty >= n:
+			continue
+		for x in gw:
+			var tx := x + ox
+			if tx < 0 or tx >= n:
+				continue
+			var si := (y * gw + x) * 4
+			var ti := ty * n + tx
+			var a := gd[si + 3] / 255.0
+			A[ti] = a
+			if a > 0.0:
+				R[ti * 3] = gd[si] / 255.0
+				R[ti * 3 + 1] = gd[si + 1] / 255.0
+				R[ti * 3 + 2] = gd[si + 2] / 255.0
+	var u := maxf(1.0, n / 48.0)
+	var H := _blur(A, n, maxi(1, int(round(1.6 * u))))
+	var SH := _blur(A, n, maxi(1, int(round(2.4 * u))))
+	var GL := _blur(A, n, maxi(2, int(round(6.0 * u))))
+	var sdx := int(round(1.4 * u))
+	var sdy := int(round(2.2 * u))
+	var L := Vector3(-0.55, -0.7, 0.62).normalized()
+	var Hv := (L + Vector3(0, 0, 1)).normalized()
+	var k := 9.0 * u
+	var out := PackedByteArray()
+	out.resize(N * 4)
+	var inv := 1.0 / float(n)
+	for y in n:
+		for x in n:
+			var i := y * n + x
+			# plate: radial light from the upper middle, vignette, a top sheen
+			var fx := (x + 0.5) * inv
+			var fy := (y + 0.5) * inv
+			var d := Vector2(fx - 0.46, fy - 0.36).length() / 0.78
+			var col: Color
+			if d < 0.5:
+				col = c0.lerp(c1, d / 0.5)
+			else:
+				col = c1.lerp(c2, clampf((d - 0.5) / 0.5, 0.0, 1.0))
+			var e := maxf(absf(fx - 0.5), absf(fy - 0.5)) * 2.0
+			var vig := 1.0 - 0.45 * clampf((e - 0.62) / 0.38, 0.0, 1.0)
+			var pr := col.r * vig
+			var pg := col.g * vig
+			var pb := col.b * vig
+			# the glyph's halo and drop shadow on the plate
+			var gv := GL[i]
+			pr += gl.r * gv * 0.32
+			pg += gl.g * gv * 0.32
+			pb += gl.b * gv * 0.32
+			var sx := x - sdx
+			var sy := y - sdy
+			if sx >= 0 and sy >= 0:
+				var sh := SH[sy * n + sx] * 0.78
+				pr *= 1.0 - sh
+				pg *= 1.0 - sh
+				pb *= 1.0 - sh
+			var a := A[i]
+			var r := pr
+			var gg := pg
+			var b := pb
+			if a > 0.0:
+				var xl := maxi(x - 1, 0)
+				var xr := mini(x + 1, n - 1)
+				var yu := maxi(y - 1, 0)
+				var yd := mini(y + 1, n - 1)
+				var nx := (H[y * n + xl] - H[y * n + xr]) * k
+				var ny := (H[yu * n + x] - H[yd * n + x]) * k
+				var nv := Vector3(nx, ny, 1.0).normalized()
+				var diff := maxf(nv.dot(L), 0.0)
+				var spec := pow(maxf(nv.dot(Hv), 0.0), 28.0) * 0.55
+				var h := H[i]
+				var edge := clampf((h - 0.25) / 0.6, 0.0, 1.0)
+				var shade := (0.5 + 0.62 * diff) * (0.72 + 0.28 * edge)
+				# rim light: the far (bottom-right) slopes catch the plate's glow
+				var rim := clampf(-nx * 0.5 - ny * 0.6, 0.0, 1.0) * (1.0 - edge) * 0.65
+				var cr := R[i * 3] * shade + spec + gl.r * rim
+				var cg := R[i * 3 + 1] * shade + spec + gl.g * rim
+				var cb := R[i * 3 + 2] * shade + spec + gl.b * rim
+				r = lerpf(pr, cr, a)
+				gg = lerpf(pg, cg, a)
+				b = lerpf(pb, cb, a)
+			# a glassy sheen on the upper third
+			var sheen := clampf(1.0 - fy / 0.42, 0.0, 1.0) * 0.07
+			r += sheen
+			gg += sheen
+			b += sheen
+			if locked:
+				var l := r * 0.3 + gg * 0.55 + b * 0.15
+				r = l * 0.56 + 0.02
+				gg = l * 0.58 + 0.025
+				b = l * 0.64 + 0.035
+			out[i * 4] = int(clampf(r, 0.0, 1.0) * 255.0)
+			out[i * 4 + 1] = int(clampf(gg, 0.0, 1.0) * 255.0)
+			out[i * 4 + 2] = int(clampf(b, 0.0, 1.0) * 255.0)
+			out[i * 4 + 3] = 255
+	return Image.create_from_data(n, n, false, Image.FORMAT_RGBA8, out)

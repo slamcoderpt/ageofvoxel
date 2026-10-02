@@ -1183,7 +1183,7 @@ Mythology: Retold's command panel (`reference/techs/ui_01..05`).
 - **Tech buttons** (`ui._tech_slots`, any finished building of the player
   whose `get_techs()` is not empty: Armory, Market, Temple, and the techs the
   Military Academy / Town Center also research): a button shows a tech that
-  is not done, not queued, not `unavailable` (its unit is not in this game)
+  is not done, not `unavailable` (its unit is not in this game)
   and not `locked_god`; a line shows only its next tier (Bronze appears once
   Copper is done, greyed until the Heroic Age); a god's techs appear from his
   age on (Retold: with the god; every god's while no minor god is chosen).
@@ -1193,15 +1193,29 @@ Mythology: Retold's command panel (`reference/techs/ui_01..05`).
   are the slot's letter, Q W E R T / A S D F G / **Y U I O P** (the third row
   is not Retold's Z X C V B: Z / C / V are the god powers here), unless a
   train / age button already has it. Frames: **gold** for generic techs,
-  **purple** for a god's; locked techs greyed with a duller frame. More techs
+  **purple** for a god's, and every button speaks the state language below
+  ("Command button states"); a tech being researched or queued keeps its
+  button. More techs
   than free slots (a Mythic Temple with no minor god chosen): the last slot is
   "More techs (n / m)" and pages.
-- **Icons**: `game/ui/tech_icons.gd`, 24-unit SVG glyphs in the HUD icon style
-  (read by `hud_style.icon()` after `icons.gd`), one per tech line: the
-  Armory's weapons (spear), armor (muscle cuirass) and shields (hoplon) in
-  the tier's metal (copper, bronze = gold, iron = silver), and Ballistics,
-  Burning Pitch, every Greek god tech, Omniscience, the Market techs, plus
-  `t_buy` / `t_sell` (trade arrows) and `t_time` (the tooltip's hourglass).
+- **Icons**: `game/ui/tech_icons.gd`, 24-unit SVG glyphs, one per tech line
+  (the Armory's weapons / armor / shields as shaded gradient templates in the
+  tier's metal: **copper** red-orange and plain, **bronze** yellow gold with a
+  red tassel / gorgon boss / star blazon, **iron** blue steel with a bright
+  edge, rivets, pteruges), Ballistics, Burning Pitch, every Greek god tech,
+  Omniscience, the Market techs, `t_buy` / `t_sell`, `t_time`, and `g_<god>`
+  emblems. A button never shows the bare glyph: `TechIcons.tile(name, px,
+  "normal"|"locked")` bakes a **painted tile** once (CPU, ~10 ms at 64 px,
+  cached; `prewarm_step()` bakes the whole set one per frame from the first
+  frames): a background plate per tech family (`PLATES` / `PLATE_OF`: ember
+  = weapons, steel = armor, sea = shields, amber = siege and forge, dusk =
+  Ares' terror techs, violet = divine, verdant = nature / healing, sky =
+  knowledge, treasury = the Market), a lit radial gradient with a vignette and
+  a top sheen; the glyph embossed from its own silhouette (height = blurred
+  alpha, key light from the top left, a specular glint, darker inner edges), a
+  rim light in the family's glow on its far edges, a soft drop shadow and a
+  halo on the plate. "locked" is the same tile desaturated and darkened. No
+  plate is red: red means "can't afford".
 - **Tooltips** (`hud._draw_wide_tooltip`, commands with `wide`): the name and
   "(hotkey)", "Cost: 100 [food] 100 [gold] 30s [hourglass]" (red where short;
   the time with Forge of Olympus at the Armory /1.5), Retold's effect text,
@@ -1214,8 +1228,9 @@ Mythology: Retold's command panel (`reference/techs/ui_01..05`).
 - **Research queue on the card** (`ui._research_info`): "Researching <tech>
   · n%", the queue as tech icons (the head with a progress bar; tooltip:
   seconds left, click to cancel: `cancel_research(building, key)`, exact
-  refund), and **RESEARCHED**: small icons of the techs done at that
-  building. A building's training waits while it researches (sim). The feed
+  refund), and **RESEARCHED**: small dimmed tiles of the techs done at
+  that building with a green check and a green frame (never a buyable gold
+  one). A building's training waits while it researches (sim). The feed
   says "<tech> researched." (`tech:researched`, a = 100 + id).
 - **Market**: trade buttons in the second row, Buy Food (A), Sell Food (S),
   Buy Wood (D), Sell Wood (F): the resource, a green / red arrow and the live
@@ -1228,14 +1243,40 @@ Mythology: Retold's command panel (`reference/techs/ui_01..05`).
 - **Capture scene `techui`** (`ui._techui_setup`; hud on, 1920x1080): the
   town scene's town in the Heroic Age with an Armory, a Market and its
   Temple, Copper Weapons and Copper Armor done, Copper Shields (39 %) and
-  Ballistics in the Armory's queue, a few trades made; the Armory selected
-  with the tooltip of its first button (Bronze Weapons) open.
+  Ballistics in the Armory's queue, two Minotaurs training at the Temple, a
+  few trades made, 14 favor left: every state at once (Bronze Weapons /
+  Armor available, Copper Shields researching, Ballistics queued, Burning
+  Pitch locked by the Mythic Age, the god techs short of favor but Enyo's
+  Bow); the Armory selected with the tooltip of its first button (Bronze
+  Weapons) open.
 
 ```
 node scripts/godot-shoot.mjs --scene techui --width 1920 --height 1080 --out shots/godot/techui.png
      [--params "techui_sel=market"]   # market | temple | armory
      [--params "techui_tip=5"]        # the command slot whose tooltip is open (-1 none)
 ```
+
+**Command button states** (`ui._set_state` / `_auto_state`, drawn by
+`hud._draw_cmd_state`): every command carries `state`, the same language for
+techs, train, build and trade buttons at every building, plus `status`
+`{state, text}`, the state in words as the first line of its tooltip,
+coloured by state (`hud.status_color`).
+
+| state | button | tooltip line |
+|---|---|---|
+| `available` | full-colour tile, bright bevelled frame (gold: generic tech, purple: god tech) | "Available · Click to research" (green) |
+| `unaffordable` (`short`: the missing resources) | the tile in full colour under a red wash deepening to the foot, a red inner line, the first missing resource in a red disc bottom-left; the frame keeps its colour | "Can't afford · Need 40 more gold, 5 more favor" (red); the cost's short numbers red |
+| `locked` (`age_req` when an age, else a prerequisite) | the tile desaturated and darkened (`tile(..., "locked")`, portraits greyed), a dim grey frame, a badge top-right: the required age's numeral (II / III / IV) or a padlock; the hotkey dimmed | "Locked · Requires Heroic Age" (tan) |
+| `researching` / `training` (`progress`, `count`) | a clockwise sweep from 12 o'clock darkens what is left, a green bar at the foot, the percentage on a tech, the count queued (green badge) on a train button | "Researching · 39% · 25s left · cancel it from the queue" (blue) |
+| `queued` (`count`: its place) | the tile dimmed, an hourglass, its place in the queue (amber badge) | "Queued · 2nd in the queue" (amber) |
+| researched | off the grid (the line's next tier takes the slot); on the card under RESEARCHED with a green check | |
+
+Identity marks, top left: an Armory line's **tier pips** (1-3 diamonds in the
+tier's metal, `tier`), a god tech's **medallion** with its god's emblem
+(`god`; `TechIcons.GODS`: Zeus' bolt, Athena's owl, Apollo's sun, Ares'
+helmet, ...: Greek gods share initials, so no letters). A click or key on a
+button that is not available says why (`_deny_text`: the lock, what is
+short, "Copper Weapons: researching, 25s left").
 
 The real-input playtest (`game/core/techs_playtest.gd`; harness shortcuts:
 AI off, resources granted, a hoplite and a hero spawned to measure on, the
@@ -1253,12 +1294,18 @@ Age"), H + A advance the age, R + a ground click places a Temple, the Armory
 button + a click an Armory, K + a click a Market (each built by the
 villagers), a click on the Armory: Copper Weapons on Q in a gold frame,
 Burning Pitch greyed "Requires Mythic Age", four or more god techs in purple,
-no Bronze tier; the hover tooltip (cost, 30 s, effect, "Human Soldier:
-Attack +10%"); a click on Copper Weapons pays 100 food + 100 gold and moves
-it to the card's queue; its key queues Copper Armor and a click on the queue
+no Bronze tier; the states (Copper Weapons `available` tier 1, Burning Pitch
+`locked` with `age_req` 3 and "Locked · Requires Mythic Age", the god techs
+with their god); with the favor taken away (harness) a god tech is
+`unaffordable`, short of favor, "Can't afford · Need n more favor"; the
+hover tooltip (cost, 30 s, effect, "Human Soldier: Attack +10%"); a click
+on Copper Weapons pays 100 food + 100 gold and puts it in the card's queue,
+its button `researching` on Q (Q again: refused, nothing paid); its key
+queues Copper Armor (`queued`, "2nd in the queue") and a click on the queue
 icon cancels it (exact refund); when Copper Weapons is done: the feed
 notice, a hoplite's damage x1.1 (`get_unit_stats`), Bronze Weapons on Q
-greyed "Requires Heroic Age", Copper Weapons under Researched; a click on the
+`locked` "Requires Heroic Age" (tier 2), Copper Weapons off the grid and
+under Researched; a click on the
 Temple and Olympian Parentage's hotkey (100 food, 10 favor): the hero's hp
 x1.25; a click on the Market: its rates on the card and the buttons' prices;
 a click on Buy Food (+100 food for the shown price, the price and the label

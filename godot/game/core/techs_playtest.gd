@@ -18,12 +18,15 @@ extends SceneTree
 ## Armory, K + a click a Market, the villagers build each; a click on the
 ## Armory shows its tech buttons (Copper Weapons on Q in a gold frame, Burning
 ## Pitch greyed "Requires Mythic Age", god techs in purple frames, no Bronze
-## tier yet), the hover tooltip gives cost, time and effect; a click on Copper
-## Weapons pays its cost and puts it in the card's queue (its button gone);
-## W queues Copper Armor and a click on its queue icon cancels it with an
+## tier yet; their states: "available", "locked" with the age numeral, god
+## techs with their god), the hover tooltip gives cost, time and effect;
+## without favor (harness) a god tech is "unaffordable", short of favor, the
+## tooltip says how much more; a click on Copper Weapons pays its cost and
+## puts it in the card's queue (its button "researching", Q again refused);
+## W queues Copper Armor ("queued", 2nd) and a click on its queue icon cancels it with an
 ## exact refund; Copper Weapons finishes (feed notice, a hoplite's damage x1.1
-## in get_unit_stats, Bronze Weapons now on Q greyed "Requires Heroic Age",
-## Copper Weapons under "Researched"); a click on the Temple and the hotkey of
+## in get_unit_stats, Bronze Weapons now on Q "locked" "Requires Heroic Age",
+## Copper Weapons off the grid and under "Researched"); a click on the Temple and the hotkey of
 ## Olympian Parentage research it (a hero's hp x1.25); a click on the Market
 ## shows its rates, a click on Buy Food buys 100 food for the shown price (the
 ## price moves, the button's label follows), S sells 100 food.
@@ -407,28 +410,58 @@ func _run() -> void:
 		and not bp.is_empty() and not bool(bp.enabled) and str(bp.warn) == "Requires Mythic Age"
 		and gods.size() >= 4 and _tech_cmd("bronze_weapons").is_empty(),
 		"Q=%s, pitch '%s', %d god techs" % [cw.get("title", ""), bp.get("warn", ""), gods.size()])
+	# the state language: available / locked by age (the numeral badge) / god techs' emblems
+	_check("button states: Copper Weapons 'available', Burning Pitch 'locked' by the Mythic Age, god techs carry their god",
+		str(cw.get("state", "")) == "available" and str(bp.get("state", "")) == "locked" and int(bp.get("age_req", -1)) == 3
+		and str(Dictionary(bp.get("status", {})).get("text", "")) == "Locked · Requires Mythic Age"
+		and int(cw.get("tier", 0)) == 1 and gods.all(func(c): return str(c.get("god", "")) != "" and ["available", "unaffordable", "locked"].has(str(c.get("state", "")))),
+		"%s / %s %s" % [cw.get("state", ""), bp.get("state", ""), bp.get("status", {})])
+	# unaffordable (harness: the favor taken away): a red-washed button, the missing resource and the words
+	var fav0 := float(_res().favor)
+	sim.set_player_resources(ME, {"favor": 0.0})
+	await _frames(14)
+	var fg = ui.commands.filter(func(c): return c != null and str(c.get("frame", "")) == "purple" and float(Dictionary(c.get("cost", {})).get("favor", 0.0)) > 0.0)
+	var fc: Dictionary = fg[0] if not fg.is_empty() else {}
+	_check("unaffordable: a god tech without favor is 'unaffordable', short of favor, the tooltip says what is missing",
+		str(fc.get("state", "")) == "unaffordable" and Array(fc.get("short", [])).has("favor") and not bool(fc.get("enabled", true))
+		and str(Dictionary(fc.get("status", {})).get("text", "")).begins_with("Can't afford · Need ") and str(fc.status.text).contains("more favor"),
+		"%s: %s %s" % [fc.get("title", "?"), fc.get("state", ""), fc.get("status", {})])
+	sim.set_player_resources(ME, {"favor": fav0})
+	await _frames(14)
 	tip = await _hover_cmd(func(c): return str(c.get("tech", "")) == "copper_weapons")
 	_check("tech tooltip: name, cost, time, effect, per-class bullets", str(tip.get("title", "")) == "Copper Weapons" and tip.get("cost", {}) == {"food": 100.0, "gold": 100.0}
 		and int(tip.get("time", 0)) == 30 and str(Array(tip.get("lines", [""]))[0]).contains("+10% attack") and Array(tip.get("bullets", [])).has("Human Soldier: Attack +10%"),
 		"%s %s %ss %s" % [tip.get("title", ""), tip.get("cost", {}), tip.get("time", 0), tip.get("bullets", [])])
 	await _shot("armory_tooltip")
 
-	# 6. a click on Copper Weapons: paid, in the card's queue, its button gone
+	# 6. a click on Copper Weapons: paid, in the card's queue, its button "researching"
 	var r0 := _res()
 	await _click(_cmd_where(func(c): return str(c.get("tech", "")) == "copper_weapons"))
 	await _frames(6)
 	var r1 := _res()
 	var q: Array = ui.info.get("queue", [])
-	_check("click Copper Weapons: paid 100 food + 100 gold, queued on the card, button gone",
+	var cwr := _tech_cmd("copper_weapons")
+	_check("click Copper Weapons: paid 100 food + 100 gold, queued on the card, its button 'researching' (not buyable)",
 		is_equal_approx(r0.food - r1.food, 100.0) and is_equal_approx(r0.gold - r1.gold, 100.0)
-		and q.size() >= 1 and str(q[0].get("tech", "")) == "copper_weapons" and _tech_cmd("copper_weapons").is_empty(),
+		and q.size() >= 1 and str(q[0].get("tech", "")) == "copper_weapons"
+		and str(cwr.get("state", "")) == "researching" and not bool(cwr.get("enabled", true)) and str(cwr.get("key", "")) == "Q"
+		and str(Dictionary(cwr.get("status", {})).get("text", "")).begins_with("Researching · "),
 		"paid %.0f / %.0f, queue %s" % [r0.food - r1.food, r0.gold - r1.gold, q.map(func(e): return e.get("tech", e.get("name", "")))])
 	# W: Copper Armor queued; a click on its queue icon cancels it (exact refund)
 	var ca := _tech_cmd("copper_armor")
 	var r2 := _res()
+	# Q again on the researching button: refused, nothing paid twice
+	await _key(KEY_Q)
+	await _frames(4)
+	var rq := _res()
+	_check("Q on the researching Copper Weapons: refused, nothing paid", is_equal_approx(rq.food, r1.food) and is_equal_approx(rq.gold, r1.gold)
+		and sim.get_research(arm).filter(func(e): return str(e.key) == "copper_weapons").size() == 1, "food %.0f -> %.0f" % [r1.food, rq.food])
 	await _key(OS.find_keycode_from_string(str(ca.get("key", "W"))))
 	await _frames(6)
 	var queued: bool = sim.get_research(arm).any(func(e): return str(e.key) == "copper_armor")
+	var caq := _tech_cmd("copper_armor")
+	_check("Copper Armor's button: 'queued', 2nd in the queue", str(caq.get("state", "")) == "queued" and int(caq.get("count", 0)) == 2
+		and str(Dictionary(caq.get("status", {})).get("text", "")).begins_with("Queued · 2nd in the queue"), "%s %s" % [caq.get("state", ""), caq.get("status", {})])
 	var qp = _card_zone("rqueue", "copper_armor")
 	if qp != null:
 		await _click(qp)
@@ -447,9 +480,10 @@ func _run() -> void:
 		"%.0f s, damage %.2f -> %.2f, feed %s" % [done_t, float(hop0.damage), float(hop1.damage), fed])
 	var bw := _tech_cmd("bronze_weapons")
 	var dts: Array = ui.info.get("done_techs", [])
-	_check("next tier: Bronze Weapons on Q, greyed 'Requires Heroic Age'; Copper Weapons under Researched",
+	_check("next tier: Bronze Weapons on Q, 'locked' by the Heroic Age; Copper Weapons off the grid, under Researched",
 		ui.commands[0] == bw and not bw.is_empty() and not bool(bw.enabled) and str(bw.warn) == "Requires Heroic Age"
-		and dts.any(func(e): return str(e.tech) == "copper_weapons"),
+		and str(bw.get("state", "")) == "locked" and int(bw.get("age_req", -1)) == 2 and int(bw.get("tier", 0)) == 2
+		and _tech_cmd("copper_weapons").is_empty() and dts.any(func(e): return str(e.tech) == "copper_weapons"),
 		"Q=%s '%s', researched %s" % [bw.get("title", ""), bw.get("warn", ""), dts.map(func(e): return e.tech)])
 	await _shot("armory_done")
 

@@ -13,6 +13,7 @@ extends Control
 ## CanvasLayer scales them to the window.
 
 const S := preload("res://game/ui/hud_style.gd")
+const TechIcons := preload("res://game/ui/tech_icons.gd")
 
 var ui: Node = null
 var layer := "back"
@@ -406,16 +407,16 @@ func _draw_commands() -> void:
 			rr = cr.grow(-1)
 		S.cell(self, rr, [[0.0, Color("#3d6f86")], [0.85, Color("#0f2d38")], [1.0, Color("#0f2d38")]], Vector2(0.5, 0.35))
 		var en: bool = c.enabled
-		var mod := Color.WHITE if en else Color(0.45, 0.47, 0.5)
+		var st := str(c.get("state", ""))
+		var mod := Color.WHITE if en or st == "unaffordable" or st == "training" else Color(0.45, 0.47, 0.5)
+		var ir := rr.grow(-3)
 		if c.has("tech"):
-			# a tech: a bigger glyph on a darker field; locked ones greyed (Retold's
-			# frames: gold for the generic techs, purple for a god's)
-			var locked: bool = c.get("locked", false)
-			draw_rect(rr.grow(-3), Color(0.0, 0.05, 0.07, 0.35))
-			S.draw_icon(self, c.svg, Rect2(rr.get_center() - Vector2(20, 21), Vector2(40, 40)), true,
-				Color(0.42, 0.43, 0.46) if locked else (Color.WHITE if en else Color(0.78, 0.78, 0.8)))
-			if locked:
-				draw_rect(rr.grow(-3), Color(0.02, 0.06, 0.08, 0.35))
+			# a tech: its painted tile (TechIcons.tile), greyed when locked
+			var tex := TechIcons.tile(str(c.svg), 64, "locked" if st == "locked" else "normal")
+			if tex:
+				draw_texture_rect(tex, ir, false)
+			else:
+				S.draw_icon(self, c.svg, Rect2(rr.get_center() - Vector2(20, 21), Vector2(40, 40)), true, mod)
 		elif c.has("trade"):
 			# a market exchange: the resource, a green (buy) / red (sell) arrow, the price in gold
 			S.draw_icon(self, str(c.trade), Rect2(rr.position + Vector2(5, 4), Vector2(30, 30)), true, mod)
@@ -425,29 +426,158 @@ func _draw_commands() -> void:
 			draw_string_outline(bold, Vector2(rr.position.x + 18, rr.end.y - 4), lb, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 4, Color(0, 0, 0, 0.75))
 			draw_string(bold, Vector2(rr.position.x + 18, rr.end.y - 4), lb, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#ffe39a") if en else Color("#ff8a70"))
 		elif c.get("tex") != null:
+			if st == "locked":
+				mod = Color(0.34, 0.36, 0.4)
 			_clip_tex(c.tex, Rect2(rr.grow(-2).position, Vector2(58, 58)), rr.grow(-2), mod)  # CSS: the oversized grid item sits at the content box origin, overflowing right / down
+			if st == "locked":
+				draw_rect(rr.grow(-2), Color(0.03, 0.06, 0.08, 0.3))
 		else:
 			S.draw_icon(self, c.svg, Rect2(rr.get_center() - Vector2(16, 16), Vector2(32, 32)), true, mod)
-		if c.has("frame"):
-			var fc := Color("#e8c050") if c.frame == "gold" else Color("#b45ae6")
-			if c.get("locked", false):
-				fc = fc.darkened(0.25).lerp(Color(0.55, 0.55, 0.58), 0.35)
-			draw_rect(rr.grow(-1), fc, false, 2.0)
-			draw_rect(rr.grow(-3), Color(fc, 0.35), false, 1.0)
-		if hover and en:
-			draw_rect(rr.grow(-2), S.GOLD_HI, false, 1.0)
-			for k in 3:
-				draw_rect(rr.grow(1.0 + k * 2.0), Color(233 / 255.0, 200 / 255.0, 120 / 255.0, 0.3 - k * 0.09), false, 2.0)
+		_draw_cmd_state(c, rr, ir, st, hover)
+		if hover and (en or st != ""):
+			draw_rect(rr.grow(-2), S.GOLD_HI if en else Color(1, 1, 1, 0.35), false, 1.0)
+			if en:
+				for k in 3:
+					draw_rect(rr.grow(1.0 + k * 2.0), Color(233 / 255.0, 200 / 255.0, 120 / 255.0, 0.3 - k * 0.09), false, 2.0)
 		if c.key != "":
 			var f := bold
 			var kx := rr.end.x - 4 - S.text_width(f, c.key, 13)
 			draw_string_outline(f, Vector2(kx, rr.end.y - 4), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 4, Color(0, 0, 0, 0.75))
-			draw_string(f, Vector2(kx, rr.end.y - 4), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color.WHITE)
+			draw_string(f, Vector2(kx, rr.end.y - 4), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.62, 0.62, 0.64) if st == "locked" else Color.WHITE)
 		var tip := {"title": c.title, "lines": c.get("lines", []), "cost": c.get("cost", {}), "hotkey": c.key, "warn": c.get("warn", "")}
-		for k in ["time", "bullets", "foot", "wide", "gain"]:
+		for k in ["time", "bullets", "foot", "wide", "gain", "status"]:
 			if c.has(k):
 				tip[k] = c[k]
 		zone(cr, "cmd", i, tip)
+
+## The state layer of a command button (PORTING.md "Command button states"):
+## the frame (a tech's gold / purple, bevelled; dim grey when locked), the
+## god's medallion on a god tech, the tier pips of an Armory line, the state
+## badges (the age numeral or a padlock when locked, the queue place / count),
+## the red wash and the missing resource when it cannot be afforded, the
+## progress sweep and bar while it researches / trains.
+func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bool) -> void:
+	var bold := S.font("bold")
+	var title := S.font("title")
+	# researching / training: a clockwise sweep darkens what is left, a bar at the foot
+	if st == "researching" or st == "training":
+		var p := clampf(float(c.get("progress", 0.0)), 0.0, 1.0)
+		_sweep(ir, p, Color(0.0, 0.03, 0.05, 0.58))
+		var bar := Rect2(ir.position.x, ir.end.y - 5, ir.size.x, 5)
+		draw_rect(bar, Color(0, 0, 0, 0.7))
+		S.hgrad(self, Rect2(bar.position + Vector2(0, 1), Vector2(bar.size.x * p, 3)), [[0.0, Color("#3fae3a")], [1.0, Color("#b8ff9a")]])
+		var pc := "%d%%" % int(floor(p * 100)) if st == "researching" else ""
+		if pc != "":
+			var tw := S.text_width(bold, pc, 13)
+			var tp := Vector2(ir.get_center().x - tw * 0.5, ir.get_center().y + 5)
+			draw_string_outline(bold, tp, pc, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 4, Color(0, 0, 0, 0.85))
+			draw_string(bold, tp, pc, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#d8ffc8"))
+	elif st == "queued":
+		draw_rect(ir, Color(0.0, 0.03, 0.05, 0.5))
+		S.draw_icon(self, "t_time", Rect2(ir.get_center() - Vector2(10, 11), Vector2(20, 20)), true)
+	elif st == "unaffordable":
+		# Retold: a red wash; the first missing resource in a red badge
+		draw_rect(ir, Color(0.7, 0.04, 0.02, 0.26))
+		draw_rect(ir.grow(-2.5), Color("#ff4a2a"), false, 1.5)
+		S.vgrad(self, Rect2(ir.position.x, ir.get_center().y, ir.size.x, ir.size.y * 0.5), [[0.0, Color(0.8, 0.05, 0.02, 0.0)], [1.0, Color(0.85, 0.06, 0.02, 0.55)]])
+		var sh: Array = c.get("short", [])
+		if not sh.is_empty():
+			var bc := Vector2(ir.position.x + 9, ir.end.y - 9)
+			draw_circle(bc, 9.0, Color(0.1, 0.0, 0.0, 0.9))
+			draw_circle(bc, 8.0, Color("#a8180e"))
+			draw_arc(bc, 8.5, 0, TAU, 20, Color("#ff9a80"), 1.0, true)
+			S.draw_icon(self, str(sh[0]), Rect2(bc - Vector2(6, 6), Vector2(12, 12)), false)
+	# the frame
+	var fam := str(c.get("frame", ""))
+	if fam != "":
+		var hi := Color("#fff0b0") if fam == "gold" else Color("#f2d0ff")
+		var mid := Color("#e2b340") if fam == "gold" else Color("#b45ae6")
+		var lo := Color("#7a5612") if fam == "gold" else Color("#4e1c86")
+		if st == "locked":
+			hi = hi.lerp(Color("#8a8a90"), 0.75).darkened(0.25)
+			mid = mid.lerp(Color("#5c5c62"), 0.72)
+			lo = lo.lerp(Color("#2a2a2e"), 0.7)
+		var o := rr.grow(-1)
+		draw_rect(o.grow(1), Color(0.03, 0.02, 0.0, 0.9), false, 1.0)
+		# bevel: lit top / left, shaded bottom / right
+		draw_rect(Rect2(o.position, Vector2(o.size.x, 2)), hi)
+		draw_rect(Rect2(o.position, Vector2(2, o.size.y)), hi.lerp(mid, 0.4))
+		draw_rect(Rect2(o.position.x, o.end.y - 2, o.size.x, 2), lo)
+		draw_rect(Rect2(o.end.x - 2, o.position.y, 2, o.size.y), lo.lerp(mid, 0.3))
+		draw_rect(o.grow(-2), mid, false, 1.0)
+		draw_rect(o.grow(-3), Color(0, 0, 0, 0.55), false, 1.0)
+		if st != "locked":
+			# the frame's glow on the tile's edge
+			draw_rect(o.grow(-4), Color(mid, 0.35), false, 1.0)
+	# identity: a god tech's medallion (the god's initial), an Armory line's tier pips
+	var god := str(c.get("god", ""))
+	if fam == "purple" and god != "":
+		var mc := ir.position + Vector2(9, 9)
+		var lockd := st == "locked"
+		draw_circle(mc, 9.0, Color(0.05, 0.0, 0.1, 0.95))
+		draw_circle(mc, 8.0, Color("#5a2a9a") if not lockd else Color("#3a3440"))
+		draw_arc(mc, 8.0, 0, TAU, 20, Color("#e8c8ff") if not lockd else Color("#8a8490"), 1.2, true)
+		var em := TechIcons.god_emblem(god)
+		if em != "":
+			S.draw_icon(self, em, Rect2(mc - Vector2(6, 6), Vector2(12, 12)), false, Color.WHITE if not lockd else Color(0.6, 0.6, 0.62))
+		else:
+			var ini := god.substr(0, 1).to_upper()
+			var iw := S.text_width(title, ini, 10)
+			draw_string(title, Vector2(mc.x - iw * 0.5, mc.y + 4), ini, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#fff4dc") if not lockd else Color("#b8b4bc"))
+	var tier := int(c.get("tier", 0))
+	if tier > 0:
+		var tc: Color = [Color("#e07a40"), Color("#f0c040"), Color("#c8d6e2")][tier - 1]
+		if st == "locked":
+			tc = tc.lerp(Color(0.5, 0.5, 0.52), 0.6)
+		for k in tier:
+			var pc := ir.position + Vector2(6 + k * 7, 6)
+			var dia := PackedVector2Array([pc + Vector2(0, -3.5), pc + Vector2(3.5, 0), pc + Vector2(0, 3.5), pc + Vector2(-3.5, 0)])
+			draw_colored_polygon(dia, Color(0, 0, 0, 0.85))
+			var din := PackedVector2Array([pc + Vector2(0, -2.5), pc + Vector2(2.5, 0), pc + Vector2(0, 2.5), pc + Vector2(-2.5, 0)])
+			draw_colored_polygon(din, tc)
+	# state badge (top right): the age numeral or a padlock; the queue place / count
+	var bc2 := Vector2(ir.end.x - 8, ir.position.y + 8)
+	if st == "locked":
+		draw_circle(bc2, 9.0, Color(0, 0, 0, 0.9))
+		draw_circle(bc2, 8.0, Color("#2a2c30"))
+		draw_arc(bc2, 8.0, 0, TAU, 20, Color("#b8a070"), 1.2, true)
+		if c.has("age_req"):
+			var rn: String = ["I", "II", "III", "IV"][clampi(int(c.age_req), 0, 3)]
+			var fs := 10 if rn.length() < 3 else 8
+			var rw := S.text_width(title, rn, fs)
+			draw_string(title, Vector2(bc2.x - rw * 0.5, bc2.y + 4), rn, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color("#f0dca0"))
+		else:
+			S.draw_icon(self, "lock", Rect2(bc2 - Vector2(6, 6), Vector2(12, 12)), false)
+	elif (st == "queued" or st == "training") and int(c.get("count", 0)) > 0:
+		var n := str(int(c.count))
+		var bw := maxf(16.0, S.text_width(bold, n, 12) + 8)
+		var br := Rect2(ir.end.x - bw, ir.position.y, bw, 16)
+		draw_rect(br, Color(0, 0, 0, 0.85))
+		draw_rect(br.grow(-1), Color("#1e5a2a") if st == "training" else Color("#6a4a12"))
+		draw_rect(br.grow(-1), Color("#9ef58a") if st == "training" else Color("#ffd27a"), false, 1.0)
+		draw_string(bold, Vector2(br.position.x + (bw - S.text_width(bold, n, 12)) * 0.5, br.end.y - 3), n, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
+
+## Darken the part of r a clockwise sweep from 12 o'clock has not reached at p.
+func _sweep(r: Rect2, p: float, col: Color) -> void:
+	if p >= 1.0:
+		return
+	var c := r.get_center()
+	var rad := r.size.length() * 0.5 + 1.0
+	var pts := PackedVector2Array([c])
+	var a0 := -PI * 0.5 + TAU * p
+	var steps := maxi(2, int(ceil((1.0 - p) * 32)))
+	for k in steps + 1:
+		var a := lerpf(a0, PI * 1.5, float(k) / steps)
+		pts.append(c + Vector2(cos(a), sin(a)) * rad)
+	# clip the fan to the rect
+	var clipped := Geometry2D.intersect_polygons(pts, PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]))
+	for poly in clipped:
+		draw_colored_polygon(poly, col)
+	if p > 0.0:
+		# the sweep's leading edge, centre to the rect's border
+		var d := Vector2(cos(a0), sin(a0))
+		var t := minf(r.size.x * 0.5 / maxf(absf(d.x), 0.001), r.size.y * 0.5 / maxf(absf(d.y), 0.001))
+		draw_line(c, c + d * t, Color(0.85, 1.0, 0.8, 0.55), 1.0, true)
 
 # selection card --------------------------------------------------------------------------------
 
@@ -545,8 +675,13 @@ func _draw_info() -> void:
 				var qr := Rect2(qx, ty + 4, 38, 38)
 				draw_rect(qr, Color("#10303c"))
 				if q.has("tech"):
-					S.draw_icon(self, q.svg, Rect2(qr.get_center() - Vector2(15, 16), Vector2(30, 30)), true)
-					draw_rect(qr.grow(-1), Color(S.GOLD, 0.5), false, 1.0)
+					var qt := TechIcons.tile(str(q.svg), 64)
+					if qt:
+						draw_texture_rect(qt, qr.grow(-2), false)
+					if q.p <= 0.0:
+						draw_rect(qr.grow(-2), Color(0.0, 0.03, 0.05, 0.45))
+					else:
+						_sweep(qr.grow(-2), float(q.p), Color(0.0, 0.03, 0.05, 0.5))
 				elif q.tex:
 					_clip_tex(q.tex, Rect2(qr.get_center() - Vector2(24, 24), Vector2(48, 48)), qr.grow(-1))
 				draw_rect(qr, S.BRONZE, false, 1.0)
@@ -569,10 +704,16 @@ func _draw_info() -> void:
 				for dt in dts:
 					if dx + 22 > r.end.x - 12:
 						break
+					# done: the tile dimmed, a green check, no buyable frame
 					var dr := Rect2(dx, ty + 2, 22, 22)
-					draw_rect(dr, Color("#0b2630"))
-					S.draw_icon(self, dt.svg, dr.grow(-2), false)
-					draw_rect(dr, Color(S.GOLD, 0.6), false, 1.0)
+					var dtex := TechIcons.tile(str(dt.svg), 32)
+					if dtex:
+						draw_texture_rect(dtex, dr, false, Color(0.62, 0.66, 0.64))
+					draw_rect(dr, Color("#2f6a34"), false, 1.0)
+					var ck := dr.end - Vector2(5, 5)
+					draw_circle(ck, 5.0, Color(0, 0, 0, 0.85))
+					draw_circle(ck, 4.0, Color("#3fae3a"))
+					draw_polyline(PackedVector2Array([ck + Vector2(-2.2, 0), ck + Vector2(-0.6, 1.6), ck + Vector2(2.2, -1.6)]), Color.WHITE, 1.3, true)
 					zone(dr, "rdone", dt.tech, {"title": dt.name, "lines": [dt.text, "Researched"]})
 					dx += 25
 				ty += 28
@@ -822,6 +963,8 @@ func _draw_tooltip() -> void:
 	w = tw
 	for l in lines:
 		w = maxf(w, S.text_width(sans, str(l), 14))
+	if t.has("status"):
+		w = maxf(w, S.text_width(bold, str(t.status.text), 13))
 	var cost_w := 0.0
 	for k in cost:
 		cost_w += 16 + S.text_width(bold, str(int(cost[k])), 14) + 10
@@ -829,7 +972,7 @@ func _draw_tooltip() -> void:
 	var menu: bool = t.get("menu", false)
 	if menu:
 		w = maxf(w, 262.0)  # room for the Graphics row
-	var h := 8.0 + 18.0 + lines.size() * 18.0 + (20.0 if not cost.is_empty() else 0.0) + (18.0 if t.get("hotkey", "") != "" else 0.0) + (18.0 if t.get("warn", "") != "" else 0.0) + (38.0 if menu else 0.0) + 8.0
+	var h := 8.0 + 18.0 + lines.size() * 18.0 + (20.0 if not cost.is_empty() else 0.0) + (18.0 if t.get("hotkey", "") != "" else 0.0) + (18.0 if t.get("warn", "") != "" or t.has("status") else 0.0) + (38.0 if menu else 0.0) + 8.0
 	var ar: Rect2 = t.anchor
 	var x := minf(W() - 290.0, ar.position.x)
 	var y := ar.position.y - h - 8.0
@@ -861,7 +1004,10 @@ func _draw_tooltip() -> void:
 	if t.get("hotkey", "") != "":
 		cy += 18
 		S.text(self, sans, Vector2(r.position.x + 11, cy), "Hotkey: " + str(t.hotkey), 12, S.MUTED, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
-	if t.get("warn", "") != "":
+	if t.has("status"):
+		cy += 18
+		S.text(self, bold, Vector2(r.position.x + 11, cy), str(t.status.text), 13, status_color(str(t.status.state)), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
+	elif t.get("warn", "") != "":
 		cy += 18
 		S.text(self, sans, Vector2(r.position.x + 11, cy), str(t.warn), 13, Color("#ff8a70"), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
 	if menu:
@@ -902,6 +1048,16 @@ static func _wrap(f: Font, s: String, px: int, w: float) -> Array:
 ## the name and hotkey, "Cost: 100 [food], 10 [favor], 40s [hourglass]"
 ## (red where short), the effect, per-class bullets, the lock's reason in
 ## red, age / building / god.
+## The colour of a command state's line in a tooltip.
+static func status_color(st: String) -> Color:
+	match st:
+		"available": return Color("#9ef58a")
+		"unaffordable": return Color("#ff7a5c")
+		"locked": return Color("#d8a878")
+		"researching", "training": return Color("#8fdcff")
+		"queued": return Color("#ffd27a")
+	return S.MUTED
+
 func _draw_wide_tooltip(t: Dictionary) -> void:
 	var title := S.font("title")
 	var sans := S.font("sans")
@@ -916,7 +1072,12 @@ func _draw_wide_tooltip(t: Dictionary) -> void:
 		var wl := _wrap(sans, "• " + str(l), 14, maxw)
 		for k in wl.size():
 			rows.append([("    " if k > 0 else "") + str(wl[k]), sans, 14, Color("#e9d39a"), 18.0])
-	if str(t.get("warn", "")) != "":
+	var stt: Dictionary = t.get("status", {})
+	if not stt.is_empty():
+		var wl := _wrap(bold, str(stt.text), 13, maxw)
+		for k in wl.size():
+			rows.insert(k, [("    " if k > 0 else "") + str(wl[k]), bold, 13, status_color(str(stt.state)), 19.0])
+	elif str(t.get("warn", "")) != "":
 		for wl in _wrap(bold, str(t.warn), 13, maxw):
 			rows.append([str(wl), bold, 13, Color("#ff8a70"), 18.0])
 	for l in t.get("foot", []):
