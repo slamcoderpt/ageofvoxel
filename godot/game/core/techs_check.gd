@@ -36,7 +36,8 @@ extends SceneTree
 ##                armor 40 % hack, 90 % pierce, 5 % crush measured on blows and arrows;
 ##                the Heroic Age needs an Armory or a Market (on by default)
 ##   ai           an AI (Moderate) builds an Armory in the Classical Age and researches
-##                there (Copper Weapons, Armor, Shields); Easy does not
+##                there (Copper Weapons, Armor, Shields); Easy later and at most two
+##                (the whole ladder: aitechs_check.gd)
 ##   determinism  two identical runs with research, trade and a fight end bit-equal
 ##   rules_off    with set_godot_rules(false) nothing can be researched, built or traded
 ##
@@ -950,8 +951,9 @@ func _case_ai() -> void:
 			"towers": a2.fort.towers, "ring_state": a2.fort.ring_state, "minutes": snappedf(sim.get_time() / 60.0, 0.1)}
 		if diff == "moderate":
 			ok = ok and armory_at > 0 and first_done > 0 and "copper_weapons" in Array(sim.get_player_techs(2).done)
-		else:
-			ok = ok and armory_at < 0 and int(a2.techs.started) == 0
+			out["moderate_armory_s"] = armory_at
+		else: # (Easy researches little and late: its Armory 9 min into the Classical Age, at most its two Copper techs)
+			ok = ok and (armory_at < 0 or armory_at > float(out.get("moderate_armory_s", 0.0))) and int(a2.techs.started) <= 2
 	_check("ai.research", ok, out)
 
 # market --------------------------------------------------------------------------------------------

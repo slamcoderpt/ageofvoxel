@@ -993,7 +993,8 @@ the Temple, with the numbers of `../reference/techs/TECHS.md`. Class `Techs`
   **The Heroic Age needs an Armory or a Market** (Retold) with the rules on,
   by default (`set_tech_rules({heroic_needs_armory: false})` turns it off);
   the advance is refused with "Requires an Armory or a Market". The enemy AI
-  never goes past the Classical Age, so it is not held back by it.
+  (Moderate and up) goes on to the Heroic / Mythic Age once its Armory
+  stands (see "Enemy AI: research, ages, Market").
 - **Myth units at the Temple**: with the rules on the Temple trains every
   Greek myth unit this game has a model for, through the same `train()`:
   Minotaur (Athena), Cyclops (Ares), Centaur (Hermes) from the Classical Age
@@ -1006,16 +1007,10 @@ the Temple, with the numbers of `../reference/techs/TECHS.md`. Class `Techs`
   existing unit defs (TECHS.md has no unit numbers). So Sylvan Lore, Will of
   Kronos and Face of the Gorgon, and the Centaur / Medusa part of Burning
   Pitch and Sun Ray, act on units a player can really train.
-- **AI research** (`combat/enemy_ai_techs.cpp`, every difficulty but Easy,
-  `AIParams::armory_at` = 18 villagers, `set_ai(owner, {armory_at: 0})`
-  off): in the Classical Age, once its academy stands and its fortifications
-  are done (ring closed, towers placed: the AI is short of wood and gold, and
-  an Armory earlier left a Moderate ring open at 18 min), it builds an Armory
-  and researches Copper Weapons, Copper Armor, Copper Shields there, one at a
-  time; short of the price its academies wait up to 45 s (as for a
-  fortification tech), then it buys when 150 of each is left over. Never
-  while it saves for the next age. `get_ai(owner).techs` = {armories,
-  started, holds}.
+- **AI research**: the enemy AI builds an Armory and a Market, researches
+  the Armory / Market / Temple techs, advances to the Heroic and Mythic Ages
+  and trades at its Market, scaled by difficulty: see "Enemy AI: research,
+  ages, Market" (`combat/enemy_ai_techs.cpp`, `aitechs_check.gd`).
 - **Research queue** (generalises the fortify stages' one-slot research):
   every building row has `tech_queue` (`TechItem` {tech, t, total, paid}),
   up to `TECH_QUEUE_MAX` = 5. `research(building, key)` checks the building
@@ -1108,7 +1103,7 @@ the Temple, with the numbers of `../reference/techs/TECHS.md`. Class `Techs`
   (`MARKET_DRIFT`). The step is this port's pick within TECHS.md's "about
   1.5 to 3"; **the drift is a deliberate departure**: TECHS.md says Retold's
   prices do not recover over time. Here the price is shared by every player
-  and the AI never trades, so without a drift one player's early sales would
+  and the AIs trade too, so without a drift one player's early sales would
   leave the price at the floor for the whole match; the slow recovery (20
   points in 100 s) keeps the Market usable. Set `MARKET_DRIFT` = 0 for
   Retold's behaviour. A Market with a full research queue
@@ -1815,6 +1810,92 @@ sieges > 0, a wall / pillar / gate piece destroyed with its last hit from a
 soldier, the match decided; ~30 s). Capture scene `aifort`: a two-AI match played `aifort_t` minutes in
 the setup, the camera on the wall piece hit most in the last minute (else
 `aifort_owner`'s Town Center).
+
+**Enemy AI: research, ages, Market** (Godot-only, behind the rules,
+`native/src/sim/combat/enemy_ai_techs.cpp`, called from `EnemyAI::update`
+after the storehouses): the AI uses the tech tree of "Research, Armory,
+Market, Temple techs" the way Retold's AI does, scaled by difficulty
+(`AIParams`, `ai_params(d)`). Deterministic: no rng draw, rows in order.
+
+| | Easy | Moderate (default AI) | Hard | Titan |
+|---|---|---|---|---|
+| Armory | 9 min into the Classical Age, 12 villagers, after its ring / towers | 1.5 min in, 18 villagers, after its ring / towers (at most 7 min more) | 45 s in, 16 villagers | 20 s in, 14 villagers |
+| Market | never | in the Heroic Age, 1 min after its Armory | Classical, 1.5 min after its Armory | Classical, 45 s after its Armory |
+| Ages | Classical only | Heroic from 15 min | Heroic from 13, Mythic from 25 | Heroic from 11, Mythic from 19 |
+| Techs (tier) | 0: Copper Weapons, Copper Armor | 1: + Copper Shields, Labyrinth of Minos, Golden Apples, Bronze Weapons / Armor | 2: + Ballistics, Sarissa, Tax Collectors, Bronze Shields, Sun Ray, Temple of Healing, Iron Weapons / Armor, Monstrous Rage | 3: + Aegis Shield, Oracle, Forge of Olympus (first in the Mythic Age), Iron Shields, Olympian Weapons, Burning Pitch, Ambassadors, Omniscience |
+| Saving (escrow) | 30 s per item, then 150 s at half | 60 s, 90 s at half; age-up 150 s | 120 s, 60 s at half; age-up 240 s | 180 s, 45 s at half; age-up 300 s |
+| Trades | none | glut beyond 1800 | 1400, a lot every 1.5 s | 1100, a lot every 1 s |
+
+- **Gods**: on reaching an age it takes that age's minor god
+  (`Techs::set_minor_god`, only if none is set): Athena (Classical: its
+  minotaurs and hoplites), Aphrodite (Easy / Moderate) or Apollo (Hard /
+  Titan) in the Heroic Age, Hera (Hard) or Hephaestus (Titan) in the Mythic.
+  Only that god's techs open, as for a player.
+- **The plan** (`PLAN`): the Classical Armory line first, then per age its
+  economy techs (Tax Collectors, Golden Apples), its armor / weapon lines
+  (urgent) and its god's techs. Each item has a tier (the lowest
+  `tech_level` that researches it) and, for unit upgrades, the units it
+  needs fielded (Labyrinth / Monstrous Rage: a myth unit; Sarissa / Aegis: a
+  hoplite; Sun Ray / Burning Pitch: a toxotes). Each of its Armory, Market
+  and Temple researches its first open tech of the plan, one at a time (a
+  Temple researching does not train, as for a player). The age-up comes
+  after the urgent techs of the age it is in. Priority: the Armory /
+  Market building, the age-up, the techs in plan order.
+- **Escrow** (what makes it research on time without starving its army):
+  the first item it cannot pay stays in the bank: its academies and Temple
+  train only with that much left over (`escrow_allows`), and when that item
+  lacks gold or wood more villagers go to it (gold share >= 0.3, wood >=
+  0.4); whole for `escrow_max` s per item (`age_escrow_max` for an
+  age-up), then only half of it for `escrow_rest` s (the army may spend the
+  rest). Never with fewer than 8 soldiers or a foe within 26 tiles of its
+  Town Center: the men first (without this rule a starved Hard AI held its
+  last food for a tech and lost its army). A tech it does not save for
+  needs `tech_keep` left over. **Still Archaic past 9 min** (the browser's
+  saving window over and its army eating every bit of food: a Titan seed 2
+  never reached the Classical Age), it saves the 400 food the same way.
+- **Market**: a lot of 100 every `trade_every` s at its Market: gold short
+  for what it saves for (an age-up, a tech): it sells the food / wood it has
+  most to spare beyond that item (no gold mine within 80 tiles: beyond 150,
+  the farms and the woods refill it, the Market is its only gold); food /
+  wood short: it buys with the gold beyond the item + 150; else a food /
+  wood glut beyond `trade_glut` with gold under half of it is sold, and a
+  gold glut buys the food or wood under 150. Never sells 100 for under 45
+  gold nor buys for over 220. Prices are the shared ones (a player sees the
+  AI's trades move them).
+- **Favor**: at its cap (190+ of 200) only one villager keeps praying (the
+  rest gather what the techs and the next age need).
+- `get_ai(owner).techs` = {armories, markets, started, holds, age_holds,
+  sold, bought, gold_in, gold_out, classical_at, heroic_at, mythic_at
+  (s, -1 not yet), last_tech, tech_level, max_age}; `set_ai(owner,
+  {armory_at (0: no research, no later age), max_age, market_age,
+  tech_level, trade_glut})`.
+
+```
+godot --headless --path godot -s res://game/core/aitechs_check.gd [-- --only=ladder,market,determinism,duel --seed=1 --minutes=35]
+```
+
+`aitechs_check.gd` ("AITECHS PASS|FAIL <case>", `AITECHS_RESULT {json}`,
+exit = failures, ~20 s): **ladder** (each difficulty in peace, the other AI
+idle and no waves, 35 min, seed 1): Easy 2 techs (Copper Weapons 29.0 min,
+Copper Armor 31.3), its Armory at 21.7, Classical only, no Market; Moderate
+5 (first 19.5), Armory 15.2, Heroic and its Market at 30.5; Hard 12 (first
+15.8), Armory 14.0, Market 16.7, Heroic 19.2; Titan 21 (first 10.5, median
+3.6 min after reaching each tech's age), Armory 9.3, Market 11.2, Heroic
+14.3, Mythic 24.5, all nine weapons / armor / shields tiers, 28 lots sold
+(its gold mines run dry by 24 min); checked: Easy <= 3 techs, the first
+after 18 min; Moderate more, Heroic, a Market; Hard more, its Market
+sooner; Titan >= Hard, >= 18, median delay <= 4 min, Mythic < 30 min; the
+Armories Titan < Hard < Moderate < Easy. **market** (a Titan given 3000
+food / wood and no gold at its Market sells 24 lots in 60 s, both prices
+fall; given 4000 gold and no food / wood while saving for its age-up buys
+12), **determinism** (two Titan runs, the same techs at the same times, the
+same lots and resources), **duel** (Titan v Moderate, Hard v Easy decided
+by player 1). `match_check.gd --only=difficulty` (the ladder of wins, 21
+duels) still passes, every duel decided within 45 min. `techs_check.gd` `ai`: Moderate's Armory and Copper
+Weapons, Easy's Armory later and at most two techs by 30 min. Capture:
+`node scripts/godot-shoot.mjs --scene aifort --params
+"aifort_ai=titan,hard&aifort_t=22&aifort_focus=town&aifort_owner=1"` (the
+Titan's town at 22 min: Temple, Armory, Market inside its ring).
 
 `set_godot_rules(on)` (default on, kept across `new_game`): off = the
 browser's rules only (no AI god powers, no free villager, no fighting back

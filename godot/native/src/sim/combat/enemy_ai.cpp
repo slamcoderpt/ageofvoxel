@@ -58,7 +58,6 @@ AIParams ai_params(int d) {
 		p.storm_min = 12;
 		p.worshippers = 1;
 		p.age_after = 720;
-		p.armory_at = 0; // (Godot-only: Easy researches nothing)
 	} else if (d == AI_HARD) {
 		p.max_villagers = 30;
 		p.academy_at = 8;
@@ -129,6 +128,39 @@ AIParams ai_params(int d) {
 		p.wall_builders = 3;
 		p.wall_upgrade = true;
 	}
+	// research, ages, the Market (Godot-only, enemy_ai_techs.cpp), scaled as
+	// Retold's AI: Easy little and late (an Armory 9 min into the Classical
+	// Age, two Copper techs, never past the Classical Age, no Market); Titan
+	// an Armory as soon as it is Classical, a Market, Heroic at 11 min,
+	// Mythic at 19, nearly every tech its gods allow on time. Moderate keeps
+	// the struct's defaults (Heroic at 15 min, its Market there)
+	if (d == AI_EASY) {
+		p.armory_at = 12;
+		p.armory_delay = 540;
+		p.tech_level = 0;
+		p.tech_keep = 300;
+		p.escrow_max = 30;
+		p.escrow_rest = 150;
+		p.max_age = 1;
+		p.market_age = 4;
+	} else if (d == AI_HARD || d == AI_TITAN) {
+		const bool titan = d == AI_TITAN;
+		p.armory_at = titan ? 14 : 16;
+		p.armory_delay = titan ? 20 : 45;
+		p.fort_first = false;
+		p.tech_level = titan ? 3 : 2;
+		p.tech_keep = titan ? 100 : 150;
+		p.escrow_max = titan ? 180 : 120;
+		p.escrow_rest = titan ? 45 : 60;
+		p.age_escrow_max = titan ? 300 : 240;
+		p.max_age = 3;
+		p.heroic_at = titan ? 660 : 780;
+		p.mythic_at = titan ? 1140 : 1500;
+		p.market_age = 1;
+		p.market_delay = titan ? 45 : 90;
+		p.trade_glut = titan ? 1100 : 1400;
+		p.trade_every = titan ? 1 : 1.5;
+	}
 	return p;
 }
 
@@ -198,10 +230,17 @@ void EnemyAI::update(double dt) {
 		sh[RES_WOOD] = std::min(sh[RES_WOOD], 1 - sh[RES_FOOD] - sh[RES_GOLD]);
 		sh[RES_FOOD] = 1 - sh[RES_WOOD] - sh[RES_GOLD];
 	}
+	// (Godot-only: what it saves for lacks gold: more hands on gold, for
+	// every difficulty; enemy_ai_techs.cpp)
+	if (S.godot_rules && tech_gold_ && sh[RES_GOLD] < 0.3) {
+		sh[RES_GOLD] = 0.3;
+		sh[RES_FOOD] = std::max(0.25, 1 - sh[RES_WOOD] - sh[RES_GOLD]);
+		sh[RES_WOOD] = 1 - sh[RES_FOOD] - sh[RES_GOLD];
+	}
 	// (Godot-only: the next stretch of the wall ring waits for wood: more
 	// hands in the woods, or the army's toxotes eat every log and the ring
-	// never rises)
-	if (S.godot_rules && line_wood_ > p.res[RES_WOOD] && sh[RES_WOOD] < 0.4) {
+	// never rises; or what it saves for lacks wood)
+	if (S.godot_rules && (line_wood_ > p.res[RES_WOOD] || tech_wood_) && sh[RES_WOOD] < 0.4) {
 		sh[RES_WOOD] = 0.4;
 		sh[RES_FOOD] = std::max(0.2, 1 - sh[RES_WOOD] - sh[RES_GOLD]);
 		sh[RES_GOLD] = 1 - sh[RES_WOOD] - sh[RES_FOOD];
@@ -267,12 +306,16 @@ void EnemyAI::update(double dt) {
 	int home = 0; // (soldiers by the Town Center: a wave out does not count)
 	if (S.godot_rules)
 		for (int u : army) home += jsm::hypot(U.x[u] - B.x[tc], U.z[u] - B.z[tc]) < STRAY_DIST;
-	const bool walls_first = S.godot_rules && (wall_saving(home) || tech_wait_); // (and an Armory tech, enemy_ai_techs.cpp)
-	if (academy >= 0 && B.built[academy] && (int)B.queue[academy].size() < par.army_queue && (!saving || par.army_while_saving) && !walls_first)
-		S.economy.train(academy, PICK[(int64_t)std::floor(S.time / 7) % 4]);
-	if (academy2 >= 0 && B.built[academy2] && (int)B.queue[academy2].size() < par.army_queue && (!saving || par.army_while_saving) && !walls_first)
-		S.economy.train(academy2, PICK[((int64_t)std::floor(S.time / 7) + 1) % 4]);
-	if (temple >= 0 && p.age >= 1 && B.queue[temple].size() < 1) S.economy.train(temple, U_MINOTAUR);
+	const bool walls_first = S.godot_rules && wall_saving(home);
+	// (Godot-only: what it saves for, an Armory / a Market / the next age / a tech, stays in the bank: enemy_ai_techs.cpp)
+	const int pick1 = PICK[(int64_t)std::floor(S.time / 7) % 4], pick2 = PICK[((int64_t)std::floor(S.time / 7) + 1) % 4];
+	if (academy >= 0 && B.built[academy] && (int)B.queue[academy].size() < par.army_queue && (!saving || par.army_while_saving) && !walls_first &&
+			(!S.godot_rules || escrow_allows(unit_def(pick1).cost)))
+		S.economy.train(academy, pick1);
+	if (academy2 >= 0 && B.built[academy2] && (int)B.queue[academy2].size() < par.army_queue && (!saving || par.army_while_saving) && !walls_first &&
+			(!S.godot_rules || escrow_allows(unit_def(pick2).cost)))
+		S.economy.train(academy2, pick2);
+	if (temple >= 0 && p.age >= 1 && B.queue[temple].size() < 1 && (!S.godot_rules || escrow_allows(unit_def(U_MINOTAUR).cost))) S.economy.train(temple, U_MINOTAUR);
 	// worshippers
 	if (temple >= 0) {
 		int worshipping = 0;
@@ -280,7 +323,10 @@ void EnemyAI::update(double dt) {
 		// Godot-only: never more than a quarter of the villagers at prayer (a
 		// town worn down to a handful of men must feed itself again: with
 		// every last villager worshipping an AI-vs-AI match could never end)
-		const int want = S.godot_rules ? std::min(par.worshippers, nv / 4) : par.worshippers;
+		// (and with the favor at its cap of 200, one prayer is enough: the
+		// rest gather what the techs and the next age need)
+		int want = S.godot_rules ? std::min(par.worshippers, nv / 4) : par.worshippers;
+		if (S.godot_rules && p.res[RES_FAVOR] >= 190) want = std::min(want, 1);
 		if (S.godot_rules && worshipping > want)
 			for (int v : vills)
 				if (worshipping > want && U.order_type[v] == O_WORSHIP) {
@@ -300,7 +346,8 @@ void EnemyAI::update(double dt) {
 
 	// Godot-only: a storehouse by a wood line / mine far from every drop-off
 	if (S.godot_rules) storehouses(tc, vills, buildings);
-	// Godot-only: an Armory and its Classical techs (enemy_ai_techs.cpp)
+	// Godot-only: the Armory, the Market, their techs and the Temple's, the
+	// Heroic / Mythic Ages, Market trades (enemy_ai_techs.cpp)
 	if (S.godot_rules) research(tc, vills, buildings, saving);
 	// Godot-only: towers, the wall ring, upgrades, repairs; breaking enemy walls, tower fear
 	if (S.godot_rules) {

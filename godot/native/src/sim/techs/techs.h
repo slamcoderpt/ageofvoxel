@@ -227,7 +227,7 @@ public:
 	std::vector<Reveal> reveals;
 	// Retold: an Armory or a Market is needed for the Heroic Age (on by
 	// default with the rules; set_tech_rules turns it off). The enemy AI
-	// stops at the Classical Age, and builds an Armory there (enemy_ai_techs)
+	// builds its Armory in the Classical Age, before it goes on (enemy_ai_techs)
 	bool heroic_needs_armory = true;
 	int researched = 0; // techs completed this game (all players)
 

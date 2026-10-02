@@ -1797,6 +1797,18 @@ Dictionary AovSim::get_ai(int64_t owner) const {
 		tk["armories"] = ai.techs.armories;
 		tk["started"] = ai.techs.started;
 		tk["holds"] = ai.techs.holds;
+		tk["markets"] = ai.techs.markets;
+		tk["age_holds"] = ai.techs.age_holds;
+		tk["sold"] = ai.techs.sold;
+		tk["bought"] = ai.techs.bought;
+		tk["gold_in"] = ai.techs.gold_in;
+		tk["gold_out"] = ai.techs.gold_out;
+		tk["classical_at"] = ai.techs.age_at[1];
+		tk["heroic_at"] = ai.techs.age_at[2];
+		tk["mythic_at"] = ai.techs.age_at[3];
+		tk["last_tech"] = ai.techs.last_tech >= 0 ? String(aov::tech_def(ai.techs.last_tech).key) : String();
+		tk["tech_level"] = ai.par.tech_level;
+		tk["max_age"] = ai.par.max_age;
 		d["techs"] = tk;
 		// Godot-only: what it did with fortifications (combat/enemy_ai_fort.cpp)
 		Dictionary f;
@@ -1864,6 +1876,11 @@ void AovSim::set_ai(int64_t owner, const Dictionary &d) {
 		}
 		if (d.has("towers_max")) ai.par.towers_max = (int)(int64_t)d["towers_max"];
 		if (d.has("armory_at")) ai.par.armory_at = (int)(int64_t)d["armory_at"]; // (0: no Armory, no research)
+		// (research knobs, checks: enemy_ai_techs.cpp)
+		if (d.has("max_age")) ai.par.max_age = (int)(int64_t)d["max_age"];
+		if (d.has("market_age")) ai.par.market_age = (int)(int64_t)d["market_age"];
+		if (d.has("tech_level")) ai.par.tech_level = (int)(int64_t)d["tech_level"];
+		if (d.has("trade_glut")) ai.par.trade_glut = d["trade_glut"];
 		if (d.has("breach_focus")) ai.par.breach_focus = d["breach_focus"];
 		if (d.has("fort") && !(bool)d["fort"]) { // no fortifications at all (A/B checks)
 			ai.par.towers_max = 0;
