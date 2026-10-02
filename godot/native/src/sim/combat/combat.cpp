@@ -355,7 +355,10 @@ void Combat::damage(int32_t tid, double amount, const Hitter &a, uint8_t kind) {
 	double dmg = amount;
 	if (ad && td && ad->bonus[td->cls] != 0) dmg *= ad->bonus[td->cls];
 	if (sim->godot_rules && ad) dmg *= sim->techs.vs_mult(a.row, tk, t); // (Godot-only: Burning Pitch, Olympian Weapons)
-	if (tk == K_BUILDING) dmg *= (ad && ad->cls == CLS_MYTH) || a.myth_class ? 1.2 : 0.35;
+	if (tk == K_BUILDING) {
+		if (sim->godot_rules && retold_armored(B.type[t])) dmg *= sim->techs.building_armor_mult(a, kind); // (Godot-only: Retold's Armory / Market / Temple armor, sim/techs)
+		else dmg *= (ad && ad->cls == CLS_MYTH) || a.myth_class ? 1.2 : 0.35;
+	}
 	if (sim->godot_rules) {
 		// Godot-only: a building's arrows (Town Center, towers) never hurt a
 		// friend, whatever happened in flight; walls / towers have their own armor

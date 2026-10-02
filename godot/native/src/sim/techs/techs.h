@@ -155,7 +155,7 @@ constexpr int PIOUS_MAX = 5;
 constexpr double HYMN_RADIUS = 5 * DIST_SCALE;
 constexpr double TEMPLE_HEAL_RADIUS = 15 * DIST_SCALE;
 constexpr int TEMPLE_HEAL_UNITS = 3;
-constexpr double REVEAL_RADIUS = 3, REVEAL_TIME = 6;
+constexpr double REVEAL_RADIUS = 25 * DIST_SCALE, REVEAL_TIME = 6, REVEAL_MERGE = 3; // Sun Ray: Retold's area 25 (a radius) x DIST_SCALE = 15 tiles
 constexpr double ARMOR_CAP = 0.95;
 
 // market
@@ -170,6 +170,26 @@ inline bool market_tradable(int res) { return res == RES_FOOD || res == RES_WOOD
 // state of a tech for a player
 enum TechState : uint8_t { TS_AVAILABLE, TS_LOCKED_AGE, TS_LOCKED_PREREQ, TS_LOCKED_GOD, TS_RESEARCHING, TS_QUEUED, TS_DONE, TS_UNAVAILABLE };
 const char *tech_state_name(int s);
+
+// Godot-only (rules on): the Temple trains the Greek myth units of Retold's
+// minor gods that this game has models for: Minotaur (Athena), Cyclops
+// (Ares), Centaur (Hermes) from the Classical Age, Medusa (Hera) from the
+// Mythic Age (the browser's Temple trains the Minotaur alone, every unit's
+// min_age is Classical). With a minor god chosen for that age
+// (set_minor_god) only his unit; none chosen: every one (as the techs).
+constexpr int RULES_TEMPLE_TRAINS[] = { U_MINOTAUR, U_CYCLOPS, U_CENTAUR, U_MEDUSA, -1 };
+const char *myth_unit_god(int type); // "athena" / "ares" / "hermes" / "hera", nullptr = not a minor god's unit
+int rules_min_age(int type);         // the unit's age with the rules on (Medusa: Mythic)
+bool rules_trains(int building_type, int type); // the building's trains list with the rules on
+
+// Retold's armor of the Armory, the Market and the Temple (TECHS.md: 40 %
+// hack / 90 % pierce / 5 % crush), with the rules on in place of the
+// browser's flat building factor (0.35, myth units 1.2)
+constexpr double RETOLD_BLD_HACK = 0.40, RETOLD_BLD_PIERCE = 0.90, RETOLD_BLD_CRUSH = 0.05;
+inline bool retold_armored(int building_type) { return building_type == B_ARMORY || building_type == B_MARKET || building_type == B_TEMPLE; }
+// Retold's Temple with the rules on: 150 wood + 150 gold, 1200 hp (the browser: 150 + 50, 1500)
+inline Cost rules_building_cost(int type) { return type == B_TEMPLE ? Cost(0, 150, 150, 0) : building_def(type).cost; }
+inline double rules_building_hp(int type) { return type == B_TEMPLE ? 1200 : building_def(type).hp; }
 
 // the Greek minor gods by age (index 1..3), Retold + the Demeter pack
 const char *const *minor_gods(int age); // nullptr-terminated
@@ -205,9 +225,10 @@ public:
 	std::string minor[MAX_PLAYERS][4]; // chosen minor god per age ("" = not chosen: every god's techs open)
 	double price[RES_COUNT] = { MARKET_BASE, MARKET_BASE, MARKET_BASE, MARKET_BASE };
 	std::vector<Reveal> reveals;
-	// Retold: an Armory or a Market is needed for the Heroic Age. Off by
-	// default: the enemy AI does not build either yet (set_tech_rules)
-	bool heroic_needs_armory = false;
+	// Retold: an Armory or a Market is needed for the Heroic Age (on by
+	// default with the rules; set_tech_rules turns it off). The enemy AI
+	// stops at the Classical Age, and builds an Armory there (enemy_ai_techs)
+	bool heroic_needs_armory = true;
 	int researched = 0; // techs completed this game (all players)
 
 	void init(Sim *s);
@@ -224,6 +245,10 @@ public:
 	// grant without cost / time (scenes, checks): applies the effects at once
 	void grant(int owner, int t);
 	TechResult set_minor_god(int owner, int age, const std::string &god);
+	// may `owner` train myth unit `type` (his minor god for its age)? reason when not
+	bool god_allows_unit(int owner, int type, std::string *reason = nullptr) const;
+	// the multiplier on a blow / arrow against an Armory / Market / Temple (Retold armor)
+	double building_armor_mult(const Hitter &a, uint8_t kind) const;
 
 	// market and tribute
 	double buy_price(int owner, int res) const;  // gold for MARKET_LOT

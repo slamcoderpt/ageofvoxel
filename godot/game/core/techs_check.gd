@@ -28,6 +28,15 @@ extends SceneTree
 ##   market       buy / sell 100 for gold, prices move with each trade (shared by all
 ##                players), clamp, drift back; favor not traded; fees with Tax Collectors /
 ##                Ambassadors (130/70 -> 122/77 -> 115/85); tribute needs a Market, fee 20/10/0 %
+##   myth_units   the Temple trains the Minotaur, Cyclops, Centaur (Classical) and Medusa
+##                (Mythic) through train(); a chosen minor god locks the others; Sylvan
+##                Lore, Will of Kronos and Face of the Gorgon researched at a real Temple
+##                and measured on units that Temple then trained (no spawn_unit)
+##   retold_bld   Retold's Temple (150 wood + 150 gold, 1200 hp); Armory / Market / Temple
+##                armor 40 % hack, 90 % pierce, 5 % crush measured on blows and arrows;
+##                the Heroic Age needs an Armory or a Market (on by default)
+##   ai           an AI (Moderate) builds an Armory in the Classical Age and researches
+##                there (Copper Weapons, Armor, Shields); Easy does not
 ##   determinism  two identical runs with research, trade and a fight end bit-equal
 ##   rules_off    with set_godot_rules(false) nothing can be researched, built or traded
 ##
@@ -150,7 +159,7 @@ func _hit_case(a_type: String, t_type: String, techs: Array, ao := 1, to := 2, g
 		sim.grant_tech(granted_to, k)
 	var a := _u(sim, a_type, ao, -3.0 if a_type != "toxotes" else -8.0, 0.0)
 	var t := -1
-	if t_type in ["house", "temple", "armory"]:
+	if t_type in ["house", "temple", "armory", "market"]:
 		t = _b(sim, t_type, to, 1, -1)
 	else:
 		t = _u(sim, t_type, to, 0.5, 0.5)
@@ -170,7 +179,7 @@ func _tech(list: Array, key: String) -> Dictionary:
 
 func _run() -> void:
 	var t0 := Time.get_ticks_msec()
-	for c in ["defs", "buildings", "research", "locks", "weapons", "armor", "ballistics", "armory_gods", "temple", "market", "determinism", "rules_off"]:
+	for c in ["defs", "buildings", "research", "locks", "weapons", "armor", "ballistics", "armory_gods", "temple", "myth_units", "retold_bld", "market", "ai", "determinism", "rules_off"]:
 		if _want(c):
 			call("_case_" + c)
 	result["ms"] = Time.get_ticks_msec() - t0
@@ -516,12 +525,25 @@ func _case_armory_gods() -> void:
 	var a3 := _u(sim3, "toxotes", 1, -8.0, 0.0)
 	var t3 := _u(sim3, "villager", 2, 0.5, 0.5)
 	sim3.tick(1)
+	# (fog on: a spot 13 tiles past the target, 21 from the archer (sight 13), is
+	# seen only through the reveal: Retold's area 25 x 0.6 = 15 tiles)
+	sim3.set_fog_reveal_all(false)
+	var far_spot := Vector2(C.x + 13.5, C.y + 0.5)
+	sim3.fog_recompute()
+	var seen_before := bool(sim3.is_visible(far_spot.x, far_spot.y))
 	var sr1 := _first_hit(sim3, a3, t3)
 	var rev := int(sim3.get_tech_rules().reveals)
+	sim3.fog_recompute()
+	var seen_hit := bool(sim3.is_visible(far_spot.x, far_spot.y))
 	sim3.kill_unit(t3)
+	sim3.order_idle(PackedInt32Array([a3]))
 	_step(sim3, 7.0)
 	var rev_after := int(sim3.get_tech_rules().reveals)
-	_check("armory.sun_ray", _near(sr1, sr0 * 1.15) and rev >= 1 and rev_after == 0, {"damage": [sr0, sr1], "reveals": rev, "after_6s": rev_after})
+	sim3.fog_recompute()
+	var seen_after := bool(sim3.is_visible(far_spot.x, far_spot.y))
+	_check("armory.sun_ray", _near(sr1, sr0 * 1.15) and rev >= 1 and rev_after == 0 and _near(float(sim3.get_tech_rules().reveal_radius), 15.0)
+			and not seen_before and seen_hit and not seen_after,
+		{"damage": [sr0, sr1], "reveals": rev, "after_6s": rev_after, "spot_13_past_target_seen [before, hit, 7 s later]": [seen_before, seen_hit, seen_after]})
 	# Shafts of Plague: +10 %, then 0.25 / s poison for 6 s
 	var sim4 := _fresh(seed_arg)
 	sim4.grant_tech(1, "shafts_of_plague")
@@ -767,6 +789,170 @@ func _case_temple() -> void:
 	_check("temple.omniscience", bool(orr.ok) and float(cost.get("gold", 0.0)) > 0 and _near(g0 - g1, float(cost.gold)) and not seen0 and seen1
 			and _near(float(cost.gold), 100.0 * 6),
 		{"cost (5 villagers + 1 hoplite)": cost, "seen_before": seen0, "seen_after": seen1, "spy": spy})
+
+# myth units ------------------------------------------------------------------------------------------
+
+## Train `type` at building `b`; the trained unit's id (unit:trained), or -1 (or the refusal).
+func _train_one(sim: Object, b: int, type: String, max_s := 60.0) -> Variant:
+	var r: Dictionary = sim.train(b, type)
+	if not bool(r.ok):
+		return str(r.reason)
+	sim.take_events()
+	for t in int(max_s * FPS):
+		sim.tick(1)
+		for e in sim.take_events():
+			if e.type == "unit:trained":
+				var u: Dictionary = sim.get_unit(int(e.id))
+				if not u.is_empty() and str(u.get("type", "")) == type:
+					return int(e.id)
+	return -1
+
+## Research `key` at `b` and run until it is done; true when done.
+func _research_done(sim: Object, b: int, key: String) -> bool:
+	if not bool(sim.research(b, key).ok):
+		return false
+	for t in 80 * FPS:
+		sim.tick(1)
+		if str(_tech(sim.get_techs(b), key).get("state", "")) == "done":
+			return true
+	return false
+
+func _case_myth_units() -> void:
+	var sim := _fresh(seed_arg, 1)
+	var tmp := _b(sim, "temple", 1, -3, -3)
+	sim.tick(1)
+	var trains: Array = Array(sim.get_building_def("temple").trains)
+	var L: Array = sim.get_techs(tmp)
+	var states := {}
+	for k in ["sylvan_lore", "will_of_kronos", "face_of_the_gorgon"]:
+		states[k] = str(_tech(L, k).get("state", ""))
+	var r_med: Dictionary = sim.train(tmp, "medusa")
+	var med_age := int(sim.get_unit_def("medusa").min_age)
+	var r_bar: Dictionary = sim.train(_b(sim, "barracks", 1, 6, -3), "centaur")
+	_check("myth_units.trainable", trains == ["minotaur", "cyclops", "centaur", "medusa"] and str(r_med.reason) == "Requires Mythic Age" and med_age == 3
+			and str(r_bar.reason) == "Cannot train here" and states.sylvan_lore == "available" and states.will_of_kronos == "available"
+			and states.face_of_the_gorgon == "locked_age",
+		{"temple_trains": trains, "medusa_classical": r_med.reason, "medusa_min_age": med_age, "centaur_at_academy": r_bar.reason, "tech_states_classical": states})
+	# a chosen minor god: only his unit (Hermes: the Centaur; the Cyclops is Ares')
+	var s2 := _fresh(seed_arg, 1)
+	var t2 := _b(s2, "temple", 1, -3, -3)
+	s2.tick(1)
+	s2.set_minor_god(1, 1, "hermes")
+	var g_cy: Dictionary = s2.train(t2, "cyclops")
+	var g_ce: Dictionary = s2.train(t2, "centaur")
+	_check("myth_units.minor_god", str(g_cy.reason) == "Requires the minor god Ares" and bool(g_ce.ok), {"cyclops": g_cy.reason, "centaur": g_ce.ok})
+	# Sylvan Lore: a Centaur trained before it and one trained after, both at this Temple
+	for i in 3:   # room for the myth units (pop 3..5 each)
+		_b(sim, "house", 1, -10 + 4 * i, 8)
+	var c0 = _train_one(sim, tmp, "centaur")
+	var ok_r := _research_done(sim, tmp, "sylvan_lore")
+	var c1 = _train_one(sim, tmp, "centaur")
+	var sl := {}
+	if c0 is int and c1 is int and int(c0) > 0 and int(c1) > 0:
+		sl = {"old": _stats(sim, c0), "new": _stats(sim, c1)}
+	var base_hp := 340.0
+	var base_rng := 12.0
+	_check("myth_units.sylvan_lore", ok_r and not sl.is_empty() and _near(sl.old.max_hp, base_hp * 1.35) and _near(sl.new.max_hp, base_hp * 1.35)
+			and _near(sl.new.range, base_rng + 1.8) and _near(sl.old.range, base_rng + 1.8) and _near(float(sim.get_unit(c1).hp), base_hp * 1.35),
+		{"trained": [c0, c1], "researched": ok_r, "old [max_hp, range, sight]": [sl.get("old", {}).get("max_hp"), sl.get("old", {}).get("range"), sl.get("old", {}).get("sight")],
+			"new [max_hp, range, sight, hp]": [sl.get("new", {}).get("max_hp"), sl.get("new", {}).get("range"), sl.get("new", {}).get("sight"), sim.get_unit(c1).get("hp") if c1 is int else null]})
+	# Will of Kronos: a trained Cyclops' splash 1.6 -> 2.5; its blow then hurts a bystander 2.2 from the target
+	sim.set_player_resources(1, {"food": 5000, "wood": 5000, "gold": 5000, "favor": 200})
+	var cy = _train_one(sim, tmp, "cyclops")
+	var sp0 := float(_stats(sim, cy).splash) if cy is int and int(cy) > 0 else -1.0
+	var ok_k := _research_done(sim, tmp, "will_of_kronos")
+	var sp1 := float(_stats(sim, cy).splash) if cy is int and int(cy) > 0 else -1.0
+	var by_lost := -1.0
+	if cy is int and int(cy) > 0:
+		var cu: Dictionary = sim.get_unit(cy)
+		var tgt := int(sim.spawn_unit("villager", 2, float(cu.x) + 3.5, float(cu.z), 0.0))
+		var by := int(sim.spawn_unit("villager", 2, float(cu.x) + 3.5, float(cu.z) + 2.2, 0.0))
+		sim.tick(1)
+		var hit := _first_hit(sim, cy, tgt)
+		by_lost = 75.0 - float(sim.get_unit(by).get("hp", 75.0)) if hit > 0 else -1.0
+	_check("myth_units.will_of_kronos", ok_k and _near(sp0, 1.6) and _near(sp1, 2.5) and _near(by_lost, 15.0),
+		{"trained": cy, "researched": ok_k, "splash": [sp0, sp1], "bystander_hp_lost": by_lost})
+	# Face of the Gorgon (Mythic): a trained Medusa's range 12 -> 15
+	sim.set_player_age(1, 3)
+	sim.set_player_resources(1, {"food": 5000, "wood": 5000, "gold": 5000, "favor": 200})
+	var st_f := str(_tech(sim.get_techs(tmp), "face_of_the_gorgon").state)
+	var md = _train_one(sim, tmp, "medusa")
+	var mr0 := float(_stats(sim, md).range) if md is int and int(md) > 0 else -1.0
+	var ok_f := _research_done(sim, tmp, "face_of_the_gorgon")
+	var mr1 := float(_stats(sim, md).range) if md is int and int(md) > 0 else -1.0
+	_check("myth_units.face_of_the_gorgon", st_f == "available" and ok_f and _near(mr0, 12.0) and _near(mr1, 15.0),
+		{"state_mythic": st_f, "trained": md, "researched": ok_f, "range": [mr0, mr1]})
+
+# Retold buildings ---------------------------------------------------------------------------------------
+
+func _case_retold_bld() -> void:
+	var sim := _fresh(seed_arg, 1)
+	var td: Dictionary = sim.get_building_def("temple")
+	var vills := []
+	for i in 2:
+		vills.append(_u(sim, "villager", 1, -6.0 + i, 6.0))
+	sim.tick(1)
+	var r0 := _res(sim, 1)
+	var t := int(sim.place_building("temple", 1, C.x - 6, C.y - 6, PackedInt32Array(vills)))
+	var r1 := _res(sim, 1)
+	var tb: Dictionary = sim.get_building(t) if t > 0 else {}
+	var off: Object = ClassDB.instantiate("AovSim")
+	off.set_godot_rules(false)
+	var tdo: Dictionary = off.get_building_def("temple")
+	_check("retold_bld.temple", td.cost == {"wood": 150.0, "gold": 150.0} and float(td.hp) == 1200.0 and t > 0 and _near(r0.wood - r1.wood, 150.0)
+			and _near(r0.gold - r1.gold, 150.0) and float(tb.get("max_hp", 0)) == 1200.0 and tdo.cost == {"wood": 150.0, "gold": 50.0} and float(tdo.hp) == 1500.0,
+		{"rules_on": [td.cost, td.hp], "placed_paid": [r0.wood - r1.wood, r0.gold - r1.gold], "max_hp": tb.get("max_hp"), "rules_off": [tdo.cost, tdo.hp]})
+	# armor: a hoplite's blow (9 hack), a toxotes' arrow (7 pierce), a minotaur's blow (24, crush) on each; the house keeps 0.35 / 1.2
+	var rows := {}
+	var ok := true
+	for bt in ["armory", "market", "temple", "house"]:
+		var v := [_hit_case("hoplite", bt, []), _hit_case("toxotes", bt, []), _hit_case("minotaur", bt, [])]
+		rows[bt] = v
+		var want := [9.0 * 0.35, 7.0 * 0.35, 24.0 * 1.2] if bt == "house" else [9.0 * 0.6, 7.0 * 0.1, 24.0 * 0.95]
+		for i in 3:
+			ok = ok and _near(v[i], want[i], 0.01)
+	_check("retold_bld.armor", ok, {"[hoplite, toxotes, minotaur] hit": rows})
+	# Heroic Age: an Armory or a Market first (Retold, on by default)
+	var s2 := _fresh(seed_arg, 1)
+	var rules: Dictionary = s2.get_tech_rules()
+	var a0: Dictionary = s2.advance_age(1)
+	var mk := _b(s2, "market", 1, -3, -3)
+	s2.tick(1)
+	var a1: Dictionary = s2.advance_age(1)
+	_check("retold_bld.heroic_needs_armory", bool(rules.heroic_needs_armory) and not bool(a0.ok) and str(a0.reason) == "Requires an Armory or a Market" and mk > 0 and bool(a1.ok),
+		{"default": rules.heroic_needs_armory, "without": a0.reason, "with_market": a1.ok})
+
+# AI research -------------------------------------------------------------------------------------------
+
+func _case_ai() -> void:
+	var out := {}
+	var ok := true
+	for diff in ["moderate", "easy"]:
+		var sim: Object = ClassDB.instantiate("AovSim")
+		sim.set_godot_rules(true)
+		var ps := [{"id": 1, "name": "P1", "human": true, "team": 1}, {"id": 2, "name": "AI", "human": false, "ai": diff, "team": 2}]
+		sim.start_match({"seed": seed_arg, "map_size": 128, "preset": "skirmish", "resources": "standard", "players": ps})
+		sim.set_victory_enabled(false)
+		var first_done := -1.0
+		var armory_at := -1.0
+		while sim.get_time() < 30 * 60.0:
+			sim.tick(300)
+			sim.take_events()
+			var ai: Dictionary = sim.get_ai(2)
+			if armory_at < 0 and int(ai.techs.armories) > 0:
+				armory_at = float(sim.get_time())
+			if first_done < 0 and not Array(sim.get_player_techs(2).done).is_empty():
+				first_done = float(sim.get_time())
+				if diff == "moderate":
+					break
+		var a2: Dictionary = sim.get_ai(2)
+		out[diff] = {"armory_s": armory_at, "first_tech_done_s": first_done, "done": sim.get_player_techs(2).done, "started": a2.techs.started, "age": sim.get_player(2).age,
+			"towers": a2.fort.towers, "ring_state": a2.fort.ring_state, "minutes": snappedf(sim.get_time() / 60.0, 0.1)}
+		if diff == "moderate":
+			ok = ok and armory_at > 0 and first_done > 0 and "copper_weapons" in Array(sim.get_player_techs(2).done)
+		else:
+			ok = ok and armory_at < 0 and int(a2.techs.started) == 0
+	_check("ai.research", ok, out)
 
 # market --------------------------------------------------------------------------------------------
 

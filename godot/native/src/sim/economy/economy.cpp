@@ -235,8 +235,16 @@ Result Economy::train(int b, int type) {
 	if (b < 0 || B.removed[b] || type < 0 || type >= U_TYPE_COUNT) return { false, "Cannot train here" };
 	Player &p = sim->players[B.owner[b]];
 	const UnitDef &def = unit_def(type);
-	if (!B.built[b] || !building_def(B.type[b]).trains_type(type)) return { false, "Cannot train here" };
-	if (def.min_age > p.age) return { false, std::string("Requires ") + AGES[def.min_age] + " Age" };
+	// (Godot-only, sim/techs: the Temple also trains the Cyclops, Centaur and
+	// Medusa; the Medusa from the Mythic Age; a chosen minor god's unit only)
+	const bool rules = sim->godot_rules;
+	if (!B.built[b] || !(rules ? rules_trains(B.type[b], type) : building_def(B.type[b]).trains_type(type))) return { false, "Cannot train here" };
+	const int min_age = rules ? rules_min_age(type) : def.min_age;
+	if (min_age > p.age) return { false, std::string("Requires ") + AGES[min_age] + " Age" };
+	if (rules) {
+		std::string why;
+		if (!sim->techs.god_allows_unit(B.owner[b], type, &why)) return { false, why };
+	}
 	if (B.queue[b].size() >= 10) return { false, "Queue full" };
 	recount();
 	if (p.pop + def.pop > p.pop_cap) return { false, "Need more houses" };

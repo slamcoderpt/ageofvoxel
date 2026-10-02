@@ -479,7 +479,8 @@ Dictionary AovSim::get_unit_def(const String &type) const {
 	d["builder"] = u.builder;
 	d["myth"] = u.myth;
 	d["hero"] = u.hero;
-	d["min_age"] = u.min_age;
+	d["min_age"] = sim_.godot_rules ? aov::rules_min_age(t) : u.min_age; // (Godot-only: the Medusa is Mythic, sim/techs)
+	if (sim_.godot_rules && aov::myth_unit_god(t)) d["god"] = aov::myth_unit_god(t);
 	Dictionary atk;
 	atk["damage"] = u.attack.damage;
 	atk["range"] = u.attack.range;
@@ -925,15 +926,20 @@ Dictionary AovSim::get_building_def(const String &type) const {
 	d["name"] = b.name;
 	d["w"] = b.w;
 	d["h"] = b.h;
-	d["hp"] = b.hp;
-	d["cost"] = cost_dict(b.cost);
+	// (Godot-only, sim/techs: Retold's Temple cost / hp, its myth units)
+	d["hp"] = sim_.godot_rules ? aov::rules_building_hp(t) : b.hp;
+	d["cost"] = cost_dict(sim_.godot_rules ? aov::rules_building_cost(t) : b.cost);
 	d["build_time"] = b.build_time;
 	d["pop"] = b.pop;
 	d["sight"] = b.sight;
 	PackedStringArray drop, trains;
 	for (int k = 0; k < 3; k++)
 		if (b.drops(k)) drop.push_back(aov::res_name(k));
-	for (int i = 0; i < 4 && b.trains[i] >= 0; i++) trains.push_back(aov::unit_def(b.trains[i]).key);
+	if (sim_.godot_rules) {
+		for (int u = 0; u < aov::U_TYPE_COUNT; u++)
+			if (aov::rules_trains(t, u)) trains.push_back(aov::unit_def(u).key);
+	} else
+		for (int i = 0; i < 4 && b.trains[i] >= 0; i++) trains.push_back(aov::unit_def(b.trains[i]).key);
 	d["dropoff"] = drop;
 	d["trains"] = trains;
 	d["age_up"] = b.age_up;
@@ -1481,6 +1487,7 @@ Dictionary AovSim::get_tech_rules() const {
 	d["heroic_needs_armory"] = sim_.techs.heroic_needs_armory;
 	d["researched"] = sim_.techs.researched;
 	d["reveals"] = (int)sim_.techs.reveals.size();
+	d["reveal_radius"] = aov::REVEAL_RADIUS;
 	return d;
 }
 
@@ -1785,6 +1792,12 @@ Dictionary AovSim::get_ai(int64_t owner) const {
 		Dictionary casts;
 		for (int k = 0; k < aov::GP_COUNT; k++) casts[aov::power_def(k).key] = ai.casts[k];
 		d["casts"] = casts;
+		// Godot-only: what it researched (combat/enemy_ai_techs.cpp)
+		Dictionary tk;
+		tk["armories"] = ai.techs.armories;
+		tk["started"] = ai.techs.started;
+		tk["holds"] = ai.techs.holds;
+		d["techs"] = tk;
 		// Godot-only: what it did with fortifications (combat/enemy_ai_fort.cpp)
 		Dictionary f;
 		f["towers"] = ai.fort.towers;
@@ -1850,6 +1863,7 @@ void AovSim::set_ai(int64_t owner, const Dictionary &d) {
 			if (ai.par.wall_builders <= 0) ai.par.wall_builders = 3;
 		}
 		if (d.has("towers_max")) ai.par.towers_max = (int)(int64_t)d["towers_max"];
+		if (d.has("armory_at")) ai.par.armory_at = (int)(int64_t)d["armory_at"]; // (0: no Armory, no research)
 		if (d.has("breach_focus")) ai.par.breach_focus = d["breach_focus"];
 		if (d.has("fort") && !(bool)d["fort"]) { // no fortifications at all (A/B checks)
 			ai.par.towers_max = 0;

@@ -58,6 +58,7 @@ AIParams ai_params(int d) {
 		p.storm_min = 12;
 		p.worshippers = 1;
 		p.age_after = 720;
+		p.armory_at = 0; // (Godot-only: Easy researches nothing)
 	} else if (d == AI_HARD) {
 		p.max_villagers = 30;
 		p.academy_at = 8;
@@ -266,7 +267,7 @@ void EnemyAI::update(double dt) {
 	int home = 0; // (soldiers by the Town Center: a wave out does not count)
 	if (S.godot_rules)
 		for (int u : army) home += jsm::hypot(U.x[u] - B.x[tc], U.z[u] - B.z[tc]) < STRAY_DIST;
-	const bool walls_first = S.godot_rules && wall_saving(home);
+	const bool walls_first = S.godot_rules && (wall_saving(home) || tech_wait_); // (and an Armory tech, enemy_ai_techs.cpp)
 	if (academy >= 0 && B.built[academy] && (int)B.queue[academy].size() < par.army_queue && (!saving || par.army_while_saving) && !walls_first)
 		S.economy.train(academy, PICK[(int64_t)std::floor(S.time / 7) % 4]);
 	if (academy2 >= 0 && B.built[academy2] && (int)B.queue[academy2].size() < par.army_queue && (!saving || par.army_while_saving) && !walls_first)
@@ -299,6 +300,8 @@ void EnemyAI::update(double dt) {
 
 	// Godot-only: a storehouse by a wood line / mine far from every drop-off
 	if (S.godot_rules) storehouses(tc, vills, buildings);
+	// Godot-only: an Armory and its Classical techs (enemy_ai_techs.cpp)
+	if (S.godot_rules) research(tc, vills, buildings, saving);
 	// Godot-only: towers, the wall ring, upgrades, repairs; breaking enemy walls, tower fear
 	if (S.godot_rules) {
 		ScopedTimer ft(S.prof.enabled ? &S.prof.sub["ai.fortify"] : nullptr);
@@ -597,11 +600,11 @@ int EnemyAI::find_target(int tc) const {
 bool EnemyAI::try_build(int type, int builder, int tc) {
 	Sim &S = *sim;
 	Player &p = S.players[owner];
-	const BuildingDef &def = building_def(type);
-	if (builder < 0 || !p.can_afford(def.cost)) return false;
+	const Cost cost = S.godot_rules ? rules_building_cost(type) : building_def(type).cost; // (Godot-only: Retold's Temple, sim/techs)
+	if (builder < 0 || !p.can_afford(cost)) return false;
 	int tx, tz;
 	if (!find_spot(type, tc, tx, tz)) return false;
-	p.pay(def.cost);
+	p.pay(cost);
 	const int b = S.buildings.spawn(type, owner, tx, tz, false);
 	S.commands.order(builder, Order::with_target(O_BUILD, S.entities.buildings.id[b]));
 	return true;

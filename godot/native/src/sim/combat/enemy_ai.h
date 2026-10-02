@@ -71,6 +71,8 @@ struct AIParams {
 	int repairers = 2;        // villagers sent to repair a damaged fortification
 	bool tower_fear = true;   // a weak wave keeps out of enemy tower range
 	bool breach_focus = true; // wall breakers close together hit one piece
+	// research (Godot-only, sim/techs; enemy_ai_techs.cpp)
+	int armory_at = 18;       // villagers before it builds an Armory in the Classical Age (0: never)
 };
 AIParams ai_params(int difficulty);
 
@@ -96,6 +98,13 @@ struct AIFortStats {
 	int storehouses = 0;  // storehouses placed by a far wood line / mine (Godot AI economy)
 	int upgrade_holds = 0; // thinks the academies waited for a fortification tech's wood / gold
 	double ring_at = -1, ring_done_at = -1;
+};
+
+// What the AI researched (AovSim.get_ai().techs; never read by the sim).
+struct AITechStats {
+	int armories = 0; // Armories placed
+	int started = 0;  // techs queued
+	int holds = 0;    // thinks the academies waited for a tech's resources
 };
 
 // A gate opening left in the AI's wall ring: filled with a segment and
@@ -126,6 +135,7 @@ public:
 	void set_difficulty(int d);
 
 	AIFortStats fort;           // (AovSim.get_ai().fort)
+	AITechStats techs;          // (AovSim.get_ai().techs)
 	// Godot-only (stress scene): towers and a finished wall ring with gates
 	// round its Town Center at once (paid); returns the pieces placed
 	int fortify_now(int towers);
@@ -153,6 +163,11 @@ private:
 	void storehouses(int tc, const std::vector<int> &vills, const std::vector<int> &buildings); // Godot-only
 	double store_t_ = 0;        // s until the next storehouse check
 	std::vector<std::pair<int32_t, double>> farm_tries_; // Godot-only: farm foundation -> first time a villager was sent to finish it
+
+	// research (Godot-only, enemy_ai_techs.cpp)
+	void research(int tc, const std::vector<int> &vills, const std::vector<int> &buildings, bool saving);
+	bool tech_wait_ = false;    // an Armory tech waits for resources (the academies wait)
+	double tech_wait_t_ = 0;    // s it has waited for the current tech
 
 	// fortifications (Godot-only, enemy_ai_fort.cpp)
 	void fortify(int tc, const std::vector<int> &vills, const std::vector<int> &army, const std::vector<int> &buildings, bool saving);

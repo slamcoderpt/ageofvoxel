@@ -82,7 +82,7 @@ const TechDef &tech_def(int t) {
 		{ "burning_pitch", "Burning Pitch", TH_ARMORY, -1, 3, Cost(0, 500, 300, 0), 40, -1, nullptr, false,
 			{ E(TE_VS_BUILDINGS, M_TOXOTES | M_RANGED_MYTH, false, 3.0), N, N, N }, nullptr,
 			"Ranged soldiers +3.0x damage vs buildings (Centaur, Medusa too)",
-			"the damage multiplier vs buildings goes 1 -> 4 (on top of the 0.35 building factor); ships: none here" },
+			"the damage multiplier vs buildings goes 1 -> 4 (on top of the building's armor: x0.35, or Retold's 90 % pierce on an Armory / Market / Temple); ships: none here" },
 		// ---- Armory: Greek god techs ----------------------------------------------------------------
 		{ "phobos_spear_of_panic", "Phobos' Spear of Panic", TH_ARMORY, B_BARRACKS, 1, Cost(100, 0, 0, 15), 40, -1, "ares", false,
 			{ E(TE_DIVINE, M_HOPLITE, false, 1), N, N, N }, nullptr,
@@ -103,7 +103,7 @@ const TechDef &tech_def(int t) {
 		{ "sun_ray", "Sun Ray", TH_ARMORY, -1, 2, Cost(100, 0, 0, 20), 30, -1, "apollo", false,
 			{ E(TE_ATTACK, M_TOXOTES | M_RANGED_MYTH, false, 0.15), E(TE_REVEAL, M_TOXOTES | M_RANGED_MYTH, false, REVEAL_RADIUS), N, N }, nullptr,
 			"+15% ranged attack; projectiles +20 LOS and reveal an area where they land for 6 s",
-			"toxotes, Centaur, Medusa (the hero here is melee); an arrow that hits reveals REVEAL_RADIUS (3) tiles round the target for 6 s" },
+			"toxotes, Centaur, Medusa (the hero here is melee); an arrow that hits reveals Retold's area 25 x DIST_SCALE = 15 tiles round the target for 6 s (a hit within 3 tiles of a live reveal renews it); +20 projectile LOS: the reveal" },
 		{ "shafts_of_plague", "Shafts of Plague", TH_ARMORY, -1, 3, Cost(0, 0, 300, 30), 40, -1, "artemis", false,
 			{ E(TE_ATTACK, M_TOXOTES, false, 0.10), E(TE_POISON, M_TOXOTES, false, POISON_DPS), N, N }, nullptr,
 			"Ranged soldiers +10% attack; projectiles poison 0.25 divine damage/s for 6 s", "poison ignores armor; a new hit restarts the 6 s" },
@@ -224,7 +224,7 @@ void Techs::init(Sim *s) {
 	}
 	for (double &p : price) p = MARKET_BASE;
 	reveals.clear();
-	heroic_needs_armory = false;
+	heroic_needs_armory = true; // (Retold; set_tech_rules turns it off)
 	researched = 0;
 	any_heal_ = any_poison_ = false;
 	// units trained later get their owner's upgrades
@@ -572,7 +572,60 @@ void Techs::on_arrow_hit(const Hitter &a, int tr) {
 		U.tech_poison_by[tr] = (uint8_t)a.owner;
 		any_poison_ = true;
 	}
-	if (m.reveal[at]) reveals.push_back({ a.owner, U.x[tr], U.z[tr], REVEAL_RADIUS, sim->time + REVEAL_TIME });
+	if (m.reveal[at]) {
+		// a hit within REVEAL_MERGE of a live reveal of his renews it (a volley
+		// on one fight is one 15-tile reveal, not twenty)
+		for (Reveal &v : reveals)
+			if (v.owner == a.owner && (v.x - U.x[tr]) * (v.x - U.x[tr]) + (v.z - U.z[tr]) * (v.z - U.z[tr]) < REVEAL_MERGE * REVEAL_MERGE) {
+				v.until = sim->time + REVEAL_TIME;
+				return;
+			}
+		reveals.push_back({ a.owner, U.x[tr], U.z[tr], REVEAL_RADIUS, sim->time + REVEAL_TIME });
+	}
+}
+
+const char *myth_unit_god(int type) {
+	switch (type) {
+		case U_MINOTAUR: return "athena";
+		case U_CYCLOPS: return "ares";
+		case U_CENTAUR: return "hermes";
+		case U_MEDUSA: return "hera";
+		default: return nullptr;
+	}
+}
+
+int rules_min_age(int type) { return type == U_MEDUSA ? 3 : unit_def(type).min_age; }
+
+bool rules_trains(int building_type, int type) {
+	if (building_type == B_TEMPLE) {
+		for (const int *t = RULES_TEMPLE_TRAINS; *t >= 0; t++)
+			if (*t == type) return true;
+		return false;
+	}
+	return building_type >= 0 && building_type < B_TYPE_COUNT && building_def(building_type).trains_type(type);
+}
+
+bool Techs::god_allows_unit(int owner, int type, std::string *reason) const {
+	const char *g = myth_unit_god(type);
+	if (!g || owner <= 0 || owner >= MAX_PLAYERS) return true;
+	const std::string &m = minor[owner][rules_min_age(type)];
+	if (m.empty() || m == g) return true;
+	if (reason) *reason = std::string("Requires the minor god ") + (char)std::toupper(g[0]) + (g + 1);
+	return false;
+}
+
+double Techs::building_armor_mult(const Hitter &a, uint8_t kind) const {
+	// the attack's type, as Fortify::armor_mult reads it: arrows (and every
+	// building's shot) pierce, myth units and god powers crush, the rest hack
+	const Entities &E = sim->entities;
+	bool arrow = kind == DK_ARROW || a.kind == K_BUILDING, myth = a.myth_class, pseudo = a.kind == 0;
+	if (a.kind == K_UNIT && a.row >= 0 && a.row < E.units.size()) {
+		const UnitDef &d = unit_def(E.units.type[a.row]);
+		arrow = arrow || d.attack.projectile;
+		myth = myth || d.cls == CLS_MYTH;
+	}
+	if (myth || (pseudo && !arrow)) return 1 - RETOLD_BLD_CRUSH;
+	return 1 - (arrow ? RETOLD_BLD_PIERCE : RETOLD_BLD_HACK);
 }
 
 bool Techs::omniscient(int fog_owner) const {

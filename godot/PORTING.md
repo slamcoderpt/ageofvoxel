@@ -974,9 +974,48 @@ the Temple, with the numbers of `../reference/techs/TECHS.md`. Class `Techs`
   Age, villager-built like the others (placement refuses them in the Archaic
   Age, and always with the rules off). Their models and construction
   stages are `game/buildings/tech_buildings.gd` (scene `techbuildings`).
-  The Temple keeps the browser's numbers (parity).
-  Retold's "an Armory or a Market for the Heroic Age" is implemented but off
-  (`set_tech_rules({heroic_needs_armory: true})`): the enemy AI builds neither yet.
+  **The Temple** takes Retold's cost and hp with the rules on (150 wood +
+  150 gold, 1200 hp: `rules_building_cost` / `rules_building_hp`, read by
+  `Buildings::place` / `spawn`, the AI's `try_build` and `get_building_def`);
+  the browser's 150 + 50, 1500 hp stay with the rules off. Its footprint
+  stays 5x6, not Retold's 5x5: the footprint is read by 54 places in the sim
+  (placement, pathing, the start towns' layout, the AI's spots) and by the
+  temple's voxel model, all of which would have to move together behind the
+  flag; the gameplay numbers do.
+  **Armor**: with the rules on the Armory, the Market and the Temple take
+  Retold's 40 % hack / 90 % pierce / 5 % crush (TECHS.md) in place of the
+  browser's flat building factor (x0.35, myth units x1.2), read the way
+  `Fortify::armor_mult` reads an attack: arrows and every building's shot
+  are pierce, myth units and god powers crush, the rest hack
+  (`Techs::building_armor_mult`). A hoplite's blow on one: 9 -> 5.4 (a house:
+  3.15), a toxotes' arrow 7 -> 0.7 (house 2.45), a minotaur's blow 24 ->
+  22.8 (house 28.8). Every other building keeps the browser's factor.
+  **The Heroic Age needs an Armory or a Market** (Retold) with the rules on,
+  by default (`set_tech_rules({heroic_needs_armory: false})` turns it off);
+  the advance is refused with "Requires an Armory or a Market". The enemy AI
+  never goes past the Classical Age, so it is not held back by it.
+- **Myth units at the Temple**: with the rules on the Temple trains every
+  Greek myth unit this game has a model for, through the same `train()`:
+  Minotaur (Athena), Cyclops (Ares), Centaur (Hermes) from the Classical Age
+  and the Medusa (Hera) from the Mythic Age (Retold; the browser trains the
+  Minotaur alone, every unit Classical). `get_building_def("temple").trains`
+  = [minotaur, cyclops, centaur, medusa] (hotkeys Q W E R, the HUD lists
+  them), `get_unit_def(t).min_age` / `god` follow the rules. A chosen minor
+  god (`set_minor_god`) allows only his unit ("Requires the minor god Ares");
+  none chosen: all of them, as with the techs. Their stats and costs are the
+  existing unit defs (TECHS.md has no unit numbers). So Sylvan Lore, Will of
+  Kronos and Face of the Gorgon, and the Centaur / Medusa part of Burning
+  Pitch and Sun Ray, act on units a player can really train.
+- **AI research** (`combat/enemy_ai_techs.cpp`, every difficulty but Easy,
+  `AIParams::armory_at` = 18 villagers, `set_ai(owner, {armory_at: 0})`
+  off): in the Classical Age, once its academy stands and its fortifications
+  are done (ring closed, towers placed: the AI is short of wood and gold, and
+  an Armory earlier left a Moderate ring open at 18 min), it builds an Armory
+  and researches Copper Weapons, Copper Armor, Copper Shields there, one at a
+  time; short of the price its academies wait up to 45 s (as for a
+  fortification tech), then it buys when 150 of each is left over. Never
+  while it saves for the next age. `get_ai(owner).techs` = {armories,
+  started, holds}.
 - **Research queue** (generalises the fortify stages' one-slot research):
   every building row has `tech_queue` (`TechItem` {tech, t, total, paid}),
   up to `TECH_QUEUE_MAX` = 5. `research(building, key)` checks the building
@@ -996,8 +1035,8 @@ the Temple, with the numbers of `../reference/techs/TECHS.md`. Class `Techs`
   same `research()`.
 - **States** (`get_techs`): `available`, `locked_age`, `locked_prereq`,
   `locked_god`, `researching` (head of a queue), `queued`, `done`,
-  `unavailable` (the unit it upgrades is not in this game, or the rules are
-  off), each with a `reason` ("Requires Heroic Age", "Requires Copper
+  `unavailable` (the unit it upgrades is not in this game: no building
+  trains it, or the rules are off), each with a `reason` ("Requires Heroic Age", "Requires Copper
   Weapons", "No Hypaspist in this game", ...).
 - **Gods**: generic techs need nothing; Olympian Parentage needs the major god
   Zeus (`Player.god`, every player here); a minor-god tech needs that god for
@@ -1036,7 +1075,7 @@ the Temple, with the numbers of `../reference/techs/TECHS.md`. Class `Techs`
 | Enyo's Bow of Horror (Ares, C) | toxotes +10 %; arrows of toxotes and buildings fly x1.5 faster |
 | Sarissa (Athena, C; also Academy) | hoplite +10 %, range +0.3 (0.5 x 0.6) |
 | Aegis Shield (Athena, C; also Academy) | hoplite +0.15 pierce armor |
-| Sun Ray (Apollo, H) | toxotes, centaur, medusa +15 %; a hit reveals 3 tiles round the target for 6 s (Retold's "+20 LOS, area 25" has no closer mapping) |
+| Sun Ray (Apollo, H) | toxotes, centaur, medusa +15 %; a hit reveals Retold's area 25 x 0.6 = 15 tiles round the target for 6 s (`REVEAL_RADIUS`; a hit within 3 tiles of a live reveal renews it, so a volley is one reveal). Retold's "+20 LOS" for projectiles is that reveal (a projectile has no sight of its own here) |
 | Shafts of Plague (Artemis, M) | toxotes +10 %; hits poison 0.25 hp/s for 6 s (ignores armor, restarts on a new hit) |
 | Forge of Olympus (Hephaestus, M) | Armory techs x0.25 food / wood / gold (favor unchanged), Armory research x1.5 |
 | Olympian Weapons (Hephaestus, M) | Myrmidon / Hetairos / Gastraphetes -> hoplite / hippikon / toxotes: +20 %, +1 multiplier vs myth units |
@@ -1066,8 +1105,13 @@ the Temple, with the numbers of `../reference/techs/TECHS.md`. Class `Techs`
   Ambassadors: Retold's readouts); each buy +2 (`MARKET_STEP`), each sale
   -2, clamped 25..1000 (60 sales: sell 17 per 100, the floor of the original
   AoM observation); the price **drifts back** towards 100 at 0.2 per second
-  (`MARKET_DRIFT`; TECHS.md notes Retold's recovery is unpublished, the step
-  too, so both are this port's choice). A Market with a full research queue
+  (`MARKET_DRIFT`). The step is this port's pick within TECHS.md's "about
+  1.5 to 3"; **the drift is a deliberate departure**: TECHS.md says Retold's
+  prices do not recover over time. Here the price is shared by every player
+  and the AI never trades, so without a drift one player's early sales would
+  leave the price at the floor for the whole match; the slow recovery (20
+  points in 100 s) keeps the Market usable. Set `MARKET_DRIFT` = 0 for
+  Retold's behaviour. A Market with a full research queue
   cannot trade. `get_market(owner)` = {food / wood: {tradable, price, buy,
   sell}, favor: {tradable: false}, fee, tribute_fee, lot, base, step, drift,
   min, max, has_market}.
@@ -1093,14 +1137,14 @@ max_hp, speed, range, sight, hack_armor, pierce_armor, reload, splash,
 divine, regen, vs_buildings, vs_myth, track, arrow_speed, poisoned}: the
 tooltip readout), `get_market(owner)`, `market_buy`, `market_sell`,
 `tribute`, `set_tech_rules({heroic_needs_armory})`, `get_tech_rules()`
-({heroic_needs_armory, researched, reveals}).
+({heroic_needs_armory, researched, reveals, reveal_radius}).
 
 ```
-godot --headless --path godot -s res://game/core/techs_check.gd [-- --only=defs,buildings,research,locks,weapons,armor,ballistics,armory_gods,temple,market,determinism,rules_off --seed=3]
+godot --headless --path godot -s res://game/core/techs_check.gd [-- --only=defs,buildings,research,locks,weapons,armor,ballistics,armory_gods,temple,myth_units,retold_bld,market,ai,determinism,rules_off --seed=3]
 ```
 
 `techs_check.gd` ("TECHS PASS|FAIL <case>", `TECHS_RESULT {json}`, exit =
-failures, ~7 s, 42 cases) measures every effect on real numbers: the
+failures, ~25 s, 51 cases) measures every effect on real numbers: the
 unit:damaged amount of a real blow / arrow before and after (hoplite 9 ->
 9.9 / 10.8 / 11.7 per weapons tier on a villager, toxotes 7 -> 9.1, hero 28
 -> 36.4, Town Center and tower 6 -> 7.8, minotaur unchanged; an enemy
@@ -1115,7 +1159,18 @@ received; plus the queue (paid at queue time, one copy, cancel refunds
 exactly, done after 30 s, event a = 100, existing and newly spawned units
 get it, a Military Academy's hoplite waits for its Sarissa), every lock,
 determinism (two runs bit-equal) and the rules off (nothing built,
-researched, traded).
+researched, traded). `myth_units` trains the Centaur, Cyclops and Medusa at
+a real Temple with `train()` (no `spawn_unit`), researches Sylvan Lore /
+Will of Kronos / Face of the Gorgon there and measures the trained units
+(centaur 340 -> 459 hp, range 12 -> 13.8, on one trained before and one
+after; cyclops splash 1.6 -> 2.5 and a bystander 2.2 tiles off losing 15 hp;
+medusa range 12 -> 15), the Medusa refused in the Classical Age, a chosen
+minor god's lock. `retold_bld`: the Temple's cost paid and hp, the armor of
+the three buildings on real blows / arrows, the Heroic Age refused without
+an Armory / Market. Sun Ray: with the fog on, a spot 13 tiles past the
+target is seen only while the reveal lasts. `ai`: a Moderate AI (seed 3)
+builds its Armory at 22.5 min and finishes Copper Weapons at 24.5; Easy
+builds none.
 
 ## Conventions
 
@@ -1924,11 +1979,13 @@ Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
   (`walls_check.gd`).
 - Done (techs sim): a general research queue, the Armory and the Market,
   all 47 Greek Armory / Market / Temple techs of Retold (35 with an effect
-  here, 12 unavailable: their units do not exist), market trade with moving,
-  drifting prices, tribute, arrows that miss without Ballistics; see
-  "Research, Armory, Market, Temple techs" (`techs_check.gd`). Not yet: the
-  enemy AI does not build an Armory / Market or research; no models or UI
-  for them in this piece.
+  here, 12 unavailable: their units do not exist), the Temple training the
+  Cyclops, Centaur and Medusa those techs upgrade, Retold's Temple numbers
+  and building armor, the Heroic Age's Armory / Market rule, market trade
+  with moving, drifting prices, tribute, arrows that miss without
+  Ballistics, an AI that builds an Armory and researches; see "Research,
+  Armory, Market, Temple techs" (`techs_check.gd`). Not yet: the AI does
+  not use the Market or the Temple's techs.
 - Done (AI fortifications): the enemy AI builds towers, walls its town in
   with gates (every difficulty), upgrades, repairs and patches them, breaks
   enemy walls one piece per group, fears towers when weak; walled-off goals
