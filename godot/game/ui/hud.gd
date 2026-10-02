@@ -465,7 +465,7 @@ func _draw_commands() -> void:
 		var ir := rr.grow(-3)
 		if c.has("tech"):
 			# a tech: its painted tile (TechIcons.tile), greyed when locked
-			var tex := TechIcons.tile(str(c.svg), 64, "locked" if st == "locked" else "normal")
+			var tex := TechIcons.tile(str(c.svg), int(ir.size.x), "locked" if st == "locked" else "normal")  # 1:1, never rescaled (48 px)
 			if tex:
 				draw_texture_rect(tex, ir, false)
 			else:
@@ -511,138 +511,114 @@ func _draw_commands() -> void:
 				tip[k] = c[k]
 		zone(cr, "cmd", i, tip)
 
-## The state layer of a command button (PORTING.md "Command button states"):
-## the frame (a tech's gold / purple, bevelled; dim grey when locked), the
-## god's medallion on a god tech, the tier pips of an Armory line, the state
-## badges (the age numeral or a padlock when locked, the queue place / count),
-## the red wash and the missing resource when it cannot be afforded, the
-## progress sweep and bar while it researches / trains.
+## The state layer of a command button (PORTING.md "Command button states").
+## Everything here rides the frame (its 3 px bevel and the 5 px gap between
+## cells), never the picture: the 48 px tile stays whole in every state.
+## available: the bright bevelled frame (gold generic / purple god); locked:
+## the greyed tile, a dim frame, the age numeral or a padlock on the top-right
+## corner; unaffordable: a red cast and the frame's bevel turned red;
+## researching / training: a clockwise sweep and a bar on the frame's foot;
+## queued: dimmed, its place on the corner. A god tech's emblem sits on the
+## frame's top-left corner, an Armory tier's notches on its top edge.
 func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bool) -> void:
 	var bold := S.font("bold")
 	var title := S.font("title")
-	# researching / training: a clockwise sweep dims what is left (the picture
-	# stays readable under it), a bar at the foot, the percent in its corner
+	var p := clampf(float(c.get("progress", 0.0)), 0.0, 1.0)
 	if st == "researching" or st == "training":
-		var p := clampf(float(c.get("progress", 0.0)), 0.0, 1.0)
-		_sweep(ir, p, Color(0.0, 0.02, 0.04, 0.46))
-		var bar := Rect2(ir.position.x, ir.end.y - 4, ir.size.x, 4)
-		draw_rect(bar, Color(0, 0, 0, 0.75))
-		S.hgrad(self, Rect2(bar.position + Vector2(0, 1), Vector2(bar.size.x * p, 2)), [[0.0, Color("#3fae3a")], [1.0, Color("#b8ff9a")]])
-		var pc := "%d%%" % int(floor(p * 100)) if st == "researching" else ""
-		if pc != "":
-			var tp := Vector2(ir.position.x + 2, ir.end.y - 6)
-			draw_string_outline(bold, tp, pc, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, 4, Color(0, 0, 0, 0.9))
-			draw_string(bold, tp, pc, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#c8ffb8"))
+		# what is left of the work dimmed by a clockwise sweep (light, so the
+		# picture reads under it); no number on the tile (the tooltip and the
+		# card say n%)
+		_sweep(ir, p, Color(0.0, 0.02, 0.05, 0.4))
 	elif st == "queued":
-		draw_rect(ir, Color(0.0, 0.03, 0.05, 0.38))
-		S.draw_icon(self, "t_time", Rect2(ir.get_center() - Vector2(8, 9), Vector2(16, 16)), true)
+		draw_rect(ir, Color(0.0, 0.03, 0.05, 0.4))
 	elif st == "unaffordable":
-		# Retold: the picture stays in full colour under a red cast (the edge
-		# and the foot strip are drawn after the frame, below, so no frame
-		# line covers them)
-		S.vgrad(self, ir, [[0.0, Color(0.8, 0.06, 0.02, 0.12)], [1.0, Color(0.85, 0.06, 0.02, 0.34)]])
-	# the frame
+		# Retold: the picture in full colour under a red cast, deepest at the foot
+		S.vgrad(self, ir, [[0.0, Color(0.8, 0.06, 0.02, 0.0)], [0.45, Color(0.8, 0.06, 0.02, 0.1)], [1.0, Color(0.9, 0.05, 0.02, 0.36)]])
+	# the frame: a 3 px bevel, lit top / left, shaded bottom / right
 	var fam := str(c.get("frame", ""))
+	var o := rr.grow(-1)
 	if fam != "":
-		var hi := Color("#fff0b0") if fam == "gold" else Color("#f2d0ff")
+		var hi := Color("#fff0b0") if fam == "gold" else Color("#f6dcff")
 		var mid := Color("#e2b340") if fam == "gold" else Color("#b45ae6")
 		var lo := Color("#7a5612") if fam == "gold" else Color("#4e1c86")
 		if st == "locked":
-			hi = hi.lerp(Color("#8a8a90"), 0.75).darkened(0.25)
-			mid = mid.lerp(Color("#5c5c62"), 0.72)
-			lo = lo.lerp(Color("#2a2a2e"), 0.7)
-		var o := rr.grow(-1)
+			hi = Color("#86868c")
+			mid = Color("#56565c")
+			lo = Color("#2a2a2e")
 		draw_rect(o.grow(1), Color(0.03, 0.02, 0.0, 0.9), false, 1.0)
-		# bevel: lit top / left, shaded bottom / right
 		draw_rect(Rect2(o.position, Vector2(o.size.x, 2)), hi)
 		draw_rect(Rect2(o.position, Vector2(2, o.size.y)), hi.lerp(mid, 0.4))
 		draw_rect(Rect2(o.position.x, o.end.y - 2, o.size.x, 2), lo)
 		draw_rect(Rect2(o.end.x - 2, o.position.y, 2, o.size.y), lo.lerp(mid, 0.3))
-		draw_rect(o.grow(-2), mid, false, 1.0)
-		draw_rect(o.grow(-3), Color(0, 0, 0, 0.55), false, 1.0)
-		if st != "locked" and st != "unaffordable":
-			# the frame's glow on the tile's edge
-			draw_rect(o.grow(-4), Color(mid, 0.35), false, 1.0)
+		draw_rect(o, mid, false, 1.0)
+		if st == "unaffordable":
+			# the family keeps its outer 2 px bevel; the inner line turns
+			# bright red (drawn last, so no frame line covers it)
+			draw_rect(o.grow(-2), Color("#ff2a12"), false, 1.0)
+			draw_rect(o.grow(-3), Color("#ff6a40"), false, 1.0)
+		else:
+			draw_rect(o.grow(-2), Color(0, 0, 0, 0.6), false, 1.0)
+	elif st == "unaffordable":
+		# a frameless portrait: the red edge on the cell's rim
+		draw_rect(rr.grow(-1), Color("#ff2a12"), false, 2.0)
 	if st == "unaffordable":
-		_draw_unaffordable(c, rr, fam != "")
-	# identity: a god tech's medallion (the god's initial), an Armory line's tier pips
+		# a soft red glow just inside the edge (1 px, on the tile's own rim)
+		draw_rect(ir.grow(-1), Color(1.0, 0.22, 0.08, 0.35), false, 1.0)
+	if st == "researching" or st == "training":
+		# progress on the frame's foot (its bevel, not the picture)
+		var bar := Rect2(o.position.x, o.end.y - 3, o.size.x, 3)
+		draw_rect(bar, Color(0, 0, 0, 0.85))
+		S.hgrad(self, Rect2(bar.position, Vector2(bar.size.x * p, 3)), [[0.0, Color("#3fae3a")], [1.0, Color("#c8ffaa")]])
+	var lockd := st == "locked"
+	# identity: a god tech's emblem on the frame's top-left corner (a small gem
+	# centred on the corner, mostly over the frame and the gap)
 	var god := str(c.get("god", ""))
 	if fam == "purple" and god != "":
-		# a small medallion riding the frame's top-left corner (mostly on the
-		# frame and the gap beside it, not on the picture)
-		var mc := rr.position + Vector2(6, 6)
-		var lockd := st == "locked"
-		draw_circle(mc, 8.0, Color(0.05, 0.0, 0.1, 0.95))
-		draw_circle(mc, 7.0, Color("#5a2a9a") if not lockd else Color("#3a3440"))
-		draw_arc(mc, 7.2, 0, TAU, 20, Color("#e8c8ff") if not lockd else Color("#8a8490"), 1.0, true)
+		var mc := rr.position + Vector2(2.5, 2.5)
+		draw_circle(mc, 6.5, Color(0.04, 0.0, 0.08, 0.95))
+		draw_circle(mc, 5.5, Color("#6a32b0") if not lockd else Color("#3a3440"))
+		draw_arc(mc, 5.7, 0, TAU, 18, Color("#f0d8ff") if not lockd else Color("#8a8490"), 1.0, true)
 		var em := TechIcons.god_emblem(god)
 		if em != "":
-			S.draw_icon(self, em, Rect2(mc - Vector2(5.5, 5.5), Vector2(11, 11)), false, Color.WHITE if not lockd else Color(0.6, 0.6, 0.62))
+			S.draw_icon(self, em, Rect2(mc - Vector2(4.5, 4.5), Vector2(9, 9)), false, Color.WHITE if not lockd else Color(0.6, 0.6, 0.62))
 		else:
 			var ini := god.substr(0, 1).to_upper()
-			var iw := S.text_width(title, ini, 10)
-			draw_string(title, Vector2(mc.x - iw * 0.5, mc.y + 3.5), ini, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#fff4dc") if not lockd else Color("#b8b4bc"))
+			draw_string(title, Vector2(mc.x - S.text_width(title, ini, 8) * 0.5, mc.y + 3), ini, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color("#fff4dc"))
+	# an Armory line's tier: 1-3 small notches set into the frame's top edge
+	# in the tier's metal (the picture itself tells the tiers apart: one
+	# sword / two / two and an axe, copper / bronze / steel)
 	var tier := int(c.get("tier", 0))
 	if tier > 0:
-		var tc: Color = [Color("#e07a40"), Color("#f0c040"), Color("#c8d6e2")][tier - 1]
-		# the pips keep their metal even when locked (the one colour left on a
-		# locked tile), so copper / bronze / iron still read apart by count and hue
-		if st == "locked":
-			tc = tc.lerp(Color(0.6, 0.6, 0.62), 0.25)
-		# 11 px diamonds along the top edge, one per tier (copper 1 .. iron 3)
+		var tc: Color = [Color("#f08a4a"), Color("#ffd050"), Color("#dfe8f0")][tier - 1]
+		if lockd:
+			tc = tc.lerp(Color(0.6, 0.6, 0.62), 0.35)
+		var x0 := rr.get_center().x - (tier * 7 - 2) * 0.5
 		for k in tier:
-			var pc := rr.position + Vector2(9 + k * 11, 3.5)
-			var dia := PackedVector2Array([pc + Vector2(0, -5.5), pc + Vector2(5.5, 0), pc + Vector2(0, 5.5), pc + Vector2(-5.5, 0)])
-			draw_colored_polygon(dia, Color(0, 0, 0, 0.92))
-			var din := PackedVector2Array([pc + Vector2(0, -4.2), pc + Vector2(4.2, 0), pc + Vector2(0, 4.2), pc + Vector2(-4.2, 0)])
-			draw_colored_polygon(din, tc.darkened(0.15))
-			draw_colored_polygon(PackedVector2Array([pc + Vector2(0, -4.2), pc + Vector2(4.2, 0), pc, pc + Vector2(-4.2, 0)]), tc.lightened(0.3))
-			draw_circle(pc + Vector2(-1.2, -1.4), 0.9, Color(1, 1, 1, 0.75))
-	# state badge (top right): the age numeral or a padlock; the queue place / count
-	# (riding the frame's top-right corner, as the god medallion the left one)
-	var bc2 := Vector2(rr.end.x - 6, rr.position.y + 6)
-	if st == "locked":
-		draw_circle(bc2, 8.0, Color(0, 0, 0, 0.9))
-		draw_circle(bc2, 7.0, Color("#2a2c30"))
-		draw_arc(bc2, 7.0, 0, TAU, 20, Color("#b8a070"), 1.2, true)
+			var nr := Rect2(x0 + k * 7, rr.position.y - 1, 5, 4)
+			draw_rect(nr.grow(1), Color(0, 0, 0, 0.9))
+			draw_rect(nr, tc)
+			draw_rect(Rect2(nr.position, Vector2(nr.size.x, 1)), tc.lightened(0.5))
+	# state badge on the frame's top-right corner: the age numeral or a padlock;
+	# the queue place / count
+	var bc2 := Vector2(rr.end.x - 3, rr.position.y + 3)
+	if lockd:
+		draw_circle(bc2, 7.5, Color(0, 0, 0, 0.92))
+		draw_circle(bc2, 6.5, Color("#2a2c30"))
+		draw_arc(bc2, 6.5, 0, TAU, 20, Color("#c8b080"), 1.2, true)
 		if c.has("age_req"):
 			var rn: String = ["I", "II", "III", "IV"][clampi(int(c.age_req), 0, 3)]
 			var fs := 9 if rn.length() < 3 else 8
-			var rw := S.text_width(title, rn, fs)
-			draw_string(title, Vector2(bc2.x - rw * 0.5, bc2.y + 3.5), rn, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color("#f0dca0"))
+			draw_string(title, Vector2(bc2.x - S.text_width(title, rn, fs) * 0.5, bc2.y + 3.5), rn, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color("#f4e0a8"))
 		else:
-			S.draw_icon(self, "lock", Rect2(bc2 - Vector2(5, 5), Vector2(10, 10)), false)
+			S.draw_icon(self, "lock", Rect2(bc2 - Vector2(4.5, 4.5), Vector2(9, 9)), false)
 	elif (st == "queued" or st == "training") and int(c.get("count", 0)) > 0:
 		var n := str(int(c.count))
-		var bw := maxf(16.0, S.text_width(bold, n, 12) + 8)
-		var br := Rect2(rr.end.x - bw + 1, rr.position.y - 1, bw, 15)
-		draw_rect(br, Color(0, 0, 0, 0.85))
+		var bw := maxf(13.0, S.text_width(bold, n, 11) + 6)
+		var br := Rect2(rr.end.x - bw + 3, rr.position.y - 3, bw, 13)
+		draw_rect(br, Color(0, 0, 0, 0.9))
 		draw_rect(br.grow(-1), Color("#1e5a2a") if st == "training" else Color("#6a4a12"))
 		draw_rect(br.grow(-1), Color("#9ef58a") if st == "training" else Color("#ffd27a"), false, 1.0)
-		draw_string(bold, Vector2(br.position.x + (bw - S.text_width(bold, n, 12)) * 0.5, br.end.y - 3), n, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
-
-## The unaffordable edge, drawn over the frame (PORTING.md "Command button
-## states"): a 2 px bright red ring on the frame's inner bevel (a gold / purple
-## frame keeps only its outer 2 px bevel, so its family still reads), a red
-## glow inside it, and a compact red chip in the bottom-left corner with the
-## missing resources (the hotkey stays bottom-right; the picture keeps the tile).
-func _draw_unaffordable(c: Dictionary, rr: Rect2, framed: bool) -> void:
-	var ring := rr.grow(-3) if framed else rr.grow(-2)
-	draw_rect(ring, Color("#ff2a12"), false, 1.0)
-	draw_rect(ring.grow(-1), Color("#ff5a32"), false, 1.0)
-	draw_rect(ring.grow(-2), Color(1.0, 0.2, 0.08, 0.38), false, 1.0)
-	draw_rect(ring.grow(-3), Color(1.0, 0.2, 0.08, 0.16), false, 1.0)
-	# the missing resources: a compact red chip in the bottom-left corner
-	# (the picture keeps the rest of the tile; the hotkey sits bottom-right)
-	var inner := ring.grow(-2)
-	var sh: Array = c.get("short", [])
-	var cnt := clampi(sh.size(), 1, 2)
-	var chip := Rect2(inner.position.x - 1, inner.end.y - 14, 4 + cnt * 12, 15)
-	draw_rect(chip.grow(1), Color(0.12, 0.0, 0.0, 0.9))
-	S.vgrad(self, chip, [[0.0, Color("#f0381a")], [1.0, Color("#9a140a")]])
-	draw_rect(Rect2(chip.position, Vector2(chip.size.x, 1)), Color("#ffb090"))
-	for k in mini(sh.size(), 2):
-		S.draw_icon(self, str(sh[k]), Rect2(chip.position + Vector2(2 + k * 12, 2), Vector2(11, 11)), true)
+		draw_string(bold, Vector2(br.position.x + (bw - S.text_width(bold, n, 11)) * 0.5, br.end.y - 3), n, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
 
 ## Darken the part of r a clockwise sweep from 12 o'clock has not reached at p.
 func _sweep(r: Rect2, p: float, col: Color) -> void:
@@ -762,9 +738,9 @@ func _draw_info() -> void:
 				var qr := Rect2(qx, ty + 4, 38, 38)
 				draw_rect(qr, Color("#10303c"))
 				if q.has("tech"):
-					var qt := TechIcons.tile(str(q.svg), 64)
+					var qt := TechIcons.tile(str(q.svg), 34)
 					if qt:
-						draw_texture_rect(qt, qr.grow(-2), false)
+						draw_texture_rect(qt, qr.grow(-2), false)  # 34 px, 1:1
 					if q.p <= 0.0:
 						draw_rect(qr.grow(-2), Color(0.0, 0.03, 0.05, 0.45))
 					else:
@@ -793,7 +769,7 @@ func _draw_info() -> void:
 						break
 					# done: the tile dimmed, a green check, no buyable frame
 					var dr := Rect2(dx, ty + 2, 22, 22)
-					var dtex := TechIcons.tile(str(dt.svg), 32)
+					var dtex := TechIcons.tile(str(dt.svg), 22)
 					if dtex:
 						draw_texture_rect(dtex, dr, false, Color(0.62, 0.66, 0.64))
 					draw_rect(dr, Color("#2f6a34"), false, 1.0)

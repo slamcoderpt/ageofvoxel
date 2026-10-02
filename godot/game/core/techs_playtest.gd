@@ -512,6 +512,15 @@ func _run() -> void:
 			missing.append(nm)
 	_check("every tech icon is a rendered 3D model (no SVG fallback)", missing.is_empty() and TI.tile_names().size() >= 38,
 		"%d icons, not rendered: %s" % [TI.tile_names().size(), missing])
+	# the grid draws a tech's tile 1:1 (a rescaled tile goes soft): the cached
+	# tiles of the Armory's buttons are the 48 px the frame leaves
+	var sizes := {}
+	for k in TI._tiles:
+		var tx: Texture2D = TI._tiles[k]
+		if tx and str(k).begins_with("t_weapons_") and str(k).ends_with(":normal"):
+			sizes[int(tx.get_width())] = true
+	_check("tech tiles are baked at the size they are drawn (48 px on the grid, never 64 rescaled)",
+		sizes.has(48) and not sizes.has(64), str(sizes.keys()))
 	# 7. the Temple: a click selects it, the hotkey of Olympian Parentage researches it
 	var tb: Dictionary = sim.get_building(ids.temple)
 	await _look(float(tb.x), float(tb.z) + 3.0)

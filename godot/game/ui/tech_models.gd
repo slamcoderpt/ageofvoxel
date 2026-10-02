@@ -994,9 +994,10 @@ static func _m_sarissa(root: Node3D) -> void:
 		var o := x * f * 0.3 + d * (-absf(f) * 0.12) + Vector3(0, 0, -0.14 * absf(f))
 		var a := o - d * 1.35
 		var b := o + d * 1.2
-		spear(root, a, b, m, 0.34, 0.1, 0.042, mat(Color(0.42, 0.25, 0.12), 0.6, "wood"))
-		var t0 := b - d * 0.42
-		put(root, tube(bez(t0, t0 - x * 0.06 - d * 0.04, t0 - x * 0.14 - d * 0.05, t0 - x * 0.22 - d * 0.12, 8), func(t): return Vector2(lerpf(0.05, 0.02, t), 0.012), 6), mat(CLOTH_RED, 0.8, "rough"))
+		# bold at button size: thick pale ash shafts, broad heads, wide ribbons
+		spear(root, a, b, m, 0.44, 0.15, 0.068, mat(Color(0.62, 0.42, 0.22), 0.55, "wood"))
+		var t0 := b - d * 0.52
+		put(root, tube(bez(t0, t0 - x * 0.07 - d * 0.04, t0 - x * 0.16 - d * 0.06, t0 - x * 0.26 - d * 0.14, 8), func(t): return Vector2(lerpf(0.08, 0.035, t), 0.018), 6), mat(Color(0.85, 0.08, 0.04), 0.7, "rough"))
 
 static func _m_aegis(root: Node3D) -> void:
 	# Athena's owl, the guardian: a silver owl, bronze wings spread to shield,

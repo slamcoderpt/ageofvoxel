@@ -208,7 +208,7 @@ const PLATE_OF := {
 
 static var _tiles := {}
 ## the share of the tile a glyph's drawn bounds fill (its longer side)
-const FIT := 0.84
+const FIT := 0.9
 
 static func plate_of(name: String) -> String:
 	if PLATE_OF.has(name):
@@ -236,7 +236,7 @@ static var _warm: Array = []
 static var _warm_init := false
 
 ## Bake one more tile of the warm-up list (every tech icon at the command
-## grid's 64 px, normal and locked, and the card's 32 px), so selecting a
+## grid's 48 px, normal and locked, the queue's 34 px and the card's 22 px), so selecting a
 ## building never stalls on ~10 ms per tile. Call once per frame; false when done.
 static func prewarm_step() -> bool:
 	if not _warm_init:
@@ -248,12 +248,16 @@ static func prewarm_step() -> bool:
 		for k in SVG:
 			if PLATE_OF.has(k):
 				names.append(k)
+		# the sizes they are drawn at, 1:1 (a rescaled tile goes soft):
+		# the command grid's 48 px, the queue's 34 px, the card's 22 px
 		for nm in names:
-			_warm.append([nm, 64, "normal"])
+			_warm.append([nm, 48, "normal"])
 		for nm in names:
-			_warm.append([nm, 64, "locked"])
+			_warm.append([nm, 48, "locked"])
 		for nm in names:
-			_warm.append([nm, 32, "normal"])
+			_warm.append([nm, 34, "normal"])
+		for nm in names:
+			_warm.append([nm, 22, "normal"])
 	if _warm.is_empty():
 		return false
 	var w: Array = _warm.pop_front()
@@ -328,7 +332,7 @@ static func render_models(host: Node, names: Array = []) -> int:
 		pivot.add_child(obj)
 		var rim := OmniLight3D.new()
 		rim.light_color = glow_of(str(nm)).lerp(Color.WHITE, 0.25)
-		rim.light_energy = 5.0
+		rim.light_energy = 7.0
 		rim.omni_range = 7.0
 		rim.omni_attenuation = 0.6
 		rim.position = at + Vector3(2.2, 1.6, -2.4)
@@ -343,8 +347,9 @@ static func render_models(host: Node, names: Array = []) -> int:
 		cam.current = true
 		if i == 0:
 			var key := DirectionalLight3D.new()
-			key.light_energy = 1.5
-			key.light_color = Color(1.0, 0.96, 0.9)
+			key.light_energy = 2.3
+			key.light_specular = 1.4
+			key.light_color = Color(1.0, 0.95, 0.86)
 			key.shadow_enabled = true
 			key.shadow_blur = 1.5
 			key.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
@@ -352,7 +357,7 @@ static func render_models(host: Node, names: Array = []) -> int:
 			vp.add_child(key)
 			key.look_at_from_position(Vector3.ZERO, Vector3(0.55, -0.62, -0.55), Vector3.UP)
 			var fill := DirectionalLight3D.new()
-			fill.light_energy = 0.35
+			fill.light_energy = 0.22
 			fill.light_color = Color(0.75, 0.85, 1.0)
 			vp.add_child(fill)
 			fill.look_at_from_position(Vector3.ZERO, Vector3(-0.8, 0.1, -0.5), Vector3.UP)
@@ -426,13 +431,17 @@ static func _studio_env() -> Environment:
 	sky.radiance_size = Sky.RADIANCE_SIZE_256
 	e.sky = sky
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	e.ambient_light_energy = 0.55
+	e.ambient_light_energy = 0.38
 	e.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
-	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	e.tonemap_exposure = 1.05
+	# ACES: a stronger toe and shoulder than filmic (deep shadows, punchy
+	# highlights: the contrast that keeps a small picture from reading flat)
+	e.tonemap_mode = Environment.TONE_MAPPER_ACES
+	e.tonemap_exposure = 1.15
+	e.tonemap_white = 6.0
 	e.ssao_enabled = true
-	e.ssao_radius = 0.35
-	e.ssao_intensity = 1.6
+	e.ssao_radius = 0.3
+	e.ssao_intensity = 2.4
+	e.ssao_power = 1.8
 	e.glow_enabled = false
 	return e
 
@@ -518,6 +527,37 @@ static func _sharpen(img: Image, amt: float) -> void:
 				o[j] = clampi(int(d[j] + amt * (d[j] - bl)), 0, a)
 	img.set_data(w, h, false, Image.FORMAT_RGBA8, o)
 
+## Local contrast ("clarity") on the rendered picture, on the tile grid: each
+## channel pushed away from its own blur (radius r), so the form shading of a
+## 40 px picture (a rim, a fold, an engraved face) is not lost to the
+## downscale; a mild saturation lift with it. Premultiplied: clamped to alpha.
+static func _clarity(R: PackedFloat32Array, A: PackedFloat32Array, n: int, r: int, amt: float) -> void:
+	var N := n * n
+	var ch := []
+	for c in 3:
+		var a := PackedFloat32Array()
+		a.resize(N)
+		for i in N:
+			a[i] = R[i * 3 + c]
+		ch.append(_blur(a, n, r))
+	var AB := _blur(A, n, r)
+	for i in N:
+		var al := A[i]
+		if al <= 0.0:
+			continue
+		# compare against the blur of the picture only (not of the empty
+		# plate around it), so edges do not get a bright halo
+		var k := 1.0 / maxf(AB[i], 0.05)
+		var lum := 0.0
+		var v := [0.0, 0.0, 0.0]
+		for c in 3:
+			var x: float = R[i * 3 + c]
+			var bl: float = ch[c][i] * k * al
+			v[c] = x + amt * (x - bl)
+			lum += v[c] * [0.3, 0.55, 0.15][c]
+		for c in 3:
+			R[i * 3 + c] = clampf(lum + (v[c] - lum) * 1.12, 0.0, al)
+
 ## Bake a tile (see above). Pure Image work: safe on a worker thread.
 static func bake(name: String, n: int, locked := false) -> Image:
 	var src := svg(name)
@@ -539,7 +579,7 @@ static func bake(name: String, n: int, locked := false) -> Image:
 		var sc := minf(FIT * n / ur3.size.x, FIT * n / ur3.size.y)
 		g = g3.get_region(ur3)
 		g.resize(maxi(1, int(round(ur3.size.x * sc))), maxi(1, int(round(ur3.size.y * sc))), Image.INTERPOLATE_LANCZOS)
-		_sharpen(g, 0.55 if n <= 64 else 0.35)
+		_sharpen(g, 0.4 if n <= 64 else 0.3)
 	else:
 		# fit the glyph's drawn bounds (not its 24-unit box) to FIT of the tile, so
 		# a thin diagonal glyph fills the button as a round one does
@@ -585,6 +625,8 @@ static func bake(name: String, n: int, locked := false) -> Image:
 				R[ti * 3 + 1] = gd[si + 1] / 255.0
 				R[ti * 3 + 2] = gd[si + 2] / 255.0
 	var u := maxf(1.0, n / 48.0)
+	if prem:
+		_clarity(R, A, n, maxi(1, int(round(2.0 * u))), 0.5)
 	var H := _blur(A, n, maxi(1, int(round(1.6 * u))))
 	var SH := _blur(A, n, maxi(1, int(round(2.4 * u))))
 	var GL := _blur(A, n, maxi(2, int(round(6.0 * u))))
@@ -673,8 +715,13 @@ static func bake(name: String, n: int, locked := false) -> Image:
 				# still reads (outline dark, glyph light, plate in between)
 				var l := r * 0.3 + gg * 0.55 + b * 0.15
 				var plum := pr * 0.3 + pg * 0.55 + pb * 0.15
-				var gl2 := l * 0.62 + 0.16
-				var pv := plum * 0.5 + 0.01
+				# the picture keeps its full light-and-shade range (an S-curve
+				# round mid grey, lifted), so the greyed shape still reads
+				# as a pot / a shield / a sword, not a grey lump
+				var lc := clampf((l - 0.42) * 1.35 + 0.5, 0.0, 1.0)
+				lc = lc * lc * (3.0 - 2.0 * lc)
+				var gl2 := lc * 0.74 + 0.12
+				var pv := plum * 0.42 + 0.01
 				var v := lerpf(pv, gl2, a)
 				var lr := v * 0.94
 				var lg := v * 0.97
