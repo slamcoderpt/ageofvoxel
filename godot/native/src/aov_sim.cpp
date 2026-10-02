@@ -93,7 +93,23 @@ void AovSim::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("convert_to_gate", "id"), &AovSim::convert_to_gate);
 	ClassDB::bind_method(D_METHOD("set_gate_locked", "id", "locked"), &AovSim::set_gate_locked);
 	ClassDB::bind_method(D_METHOD("research", "building", "tech"), &AovSim::research);
-	ClassDB::bind_method(D_METHOD("cancel_research", "building"), &AovSim::cancel_research);
+	ClassDB::bind_method(D_METHOD("cancel_research", "building", "tech"), &AovSim::cancel_research, DEFVAL(String()));
+	// research, techs, market (sim/techs)
+	ClassDB::bind_method(D_METHOD("tech_names"), &AovSim::tech_names);
+	ClassDB::bind_method(D_METHOD("get_tech_def", "tech"), &AovSim::get_tech_def);
+	ClassDB::bind_method(D_METHOD("get_techs", "building"), &AovSim::get_techs);
+	ClassDB::bind_method(D_METHOD("get_owner_techs", "owner", "building_type"), &AovSim::get_owner_techs);
+	ClassDB::bind_method(D_METHOD("get_player_techs", "owner"), &AovSim::get_player_techs);
+	ClassDB::bind_method(D_METHOD("get_research", "building"), &AovSim::get_research);
+	ClassDB::bind_method(D_METHOD("set_minor_god", "owner", "age", "god"), &AovSim::set_minor_god);
+	ClassDB::bind_method(D_METHOD("grant_tech", "owner", "tech"), &AovSim::grant_tech);
+	ClassDB::bind_method(D_METHOD("get_unit_stats", "id"), &AovSim::get_unit_stats);
+	ClassDB::bind_method(D_METHOD("get_market", "owner"), &AovSim::get_market, DEFVAL(1));
+	ClassDB::bind_method(D_METHOD("market_buy", "market", "res"), &AovSim::market_buy);
+	ClassDB::bind_method(D_METHOD("market_sell", "market", "res"), &AovSim::market_sell);
+	ClassDB::bind_method(D_METHOD("tribute", "from", "to", "res", "amount"), &AovSim::tribute);
+	ClassDB::bind_method(D_METHOD("set_tech_rules", "opts"), &AovSim::set_tech_rules);
+	ClassDB::bind_method(D_METHOD("get_tech_rules"), &AovSim::get_tech_rules);
 	ClassDB::bind_method(D_METHOD("fort_tech_names"), &AovSim::fort_tech_names);
 	ClassDB::bind_method(D_METHOD("get_walls"), &AovSim::get_walls);
 	ClassDB::bind_method(D_METHOD("get_fortify", "owner"), &AovSim::get_fortify);
@@ -463,7 +479,8 @@ Dictionary AovSim::get_unit_def(const String &type) const {
 	d["builder"] = u.builder;
 	d["myth"] = u.myth;
 	d["hero"] = u.hero;
-	d["min_age"] = u.min_age;
+	d["min_age"] = sim_.godot_rules ? aov::rules_min_age(t) : u.min_age; // (Godot-only: the Medusa is Mythic, sim/techs)
+	if (sim_.godot_rules && aov::myth_unit_god(t)) d["god"] = aov::myth_unit_god(t);
 	Dictionary atk;
 	atk["damage"] = u.attack.damage;
 	atk["range"] = u.attack.range;
@@ -909,15 +926,20 @@ Dictionary AovSim::get_building_def(const String &type) const {
 	d["name"] = b.name;
 	d["w"] = b.w;
 	d["h"] = b.h;
-	d["hp"] = b.hp;
-	d["cost"] = cost_dict(b.cost);
+	// (Godot-only, sim/techs: Retold's Temple cost / hp, its myth units)
+	d["hp"] = sim_.godot_rules ? aov::rules_building_hp(t) : b.hp;
+	d["cost"] = cost_dict(sim_.godot_rules ? aov::rules_building_cost(t) : b.cost);
 	d["build_time"] = b.build_time;
 	d["pop"] = b.pop;
 	d["sight"] = b.sight;
 	PackedStringArray drop, trains;
 	for (int k = 0; k < 3; k++)
 		if (b.drops(k)) drop.push_back(aov::res_name(k));
-	for (int i = 0; i < 4 && b.trains[i] >= 0; i++) trains.push_back(aov::unit_def(b.trains[i]).key);
+	if (sim_.godot_rules) {
+		for (int u = 0; u < aov::U_TYPE_COUNT; u++)
+			if (aov::rules_trains(t, u)) trains.push_back(aov::unit_def(u).key);
+	} else
+		for (int i = 0; i < 4 && b.trains[i] >= 0; i++) trains.push_back(aov::unit_def(b.trains[i]).key);
 	d["dropoff"] = drop;
 	d["trains"] = trains;
 	d["age_up"] = b.age_up;
@@ -996,6 +1018,7 @@ Dictionary AovSim::get_building(int64_t id) const {
 	}
 	d["farm_rows"] = B.econ_rows[b];
 	d["farmer"] = B.farmer[b];
+	d["research"] = get_research(id); // (Godot-only, sim/techs)
 	return d;
 }
 
@@ -1051,12 +1074,31 @@ Dictionary AovSim::convert_to_gate(int64_t id) { return fort_result(sim_.fortify
 Dictionary AovSim::set_gate_locked(int64_t id, bool locked) { return fort_result(sim_.fortify.set_gate_locked((int32_t)id, locked)); }
 
 Dictionary AovSim::research(int64_t building, const String &tech) {
-	const int t = aov::fort_tech_of(tech.utf8().get_data());
-	if (!t) return fort_result({ false, "Unknown technology" });
-	return fort_result(sim_.fortify.research((int32_t)building, t));
+	const std::string key = tech.utf8().get_data();
+	const int t = aov::fort_tech_of(key.c_str());
+	if (t) return fort_result(sim_.fortify.research((int32_t)building, t));
+	const int g = aov::tech_of(key.c_str()); // (sim/techs)
+	if (g < 0) return fort_result({ false, "Unknown technology" });
+	const aov::TechResult r = sim_.techs.research((int32_t)building, g);
+	return fort_result({ r.ok, r.reason });
 }
 
-bool AovSim::cancel_research(int64_t building) { return sim_.fortify.cancel_research((int32_t)building); }
+bool AovSim::cancel_research(int64_t building, const String &tech) {
+	const int b = sim_.entities.building_slot((int32_t)building);
+	if (b < 0) return false;
+	const aov::BuildingStore &B = sim_.entities.buildings;
+	const std::string key = tech.utf8().get_data();
+	if (B.fort_tech[b] && (key.empty() || aov::fort_tech_of(key.c_str()) == B.fort_tech[b])) return sim_.fortify.cancel_research((int32_t)building);
+	int index = -1;
+	if (!key.empty()) {
+		const int g = aov::tech_of(key.c_str());
+		const aov::TechQueue &q = B.tech_queue[b];
+		for (size_t i = 0; i < q.size(); i++)
+			if ((int)q[i].tech == g) index = (int)i;
+		if (index < 0) return false;
+	}
+	return sim_.techs.cancel((int32_t)building, index);
+}
 
 PackedStringArray AovSim::fort_tech_names() const {
 	PackedStringArray out;
@@ -1148,6 +1190,304 @@ Dictionary AovSim::get_fortify(int64_t owner) const {
 	d["walls"] = F.walls;
 	d["gates"] = F.gates;
 	d["towers"] = F.towers;
+	return d;
+}
+
+// ---- research, techs, market (sim/techs, Godot-only) -------------------------
+
+static const char *tech_effect_name(int k) {
+	static const char *n[] = { "none", "attack", "hack_armor", "pierce_armor", "hp", "speed", "range", "sight", "regen", "reload",
+		"splash", "divine", "vs_buildings", "vs_myth", "arrow_speed", "track", "poison", "frenzy", "pious", "heal_aura",
+		"temple_heal", "favor", "market_fee", "tribute_fee", "omniscience", "queue_view", "armory_discount", "reveal" };
+	return k >= 0 && k < aov::TE_COUNT ? n[k] : "?";
+}
+
+static PackedStringArray unit_mask_names(uint16_t m) {
+	PackedStringArray out;
+	for (int u = 0; u < aov::U_TYPE_COUNT; u++)
+		if ((m >> u) & 1) out.push_back(aov::unit_def(u).key);
+	return out;
+}
+
+static Dictionary tech_static(int t) {
+	const aov::TechDef &d = aov::tech_def(t);
+	Dictionary e;
+	e["key"] = d.key;
+	e["name"] = d.name;
+	e["building"] = aov::building_def(aov::tech_home_building(d.home)).key;
+	e["also"] = d.also >= 0 ? String(aov::building_def(d.also).key) : String();
+	e["age"] = d.age;
+	e["age_name"] = aov::AGES[d.age];
+	e["base_cost"] = cost_dict(d.cost);
+	e["time"] = d.time;
+	e["requires"] = d.requires >= 0 ? String(aov::tech_def(d.requires).key) : String();
+	e["god"] = d.god ? String(d.god) : String();
+	e["major_god"] = d.major;
+	e["generic"] = d.god == nullptr;
+	e["missing"] = d.missing ? String(d.missing) : String();
+	e["text"] = d.text;
+	e["mapping"] = d.mapping;
+	Array effs;
+	for (const aov::TechEffect &f : d.eff) {
+		if (f.kind == aov::TE_NONE) continue;
+		Dictionary x;
+		x["kind"] = tech_effect_name(f.kind);
+		x["units"] = unit_mask_names(f.units);
+		x["buildings"] = f.buildings;
+		x["value"] = f.v;
+		x["retold"] = f.retold;
+		effs.push_back(x);
+	}
+	e["effects"] = effs;
+	e["id"] = t;
+	e["event_a"] = aov::TECH_EVENT_BASE + t;
+	return e;
+}
+
+PackedStringArray AovSim::tech_names() const {
+	PackedStringArray out;
+	for (int t = 0; t < aov::T_COUNT; t++) out.push_back(aov::tech_def(t).key);
+	return out;
+}
+
+Dictionary AovSim::get_tech_def(const String &tech) const {
+	const int t = aov::tech_of(tech.utf8().get_data());
+	return t < 0 ? Dictionary() : tech_static(t);
+}
+
+// one tech's entry for an owner (static data + state, the price he would pay, progress)
+static Dictionary tech_entry(const aov::Sim &S, int owner, int t) {
+	Dictionary e = tech_static(t);
+	std::string why;
+	const int st = S.techs.state(owner, t, &why);
+	e["state"] = aov::tech_state_name(st);
+	e["reason"] = String(why.c_str());
+	e["cost"] = cost_dict(S.techs.cost_for(owner, t));
+	int32_t at = 0;
+	int idx = -1;
+	if (S.techs.queued_at(owner, t, &at, &idx)) {
+		const int b = S.entities.building_slot(at);
+		const aov::TechItem &it = S.entities.buildings.tech_queue[b][idx];
+		e["at"] = at;
+		e["queue_index"] = idx;
+		e["progress"] = it.total > 0 ? it.t / it.total : 0.0;
+	}
+	return e;
+}
+
+Array AovSim::get_owner_techs(int64_t owner, const String &building_type) const {
+	Array out;
+	const int bt = aov::building_type_of(building_type.utf8().get_data());
+	if (bt < 0 || owner <= 0 || owner >= aov::MAX_PLAYERS) return out;
+	for (int t = 0; t < aov::T_COUNT; t++)
+		if (sim_.techs.researches_at(bt, t)) out.push_back(tech_entry(sim_, (int)owner, t));
+	return out;
+}
+
+Array AovSim::get_techs(int64_t building) const {
+	Array out;
+	const int b = sim_.entities.building_slot((int32_t)building);
+	if (b < 0) return out;
+	const aov::BuildingStore &B = sim_.entities.buildings;
+	const int type = B.type[b], owner = B.owner[b];
+	if (aov::is_fort_type(type)) {
+		// the fortification stages researched here, in the same shape
+		static const char *STATES[] = { "done", "available", "locked_prereq", "locked_age", "researching" };
+		const aov::Fortify &F = sim_.fortify;
+		for (int t = 1; t < aov::FT_COUNT; t++) {
+			const aov::FortTechDef &td = aov::fort_tech_def(t);
+			if (td.line == 1 ? type != aov::B_TOWER : !aov::is_wall_piece(type)) continue;
+			Dictionary e;
+			e["key"] = td.key;
+			e["name"] = td.name;
+			e["building"] = td.line ? "tower" : "wall";
+			e["age"] = td.min_age;
+			e["age_name"] = aov::AGES[td.min_age];
+			e["cost"] = cost_dict(td.cost);
+			e["base_cost"] = cost_dict(td.cost);
+			e["time"] = td.time;
+			e["requires"] = td.level > 1 ? String(aov::fort_tech_def(t - 1).key) : String();
+			e["generic"] = true;
+			e["fort"] = true;
+			e["state"] = STATES[F.tech_state(owner, t)];
+			if (B.fort_tech[b] == t) e["progress"] = B.fort_tech_total[b] > 0 ? B.fort_tech_t[b] / B.fort_tech_total[b] : 0.0;
+			out.push_back(e);
+		}
+		return out;
+	}
+	for (int t = 0; t < aov::T_COUNT; t++)
+		if (sim_.techs.researches_at(type, t)) out.push_back(tech_entry(sim_, owner, t));
+	return out;
+}
+
+Array AovSim::get_research(int64_t building) const {
+	Array out;
+	const int b = sim_.entities.building_slot((int32_t)building);
+	if (b < 0) return out;
+	const aov::BuildingStore &B = sim_.entities.buildings;
+	if (B.fort_tech[b]) {
+		Dictionary e;
+		e["key"] = aov::fort_tech_def(B.fort_tech[b]).key;
+		e["name"] = aov::fort_tech_def(B.fort_tech[b]).name;
+		e["t"] = B.fort_tech_t[b];
+		e["total"] = B.fort_tech_total[b];
+		e["progress"] = B.fort_tech_total[b] > 0 ? B.fort_tech_t[b] / B.fort_tech_total[b] : 0.0;
+		out.push_back(e);
+	}
+	for (const aov::TechItem &it : B.tech_queue[b]) {
+		Dictionary e;
+		e["key"] = aov::tech_def(it.tech).key;
+		e["name"] = aov::tech_def(it.tech).name;
+		e["t"] = it.t;
+		e["total"] = it.total;
+		e["progress"] = it.total > 0 ? it.t / it.total : 0.0;
+		Dictionary paid;
+		for (int k = 0; k < aov::RES_COUNT; k++)
+			if (it.paid[k] != 0) paid[aov::res_name(k)] = it.paid[k];
+		e["paid"] = paid;
+		out.push_back(e);
+	}
+	return out;
+}
+
+Dictionary AovSim::get_player_techs(int64_t owner) const {
+	Dictionary d;
+	if (owner <= 0 || owner >= aov::MAX_PLAYERS || !sim_.players[owner].exists) return d;
+	const aov::Techs &T = sim_.techs;
+	const int o = (int)owner;
+	PackedStringArray done;
+	for (int t = 0; t < aov::T_COUNT; t++)
+		if (T.is_done(o, t)) done.push_back(aov::tech_def(t).key);
+	d["done"] = done;
+	Array queue;
+	const aov::BuildingStore &B = sim_.entities.buildings;
+	for (int b = 0; b < B.size(); b++) {
+		if (B.removed[b] || B.dead[b] || B.owner[b] != o) continue;
+		for (size_t i = 0; i < B.tech_queue[b].size(); i++) {
+			const aov::TechItem &it = B.tech_queue[b][i];
+			Dictionary e;
+			e["key"] = aov::tech_def(it.tech).key;
+			e["building"] = B.id[b];
+			e["index"] = (int)i;
+			e["progress"] = it.total > 0 ? it.t / it.total : 0.0;
+			queue.push_back(e);
+		}
+	}
+	d["queue"] = queue;
+	Dictionary gods;
+	for (int a = 1; a <= 3; a++) gods[a] = String(T.minor[o][a].c_str());
+	d["minor_gods"] = gods;
+	d["god"] = String(sim_.players[o].god.c_str());
+	const aov::TechMods &m = T.mods[o];
+	d["market_fee"] = T.fee(o);
+	d["tribute_fee"] = T.tribute_fee(o);
+	d["favor_mult"] = T.favor_mult(o);
+	d["building_attack"] = T.building_attack(o);
+	d["building_sight"] = m.b_sight;
+	d["omniscience"] = m.omniscience;
+	d["queue_view"] = m.queue_view;
+	d["armory_discount"] = m.armory_discount;
+	d["has_market"] = T.has_market(o);
+	return d;
+}
+
+Dictionary AovSim::set_minor_god(int64_t owner, int64_t age, const String &god) {
+	const aov::TechResult r = sim_.techs.set_minor_god((int)owner, (int)age, god.utf8().get_data());
+	return fort_result({ r.ok, r.reason });
+}
+
+bool AovSim::grant_tech(int64_t owner, const String &tech) {
+	const int t = aov::tech_of(tech.utf8().get_data());
+	if (t < 0 || owner <= 0 || owner >= aov::MAX_PLAYERS || !sim_.players[owner].exists) return false;
+	sim_.techs.grant((int)owner, t);
+	return sim_.techs.is_done((int)owner, t);
+}
+
+Dictionary AovSim::get_unit_stats(int64_t id) const {
+	Dictionary d;
+	const int r = sim_.entities.unit_slot((int32_t)id);
+	if (r < 0) return d;
+	const aov::UnitStats s = sim_.techs.stats(r);
+	d["damage"] = s.damage;
+	d["hp"] = s.hp;
+	d["max_hp"] = s.max_hp;
+	d["speed"] = s.speed;
+	d["range"] = s.range;
+	d["sight"] = s.sight;
+	d["hack_armor"] = s.hack_armor;
+	d["pierce_armor"] = s.pierce_armor;
+	d["reload"] = s.reload;
+	d["splash"] = s.splash;
+	d["divine"] = s.divine;
+	d["regen"] = s.regen;
+	d["vs_buildings"] = s.vs_buildings;
+	d["vs_myth"] = s.vs_myth;
+	d["track"] = s.track;
+	d["arrow_speed"] = s.arrow_speed;
+	d["poisoned"] = sim_.entities.units.tech_poison_t[r];
+	return d;
+}
+
+Dictionary AovSim::get_market(int64_t owner) const {
+	Dictionary d;
+	const aov::Techs &T = sim_.techs;
+	const int o = (int)owner;
+	for (int k = 0; k < aov::RES_COUNT; k++) {
+		if (k == aov::RES_GOLD) continue;
+		Dictionary e;
+		const bool tr = aov::market_tradable(k);
+		e["tradable"] = tr;
+		if (tr) {
+			e["price"] = T.price[k];
+			e["buy"] = T.buy_price(o, k);
+			e["sell"] = T.sell_price(o, k);
+		}
+		d[aov::res_name(k)] = e;
+	}
+	d["fee"] = T.fee(o);
+	d["tribute_fee"] = T.tribute_fee(o);
+	d["lot"] = aov::MARKET_LOT;
+	d["base"] = aov::MARKET_BASE;
+	d["step"] = aov::MARKET_STEP;
+	d["drift"] = aov::MARKET_DRIFT;
+	d["min"] = aov::MARKET_MIN;
+	d["max"] = aov::MARKET_MAX;
+	d["has_market"] = o > 0 && o < aov::MAX_PLAYERS && T.has_market(o);
+	return d;
+}
+
+static Dictionary trade_dict(const aov::TradeResult &r) {
+	Dictionary d;
+	d["ok"] = r.ok;
+	d["reason"] = String(r.reason.c_str());
+	d["gold"] = r.gold;
+	d["amount"] = r.amount;
+	return d;
+}
+
+Dictionary AovSim::market_buy(int64_t market, const String &res) { return trade_dict(sim_.techs.buy((int32_t)market, res_kind_of(res))); }
+Dictionary AovSim::market_sell(int64_t market, const String &res) { return trade_dict(sim_.techs.sell((int32_t)market, res_kind_of(res))); }
+
+Dictionary AovSim::tribute(int64_t from, int64_t to, const String &res, double amount) {
+	const aov::TradeResult r = sim_.techs.tribute((int)from, (int)to, res_kind_of(res), amount);
+	Dictionary d;
+	d["ok"] = r.ok;
+	d["reason"] = String(r.reason.c_str());
+	d["amount"] = r.amount;
+	d["fee"] = r.gold;
+	return d;
+}
+
+void AovSim::set_tech_rules(const Dictionary &opts) {
+	if (opts.has("heroic_needs_armory")) sim_.techs.heroic_needs_armory = (bool)opts["heroic_needs_armory"];
+}
+
+Dictionary AovSim::get_tech_rules() const {
+	Dictionary d;
+	d["heroic_needs_armory"] = sim_.techs.heroic_needs_armory;
+	d["researched"] = sim_.techs.researched;
+	d["reveals"] = (int)sim_.techs.reveals.size();
+	d["reveal_radius"] = aov::REVEAL_RADIUS;
 	return d;
 }
 
@@ -1452,6 +1792,24 @@ Dictionary AovSim::get_ai(int64_t owner) const {
 		Dictionary casts;
 		for (int k = 0; k < aov::GP_COUNT; k++) casts[aov::power_def(k).key] = ai.casts[k];
 		d["casts"] = casts;
+		// Godot-only: what it researched (combat/enemy_ai_techs.cpp)
+		Dictionary tk;
+		tk["armories"] = ai.techs.armories;
+		tk["started"] = ai.techs.started;
+		tk["holds"] = ai.techs.holds;
+		tk["markets"] = ai.techs.markets;
+		tk["age_holds"] = ai.techs.age_holds;
+		tk["sold"] = ai.techs.sold;
+		tk["bought"] = ai.techs.bought;
+		tk["gold_in"] = ai.techs.gold_in;
+		tk["gold_out"] = ai.techs.gold_out;
+		tk["classical_at"] = ai.techs.age_at[1];
+		tk["heroic_at"] = ai.techs.age_at[2];
+		tk["mythic_at"] = ai.techs.age_at[3];
+		tk["last_tech"] = ai.techs.last_tech >= 0 ? String(aov::tech_def(ai.techs.last_tech).key) : String();
+		tk["tech_level"] = ai.par.tech_level;
+		tk["max_age"] = ai.par.max_age;
+		d["techs"] = tk;
 		// Godot-only: what it did with fortifications (combat/enemy_ai_fort.cpp)
 		Dictionary f;
 		f["towers"] = ai.fort.towers;
@@ -1517,6 +1875,12 @@ void AovSim::set_ai(int64_t owner, const Dictionary &d) {
 			if (ai.par.wall_builders <= 0) ai.par.wall_builders = 3;
 		}
 		if (d.has("towers_max")) ai.par.towers_max = (int)(int64_t)d["towers_max"];
+		if (d.has("armory_at")) ai.par.armory_at = (int)(int64_t)d["armory_at"]; // (0: no Armory, no research)
+		// (research knobs, checks: enemy_ai_techs.cpp)
+		if (d.has("max_age")) ai.par.max_age = (int)(int64_t)d["max_age"];
+		if (d.has("market_age")) ai.par.market_age = (int)(int64_t)d["market_age"];
+		if (d.has("tech_level")) ai.par.tech_level = (int)(int64_t)d["tech_level"];
+		if (d.has("trade_glut")) ai.par.trade_glut = d["trade_glut"];
 		if (d.has("breach_focus")) ai.par.breach_focus = d["breach_focus"];
 		if (d.has("fort") && !(bool)d["fort"]) { // no fortifications at all (A/B checks)
 			ai.par.towers_max = 0;

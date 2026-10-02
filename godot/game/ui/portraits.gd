@@ -32,7 +32,8 @@ func building(type: String, owner: int) -> Texture2D:
 	var key := "b:%s:%d" % [type, owner]
 	if not _cache.has(key):
 		var mi := MeshInstance3D.new()
-		mi.mesh = VoxelModels.mesh("buildings", "%s/0" % type)
+		# the Armory and the Market are the "techbuildings" models (Classical look)
+		mi.mesh = VoxelModels.mesh("techbuildings", "%s/a1" % type) if TECHB.has(type) else VoxelModels.mesh("buildings", "%s/0" % type)
 		mi.material_override = _material(owner)
 		var root := Node3D.new()
 		root.add_child(mi)
@@ -42,6 +43,7 @@ func building(type: String, owner: int) -> Texture2D:
 ## Fortification portraits (Godot-only models, groups "walls" / "towers"):
 ## a short run of wall between two pillars, a pillar, a closed gate between
 ## its two gate towers, a tower at a stage (level 0..3).
+const TECHB := {"armory": true, "market": true}
 const FORT := {"wall": true, "wall_pillar": true, "gate": true, "tower": true}
 
 func fort(type: String, owner: int, level := 0) -> Texture2D:

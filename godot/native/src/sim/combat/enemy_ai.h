@@ -14,6 +14,7 @@
 namespace aov {
 
 class Sim;
+struct Cost;
 
 // One launched attack wave (debug / report record, never read by the sim).
 struct WaveLog {
@@ -71,6 +72,24 @@ struct AIParams {
 	int repairers = 2;        // villagers sent to repair a damaged fortification
 	bool tower_fear = true;   // a weak wave keeps out of enemy tower range
 	bool breach_focus = true; // wall breakers close together hit one piece
+	// research, ages, the Market (Godot-only, sim/techs; enemy_ai_techs.cpp).
+	// The defaults are Moderate's (and the default AI's)
+	int armory_at = 18;       // villagers before it builds an Armory in the Classical Age (0: no research at all)
+	double armory_delay = 90; // s after reaching the Classical Age before the Armory
+	bool fort_first = true;   // ... and only once its ring is closed and its towers placed (at most fort_cap s more)
+	double fort_cap = 420;
+	int tech_level = 1;       // researches the plan's techs of this tier and below (0 Easy .. 3 Titan)
+	double tech_keep = 200;   // food / wood / gold left over after a tech it does not save for
+	double escrow_max = 60;   // s it saves for one item (training waits for it; 0: never saves)
+	double escrow_rest = 90;  // ... then this long at half (the army's turn)
+	double age_escrow_max = 150; // s it saves whole for an age-up
+	int max_age = 2;          // advances up to this age (1 Classical .. 3 Mythic)
+	double heroic_at = 900;   // earliest time it advances to the Heroic Age (s)
+	double mythic_at = 1e9;   // ... the Mythic Age
+	int market_age = 2;       // builds a Market once in this age (4: never)
+	double market_delay = 60; // ... and this long after its Armory stands
+	double trade_glut = 1800; // food / wood beyond this (gold short) is sold at the Market
+	double trade_every = 2;   // s between Market trades (one lot each)
 };
 AIParams ai_params(int difficulty);
 
@@ -96,6 +115,19 @@ struct AIFortStats {
 	int storehouses = 0;  // storehouses placed by a far wood line / mine (Godot AI economy)
 	int upgrade_holds = 0; // thinks the academies waited for a fortification tech's wood / gold
 	double ring_at = -1, ring_done_at = -1;
+};
+
+// What the AI researched (AovSim.get_ai().techs; never read by the sim).
+struct AITechStats {
+	int armories = 0; // Armories placed
+	int markets = 0;  // Markets placed
+	int started = 0;  // techs queued
+	int holds = 0;    // thinks the academies waited for a tech's resources
+	int age_holds = 0; // thinks the academies waited for an age-up's resources
+	int sold = 0, bought = 0;        // Market lots sold / bought
+	double gold_in = 0, gold_out = 0; // gold the sales brought / the purchases cost
+	double age_at[4] = { 0, -1, -1, -1 }; // when it reached each age (-1: not yet)
+	int last_tech = -1;  // the last tech queued (TechId)
 };
 
 // A gate opening left in the AI's wall ring: filled with a segment and
@@ -126,6 +158,7 @@ public:
 	void set_difficulty(int d);
 
 	AIFortStats fort;           // (AovSim.get_ai().fort)
+	AITechStats techs;          // (AovSim.get_ai().techs)
 	// Godot-only (stress scene): towers and a finished wall ring with gates
 	// round its Town Center at once (paid); returns the pieces placed
 	int fortify_now(int towers);
@@ -153,6 +186,22 @@ private:
 	void storehouses(int tc, const std::vector<int> &vills, const std::vector<int> &buildings); // Godot-only
 	double store_t_ = 0;        // s until the next storehouse check
 	std::vector<std::pair<int32_t, double>> farm_tries_; // Godot-only: farm foundation -> first time a villager was sent to finish it
+
+	// research (Godot-only, enemy_ai_techs.cpp)
+	void research(int tc, const std::vector<int> &vills, const std::vector<int> &buildings, bool saving);
+	// escrow: what it saves for (the Armory / Market, the next age, the
+	// first tech it cannot pay): the academies and the Temple train only with
+	// that much left over, for escrow_max s per item, then escrow_rest s at half
+	double escrow_[4] = { 0, 0, 0, 0 };
+	int escrow_item_ = -1;      // what it is (-1 none; 1000 + building type, 2000 + age, else TechId)
+	double escrow_since_ = 0;   // since when that item has been escrowed
+	double escrow_free_until_ = -1; // escrow at half till then (the army's turn)
+	bool tech_gold_ = false, tech_wood_ = false; // the escrowed item lacks gold / wood (more hands on it)
+	double trade_t_ = 0;        // s until the next Market trade
+	double armory_up_at_ = -1;  // when its first Armory was seen standing
+	void choose_gods();
+	void trade(int market, int32_t tc_id, const Cost *goal);
+	bool escrow_allows(const Cost &c) const; // may it spend c (training) with the escrow left over
 
 	// fortifications (Godot-only, enemy_ai_fort.cpp)
 	void fortify(int tc, const std::vector<int> &vills, const std::vector<int> &army, const std::vector<int> &buildings, bool saving);

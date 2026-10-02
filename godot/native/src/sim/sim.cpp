@@ -28,6 +28,7 @@ void Sim::new_game(uint32_t seed_, int map_size, const std::string &preset, int 
 	economy.init(this);
 	buildings.init(this);
 	fortify.init(this);
+	techs.init(this);
 	combat.init(this);
 	combat.ai().enabled = false; // main.gd turns it on per scene (the JS main.js: combat.ai.enabled = !!scene.ai)
 	godpowers.init(this);
@@ -66,6 +67,7 @@ void Sim::tick(double dt) {
 	run("buildings", [&] {
 		buildings.update(dt);
 		fortify.update(dt); // (Godot-only: returns at once with the rules off)
+		techs.update(dt);   // (Godot-only: research queues, market drift, healing; same)
 	});
 	run("combat", [&] { combat.update(dt); });
 	run("godpowers", [&] { godpowers.update(dt); });

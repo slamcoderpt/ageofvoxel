@@ -5,6 +5,7 @@ extends RefCounted
 ## "CSS pixels" (the browser layout at 1920x1080); the HUD CanvasLayer scales.
 
 const Icons := preload("res://game/ui/icons.gd")
+const TechIcons := preload("res://game/ui/tech_icons.gd")
 
 const GOLD := Color("#e9c878")
 const GOLD_HI := Color("#fff0c0")
@@ -67,6 +68,8 @@ static func icon(name: String, px: int, tint := "") -> Texture2D:
 	if _icons.has(key):
 		return _icons[key]
 	var svg: String = Icons.SVG.get(name, "")
+	if svg.is_empty():
+		svg = TechIcons.svg(name)   # the tech / market glyphs (Godot-only)
 	if svg.is_empty():
 		return null
 	if tint != "":

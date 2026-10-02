@@ -21,9 +21,14 @@ namespace aov {
 // gates (a converted segment) and the sentry tower. Their hp, build time and
 // numbers depend on the owner's wall / tower stage (fortify.h); the values
 // here are stage 0, per tile for walls.
-enum BuildingType : uint8_t { B_TOWN_CENTER, B_HOUSE, B_STOREHOUSE, B_FARM, B_TEMPLE, B_BARRACKS, B_WALL, B_WALL_PILLAR, B_GATE, B_TOWER, B_TYPE_COUNT };
+// B_ARMORY and B_MARKET are Godot-only too (sim/techs, Retold's Greek
+// Armory and Market: 150 wood, 40 s, 1200 hp, 4x4, Classical Age): the
+// Armory researches the weapon / armor / shield lines, the Market trades
+// food and wood for gold and researches its economic techs.
+enum BuildingType : uint8_t { B_TOWN_CENTER, B_HOUSE, B_STOREHOUSE, B_FARM, B_TEMPLE, B_BARRACKS, B_WALL, B_WALL_PILLAR, B_GATE, B_TOWER, B_ARMORY, B_MARKET, B_TYPE_COUNT };
 inline bool is_wall_piece(int t) { return t == B_WALL || t == B_WALL_PILLAR || t == B_GATE; }
 inline bool is_fort_type(int t) { return t >= B_WALL && t <= B_TOWER; }
+inline bool is_tech_building(int t) { return t == B_ARMORY || t == B_MARKET; } // (Godot-only, sim/techs)
 
 constexpr double BUILDING_VOXEL = 0.25;
 constexpr int HOUSE_PLANS = 4;   // src/buildings/models.js
@@ -78,6 +83,11 @@ inline const BuildingDef *building_defs() {
 			false, 0, 0, 0, "G", 0, 1 },
 		{ "tower", "Sentry Tower", 2, 2, 750, Cost(0, 120, 60, 0), 30, 0, 12, 0, { -1 }, false, false, false, false,
 			false, 0, 0, 0, "Y", 0, 1 },
+		// research and trade (Godot-only, sim/techs; Retold: LOS 9)
+		{ "armory", "Armory", 4, 4, 1200, Cost(0, 150, 0, 0), 40, 0, 9, 0, { -1 }, false, false, false, false,
+			false, 0, 0, 0, "U", 1, 1 },
+		{ "market", "Market", 4, 4, 1200, Cost(0, 150, 0, 0), 40, 0, 9, 0, { -1 }, false, false, false, false,
+			false, 0, 0, 0, "K", 1, 1 },
 	};
 	// clang-format on
 	return D;

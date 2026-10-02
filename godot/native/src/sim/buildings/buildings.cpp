@@ -227,8 +227,9 @@ int Buildings::spawn(int type, int owner, int tx, int tz, bool built, bool site)
 	B.x[b] = tx + def.w / 2.0;
 	B.z[b] = tz + def.h / 2.0;
 	B.rot[b] = 0;
-	B.hp[b] = built ? def.hp : std::max(1.0, def.hp * 0.1);
-	B.max_hp[b] = def.hp;
+	const double hp = sim->godot_rules ? rules_building_hp(type) : def.hp; // (Godot-only: Retold's Temple, sim/techs)
+	B.hp[b] = built ? hp : std::max(1.0, hp * 0.1);
+	B.max_hp[b] = hp;
 	B.built[b] = built;
 	B.progress[b] = built ? 1 : 0;
 	B.sight[b] = def.sight;
@@ -279,9 +280,11 @@ int32_t Buildings::place(int type, int owner, int tx, int tz, const std::vector<
 	if (type < 0 || type >= B_TYPE_COUNT || owner < 0 || owner >= MAX_PLAYERS || !sim->players[owner].exists) return 0;
 	const BuildingDef &def = building_def(type);
 	Player &p = sim->players[owner];
-	if (!can_place(type, tx, tz) || !p.can_afford(def.cost)) return 0;
+	const Cost cost = sim->godot_rules ? rules_building_cost(type) : def.cost; // (Godot-only: Retold's Temple, sim/techs)
+	if (!can_place(type, tx, tz) || !p.can_afford(cost)) return 0;
 	if (sim->godot_rules && p.age < def.min_age) return 0; // (Godot-only: the fortifications' ages)
-	if (!p.pay(def.cost)) return 0;
+	if (!sim->godot_rules && is_tech_building(type)) return 0; // (Godot-only: Armory, Market)
+	if (!p.pay(cost)) return 0;
 	const int b = spawn(type, owner, tx, tz, false);
 	const int32_t id = sim->entities.buildings.id[b];
 	UnitStore &U = sim->entities.units;
