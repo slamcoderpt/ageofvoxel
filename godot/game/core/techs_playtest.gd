@@ -503,6 +503,15 @@ func _run() -> void:
 	sim.set_player_age(ME, age0)
 	await _frames(14)
 
+	# the tech icons are rendered 3D models (TechIcons "the 3D studio"), every
+	# one of them, and their tiles carry the render, not the SVG fallback
+	var TI = load("res://game/ui/tech_icons.gd")
+	var missing := []
+	for nm in TI.tile_names():
+		if not TI.rendered(str(nm)):
+			missing.append(nm)
+	_check("every tech icon is a rendered 3D model (no SVG fallback)", missing.is_empty() and TI.tile_names().size() >= 38,
+		"%d icons, not rendered: %s" % [TI.tile_names().size(), missing])
 	# 7. the Temple: a click selects it, the hotkey of Olympian Parentage researches it
 	var tb: Dictionary = sim.get_building(ids.temple)
 	await _look(float(tb.x), float(tb.z) + 3.0)

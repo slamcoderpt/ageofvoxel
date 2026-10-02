@@ -258,6 +258,213 @@ static func prewarm_step() -> bool:
 	tile(str(w[0]), int(w[1]), str(w[2]))
 	return true
 
+# ---- the 3D studio -------------------------------------------------------------------
+# Icons with a model (tech_models.gd) are rendered, not drawn: every model in
+# one shared world (spaced apart, one SubViewport + camera each), lit by a
+# softbox panorama (the metal's reflections and the ambient light), a key
+# light from the top left with soft shadows, a cool fill from the right, a
+# rim light behind each model in its tile family's glow, SSAO, filmic tone
+# mapping; the next drawn frame renders them all, the pictures are read back
+# (premultiplied, 256 px, 4x MSAA) and kept for bake(), which fits each to
+# the tile and composites it on the family plate. No renderer (headless):
+# nothing is rendered and the SVG glyphs stay.
+
+const TechModels := preload("res://game/ui/tech_models.gd")
+const STUDIO_PX := 256
+static var _glyph3d := {}   # icon name -> Image (RGBA8, premultiplied alpha)
+static var _studio_done := false
+
+## Every icon name with a tile (the Armory's tiers and every SVG with a plate).
+static func tile_names() -> Array:
+	var names := []
+	for t in TIERS:
+		for l in TEMPLATES:
+			names.append("t_%s_%s" % [l, t])
+	for k in SVG:
+		if PLATE_OF.has(k):
+			names.append(k)
+	return names
+
+## True when an icon's picture comes from its 3D model.
+static func rendered(name: String) -> bool:
+	return _glyph3d.has(name)
+
+## Set up the studio: every model in its viewport; they draw with the next
+## frame and studio_finish() (after it) reads them back (a forced draw does
+## not render freshly added viewports, so this takes two real frames).
+static func render_models(host: Node, names: Array = []) -> int:
+	if _studio_done:
+		return _glyph3d.size()
+	_studio_done = true
+	if DisplayServer.get_name() == "headless":
+		return 0
+	if names.is_empty():
+		names = tile_names()
+	var world := World3D.new()
+	world.environment = _studio_env()
+	var holder := Node.new()
+	holder.name = "TechIconStudio"
+	host.add_child(holder)
+	var vps := []
+	var i := 0
+	for nm in names:
+		var obj: Node3D = TechModels.build(str(nm))
+		if obj == null:
+			continue
+		var vp := SubViewport.new()
+		vp.size = Vector2i(STUDIO_PX, STUDIO_PX)
+		vp.world_3d = world
+		vp.transparent_bg = true
+		vp.msaa_3d = Viewport.MSAA_4X
+		vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		vp.positional_shadow_atlas_size = 0
+		holder.add_child(vp)
+		var at := Vector3(i * 40.0, 0.0, 0.0)
+		var pivot := Node3D.new()
+		pivot.position = at
+		vp.add_child(pivot)
+		pivot.add_child(obj)
+		var rim := OmniLight3D.new()
+		rim.light_color = glow_of(str(nm)).lerp(Color.WHITE, 0.25)
+		rim.light_energy = 5.0
+		rim.omni_range = 7.0
+		rim.omni_attenuation = 0.6
+		rim.position = at + Vector3(2.2, 1.6, -2.4)
+		vp.add_child(rim)
+		var cam := Camera3D.new()
+		cam.fov = 17.0
+		cam.near = 1.0
+		cam.far = 30.0
+		vp.add_child(cam)
+		cam.position = at + Vector3(0.0, 0.5, 9.0)
+		cam.look_at(at, Vector3.UP)
+		cam.current = true
+		if i == 0:
+			var key := DirectionalLight3D.new()
+			key.light_energy = 1.5
+			key.light_color = Color(1.0, 0.96, 0.9)
+			key.shadow_enabled = true
+			key.shadow_blur = 1.5
+			key.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+			key.directional_shadow_max_distance = 14.0
+			vp.add_child(key)
+			key.look_at_from_position(Vector3.ZERO, Vector3(0.55, -0.62, -0.55), Vector3.UP)
+			var fill := DirectionalLight3D.new()
+			fill.light_energy = 0.35
+			fill.light_color = Color(0.75, 0.85, 1.0)
+			vp.add_child(fill)
+			fill.look_at_from_position(Vector3.ZERO, Vector3(-0.8, 0.1, -0.5), Vector3.UP)
+		vps.append([str(nm), vp])
+		i += 1
+	if vps.is_empty():
+		holder.queue_free()
+		return 0
+	_studio_vps = vps
+	_studio_holder = holder
+	return 0
+
+static var _studio_vps := []
+static var _studio_holder: Node = null
+static var _studio_frame := -1
+
+## Start the studio without waiting (the game: from ui.setup, so the pictures
+## are back by the second drawn frame); studio_poll() each frame finishes it.
+static func studio_start(host: Node) -> void:
+	if _studio_done:
+		return
+	render_models(host)
+	_studio_frame = Engine.get_frames_drawn()
+
+## Finish the studio once it has drawn (two frames after studio_start); true while pending.
+static func studio_poll() -> bool:
+	if _studio_holder == null:
+		return false
+	if Engine.get_frames_drawn() - _studio_frame < 2:
+		return true
+	studio_finish()
+	return false
+
+## Read the studio's pictures back (after it has drawn) and free it.
+static func studio_finish() -> int:
+	var vps := _studio_vps
+	var holder := _studio_holder
+	_studio_vps = []
+	_studio_holder = null
+	if holder == null:
+		return _glyph3d.size()
+	for e in vps:
+		var img: Image = (e[1] as SubViewport).get_texture().get_image()
+		if img == null or img.is_empty():
+			continue
+		img.convert(Image.FORMAT_RGBA8)
+		if img.get_used_rect().size.x < 4:
+			continue
+		_glyph3d[e[0]] = img
+	holder.queue_free()
+	# tiles baked from the SVGs before now are re-baked in place
+	for key in _tiles:
+		var tex: ImageTexture = _tiles[key]
+		var nm := str(key).get_slice("@", 0)
+		if tex and _glyph3d.has(nm):
+			var px := int(str(key).get_slice("@", 1).get_slice(":", 0))
+			var img2 := bake(nm, px, str(key).ends_with(":locked"))
+			if img2:
+				tex.update(img2)
+	return _glyph3d.size()
+
+## The studio: a softbox panorama for reflections and ambient light.
+static func _studio_env() -> Environment:
+	var e := Environment.new()
+	e.background_mode = Environment.BG_CLEAR_COLOR
+	var sky := Sky.new()
+	var pm := PanoramaSkyMaterial.new()
+	pm.panorama = ImageTexture.create_from_image(_studio_panorama())
+	sky.sky_material = pm
+	sky.process_mode = Sky.PROCESS_MODE_QUALITY
+	sky.radiance_size = Sky.RADIANCE_SIZE_128
+	e.sky = sky
+	e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	e.ambient_light_energy = 0.55
+	e.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	e.tonemap_exposure = 1.05
+	e.ssao_enabled = true
+	e.ssao_radius = 0.35
+	e.ssao_intensity = 1.6
+	e.glow_enabled = false
+	return e
+
+## An equirectangular HDR studio: a big warm softbox up left in front, a long
+## strip light behind on the right, a soft top light, a dark warm floor.
+static func _studio_panorama() -> Image:
+	var w := 256
+	var h := 128
+	var img := Image.create(w, h, false, Image.FORMAT_RGBF)
+	var K := Vector3(-0.55, 0.62, 0.56).normalized()
+	var Rs := Vector3(0.75, 0.25, -0.62).normalized()
+	var T := Vector3(0.1, 1.0, 0.1).normalized()
+	var F := Vector3(0.25, 0.35, 1.0).normalized()
+	for y in h:
+		var th := (y + 0.5) / h * PI
+		for x in w:
+			var ph := ((x + 0.5) / w - 0.5) * TAU
+			var d := Vector3(sin(th) * sin(ph), cos(th), -sin(th) * cos(ph))
+			var c := Color(0.07, 0.075, 0.09)
+			if d.y < 0.0:
+				c = Color(0.06, 0.045, 0.035).lerp(Color(0.02, 0.015, 0.012), clampf(-d.y * 2.0, 0.0, 1.0))
+			var k := clampf((d.dot(K) - 0.82) / 0.1, 0.0, 1.0)
+			c += Color(1.0, 0.92, 0.8) * 7.0 * k * k
+			var r := clampf((d.dot(Rs) - 0.9) / 0.06, 0.0, 1.0)
+			c += Color(0.8, 0.9, 1.0) * 4.0 * r
+			# a soft frontal box behind the camera (flat faces turned to the
+			# viewer reflect it instead of the dark studio)
+			var f := clampf((d.dot(F) - 0.75) / 0.2, 0.0, 1.0)
+			c += Color(1.0, 0.97, 0.92) * 1.6 * f
+			var t := clampf((d.dot(T) - 0.7) / 0.3, 0.0, 1.0)
+			c += Color(0.9, 0.95, 1.0) * 1.2 * t
+			img.set_pixel(x, y, c)
+	return img
+
 static func _blur(src: PackedFloat32Array, n: int, r: int) -> PackedFloat32Array:
 	# two box passes per axis (close to a gaussian), clamped edges
 	var a := src
@@ -288,7 +495,8 @@ static func _blur(src: PackedFloat32Array, n: int, r: int) -> PackedFloat32Array
 ## Bake a tile (see above). Pure Image work: safe on a worker thread.
 static func bake(name: String, n: int, locked := false) -> Image:
 	var src := svg(name)
-	if src.is_empty():
+	var g3: Image = _glyph3d.get(name)
+	if src.is_empty() and g3 == null:
 		return null
 	var pl: Array = PLATES[plate_of(name)]
 	var c0 := Color(str(pl[0]))
@@ -297,26 +505,36 @@ static func bake(name: String, n: int, locked := false) -> Image:
 	var gl := Color(str(pl[3]))
 	var nparts := name.split("_")
 	var tint := 0.3 if nparts.size() == 3 and TIERS.has(nparts[2]) else 0.0
-	# fit the glyph's drawn bounds (not its 24-unit box) to FIT of the tile, so
-	# a thin diagonal glyph fills the button as a round one does
-	var g := Image.new()
-	var s0 := float(n) / 24.0
-	if g.load_svg_from_string(src, s0) != OK:
-		return null
-	var ur := g.get_used_rect()
-	if ur.size.x <= 0 or ur.size.y <= 0:
-		return null
-	var fit := FIT * n
-	var s1 := s0 * minf(minf(fit / ur.size.x, fit / ur.size.y), 1.6)
-	if g.load_svg_from_string(src, s1) != OK:
-		return null
+	var g: Image
+	if g3 != null:
+		# the rendered model: its drawn bounds fitted to FIT of the tile
+		# (downscaled from 256 px: smooth edges, crisp highlights)
+		var ur3 := g3.get_used_rect()
+		var sc := minf(FIT * n / ur3.size.x, FIT * n / ur3.size.y)
+		g = g3.get_region(ur3)
+		g.resize(maxi(1, int(round(ur3.size.x * sc))), maxi(1, int(round(ur3.size.y * sc))), Image.INTERPOLATE_LANCZOS)
+	else:
+		# fit the glyph's drawn bounds (not its 24-unit box) to FIT of the tile, so
+		# a thin diagonal glyph fills the button as a round one does
+		g = Image.new()
+		var s0 := float(n) / 24.0
+		if g.load_svg_from_string(src, s0) != OK:
+			return null
+		var ur0 := g.get_used_rect()
+		if ur0.size.x <= 0 or ur0.size.y <= 0:
+			return null
+		var fit := FIT * n
+		var s1 := s0 * minf(minf(fit / ur0.size.x, fit / ur0.size.y), 1.6)
+		if g.load_svg_from_string(src, s1) != OK:
+			return null
 	g.convert(Image.FORMAT_RGBA8)
-	ur = g.get_used_rect()
+	var ur := g.get_used_rect()
 	var ox := (n - ur.size.x) / 2 - ur.position.x
 	var oy := (n - ur.size.y) / 2 - ur.position.y
 	var gd := g.get_data()
 	var gw := g.get_width()
 	var gh := g.get_height()
+	var prem := g3 != null
 	# the glyph's colour and alpha on the tile grid
 	var N := n * n
 	var A := PackedFloat32Array()
@@ -391,7 +609,12 @@ static func bake(name: String, n: int, locked := false) -> Image:
 			var r := pr
 			var gg := pg
 			var b := pb
-			if a > 0.0:
+			if a > 0.0 and prem:
+				# a rendered model: already lit; premultiplied over the plate
+				r = pr * (1.0 - a) + R[i * 3]
+				gg = pg * (1.0 - a) + R[i * 3 + 1]
+				b = pb * (1.0 - a) + R[i * 3 + 2]
+			elif a > 0.0:
 				var xl := maxi(x - 1, 0)
 				var xr := mini(x + 1, n - 1)
 				var yu := maxi(y - 1, 0)

@@ -150,6 +150,8 @@ func setup(g: Node) -> void:
 	_portraits.name = "Portraits"
 	_portraits.sim = sim
 	add_child(_portraits)
+	if hud_visible:
+		TechIcons.studio_start(self)   # the tech icons' 3D models (TechIcons "the 3D studio")
 
 	_layer = CanvasLayer.new()
 	_layer.layer = 10
@@ -302,6 +304,7 @@ func _frame(dt: float, alpha: float) -> void:
 	_handle_events(game.events)
 	_prune_selection()
 	if hud_visible:
+		TechIcons.studio_poll()    # the 3D tech icons, rendered once (tech_models.gd)
 		TechIcons.prewarm_step()   # the tech tiles, one per frame (PORTING.md "Command button states")
 	_update_rings(alpha)
 	_update_markers(dt)

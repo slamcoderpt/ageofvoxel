@@ -540,7 +540,7 @@ func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bo
 		# Retold: the picture stays in full colour under a red cast (the edge
 		# and the foot strip are drawn after the frame, below, so no frame
 		# line covers them)
-		draw_rect(ir, Color(0.8, 0.06, 0.02, 0.2))
+		S.vgrad(self, ir, [[0.0, Color(0.8, 0.06, 0.02, 0.12)], [1.0, Color(0.85, 0.06, 0.02, 0.34)]])
 	# the frame
 	var fam := str(c.get("frame", ""))
 	if fam != "":
@@ -624,21 +624,25 @@ func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bo
 ## The unaffordable edge, drawn over the frame (PORTING.md "Command button
 ## states"): a 2 px bright red ring on the frame's inner bevel (a gold / purple
 ## frame keeps only its outer 2 px bevel, so its family still reads), a red
-## glow inside it, and a bright red strip along the foot with the missing
-## resources (the hotkey shares it on the right).
+## glow inside it, and a compact red chip in the bottom-left corner with the
+## missing resources (the hotkey stays bottom-right; the picture keeps the tile).
 func _draw_unaffordable(c: Dictionary, rr: Rect2, framed: bool) -> void:
 	var ring := rr.grow(-3) if framed else rr.grow(-2)
 	draw_rect(ring, Color("#ff2a12"), false, 1.0)
 	draw_rect(ring.grow(-1), Color("#ff5a32"), false, 1.0)
 	draw_rect(ring.grow(-2), Color(1.0, 0.2, 0.08, 0.38), false, 1.0)
 	draw_rect(ring.grow(-3), Color(1.0, 0.2, 0.08, 0.16), false, 1.0)
+	# the missing resources: a compact red chip in the bottom-left corner
+	# (the picture keeps the rest of the tile; the hotkey sits bottom-right)
 	var inner := ring.grow(-2)
-	var strip := Rect2(inner.position.x, inner.end.y - 13, inner.size.x, 13)
-	S.vgrad(self, strip, [[0.0, Color("#e0280e")], [1.0, Color("#86100a")]])
-	draw_rect(Rect2(strip.position, Vector2(strip.size.x, 1)), Color("#ffb090"))
 	var sh: Array = c.get("short", [])
+	var cnt := clampi(sh.size(), 1, 2)
+	var chip := Rect2(inner.position.x - 1, inner.end.y - 14, 4 + cnt * 12, 15)
+	draw_rect(chip.grow(1), Color(0.12, 0.0, 0.0, 0.9))
+	S.vgrad(self, chip, [[0.0, Color("#f0381a")], [1.0, Color("#9a140a")]])
+	draw_rect(Rect2(chip.position, Vector2(chip.size.x, 1)), Color("#ffb090"))
 	for k in mini(sh.size(), 2):
-		S.draw_icon(self, str(sh[k]), Rect2(strip.position + Vector2(1 + k * 13, 1), Vector2(12, 12)), true)
+		S.draw_icon(self, str(sh[k]), Rect2(chip.position + Vector2(2 + k * 12, 2), Vector2(11, 11)), true)
 
 ## Darken the part of r a clockwise sweep from 12 o'clock has not reached at p.
 func _sweep(r: Rect2, p: float, col: Color) -> void:

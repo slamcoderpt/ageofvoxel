@@ -35,7 +35,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), `tower_fire.gd` + `tower_flash / tower_puff.gdshader` (tower arrows: loose flash, heavier arrow, tracer, strike; see "Towers: the look"), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported, plus god powers and a wave log, Godot-only; enemy_ai_fort.cpp: the AI's walls, towers and breaches, Godot-only) | `src/combat/` |
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor; Godot-only activity fx: axe / pick chips and dust, sickle chaff, stooks on cut rows, hoof dust, shoal ripples, fish splashes, net ripples, boat wakes; crops sway, `econ_voxel.gdshader`, `fx_chip / fx_puff / fx_ring.gdshader`), buffers built in C++ by `AovEconView` (`native/src/econ_view.{h,cpp}`, render side, reads the sim, never writes it) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
 | godpowers | `game/godpowers/godpowers.gd` (the whole BoltRenderer of effects.js: bolt / sky / zap ribbons, impact flash sprites and decals, scorches with ember cracks (hot orange / red, glowing as long as the scorch lasts), a charcoal ash edge and a hot rim, an expanding impact ring at every strike point (Godot-only; decals are pulled toward the camera so voxel bumps do not swallow them), crater debris, char rims, spark streaks, smoke and flames, the storm funnel (wall, cloud body, dust wall, ground shockwave, rain, energy bands, whirled debris), flyer trails / back lights / drop shadows, meteor fireball and fire, strike / storm point lights and the shadow spot, the full-frame storm grade with light pools; dims the lighting piece's sun / sky / grade while a storm plays), shaders beside it; buffers built in C++ by `AovGodpowerView` (`native/src/godpower_view.{h,cpp}`, render side, reads the sim, never writes it) | `godpowers/` (favor, cooldowns, Lightning Storm, Bolt, Meteor, thrown units: ported) | `src/godpowers/` |
-| ui (HUD, selection, input) | `game/ui/ui.gd` (selection, box / double-click select, smart orders, rally points, control groups, hotkeys, placement ghost, wall drawing (click-drag line ghost, cost, snapping) and the wall / gate / tower commands (see "Walls, gates, towers: placement"), god-power targeting ring, move markers, selection rings (one MultiMesh) + bars, event feed, messages, result card; public: `pieces.ui.selected`, `hover_entity`, `message()`, `feed()`), `hud.gd` (the drawn HUD, two layers with hit zones), `hud_style.gd` (palette, Cinzel / Alegreya fonts in `fonts/`, SVG icons from `icons.gd` = `src/ui/icons.js` rasterised at runtime, draw helpers), `panel.gdshader` (the gilded teal panels), `minimap.gd` + `minimap_ground/units.gdshader` (terrain colours computed in the shader from `get_heights()` / `get_ground()` uploaded as textures, re-uploaded on `building:placed`; unit dots read straight from `get_units()` arrays as data textures: no per-unit script), `portraits.gd` + `portrait.gdshader` (one SubViewport per type / owner, rendered once, unshaded with the browser's three.js hemisphere + sun lighting, no tonemap), the research / market panel and tooltips with `tech_icons.gd` (see "Research panel, tooltips, market trade") | none | `src/ui/` |
+| ui (HUD, selection, input) | `game/ui/ui.gd` (selection, box / double-click select, smart orders, rally points, control groups, hotkeys, placement ghost, wall drawing (click-drag line ghost, cost, snapping) and the wall / gate / tower commands (see "Walls, gates, towers: placement"), god-power targeting ring, move markers, selection rings (one MultiMesh) + bars, event feed, messages, result card; public: `pieces.ui.selected`, `hover_entity`, `message()`, `feed()`), `hud.gd` (the drawn HUD, two layers with hit zones), `hud_style.gd` (palette, Cinzel / Alegreya fonts in `fonts/`, SVG icons from `icons.gd` = `src/ui/icons.js` rasterised at runtime, draw helpers), `panel.gdshader` (the gilded teal panels), `minimap.gd` + `minimap_ground/units.gdshader` (terrain colours computed in the shader from `get_heights()` / `get_ground()` uploaded as textures, re-uploaded on `building:placed`; unit dots read straight from `get_units()` arrays as data textures: no per-unit script), `portraits.gd` + `portrait.gdshader` (one SubViewport per type / owner, rendered once, unshaded with the browser's three.js hemisphere + sun lighting, no tonemap), the research / market panel and tooltips with `tech_icons.gd` + `tech_models.gd` (the tech icons as rendered 3D models; see "Research panel, tooltips, market trade") | none | `src/ui/` |
 | performance (6 teams, 2000 units) | `game/perf/perf.gd` (the render bench, `--renderbench`), and in the render paths of the stress scene: unit LOD + box shadow casters (`game/units`), coarse voxel twins `VoxelModels.coarse()` (tree shadow casters), tight resource / ground-detail buckets (`game/terrain`), economy props frustum culling (`AovEconView`); report in `../docs/godot-stress-report.md` | sim hot paths (with their owners); `native/src/unit_lod.cpp` (`AovUnitView.lod_mesh`) | `docs/stress-report.md` |
 | exports (Windows, macOS, Linux, web) | `export_presets.cfg`, `../scripts/godot-export.sh`, `../.github/workflows/godot.yml`, `native/SConstruct` + `native/aov.gdextension` (platform entries); see "Export" | none | `vite build` |
 | scenes | `AovScenes.set_setup()` from the owning piece, else the C++ setup | `scenes/` (helpers.js, skirmish / town / coast / hud, EconomyScene.js; battle.cpp: BattleScene.js + units/battleHost.js, godpower, stress.js: all ported) | `src/core/scenes/`, `BattleScene.js`, `EconomyScene.js` |
@@ -1198,38 +1198,66 @@ Mythology: Retold's command panel (`reference/techs/ui_01..05`).
   button. More techs
   than free slots (a Mythic Temple with no minor god chosen): the last slot is
   "More techs (n / m)" and pages.
-- **Icons**: `game/ui/tech_icons.gd`, 24-unit SVG glyphs, one per tech line
-  (the Armory's weapons / armor / shields as shaded gradient templates in the
-  tier's metal: **copper** red-orange and plain, **bronze** yellow gold with a
-  red tassel / gorgon boss / star blazon, **iron** blue steel with a bright
-  edge, rivets, pteruges; the weapons line also differs by silhouette,
-  `WEAPON_BLADES`: copper one spear, bronze two crossed spears, iron the
-  crossed spears behind an upright xiphos), Ballistics, Burning Pitch, every
-  Greek god tech (Monstrous Rage: a raging bull's head),
-  Omniscience, the Market techs, `t_buy` / `t_sell`, `t_time`, and `g_<god>`
-  emblems. A button never shows the bare glyph: `TechIcons.tile(name, px,
-  "normal"|"locked")` bakes a **painted tile** once (CPU, ~10 ms at 64 px,
-  cached; `prewarm_step()` bakes the whole set one per frame from the first
-  frames): a background plate per tech family (`PLATES` / `PLATE_OF`: ember
-  = weapons, steel = armor, sea = shields, amber = siege and forge, dusk =
-  Ares' terror techs, violet = divine, verdant = nature / healing, sky =
-  knowledge, treasury = the Market), a lit radial gradient with a vignette and
-  a top sheen; the glyph embossed from its own silhouette (height = blurred
-  alpha, key light from the top left, a specular glint, darker inner edges), a
-  rim light in the family's glow on its far edges, a soft drop shadow and a
-  halo on the plate, and a dark sticker outline (dilated alpha) round the
-  silhouette so it reads against any plate. The glyph's drawn bounds (not
-  its 24-unit box) are fitted to 84% of the tile (`FIT`), so a thin diagonal
-  glyph fills the button as a round one does. Every glyph is a bold, distinct
-  silhouette at 48 px: Phobos' Spear upright with a broad red blade and
-  terror sparks, Deimos' Sword a curved kopis, Enyo's Bow a recurve with the
-  arrow drawn level, Sarissa a fan of three pikes, Burning Pitch a steel head
-  trailing fire. "locked" is the same tile with no colour and its values
-  split: the plate drops to a dark slate (luminance x 0.5), the glyph keeps a
-  lifted grey (x 0.62 + 0.16), the outline stays dark, so the picture still
-  reads greyed (a tier glyph keeps a trace of its metal). Iterate on the set
-  with a contact sheet: `TechIcons.bake(name, 64, locked)` for every name. No
-  plate is red: red means "can't afford".
+- **Icons**: rendered **3D models**, not drawn glyphs. `game/ui/tech_models.gd`
+  builds one small scene per icon from code (lofted blades with a diamond
+  section and crisp ridges, lathed shields / bowls / apples / helmets,
+  parametric discs with relief and painted faces, swept shafts, horns, bows
+  and snakes, bevelled extrusions; materials: polished metal with a hammered
+  normal map, wood grain, leather, cloth, marble, glass, unshaded glowing
+  fire / souls / lightning / venom with alpha). `TechIcons` "the 3D studio"
+  renders them all once: one shared World3D, each model in its own 256 px
+  SubViewport (4x MSAA, transparent) spaced 40 units apart, lit by a softbox
+  panorama sky (the metal's reflections and ambient: a warm softbox up left,
+  a strip light behind right, a soft frontal box, a dark floor), a key light
+  from the top left with soft shadows, a cool fill, a rim omni light behind
+  each model in its tile family's glow, SSAO, filmic tone mapping.
+  `ui.setup` calls `TechIcons.studio_start(self)`, the next drawn frame
+  renders the studio, `studio_poll()` (every ui frame) reads the pictures
+  back two drawn frames later and frees it (a `RenderingServer.force_draw`
+  does not render freshly added viewports), then re-bakes any tile already
+  made, in place (`ImageTexture.update`). Headless (no renderer): nothing is
+  rendered and the SVG glyphs below are the fallback. The models:
+  **weapons** copper one spear, bronze two crossed spears with red tassels,
+  iron crossed spears behind an upright xiphos; **armor** a muscle cuirass,
+  copper plain, bronze with shoulder guards and a gold medallion, iron
+  (steel) with shoulder guards, gold rivets and leather pteruges; **shields**
+  a hoplon, copper plain with turned rings, bronze a gold star raised on dark
+  blue enamel, iron a crimson face with a silver lambda, steel rim and
+  rivets; so the tiers differ by metal and by silhouette. Ballistics an
+  arrow in a straw target, Burning Pitch a broad arrowhead ablaze, Phobos a
+  dark barbed spear with a glowing red fuller, Deimos a curved kopis in
+  purple dread wisps, Enyo a drawn recurve bow, Sarissa three pikes behind a
+  small shield, Aegis a gold shield ringed by a snake with a ward of light,
+  Sun Ray a blazing sun and a golden arrow, Shafts of Plague two arrows
+  dripping green venom, Forge of Olympus an anvil, a hot ingot, the hammer
+  and sparks, Olympian Weapons a sword between lightning bolts, Harvest of
+  Souls a scythe and rising souls; Tax Collectors a purse and coins,
+  Ambassadors a sealed scroll, Coinage a stack of staters and an owl coin;
+  Omniscience an eye in gold lids with rays, Olympian Parentage a crested
+  Corinthian helmet, Labyrinth the maze from above, Sylvan Lore an oak
+  sprig, Will of Kronos an hourglass, Hymn Pan's pipes, Oracle the Delphic
+  tripod's vapours, Temple of Healing the Rod of Asclepius, Golden Apples,
+  Dionysia grapes, Face of the Gorgon a bronze gorgoneion with snakes and
+  glowing eyes, Monstrous Rage a bull's head with burning eyes, Pious
+  Sacrifice an altar ablaze. A button never shows the bare picture:
+  `TechIcons.tile(name, px, "normal"|"locked")` composites it once (CPU,
+  cached; `prewarm_step()` bakes the set one per frame): a background plate
+  per tech family (`PLATES` / `PLATE_OF`: ember = weapons, steel = armor,
+  sea = shields, amber = siege and forge, dusk = Ares' terror techs, violet
+  = divine, verdant = nature / healing, sky = knowledge, treasury = the
+  Market), a lit radial gradient with a vignette and a top sheen, the
+  picture's drawn bounds fitted to 84% of the tile (`FIT`, Lanczos from
+  256 px), a soft drop shadow, a halo in the family's glow and a dark
+  outline round the silhouette so it reads on any plate. The SVG fallback
+  (`SVG`, `TEMPLATES`: 24-unit glyphs, embossed from their blurred alpha)
+  and the `g_<god>` emblems, `t_buy` / `t_sell`, `t_time` stay SVG.
+  "locked" is the same tile with no colour and its values split: the plate
+  drops to a dark slate (luminance x 0.5), the picture keeps a lifted grey
+  (x 0.62 + 0.16), the outline stays dark, so it still reads greyed (a tier
+  keeps 30% of its metal's hue). Iterate with a contact sheet: after
+  `render_models(host, names)` and two drawn frames `studio_finish()`, then
+  `TechIcons.bake(name, 64, locked)` per name (`TechIcons._glyph3d[name]`
+  is the raw render). No plate is red: red means "can't afford".
 - **Tooltips** (`hud._draw_wide_tooltip`, commands with `wide`): the name and
   "(hotkey)", "Cost: 100 [food] 100 [gold] 30s [hourglass]" (red where short;
   the time with Forge of Olympus at the Armory /1.5), Retold's effect text,
@@ -1279,7 +1307,7 @@ coloured by state (`hud.status_color`).
 | state | button | tooltip line |
 |---|---|---|
 | `available` | full-colour tile, bright bevelled frame (gold: generic tech, purple: god tech) | "Available · Click to research" (green) |
-| `unaffordable` (`short`: the missing resources) | the picture in full colour under a red cast (20%); drawn **after** the frame (`hud._draw_unaffordable`, so no frame line covers it): a 2 px bright red ring on the frame's inner bevel (#ff2a12 / #ff5a32, a red glow inside it; a gold / purple frame keeps only its outer 2 px bevel, so the family still reads, and drops its own inner glow), and a bright red strip along the foot (13 px, #e0280e to #86100a, a light top line, shared with the hotkey) holding the missing resources' icons (up to two); on a frameless portrait the same ring sits on the cell's edge | "Can't afford · Need 40 more gold, 5 more favor" (red); the cost's short numbers red |
+| `unaffordable` (`short`: the missing resources) | the picture in full colour under a red cast; drawn **after** the frame (`hud._draw_unaffordable`, so no frame line covers it): a 2 px bright red ring on the frame's inner bevel (#ff2a12 / #ff5a32, a red glow inside it; a gold / purple frame keeps only its outer 2 px bevel, so the family still reads, and drops its own inner glow), and a compact red chip in the bottom-left corner (15 px high, as wide as its icons, #f0381a to #9a140a, a light top line) holding the missing resources' icons (up to two), so the picture keeps the whole tile (the hotkey stays bottom-right); the red cast is a gradient, 12% at the top to 34% at the foot; on a frameless portrait the same ring sits on the cell's edge | "Can't afford · Need 40 more gold, 5 more favor" (red); the cost's short numbers red |
 | `locked` (`age_req` when an age, else a prerequisite) | the tile desaturated and darkened (`tile(..., "locked")`); a unit / building portrait the same: `hud.locked_portrait(tex)` reads the portrait back once, turns every pixel into the tiles' locked slate grey (luminance x 0.6-0.68) and caches it (a near-black tint for the frame or two before the portrait has rendered), on a grey cell plate (no team teal; mean saturation ~0.18, the same as a locked tech tile); a dim grey frame, a badge riding the frame's top-right corner: the required age's numeral (II / III / IV) or, locked by a prerequisite, a padlock; the hotkey dimmed. A tech locked by a prerequisite is shown only while that prerequisite is researching / queued (`ui._tech_visible`'s `busy`: the line's next step, padlocked, after the buyable buttons), else hidden as in Retold | "Locked · Requires Heroic Age" / "Locked · Requires Copper Shields" (tan) |
 | `researching` / `training` (`progress`, `count`) | a clockwise sweep from 12 o'clock dims what is left (46%, the picture still reads under it), a thin green bar at the foot, the percentage small in the bottom-left corner on a tech (no plate behind it), the count queued (green badge on the top-right corner) on a train button | "Researching · 39% · 25s left · cancel it from the queue" (blue) |
 | `queued` (`count`: its place) | the tile dimmed, an hourglass, its place in the queue (amber badge) | "Queued · 2nd in the queue" (amber) |
