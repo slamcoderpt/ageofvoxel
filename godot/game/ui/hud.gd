@@ -606,17 +606,22 @@ func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bo
 		for k in 4:
 			draw_rect(Rect2(bar.position.x + 3 + k * (bar.size.x - 6) / 4.0, bar.position.y + 2, 4, 2), Color("#4a86c8"))
 	var lockd := st == "locked"
-	# identity: a god tech's emblem on the frame's top-left corner (a small gem
-	# centred on the corner, mostly over the frame and the gap)
+	# identity: a god tech keeps its god in every state. Purple corner caps
+	# (an L bracket on each of the four corners, over the state's bevel) and
+	# the god's emblem on a medallion at the top-left: a red can't-afford or
+	# a blue researching god tech still reads "god tech" by shape, not only
+	# by a frame colour the state has taken over
 	var god := str(c.get("god", ""))
+	if fam == "purple":
+		_god_corners(rr, lockd)
 	if fam == "purple" and god != "":
-		var mc := rr.position + Vector2(2.5, 2.5)
-		draw_circle(mc, 6.5, Color(0.04, 0.0, 0.08, 0.95))
-		draw_circle(mc, 5.5, Color("#6a32b0") if not lockd else Color("#3a3440"))
-		draw_arc(mc, 5.7, 0, TAU, 18, Color("#f0d8ff") if not lockd else Color("#8a8490"), 1.0, true)
+		var mc := rr.position + Vector2(3.5, 3.5)
+		draw_circle(mc, 8.0, Color(0.04, 0.0, 0.08, 0.95))
+		draw_circle(mc, 7.0, Color("#6a32b0") if not lockd else Color("#3a3440"))
+		draw_arc(mc, 7.0, 0, TAU, 22, Color("#f0d8ff") if not lockd else Color("#8a8490"), 1.2, true)
 		var em := TechIcons.god_emblem(god)
 		if em != "":
-			S.draw_icon(self, em, Rect2(mc - Vector2(4.5, 4.5), Vector2(9, 9)), false, Color.WHITE if not lockd else Color(0.6, 0.6, 0.62))
+			S.draw_icon(self, em, Rect2(mc - Vector2(5.5, 5.5), Vector2(11, 11)), false, Color.WHITE if not lockd else Color(0.6, 0.6, 0.62))
 		else:
 			var ini := god.substr(0, 1).to_upper()
 			draw_string(title, Vector2(mc.x - S.text_width(title, ini, 8) * 0.5, mc.y + 3), ini, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color("#fff4dc"))
@@ -661,6 +666,35 @@ func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bo
 		if qt:
 			S.draw_icon(self, "t_time", Rect2(br.position + Vector2(2, 2), Vector2(9, 9)), false)
 		draw_string(bold, Vector2(br.position.x + iw + (bw - iw - S.text_width(bold, n, 11)) * 0.5, br.end.y - 3), n, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
+
+## A god tech's corner caps: a purple L bracket on each corner of rr, set over
+## the frame's bevel (whatever colour the state gave it) and the gap round it.
+func _god_corners(rr: Rect2, dim: bool) -> void:
+	var hi := Color("#f6dcff") if not dim else Color("#8a8490")
+	var mid := Color("#a04ee0") if not dim else Color("#4a4452")
+	var arm := 12.0
+	var th := 3.0
+	var o := rr.grow(1)
+	for cx in [0, 1]:
+		for cy in [0, 1]:
+			var x := o.position.x if cx == 0 else o.end.x - arm
+			var y := o.position.y if cy == 0 else o.end.y - th
+			var xv := o.position.x if cx == 0 else o.end.x - th
+			var yv := o.position.y if cy == 0 else o.end.y - arm
+			var hr := Rect2(x, y, arm, th)
+			var vr := Rect2(xv, yv, th, arm)
+			draw_rect(hr.grow(1), Color(0.03, 0.0, 0.06, 0.95))
+			draw_rect(vr.grow(1), Color(0.03, 0.0, 0.06, 0.95))
+			draw_rect(hr, mid)
+			draw_rect(vr, mid)
+			# lit edge on the top / left faces
+			draw_rect(Rect2(hr.position, Vector2(hr.size.x, 1)), hi)
+			draw_rect(Rect2(vr.position, Vector2(1, vr.size.y)), hi.lerp(mid, 0.3))
+			# a stud on the bracket's end
+			var sx := hr.end.x - 1.5 if cx == 0 else hr.position.x + 1.5
+			var sy := vr.end.y - 1.5 if cy == 0 else vr.position.y + 1.5
+			draw_circle(Vector2(sx, hr.get_center().y), 1.1, hi)
+			draw_circle(Vector2(vr.get_center().x, sy), 1.1, hi)
 
 ## Darken the part of r a clockwise sweep from 12 o'clock has not reached at p.
 func _sweep(r: Rect2, p: float, col: Color) -> void:

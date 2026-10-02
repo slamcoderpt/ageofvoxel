@@ -365,7 +365,7 @@ func _pin_scene_tip() -> void:
 ## Heroic Age with an Armory, a Market and its Temple; Copper Weapons and
 ## Copper Armor researched, Copper Shields and Ballistics in the Armory's
 ## queue (the first one under way), two Minotaurs training at the Temple, a
-## few trades made so the prices moved, and 14 favor left so most god techs
+## few trades made so the prices moved, and 16 favor left so some god techs
 ## are short of favor: every button state at once (available, unaffordable,
 ## locked by age, locked by a prerequisite: Bronze Shields padlocked behind
 ## Copper Shields, researching, queued, training); the Armory selected with
@@ -422,7 +422,7 @@ static func _techui_setup(g: Node) -> Dictionary:
 		sim2.train(temple, "minotaur")
 	sim2.tick(12 * 30)   # Copper Shields 40 % done
 	# then a purse that leaves some techs short (the favor of most god techs)
-	sim2.set_player_resources(1, {"food": 1450.0, "wood": 980.0, "gold": 1210.0, "favor": 14.0})
+	sim2.set_player_resources(1, {"food": 1450.0, "wood": 980.0, "gold": 1210.0, "favor": 16.0})
 	var pick := str(g.args.get("techui_sel", "armory"))
 	var sel := market if pick == "market" else temple if pick == "temple" and temple > 0 else armory
 	var focus: Vector2i = lots[1] if sel == market else lots[0]

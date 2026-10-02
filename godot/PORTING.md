@@ -1360,7 +1360,7 @@ locked; the picture backs it (full colour, red cast, blue duotone, slate).
 | state | button | tooltip line |
 |---|---|---|
 | `available` | full-colour tile, bright bevelled frame (gold: generic tech, purple: god tech, the god's emblem on its top-left corner); a unit / building portrait keeps the cell's gold edge | "Available · Click to research" (green) |
-| `unaffordable` (`short`: the missing resources) | **the same on every button** (techs, train, build, trades): the whole 3 px bevel turns red (`hud.FRAMES.red`: #ffb4a0 / #ff2a12 / #800c04, inner line #ff6a40) with a red glow into the gap between cells, the picture in full colour under a red cast (8% at the top, 16% at the middle, 42% at the foot); a god tech keeps its emblem medallion, so it still reads as a god tech | "Can't afford · Need 40 more gold, 5 more favor" (red); the cost's short numbers red |
+| `unaffordable` (`short`: the missing resources) | **the same on every button** (techs, train, build, trades): the whole 3 px bevel turns red (`hud.FRAMES.red`: #ffb4a0 / #ff2a12 / #800c04, inner line #ff6a40) with a red glow into the gap between cells, the picture in full colour under a red cast (8% at the top, 16% at the middle, 42% at the foot); a god tech keeps its purple corner caps and emblem medallion, so it still reads as a god tech | "Can't afford · Need 40 more gold, 5 more favor" (red); the cost's short numbers red |
 | `locked` (`age_req` when an age, else a prerequisite) | the tile desaturated and darkened (`tile(..., "locked")`); a unit / building portrait the same: `hud.locked_portrait(tex)` reads the portrait back once, turns every pixel into the tiles' locked slate grey (luminance x 0.6-0.68) and caches it (a near-black tint for the frame or two before the portrait has rendered), on a grey cell plate (no team teal; mean saturation ~0.18, the same as a locked tech tile); a dim grey frame, a badge centred on the frame's top-right corner (7.5 px radius, mostly over the frame and the gap): the required age's numeral (II / III / IV) or, locked by a prerequisite, a padlock; the hotkey dimmed. A tech locked by a prerequisite is shown only while that prerequisite is researching / queued (`ui._tech_visible`'s `busy`: the line's next step, padlocked, after the buyable buttons), else hidden as in Retold | "Locked · Requires Heroic Age" / "Locked · Requires Copper Shields" (tan) |
 | `researching` / `training` (`progress`, `count`) | "busy", **the same on techs and train buttons**: the whole bevel blue (`hud.FRAMES.blue`: #d8f2ff / #2ea2ff / #0a3a80, inner #7ccaff) with a blue glow in the gap; the picture in the **busy duotone** (`TechIcons.tile(..., "busy")` / `hud.busy_portrait(tex)`, both `TechIcons.busy_image`: luminance mapped navy #06142c to ice #b4dcff, 8% of the hue kept), its full colour coming back clockwise from 12 o'clock as the work runs (`hud._reveal`, a textured fan; its leading edge an ice line), a thick 6 px progress bar on the tile's foot (blue to ice in a dark trough; the hotkey rides above it); a train button's queued count on a blue chip at the top-right corner | "Researching · 39% · 25s left · cancel it from the queue" (blue) |
 | `queued` (`count`: its place) | blue bevel and the busy duotone (no colour yet), an empty dashed 6 px bar on the foot (it waits its turn), its place in the queue on the **blue corner chip** with an hourglass (the training count's chip), never over the picture: a queued Ballistics still shows its dividers | "Queued · 2nd in the queue" (blue-amber) |
@@ -1377,9 +1377,14 @@ an Armory line's **tier notches** set into the frame's top edge (1-3 small
 5x4 px bars in the tier's metal, `tier`; the picture itself tells the tiers
 apart: one sword / two / two and an axe, copper / bronze / steel, and a
 locked tier glyph keeps 20% of its metal's hue), a god tech's **medallion**
-centred on the frame's top-left corner (6.5 px radius) with its god's emblem
+centred on the frame's top-left corner (8 px radius) with its god's emblem
 (`god`; `TechIcons.GODS`: Zeus' bolt, Athena's owl, Apollo's sun, Ares'
-helmet, ...: Greek gods share initials, so no letters). A click or key on a
+helmet, ...: Greek gods share initials, so no letters), and on every god
+tech, **in every state**, purple **corner caps** (a 3 px L bracket with
+12 px arms, a lit edge and a stud, `hud._god_corners`) on all four corners
+over the state's bevel: a red can't-afford or blue researching god tech
+keeps the god-tech shape, a generic tech has plain corners; locked, the caps
+go slate. A click or key on a
 button that is not available says why (`_deny_text`: the lock, what is
 short, "Copper Weapons: researching, 25s left").
 
@@ -1392,6 +1397,12 @@ VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 
   godot --path godot --rendering-driver vulkan --audio-driver Dummy --resolution 1280x720 \
   -s res://game/core/techs_playtest.gd -- --scene=skirmish [--shots=/abs/dir]   # "TECHSPLAY ok|FAIL <step>", exit = failures
 ```
+
+It is slow under lavapipe: a full run is about 9.5 minutes on 4 cores
+(1-2 s a frame; the last check, "S sells 100 food", lands at ~9m20s), longer
+with another Godot running. Give it `timeout 900` or more and run it alone;
+a 580 s timeout kills it just after "click Buy Food" and looks like a stall.
+Its own watchdog quits with 99 after 1500 s.
 
 It box-selects the villagers, checks the Armory (U) / Market (K) buttons and
 the Armory tooltip's age lock (a click refused with "Requires the Classical
