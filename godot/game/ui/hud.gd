@@ -524,7 +524,7 @@ func _draw_commands() -> void:
 			var f := bold
 			var kx := rr.end.x - 4 - S.text_width(f, c.key, 13)
 			# over a progress bar (on the tile's foot) the key sits above it
-			var ky := rr.end.y - (12 if st == "researching" or st == "training" else 4)
+			var ky := rr.end.y - (12 if st == "researching" or st == "training" or (st == "queued" and c.has("tech")) else 4)
 			draw_string_outline(f, Vector2(kx, ky), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 4, Color(0, 0, 0, 0.75))
 			draw_string(f, Vector2(kx, ky), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.62, 0.62, 0.64) if st == "locked" else Color.WHITE)
 		var tip := {"title": c.title, "lines": c.get("lines", []), "cost": c.get("cost", {}), "hotkey": c.key, "warn": c.get("warn", "")}
@@ -541,7 +541,7 @@ func _draw_commands() -> void:
 ## portraits alike); researching / training / queued: the whole bevel blue,
 ## the picture in the blue "busy" duotone, its colour coming back clockwise
 ## as the work runs, a thick bar on the tile's foot; a queued tech its place
-## in the queue, large, on the picture; locked: the greyed picture, a dim grey
+## in the queue on a corner chip (never over the picture); locked: the greyed picture, a dim grey
 ## bevel, the age numeral or a padlock on the corner.
 const FRAMES := {
 	"gold": ["#fff0b0", "#e2b340", "#7a5612", ""],
@@ -598,16 +598,13 @@ func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bo
 			S.hgrad(self, fr, [[0.0, Color("#1c78e0")], [1.0, Color("#a8e4ff")]])
 			draw_rect(Rect2(fr.position, Vector2(fr.size.x, 1)), Color(1, 1, 1, 0.55))
 	elif st == "queued" and c.has("tech"):
-		# a queued tech: its place in the queue, large, on the picture
-		var n := str(maxi(1, int(c.get("count", 1))))
-		var fs := 26
-		var tw := S.text_width(bold, n, fs)
-		var cc := ir.get_center()
-		var pos := Vector2(cc.x - tw * 0.5, cc.y + fs * 0.36)
-		draw_circle(cc, 13.0, Color(0.02, 0.06, 0.14, 0.7))
-		draw_arc(cc, 13.0, 0, TAU, 28, Color("#7ccaff"), 1.5, true)
-		draw_string_outline(bold, pos, n, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 5, Color(0, 0, 0, 0.85))
-		draw_string(bold, pos, n, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color("#eaf7ff"))
+		# a queued tech: a dark blue bar on the foot, empty (it waits its turn);
+		# its place in the queue is the corner chip below, off the picture
+		var bar := Rect2(ir.position.x + 1, ir.end.y - 7, ir.size.x - 2, 6)
+		draw_rect(bar.grow(1), Color(0, 0, 0, 0.9))
+		draw_rect(bar, Color("#0a1a30"))
+		for k in 4:
+			draw_rect(Rect2(bar.position.x + 3 + k * (bar.size.x - 6) / 4.0, bar.position.y + 2, 4, 2), Color("#4a86c8"))
 	var lockd := st == "locked"
 	# identity: a god tech's emblem on the frame's top-left corner (a small gem
 	# centred on the corner, mostly over the frame and the gap)
@@ -650,14 +647,20 @@ func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bo
 			draw_string(title, Vector2(bc2.x - S.text_width(title, rn, fs) * 0.5, bc2.y + 3.5), rn, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color("#f4e0a8"))
 		else:
 			S.draw_icon(self, "lock", Rect2(bc2 - Vector2(4.5, 4.5), Vector2(9, 9)), false)
-	elif (st == "training" or (st == "queued" and not c.has("tech"))) and int(c.get("count", 0)) > 0:
+	elif (st == "training" or st == "queued") and int(c.get("count", 0)) > 0:
+		# the count in training / the place in the queue: a blue chip on the
+		# frame's corner (a queued tech's with an hourglass), never on the picture
 		var n := str(int(c.count))
-		var bw := maxf(13.0, S.text_width(bold, n, 11) + 6)
+		var qt := st == "queued" and c.has("tech")
+		var iw := 9.0 if qt else 0.0
+		var bw := maxf(13.0, S.text_width(bold, n, 11) + 6 + iw)
 		var br := Rect2(rr.end.x - bw + 3, rr.position.y - 3, bw, 13)
 		draw_rect(br, Color(0, 0, 0, 0.9))
 		draw_rect(br.grow(-1), Color("#0e3a78"))
 		draw_rect(br.grow(-1), Color("#9fd8ff"), false, 1.0)
-		draw_string(bold, Vector2(br.position.x + (bw - S.text_width(bold, n, 11)) * 0.5, br.end.y - 3), n, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
+		if qt:
+			S.draw_icon(self, "t_time", Rect2(br.position + Vector2(2, 2), Vector2(9, 9)), false)
+		draw_string(bold, Vector2(br.position.x + iw + (bw - iw - S.text_width(bold, n, 11)) * 0.5, br.end.y - 3), n, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
 
 ## Darken the part of r a clockwise sweep from 12 o'clock has not reached at p.
 func _sweep(r: Rect2, p: float, col: Color) -> void:

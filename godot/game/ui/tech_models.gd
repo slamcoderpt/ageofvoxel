@@ -157,6 +157,21 @@ static func painted(rough := 0.45, metallic := 0.0) -> StandardMaterial3D:
 	m.metallic = metallic
 	return m
 
+## Plumage / fur: vertex-coloured, soft and matt, with a fine bumpy normal so
+## a lit surface breaks into many small highlights instead of one airbrushed sheen.
+static func feathers() -> StandardMaterial3D:
+	if _mats.has("feathers"):
+		return _mats["feathers"]
+	var m := _base("feathers")
+	m.vertex_color_use_as_albedo = true
+	m.vertex_color_is_srgb = true
+	m.roughness = 0.78
+	m.normal_enabled = true
+	m.normal_texture = _noise_normal("soft")
+	m.normal_scale = 0.9
+	m.uv1_scale = Vector3(6, 6, 6)
+	return m
+
 ## Glowing: fire, souls, lightning, magic (unshaded, vertex colours with alpha).
 static func glow(c: Color, alpha := false) -> StandardMaterial3D:
 	var key := "glow:%s:%s" % [c.to_html(), alpha]
@@ -860,72 +875,90 @@ static func _m_ballistics(root: Node3D) -> void:
 	put(root, torus(0.1, 0.15), glow(Color(1.0, 0.3, 0.15)), Transform3D(Basis(Vector3.RIGHT, 1.2), tip + Vector3(0.05, -0.12, 0)))
 
 static func _m_burning_pitch(root: Node3D) -> void:
-	# a painted clay pot brimming with black pitch, ablaze, the pitch running
-	# down its side
-	var prof := [Vector2(0.0, -0.95), Vector2(0.3, -0.95), Vector2(0.36, -0.9), Vector2(0.5, -0.65), Vector2(0.66, -0.3), Vector2(0.7, -0.05), Vector2(0.62, 0.22), Vector2(0.42, 0.4), Vector2(0.32, 0.46), Vector2(0.34, 0.52), Vector2(0.44, 0.56), Vector2(0.45, 0.6), Vector2(0.3, 0.6), Vector2(0.0, 0.5)]
+	# a two-handled clay amphora painted black-figure (a black foot, a wave
+	# band on the shoulder, a black neck), brimming with glossy black pitch,
+	# ablaze, the pitch running down its side
+	var base_prof := [Vector2(0.0, -0.95), Vector2(0.3, -0.95), Vector2(0.36, -0.9), Vector2(0.5, -0.65), Vector2(0.66, -0.3), Vector2(0.7, -0.05), Vector2(0.62, 0.22), Vector2(0.42, 0.4), Vector2(0.32, 0.46), Vector2(0.34, 0.52), Vector2(0.44, 0.56), Vector2(0.45, 0.6), Vector2(0.3, 0.6), Vector2(0.0, 0.5)]
+	# subdivided, so the painted bands have rows to land on
+	var prof := []
+	for i in base_prof.size() - 1:
+		for k in 4:
+			prof.append((base_prof[i] as Vector2).lerp(base_prof[i + 1], k / 4.0))
+	prof.append(base_prof[base_prof.size() - 1])
 	var col := func(i: int, a: float) -> Color:
 		var y: float = prof[i].y
-		var terra := Color(0.7, 0.3, 0.13)
-		if (y > -0.4 and y < -0.28) or (y > 0.1 and y < 0.18) or y > 0.5:
-			return Color(0.06, 0.04, 0.03)
-		if y > -0.25 and y < 0.08 and absf(sin(a * 6.0)) > 0.75:
-			return Color(0.06, 0.04, 0.03)
+		var terra := Color(0.72, 0.31, 0.13).lerp(Color(0.6, 0.24, 0.1), 0.5 + 0.5 * sin(a * 3.0 + y * 7.0))
+		var blk := Color(0.05, 0.035, 0.03)
+		if y < -0.74 or y > 0.36:
+			return blk
+		if absf(y + 0.38) < 0.03:
+			return blk
+		if y > -0.02 and y < 0.26:
+			# the shoulder band: a running wave in the clay's colour on black
+			var wv := 0.12 + 0.06 * sin(a * 8.0)
+			return terra if absf(y - wv) < 0.035 else blk
 		return terra
 	var pot := Node3D.new()
 	root.add_child(pot)
 	pot.transform = Transform3D(Basis(Vector3.RIGHT, 0.22), Vector3(0, -0.15, 0))
-	put(pot, lathe(prof, 48, Callable(), col), painted(0.55))
+	put(pot, lathe(prof, 56, Callable(), col), painted(0.5))
+	# the two loop handles, shoulder to neck, out to the sides
+	for s in [-1.0, 1.0]:
+		var h := bez(Vector3(0.6 * s, 0.1, 0), Vector3(0.95 * s, 0.16, 0), Vector3(0.84 * s, 0.46, 0), Vector3(0.38 * s, 0.42, 0), 16)
+		put(pot, tube(h, func(_t): return Vector2(0.08, 0.065), 10), mat(Color(0.62, 0.26, 0.11), 0.6, "rough"))
 	# the pitch: a glossy black pool in the mouth and two runs down the side
 	put(pot, disc(0.36, func(r, _a): return 0.03 * (1.0 - r / 0.36), 6, 32), mat(Color(0.02, 0.015, 0.01), 0.08), Transform3D(Basis(Vector3.RIGHT, -PI / 2), Vector3(0, 0.6, 0)))
-	for k in 2:
-		var a := 1.2 + k * 0.7
-		var o := Vector3(cos(a) * 0.44, 0.58, sin(a) * 0.44)
-		var o2 := Vector3(cos(a) * 0.64, 0.05 - k * 0.25, sin(a) * 0.64)
-		put(pot, tube(bez(o, o + Vector3(cos(a) * 0.1, -0.2, sin(a) * 0.1), o2 + Vector3(cos(a) * 0.08, 0.3, sin(a) * 0.08), o2, 14), func(t): return Vector2.ONE * (0.05 + 0.03 * t * t), 10), mat(Color(0.02, 0.015, 0.01), 0.08))
-		put(pot, sphere(0.085), mat(Color(0.02, 0.015, 0.01), 0.08), Transform3D(Basis(), o2))
-	flames(root, Vector3(0, 0.5, 0.1), 0.34, 1.05, 5, Vector3.UP, 3)
+	# one glossy run of pitch over the lip, down the black neck onto the clay
+	var ra := 1.75
+	var ro := Vector3(cos(ra) * 0.45, 0.6, sin(ra) * 0.45)
+	var ro2 := Vector3(cos(ra) * 0.68, -0.12, sin(ra) * 0.68)
+	put(pot, tube(bez(ro, ro + Vector3(cos(ra) * 0.08, -0.2, sin(ra) * 0.08), ro2 + Vector3(cos(ra) * 0.06, 0.35, sin(ra) * 0.06), ro2, 14), func(t): return Vector2.ONE * (0.055 + 0.035 * t * t), 10), mat(Color(0.02, 0.015, 0.01), 0.06))
+	put(pot, sphere(0.095), mat(Color(0.02, 0.015, 0.01), 0.06), Transform3D(Basis(), ro2))
+	flames(root, Vector3(0, 0.5, 0.1), 0.4, 1.2, 6, Vector3.UP, 3)
 
 static func _m_phobos(root: Node3D) -> void:
 	# Phobos' spear, close up: a huge obsidian spearhead cracked with red fire,
 	# gold rings on its socket, a red aura of panic
 	var dark := metal(Color(0.16, 0.13, 0.15), 0.14)
-	var a := Vector3(-0.42, -1.05, 0)
-	var b := Vector3(0.3, 1.0, 0)
-	var hl := 1.5
-	var hw := 0.46
-	spear(root, a, b, dark, hl, hw, 0.075, mat(Color(0.12, 0.06, 0.05), 0.5, "wood"), 0.38)
+	# a long lanceolate war-spear head (straight edges to a hard point, not a
+	# leaf), nearly upright, its socket and a length of shaft below
+	var a := Vector3(-0.62, -1.0, 0)
+	var b := Vector3(0.5, 1.02, 0)
+	var hl := 1.4
+	var hw := 0.4
+	spear(root, a, b, dark, hl, hw, 0.085, mat(Color(0.12, 0.06, 0.05), 0.5, "wood"), 0.26)
 	var d := (b - a).normalized()
 	var x := d.cross(Vector3(0, 0, 1)).normalized()
 	var base := b - d * hl
-	# the cracks: glowing seams on the blade's face, a spine and branches to the edges
+	# heat, not veins: the two cutting edges glow red-hot to the point, and a
+	# few jagged fractures cross the black glass near the socket (no midrib
+	# with side branches: that read as a leaf)
 	var acc := _acc()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 5
 	var zof := func(t: float, e: float) -> float:
-		var w := _leaf(t, hw, 0.38)
+		var w := _leaf(t, hw, 0.26)
 		return (w * 0.3 + 0.004) * (1.0 - absf(e) / maxf(w, 0.001)) + 0.012
-	var spine := PackedVector3Array()
-	for k in 15:
-		var t := lerpf(0.06, 0.9, float(k) / 14.0)
-		var e := 0.03 * sin(k * 2.3)
-		spine.append(base + d * t * hl + x * e + Vector3(0, 0, zof.call(t, e)))
-	tube_acc(acc, spine, func(t): return Vector2.ONE * (0.026 * (1.0 - t * 0.6)), 6, Vector3(0, 0, 1), false, func(t, _a): return Color(1.0, 0.75 - t * 0.4, 0.3 - t * 0.2))
-	for k in 6:
-		var t0 := lerpf(0.15, 0.7, float(k) / 5.0)
-		var s := 1.0 if k % 2 == 0 else -1.0
-		var br := PackedVector3Array()
-		var w := _leaf(t0, hw, 0.38)
-		for j in 6:
-			var f := float(j) / 5.0
-			var t := t0 + f * 0.1
-			var e := s * f * w * 0.85 + rng.randf_range(-0.02, 0.02)
-			br.append(base + d * t * hl + x * e + Vector3(0, 0, zof.call(t, e)))
-		tube_acc(acc, br, func(t): return Vector2.ONE * lerpf(0.016, 0.005, t), 6, Vector3(0, 0, 1), false, func(_t, _a): return Color(1.0, 0.3, 0.08))
+	for s2 in [-1.0, 1.0]:
+		var ed := PackedVector3Array()
+		for k in 25:
+			var t := lerpf(0.03, 0.995, float(k) / 24.0)
+			var e: float = s2 * _leaf(t, hw, 0.26) * 0.93
+			ed.append(base + d * t * hl + x * e + Vector3(0, 0, zof.call(t, e)))
+		tube_acc(acc, ed, func(t): return Vector2.ONE * lerpf(0.022, 0.01, t), 6, Vector3(0, 0, 1), false, func(t, _a): return Color(1.0, lerpf(0.35, 0.85, t), lerpf(0.1, 0.45, t)))
+	for k in 3:
+		var t0 := 0.12 + 0.13 * k
+		var cr := PackedVector3Array()
+		var e0 := (-1.0 if k % 2 == 0 else 1.0) * _leaf(t0, hw, 0.26) * 0.8
+		for j in 5:
+			var f := float(j) / 4.0
+			var t := t0 + f * 0.12 + rng.randf_range(-0.015, 0.015)
+			var e := lerpf(e0, -e0 * 0.3, f) + rng.randf_range(-0.03, 0.03)
+			cr.append(base + d * t * hl + x * e + Vector3(0, 0, zof.call(t, e)))
+		tube_acc(acc, cr, func(t): return Vector2.ONE * lerpf(0.014, 0.006, t), 6, Vector3(0, 0, 1), false, func(_t, _a): return Color(1.0, 0.3, 0.08))
 	put(root, _mesh(acc), glow(Color.WHITE))
 	for k in 3:
 		put(root, torus(0.075, 0.11), metal(GOLD, 0.22), along(base - d * (0.06 + k * 0.1), d))
-	wisps(root, [bez(base + Vector3(-0.2, 0.2, -0.2), base + Vector3(-0.6, 0.5, -0.2), base + Vector3(-0.4, 0.9, -0.2), base + Vector3(-0.8, 1.2, -0.2), 12),
-		bez(base + Vector3(0.3, 0.0, -0.2), base + Vector3(0.7, 0.2, -0.2), base + Vector3(0.6, -0.2, -0.2), base + Vector3(0.95, -0.35, -0.2), 12)], 0.12, Color(1.0, 0.45, 0.3), Color(0.5, 0.02, 0.02))
 
 static func _m_deimos(root: Node3D) -> void:
 	# Deimos, dread: a black horned war helm, its eye slits burning violet
@@ -1000,37 +1033,102 @@ static func _m_sarissa(root: Node3D) -> void:
 		put(root, tube(bez(t0, t0 - x * 0.07 - d * 0.04, t0 - x * 0.16 - d * 0.06, t0 - x * 0.26 - d * 0.14, 8), func(t): return Vector2(lerpf(0.08, 0.035, t), 0.018), 6), mat(Color(0.85, 0.08, 0.04), 0.7, "rough"))
 
 static func _m_aegis(root: Node3D) -> void:
-	# Athena's owl, the guardian: a silver owl, bronze wings spread to shield,
-	# eyes of glowing gold
-	var silver := metal(Color(0.8, 0.82, 0.86), 0.2)
-	var gold := metal(GOLD, 0.22)
-	var wingm := metal(TIER_METAL.bronze.darkened(0.15), 0.24)
-	# the body and head
-	put(root, sphere(0.42), silver, Transform3D(Basis().scaled(Vector3(0.95, 1.2, 0.8)), Vector3(0, -0.28, 0)))
-	put(root, sphere(0.34), silver, Transform3D(Basis().scaled(Vector3(1.1, 0.95, 0.85)), Vector3(0, 0.36, 0.06)))
-	# breast feathers: rows of small scallops
-	for row in 3:
-		for k in 4 - row % 2:
-			var xx := (k - (1.5 - (row % 2) * 0.5)) * 0.16
-			put(root, sphere(0.07, 0.05), gold, Transform3D(Basis(), Vector3(xx, -0.18 - row * 0.15, 0.33 - row * 0.02)))
-	# the facial disc, the eyes, the beak, the ear tufts
+	# Athena's owl, the guardian, close up and alive (not a statuette): a
+	# tawny owl perched on an olive branch, half-raised barred wings, a pale
+	# facial disc ringed dark, huge amber eyes with black pupils and a glint,
+	# a scowling brow running up into the ear tufts, layered breast feathers
+	# with dark streaks (shape from displacement, pattern from vertex colours)
+	var fm := feathers()
+	var tawny := Color(0.46, 0.27, 0.12)
+	var cream := Color(0.86, 0.74, 0.54)
+	var dark := Color(0.13, 0.07, 0.035)
+	# the body: an egg of layered feathers, each row overlapping the next
+	var bprof := []
+	for i in 41:
+		var t := PI * i / 40.0
+		bprof.append(Vector2(0.52 * sin(t) * (1.0 + 0.12 * sin(t * 0.5 + 1.6)), -0.66 * cos(t)))
+	var bdisp := func(a: float, i: int) -> float:
+		var y := -0.66 * cos(PI * i / 40.0)
+		var band := y * 9.0 + 0.35 * absf(sin(a * 8.0))
+		return 1.0 + 0.045 * fposmod(band, 1.0)
+	var bcol := func(i: int, a: float) -> Color:
+		var y := -0.66 * cos(PI * i / 40.0)
+		var front := clampf(sin(a) * 1.6 - 0.2, 0.0, 1.0)
+		var band := fposmod(y * 9.0 + 0.35 * absf(sin(a * 8.0)), 1.0)
+		var c := tawny.lerp(cream, front * 0.7)
+		# feather by feather: some warmer, a short dark streak (a broken
+		# arrow mark, not a stripe) on some, dark-edged tips on all
+		var col_i := floorf(a * 8.0 / PI)
+		var row_i := floorf(y * 9.0 + 0.35 * absf(sin(a * 8.0)))
+		var h := fposmod(sin(col_i * 12.9898 + row_i * 78.233) * 43758.5453, 1.0)
+		c = c.lerp(tawny, front * h * 0.45)
+		var streak := clampf(1.0 - absf(fposmod(a * 8.0 / PI, 1.0) - 0.5) * 12.0, 0.0, 1.0) * front
+		streak *= clampf(1.0 - absf(band - 0.55) * 3.0, 0.0, 1.0) * (1.0 if h > 0.35 else 0.0)
+		c = c.lerp(dark, streak * 0.8)
+		c = c.lerp(dark.lerp(tawny, 0.4), clampf((band - 0.8) * 5.0, 0.0, 1.0) * 0.55)
+		return c
+	put(root, lathe(bprof, 64, bdisp, bcol), fm, Transform3D(Basis().scaled(Vector3(1.0, 1.0, 0.82)), Vector3(0, -0.36, 0)))
+	# the head: broad, flattened on top
+	var hprof := []
+	for i in 33:
+		var t := PI * i / 32.0
+		hprof.append(Vector2(0.47 * sin(t), -0.4 * cos(t)))
+	var hcol := func(i: int, a: float) -> Color:
+		var sp := 1.0 if fposmod(i * 0.37 + a * 2.3, 1.0) > 0.86 else 0.0
+		return tawny.darkened(0.08).lerp(cream, sp * 0.8)
+	put(root, lathe(hprof, 56, Callable(), hcol), fm, Transform3D(Basis().scaled(Vector3(1.12, 1.0, 0.9)), Vector3(0, 0.44, 0.0)))
+	# the facial disc: two pale dishes ringed by a dark ruff, rippled feathers
 	for s in [-1.0, 1.0]:
-		put(root, disc(0.15, func(r, _a): return 0.03 * (1.0 - r / 0.15), 8, 32), gold, Transform3D(Basis(), Vector3(0.15 * s, 0.4, 0.33)))
-		put(root, sphere(0.1), glow(Color(1.0, 0.75, 0.15)), Transform3D(Basis().scaled(Vector3(1, 1, 0.5)), Vector3(0.15 * s, 0.4, 0.37)))
-		put(root, sphere(0.045), mat(Color(0.01, 0.01, 0.01), 0.1), Transform3D(Basis(), Vector3(0.15 * s, 0.4, 0.43)))
-		put(root, cyl(0.07, 0.0, 0.2, 12), silver, Transform3D(Basis(Vector3(0, 0, 1), -0.45 * s), Vector3(0.22 * s, 0.68, 0.02)))
-		# the wing: five long flight feathers fanned out and up from the shoulder
-		var sh := Vector3(0.26 * s, 0.05, -0.05)
-		for k in 5:
-			var ang := lerpf(1.05, -0.25, k / 4.0)
-			var L := lerpf(0.82, 0.55, k / 4.0)
-			var dir := Vector3(cos(ang) * s, sin(ang), 0)
+		var dk := func(r: float, a: float) -> float:
+			return 0.07 * (1.0 - r / 0.26) + 0.008 * sin(a * 18.0) * r / 0.26
+		var dc := func(r: float, a: float) -> Color:
+			var q := r / 0.26
+			var c := cream.lerp(Color(0.95, 0.88, 0.72), 1.0 - q)
+			c = c.lerp(tawny, clampf((q - 0.25) * 1.4, 0.0, 1.0) * 0.35 * (0.6 + 0.4 * sin(a * 18.0)))
+			return c.lerp(dark, clampf((q - 0.82) * 6.0, 0.0, 1.0))
+		put(root, disc(0.26, dk, 14, 48, dc), fm, Transform3D(Basis(Vector3.UP, 0.32 * s), Vector3(0.19 * s, 0.4, 0.27)))
+		# the eye: an amber iris with a deep pupil and a catch light
+		var e := Vector3(0.19 * s, 0.42, 0.37)
+		put(root, sphere(0.125), glow(Color(1.0, 0.62, 0.08)), Transform3D(Basis().scaled(Vector3(1, 1, 0.55)), e))
+		put(root, sphere(0.135, 0.06), mat(dark, 0.4), Transform3D(Basis(), e + Vector3(0, 0, -0.02)))
+		put(root, sphere(0.068), mat(Color(0.01, 0.005, 0.0), 0.05), Transform3D(Basis().scaled(Vector3(1, 1, 0.6)), e + Vector3(0, 0, 0.055)))
+		put(root, sphere(0.024), glow(Color(1, 1, 0.95)), Transform3D(Basis(), e + Vector3(-0.035, 0.04, 0.1)))
+		# the scowling brow: a dark ridge from the beak up into the ear tuft
+		var brow := bez(Vector3(0.03 * s, 0.5, 0.42), Vector3(0.14 * s, 0.6, 0.42), Vector3(0.3 * s, 0.64, 0.33), Vector3(0.42 * s, 0.7, 0.15), 14)
+		put(root, tube(brow, func(t): return Vector2(lerpf(0.035, 0.05, t), 0.03), 8), mat(dark, 0.7, "rough"))
+		# the ear tuft: three feathers
+		for k in 3:
+			var o := Vector3((0.34 + 0.05 * k) * s, 0.7 - 0.03 * k, 0.08 - 0.06 * k)
+			var tip := o + Vector3((0.12 + 0.05 * k) * s, 0.3 - 0.06 * k, -0.04)
+			put(root, tube(bez(o, o + (tip - o) * 0.4, o + (tip - o) * 0.7 + Vector3(0.03 * s, 0, 0), tip, 10), func(t): var w: float = 0.06 * (1.0 - t) ** 0.7; return Vector2(w, w * 0.45), 8, Vector3(0, 0, 1), false,
+				func(t, _a): return tawny.darkened(0.2).lerp(dark, t)), fm)
+		# the wing: half raised, barred flight feathers fanned from the shoulder
+		var sh := Vector3(0.38 * s, -0.12, -0.12)
+		for k in 6:
+			var ang := lerpf(1.25, 0.05, k / 5.0)
+			var L := lerpf(0.95, 0.62, k / 5.0)
+			var dir := Vector3(cos(ang) * s, sin(ang) * 0.95 - 0.12, -0.05)
 			var tip := sh + dir * L
-			put(root, tube(line(sh, tip, 14), func(t): var w: float = 0.12 * sin(PI * clampf(t * 0.85 + 0.15, 0.0, 1.0)) ** 0.6; return Vector2(w, 0.025), 4, Vector3(0, 0, 1), true),
-				wingm if k % 2 == 0 else gold, Transform3D(Basis(), Vector3(0, 0, -0.04 * k)))
-	put(root, cyl(0.06, 0.0, 0.14, 12), gold, Transform3D(Basis(Vector3.RIGHT, PI), Vector3(0, 0.27, 0.4)))
-	# the talons on a gold bar
-	put(root, tube(line(Vector3(-0.5, -0.85, 0.1), Vector3(0.5, -0.85, 0.1), 4), func(_t): return Vector2.ONE * 0.05, 10), gold)
+			var fc := func(t: float, _a: float) -> Color:
+				var bar := 1.0 if fposmod(t * 5.5, 1.0) > 0.62 else 0.0
+				return tawny.darkened(0.15).lerp(cream, bar * 0.7).lerp(dark, clampf((t - 0.86) * 6.0, 0.0, 1.0))
+			put(root, tube(bez(sh, sh + dir * L * 0.4, tip - Vector3(0, 0.08, 0), tip, 14), func(t): var w: float = 0.12 * sin(PI * clampf(t * 0.85 + 0.15, 0.0, 1.0)) ** 0.6; return Vector2(w, 0.03), 6, Vector3(0, 0, 1), false, fc),
+				fm, Transform3D(Basis(), Vector3(0, 0, -0.05 * k)))
+		# coverts over the wing's root
+		put(root, sphere(0.2), mat(tawny.darkened(0.1), 0.75, "rough"), Transform3D(Basis(Vector3(0, 0, 1), -0.7 * s).scaled(Vector3(1.4, 0.8, 0.6)), Vector3(0.42 * s, 0.02, -0.02)))
+		# talons gripping the branch
+		for k in 3:
+			var tb := Vector3((0.1 + 0.06 * k) * s - 0.06 * s, -0.98, 0.18)
+			put(root, tube(bez(tb + Vector3(0, 0.12, 0), tb + Vector3(0, 0.05, 0.06), tb + Vector3(0, -0.04, 0.08), tb + Vector3(0, -0.09, 0.03), 8), func(t): return Vector2.ONE * lerpf(0.035, 0.012, t), 8), mat(Color(0.75, 0.6, 0.25), 0.45))
+	# the beak: a hooked horn-grey bill between the eyes
+	put(root, tube(bez(Vector3(0, 0.38, 0.4), Vector3(0, 0.36, 0.5), Vector3(0, 0.28, 0.52), Vector3(0, 0.22, 0.46), 10), func(t): return Vector2(lerpf(0.06, 0.008, t), lerpf(0.05, 0.008, t)), 10), mat(Color(0.38, 0.36, 0.3), 0.3))
+	# the olive branch it perches on, two leaves and an olive
+	var br := bez(Vector3(-0.85, -1.02, 0.12), Vector3(-0.3, -1.08, 0.2), Vector3(0.3, -1.0, 0.2), Vector3(0.88, -1.08, 0.1), 16)
+	put(root, tube(br, func(t): return Vector2.ONE * lerpf(0.06, 0.04, t), 10), mat(Color(0.3, 0.2, 0.12), 0.8, "wood"))
+	var leaf := mat(Color(0.32, 0.42, 0.2), 0.5)
+	for L2 in [[Vector3(0.62, -1.06, 0.14), Vector3(0.95, -0.9, 0.2)], [Vector3(-0.6, -1.05, 0.15), Vector3(-0.95, -1.18, 0.22)]]:
+		put(root, tube(line(L2[0], L2[1], 10), func(t): var w: float = 0.07 * sin(PI * t) ** 0.8; return Vector2(w, 0.012), 6), leaf)
+	put(root, sphere(0.05), mat(Color(0.12, 0.14, 0.06), 0.25), Transform3D(Basis(), Vector3(0.72, -1.14, 0.18)))
 
 static func _m_sun_ray(root: Node3D) -> void:
 	# Apollo's sun: a blazing disc in a gold ring throwing long rays

@@ -2,8 +2,8 @@ extends RefCounted
 ## Tech and market icons (ui piece, Godot-only; no icons.js counterpart): one
 ## glyph per tech line of the Greek Armory, Market and Temple (Age of
 ## Mythology: Retold's command grid, reference/techs/ui_02.jpg) as 24-unit SVGs,
-## and the painted tile a command button shows (tile(): a background plate
-## per tech family, the glyph embossed and lit, see "painted tiles" below).
+## and the painted tile a command button shows (tile(): the icon's own painted
+## backdrop, the picture lit into it, see "painted tiles" below).
 ## The pictures a player sees are rendered 3D models (tech_models.gd, "the
 ## 3D studio" below); these SVGs are the headless fallback.
 ## The Armory's three generic lines (weapons: a spear, armor: a muscle
@@ -173,8 +173,9 @@ static func tier_of(tech: String) -> int:
 	return 0
 
 # ---- painted tiles ----------------------------------------------------------------
-# A command button's icon is a baked tile: a background plate per tech family
-# (a lit radial gradient with a vignette, like Retold's painted icons), the
+# A command button's icon is a baked tile: the icon's own painted backdrop
+# (BACKDROPS: a scene per line, like Retold's painted icons; the PLATES
+# families below only colour the SVG fallback's rim light), the
 # glyph embossed from its own silhouette (height = blurred alpha: key light
 # from the top left, a specular glint, darker inner edges), a rim light in the
 # family's glow colour on the far edges, a soft drop shadow and a halo on the
@@ -205,6 +206,250 @@ const PLATE_OF := {
 	"t_face_of_the_gorgon": "verdant", "t_pious_sacrifice": "ember",
 	"t_tax_collectors": "treasury", "t_ambassadors": "treasury", "t_coinage": "treasury", "t_scroll": "sky",
 }
+
+## Every icon's own painted backdrop (not one vignette per family): a sky
+## gradient, a light source placed for that picture, and a pattern that says
+## where the tech lives, so two buttons of one frame colour differ by their
+## scene before their art (Retold paints a scene behind each icon):
+## [top, bottom, light colour, light x, light y, light radius, pattern,
+##  pattern colour, pattern strength, seed]. Patterns: embers (a forge's
+## sparks over heat haze), streaks (brushed steel), waves (the sea), grid
+## (an engineer's parchment), smoke, cracks (glowing seams), mist, horizon (a
+## dusk skyline), dust (light shafts in a dusty field), stars (night, a
+## nebula), rays (a sunburst), bokeh (lit leaves / coins out of focus),
+## blocks (a stone wall), drips (venom), clouds (a storm). No backdrop is red:
+## red means "can't afford".
+const BACKDROPS := {
+	"t_weapons": ["#1c0d06", "#5e2408", "#ff9a3a", 0.5, 1.08, 0.75, "embers", "#ffd27a", 1.0, 1],
+	"t_armor": ["#30506a", "#0a1420", "#a8d0f4", 0.22, 0.12, 0.8, "streaks", "#b4d4f0", 0.55, 2],
+	"t_shields": ["#0c4048", "#03161a", "#6ae0d4", 0.5, 0.22, 0.7, "waves", "#90f4ea", 0.6, 3],
+	"t_ballistics": ["#26385e", "#080e1e", "#9ab8e8", 0.45, 0.4, 0.65, "grid", "#a8c8f4", 0.5, 4],
+	"t_burning_pitch": ["#100a08", "#2e1408", "#ff7a20", 0.18, 1.02, 0.8, "smoke", "#7a6458", 0.8, 5],
+	"t_phobos": ["#2a0c2c", "#080208", "#d0507a", 0.62, 0.3, 0.55, "mist", "#a04070", 0.7, 6],
+	"t_deimos": ["#2c1650", "#08040e", "#a87cff", 0.5, 0.8, 0.7, "mist", "#c8a8ff", 0.7, 7],
+	"t_enyo": ["#3a1048", "#0c0410", "#ff9a5a", 0.5, 0.68, 0.55, "horizon", "#ffc080", 1.0, 8],
+	"t_sarissa": ["#56523c", "#16140c", "#f0dca0", 0.85, 0.05, 0.75, "dust", "#fff0c0", 0.7, 9],
+	"t_aegis": ["#0c1e48", "#02050e", "#7a9ae8", 0.72, 0.2, 0.45, "stars", "#eef4ff", 1.0, 10],
+	"t_sun_ray": ["#2a66b0", "#0a1e40", "#ffe08a", 0.5, 0.5, 0.55, "rays", "#ffeaa8", 0.8, 11],
+	"t_shafts_of_plague": ["#22361a", "#050a02", "#8ae04a", 0.5, 0.25, 0.6, "drips", "#a8f060", 0.75, 12],
+	"t_forge_of_olympus": ["#2c1404", "#6e3008", "#ffb040", 0.3, 1.05, 0.8, "embers", "#ffe090", 1.0, 13],
+	"t_olympian_weapons": ["#1c1c46", "#06061a", "#b8c8ff", 0.62, 0.15, 0.55, "clouds", "#9098c8", 0.85, 14],
+	"t_harvest_of_souls": ["#0a2e2a", "#020a0a", "#4ae0c0", 0.5, 0.85, 0.6, "mist", "#80f0d8", 0.75, 15],
+	"t_omniscience": ["#1c3a70", "#040a1a", "#ffe8a0", 0.5, 0.5, 0.5, "rays", "#c8e0ff", 0.55, 16],
+	"t_olympian_parentage": ["#3c1a5e", "#0c0418", "#ffd070", 0.5, 0.2, 0.6, "rays", "#ffd890", 0.5, 17],
+	"t_labyrinth": ["#3e2c1a", "#120a04", "#d8a860", 0.5, 0.4, 0.7, "blocks", "#7a5c38", 0.8, 18],
+	"t_sylvan_lore": ["#2c5e20", "#061404", "#d0f488", 0.72, 0.18, 0.7, "bokeh", "#dcff98", 0.7, 19],
+	"t_will_of_kronos": ["#2c1054", "#06020e", "#c890ff", 0.5, 0.5, 0.55, "stars", "#f0e0ff", 0.9, 20],
+	"t_hymn": ["#4e6e1c", "#0e1804", "#fff0a0", 0.28, 0.18, 0.7, "bokeh", "#fff4b0", 0.6, 21],
+	"t_oracle": ["#1c2c50", "#04060e", "#a8c4ff", 0.5, 0.25, 0.6, "mist", "#c0d4ff", 0.8, 22],
+	"t_temple_of_healing": ["#1c4e34", "#04100a", "#e4ffd4", 0.5, 0.15, 0.6, "rays", "#e8ffd8", 0.45, 23],
+	"t_golden_apples": ["#205020", "#041004", "#ffe070", 0.5, 0.3, 0.6, "bokeh", "#ffe890", 0.7, 24],
+	"t_dionysia": ["#4e1c4e", "#0e040e", "#ff98d8", 0.5, 0.3, 0.6, "bokeh", "#ffb0e8", 0.6, 25],
+	"t_face_of_the_gorgon": ["#3e4e3c", "#0a0e0a", "#b4e494", 0.5, 0.4, 0.6, "cracks", "#121810", 0.7, 26],
+	"t_monstrous_rage": ["#3c0e30", "#0a0208", "#ffa050", 0.5, 1.05, 0.7, "smoke", "#7a3460", 0.8, 27],
+	"t_pious_sacrifice": ["#4e443a", "#12100c", "#ffc070", 0.5, 0.2, 0.6, "blocks", "#968470", 0.7, 28],
+	"t_tax_collectors": ["#16463c", "#03100c", "#ffe48a", 0.5, 0.3, 0.6, "bokeh", "#ffe48a", 0.75, 29],
+	"t_ambassadors": ["#1c3e4c", "#04100c", "#ffd890", 0.5, 0.66, 0.55, "horizon", "#ffe0a0", 0.9, 30],
+	"t_coinage": ["#103e34", "#021008", "#ffe08a", 0.5, 0.4, 0.55, "rays", "#ffe8a0", 0.5, 31],
+	"t_scroll": ["#1c3a6e", "#040a18", "#d4ecff", 0.5, 0.3, 0.6, "mist", "#c0d8ff", 0.6, 32],
+}
+
+## Per icon framing: [fit, dx, dy] (fit: the share of the tile the picture's
+## longer side fills, above 1 the picture is cropped by the frame as Retold's
+## close-ups are; dx / dy: an offset, a share of the tile), so pictures are not
+## all one weight and size.
+const FRAMING := {
+	"t_weapons": [0.98, 0.0, 0.0], "t_armor": [0.86, 0.0, 0.03], "t_shields": [0.88, 0.0, 0.0],
+	"t_ballistics": [0.94, 0.0, 0.0], "t_burning_pitch": [0.96, 0.0, 0.04],
+	"t_phobos": [1.04, 0.0, 0.0], "t_deimos": [0.92, 0.0, 0.04], "t_enyo": [0.96, 0.0, 0.0],
+	"t_sarissa": [1.02, 0.0, 0.0], "t_aegis": [1.0, 0.0, 0.05], "t_sun_ray": [1.06, 0.0, 0.0],
+	"t_monstrous_rage": [0.96, 0.0, 0.03], "t_omniscience": [1.0, 0.0, 0.0],
+}
+
+## The backdrop / framing key of an icon name (an Armory tier: its line).
+static func _line_key(name: String) -> String:
+	var parts := name.split("_")
+	if parts.size() == 3 and TIERS.has(parts[2]):
+		return "t_" + parts[1]
+	return name
+
+static var _backdrops := {}
+
+static func _hash2(x: int, y: int, s: int) -> float:
+	var h := (x * 374761393 + y * 668265263 + s * 2246822519) & 0x7fffffff
+	h = ((h ^ (h >> 13)) * 1274126177) & 0x7fffffff
+	return float(h ^ (h >> 16)) / float(0x7fffffff)
+
+## Smooth value noise in 0..1 (cell size 1).
+static func _vnoise(x: float, y: float, s: int) -> float:
+	var xi := int(floor(x))
+	var yi := int(floor(y))
+	var fx := x - xi
+	var fy := y - yi
+	fx = fx * fx * (3.0 - 2.0 * fx)
+	fy = fy * fy * (3.0 - 2.0 * fy)
+	var a := _hash2(xi, yi, s)
+	var b := _hash2(xi + 1, yi, s)
+	var c := _hash2(xi, yi + 1, s)
+	var d := _hash2(xi + 1, yi + 1, s)
+	return lerpf(lerpf(a, b, fx), lerpf(c, d, fx), fy)
+
+static func _fbm(x: float, y: float, s: int, oct := 4) -> float:
+	var v := 0.0
+	var amp := 0.5
+	var f := 1.0
+	var tot := 0.0
+	for o in oct:
+		v += amp * _vnoise(x * f, y * f, s + o * 17)
+		tot += amp
+		amp *= 0.5
+		f *= 2.03
+	return v / tot
+
+## An icon's painted backdrop at n x n (RGB floats), cached.
+static func backdrop(name: String, n: int) -> PackedFloat32Array:
+	var lk := _line_key(name)
+	var key := "%s@%d" % [lk, n]
+	if _backdrops.has(key):
+		return _backdrops[key]
+	var bd: Array = BACKDROPS.get(lk, BACKDROPS["t_scroll"])
+	var ct := Color(str(bd[0]))
+	var cbm := Color(str(bd[1]))
+	var cl := Color(str(bd[2]))
+	var lx: float = bd[3]
+	var ly: float = bd[4]
+	var lr: float = bd[5]
+	var pat: String = bd[6]
+	var cp := Color(str(bd[7]))
+	var ps: float = bd[8]
+	var sd: int = bd[9]
+	var out := PackedFloat32Array()
+	out.resize(n * n * 3)
+	var inv := 1.0 / float(n)
+	for y in n:
+		for x in n:
+			var fx := (x + 0.5) * inv
+			var fy := (y + 0.5) * inv
+			var col := ct.lerp(cbm, fy)
+			# the light: a soft pool round (lx, ly)
+			var dl := Vector2(fx - lx, fy - ly).length() / lr
+			var li := clampf(1.0 - dl, 0.0, 1.0)
+			li = li * li
+			col = col.lerp(cl, li * 0.55)
+			var m := 0.0       # pattern mask 0..1 (blends toward cp)
+			var add := 0.0     # pattern light (added, in cp)
+			match pat:
+				"embers":
+					var heat := _fbm(fx * 3.0, fy * 2.0 - 0.3, sd)
+					col = col.lerp(cl, clampf((fy - 0.45) * 1.2, 0.0, 1.0) * heat * 0.6)
+					# sparks: a few bright points on a jittered grid, rising
+					var gx := int(fx * 9.0)
+					var gy := int(fy * 9.0)
+					var hx := _hash2(gx, gy, sd)
+					var hy := _hash2(gx, gy, sd + 5)
+					var on := _hash2(gx, gy, sd + 9) > 0.7
+					if on:
+						# a short rising streak
+						var dd := Vector2(fx * 9.0 - gx - (0.2 + 0.6 * hx), fy * 9.0 - gy - (0.2 + 0.6 * hy)).length()
+						add = clampf(1.0 - dd * (3.0 + 4.0 * _hash2(gx, gy, sd + 13)), 0.0, 1.0) * (0.35 + 0.9 * fy)
+				"streaks":
+					var st := _fbm(fx * 1.5, fy * 26.0, sd, 3)
+					m = clampf((st - 0.45) * 2.2, 0.0, 1.0) * 0.35
+					# a window's light falling across the rack
+					add = clampf(1.0 - absf((fx + fy * 0.6) - 0.55) * 6.0, 0.0, 1.0) * 0.18
+				"waves":
+					var w := sin((fy * 14.0 + sin(fx * 7.0 + fy * 3.0) * 0.9 + _fbm(fx * 4.0, fy * 4.0, sd) * 2.5))
+					add = clampf((w - 0.6) * 2.5, 0.0, 1.0) * (0.25 + 0.5 * (1.0 - fy))
+				"grid":
+					var stain := _fbm(fx * 4.0, fy * 4.0, sd)
+					col = col.lerp(cbm, clampf((stain - 0.5) * 1.6, 0.0, 1.0) * 0.6)
+					var gxl := absf(fposmod(fx * 6.0, 1.0) - 0.5)
+					var gyl := absf(fposmod(fy * 6.0, 1.0) - 0.5)
+					m = (clampf((gxl - 0.44) * 18.0, 0.0, 1.0) + clampf((gyl - 0.44) * 18.0, 0.0, 1.0)) * 0.45
+					# a drafting arc
+					var ra := Vector2(fx - 0.05, fy - 1.0).length()
+					m = maxf(m, clampf(1.0 - absf(ra - 0.78) * 60.0, 0.0, 1.0) * 0.7)
+				"smoke":
+					var sm := _fbm(fx * 2.4 + _fbm(fx * 2.0, fy * 2.0, sd + 3) * 1.4, fy * 2.0 - fx * 0.5, sd)
+					m = clampf((sm - 0.42) * 2.0, 0.0, 1.0) * 0.6
+				"cracks":
+					var q := _fbm(fx * 3.2, fy * 3.2, sd, 3)
+					var ln := clampf(1.0 - absf(q - 0.5) * 22.0, 0.0, 1.0)
+					var q2 := _fbm(fx * 5.0 + 7.0, fy * 5.0, sd + 1, 3)
+					ln = maxf(ln, clampf(1.0 - absf(q2 - 0.5) * 26.0, 0.0, 1.0) * 0.7)
+					if cp.get_luminance() > 0.3:
+						add = ln * 0.75
+					else:
+						m = ln * 0.8
+				"mist":
+					var mi := _fbm(fx * 2.2, fy * 3.0 + _fbm(fx * 3.0, fy, sd + 2) * 0.8, sd)
+					m = clampf((mi - 0.38) * 1.8, 0.0, 1.0) * 0.45 * (0.4 + fy)
+				"horizon":
+					var hb := clampf(1.0 - absf(fy - ly) * 9.0, 0.0, 1.0)
+					add = hb * hb * 0.8
+					# the land below the skyline: dark hills
+					var hill := ly + 0.04 + 0.05 * sin(fx * 9.0 + sd) + 0.03 * sin(fx * 23.0)
+					if fy > hill:
+						col = col.lerp(Color(0.02, 0.01, 0.02), 0.8)
+						add = 0.0
+				"dust":
+					var du := _fbm(fx * 3.0, fy * 3.0, sd)
+					m = clampf((du - 0.4) * 1.6, 0.0, 1.0) * 0.3
+					var shaft := sin((fx * 0.8 - fy) * 22.0)
+					add = clampf(shaft - 0.6, 0.0, 1.0) * 0.35 * clampf(1.0 - fy, 0.0, 1.0)
+				"stars":
+					var neb := _fbm(fx * 2.5, fy * 2.5, sd + 4)
+					col = col.lerp(cl, clampf((neb - 0.5) * 1.5, 0.0, 1.0) * 0.35)
+					var sx := int(fx * 14.0)
+					var sy := int(fy * 14.0)
+					if _hash2(sx, sy, sd) > 0.72:
+						var px := fx * 14.0 - sx - (0.2 + 0.6 * _hash2(sx, sy, sd + 1))
+						var py := fy * 14.0 - sy - (0.2 + 0.6 * _hash2(sx, sy, sd + 2))
+						add = clampf(1.0 - Vector2(px, py).length() * 3.2, 0.0, 1.0) * (0.5 + 0.5 * _hash2(sx, sy, sd + 3))
+				"rays":
+					var an := atan2(fy - ly, fx - lx)
+					var rw := 0.5 + 0.5 * sin(an * 12.0 + sd)
+					add = clampf((rw - 0.55) * 2.6, 0.0, 1.0) * clampf(1.0 - dl * 0.7, 0.0, 1.0) * 0.55
+				"bokeh":
+					for layer in 2:
+						var cs := 4.0 + layer * 3.0
+						var bx := int(fx * cs)
+						var by := int(fy * cs)
+						if _hash2(bx, by, sd + layer * 31) > 0.45:
+							var cx := 0.25 + 0.5 * _hash2(bx, by, sd + layer * 31 + 1)
+							var cy := 0.25 + 0.5 * _hash2(bx, by, sd + layer * 31 + 2)
+							var rr := 0.22 + 0.2 * _hash2(bx, by, sd + layer * 31 + 3)
+							var dd := Vector2(fx * cs - bx - cx, fy * cs - by - cy).length()
+							add = maxf(add, clampf((rr - dd) * 14.0, 0.0, 1.0) * (0.35 - layer * 0.12) * (0.5 + li))
+				"blocks":
+					var row := int(fy * 5.0)
+					var bxx := fx * 3.0 + (0.5 if row % 2 == 1 else 0.0)
+					var mx := absf(fposmod(bxx, 1.0) - 0.5)
+					var my := absf(fposmod(fy * 5.0, 1.0) - 0.5)
+					var shade := _hash2(int(floor(bxx)), row, sd) * 0.25 + _fbm(fx * 6.0, fy * 6.0, sd) * 0.3
+					col = col.lerp(cp, shade)
+					m = 0.0
+					if mx > 0.46 or my > 0.43:
+						col = col.darkened(0.55)
+				"drips":
+					var dr := _fbm(fx * 9.0, fy * 0.9, sd, 3)
+					add = clampf((dr - 0.55) * 3.0, 0.0, 1.0) * 0.4 * clampf(1.0 - fy * 0.8, 0.0, 1.0)
+				"clouds":
+					var cc := _fbm(fx * 2.0 + _fbm(fx * 2.0, fy * 2.0, sd + 5) * 1.2, fy * 2.6, sd)
+					m = clampf((cc - 0.4) * 2.2, 0.0, 1.0) * 0.65
+					# the bright edge of the clouds toward the light
+					add = clampf((cc - 0.55) * 4.0, 0.0, 1.0) * li * 0.6
+			col = col.lerp(cp, m * ps)
+			col = Color(col.r + cp.r * add * ps, col.g + cp.g * add * ps, col.b + cp.b * add * ps)
+			# a soft corner falloff (framing, not the same heavy vignette everywhere)
+			var e := maxf(absf(fx - 0.5), absf(fy - 0.5)) * 2.0
+			var vig := 1.0 - 0.3 * clampf((e - 0.7) / 0.3, 0.0, 1.0)
+			var i := (y * n + x) * 3
+			out[i] = col.r * vig
+			out[i + 1] = col.g * vig
+			out[i + 2] = col.b * vig
+	_backdrops[key] = out
+	return out
 
 static var _tiles := {}
 ## the share of the tile a glyph's drawn bounds fill (its longer side)
@@ -366,12 +611,20 @@ static func render_models(host: Node, names: Array = []) -> int:
 		pivot.position = at
 		vp.add_child(pivot)
 		pivot.add_child(obj)
+		# the rim light comes from the icon's own backdrop light (its colour and
+		# side: a forge's glow from below, the moon over the owl), so the model
+		# sits lit inside its scene rather than pasted on a plate
+		var bd: Array = BACKDROPS.get(_line_key(str(nm)), BACKDROPS["t_scroll"])
 		var rim := OmniLight3D.new()
-		rim.light_color = glow_of(str(nm)).lerp(Color.WHITE, 0.25)
-		rim.light_energy = 7.0
+		rim.light_color = Color(str(bd[2])).lerp(Color.WHITE, 0.2)
+		rim.light_energy = 8.0
 		rim.omni_range = 7.0
 		rim.omni_attenuation = 0.6
-		rim.position = at + Vector3(2.2, 1.6, -2.4)
+		var side := Vector2(float(bd[3]) - 0.5, 0.5 - float(bd[4]))
+		if side.length() < 0.15:
+			side = Vector2(0.35, 0.25)
+		side = side.normalized() * 2.7
+		rim.position = at + Vector3(side.x, side.y, -2.4)
 		vp.add_child(rim)
 		var cam := Camera3D.new()
 		cam.fov = 17.0
@@ -600,19 +853,19 @@ static func bake(name: String, n: int, locked := false) -> Image:
 	var g3: Image = _glyph3d.get(name)
 	if src.is_empty() and g3 == null:
 		return null
-	var pl: Array = PLATES[plate_of(name)]
-	var c0 := Color(str(pl[0]))
-	var c1 := Color(str(pl[1]))
-	var c2 := Color(str(pl[2]))
-	var gl := Color(str(pl[3]))
+	# the halo behind the picture in its backdrop's light colour
+	var gl := Color(str((BACKDROPS.get(_line_key(name), BACKDROPS["t_scroll"]) as Array)[2]))
+	var fr: Array = FRAMING.get(_line_key(name), [FIT, 0.0, 0.0])
+	var fit_k: float = fr[0]
+	var BD := backdrop(name, n)
 	var nparts := name.split("_")
-	var tint := 0.3 if nparts.size() == 3 and TIERS.has(nparts[2]) else 0.0
+	var tint := 0.2 if nparts.size() == 3 and TIERS.has(nparts[2]) else 0.0
 	var g: Image
 	if g3 != null:
 		# the rendered model: its drawn bounds fitted to FIT of the tile
 		# (downscaled from 256 px: smooth edges, crisp highlights)
 		var ur3 := g3.get_used_rect()
-		var sc := minf(FIT * n / ur3.size.x, FIT * n / ur3.size.y)
+		var sc := minf(fit_k * n / ur3.size.x, fit_k * n / ur3.size.y)
 		g = g3.get_region(ur3)
 		g.resize(maxi(1, int(round(ur3.size.x * sc))), maxi(1, int(round(ur3.size.y * sc))), Image.INTERPOLATE_LANCZOS)
 		_sharpen(g, 0.4 if n <= 64 else 0.3)
@@ -626,14 +879,14 @@ static func bake(name: String, n: int, locked := false) -> Image:
 		var ur0 := g.get_used_rect()
 		if ur0.size.x <= 0 or ur0.size.y <= 0:
 			return null
-		var fit := FIT * n
+		var fit := fit_k * n
 		var s1 := s0 * minf(minf(fit / ur0.size.x, fit / ur0.size.y), 1.6)
 		if g.load_svg_from_string(src, s1) != OK:
 			return null
 	g.convert(Image.FORMAT_RGBA8)
 	var ur := g.get_used_rect()
-	var ox := (n - ur.size.x) / 2 - ur.position.x
-	var oy := (n - ur.size.y) / 2 - ur.position.y
+	var ox := (n - ur.size.x) / 2 - ur.position.x + int(round(float(fr[1]) * n))
+	var oy := (n - ur.size.y) / 2 - ur.position.y + int(round(float(fr[2]) * n))
 	var gd := g.get_data()
 	var gw := g.get_width()
 	var gh := g.get_height()
@@ -680,25 +933,16 @@ static func bake(name: String, n: int, locked := false) -> Image:
 	for y in n:
 		for x in n:
 			var i := y * n + x
-			# plate: radial light from the upper middle, vignette, a top sheen
-			var fx := (x + 0.5) * inv
+			# the icon's own painted backdrop (backdrop())
 			var fy := (y + 0.5) * inv
-			var d := Vector2(fx - 0.46, fy - 0.36).length() / 0.78
-			var col: Color
-			if d < 0.5:
-				col = c0.lerp(c1, d / 0.5)
-			else:
-				col = c1.lerp(c2, clampf((d - 0.5) / 0.5, 0.0, 1.0))
-			var e := maxf(absf(fx - 0.5), absf(fy - 0.5)) * 2.0
-			var vig := 1.0 - 0.45 * clampf((e - 0.62) / 0.38, 0.0, 1.0)
-			var pr := col.r * vig
-			var pg := col.g * vig
-			var pb := col.b * vig
-			# the glyph's halo and drop shadow on the plate
+			var pr := BD[i * 3]
+			var pg := BD[i * 3 + 1]
+			var pb := BD[i * 3 + 2]
+			# a faint glow of the family behind the picture (separation, not an airbrush)
 			var gv := GL[i]
-			pr += gl.r * gv * 0.32
-			pg += gl.g * gv * 0.32
-			pb += gl.b * gv * 0.32
+			pr += gl.r * gv * 0.12
+			pg += gl.g * gv * 0.12
+			pb += gl.b * gv * 0.12
 			var sx := x - sdx
 			var sy := y - sdy
 			if sx >= 0 and sy >= 0:
@@ -741,7 +985,7 @@ static func bake(name: String, n: int, locked := false) -> Image:
 				gg = lerpf(pg, cg, a)
 				b = lerpf(pb, cb, a)
 			# a glassy sheen on the upper third
-			var sheen := clampf(1.0 - fy / 0.42, 0.0, 1.0) * 0.07
+			var sheen := clampf(1.0 - fy / 0.3, 0.0, 1.0) * 0.025
 			r += sheen
 			gg += sheen
 			b += sheen
@@ -754,14 +998,21 @@ static func bake(name: String, n: int, locked := false) -> Image:
 				# the picture keeps its full light-and-shade range (an S-curve
 				# round mid grey, lifted), so the greyed shape still reads
 				# as a pot / a shield / a sword, not a grey lump
-				var lc := clampf((l - 0.42) * 1.35 + 0.5, 0.0, 1.0)
-				lc = lc * lc * (3.0 - 2.0 * lc)
-				var gl2 := lc * 0.74 + 0.12
+				var lc := clampf((l - 0.4) * 1.3 + 0.5, 0.0, 1.0)
+				lc = lc * lc * (3.0 - 2.0 * lc) * 0.6 + lc * 0.4
+				var gl2 := lc * 0.64 + 0.07
 				var pv := plum * 0.42 + 0.01
 				var v := lerpf(pv, gl2, a)
 				var lr := v * 0.94
 				var lg := v * 0.97
 				var lb := v * 1.06
+				if a > 0.0:
+					# a trace of the picture's own hue (14%), so a flame still
+					# reads warmer and brighter than the clay pot it rises from
+					var cw := 0.14 * a
+					lr += (r - l) * cw
+					lg += (gg - l) * cw
+					lb += (b - l) * cw
 				if tint > 0.0 and a > 0.0:
 					# a tier's metal keeps a trace of its hue on the glyph only
 					# (copper rust, bronze ochre, iron slate), so the three tiers

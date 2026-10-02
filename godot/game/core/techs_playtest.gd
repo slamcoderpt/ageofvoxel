@@ -521,6 +521,31 @@ func _run() -> void:
 			sizes[int(tx.get_width())] = true
 	_check("tech tiles are baked at the size they are drawn (48 px on the grid, never 64 rescaled)",
 		sizes.has(48) and not sizes.has(64), str(sizes.keys()))
+	# every icon has its own painted backdrop (TechIcons.BACKDROPS), and the
+	# five gold lines of the Armory's top row (one frame colour) differ by
+	# their scene: no two backdrops share a pattern and their mean colours
+	# are apart, so the art, not the frame, tells them apart
+	var no_bd := []
+	for nm in TI.tile_names():
+		if not TI.BACKDROPS.has(TI._line_key(str(nm))):
+			no_bd.append(nm)
+	var row := ["t_weapons_copper", "t_armor_copper", "t_shields_copper", "t_ballistics", "t_burning_pitch"]
+	var means := []
+	var pats := {}
+	for nm in row:
+		var bdp: PackedFloat32Array = TI.backdrop(nm, 48)
+		var m := Vector3.ZERO
+		for k in range(0, bdp.size(), 3):
+			m += Vector3(bdp[k], bdp[k + 1], bdp[k + 2])
+		means.append(m / float(bdp.size() / 3))
+		pats[str(TI.BACKDROPS[TI._line_key(nm)][6])] = true
+	var dmin := 9.0
+	for i2 in means.size():
+		for j2 in range(i2 + 1, means.size()):
+			dmin = minf(dmin, (means[i2] - means[j2]).length())
+	_check("every tech icon has its own backdrop; the gold top row's five differ by pattern and colour",
+		no_bd.is_empty() and pats.size() == row.size() and dmin > 0.04,
+		"missing %s, patterns %s, closest mean colours %.3f" % [no_bd, pats.keys(), dmin])
 	# 7. the Temple: a click selects it, the hotkey of Olympian Parentage researches it
 	var tb: Dictionary = sim.get_building(ids.temple)
 	await _look(float(tb.x), float(tb.z) + 3.0)

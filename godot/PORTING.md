@@ -1254,24 +1254,50 @@ Mythology: Retold's command panel (`reference/techs/ui_01..05`).
   reflection (polished bronze, not plastic); the 256 px render is unsharp-
   masked after the downscale (`TechIcons._sharpen`) so edges and highlights
   stay crisp at button size. Iterate with a contact sheet (below).
+  **Aegis** is a living tawny owl (not a statuette, `TechModels.feathers()`:
+  vertex-coloured plumage with a fine bump normal): an egg of layered breast
+  feathers (displaced rows, each tip dark, short broken streaks), a broad
+  head, a pale facial disc ringed by a dark ruff, huge amber eyes with black
+  pupils and a glint, a scowling brow running up into the ear tufts,
+  half-raised barred wings, talons on an olive branch. **Burning Pitch** is a
+  two-handled black-figure amphora (a black foot, a running-wave band on the
+  shoulder, a black neck) brimming with glossy pitch, one run over the lip,
+  ablaze. **Phobos** is a lanceolate war-spear head of black glass whose two
+  cutting edges glow red-hot to the point, a few jagged fractures near the
+  socket (no midrib with side veins: that read as a leaf).
   A button never shows the bare picture:
   `TechIcons.tile(name, px, "normal"|"locked")` composites it once (CPU,
-  cached; `prewarm_step()` bakes the set one per frame): a background plate
-  per tech family (`PLATES` / `PLATE_OF`: ember = weapons, steel = armor,
-  sea = shields, amber = siege and forge, dusk = Ares' terror techs, violet
-  = divine, verdant = nature / healing, sky = knowledge, treasury = the
-  Market), a lit radial gradient with a vignette and a top sheen, the
-  picture's drawn bounds fitted to 90% of the tile (`FIT`, Lanczos from
-  256 px), a soft drop shadow, a halo in the family's glow and a dark
-  outline round the silhouette so it reads on any plate. The SVG fallback
+  cached; `prewarm_step()` bakes the set one per frame): **its own painted
+  backdrop** (`TechIcons.BACKDROPS`, `backdrop(name, px)`, cached; one per
+  line, not one vignette per family): a sky gradient, a light pool placed
+  for that picture and a value-noise pattern that says where the tech
+  lives: the weapons a forge (orange heat from below, sparks), armor
+  brushed steel with a window's light, shields the sea, Ballistics an
+  engineer's blueprint grid with a drafting arc, Burning Pitch smoke over a
+  low fire, Phobos a crimson mist, Deimos violet fog, Enyo a dusk skyline
+  over dark hills, Sarissa dusty light shafts, Aegis a starry night with a
+  moon glow, Sun Ray a sunburst, Shafts of Plague venom drips, Olympian
+  Weapons storm clouds, Harvest of Souls an underworld mist, the Labyrinth
+  and Pious Sacrifice stone walls, the gardens out-of-focus leaves, the
+  Market coin bokeh (patterns: embers, streaks, waves, grid, smoke, cracks,
+  mist, horizon, dust, stars, rays, bokeh, blocks, drips, clouds; none red).
+  So five gold buttons in one row differ by their scene before their art
+  (techs_playtest checks it). The studio's rim light takes that backdrop
+  light's colour and side (a forge's orange from below, the moon's blue on
+  the owl), so the model sits lit inside its scene; the halo behind the
+  picture is that light at 12% (not an airbrushed glow), the top sheen 2.5%.
+  The picture's drawn bounds are fitted per icon (`FRAMING`: [fit, dx, dy],
+  default `FIT` 90%; Phobos, Sun Ray and Sarissa fill past the frame as
+  close-ups, the cuirass sits smaller), Lanczos from 256 px, a soft drop
+  shadow and a dark outline round the silhouette so it reads on any
+  backdrop. The SVG fallback
   (`SVG`, `TEMPLATES`: 24-unit glyphs, embossed from their blurred alpha)
   and the `g_<god>` emblems, `t_buy` / `t_sell`, `t_time` stay SVG.
-  "locked" is the same tile with no colour and its values split: the plate
-  drops to a dark slate (luminance x 0.5), the picture keeps a lifted grey
-  (x 0.62 + 0.16), the outline stays dark, so it still reads greyed (a tier
-  keeps 30% of its metal's hue; the picture's grey keeps its full light-and-
-shade range through an S-curve, so a greyed pot or shield still reads as
-one). **Sharpness at button size**: every tile is baked at the exact size it
+  "locked" is the same tile drained and its values split: the backdrop
+  drops to a dark slate (luminance x 0.42), the picture to a mid grey (x
+  0.64 + 0.07 through a soft S-curve, so it is not silvery), the outline
+  stays dark; the picture keeps 14% of its own hue (a tier's metal 20%), so
+  a greyed flame still reads warmer and brighter than its clay pot. **Sharpness at button size**: every tile is baked at the exact size it
 is drawn (48 px on the grid, 34 px in the queue, 22 px on the card; a 64 px
 tile drawn at 48 went soft), the studio uses ACES tone mapping, a stronger
 key (2.3, specular 1.4) over a lower ambient (0.38) and stronger SSAO, and
@@ -1337,20 +1363,20 @@ locked; the picture backs it (full colour, red cast, blue duotone, slate).
 | `unaffordable` (`short`: the missing resources) | **the same on every button** (techs, train, build, trades): the whole 3 px bevel turns red (`hud.FRAMES.red`: #ffb4a0 / #ff2a12 / #800c04, inner line #ff6a40) with a red glow into the gap between cells, the picture in full colour under a red cast (8% at the top, 16% at the middle, 42% at the foot); a god tech keeps its emblem medallion, so it still reads as a god tech | "Can't afford · Need 40 more gold, 5 more favor" (red); the cost's short numbers red |
 | `locked` (`age_req` when an age, else a prerequisite) | the tile desaturated and darkened (`tile(..., "locked")`); a unit / building portrait the same: `hud.locked_portrait(tex)` reads the portrait back once, turns every pixel into the tiles' locked slate grey (luminance x 0.6-0.68) and caches it (a near-black tint for the frame or two before the portrait has rendered), on a grey cell plate (no team teal; mean saturation ~0.18, the same as a locked tech tile); a dim grey frame, a badge centred on the frame's top-right corner (7.5 px radius, mostly over the frame and the gap): the required age's numeral (II / III / IV) or, locked by a prerequisite, a padlock; the hotkey dimmed. A tech locked by a prerequisite is shown only while that prerequisite is researching / queued (`ui._tech_visible`'s `busy`: the line's next step, padlocked, after the buyable buttons), else hidden as in Retold | "Locked · Requires Heroic Age" / "Locked · Requires Copper Shields" (tan) |
 | `researching` / `training` (`progress`, `count`) | "busy", **the same on techs and train buttons**: the whole bevel blue (`hud.FRAMES.blue`: #d8f2ff / #2ea2ff / #0a3a80, inner #7ccaff) with a blue glow in the gap; the picture in the **busy duotone** (`TechIcons.tile(..., "busy")` / `hud.busy_portrait(tex)`, both `TechIcons.busy_image`: luminance mapped navy #06142c to ice #b4dcff, 8% of the hue kept), its full colour coming back clockwise from 12 o'clock as the work runs (`hud._reveal`, a textured fan; its leading edge an ice line), a thick 6 px progress bar on the tile's foot (blue to ice in a dark trough; the hotkey rides above it); a train button's queued count on a blue chip at the top-right corner | "Researching · 39% · 25s left · cancel it from the queue" (blue) |
-| `queued` (`count`: its place) | blue bevel and the busy duotone (no colour yet), its place in the queue **large on the picture** (a 26 px numeral in a dark ring) | "Queued · 2nd in the queue" (blue-amber) |
+| `queued` (`count`: its place) | blue bevel and the busy duotone (no colour yet), an empty dashed 6 px bar on the foot (it waits its turn), its place in the queue on the **blue corner chip** with an hourglass (the training count's chip), never over the picture: a queued Ballistics still shows its dividers | "Queued · 2nd in the queue" (blue-amber) |
 | researched | off the grid (the line's next tier takes the slot); on the card under RESEARCHED with a green check | |
 
 Every tooltip, narrow (train / build / age) or wide (techs, trades), opens
 with that state line right under the name, before the cost and the hotkey.
 
 **Nothing covers the picture** except the work in progress (a researching /
-training tile's 6 px bar and sweep edge, a queued tech's place numeral, both
-meant to read at a glance). Every other mark rides the frame (its 3 px bevel
+training / queued tile's 6 px bar on its foot and a researching tile's sweep
+edge). Every other mark rides the frame (its 3 px bevel
 and the 5 px gap between cells):
 an Armory line's **tier notches** set into the frame's top edge (1-3 small
 5x4 px bars in the tier's metal, `tier`; the picture itself tells the tiers
 apart: one sword / two / two and an axe, copper / bronze / steel, and a
-locked tier glyph keeps 30% of its metal's hue), a god tech's **medallion**
+locked tier glyph keeps 20% of its metal's hue), a god tech's **medallion**
 centred on the frame's top-left corner (6.5 px radius) with its god's emblem
 (`god`; `TechIcons.GODS`: Zeus' bolt, Athena's owl, Apollo's sun, Ares'
 helmet, ...: Greek gods share initials, so no letters). A click or key on a
