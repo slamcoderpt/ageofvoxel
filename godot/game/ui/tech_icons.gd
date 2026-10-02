@@ -4,6 +4,8 @@ extends RefCounted
 ## Mythology: Retold's command grid, reference/techs/ui_02.jpg) as 24-unit SVGs,
 ## and the painted tile a command button shows (tile(): a background plate
 ## per tech family, the glyph embossed and lit, see "painted tiles" below).
+## The pictures a player sees are rendered 3D models (tech_models.gd, "the
+## 3D studio" below); these SVGs are the headless fallback.
 ## The Armory's three generic lines (weapons: a spear, armor: a muscle
 ## cuirass, shields: a hoplon) are shaded templates in the tier's metal, each
 ## tier with its own detail: copper plain, bronze (gold) with a red tassel /
@@ -196,7 +198,7 @@ const PLATE_OF := {
 	"t_weapons": "ember", "t_armor": "steel", "t_shields": "sea",
 	"t_ballistics": "amber", "t_burning_pitch": "amber", "t_forge_of_olympus": "amber",
 	"t_phobos": "dusk", "t_deimos": "dusk", "t_enyo": "dusk", "t_monstrous_rage": "dusk", "t_sarissa": "steel",
-	"t_aegis": "bronze", "t_sun_ray": "sky", "t_shafts_of_plague": "verdant", "t_olympian_weapons": "violet",
+	"t_aegis": "sea", "t_sun_ray": "sky", "t_shafts_of_plague": "verdant", "t_olympian_weapons": "violet",
 	"t_harvest_of_souls": "violet", "t_omniscience": "sky", "t_olympian_parentage": "violet",
 	"t_labyrinth": "amber", "t_sylvan_lore": "verdant", "t_will_of_kronos": "violet", "t_hymn": "verdant",
 	"t_oracle": "sky", "t_temple_of_healing": "verdant", "t_golden_apples": "verdant", "t_dionysia": "violet",
@@ -421,7 +423,7 @@ static func _studio_env() -> Environment:
 	pm.panorama = ImageTexture.create_from_image(_studio_panorama())
 	sky.sky_material = pm
 	sky.process_mode = Sky.PROCESS_MODE_QUALITY
-	sky.radiance_size = Sky.RADIANCE_SIZE_128
+	sky.radiance_size = Sky.RADIANCE_SIZE_256
 	e.sky = sky
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	e.ambient_light_energy = 0.55
@@ -437,8 +439,8 @@ static func _studio_env() -> Environment:
 ## An equirectangular HDR studio: a big warm softbox up left in front, a long
 ## strip light behind on the right, a soft top light, a dark warm floor.
 static func _studio_panorama() -> Image:
-	var w := 256
-	var h := 128
+	var w := 512
+	var h := 256
 	var img := Image.create(w, h, false, Image.FORMAT_RGBF)
 	var K := Vector3(-0.55, 0.62, 0.56).normalized()
 	var Rs := Vector3(0.75, 0.25, -0.62).normalized()
@@ -449,9 +451,12 @@ static func _studio_panorama() -> Image:
 		for x in w:
 			var ph := ((x + 0.5) / w - 0.5) * TAU
 			var d := Vector3(sin(th) * sin(ph), cos(th), -sin(th) * cos(ph))
-			var c := Color(0.07, 0.075, 0.09)
+			# above the horizon a cool sky brightening down to a sharp horizon
+			# line, below it a dark warm floor: the chrome look that makes a
+			# curved metal part read as metal (light top, dark bottom, a crisp edge)
+			var c := Color(0.16, 0.18, 0.22).lerp(Color(0.5, 0.52, 0.56), clampf(1.0 - d.y * 3.0, 0.0, 1.0))
 			if d.y < 0.0:
-				c = Color(0.06, 0.045, 0.035).lerp(Color(0.02, 0.015, 0.012), clampf(-d.y * 2.0, 0.0, 1.0))
+				c = Color(0.05, 0.035, 0.025).lerp(Color(0.012, 0.01, 0.008), clampf(-d.y * 3.0, 0.0, 1.0))
 			var k := clampf((d.dot(K) - 0.82) / 0.1, 0.0, 1.0)
 			c += Color(1.0, 0.92, 0.8) * 7.0 * k * k
 			var r := clampf((d.dot(Rs) - 0.9) / 0.06, 0.0, 1.0)
@@ -459,7 +464,7 @@ static func _studio_panorama() -> Image:
 			# a soft frontal box behind the camera (flat faces turned to the
 			# viewer reflect it instead of the dark studio)
 			var f := clampf((d.dot(F) - 0.75) / 0.2, 0.0, 1.0)
-			c += Color(1.0, 0.97, 0.92) * 1.6 * f
+			c += Color(1.0, 0.97, 0.92) * 0.9 * f
 			var t := clampf((d.dot(T) - 0.7) / 0.3, 0.0, 1.0)
 			c += Color(0.9, 0.95, 1.0) * 1.2 * t
 			img.set_pixel(x, y, c)
@@ -492,6 +497,27 @@ static func _blur(src: PackedFloat32Array, n: int, r: int) -> PackedFloat32Array
 		a = c
 	return a
 
+## Unsharp mask on a premultiplied RGBA8 image (RGB only, clamped to alpha):
+## restores the edge and highlight crispness the downscale from 256 px loses.
+static func _sharpen(img: Image, amt: float) -> void:
+	var w := img.get_width()
+	var h := img.get_height()
+	if w < 3 or h < 3:
+		return
+	var d := img.get_data()
+	var o := d.duplicate()
+	for y in range(1, h - 1):
+		for x in range(1, w - 1):
+			var i := (y * w + x) * 4
+			var a := d[i + 3]
+			if a == 0:
+				continue
+			for c in 3:
+				var j := i + c
+				var bl := (d[j - 4] + d[j + 4] + d[j - w * 4] + d[j + w * 4]) * 0.25
+				o[j] = clampi(int(d[j] + amt * (d[j] - bl)), 0, a)
+	img.set_data(w, h, false, Image.FORMAT_RGBA8, o)
+
 ## Bake a tile (see above). Pure Image work: safe on a worker thread.
 static func bake(name: String, n: int, locked := false) -> Image:
 	var src := svg(name)
@@ -513,6 +539,7 @@ static func bake(name: String, n: int, locked := false) -> Image:
 		var sc := minf(FIT * n / ur3.size.x, FIT * n / ur3.size.y)
 		g = g3.get_region(ur3)
 		g.resize(maxi(1, int(round(ur3.size.x * sc))), maxi(1, int(round(ur3.size.y * sc))), Image.INTERPOLATE_LANCZOS)
+		_sharpen(g, 0.55 if n <= 64 else 0.35)
 	else:
 		# fit the glyph's drawn bounds (not its 24-unit box) to FIT of the tile, so
 		# a thin diagonal glyph fills the button as a round one does

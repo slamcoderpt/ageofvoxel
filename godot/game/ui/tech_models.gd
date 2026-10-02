@@ -14,7 +14,7 @@ extends RefCounted
 ## Space: x right, y up, z toward the camera; a model fills about [-1, 1]^2.
 
 const TIER_METAL := {
-	"copper": Color(0.96, 0.5, 0.3),
+	"copper": Color(0.92, 0.42, 0.24),
 	"bronze": Color(1.0, 0.76, 0.34),
 	"iron": Color(0.72, 0.76, 0.82),
 }
@@ -68,6 +68,35 @@ static func _noise_normal(kind: String) -> Texture2D:
 	_texs[kind] = t
 	return t
 
+## A metal's wear map (grey, multiplies albedo and roughness): broad tarnish
+## clouds, fine scratches and pits, so a polished part is not one smooth
+## colour (what made gold read as plastic).
+static func _wear() -> Texture2D:
+	if _texs.has("wear"):
+		return _texs["wear"]
+	var cloud := FastNoiseLite.new()
+	cloud.seed = 3
+	cloud.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	cloud.frequency = 0.035
+	cloud.fractal_octaves = 4
+	var pit := FastNoiseLite.new()
+	pit.seed = 9
+	pit.noise_type = FastNoiseLite.TYPE_CELLULAR
+	pit.frequency = 0.22
+	var img := Image.create(128, 128, false, Image.FORMAT_RGBA8)
+	for y in 128:
+		for x in 128:
+			var c := 0.5 + 0.5 * cloud.get_noise_2d(x, y)
+			var pv := 0.5 + 0.5 * pit.get_noise_2d(x, y)
+			# scratches: thin bright-dark streaks along one axis
+			var sc := pow(absf(sin(x * 0.9 + 6.0 * cloud.get_noise_2d(x * 3.0, y * 0.2))), 40.0)
+			var v := 0.78 + 0.22 * smoothstep(0.25, 0.75, c) - 0.1 * smoothstep(0.75, 0.95, pv) + 0.08 * sc
+			img.set_pixel(x, y, Color(v, v, v))
+	img.generate_mipmaps()
+	var t := ImageTexture.create_from_image(img)
+	_texs["wear"] = t
+	return t
+
 static func _base(key: String) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.uv1_triplanar = true
@@ -85,10 +114,14 @@ static func metal(c: Color, rough := 0.3) -> StandardMaterial3D:
 	m.albedo_color = c
 	m.metallic = 1.0
 	m.metallic_specular = 0.6
-	m.roughness = rough
+	# sharper than asked (crisp studio reflections read as metal), the wear
+	# map breaking it up again
+	m.roughness = minf(1.0, rough * 1.25)
+	m.albedo_texture = _wear()
+	m.roughness_texture = _wear()
 	m.normal_enabled = true
 	m.normal_texture = _noise_normal("hammer")
-	m.normal_scale = 0.35
+	m.normal_scale = 0.6
 	return m
 
 ## A non-metal surface (wood, leather, cloth, stone, skin, fruit).
@@ -618,22 +651,39 @@ static func _custom(name: String, root: Node3D) -> bool:
 			return false
 	return true
 
+## Weapons line: swords (not spears: the god techs own the spear, the pike and
+## the bow), copper one xiphos, bronze two crossed, iron two crossed before a
+## labrys (the double axe), so a tier reads by count and silhouette.
 static func _weapons(root: Node3D, tier: String) -> void:
-	var m := metal(TIER_METAL[tier], 0.3 if tier != "iron" else 0.22)
+	var m := metal(TIER_METAL[tier], 0.26 if tier != "iron" else 0.18)
+	var hilt := metal(GOLD, 0.24) if tier != "copper" else metal(TIER_METAL.bronze, 0.3)
+	var grip := mat(Color(0.32, 0.16, 0.08), 0.75, "rough")
 	match tier:
 		"copper":
-			spear(root, Vector3(-0.95, -0.95, 0), Vector3(0.95, 0.95, 0), m, 0.85, 0.25, 0.065)
+			xiphos(root, Vector3(-0.42, -0.42, 0), Vector3(1, 1, 0), 1.5, 0.2, m, hilt, grip)
 		"bronze":
-			spear(root, Vector3(-0.95, -0.95, -0.05), Vector3(0.95, 0.95, -0.05), m, 0.7, 0.21)
-			spear(root, Vector3(0.95, -0.95, 0.05), Vector3(-0.95, 0.95, 0.05), m, 0.7, 0.21)
-			# red horsehair tassels under the heads
-			for s in [-1.0, 1.0]:
-				var o := Vector3(0.4 * s, 0.4, 0.1)
-				put(root, tube(bez(o, o + Vector3(0.02 * s, -0.1, 0.02), o + Vector3(0.06 * s, -0.22, 0.02), o + Vector3(0.1 * s, -0.32, 0.0), 10), func(t): return Vector2.ONE * lerpf(0.05, 0.015, t), 8), mat(CLOTH_RED, 0.85, "rough"))
+			xiphos(root, Vector3(-0.5, -0.55, -0.05), Vector3(0.8, 1, 0), 1.45, 0.17, m, hilt, grip)
+			xiphos(root, Vector3(0.5, -0.55, 0.06), Vector3(-0.8, 1, 0), 1.45, 0.17, m, hilt, grip)
 		_:
-			spear(root, Vector3(-0.95, -0.95, -0.12), Vector3(0.9, 0.9, -0.12), m, 0.62, 0.19)
-			spear(root, Vector3(0.95, -0.95, -0.12), Vector3(-0.9, 0.9, -0.12), m, 0.62, 0.19)
-			sword(root, Vector3(0, -0.42, 0.12), Vector3.UP, 1.38, 0.15, metal(Color(0.85, 0.88, 0.92), 0.16), metal(GOLD, 0.3))
+			# the labrys behind: a shaft and a double crescent head of dark steel
+			var ax := Node3D.new()
+			root.add_child(ax)
+			ax.position = Vector3(0, 0, -0.25)
+			put(ax, tube(line(Vector3(0, -1.0, 0), Vector3(0, 0.95, 0), 6), func(_t): return Vector2(0.045, 0.045), 10), mat(DARK_WOOD, 0.55, "wood"))
+			var head := PackedVector2Array([Vector2(0.06, 0.44)])
+			for k in 25:
+				var a := lerpf(-1.05, 1.05, float(k) / 24.0)
+				head.append(Vector2(0.06 + 0.66 * cos(a), 0.62 + 0.5 * sin(a)))
+			head.append(Vector2(0.06, 0.8))
+			var mir := PackedVector2Array()
+			for v in head:
+				mir.append(Vector2(-v.x, v.y))
+			put(ax, extrude(head, 0.04, 0.03), metal(Color(0.5, 0.52, 0.56), 0.22))
+			put(ax, extrude(mir, 0.04, 0.03), metal(Color(0.5, 0.52, 0.56), 0.22))
+			put(ax, cyl(0.08, 0.08, 0.34, 16), metal(GOLD, 0.3), Transform3D(Basis(), Vector3(0, 0.62, 0)))
+			xiphos(root, Vector3(-0.5, -0.6, 0.12), Vector3(0.8, 1, 0), 1.4, 0.16, m, hilt, grip)
+			xiphos(root, Vector3(0.5, -0.6, 0.2), Vector3(-0.8, 1, 0), 1.4, 0.16, m, hilt, grip)
+	root.rotation = Vector3(0.0, -0.25, 0)
 
 static func _armor(root: Node3D, tier: String) -> void:
 	var m := metal(TIER_METAL[tier], 0.32 if tier != "iron" else 0.24)
@@ -663,8 +713,10 @@ static func _armor(root: Node3D, tier: String) -> void:
 			for ay in [0.08, -0.18, -0.44]:
 				for ax in [-0.12, 0.12]:
 					abs_ += exp(-((x - ax) ** 2 + (y - ay) ** 2 * 0.8) / 0.008)
-			z += (0.09 * pec + 0.035 * abs_) * strong
-			z -= 0.04 * exp(-x * x / 0.002) * clampf((0.55 - y) * 2.0, 0.0, 1.0)
+			z += (0.15 * pec + 0.065 * abs_) * strong
+			z -= 0.05 * exp(-x * x / 0.002) * clampf((0.55 - y) * 2.0, 0.0, 1.0)
+			# the lower edge of the ribcage: an arch ridge under the pectorals
+			z += 0.035 * exp(-pow(y - (0.2 - 0.35 * x * x), 2.0) / 0.0025) * clampf(1.0 - absf(x) / 0.5, 0.0, 1.0) * strong
 			# the flared lip at the hem
 			z += 0.08 * clampf((-0.75 - y) / 0.2, 0.0, 1.0)
 			row.append(Vector3(x, y, z))
@@ -689,6 +741,12 @@ static func _armor(root: Node3D, tier: String) -> void:
 	var rim_m := m if tier == "copper" else metal(GOLD if tier == "iron" else TIER_METAL[tier].lightened(0.1), 0.25)
 	for pth in [rim, rimb, rl, rr]:
 		put(root, tube(pth, func(_t): return Vector2(0.03, 0.03), 8), rim_m)
+	# two engraved bands above the hem (a raised pair of beads)
+	for jj in [3, 6]:
+		var band := PackedVector3Array()
+		for i in nu + 1:
+			band.append(rows[jj][i] + Vector3(0, 0, 0.012))
+		put(root, tube(band, func(_t): return Vector2(0.018, 0.018), 6), rim_m)
 	if tier != "copper":
 		# shoulder guards: curved plates over each shoulder
 		for s in [-1.0, 1.0]:
@@ -713,36 +771,47 @@ static func _armor(root: Node3D, tier: String) -> void:
 				put(root, sphere(0.028), metal(GOLD, 0.25), Transform3D(Basis(), Vector3(0.52 * s, yy, 0.22)))
 	root.rotation = Vector3(0.08, -0.3, 0)
 
+## Shields line: a hoplon turned three quarters (its thick rolled rim shows,
+## so it reads as a shield, never a target), each tier its blazon: copper a
+## raised crescent, bronze a gold star on dark blue enamel, iron a silver
+## lambda on crimson with a steel rim and rivets.
 static func _shields(root: Node3D, tier: String) -> void:
-	var m := metal(TIER_METAL[tier], 0.3 if tier != "iron" else 0.24)
+	var m := metal(TIER_METAL[tier], 0.26 if tier != "iron" else 0.2)
 	var R := 1.0
 	match tier:
 		"copper":
-			# a plain hoplon: a domed face with turned rings, a broad flat rim, a boss
-			put(root, disc(R, func(r, _a): return _hoplon(r) + (0.012 * sin(r * 40.0) if r < 0.7 else 0.0), 40, 72), m)
-			put(root, sphere(0.14, 0.14), m, Transform3D(Basis(), Vector3(0, 0, 0.26)))
+			put(root, disc(R, func(r, _a): return _hoplon(r), 40, 72), m)
+			var cres := PackedVector2Array()
+			for k in 33:
+				var a := lerpf(-2.3, 2.3, float(k) / 32.0)
+				cres.append(Vector2(cos(a) * 0.52, sin(a) * 0.52))
+			for k in 33:
+				var a := lerpf(2.0, -2.0, float(k) / 32.0)
+				cres.append(Vector2(cos(a) * 0.4 + 0.16, sin(a) * 0.4))
+			put(root, extrude(cres, 0.035, 0.03), metal(GOLD, 0.2), Transform3D(Basis(Vector3(0, 0, 1), PI * 0.5), Vector3(0, 0, _hoplon(0.0) - 0.02)))
 		"bronze":
-			# gold, a star / sunburst raised on the face
 			var star := func(r: float, a: float) -> float:
 				var k := absf(cos(4.0 * a))
 				var edge := 0.3 + 0.36 * k ** 3.0
 				return 0.055 * smoothstep(edge + 0.05, edge - 0.05, r)
 			var starc := func(r: float, a: float) -> Color:
-				return Color(1.0, 0.78, 0.36) if r > 0.8 or star.call(r, a) > 0.02 else Color(0.08, 0.1, 0.22)
-			put(root, disc(R, func(r, a): return _hoplon(r) + star.call(r, a), 56, 192, starc), painted(0.3, 1.0))
-			put(root, sphere(0.12, 0.14), metal(Color(0.85, 0.2, 0.12), 0.25), Transform3D(Basis(), Vector3(0, 0, 0.3)))
+				return Color(1.0, 0.78, 0.36) if r > 0.8 or star.call(r, a) > 0.02 else Color(0.06, 0.09, 0.24)
+			put(root, disc(R, func(r, a): return _hoplon(r) + star.call(r, a), 56, 192, starc), painted(0.24, 1.0))
 		_:
-			# iron: a painted face (crimson, a silver lambda) on a steel rim with rivets
 			var col := func(r: float, _a: float) -> Color:
 				return Color(0.55, 0.06, 0.04) if r < 0.8 else Color.WHITE
-			put(root, disc(0.82, func(r, _a): return _hoplon(r), 32, 72, col), painted(0.5))
+			put(root, disc(0.82, func(r, _a): return _hoplon(r), 32, 72, col), painted(0.4))
 			put(root, disc(R, func(r, _a): return _hoplon(r) - (0.0 if r > 0.8 else 0.05), 40, 72), m)
 			for k in 12:
 				var a := TAU * k / 12.0
 				put(root, sphere(0.04), metal(Color(0.9, 0.92, 0.95), 0.2), Transform3D(Basis(), Vector3(cos(a) * 0.9, sin(a) * 0.9, _hoplon(0.9) + 0.02)))
 			var lam := PackedVector2Array([Vector2(-0.38, -0.42), Vector2(-0.2, -0.42), Vector2(0, 0.08), Vector2(0.2, -0.42), Vector2(0.38, -0.42), Vector2(0.08, 0.48), Vector2(-0.08, 0.48)])
 			put(root, extrude(lam, 0.02, 0.015), metal(Color(0.88, 0.9, 0.94), 0.2), Transform3D(Basis(), Vector3(0, 0, _hoplon(0.0) - 0.01)))
-	root.rotation = Vector3(-0.15, -0.42, 0)
+	# the rolled rim and the shield's depth behind it (a bowl, seen edge-on)
+	var rim_m := m if tier != "bronze" else metal(GOLD, 0.24)
+	put(root, torus(0.94, 1.06), rim_m, Transform3D(Basis(Vector3.RIGHT, PI / 2), Vector3(0, 0, 0.0)))
+	put(root, lathe([Vector2(1.0, 0.0), Vector2(0.98, -0.12), Vector2(0.9, -0.24), Vector2(0.7, -0.34), Vector2(0.0, -0.38)], 48), m, Transform3D(Basis(Vector3.RIGHT, PI / 2), Vector3.ZERO))
+	root.rotation = Vector3(-0.12, -0.72, 0.05)
 
 ## The hoplon's profile: a dome to r 0.8, a broad flat rim to 1.
 static func _hoplon(r: float) -> float:
@@ -761,134 +830,209 @@ static func wisps(root: Node3D, paths: Array, w: float, c0: Color, c1: Color) ->
 	put(root, _mesh(acc), glow(Color.WHITE, true))
 
 static func _m_ballistics(root: Node3D) -> void:
-	# a straw target in its wooden ring, an arrow in the bull's-eye
-	var col := func(r: float, _a: float) -> Color:
-		if r < 0.15:
-			return Color(0.95, 0.72, 0.12)
-		if r < 0.31:
-			return Color(0.62, 0.04, 0.03)
-		if r < 0.47:
-			return Color(0.9, 0.84, 0.68)
-		if r < 0.63:
-			return Color(0.62, 0.04, 0.03)
-		return Color(0.88, 0.8, 0.62)
-	var tgt := Node3D.new()
-	root.add_child(tgt)
-	tgt.transform = Transform3D(Basis(Vector3.UP, -0.55), Vector3(0.18, -0.12, 0))
-	put(tgt, disc(0.78, func(r, _a): return 0.12 * (1.0 - (r / 0.78) ** 2), 30, 72, col), painted(0.8))
-	put(tgt, torus(0.76, 0.9), mat(WOOD, 0.6, "wood"), Transform3D(Basis(Vector3.RIGHT, PI / 2), Vector3(0, 0, 0.0)))
-	put(tgt, box(Vector3(0.12, 0.7, 0.1)), mat(WOOD, 0.6, "wood"), Transform3D(Basis(Vector3.FORWARD, 0.4), Vector3(-0.3, -0.85, -0.1)))
-	put(tgt, box(Vector3(0.12, 0.7, 0.1)), mat(WOOD, 0.6, "wood"), Transform3D(Basis(Vector3.FORWARD, -0.4), Vector3(0.3, -0.85, -0.1)))
-	arrow(root, Vector3(-1.0, 0.92, 0.75), Vector3(0.12, -0.05, 0.12), metal(STEEL, 0.25), mat(Color(0.5, 0.32, 0.16), 0.6, "wood"), Color(0.75, 0.08, 0.05), 0.2, 0.08)
-	# a second arrow, already in the target
-	arrow(root, Vector3(-0.2, 1.0, 0.6), Vector3(0.38, 0.28, 0.06), metal(STEEL, 0.25), mat(Color(0.5, 0.32, 0.16), 0.6, "wood"), Color(0.92, 0.88, 0.8), 0.2, 0.08)
+	# the science of the shot: a bronze pair of dividers astride a glowing
+	# trajectory, the arc ending in an arrowhead on its mark
+	var br := metal(TIER_METAL.bronze, 0.22)
+	var hinge := Vector3(-0.05, 0.86, 0.0)
+	for f in [Vector3(-0.78, -0.95, 0.0), Vector3(0.62, -0.95, 0.0)]:
+		var d: Vector3 = (f - hinge).normalized()
+		put(root, tube(line(hinge, f, 16), func(t): var ww: float = lerpf(0.075, 0.012, t ** 1.4); return Vector2(ww, ww * 0.7), 4, Vector3(0, 0, 1), true), br)
+		put(root, tube(line(f - d * 0.16, f, 4), func(t): return Vector2.ONE * lerpf(0.02, 0.003, t), 6), metal(STEEL, 0.2))
+	put(root, cyl(0.15, 0.15, 0.08, 28), metal(GOLD, 0.2), Transform3D(Basis(Vector3.RIGHT, PI / 2), hinge + Vector3(0, 0, 0.04)))
+	put(root, torus(0.06, 0.11), metal(GOLD, 0.24), Transform3D(Basis(Vector3.RIGHT, PI / 2), hinge + Vector3(0, 0.2, 0)))
+	# the trajectory: glowing dashes on a parabola, brightening to the mark
+	var acc := _acc()
+	var pts := PackedVector3Array()
+	for k in 41:
+		var t := float(k) / 40.0
+		pts.append(Vector3(lerpf(-0.95, 0.9, t), -0.7 + 1.55 * 4.0 * t * (1.0 - t) * 0.82 - t * 0.12, 0.3))
+	for k in 9:
+		var seg := PackedVector3Array()
+		for j in 4:
+			seg.append(pts[k * 4 + j + 1])
+		var b := float(k) / 8.0
+		tube_acc(acc, seg, func(_t): return Vector2.ONE * (0.03 + 0.012 * b), 8, Vector3(0, 0, 1), false, func(_t, _a): return Color(Color(1.0, 0.8, 0.4).lerp(Color(1.0, 0.98, 0.85), b), 0.55 + 0.45 * b))
+	put(root, _mesh(acc), glow(Color.WHITE, true))
+	var tip := pts[40]
+	var dd := (pts[40] - pts[37]).normalized()
+	put(root, tube(line(tip - dd * 0.3, tip + dd * 0.02, 12), func(t): var w: float = 0.13 * (1.0 - t) ** 0.8 if t > 0.25 else 0.13 * t / 0.25; return Vector2(w, w * 0.25 + 0.006), 4, Vector3(0, 0, 1), true), metal(STEEL, 0.18))
+	# the mark: a small red ring where it lands
+	put(root, torus(0.1, 0.15), glow(Color(1.0, 0.3, 0.15)), Transform3D(Basis(Vector3.RIGHT, 1.2), tip + Vector3(0.05, -0.12, 0)))
 
 static func _m_burning_pitch(root: Node3D) -> void:
-	# a broad steel arrowhead and its pitch-soaked wrap, ablaze
-	var a := Vector3(-0.95, -0.95, 0)
-	var b := Vector3(0.95, 0.95, 0)
-	arrow(root, a, b, metal(Color(0.8, 0.82, 0.86), 0.2), mat(Color(0.42, 0.26, 0.12), 0.6, "wood"), Color(0.9, 0.86, 0.78), 0.5, 0.24)
-	var w := Vector3(0.3, 0.3, 0)
-	put(root, tube(line(w - Vector3(0.14, 0.14, 0), w + Vector3(0.1, 0.1, 0), 6), func(t): return Vector2.ONE * (0.07 + 0.04 * sin(t * PI)), 10), mat(Color(0.06, 0.04, 0.03), 0.25))
-	flames(root, w + Vector3(-0.05, 0.05, 0.1), 0.26, 0.95, 5, Vector3(-0.4, 1.0, 0).normalized(), 3)
-	flames(root, w + Vector3(-0.3, -0.2, 0.15), 0.16, 0.55, 3, Vector3(-0.6, 1.0, 0).normalized(), 5)
+	# a painted clay pot brimming with black pitch, ablaze, the pitch running
+	# down its side
+	var prof := [Vector2(0.0, -0.95), Vector2(0.3, -0.95), Vector2(0.36, -0.9), Vector2(0.5, -0.65), Vector2(0.66, -0.3), Vector2(0.7, -0.05), Vector2(0.62, 0.22), Vector2(0.42, 0.4), Vector2(0.32, 0.46), Vector2(0.34, 0.52), Vector2(0.44, 0.56), Vector2(0.45, 0.6), Vector2(0.3, 0.6), Vector2(0.0, 0.5)]
+	var col := func(i: int, a: float) -> Color:
+		var y: float = prof[i].y
+		var terra := Color(0.7, 0.3, 0.13)
+		if (y > -0.4 and y < -0.28) or (y > 0.1 and y < 0.18) or y > 0.5:
+			return Color(0.06, 0.04, 0.03)
+		if y > -0.25 and y < 0.08 and absf(sin(a * 6.0)) > 0.75:
+			return Color(0.06, 0.04, 0.03)
+		return terra
+	var pot := Node3D.new()
+	root.add_child(pot)
+	pot.transform = Transform3D(Basis(Vector3.RIGHT, 0.22), Vector3(0, -0.15, 0))
+	put(pot, lathe(prof, 48, Callable(), col), painted(0.55))
+	# the pitch: a glossy black pool in the mouth and two runs down the side
+	put(pot, disc(0.36, func(r, _a): return 0.03 * (1.0 - r / 0.36), 6, 32), mat(Color(0.02, 0.015, 0.01), 0.08), Transform3D(Basis(Vector3.RIGHT, -PI / 2), Vector3(0, 0.6, 0)))
+	for k in 2:
+		var a := 1.2 + k * 0.7
+		var o := Vector3(cos(a) * 0.44, 0.58, sin(a) * 0.44)
+		var o2 := Vector3(cos(a) * 0.64, 0.05 - k * 0.25, sin(a) * 0.64)
+		put(pot, tube(bez(o, o + Vector3(cos(a) * 0.1, -0.2, sin(a) * 0.1), o2 + Vector3(cos(a) * 0.08, 0.3, sin(a) * 0.08), o2, 14), func(t): return Vector2.ONE * (0.05 + 0.03 * t * t), 10), mat(Color(0.02, 0.015, 0.01), 0.08))
+		put(pot, sphere(0.085), mat(Color(0.02, 0.015, 0.01), 0.08), Transform3D(Basis(), o2))
+	flames(root, Vector3(0, 0.5, 0.1), 0.34, 1.05, 5, Vector3.UP, 3)
 
 static func _m_phobos(root: Node3D) -> void:
-	# Phobos' spear: upright, a long barbed head of dark steel, its edge glowing
-	# red, red pennons streaming from the socket
-	var dark := metal(Color(0.42, 0.38, 0.4), 0.25)
-	var a := Vector3(-0.22, -1.0, 0)
-	var b := Vector3(0.16, 1.0, 0)
-	spear(root, a, b, dark, 1.05, 0.32, 0.065, mat(Color(0.12, 0.06, 0.05), 0.5, "wood"), 0.35)
+	# Phobos' spear, close up: a huge obsidian spearhead cracked with red fire,
+	# gold rings on its socket, a red aura of panic
+	var dark := metal(Color(0.16, 0.13, 0.15), 0.14)
+	var a := Vector3(-0.42, -1.05, 0)
+	var b := Vector3(0.3, 1.0, 0)
+	var hl := 1.5
+	var hw := 0.46
+	spear(root, a, b, dark, hl, hw, 0.075, mat(Color(0.12, 0.06, 0.05), 0.5, "wood"), 0.38)
 	var d := (b - a).normalized()
 	var x := d.cross(Vector3(0, 0, 1)).normalized()
-	var base := b - d * 0.95
-	# the glowing fuller along the blade
-	put(root, tube(line(base + d * 0.08, b - d * 0.08, 10), func(t): return Vector2.ONE * (0.025 * sin(PI * t) + 0.004), 6), glow(Color(1.0, 0.25, 0.08)), Transform3D(Basis(), Vector3(0, 0, 0.07)))
-	# barbs sweeping back from the head's base
-	for s in [-1.0, 1.0]:
-		var o := base + d * 0.06
-		put(root, tube(bez(o, o + x * s * 0.14, o + x * s * 0.24 - d * 0.06, o + x * s * 0.28 - d * 0.22, 10), func(t): return Vector2(lerpf(0.05, 0.004, t), lerpf(0.02, 0.003, t)), 4, Vector3(0, 0, 1), true), dark)
-	# gold rings
+	var base := b - d * hl
+	# the cracks: glowing seams on the blade's face, a spine and branches to the edges
+	var acc := _acc()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var zof := func(t: float, e: float) -> float:
+		var w := _leaf(t, hw, 0.38)
+		return (w * 0.3 + 0.004) * (1.0 - absf(e) / maxf(w, 0.001)) + 0.012
+	var spine := PackedVector3Array()
+	for k in 15:
+		var t := lerpf(0.06, 0.9, float(k) / 14.0)
+		var e := 0.03 * sin(k * 2.3)
+		spine.append(base + d * t * hl + x * e + Vector3(0, 0, zof.call(t, e)))
+	tube_acc(acc, spine, func(t): return Vector2.ONE * (0.026 * (1.0 - t * 0.6)), 6, Vector3(0, 0, 1), false, func(t, _a): return Color(1.0, 0.75 - t * 0.4, 0.3 - t * 0.2))
+	for k in 6:
+		var t0 := lerpf(0.15, 0.7, float(k) / 5.0)
+		var s := 1.0 if k % 2 == 0 else -1.0
+		var br := PackedVector3Array()
+		var w := _leaf(t0, hw, 0.38)
+		for j in 6:
+			var f := float(j) / 5.0
+			var t := t0 + f * 0.1
+			var e := s * f * w * 0.85 + rng.randf_range(-0.02, 0.02)
+			br.append(base + d * t * hl + x * e + Vector3(0, 0, zof.call(t, e)))
+		tube_acc(acc, br, func(t): return Vector2.ONE * lerpf(0.016, 0.005, t), 6, Vector3(0, 0, 1), false, func(_t, _a): return Color(1.0, 0.3, 0.08))
+	put(root, _mesh(acc), glow(Color.WHITE))
 	for k in 3:
-		put(root, torus(0.055, 0.085), metal(GOLD, 0.25), along(base - d * (0.2 + k * 0.08), d))
-	# pennons
-	var o2 := base - d * 0.2
-	var p := bez(o2, o2 + Vector3(-0.3, 0.05, 0.1), o2 + Vector3(-0.45, -0.3, 0.05), o2 + Vector3(-0.7, -0.35, 0.0), 16)
-	put(root, tube(p, func(t): return Vector2(0.11 * (1.0 - t * 0.5), 0.012), 6, Vector3(0, 0, 1)), mat(Color(0.7, 0.05, 0.03), 0.7, "rough"))
+		put(root, torus(0.075, 0.11), metal(GOLD, 0.22), along(base - d * (0.06 + k * 0.1), d))
+	wisps(root, [bez(base + Vector3(-0.2, 0.2, -0.2), base + Vector3(-0.6, 0.5, -0.2), base + Vector3(-0.4, 0.9, -0.2), base + Vector3(-0.8, 1.2, -0.2), 12),
+		bez(base + Vector3(0.3, 0.0, -0.2), base + Vector3(0.7, 0.2, -0.2), base + Vector3(0.6, -0.2, -0.2), base + Vector3(0.95, -0.35, -0.2), 12)], 0.12, Color(1.0, 0.45, 0.3), Color(0.5, 0.02, 0.02))
 
 static func _m_deimos(root: Node3D) -> void:
-	# Deimos' sword: a forward-curved kopis, the blade widening to its belly
-	var g := Vector3(-0.42, -0.5, 0)
-	var p := bez(g, g + Vector3(0.3, 0.5, 0), g + Vector3(0.95, 0.95, 0), g + Vector3(1.38, 1.4, 0), 30)
-	put(root, tube(p, func(t): var w: float = (0.1 + 0.12 * t ** 1.3) * (1.0 if t < 0.82 else (1.0 - (t - 0.82) / 0.18) ** 0.8); return Vector2(w, w * 0.18 + 0.006), 4, Vector3(0, 0, 1), true), metal(Color(0.86, 0.88, 0.93), 0.34))
-	var d := (p[1] - p[0]).normalized()
-	var x := d.cross(Vector3(0, 0, 1)).normalized()
-	put(root, tube(line(g - x * 0.26, g + x * 0.26, 6), func(t): return Vector2.ONE * (0.05 + 0.03 * absf(t - 0.5) * 2.0), 10), metal(GOLD, 0.28))
-	var hp := bez(g, g - d * 0.15, g - d * 0.32 - x * 0.02, g - d * 0.42 - x * 0.12, 10)
-	put(root, tube(hp, func(_t): return Vector2(0.055, 0.05), 10), mat(Color(0.18, 0.08, 0.2), 0.6, "rough"))
-	put(root, sphere(0.08), metal(GOLD, 0.25), Transform3D(Basis(), hp[hp.size() - 1]))
-	wisps(root, [bez(Vector3(-0.1, 0.4, -0.1), Vector3(-0.4, 0.6, 0), Vector3(-0.2, 0.9, 0), Vector3(-0.6, 1.05, 0), 12),
-		bez(Vector3(0.5, -0.1, -0.1), Vector3(0.8, -0.3, 0), Vector3(0.7, -0.6, 0), Vector3(1.0, -0.8, 0), 12),
-		bez(Vector3(0.2, 0.1, -0.2), Vector3(0.1, -0.3, -0.1), Vector3(0.4, -0.5, 0), Vector3(0.3, -0.95, 0), 12)], 0.11, Color(0.85, 0.5, 1.0), Color(0.3, 0.05, 0.5))
+	# Deimos, dread: a black horned war helm, its eye slits burning violet
+	var iron := metal(Color(0.2, 0.19, 0.22), 0.2)
+	var helm := Node3D.new()
+	root.add_child(helm)
+	helm.rotation = Vector3(0.05, -0.32, 0)
+	# the bowl and the face plate (a lathed dome, flattened front to back)
+	var prof := []
+	for i in 21:
+		var t := float(i) / 20.0
+		var y := lerpf(-0.75, 0.62, t)
+		var r := 0.52 * sqrt(maxf(0.0, 1.0 - pow((y - 0.0) / 0.68, 2.0))) if y > 0.0 else 0.52 - 0.08 * (-y / 0.75) ** 2
+		prof.append(Vector2(maxf(r, 0.001), y))
+	prof.append(Vector2(0.0, 0.62))
+	put(helm, lathe(prof, 48), iron, Transform3D(Basis().scaled(Vector3(1.0, 1.0, 0.9)), Vector3.ZERO))
+	# the T of the face opening: black, the eyes glowing in it
+	var tee := PackedVector2Array([Vector2(-0.4, 0.08), Vector2(0.4, 0.08), Vector2(0.4, -0.06), Vector2(0.08, -0.12), Vector2(0.07, -0.75), Vector2(-0.07, -0.75), Vector2(-0.08, -0.12), Vector2(-0.4, -0.06)])
+	put(helm, extrude(tee, 0.02), mat(Color(0.01, 0.0, 0.02), 0.9), Transform3D(Basis(), Vector3(0, 0, 0.46)))
+	for s in [-1.0, 1.0]:
+		put(helm, sphere(0.075, 0.06), glow(Color(0.85, 0.5, 1.0)), Transform3D(Basis().scaled(Vector3(1.6, 1.0, 0.6)), Vector3(0.22 * s, 0.01, 0.49)))
+		put(helm, sphere(0.14, 0.1), glow(Color(0.6, 0.2, 1.0, 0.4), true), Transform3D(Basis().scaled(Vector3(1.6, 1.0, 0.5)), Vector3(0.22 * s, 0.01, 0.5)))
+		# ram's horns: curling out and down from the temples
+		var o := Vector3(0.42 * s, 0.3, 0.05)
+		var p := bez(o, o + Vector3(0.45 * s, 0.4, 0.0), o + Vector3(0.75 * s, -0.25, 0.15), o + Vector3(0.38 * s, -0.42, 0.3), 24)
+		put(helm, tube(p, func(t): return Vector2.ONE * lerpf(0.13, 0.025, t), 12), mat(Color(0.55, 0.47, 0.36), 0.4, "rough"))
+		for k in 5:
+			put(helm, torus(lerpf(0.11, 0.03, k / 5.0), lerpf(0.145, 0.05, k / 5.0)), mat(Color(0.34, 0.28, 0.2), 0.5), along(p[k * 4 + 2], p[k * 4 + 3] - p[k * 4 + 1]))
+	# a crest ridge of dark steel over the bowl
+	put(helm, tube(bez(Vector3(0, 0.15, 0.45), Vector3(0, 0.72, 0.35), Vector3(0, 0.78, -0.3), Vector3(0, 0.3, -0.5), 16), func(_t): return Vector2(0.03, 0.07), 8, Vector3(1, 0, 0)), metal(GOLD, 0.24))
+	wisps(root, [bez(Vector3(-0.3, -0.6, -0.3), Vector3(-0.7, -0.3, -0.3), Vector3(-0.5, 0.2, -0.3), Vector3(-0.95, 0.5, -0.3), 12),
+		bez(Vector3(0.3, -0.6, -0.3), Vector3(0.7, -0.3, -0.3), Vector3(0.5, 0.2, -0.3), Vector3(0.95, 0.5, -0.3), 12)], 0.13, Color(0.8, 0.5, 1.0), Color(0.25, 0.05, 0.45))
 
 static func _m_enyo(root: Node3D) -> void:
-	# Enyo's bow: a recurve drawn, the arrow level, its head glowing
-	var top := Vector3(-0.32, 0.98, 0)
-	var bot := Vector3(-0.32, -0.98, 0)
+	# Enyo's bow: a heavy horn-and-sinew recurve, drawn, bound in red leather
+	# with gold tips, the arrow's head glowing
 	var limb := func(sgn: float) -> PackedVector3Array:
-		return bez(Vector3(0.18, 0, 0), Vector3(0.22, 0.45 * sgn, 0), Vector3(-0.05, 0.85 * sgn, 0), Vector3(-0.32, 0.98 * sgn, 0), 20)
-	var wood := mat(Color(0.2, 0.09, 0.05), 0.45, "wood")
+		return bez(Vector3(0.18, 0, 0), Vector3(0.26, 0.45 * sgn, 0), Vector3(-0.05, 0.85 * sgn, 0), Vector3(-0.34, 0.98 * sgn, 0), 24)
+	var horn := mat(Color(0.26, 0.12, 0.06), 0.32, "wood")
+	var gold := metal(GOLD, 0.22)
 	for sgn in [1.0, -1.0]:
-		put(root, tube(limb.call(sgn), func(t): return Vector2(lerpf(0.095, 0.04, t), lerpf(0.075, 0.035, t)), 10), wood)
-		put(root, tube(bez(Vector3(-0.32, 0.98 * sgn, 0), Vector3(-0.4, 1.02 * sgn, 0), Vector3(-0.46, 0.98 * sgn, 0), Vector3(-0.47, 0.9 * sgn, 0), 8), func(t): return Vector2.ONE * lerpf(0.032, 0.012, t), 8), mat(Color(0.92, 0.88, 0.76), 0.35))
-	put(root, tube(line(Vector3(0.19, -0.16, 0), Vector3(0.19, 0.16, 0), 4), func(_t): return Vector2(0.085, 0.08), 12), mat(Color(0.5, 0.08, 0.06), 0.6, "rough"))
-	var nock := Vector3(-0.72, 0, 0.02)
+		var lp: PackedVector3Array = limb.call(sgn)
+		put(root, tube(lp, func(t): return Vector2(lerpf(0.15, 0.06, t), lerpf(0.11, 0.05, t)), 12), horn)
+		# sinew wraps and a gold band along each limb
+		for k in [6, 12]:
+			put(root, torus(lerpf(0.13, 0.08, k / 24.0), lerpf(0.165, 0.105, k / 24.0)), gold, along(lp[k], lp[k + 1] - lp[k - 1]))
+		var tipc := bez(Vector3(-0.34, 0.98 * sgn, 0), Vector3(-0.44, 1.03 * sgn, 0), Vector3(-0.52, 0.98 * sgn, 0), Vector3(-0.53, 0.88 * sgn, 0), 10)
+		put(root, tube(tipc, func(t): return Vector2.ONE * lerpf(0.055, 0.02, t), 10), gold)
+	put(root, tube(line(Vector3(0.2, -0.2, 0), Vector3(0.2, 0.2, 0), 4), func(_t): return Vector2(0.15, 0.12), 14), mat(Color(0.55, 0.06, 0.05), 0.6, "rough"))
+	var nock := Vector3(-0.78, 0, 0.02)
 	var sm := mat(Color(0.95, 0.92, 0.84), 0.5)
-	put(root, tube(line(top, nock, 6), func(_t): return Vector2(0.012, 0.012), 6), sm)
-	put(root, tube(line(nock, bot, 6), func(_t): return Vector2(0.012, 0.012), 6), sm)
-	arrow(root, nock, Vector3(0.98, 0, 0.04), metal(Color(0.85, 0.25, 0.2), 0.25), mat(Color(0.5, 0.32, 0.16), 0.6, "wood"), Color(0.15, 0.1, 0.1), 0.3, 0.12)
-	put(root, sphere(0.1), glow(Color(1.0, 0.4, 0.3)), Transform3D(Basis(), Vector3(0.82, 0, 0.04)))
-	root.rotation = Vector3(0, -0.35, 0)
+	put(root, tube(line(Vector3(-0.36, 0.97, 0), nock, 6), func(_t): return Vector2(0.022, 0.022), 6), sm)
+	put(root, tube(line(nock, Vector3(-0.36, -0.97, 0), 6), func(_t): return Vector2(0.022, 0.022), 6), sm)
+	arrow(root, nock, Vector3(1.0, 0, 0.06), metal(Color(0.85, 0.2, 0.15), 0.2), mat(Color(0.12, 0.07, 0.05), 0.5, "wood"), Color(0.08, 0.05, 0.05), 0.34, 0.15)
+	put(root, sphere(0.13), glow(Color(1.0, 0.45, 0.3, 0.5), true), Transform3D(Basis(), Vector3(0.84, 0, 0.06)))
+	root.rotation = Vector3(0, -0.2, 0.0)
 
 static func _m_sarissa(root: Node3D) -> void:
-	# a fan of three long pikes behind a small bronze shield
-	var m := metal(Color(0.8, 0.82, 0.86), 0.22)
-	spear(root, Vector3(-0.12, -1.0, -0.1), Vector3(-0.8, 0.98, -0.1), m, 0.36, 0.11, 0.045)
-	spear(root, Vector3(0.0, -1.0, -0.05), Vector3(0.0, 1.0, -0.05), m, 0.36, 0.11, 0.045)
-	spear(root, Vector3(0.12, -1.0, -0.1), Vector3(0.8, 0.98, -0.1), m, 0.36, 0.11, 0.045)
-	var sh := Node3D.new()
-	root.add_child(sh)
-	sh.transform = Transform3D(Basis(Vector3.UP, -0.3).scaled(Vector3(0.48, 0.48, 0.48)), Vector3(0, -0.45, 0.25))
-	put(sh, disc(1.0, func(r, _a): return _hoplon(r), 32, 64), metal(TIER_METAL.bronze, 0.3))
-	put(sh, disc(0.55, func(r, _a): return _hoplon(r) + 0.01, 16, 64, func(r, a): return Color(0.55, 0.04, 0.03) if r > 0.25 or absf(sin(a * 4.0)) > 0.5 else Color(0.95, 0.9, 0.8)), painted(0.45))
+	# a phalanx lowering its sarissas: five long pikes, parallel, staggered in
+	# depth, red ribbons under the heads (a hatch of shafts, unlike any blade)
+	var m := metal(Color(0.8, 0.82, 0.86), 0.18)
+	var d := Vector3(1.0, 0.62, 0).normalized()
+	var x := d.cross(Vector3(0, 0, 1)).normalized()
+	for k in 5:
+		var f := float(k) - 2.0
+		var o := x * f * 0.3 + d * (-absf(f) * 0.12) + Vector3(0, 0, -0.14 * absf(f))
+		var a := o - d * 1.35
+		var b := o + d * 1.2
+		spear(root, a, b, m, 0.34, 0.1, 0.042, mat(Color(0.42, 0.25, 0.12), 0.6, "wood"))
+		var t0 := b - d * 0.42
+		put(root, tube(bez(t0, t0 - x * 0.06 - d * 0.04, t0 - x * 0.14 - d * 0.05, t0 - x * 0.22 - d * 0.12, 8), func(t): return Vector2(lerpf(0.05, 0.02, t), 0.012), 6), mat(CLOTH_RED, 0.8, "rough"))
 
 static func _m_aegis(root: Node3D) -> void:
-	# Athena's aegis: a golden shield ringed with snakes, a gorgon boss, a ward of light behind
-	var sh := Node3D.new()
-	root.add_child(sh)
-	sh.transform = Transform3D(Basis(Vector3.UP, -0.38) * Basis(Vector3.RIGHT, -0.12), Vector3.ZERO)
-	put(sh, disc(0.86, func(r, _a): return _hoplon(r / 0.86 * 0.95) * 0.9, 36, 72), metal(GOLD, 0.24))
-	# the snake rim: a scaly green body winding round the edge
-	var ring := PackedVector3Array()
-	for k in 145:
-		var a := TAU * k / 144.0
-		var rr := 0.9 + 0.035 * sin(a * 14.0)
-		ring.append(Vector3(cos(a) * rr, sin(a) * rr, 0.06 + 0.04 * cos(a * 14.0)))
-	put(sh, tube(ring, func(_t): return Vector2(0.07, 0.07), 10), metal(Color(0.3, 0.62, 0.22), 0.35))
-	for k in 4:
-		var a := TAU * k / 4.0 + 0.5
-		var o := Vector3(cos(a), sin(a), 0) * 0.92
-		put(sh, sphere(0.1, 0.16), metal(Color(0.3, 0.62, 0.22), 0.3), Transform3D(Basis(Vector3(0, 0, 1), a), o + Vector3(0, 0, 0.1)))
-	# the boss: a silver disc ringed in gold
-	put(sh, disc(0.3, func(r, _a): return 0.24 + 0.1 * (1.0 - (r / 0.3) ** 2), 12, 48), metal(Color(0.85, 0.87, 0.9), 0.2))
-	put(sh, torus(0.28, 0.34), metal(GOLD, 0.25), Transform3D(Basis(Vector3.RIGHT, PI / 2), Vector3(0, 0, 0.25)))
-	put(sh, sphere(0.07), metal(GOLD, 0.2), Transform3D(Basis(), Vector3(0, 0, 0.35)))
-	# the ward of light behind it
-	put(root, torus(0.98, 1.08), glow(Color(0.7, 0.85, 1.0)), Transform3D(Basis(Vector3.RIGHT, PI / 2), Vector3(0, 0, -0.35)))
+	# Athena's owl, the guardian: a silver owl, bronze wings spread to shield,
+	# eyes of glowing gold
+	var silver := metal(Color(0.8, 0.82, 0.86), 0.2)
+	var gold := metal(GOLD, 0.22)
+	var wingm := metal(TIER_METAL.bronze.darkened(0.15), 0.24)
+	# the body and head
+	put(root, sphere(0.42), silver, Transform3D(Basis().scaled(Vector3(0.95, 1.2, 0.8)), Vector3(0, -0.28, 0)))
+	put(root, sphere(0.34), silver, Transform3D(Basis().scaled(Vector3(1.1, 0.95, 0.85)), Vector3(0, 0.36, 0.06)))
+	# breast feathers: rows of small scallops
+	for row in 3:
+		for k in 4 - row % 2:
+			var xx := (k - (1.5 - (row % 2) * 0.5)) * 0.16
+			put(root, sphere(0.07, 0.05), gold, Transform3D(Basis(), Vector3(xx, -0.18 - row * 0.15, 0.33 - row * 0.02)))
+	# the facial disc, the eyes, the beak, the ear tufts
+	for s in [-1.0, 1.0]:
+		put(root, disc(0.15, func(r, _a): return 0.03 * (1.0 - r / 0.15), 8, 32), gold, Transform3D(Basis(), Vector3(0.15 * s, 0.4, 0.33)))
+		put(root, sphere(0.1), glow(Color(1.0, 0.75, 0.15)), Transform3D(Basis().scaled(Vector3(1, 1, 0.5)), Vector3(0.15 * s, 0.4, 0.37)))
+		put(root, sphere(0.045), mat(Color(0.01, 0.01, 0.01), 0.1), Transform3D(Basis(), Vector3(0.15 * s, 0.4, 0.43)))
+		put(root, cyl(0.07, 0.0, 0.2, 12), silver, Transform3D(Basis(Vector3(0, 0, 1), -0.45 * s), Vector3(0.22 * s, 0.68, 0.02)))
+		# the wing: five long flight feathers fanned out and up from the shoulder
+		var sh := Vector3(0.26 * s, 0.05, -0.05)
+		for k in 5:
+			var ang := lerpf(1.05, -0.25, k / 4.0)
+			var L := lerpf(0.82, 0.55, k / 4.0)
+			var dir := Vector3(cos(ang) * s, sin(ang), 0)
+			var tip := sh + dir * L
+			put(root, tube(line(sh, tip, 14), func(t): var w: float = 0.12 * sin(PI * clampf(t * 0.85 + 0.15, 0.0, 1.0)) ** 0.6; return Vector2(w, 0.025), 4, Vector3(0, 0, 1), true),
+				wingm if k % 2 == 0 else gold, Transform3D(Basis(), Vector3(0, 0, -0.04 * k)))
+	put(root, cyl(0.06, 0.0, 0.14, 12), gold, Transform3D(Basis(Vector3.RIGHT, PI), Vector3(0, 0.27, 0.4)))
+	# the talons on a gold bar
+	put(root, tube(line(Vector3(-0.5, -0.85, 0.1), Vector3(0.5, -0.85, 0.1), 4), func(_t): return Vector2.ONE * 0.05, 10), gold)
 
 static func _m_sun_ray(root: Node3D) -> void:
-	# Apollo's sun: a blazing disc throwing long rays, a golden arrow across it
+	# Apollo's sun: a blazing disc in a gold ring throwing long rays
 	var acc := _acc()
 	for k in 16:
 		var a := TAU * k / 16.0 + 0.1
@@ -905,7 +1049,6 @@ static func _m_sun_ray(root: Node3D) -> void:
 		prof.append(Vector2(0.42 * sin(t * PI * 0.5), 0.42 * cos(t * PI * 0.5)))
 	put(root, lathe(prof, 40, Callable(), col), glow(Color.WHITE), Transform3D(Basis(Vector3.RIGHT, PI / 2), Vector3.ZERO))
 	put(root, torus(0.42, 0.5), metal(GOLD, 0.2), Transform3D(Basis(Vector3.RIGHT, PI / 2), Vector3(0, 0, 0.02)))
-	arrow(root, Vector3(-0.95, -0.7, 0.45), Vector3(0.98, 0.72, 0.45), metal(GOLD, 0.2), metal(Color(0.9, 0.7, 0.35), 0.35), Color(1.0, 0.9, 0.6), 0.3, 0.12)
 
 static func _m_shafts_of_plague(root: Node3D) -> void:
 	# two arrows, their heads coated in glowing green venom, dripping
@@ -955,10 +1098,30 @@ static func _bolt(root: Node3D, a: Vector3, b: Vector3, w: float, seed := 1) -> 
 	put(root, tube(pts, func(t): return Vector2.ONE * lerpf(0.13, 0.03, t), 8, Vector3(0, 0, 1), false, func(_t, _a): return Color(0.5, 0.75, 1.0, 0.35)), glow(Color.WHITE, true))
 
 static func _m_olympian_weapons(root: Node3D) -> void:
-	# a gleaming sword with a golden hilt between two lightning bolts
-	sword(root, Vector3(0, -0.5, 0.05), Vector3.UP, 1.45, 0.16, metal(Color(0.88, 0.9, 0.95), 0.12), metal(GOLD, 0.22), mat(Color(0.25, 0.12, 0.45), 0.6, "rough"))
-	_bolt(root, Vector3(-0.45, 1.0, -0.1), Vector3(-0.75, -0.6, -0.1), 0.14, 2)
-	_bolt(root, Vector3(0.5, 1.0, -0.1), Vector3(0.78, -0.55, -0.1), 0.14, 5)
+	# Zeus' keraunos, forged by Hephaestus: a gold thunderbolt, a ringed grip,
+	# three lightning prongs fanning from each flared end
+	var gold := metal(GOLD, 0.2)
+	var bolt := Node3D.new()
+	root.add_child(bolt)
+	bolt.rotation = Vector3(0, 0, -0.32)
+	put(bolt, tube(line(Vector3(0, -0.28, 0), Vector3(0, 0.28, 0), 8), func(t): return Vector2.ONE * (0.08 + 0.025 * sin(t * PI)), 14), gold)
+	for k in 3:
+		put(bolt, torus(0.08, 0.13), gold, Transform3D(Basis(), Vector3(0, -0.18 + k * 0.18, 0)))
+	for s in [-1.0, 1.0]:
+		put(bolt, cyl(0.09, 0.2, 0.22, 20), gold, Transform3D(Basis(Vector3.RIGHT, 0.0 if s > 0 else PI), Vector3(0, 0.38 * s, 0)))
+		for j in 3:
+			var ang := (j - 1) * 0.62
+			var dir := Vector3(sin(ang), cos(ang) * s, 0)
+			var a0 := Vector3(0, 0.46 * s, 0)
+			var a1 := a0 + dir * (0.9 if j == 1 else 0.72)
+			var side := dir.cross(Vector3(0, 0, 1)).normalized()
+			var zz := PackedVector3Array()
+			for q in 6:
+				var t := q / 5.0
+				zz.append(a0.lerp(a1, t) + side * (0.0 if q == 0 or q == 5 else (0.1 if q % 2 == 1 else -0.1)))
+			# a gold zigzag prong, sharp-edged, in a blue-white glow
+			put(bolt, tube(zz, func(t): return Vector2(lerpf(0.11, 0.02, t), lerpf(0.07, 0.015, t)), 4, Vector3(0, 0, 1), true), gold)
+			put(bolt, tube(zz, func(t): return Vector2.ONE * lerpf(0.16, 0.04, t), 8, Vector3(0, 0, 1), false, func(_t, _a): return Color(0.45, 0.7, 1.0, 0.45)), glow(Color.WHITE, true), Transform3D(Basis(), Vector3(0, 0, -0.08)))
 
 static func _m_harvest_of_souls(root: Node3D) -> void:
 	# a scythe, souls rising from its blade
@@ -973,6 +1136,28 @@ static func _m_harvest_of_souls(root: Node3D) -> void:
 		bez(Vector3(-0.3, -0.95, 0.05), Vector3(-0.5, -0.6, 0.05), Vector3(-0.2, -0.45, 0.05), Vector3(-0.35, -0.1, 0.05), 14)], 0.13, Color(0.75, 1.0, 0.95), Color(0.2, 0.7, 0.8))
 	for p in [Vector3(-0.8, 0.45, 0.12), Vector3(0.0, 0.4, 0.17), Vector3(-0.35, -0.1, 0.07)]:
 		put(root, sphere(0.09), glow(Color(0.85, 1.0, 1.0)), Transform3D(Basis(), p))
+
+## A xiphos (the hoplite's leaf-bladed short sword), hilt guard at g, blade
+## along dir, length L, half width w: a waisted leaf blade with a raised
+## midrib, a crossguard with flared ends, a cord-bound grip, a disc pommel.
+static func xiphos(root: Node3D, g: Vector3, dir: Vector3, L: float, w: float, m: Material, hilt: Material, grip: Material = null) -> void:
+	var d := dir.normalized()
+	var x := d.cross(Vector3(0, 0, 1)).normalized()
+	var wf := func(t: float) -> float:
+		# waisted near the hilt, the leaf's belly at two thirds, then the point
+		var ww: float = w * (0.72 + 0.16 * sin(PI * clampf((t - 0.05) / 0.9, 0.0, 1.0)) + 0.14 * exp(-pow((t - 0.62) / 0.16, 2.0)))
+		return ww * (1.0 if t < 0.74 else pow(1.0 - (t - 0.74) / 0.26, 0.85))
+	put(root, tube(line(g, g + d * L, 32), func(t): var ww: float = wf.call(t); return Vector2(ww, ww * 0.2 + 0.006), 4, Vector3(0, 0, 1), true), m)
+	# the midrib: a thin bright ridge down the blade
+	put(root, tube(line(g + d * 0.04, g + d * L * 0.9, 12), func(t): return Vector2.ONE * (0.022 * (1.0 - t * 0.8) + 0.004), 6), m, Transform3D(Basis(), Vector3(0, 0, w * 0.18)))
+	# guard: a bar thickest at its flared ends
+	put(root, tube(line(g - x * w * 1.9, g + x * w * 1.9, 10), func(t): return Vector2.ONE * (0.04 + 0.035 * pow(absf(t - 0.5) * 2.0, 3.0)), 10), hilt)
+	if grip == null:
+		grip = mat(LEATHER, 0.7, "rough")
+	put(root, tube(line(g - d * 0.03, g - d * 0.32, 8), func(t): return Vector2.ONE * (0.042 + 0.008 * sin(t * PI)), 10), grip)
+	for k in 3:
+		put(root, torus(0.04, 0.058), hilt, along(g - d * (0.08 + k * 0.1), d))
+	put(root, cyl(0.075, 0.075, 0.05, 20), hilt, along(g - d * 0.36, d))
 
 # ---- Market ----------------------------------------------------------------------------
 
@@ -1283,14 +1468,37 @@ static func _m_monstrous_rage(root: Node3D) -> void:
 		bez(Vector3(0.5, -0.3, -0.3), Vector3(0.8, 0.0, -0.3), Vector3(0.6, 0.4, -0.3), Vector3(0.95, 0.75, -0.3), 12)], 0.16, Color(1.0, 0.35, 0.1), Color(0.5, 0.0, 0.0))
 
 static func _m_pious_sacrifice(root: Node3D) -> void:
-	# a marble altar with its offering ablaze
-	var marble := mat(Color(0.9, 0.87, 0.8), 0.35, "rough")
-	put(root, box(Vector3(1.5, 0.16, 0.9)), marble, Transform3D(Basis(), Vector3(0, -0.92, 0)))
-	put(root, box(Vector3(1.2, 0.72, 0.7)), marble, Transform3D(Basis(), Vector3(0, -0.5, 0)))
-	put(root, box(Vector3(1.0, 0.36, 0.05)), mat(Color(0.62, 0.12, 0.08), 0.6), Transform3D(Basis(), Vector3(0, -0.5, 0.36)))
-	put(root, box(Vector3(1.45, 0.14, 0.86)), marble, Transform3D(Basis(), Vector3(0, -0.08, 0)))
+	# a marble altar, its front hung with gold garlands and rosettes between
+	# fluted corner posts, a log pile on top ablaze
+	var marble := mat(Color(0.74, 0.71, 0.65), 0.4, "rough")
+	var shade := mat(Color(0.5, 0.46, 0.41), 0.5, "rough")
+	var gold := metal(GOLD, 0.22)
+	put(root, box(Vector3(1.55, 0.16, 0.95)), marble, Transform3D(Basis(), Vector3(0, -0.92, 0)))
+	put(root, box(Vector3(1.4, 0.06, 0.85)), shade, Transform3D(Basis(), Vector3(0, -0.82, 0)))
+	put(root, box(Vector3(1.2, 0.72, 0.7)), marble, Transform3D(Basis(), Vector3(0, -0.45, 0)))
+	put(root, box(Vector3(1.4, 0.06, 0.85)), shade, Transform3D(Basis(), Vector3(0, -0.07, 0)))
+	put(root, box(Vector3(1.5, 0.14, 0.92)), marble, Transform3D(Basis(), Vector3(0, 0.03, 0)))
+	# fluted posts at the front corners
 	for s in [-1.0, 1.0]:
-		put(root, cyl(0.1, 0.1, 0.86, 16), marble, Transform3D(Basis(Vector3.RIGHT, PI / 2), Vector3(0.62 * s, 0.02, 0)))
-	put(root, box(Vector3(0.7, 0.12, 0.35)), mat(DARK_WOOD, 0.8, "wood"), Transform3D(Basis(Vector3.UP, 0.3), Vector3(0, 0.05, 0)))
-	flames(root, Vector3(0, 0.05, 0.05), 0.42, 0.95, 5, Vector3.UP, 9)
-	root.rotation = Vector3(0.12, -0.45, 0)
+		put(root, cyl(0.1, 0.1, 0.72, 16), marble, Transform3D(Basis(), Vector3(0.56 * s, -0.45, 0.33)))
+		for k in 3:
+			put(root, box(Vector3(0.015, 0.66, 0.02)), shade, Transform3D(Basis(), Vector3(0.56 * s + (k - 1) * 0.05, -0.45, 0.43)))
+		# volutes on the top corners
+		put(root, cyl(0.11, 0.11, 0.92, 18), marble, Transform3D(Basis(Vector3.RIGHT, PI / 2), Vector3(0.64 * s, 0.14, 0)))
+		put(root, torus(0.05, 0.1), gold, Transform3D(Basis(Vector3.RIGHT, PI / 2), Vector3(0.64 * s, 0.14, 0.47)))
+	# two garland swags between three rosettes
+	for k in 3:
+		var x := lerpf(-0.36, 0.36, k / 2.0)
+		put(root, disc(0.07, func(r, a): return 0.03 * (1.0 - r / 0.07) + 0.01 * sin(a * 8.0), 6, 32), gold, Transform3D(Basis(), Vector3(x, -0.2, 0.36)))
+	for k in 2:
+		var x0 := lerpf(-0.36, 0.36, k / 2.0)
+		var x1 := x0 + 0.36
+		put(root, tube(bez(Vector3(x0, -0.22, 0.37), Vector3(x0 + 0.04, -0.46, 0.4), Vector3(x1 - 0.04, -0.46, 0.4), Vector3(x1, -0.22, 0.37), 16), func(t): return Vector2.ONE * (0.03 + 0.03 * sin(t * PI)), 8), mat(Color(0.25, 0.5, 0.15), 0.6, "rough"))
+	# the log pile
+	var wood := mat(DARK_WOOD, 0.8, "wood")
+	for k in 3:
+		var y := 0.17 + 0.06 * k
+		put(root, cyl(0.06, 0.06, 0.8, 10), wood, Transform3D(Basis(Vector3(0, 0, 1), PI / 2) * Basis(Vector3.RIGHT, 0.0).rotated(Vector3.UP, 0.4 + k * 0.9), Vector3(0, y, 0)))
+	flames(root, Vector3(0, 0.25, 0.05), 0.42, 1.0, 5, Vector3.UP, 9)
+	root.rotation = Vector3(0.18, -0.5, 0)
+

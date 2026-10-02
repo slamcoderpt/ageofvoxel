@@ -1216,30 +1216,45 @@ Mythology: Retold's command panel (`reference/techs/ui_01..05`).
   back two drawn frames later and frees it (a `RenderingServer.force_draw`
   does not render freshly added viewports), then re-bakes any tile already
   made, in place (`ImageTexture.update`). Headless (no renderer): nothing is
-  rendered and the SVG glyphs below are the fallback. The models:
-  **weapons** copper one spear, bronze two crossed spears with red tassels,
-  iron crossed spears behind an upright xiphos; **armor** a muscle cuirass,
-  copper plain, bronze with shoulder guards and a gold medallion, iron
-  (steel) with shoulder guards, gold rivets and leather pteruges; **shields**
-  a hoplon, copper plain with turned rings, bronze a gold star raised on dark
-  blue enamel, iron a crimson face with a silver lambda, steel rim and
-  rivets; so the tiers differ by metal and by silhouette. Ballistics an
-  arrow in a straw target, Burning Pitch a broad arrowhead ablaze, Phobos a
-  dark barbed spear with a glowing red fuller, Deimos a curved kopis in
-  purple dread wisps, Enyo a drawn recurve bow, Sarissa three pikes behind a
-  small shield, Aegis a gold shield ringed by a snake with a ward of light,
-  Sun Ray a blazing sun and a golden arrow, Shafts of Plague two arrows
-  dripping green venom, Forge of Olympus an anvil, a hot ingot, the hammer
-  and sparks, Olympian Weapons a sword between lightning bolts, Harvest of
-  Souls a scythe and rising souls; Tax Collectors a purse and coins,
-  Ambassadors a sealed scroll, Coinage a stack of staters and an owl coin;
-  Omniscience an eye in gold lids with rays, Olympian Parentage a crested
-  Corinthian helmet, Labyrinth the maze from above, Sylvan Lore an oak
-  sprig, Will of Kronos an hourglass, Hymn Pan's pipes, Oracle the Delphic
-  tripod's vapours, Temple of Healing the Rod of Asclepius, Golden Apples,
-  Dionysia grapes, Face of the Gorgon a bronze gorgoneion with snakes and
-  glowing eyes, Monstrous Rage a bull's head with burning eyes, Pious
-  Sacrifice an altar ablaze. A button never shows the bare picture:
+  rendered and the SVG glyphs below are the fallback. **No motif is shared
+  between two Armory lines** (each line owns one silhouette, so a button is
+  told apart by its art, not by its frame or pips): **weapons** are swords
+  (copper one leaf-bladed xiphos with a midrib, bronze two crossed, iron two
+  crossed before a labrys), **armor** a muscle cuirass with pectorals, the
+  ribcage arch, abdominals and two beaded bands at the hem (copper plain,
+  bronze with shoulder guards and a gold medallion, iron steel with shoulder
+  guards, gold rivets and pteruges), **shields** a hoplon turned three
+  quarters so its rolled rim and bowl show (never a flat target), copper a
+  raised gold crescent, bronze a gold star on dark blue enamel, iron a
+  silver lambda on crimson with rivets; Ballistics a bronze pair of dividers
+  astride a glowing trajectory ending in an arrowhead on its mark, Burning
+  Pitch a painted clay pot brimming with black pitch, ablaze, the pitch
+  running down its side, Phobos a huge obsidian spearhead (the only spear)
+  cracked with glowing red seams, Deimos a black ram-horned war helm with
+  burning violet eye slits, Enyo a heavy horn recurve with gold bands and
+  tips, drawn, Sarissa a phalanx of five parallel lowered pikes with red
+  ribbons (a hatch, no shield), Aegis Athena's silver owl with fanned bronze
+  and gold wings and glowing eyes, Sun Ray a blazing sun in a gold ring,
+  Shafts of Plague two arrows dripping green venom, Forge of Olympus an
+  anvil, a hot ingot, the hammer and sparks, Olympian Weapons Zeus' gold
+  keraunos (a ringed grip, three zigzag prongs fanning from each end),
+  Harvest of Souls a scythe and rising souls; Tax Collectors a purse and
+  coins, Ambassadors a sealed scroll, Coinage a stack of staters and an owl
+  coin; Omniscience an eye in gold lids with rays, Olympian Parentage a
+  crested Corinthian helmet, Labyrinth the maze from above, Sylvan Lore an
+  oak sprig, Will of Kronos an hourglass, Hymn Pan's pipes, Oracle the
+  Delphic tripod's vapours, Temple of Healing the Rod of Asclepius, Golden
+  Apples, Dionysia grapes, Face of the Gorgon a bronze gorgoneion with snakes
+  and glowing eyes, Monstrous Rage a bull's head with burning eyes, Pious
+  Sacrifice a marble altar with fluted posts, volutes, garlands and gold
+  rosettes, its log pile ablaze. Materials: every metal carries a wear map
+  (`TechModels._wear()`: tarnish clouds, pits, scratches) on its albedo and
+  roughness over a hammered normal map, and the studio sky has a bright
+  horizon over a dark floor, so curved metal shows a crisp light-over-dark
+  reflection (polished bronze, not plastic); the 256 px render is unsharp-
+  masked after the downscale (`TechIcons._sharpen`) so edges and highlights
+  stay crisp at button size. Iterate with a contact sheet (below).
+  A button never shows the bare picture:
   `TechIcons.tile(name, px, "normal"|"locked")` composites it once (CPU,
   cached; `prewarm_step()` bakes the set one per frame): a background plate
   per tech family (`PLATES` / `PLATE_OF`: ember = weapons, steel = armor,
