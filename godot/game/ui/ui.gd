@@ -27,7 +27,18 @@ const Settings := preload("res://game/ui/settings.gd")
 const AGES := ["Archaic", "Classical", "Heroic", "Mythic"]
 const ROMAN := ["I", "II", "III", "IV"]
 const FLOW := "res://game/menu/flow.gd"   # screen flow (Play Again, Main Menu), when the menu piece is there
-const BUILD_MENU := ["house", "farm", "storehouse", "temple", "barracks", "town_center", "wall", "tower"]
+const BUILD_MENU := ["house", "farm", "storehouse", "temple", "barracks", "armory", "market", "town_center", "wall", "tower"]
+## build-grid tooltip lines of the buildings that research (Retold's help text)
+const BUILD_LINES := {
+	"armory": ["Researches weapon, armor and shield upgrades", "and its gods' military techs."],
+	"market": ["Buys and sells food and wood for gold;", "researches the trade techs."],
+}
+## the command grid's hotkeys by slot (tech buttons: Retold's grid letters;
+## the third row is Y..P, as Z / C / V are the god powers here)
+const SLOT_KEYS := ["Q", "W", "E", "R", "T", "A", "S", "D", "F", "G", "Y", "U", "I", "O", "P"]
+## the Armory's generic lines, one column each in the top row (Retold, ui_02.jpg)
+const ARMORY_COLS := {"weapons": 0, "armor": 1, "shields": 2, "ballistics": 3, "burning_pitch": 4}
+const TechIcons := preload("res://game/ui/tech_icons.gd")
 const FORT_TYPES := {"wall": true, "wall_pillar": true, "gate": true, "tower": true}
 const GHOST_OK := Color(0.49, 1.0, 0.6, 0.45)
 const GHOST_BAD := Color(1.0, 0.35, 0.29, 0.45)
@@ -126,6 +137,8 @@ func setup(g: Node) -> void:
 		_bdefs[n] = sim.get_building_def(n)
 	for n in sim.power_names():
 		_pdefs[n] = sim.get_power_def(n)
+	_tech_names = sim.tech_names() if sim.has_method("tech_names") else PackedStringArray()
+	AovScenes.set_setup("techui", _techui_setup)
 	hud_visible = AovArgs.flag(g.args, "hud", bool(g.scene_def.get("hud", false)))
 	_fog_on = AovArgs.flag(g.args, "fog", not bool(g.scene_def.get("reveal_all", false)))
 	# interactive play: formation moves share one path field (PORTING.md);
@@ -137,6 +150,8 @@ func setup(g: Node) -> void:
 	_portraits.name = "Portraits"
 	_portraits.sim = sim
 	add_child(_portraits)
+	if hud_visible:
+		TechIcons.studio_start(self)   # the tech icons' 3D models (TechIcons "the 3D studio")
 
 	_layer = CanvasLayer.new()
 	_layer.layer = 10
@@ -288,6 +303,9 @@ func _frame(dt: float, alpha: float) -> void:
 		_apply_scene_ctx()
 	_handle_events(game.events)
 	_prune_selection()
+	if hud_visible:
+		TechIcons.studio_poll()    # the 3D tech icons, rendered once (tech_models.gd)
+		TechIcons.prewarm_step()   # the tech tiles, one per frame (PORTING.md "Command button states")
 	_update_rings(alpha)
 	_update_markers(dt)
 	_update_ghost()
@@ -307,6 +325,8 @@ func _frame(dt: float, alpha: float) -> void:
 	if _hud_t <= 0.0 or sig != _cmd_sig:
 		_hud_t = 0.2
 		_refresh_hud(sig)
+	if _scene_tip >= 0:
+		_pin_scene_tip()
 	minimap.rotation = game.camera.yaw
 	minimap.refresh(dt)
 	_view_t -= dt
@@ -324,6 +344,93 @@ func _apply_scene_ctx() -> void:
 		if ctx.has("tc"): groups["3"] = [ctx.tc]
 	if ctx.has("select") and hud_visible:
 		set_selection(Array(ctx.select))
+	_scene_tip = int(ctx.get("tip_slot", -1))
+
+var _scene_tip := -1   # techui capture scene: the command slot whose tooltip stays open
+
+## The techui scene's open tooltip: the tip of command slot _scene_tip as if
+## the mouse rested on it (zones exist once the HUD has drawn).
+func _pin_scene_tip() -> void:
+	for z in _back.zones:
+		if z.id == "cmd" and int(z.arg) == _scene_tip and not z.tip.is_empty():
+			var t: Dictionary = z.tip.duplicate()
+			t["anchor"] = z.rect
+			if t != tooltip or hover_id != "cmd:%d" % _scene_tip:
+				tooltip = t
+				hover_id = "cmd:%d" % _scene_tip
+				_redraw()
+			return
+
+## The "techui" capture scene (Godot-only): the town scene's town in the
+## Heroic Age with an Armory, a Market and its Temple; Copper Weapons and
+## Copper Armor researched, Copper Shields and Ballistics in the Armory's
+## queue (the first one under way), two Minotaurs training at the Temple, a
+## few trades made so the prices moved, and 16 favor left so some god techs
+## are short of favor: every button state at once (available, unaffordable,
+## locked by age, locked by a prerequisite: Bronze Shields padlocked behind
+## Copper Shields, researching, queued, training); the Armory selected with
+## the tooltip of its first tech button open.
+##   node scripts/godot-shoot.mjs --scene techui --width 1920 --height 1080
+##     [--params "techui_sel=market"]   # market | temple | armory (default)
+##     [--params "techui_tip=5"]        # the command slot whose tooltip is open (-1: none)
+static func _techui_setup(g: Node) -> Dictionary:
+	var sim2: Object = g.sim
+	var ctx: Dictionary = sim2.setup_scene("town", g.scene_opts())
+	sim2.set_player_age(1, 2)
+	sim2.set_player_resources(1, {"food": 3000.0, "wood": 3000.0, "gold": 3000.0, "favor": 100.0})
+	var B: Dictionary = sim2.get_buildings()
+	var tn: PackedStringArray = B.type_names
+	var tc := Vector2i(-1, -1)
+	var temple := 0
+	for i in int(B.count):
+		if int(B.owner[i]) != 1:
+			continue
+		if tn[B.type[i]] == "town_center":
+			tc = Vector2i(B.rect[i * 4] + B.rect[i * 4 + 2] / 2, B.rect[i * 4 + 1] + B.rect[i * 4 + 3] / 2)
+		elif tn[B.type[i]] == "temple":
+			temple = int(B.ids[i])
+	# two free 4x4 lots near the Town Center, nearest first
+	var lots := []
+	for r in range(6, 20):
+		for k in 32:
+			var a := TAU * k / 32.0
+			var t := Vector2i(tc.x + int(round(cos(a) * r)) - 2, tc.y + int(round(sin(a) * r)) - 2)
+			var ok: bool = sim2.can_place("armory", t.x, t.y)
+			for l in lots:
+				if absi(t.x - l.x) < 6 and absi(t.y - l.y) < 6:
+					ok = false
+			if ok:
+				lots.append(t)
+			if lots.size() == 2:
+				break
+		if lots.size() == 2:
+			break
+	if lots.size() < 2:
+		push_error("techui: no lots for the Armory and the Market")
+		return ctx
+	var armory := int(sim2.spawn_building("armory", 1, lots[0].x, lots[0].y, true))
+	var market := int(sim2.spawn_building("market", 1, lots[1].x, lots[1].y, true))
+	sim2.grant_tech(1, "copper_weapons")
+	sim2.grant_tech(1, "copper_armor")
+	sim2.research(armory, "copper_shields")
+	sim2.research(armory, "ballistics")
+	for k in 3:
+		sim2.market_buy(market, "food")
+	sim2.market_sell(market, "wood")
+	if temple > 0:
+		sim2.train(temple, "minotaur")
+		sim2.train(temple, "minotaur")
+	sim2.tick(12 * 30)   # Copper Shields 40 % done
+	# then a purse that leaves some techs short (the favor of most god techs)
+	sim2.set_player_resources(1, {"food": 1450.0, "wood": 980.0, "gold": 1210.0, "favor": 16.0})
+	var pick := str(g.args.get("techui_sel", "armory"))
+	var sel := market if pick == "market" else temple if pick == "temple" and temple > 0 else armory
+	var focus: Vector2i = lots[1] if sel == market else lots[0]
+	ctx["focus"] = Vector2(focus.x + 2.0, focus.y + 2.0)
+	ctx["select"] = [sel]
+	ctx["tip_slot"] = int(g.args.get("techui_tip", 0))
+	print("techui: armory %d market %d temple %d, selected %d" % [armory, market, temple, sel])
+	return ctx
 
 func _refresh_all() -> void:
 	_refresh_stats()
@@ -366,6 +473,9 @@ func _handle_events(events: Array) -> void:
 					var tk := int(e.a) - 1
 					if tk >= 0 and tk < names.size():
 						batch.append(["%s researched." % str(_tech_def(names[tk]).get("name", names[tk])), true])
+					elif int(e.a) >= 100 and int(e.a) - 100 < _tech_names.size():
+						# an Armory / Market / Temple tech (a = 100 + its id)
+						batch.append(["%s researched." % str(sim.get_tech_def(_tech_names[int(e.a) - 100]).get("name", "")), true])
 					_hud_t = 0.0
 			"unit:trained":
 				if int(e.owner) == me and t > 0.0:
@@ -677,6 +787,7 @@ func _commands_for() -> Array:
 	if sel.is_empty() or int(sel[0].get("owner", 0)) != me:
 		return slots
 	var list := []
+	var tech_bld := {}   # a finished building of the player that researches / trades
 	var us := sel.filter(func(e): return e.kind == "unit")
 	var age := int(player.get("age", 0))
 	if not us.is_empty():
@@ -690,6 +801,10 @@ func _commands_for() -> Array:
 				var c := {"key": str(d.hotkey), "tex": _portraits.building(t, me), "title": "Build %s" % d.name, "cost": d.cost,
 					"enabled": ok_age and _can_afford(d.cost), "action": "build", "arg": t,
 					"warn": "" if ok_age else "Requires the %s Age" % AGES[int(d.min_age)]}
+				if not ok_age:
+					c["age_req"] = int(d.min_age)
+				if BUILD_LINES.has(t):
+					c["lines"] = BUILD_LINES[t] + ["%d hp · %s Age" % [int(d.get("hp", 0)), AGES[clampi(int(d.get("min_age", 0)), 0, 3)]]]
 				if t == "wall":
 					c.title = "Build Wall"
 					c.action = "wall"
@@ -714,8 +829,12 @@ func _commands_for() -> Array:
 			for t in bd.get("trains", []):
 				var d: Dictionary = _defs[t]
 				var ok := int(d.get("min_age", 0)) <= age
-				list.append({"key": str(d.hotkey), "tex": _portraits.unit(t, me), "title": "Train %s" % d.name + ("" if ok else " (requires %s Age)" % AGES[int(d.min_age)]),
-					"cost": d.cost, "enabled": ok and _can_afford(d.cost), "action": "train", "arg": t})
+				var tc := {"key": str(d.hotkey), "tex": _portraits.unit(t, me), "title": "Train %s" % d.name,
+					"cost": d.cost, "enabled": ok and _can_afford(d.cost), "action": "train", "arg": t}
+				if not ok:
+					tc["warn"] = "Requires the %s Age" % AGES[int(d.min_age)]
+					tc["age_req"] = int(d.min_age)
+				list.append(tc)
 			if bool(bd.get("age_up", false)) and age + 1 < AGES.size():
 				var cost: Dictionary = sim.next_age_cost(me)
 				var adv := bool(player.get("advancing", false))
@@ -723,6 +842,10 @@ func _commands_for() -> Array:
 					"cost": cost, "enabled": not adv and _can_afford(cost), "action": "age", "slot": 4})
 			if FORT_TYPES.has(str(b.type)):
 				_fort_commands(b, list)
+			else:
+				tech_bld = b
+				if str(b.type) == "market":
+					_market_commands(b, list)
 	var i := 0
 	for c in list:
 		if c.has("slot") and slots[c.slot] == null:
@@ -732,7 +855,324 @@ func _commands_for() -> Array:
 				i += 1
 			if i < 15:
 				slots[i] = c
+	if not tech_bld.is_empty():
+		_tech_slots(slots, tech_bld)
+	var sb: Dictionary = sel[0] if sel[0].kind == "building" else {}
+	for c in slots:
+		if c != null:
+			_auto_state(c, sb)
 	return slots
+
+# ---- research and trade commands (sim/techs; PORTING.md "Research panel, tooltips, market") ----
+
+var _tech_names: PackedStringArray
+var _tech_page := 0
+var _tech_page_of := 0          # the building the page belongs to
+var _ptechs := {}               # get_player_techs(me), refreshed with the HUD
+
+## Which of a building's techs get a button: not done (researched techs leave
+## the grid; the card lists them), not "unavailable" (their unit is
+## not in this game); a line shows only its next tier (Bronze once Copper is
+## done; greyed until its age); a god's techs appear in his age (Retold: with
+## the god), all gods' while no minor god is chosen, only his once one is;
+## a tech being researched or queued keeps its button (state "researching" /
+## "queued": a progress sweep, its place in the queue); the step after a tech
+## under way (`busy`: researching / queued) shows padlocked, "Requires <it>",
+## so the line's next step is seen waiting on the one in progress.
+func _tech_visible(te: Dictionary, done: Dictionary, busy := {}) -> bool:
+	var st := str(te.state)
+	if st == "unavailable" or st == "done" or st == "locked_god":
+		return false
+	if st == "researching" or st == "queued":
+		return true   # stays on its button with the progress sweep / queue badge
+	if st == "locked_prereq" and busy.has(str(te.requires)):
+		return true   # padlocked: waits on the tech under way
+	if str(te.requires) != "" and not done.has(str(te.requires)):
+		return false
+	if not bool(te.generic) and int(te.age) > int(player.get("age", 0)):
+		return false
+	return true
+
+## Retold-style effect bullets ("Human Soldier: Attack +10%") from a tech's effects.
+func _tech_bullets(te: Dictionary) -> Array:
+	var out := []
+	for f in te.get("effects", []):
+		var v := float(f.value)
+		var what := ""
+		match str(f.kind):
+			"attack": what = "Attack %+d%%" % int(round(v * 100))
+			"hack_armor": what = "Vulnerability to Hack attacks -%d%%" % int(round(v * 100))
+			"pierce_armor": what = "Vulnerability to Pierce attacks -%d%%" % int(round(v * 100))
+			"hp": what = "Hitpoints +%d%% of base" % int(round(v * 100))
+			"speed": what = "Speed +%d%%" % int(round(v * 100))
+			"range": what = "Range +%s" % _num(snappedf(v, 0.1))
+			"sight": what = "Line of Sight +%s" % _num(snappedf(v, 0.1))
+			"regen": what = "Regeneration Rate +%s per second" % _num(v)
+			"reload": what = "Rate of fire %+d%%" % int(round((v - 1.0) * 100))
+			"splash": what = "Area damage radius +%s" % _num(snappedf(v, 0.1))
+			"divine": what = "+%s divine damage per attack" % _num(v)
+			"vs_buildings": what = "Damage vs buildings +%sx" % ("%.1f" % v)
+			"vs_myth": what = "Damage vs myth units +%sx" % ("%.1f" % v)
+			"arrow_speed": what = "Projectile speed +%d%%" % int(round(v * 100))
+			"track": what = "Track rating +%s" % _num(v)
+			"poison": what = "Poison %s damage/s for 6 s" % _num(v)
+			"heal_aura": what = "Heals nearby units %s hp/s" % _num(v)
+			"favor": what = "Favor rate +%d%%" % int(round(v * 100))
+			"market_fee": what = "Market fee %d%%" % int(round(v * 100))
+			"tribute_fee": what = "Tribute fee %d%%" % int(round(v * 100))
+		if what == "":
+			continue
+		var groups := _class_groups(Array(f.get("units", [])))
+		for who in groups:
+			out.append("%s: %s" % [who, what])
+		if bool(f.get("buildings", false)):
+			out.append("Buildings: %s" % what)
+		if groups.is_empty() and not bool(f.get("buildings", false)):
+			out.append(what)
+	return out
+
+## Retold's unit classes of a tech's units: "All Units", "Human Soldier"
+## (hoplite, toxotes, hippikon), "Hero", "Myth Unit" (the four myth units),
+## else each unit's name.
+func _class_groups(units: Array) -> Array:
+	if units.is_empty():
+		return []
+	var set := {}
+	for u in units:
+		set[str(u)] = true
+	if set.size() >= 9:
+		return ["All Units"]
+	var out := []
+	var human := ["hoplite", "toxotes", "hippikon"]
+	var myth := ["minotaur", "cyclops", "centaur", "medusa"]
+	if human.all(func(k): return set.has(k)):
+		out.append("Human Soldier")
+		for k in human: set.erase(k)
+	if myth.all(func(k): return set.has(k)):
+		out.append("Myth Unit")
+		for k in myth: set.erase(k)
+	if set.has("hero"):
+		out.append("Hero")
+		set.erase("hero")
+	for u in units:
+		if set.has(str(u)):
+			out.append(str(_defs[u].name) if _defs.has(u) else str(u).capitalize())
+	return out
+
+## The command of one tech button (tooltip: name, cost and time, Retold's
+## effect, per-class bullets, age / building, the lock's reason).
+func _tech_command(bid: int, btype: String, te: Dictionary) -> Dictionary:
+	var st := str(te.state)
+	var cost: Dictionary = te.cost
+	var t := float(te.time)
+	if btype == "armory" and bool(_ptechs.get("armory_discount", false)):
+		t /= 1.5   # Forge of Olympus: +50 % research speed at the Armory
+	var foot := ["%s Age · %s" % [str(te.age_name), str(_bdefs[str(te.building)].name) if _bdefs.has(str(te.building)) else ""]]
+	if str(te.also) != "" and _bdefs.has(str(te.also)):
+		foot.append("Also researched at the %s" % _bdefs[str(te.also)].name if str(te.building) == btype else "Also researched at the %s" % _bdefs[str(te.building)].name)
+	if str(te.god) != "":
+		foot.append("God: %s" % str(te.god).capitalize())
+	var lines := [str(te.text)]
+	var short := _short_of(cost)
+	var deny := "" if short.is_empty() else "Not enough %s" % short[0]
+	var c := {"key": "", "svg": TechIcons.icon_for(str(te.key)), "title": str(te.name), "cost": cost, "time": t,
+		"lines": lines, "bullets": _tech_bullets(te), "foot": foot, "wide": true,
+		"frame": "gold" if bool(te.generic) else "purple", "tech": str(te.key),
+		"tier": TechIcons.tier_of(str(te.key)), "god": str(te.god),
+		"enabled": st == "available" and deny == "", "locked": st.begins_with("locked"),
+		"warn": str(te.reason) if st.begins_with("locked") else "", "deny": deny,
+		"action": "research", "arg": [bid, str(te.key)]}
+	match st:
+		"available":
+			if short.is_empty():
+				_set_state(c, "available", "Click to research")
+			else:
+				c["short"] = short
+				_set_state(c, "unaffordable", _short_text(cost))
+		"researching", "queued":
+			var p := float(te.get("progress", 0.0))
+			var here := int(te.get("at", bid)) == bid
+			var where := "" if here else " at another %s" % (str(_bdefs[str(te.building)].name) if _bdefs.has(str(te.building)) else "building")
+			c["progress"] = p if st == "researching" else 0.0
+			c["count"] = int(te.get("queue_index", 0)) + 1
+			if st == "researching":
+				c.deny = "%s: researching%s, %s left" % [str(te.name), where, _secs_text((1.0 - p) * t)]
+				_set_state(c, "researching", "%d%% · %s left%s · cancel it from the queue" % [int(floor(p * 100)), _secs_text((1.0 - p) * t), where])
+			else:
+				c.deny = "%s: queued%s" % [str(te.name), where]
+				_set_state(c, "queued", "%s in the queue%s · cancel it from the queue" % [_ordinal(int(c.count)), where])
+		_:
+			if st == "locked_age":
+				c["age_req"] = int(te.age)
+			_set_state(c, "locked", str(te.reason))
+	return c
+
+## A command's state, the language every command button speaks (PORTING.md
+## "Command button states"): "available", "unaffordable" (c.short: the
+## missing resources), "locked" (c.age_req: the age it waits for, else a
+## prerequisite), "researching" / "training" (c.progress, c.count),
+## "queued" (c.count: its place in the queue). The tooltip says it in words.
+static func _set_state(c: Dictionary, st: String, why: String) -> void:
+	c["state"] = st
+	var word: String = {"available": "Available", "unaffordable": "Can't afford", "locked": "Locked",
+		"researching": "Researching", "training": "Training", "queued": "Queued"}.get(st, st.capitalize())
+	c["status"] = {"state": st, "text": word + (" · " + why if why != "" else "")}
+
+## The resources a cost is short of, in cost order.
+func _short_of(cost: Dictionary) -> Array:
+	var out := []
+	for k in cost:
+		if float(player.get(k, 0.0)) < float(cost[k]):
+			out.append(str(k))
+	return out
+
+## "Need 40 more gold, 10 more favor".
+func _short_text(cost: Dictionary) -> String:
+	var parts := []
+	for k in cost:
+		var need := float(cost[k]) - float(player.get(k, 0.0))
+		if need > 0.0:
+			parts.append("%d more %s" % [int(ceil(need)), k])
+	return "Need " + ", ".join(parts)
+
+static func _secs_text(t: float) -> String:
+	return "%ds" % int(ceil(maxf(t, 0.0)))
+
+static func _ordinal(n: int) -> String:
+	return str(n) + ("st" if n == 1 else "nd" if n == 2 else "rd" if n == 3 else "th")
+
+## The state of a train / build / age / trade command that has none yet:
+## locked by its age (c.age_req) or another reason (c.warn), else short of
+## its cost, else training (b's queue holds this unit: the head's progress
+## and the count queued), else available.
+func _auto_state(c: Dictionary, b: Dictionary) -> void:
+	if c.has("state"):
+		return
+	if str(c.get("warn", "")) != "":
+		_set_state(c, "locked", str(c.warn))
+		return
+	var cost: Dictionary = c.get("cost", {})
+	if str(c.get("action", "")) == "train" and not b.is_empty():
+		var n := 0
+		var p := 0.0
+		var q: Array = b.get("queue", [])
+		for k in q.size():
+			if str(q[k].type) == str(c.arg):
+				if n == 0 and k == 0:
+					p = float(q[k].t) / maxf(0.001, float(q[k].total))
+				n += 1
+		if n > 0:
+			c["count"] = n
+			c["progress"] = p
+			c["short"] = _short_of(cost)
+			_set_state(c, "training", "%d queued%s" % [n, " · %d%%" % int(floor(p * 100)) if p > 0.0 else ""] + ("" if c.short.is_empty() else " · " + _short_text(cost)))
+			return
+	var short := _short_of(cost)
+	if not short.is_empty():
+		c["short"] = short
+		_set_state(c, "unaffordable", _short_text(cost))
+	elif bool(c.get("enabled", true)):
+		_set_state(c, "available", "")
+
+## Place a building's tech buttons in the free slots of the grid (the
+## Armory's generic lines by column in the top row, god techs below; at a
+## building that trains, below its train buttons), with the slot's letter as
+## hotkey unless another button has it; more than fit: the last free slot
+## pages through them.
+func _tech_slots(slots: Array, b: Dictionary) -> void:
+	var bid := int(b.id)
+	var btype := str(b.type)
+	var techs: Array = sim.get_techs(bid)
+	if techs.is_empty():
+		return
+	_ptechs = sim.get_player_techs(me)
+	var done := {}
+	for k in _ptechs.get("done", []):
+		done[str(k)] = true
+	var busy := {}
+	for te in techs:
+		if str(te.state) == "researching" or str(te.state) == "queued":
+			busy[str(te.key)] = true
+	var generic := []
+	var gods := []
+	for te in techs:
+		if not _tech_visible(te, done, busy):
+			continue
+		(generic if bool(te.generic) else gods).append(te)
+	var used := {}
+	for c in slots:
+		if c != null and str(c.key) != "":
+			used[str(c.key)] = true
+	var put := func(slot: int, c: Dictionary) -> void:
+		var k: String = SLOT_KEYS[slot]
+		if not used.has(k):
+			c.key = k
+			used[k] = true
+		slots[slot] = c
+	var rest := []
+	if btype == "armory":
+		for te in generic:
+			var line := str(te.key)
+			for l in ["weapons", "armor", "shields"]:
+				if line.ends_with("_" + l):
+					line = l
+			var col := int(ARMORY_COLS.get(line, -1))
+			if col >= 0 and slots[col] == null:
+				put.call(col, _tech_command(bid, btype, te))
+			else:
+				rest.append(te)
+		rest.append_array(gods)
+	else:
+		rest = generic + gods
+	# the padlocked next steps after every buyable / greyed-by-age button
+	rest = rest.filter(func(te): return str(te.state) != "locked_prereq") + rest.filter(func(te): return str(te.state) == "locked_prereq")
+	if rest.is_empty():
+		return
+	# free slots: below the top row when the building trains / ages up (or is the Armory), else from the top
+	var top_busy := btype == "armory" or btype == "market" or not Array(_bdefs[btype].get("trains", [])).is_empty() or bool(_bdefs[btype].get("age_up", false))
+	var order := []
+	if btype == "market":
+		order = [0, 1, 2, 3, 4, 10, 11, 12, 13, 14]
+	elif top_busy:
+		order = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 0, 1, 2, 3, 4]
+	else:
+		order = range(15)
+	var free := order.filter(func(k): return slots[k] == null)
+	if free.is_empty():
+		return
+	if _tech_page_of != bid:
+		_tech_page_of = bid
+		_tech_page = 0
+	var per: int = free.size() if rest.size() <= free.size() else free.size() - 1
+	var pages := int(ceil(float(rest.size()) / float(maxi(1, per))))
+	_tech_page = posmod(_tech_page, maxi(1, pages))
+	var shown := rest.slice(_tech_page * per, _tech_page * per + per)
+	for j in shown.size():
+		put.call(int(free[j]), _tech_command(bid, btype, shown[j]))
+	if pages > 1:
+		put.call(int(free[free.size() - 1]), {"key": "", "svg": "fast", "title": "More techs (%d / %d)" % [_tech_page + 1, pages],
+			"lines": ["%d techs here: show the next ones." % rest.size()], "enabled": true, "action": "tech_page"})
+
+## The Market's exchange (Retold: buy / sell buttons with the live price):
+## food and wood in lots of 100 for gold, the price moving with each trade.
+func _market_commands(b: Dictionary, list: Array) -> void:
+	var M: Dictionary = sim.get_market(me)
+	var lot := int(M.get("lot", 100))
+	var slot := 5
+	for res in ["food", "wood"]:
+		var m: Dictionary = M.get(res, {})
+		if not bool(m.get("tradable", false)):
+			continue
+		var buy := int(m.buy)
+		var sell := int(m.sell)
+		var R: String = str(res).capitalize()
+		list.append({"key": SLOT_KEYS[slot], "trade": res, "dir": "buy", "label": str(buy), "title": "Buy %d %s" % [lot, R],
+			"cost": {"gold": buy}, "lines": ["Pay %d gold for %d %s." % [buy, lot, res], "Each purchase raises the price (now %d)." % int(m.price)],
+			"enabled": float(player.get("gold", 0)) >= buy, "deny": "Not enough gold", "wide": true, "action": "trade", "arg": [int(b.id), res, "buy"], "slot": slot})
+		list.append({"key": SLOT_KEYS[slot + 1], "trade": res, "dir": "sell", "label": str(sell), "title": "Sell %d %s" % [lot, R],
+			"cost": {res: float(lot)}, "gain": {"gold": sell}, "lines": ["Get %d gold for %d %s." % [sell, lot, res], "Each sale lowers the price (now %d)." % int(m.price)],
+			"enabled": float(player.get(res, 0)) >= lot, "deny": "Not enough %s" % res, "wide": true, "action": "trade", "arg": [int(b.id), res, "sell"], "slot": slot + 1})
+		slot += 2
 
 ## A wall row of get_walls() (cached with the HUD) for a building id, or -1.
 func _wall_row(id: int) -> int:
@@ -876,6 +1316,8 @@ func _info_for() -> Dictionary:
 			var it: Dictionary = q[qi]
 			d.queue.append({"i": qi, "tex": _portraits.unit(it.type, int(e.owner)), "name": _defs[it.type].name + (" (free)" if bool(it.get("free", false)) else ""),
 				"p": float(it.t) / maxf(0.001, float(it.total)) if qi == 0 else 0.0})
+		if not FORT_TYPES.has(str(e.type)) and bool(e.built):
+			_research_info(e, d)
 	else:
 		var r: Dictionary = sim.get_resources()
 		var ids: PackedInt32Array = r.ids
@@ -888,6 +1330,29 @@ func _info_for() -> Dictionary:
 			d["icon"] = rk
 			d.stats.append([rk, str(int(ceil(float(r.amount[i])))), rk])
 	return d
+
+## The research part of a building's card: "Researching <tech> · n%", the
+## queue (icon + progress, click to cancel: refunds what was paid), the techs
+## researched here (small icons), and at a Market its live exchange rates.
+func _research_info(e: Dictionary, d: Dictionary) -> void:
+	var bid := int(e.id)
+	var mine := int(e.owner) == me
+	var R: Array = sim.get_research(bid) if mine else []
+	for k in R.size():
+		var it: Dictionary = R[k]
+		var p := float(it.get("progress", 0.0))
+		if k == 0:
+			d.tasks.append("Researching %s · %d%%" % [str(it.name), int(floor(p * 100))])
+		d.queue.append({"i": k, "tech": str(it.key), "svg": TechIcons.icon_for(str(it.key)), "name": str(it.name),
+			"p": p if k == 0 else 0.0, "left": float(it.total) - float(it.t)})
+	if mine and _tech_names.size() > 0:
+		var done := []
+		for te in sim.get_techs(bid):
+			if str(te.state) == "done" and str(te.building) == str(e.type):
+				done.append({"tech": str(te.key), "svg": TechIcons.icon_for(str(te.key)), "name": str(te.name), "text": str(te.text)})
+		d["done_techs"] = done
+	if str(e.type) == "market":
+		d["market"] = sim.get_market(int(e.owner))
 
 ## The selection card of a wall piece, gate or tower: its stage's name and
 ## portrait, a tower's damage and range, gate state, research progress.
@@ -1237,7 +1702,7 @@ func _refresh_hover() -> void:
 
 func _hover_key(z: Dictionary) -> String:
 	var id: String = z.get("id", "")
-	if id == "cmd" or id == "group" or id == "power" or id == "res" or id == "queue" or id == "multi" or id == "gfx":
+	if id == "cmd" or id == "group" or id == "power" or id == "res" or id == "queue" or id == "multi" or id == "gfx" or id == "rqueue" or id == "rdone":
 		id = "%s:%s" % [id, z.arg]
 	return id
 
@@ -1276,7 +1741,7 @@ func _click_zone(id: String, arg) -> void:
 			if c == null:
 				return
 			if not c.enabled:
-				message(c.get("warn", "") if c.get("warn", "") != "" else "Cannot do that yet")
+				message(_deny_text(c))
 				return
 			_run_command(c)
 		"power":
@@ -1302,6 +1767,13 @@ func _click_zone(id: String, arg) -> void:
 			if not sel.is_empty() and sel[0].kind == "building":
 				sim.cancel_train(sel[0].id, int(arg))
 				_hud_t = 0.0
+		"rqueue":
+			# a tech in the building's research queue: cancel it (refunds what was paid)
+			var sel := _sel_entities()
+			if not sel.is_empty() and sel[0].kind == "building" and int(sel[0].get("owner", 0)) == me:
+				sim.cancel_research(sel[0].id, str(arg))
+				_hud_t = 0.0
+				_stat_t = 0.0
 		"mb:speed":
 			game.time_scale = 1.0 if float(game.time_scale) > 1.0 else 1.5
 			message("Fast speed" if float(game.time_scale) > 1.0 else "Normal speed")
@@ -1348,6 +1820,14 @@ func _click_zone(id: String, arg) -> void:
 		"medal":
 			pass
 
+## Why a disabled command refuses: its lock (age, prerequisite), else what is short.
+static func _deny_text(c: Dictionary) -> String:
+	if str(c.get("warn", "")) != "":
+		return str(c.warn)
+	if str(c.get("deny", "")) != "":
+		return str(c.deny)
+	return "Cannot do that yet"
+
 func _run_command(c: Dictionary) -> void:
 	var sel := _sel_entities()
 	match str(c.action):
@@ -1374,6 +1854,16 @@ func _run_command(c: Dictionary) -> void:
 			if not r.ok: message(r.reason)
 		"cancel_research":
 			sim.cancel_research(int(c.arg))
+		"tech_page":
+			_tech_page += 1
+		"trade":
+			var r: Dictionary = sim.market_buy(int(c.arg[0]), str(c.arg[1])) if str(c.arg[2]) == "buy" else sim.market_sell(int(c.arg[0]), str(c.arg[1]))
+			if not bool(r.ok):
+				message(str(r.reason))
+			elif str(c.arg[2]) == "buy":
+				message("Bought %d %s for %d gold" % [absi(int(r.amount)), str(c.arg[1]), absi(int(r.gold))])
+			else:
+				message("Sold %d %s for %d gold" % [absi(int(r.amount)), str(c.arg[1]), absi(int(r.gold))])
 		"stop":
 			sim.order_idle(PackedInt32Array(_own_units()))
 		"attack_move":
@@ -1639,7 +2129,7 @@ func _key(e: InputEventKey) -> void:
 			if c.enabled:
 				_run_command(c)
 			else:
-				message(c.get("warn", "") if c.get("warn", "") != "" else "Cannot do that yet")
+				message(_deny_text(c))
 			return
 
 func _recall_group(k: String, add: bool, center: bool) -> void:
@@ -1716,6 +2206,8 @@ func _begin_place(type: String, builders: Array) -> void:
 	_ghost = MeshInstance3D.new()
 	if type == "tower":
 		_ghost.mesh = VoxelModels.mesh("towers", str(clampi(int(_fort.get("tower_level", 0)), 0, 3)))
+	elif type == "armory" or type == "market":
+		_ghost.mesh = VoxelModels.mesh("techbuildings", "%s/a1" % type)
 	else:
 		_ghost.mesh = VoxelModels.mesh("buildings", "%s/0" % type)
 	var m := StandardMaterial3D.new()

@@ -13,6 +13,7 @@ extends Control
 ## CanvasLayer scales them to the window.
 
 const S := preload("res://game/ui/hud_style.gd")
+const TechIcons := preload("res://game/ui/tech_icons.gd")
 
 var ui: Node = null
 var layer := "back"
@@ -373,6 +374,64 @@ func _draw_groups() -> void:
 		zone(r, "group", g.key, {"title": "Group %s" % g.key, "lines": ["%d × %s" % [g.count, g.name], "Press %s to select, twice to centre" % g.key]})
 		x += 55
 
+static var _grey := {}   # portrait texture RID -> its locked (greyscale, darkened) copy
+static var _grey_seen := {}   # portrait texture RID -> the frame it was first asked for
+
+## The "locked" copy of a portrait (a unit / building ViewportTexture): every
+## pixel's luminance in the tech tiles' locked grey (TechIcons.bake: l * 0.56
+## .. 0.64, a cold slate), alpha kept, so a locked train / build button has no
+## colour left, as a locked tech tile. Read back once per portrait and cached;
+## null while the portrait's viewport has not rendered yet (then retried).
+static func locked_portrait(tex: Texture2D) -> Texture2D:
+	return _portrait_variant(tex, "locked")
+
+## The "busy" copy of a portrait (a unit training): TechIcons.busy_image's
+## cold blue duotone, as a tech tile being researched; cached as above.
+static func busy_portrait(tex: Texture2D) -> Texture2D:
+	return _portrait_variant(tex, "busy")
+
+static func _portrait_variant(tex: Texture2D, mode: String) -> Texture2D:
+	if tex == null:
+		return null
+	var key := "%s:%s" % [tex.get_rid().get_id(), mode]
+	if _grey.has(key):
+		return _grey[key]
+	# a portrait's viewport renders once, some frames after it is made: read it
+	# back only after it has been asked for over a few drawn frames
+	var f := Engine.get_frames_drawn()
+	if not _grey_seen.has(key):
+		_grey_seen[key] = f
+	if f - int(_grey_seen[key]) < 1:
+		return null
+	var img := tex.get_image()
+	if img == null or img.is_empty():
+		return null
+	img = img.duplicate()
+	if img.is_compressed():
+		img.decompress()
+	img.convert(Image.FORMAT_RGBA8)
+	var d := img.get_data()
+	var solid := 0
+	for i in range(3, d.size(), 4):
+		if d[i] > 200:
+			solid += 1
+	if solid * 50 < d.size() / 4:
+		return null  # not rendered yet (under 2% of it opaque)
+	if mode == "busy":
+		TechIcons.busy_image(img)
+	else:
+		for i in range(0, d.size(), 4):
+			if d[i + 3] == 0:
+				continue
+			var l := (d[i] * 0.3 + d[i + 1] * 0.55 + d[i + 2] * 0.15) / 255.0
+			d[i] = int(clampf(l * 0.6 + 0.03, 0.0, 1.0) * 255.0)
+			d[i + 1] = int(clampf(l * 0.62 + 0.035, 0.0, 1.0) * 255.0)
+			d[i + 2] = int(clampf(l * 0.68 + 0.045, 0.0, 1.0) * 255.0)
+		img.set_data(img.get_width(), img.get_height(), false, Image.FORMAT_RGBA8, d)
+	var out := ImageTexture.create_from_image(img)
+	_grey[key] = out
+	return out
+
 ## Draw `tex` into `dst`, clipped to `clip` (overflow: hidden).
 func _clip_tex(tex: Texture2D, dst: Rect2, clip: Rect2, mod := Color.WHITE) -> void:
 	var inter := dst.intersection(clip)
@@ -404,23 +463,297 @@ func _draw_commands() -> void:
 		var rr := cr
 		if pressed:
 			rr = cr.grow(-1)
-		S.cell(self, rr, [[0.0, Color("#3d6f86")], [0.85, Color("#0f2d38")], [1.0, Color("#0f2d38")]], Vector2(0.5, 0.35))
 		var en: bool = c.enabled
-		var mod := Color.WHITE if en else Color(0.45, 0.47, 0.5)
-		if c.get("tex") != null:
-			_clip_tex(c.tex, Rect2(rr.grow(-2).position, Vector2(58, 58)), rr.grow(-2), mod)  # CSS: the oversized grid item sits at the content box origin, overflowing right / down
+		var st := str(c.get("state", ""))
+		if st == "locked" and not c.has("tech"):
+			# locked: the cell's plate goes grey with the portrait (no team-teal left)
+			S.cell(self, rr, [[0.0, Color("#3e4246")], [0.85, Color("#16181b")], [1.0, Color("#16181b")]], Vector2(0.5, 0.35))
+			# and its gold metal edge dims to the locked tech frame's grey
+			draw_rect(rr.grow(-1), Color("#5c5c62"), false, 2.0)
+			draw_rect(Rect2(rr.position + Vector2(0, 0), Vector2(rr.size.x, 1)), Color("#8a8a90"))
+		else:
+			S.cell(self, rr, [[0.0, Color("#3d6f86")], [0.85, Color("#0f2d38")], [1.0, Color("#0f2d38")]], Vector2(0.5, 0.35))
+		var mod := Color.WHITE if en or st == "unaffordable" or st == "training" else Color(0.45, 0.47, 0.5)
+		var ir := rr.grow(-3)
+		if c.has("tech"):
+			# a tech: its painted tile (TechIcons.tile), greyed when locked
+			var busy := st == "researching" or st == "queued"
+			var tex := TechIcons.tile(str(c.svg), int(ir.size.x), "locked" if st == "locked" else ("busy" if busy else "normal"))  # 1:1, never rescaled (48 px)
+			if tex:
+				draw_texture_rect(tex, ir, false)
+				if st == "researching":
+					# the colour comes back clockwise from 12 o'clock as it is researched
+					_reveal(TechIcons.tile(str(c.svg), int(ir.size.x), "normal"), ir, ir, float(c.get("progress", 0.0)))
+			else:
+				S.draw_icon(self, c.svg, Rect2(rr.get_center() - Vector2(20, 21), Vector2(40, 40)), true, mod)
+		elif c.has("trade"):
+			# a market exchange: the resource, a green (buy) / red (sell) arrow, the price in gold
+			S.draw_icon(self, str(c.trade), Rect2(rr.position + Vector2(5, 4), Vector2(30, 30)), true, mod)
+			S.draw_icon(self, "t_buy" if c.dir == "buy" else "t_sell", Rect2(rr.position + Vector2(32, 5), Vector2(18, 18)), true, mod)
+			S.draw_icon(self, "gold", Rect2(rr.position + Vector2(3, 36), Vector2(14, 14)), false, mod)
+			var lb := str(c.get("label", ""))
+			draw_string_outline(bold, Vector2(rr.position.x + 18, rr.end.y - 4), lb, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 4, Color(0, 0, 0, 0.75))
+			draw_string(bold, Vector2(rr.position.x + 18, rr.end.y - 4), lb, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#ffe39a") if en else Color("#ff8a70"))
+		elif c.get("tex") != null:
+			var ptex: Texture2D = c.tex
+			var pdst := Rect2(rr.grow(-2).position, Vector2(58, 58))  # CSS: the oversized grid item sits at the content box origin, overflowing right / down
+			if st == "locked" or st == "training" or st == "queued":
+				# locked: the portrait's greyscale copy (the tech tiles' "locked"
+				# grey); training / queued: its blue "busy" copy, as a tech being
+				# researched; until the portrait has rendered, a dark tint
+				var gt := locked_portrait(ptex) if st == "locked" else busy_portrait(ptex)
+				if gt:
+					ptex = gt
+					mod = Color.WHITE
+				else:
+					mod = Color(0.2, 0.2, 0.22) if st == "locked" else Color(0.3, 0.42, 0.6)
+			_clip_tex(ptex, pdst, rr.grow(-2), mod)
+			if st == "training" and ptex != c.tex:
+				_reveal(c.tex, pdst, rr.grow(-2), float(c.get("progress", 0.0)))
+			if st == "locked":
+				draw_rect(rr.grow(-2), Color(0.03, 0.05, 0.07, 0.22))
 		else:
 			S.draw_icon(self, c.svg, Rect2(rr.get_center() - Vector2(16, 16), Vector2(32, 32)), true, mod)
-		if hover and en:
-			draw_rect(rr.grow(-2), S.GOLD_HI, false, 1.0)
-			for k in 3:
-				draw_rect(rr.grow(1.0 + k * 2.0), Color(233 / 255.0, 200 / 255.0, 120 / 255.0, 0.3 - k * 0.09), false, 2.0)
+		_draw_cmd_state(c, rr, ir, st, hover)
+		if hover and (en or st != ""):
+			draw_rect(rr.grow(-2), S.GOLD_HI if en else Color(1, 1, 1, 0.35), false, 1.0)
+			if en:
+				for k in 3:
+					draw_rect(rr.grow(1.0 + k * 2.0), Color(233 / 255.0, 200 / 255.0, 120 / 255.0, 0.3 - k * 0.09), false, 2.0)
 		if c.key != "":
 			var f := bold
 			var kx := rr.end.x - 4 - S.text_width(f, c.key, 13)
-			draw_string_outline(f, Vector2(kx, rr.end.y - 4), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 4, Color(0, 0, 0, 0.75))
-			draw_string(f, Vector2(kx, rr.end.y - 4), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color.WHITE)
-		zone(cr, "cmd", i, {"title": c.title, "lines": c.get("lines", []), "cost": c.get("cost", {}), "hotkey": c.key, "warn": c.get("warn", "")})
+			# over a progress bar (on the tile's foot) the key sits above it
+			var ky := rr.end.y - (12 if st == "researching" or st == "training" or (st == "queued" and c.has("tech")) else 4)
+			draw_string_outline(f, Vector2(kx, ky), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 4, Color(0, 0, 0, 0.75))
+			draw_string(f, Vector2(kx, ky), c.key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.62, 0.62, 0.64) if st == "locked" else Color.WHITE)
+		var tip := {"title": c.title, "lines": c.get("lines", []), "cost": c.get("cost", {}), "hotkey": c.key, "warn": c.get("warn", "")}
+		for k in ["time", "bullets", "foot", "wide", "gain", "status"]:
+			if c.has(k):
+				tip[k] = c[k]
+		zone(cr, "cmd", i, tip)
+
+## The state layer of a command button (PORTING.md "Command button states").
+## One language for every button (tech, train, build, trade), read from the
+## frame's colour first: available: the family's bright bevel (gold generic /
+## purple god, the god's emblem on its corner; a portrait keeps the cell's
+## edge); unaffordable: the whole bevel red plus a red cast (techs and
+## portraits alike); researching / training / queued: the whole bevel blue,
+## the picture in the blue "busy" duotone, its colour coming back clockwise
+## as the work runs, a thick bar on the tile's foot; a queued tech its place
+## in the queue on a corner chip (never over the picture); locked: the greyed picture, a dim grey
+## bevel, the age numeral or a padlock on the corner.
+const FRAMES := {
+	"gold": ["#fff0b0", "#e2b340", "#7a5612", ""],
+	"purple": ["#f6dcff", "#b45ae6", "#4e1c86", ""],
+	"grey": ["#86868c", "#56565c", "#2a2a2e", ""],
+	"red": ["#ffb4a0", "#ff2a12", "#800c04", "#ff6a40"],
+	"blue": ["#d8f2ff", "#2ea2ff", "#0a3a80", "#7ccaff"],
+}
+
+## The frame colour a state draws (FRAMES), "" for none (a plain portrait).
+static func frame_of(fam: String, st: String) -> String:
+	match st:
+		"unaffordable": return "red"
+		"researching", "training", "queued": return "blue"
+		"locked": return "grey" if fam != "" else ""
+	return fam
+
+func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bool) -> void:
+	var bold := S.font("bold")
+	var title := S.font("title")
+	var p := clampf(float(c.get("progress", 0.0)), 0.0, 1.0)
+	if st == "unaffordable":
+		# Retold: the picture in full colour under a red cast, deepest at the foot
+		S.vgrad(self, ir, [[0.0, Color(0.8, 0.06, 0.02, 0.08)], [0.45, Color(0.8, 0.06, 0.02, 0.16)], [1.0, Color(0.9, 0.05, 0.02, 0.42)]])
+	# the frame: a 3 px bevel, lit top / left, shaded bottom / right
+	var fam := str(c.get("frame", ""))
+	var sf := frame_of(fam, st)
+	var o := rr.grow(-1)
+	if sf != "":
+		var fc: Array = FRAMES[sf]
+		var hi := Color(str(fc[0]))
+		var mid := Color(str(fc[1]))
+		var lo := Color(str(fc[2]))
+		if sf == "red" or sf == "blue":
+			# a glow into the gap between cells: the state reads from afar
+			draw_rect(rr.grow(1), Color(mid, 0.45), false, 2.0)
+		draw_rect(o.grow(1), Color(0.03, 0.02, 0.0, 0.9), false, 1.0)
+		draw_rect(Rect2(o.position, Vector2(o.size.x, 2)), hi)
+		draw_rect(Rect2(o.position, Vector2(2, o.size.y)), hi.lerp(mid, 0.4))
+		draw_rect(Rect2(o.position.x, o.end.y - 2, o.size.x, 2), lo)
+		draw_rect(Rect2(o.end.x - 2, o.position.y, 2, o.size.y), lo.lerp(mid, 0.3))
+		draw_rect(o, mid, false, 1.0)
+		draw_rect(o.grow(-2), Color(str(fc[3])) if str(fc[3]) != "" else Color(0, 0, 0, 0.6), false, 1.0)
+	if st == "researching" or st == "training":
+		# where the colour stops: the sweep's leading edge on the picture
+		if p > 0.0 and p < 1.0:
+			_sweep_edge(ir, p)
+		# progress: a thick bar on the tile's foot (dark trough, blue to ice)
+		var bar := Rect2(ir.position.x + 1, ir.end.y - 7, ir.size.x - 2, 6)
+		draw_rect(bar.grow(1), Color(0, 0, 0, 0.9))
+		draw_rect(bar, Color("#0a1a30"))
+		var fr := Rect2(bar.position, Vector2(roundf(bar.size.x * p), bar.size.y))
+		if fr.size.x > 0:
+			S.hgrad(self, fr, [[0.0, Color("#1c78e0")], [1.0, Color("#a8e4ff")]])
+			draw_rect(Rect2(fr.position, Vector2(fr.size.x, 1)), Color(1, 1, 1, 0.55))
+	elif st == "queued" and c.has("tech"):
+		# a queued tech: a dark blue bar on the foot, empty (it waits its turn);
+		# its place in the queue is the corner chip below, off the picture
+		var bar := Rect2(ir.position.x + 1, ir.end.y - 7, ir.size.x - 2, 6)
+		draw_rect(bar.grow(1), Color(0, 0, 0, 0.9))
+		draw_rect(bar, Color("#0a1a30"))
+		for k in 4:
+			draw_rect(Rect2(bar.position.x + 3 + k * (bar.size.x - 6) / 4.0, bar.position.y + 2, 4, 2), Color("#4a86c8"))
+	var lockd := st == "locked"
+	# identity: a god tech keeps its god in every state. Purple corner caps
+	# (an L bracket on each of the four corners, over the state's bevel) and
+	# the god's emblem on a medallion at the top-left: a red can't-afford or
+	# a blue researching god tech still reads "god tech" by shape, not only
+	# by a frame colour the state has taken over
+	var god := str(c.get("god", ""))
+	if fam == "purple":
+		_god_corners(rr, lockd)
+	if fam == "purple" and god != "":
+		var mc := rr.position + Vector2(3.5, 3.5)
+		draw_circle(mc, 8.0, Color(0.04, 0.0, 0.08, 0.95))
+		draw_circle(mc, 7.0, Color("#6a32b0") if not lockd else Color("#3a3440"))
+		draw_arc(mc, 7.0, 0, TAU, 22, Color("#f0d8ff") if not lockd else Color("#8a8490"), 1.2, true)
+		var em := TechIcons.god_emblem(god)
+		if em != "":
+			S.draw_icon(self, em, Rect2(mc - Vector2(5.5, 5.5), Vector2(11, 11)), false, Color.WHITE if not lockd else Color(0.6, 0.6, 0.62))
+		else:
+			var ini := god.substr(0, 1).to_upper()
+			draw_string(title, Vector2(mc.x - S.text_width(title, ini, 8) * 0.5, mc.y + 3), ini, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color("#fff4dc"))
+	# an Armory line's tier: 1-3 small notches set into the frame's top edge
+	# in the tier's metal (the picture itself tells the tiers apart: one
+	# sword / two / two and an axe, copper / bronze / steel)
+	var tier := int(c.get("tier", 0))
+	if tier > 0:
+		var tc: Color = [Color("#f08a4a"), Color("#ffd050"), Color("#dfe8f0")][tier - 1]
+		if lockd:
+			tc = tc.lerp(Color(0.6, 0.6, 0.62), 0.35)
+		var x0 := rr.get_center().x - (tier * 7 - 2) * 0.5
+		for k in tier:
+			var nr := Rect2(x0 + k * 7, rr.position.y - 1, 5, 4)
+			draw_rect(nr.grow(1), Color(0, 0, 0, 0.9))
+			draw_rect(nr, tc)
+			draw_rect(Rect2(nr.position, Vector2(nr.size.x, 1)), tc.lightened(0.5))
+	# state badge on the frame's top-right corner: the age numeral or a padlock;
+	# the queue place / count
+	var bc2 := Vector2(rr.end.x - 3, rr.position.y + 3)
+	if lockd:
+		draw_circle(bc2, 7.5, Color(0, 0, 0, 0.92))
+		draw_circle(bc2, 6.5, Color("#2a2c30"))
+		draw_arc(bc2, 6.5, 0, TAU, 20, Color("#c8b080"), 1.2, true)
+		if c.has("age_req"):
+			var rn: String = ["I", "II", "III", "IV"][clampi(int(c.age_req), 0, 3)]
+			var fs := 9 if rn.length() < 3 else 8
+			draw_string(title, Vector2(bc2.x - S.text_width(title, rn, fs) * 0.5, bc2.y + 3.5), rn, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color("#f4e0a8"))
+		else:
+			S.draw_icon(self, "lock", Rect2(bc2 - Vector2(4.5, 4.5), Vector2(9, 9)), false)
+	elif (st == "training" or st == "queued") and int(c.get("count", 0)) > 0:
+		# the count in training / the place in the queue: a blue chip on the
+		# frame's corner (a queued tech's with an hourglass), never on the picture
+		var n := str(int(c.count))
+		var qt := st == "queued" and c.has("tech")
+		var iw := 9.0 if qt else 0.0
+		var bw := maxf(13.0, S.text_width(bold, n, 11) + 6 + iw)
+		var br := Rect2(rr.end.x - bw + 3, rr.position.y - 3, bw, 13)
+		draw_rect(br, Color(0, 0, 0, 0.9))
+		draw_rect(br.grow(-1), Color("#0e3a78"))
+		draw_rect(br.grow(-1), Color("#9fd8ff"), false, 1.0)
+		if qt:
+			S.draw_icon(self, "t_time", Rect2(br.position + Vector2(2, 2), Vector2(9, 9)), false)
+		draw_string(bold, Vector2(br.position.x + iw + (bw - iw - S.text_width(bold, n, 11)) * 0.5, br.end.y - 3), n, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
+
+## A god tech's corner caps: a purple L bracket on each corner of rr, set over
+## the frame's bevel (whatever colour the state gave it) and the gap round it.
+func _god_corners(rr: Rect2, dim: bool) -> void:
+	var hi := Color("#f6dcff") if not dim else Color("#8a8490")
+	var mid := Color("#a04ee0") if not dim else Color("#4a4452")
+	var arm := 12.0
+	var th := 3.0
+	var o := rr.grow(1)
+	for cx in [0, 1]:
+		for cy in [0, 1]:
+			var x := o.position.x if cx == 0 else o.end.x - arm
+			var y := o.position.y if cy == 0 else o.end.y - th
+			var xv := o.position.x if cx == 0 else o.end.x - th
+			var yv := o.position.y if cy == 0 else o.end.y - arm
+			var hr := Rect2(x, y, arm, th)
+			var vr := Rect2(xv, yv, th, arm)
+			draw_rect(hr.grow(1), Color(0.03, 0.0, 0.06, 0.95))
+			draw_rect(vr.grow(1), Color(0.03, 0.0, 0.06, 0.95))
+			draw_rect(hr, mid)
+			draw_rect(vr, mid)
+			# lit edge on the top / left faces
+			draw_rect(Rect2(hr.position, Vector2(hr.size.x, 1)), hi)
+			draw_rect(Rect2(vr.position, Vector2(1, vr.size.y)), hi.lerp(mid, 0.3))
+			# a stud on the bracket's end
+			var sx := hr.end.x - 1.5 if cx == 0 else hr.position.x + 1.5
+			var sy := vr.end.y - 1.5 if cy == 0 else vr.position.y + 1.5
+			draw_circle(Vector2(sx, hr.get_center().y), 1.1, hi)
+			draw_circle(Vector2(vr.get_center().x, sy), 1.1, hi)
+
+## Darken the part of r a clockwise sweep from 12 o'clock has not reached at p.
+func _sweep(r: Rect2, p: float, col: Color) -> void:
+	if p >= 1.0:
+		return
+	var c := r.get_center()
+	var rad := r.size.length() * 0.5 + 1.0
+	var pts := PackedVector2Array([c])
+	var a0 := -PI * 0.5 + TAU * p
+	var steps := maxi(2, int(ceil((1.0 - p) * 32)))
+	for k in steps + 1:
+		var a := lerpf(a0, PI * 1.5, float(k) / steps)
+		pts.append(c + Vector2(cos(a), sin(a)) * rad)
+	# clip the fan to the rect
+	var clipped := Geometry2D.intersect_polygons(pts, PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]))
+	for poly in clipped:
+		draw_colored_polygon(poly, col)
+	if p > 0.0:
+		# the sweep's leading edge, centre to the rect's border
+		var d := Vector2(cos(a0), sin(a0))
+		var t := minf(r.size.x * 0.5 / maxf(absf(d.x), 0.001), r.size.y * 0.5 / maxf(absf(d.y), 0.001))
+		draw_line(c, c + d * t, Color(0.85, 1.0, 0.8, 0.3), 1.0, true)
+
+## The clockwise fan from 12 o'clock to p (0..1) round clip's centre, clipped to clip.
+func _fan(clip: Rect2, p: float) -> Array:
+	var c := clip.get_center()
+	var rad := clip.size.length() * 0.5 + 1.0
+	var pts := PackedVector2Array([c])
+	var a1 := -PI * 0.5 + TAU * p
+	var steps := maxi(2, int(ceil(p * 48)))
+	for k in steps + 1:
+		var a := lerpf(-PI * 0.5, a1, float(k) / steps)
+		pts.append(c + Vector2(cos(a), sin(a)) * rad)
+	return Geometry2D.intersect_polygons(pts, PackedVector2Array([clip.position, Vector2(clip.end.x, clip.position.y), clip.end, Vector2(clip.position.x, clip.end.y)]))
+
+## Draw tex (laid at dst) over the part of clip a clockwise sweep from
+## 12 o'clock has reached at p: the busy picture's colour coming back.
+func _reveal(tex: Texture2D, dst: Rect2, clip: Rect2, p: float) -> void:
+	if tex == null or p <= 0.0:
+		return
+	if p >= 1.0:
+		_clip_tex(tex, dst, clip)
+		return
+	for poly in _fan(clip, p):
+		var uv := PackedVector2Array()
+		for q in poly:
+			uv.append((q - dst.position) / dst.size)
+		draw_colored_polygon(poly, Color.WHITE, uv, tex)
+
+## The sweep's leading edge, centre to the rect's border, and its 12 o'clock start.
+func _sweep_edge(r: Rect2, p: float) -> void:
+	var c := r.get_center()
+	var a0 := -PI * 0.5 + TAU * p
+	var d := Vector2(cos(a0), sin(a0))
+	var t := minf(r.size.x * 0.5 / maxf(absf(d.x), 0.001), r.size.y * 0.5 / maxf(absf(d.y), 0.001))
+	draw_line(c, c + d * t, Color(0, 0, 0, 0.6), 3.0, true)
+	draw_line(c, c + d * t, Color("#c8ecff"), 1.0, true)
+	draw_line(c, Vector2(c.x, r.position.y), Color(0, 0, 0, 0.45), 2.0, true)
+	draw_circle(c, 2.0, Color("#c8ecff"))
 
 # selection card --------------------------------------------------------------------------------
 
@@ -513,16 +846,96 @@ func _draw_info() -> void:
 				S.text(self, title, Vector2(sx, ty + 14), str(t).to_upper(), 13, S.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.85, 0.8)
 				ty += 20
 			var qx := sx
-			for q in info.get("queue", []):
+			var qs: Array = info.get("queue", [])
+			for q in qs:
 				var qr := Rect2(qx, ty + 4, 38, 38)
 				draw_rect(qr, Color("#10303c"))
-				if q.tex:
+				if q.has("tech"):
+					var qt := TechIcons.tile(str(q.svg), 34)
+					if qt:
+						draw_texture_rect(qt, qr.grow(-2), false)  # 34 px, 1:1
+					if q.p <= 0.0:
+						draw_rect(qr.grow(-2), Color(0.0, 0.03, 0.05, 0.45))
+					else:
+						_sweep(qr.grow(-2), float(q.p), Color(0.0, 0.03, 0.05, 0.5))
+				elif q.tex:
 					_clip_tex(q.tex, Rect2(qr.get_center() - Vector2(24, 24), Vector2(48, 48)), qr.grow(-1))
 				draw_rect(qr, S.BRONZE, false, 1.0)
 				if q.p > 0.0:
-					draw_rect(Rect2(qr.position.x, qr.end.y - 4, qr.size.x * q.p, 4), Color("#8ef07a"))
-				zone(qr, "queue", q.i, {"title": q.name, "lines": ["Click to cancel"]})
+					draw_rect(Rect2(qr.position.x, qr.end.y - 4, qr.size.x, 4), Color(0, 0, 0, 0.6))
+					draw_rect(Rect2(qr.position.x, qr.end.y - 4, qr.size.x * q.p, 4), Color("#6cc4ff"))  # the busy blue of the grid's bars
+				if q.has("tech"):
+					var ql := ["%s left" % _secs(float(q.left)) if q.p > 0.0 else "Queued", "Click to cancel (refunds its cost)"]
+					zone(qr, "rqueue", q.tech, {"title": q.name, "lines": ql})
+				else:
+					zone(qr, "queue", q.i, {"title": q.name, "lines": ["Click to cancel"]})
 				qx += 42
+			if not qs.is_empty():
+				ty += 46
+			# the techs researched here (small icons) and a Market's rates
+			var dts: Array = info.get("done_techs", [])
+			if not dts.is_empty() and ty + 24 <= r.end.y - 4:
+				S.text(self, title, Vector2(sx, ty + 16), "RESEARCHED", 11, S.MUTED, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.85, 0.8)
+				var dx := sx + S.text_width(title, "RESEARCHED", 11, 0.8) + 8
+				for dt in dts:
+					if dx + 22 > r.end.x - 12:
+						break
+					# done: the tile dimmed, a green check, no buyable frame
+					var dr := Rect2(dx, ty + 2, 22, 22)
+					var dtex := TechIcons.tile(str(dt.svg), 22)
+					if dtex:
+						draw_texture_rect(dtex, dr, false, Color(0.62, 0.66, 0.64))
+					draw_rect(dr, Color("#2f6a34"), false, 1.0)
+					var ck := dr.end - Vector2(5, 5)
+					draw_circle(ck, 5.0, Color(0, 0, 0, 0.85))
+					draw_circle(ck, 4.0, Color("#3fae3a"))
+					draw_polyline(PackedVector2Array([ck + Vector2(-2.2, 0), ck + Vector2(-0.6, 1.6), ck + Vector2(2.2, -1.6)]), Color.WHITE, 1.3, true)
+					zone(dr, "rdone", dt.tech, {"title": dt.name, "lines": [dt.text, "Researched"]})
+					dx += 25
+				ty += 28
+			if info.has("market"):
+				_draw_market_rates(Vector2(sx, ty), r.end.x - 14 - sx, info.market)
+
+static func _secs(t: float) -> String:
+	return "%ds" % int(ceil(maxf(t, 0.0)))
+
+## A Market's exchange on its card (Retold's trade readout): per resource the
+## gold a lot costs / brings now, how far its price is above or below the
+## base, and the fee.
+func _draw_market_rates(p: Vector2, _w: float, m: Dictionary) -> void:
+	var bold := S.font("bold")
+	var sans := S.font("sans")
+	var title := S.font("title")
+	var y := p.y
+	S.text(self, title, Vector2(p.x, y + 13), "EXCHANGE  ·  %d PER LOT  ·  FEE %s%%" % [int(m.get("lot", 100)), _num1(float(m.get("fee", 0.3)) * 100.0)], 11, S.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.85, 0.8)
+	y += 18
+	for res in ["food", "wood"]:
+		var e: Dictionary = m.get(res, {})
+		if not bool(e.get("tradable", false)):
+			continue
+		var x := p.x
+		S.draw_icon(self, res, Rect2(x, y + 1, 18, 18))
+		x += 24
+		S.text(self, sans, Vector2(x, y + 15), "Buy", 14, S.MUTED)
+		x += S.text_width(sans, "Buy", 14) + 5
+		S.text(self, bold, Vector2(x, y + 15), str(int(e.buy)), 15, S.INK)
+		x += S.text_width(bold, str(int(e.buy)), 15) + 3
+		S.draw_icon(self, "gold", Rect2(x, y + 3, 14, 14), false)
+		x += 24
+		S.text(self, sans, Vector2(x, y + 15), "Sell", 14, S.MUTED)
+		x += S.text_width(sans, "Sell", 14) + 5
+		S.text(self, bold, Vector2(x, y + 15), str(int(e.sell)), 15, S.INK)
+		x += S.text_width(bold, str(int(e.sell)), 15) + 3
+		S.draw_icon(self, "gold", Rect2(x, y + 3, 14, 14), false)
+		x += 22
+		var d := float(e.price) - float(m.get("base", 100.0))
+		if absf(d) >= 0.5:
+			S.draw_icon(self, "t_buy" if d > 0 else "t_sell", Rect2(x, y + 3, 14, 14), false)
+			S.text(self, sans, Vector2(x + 16, y + 15), "%+d" % int(round(d)), 13, Color("#9ef58a") if d > 0 else Color("#ff8a70"))
+		y += 22
+
+static func _num1(v: float) -> String:
+	return str(int(v)) if v == floor(v) else "%.1f" % v
 
 func _owner_line(p: Vector2, info: Dictionary) -> void:
 	var bold := S.font("bold")
@@ -711,6 +1124,9 @@ func _draw_tooltip() -> void:
 	var t: Dictionary = ui.tooltip
 	if t.is_empty() or not t.has("anchor"):
 		return
+	if t.get("wide", false):
+		_draw_wide_tooltip(t)
+		return
 	var title := S.font("title")
 	var sans := S.font("sans")
 	var bold := S.font("bold")
@@ -723,6 +1139,8 @@ func _draw_tooltip() -> void:
 	w = tw
 	for l in lines:
 		w = maxf(w, S.text_width(sans, str(l), 14))
+	if t.has("status"):
+		w = maxf(w, S.text_width(bold, str(t.status.text), 13))
 	var cost_w := 0.0
 	for k in cost:
 		cost_w += 16 + S.text_width(bold, str(int(cost[k])), 14) + 10
@@ -730,7 +1148,7 @@ func _draw_tooltip() -> void:
 	var menu: bool = t.get("menu", false)
 	if menu:
 		w = maxf(w, 262.0)  # room for the Graphics row
-	var h := 8.0 + 18.0 + lines.size() * 18.0 + (20.0 if not cost.is_empty() else 0.0) + (18.0 if t.get("hotkey", "") != "" else 0.0) + (18.0 if t.get("warn", "") != "" else 0.0) + (38.0 if menu else 0.0) + 8.0
+	var h := 8.0 + 18.0 + lines.size() * 18.0 + (20.0 if not cost.is_empty() else 0.0) + (18.0 if t.get("hotkey", "") != "" else 0.0) + (18.0 if t.get("warn", "") != "" or t.has("status") else 0.0) + (38.0 if menu else 0.0) + 8.0
 	var ar: Rect2 = t.anchor
 	var x := minf(W() - 290.0, ar.position.x)
 	var y := ar.position.y - h - 8.0
@@ -746,6 +1164,13 @@ func _draw_tooltip() -> void:
 	S.text(self, title, Vector2(r.position.x + 11, cy), str(t.get("title", "")), 14, S.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.8, 0.5)
 	if t.get("sub", "") != "":
 		S.text(self, sans, Vector2(r.position.x + 11 + S.text_width(title, str(t.title), 14, 0.5) + 5, cy), t.sub, 14, S.MUTED)
+	# the state and its reason open the tooltip, right under the name (as a tech's)
+	if t.has("status"):
+		cy += 18
+		S.text(self, bold, Vector2(r.position.x + 11, cy), str(t.status.text), 13, status_color(str(t.status.state)), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
+	elif t.get("warn", "") != "":
+		cy += 18
+		S.text(self, sans, Vector2(r.position.x + 11, cy), str(t.warn), 13, Color("#ff8a70"), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
 	for l in lines:
 		cy += 18
 		S.text(self, sans, Vector2(r.position.x + 11, cy), str(l), 14, S.INK, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
@@ -762,9 +1187,6 @@ func _draw_tooltip() -> void:
 	if t.get("hotkey", "") != "":
 		cy += 18
 		S.text(self, sans, Vector2(r.position.x + 11, cy), "Hotkey: " + str(t.hotkey), 12, S.MUTED, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
-	if t.get("warn", "") != "":
-		cy += 18
-		S.text(self, sans, Vector2(r.position.x + 11, cy), str(t.warn), 13, Color("#ff8a70"), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
 	if menu:
 		# the graphics quality row of the pinned hotkey card (browser: gear card,
 		# Graphics High / Medium / Low; applies at once and is remembered)
@@ -783,6 +1205,126 @@ func _draw_tooltip() -> void:
 			S.text(self, bold if on else sans, Vector2(br.position.x, cy), q[1], 13, S.INK if on else S.MUTED, HORIZONTAL_ALIGNMENT_CENTER, br.size.x, 0.6)
 			zone(br, "gfx", q[0])
 			bx += 62
+
+## Words of `s` in lines no wider than `w` at font size `px`.
+static func _wrap(f: Font, s: String, px: int, w: float) -> Array:
+	var out := []
+	var cur := ""
+	for word in s.split(" ", false):
+		var tryw: String = word if cur == "" else cur + " " + word
+		if cur != "" and S.text_width(f, tryw, px) > w:
+			out.append(cur)
+			cur = word
+		else:
+			cur = tryw
+	if cur != "":
+		out.append(cur)
+	return out
+
+## A tech / trade tooltip as Retold's (reference/techs/ui_03.jpg, ui_05.jpg):
+## the name and hotkey, "Cost: 100 [food], 10 [favor], 40s [hourglass]"
+## (red where short), the effect, per-class bullets, the lock's reason in
+## red, age / building / god.
+## The colour of a command state's line in a tooltip.
+static func status_color(st: String) -> Color:
+	match st:
+		"available": return Color("#9ef58a")
+		"unaffordable": return Color("#ff7a5c")
+		"locked": return Color("#d8a878")
+		"researching", "training": return Color("#8fdcff")
+		"queued": return Color("#ffd27a")
+	return S.MUTED
+
+func _draw_wide_tooltip(t: Dictionary) -> void:
+	var title := S.font("title")
+	var sans := S.font("sans")
+	var bold := S.font("bold")
+	var maxw := 350.0
+	var rows := []   # [text, font, size, color, height]
+	for l in t.get("lines", []):
+		var wl := _wrap(sans, "• " + str(l), 15, maxw)
+		for k in wl.size():
+			rows.append([("    " if k > 0 else "") + str(wl[k]), sans, 15, S.INK, 19.0])
+	for l in t.get("bullets", []):
+		var wl := _wrap(sans, "• " + str(l), 14, maxw)
+		for k in wl.size():
+			rows.append([("    " if k > 0 else "") + str(wl[k]), sans, 14, Color("#e9d39a"), 18.0])
+	var stt: Dictionary = t.get("status", {})
+	if not stt.is_empty():
+		var wl := _wrap(bold, str(stt.text), 13, maxw)
+		for k in wl.size():
+			rows.insert(k, [("    " if k > 0 else "") + str(wl[k]), bold, 13, status_color(str(stt.state)), 19.0])
+	elif str(t.get("warn", "")) != "":
+		for wl in _wrap(bold, str(t.warn), 13, maxw):
+			rows.append([str(wl), bold, 13, Color("#ff8a70"), 18.0])
+	for l in t.get("foot", []):
+		rows.append([str(l), sans, 12, S.MUTED, 16.0])
+	var head := str(t.get("title", ""))
+	var hk := str(t.get("hotkey", ""))
+	var w := S.text_width(title, head, 15, 0.5) + (6.0 + S.text_width(sans, "(%s)" % hk, 14) if hk != "" else 0.0)
+	var cost: Dictionary = t.get("cost", {})
+	var gain: Dictionary = t.get("gain", {})
+	var cw := S.text_width(sans, "Cost:", 14) + 6
+	for k in cost:
+		cw += S.text_width(bold, str(int(cost[k])), 14) + 3 + 16 + 10
+	if t.has("time"):
+		cw += S.text_width(bold, "%ds" % int(ceil(float(t.time))), 14) + 3 + 16
+	w = maxf(w, cw)
+	if not gain.is_empty():
+		w = maxf(w, S.text_width(sans, "Gives:", 14) + 6 + 60)
+	for row in rows:
+		w = maxf(w, S.text_width(row[1], row[0], row[2]))
+	w = minf(w, maxw + 10)
+	var h := 8.0 + 20.0 + (22.0 if not cost.is_empty() or t.has("time") else 0.0) + (20.0 if not gain.is_empty() else 0.0) + 4.0
+	for row in rows:
+		h += row[4]
+	h += 8.0
+	var ar: Rect2 = t.anchor
+	var x := clampf(ar.position.x, 4.0, W() - w - 30.0)
+	var y := ar.position.y - h - 8.0
+	if y < 4.0:
+		y = ar.end.y + 8.0
+	var r := Rect2(x, y, w + 22, h)
+	draw_rect(Rect2(r.position + Vector2(0, 4), r.size).grow(4), Color(0, 0, 0, 0.18))
+	draw_rect(Rect2(r.position + Vector2(0, 2), r.size).grow(2), Color(0, 0, 0, 0.25))
+	draw_rect(r.grow(1), Color.BLACK)
+	S.vgrad(self, r, [[0.0, Color(12 / 255.0, 40 / 255.0, 48 / 255.0, 0.97)], [1.0, Color(4 / 255.0, 17 / 255.0, 22 / 255.0, 0.97)]])
+	draw_rect(r, S.BRONZE_HI, false, 1.0)
+	var lx := r.position.x + 11
+	var cy := r.position.y + 8 + 15
+	S.text(self, title, Vector2(lx, cy), head, 15, S.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.8, 0.5)
+	if hk != "":
+		S.text(self, sans, Vector2(lx + S.text_width(title, head, 15, 0.5) + 6, cy), "(%s)" % hk, 14, S.MUTED)
+	if not cost.is_empty() or t.has("time"):
+		cy += 22
+		S.text(self, sans, Vector2(lx, cy), "Cost:", 14, S.INK, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
+		var cx := lx + S.text_width(sans, "Cost:", 14) + 6
+		for k in cost:
+			var v := str(int(cost[k]))
+			var have: float = ui.player.get(k, 0.0)
+			S.text(self, bold, Vector2(cx, cy), v, 14, S.INK if have >= float(cost[k]) else Color("#ff8a70"), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
+			cx += S.text_width(bold, v, 14) + 3
+			S.draw_icon(self, k, Rect2(cx, cy - 13, 16, 16))
+			cx += 16 + 10
+		if t.has("time"):
+			var ts := "%ds" % int(ceil(float(t.time)))
+			S.text(self, bold, Vector2(cx, cy), ts, 14, S.INK, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
+			cx += S.text_width(bold, ts, 14) + 3
+			S.draw_icon(self, "t_time", Rect2(cx, cy - 13, 16, 16))
+	if not gain.is_empty():
+		cy += 20
+		S.text(self, sans, Vector2(lx, cy), "Gives:", 14, S.INK, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
+		var gx := lx + S.text_width(sans, "Gives:", 14) + 6
+		for k in gain:
+			var v := str(int(gain[k]))
+			S.text(self, bold, Vector2(gx, cy), v, 14, Color("#9ef58a"), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
+			gx += S.text_width(bold, v, 14) + 3
+			S.draw_icon(self, k, Rect2(gx, cy - 13, 16, 16))
+			gx += 26
+	cy += 4
+	for row in rows:
+		cy += row[4]
+		S.text(self, row[1], Vector2(lx, cy), row[0], row[2], row[3], HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
 
 func _draw_result() -> void:
 	var res: Dictionary = ui.result

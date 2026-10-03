@@ -121,11 +121,31 @@ public:
 	Dictionary place_wall(int64_t owner, const Vector2 &a, const Vector2 &b, const PackedInt32Array &builders); // {ok, reason, ids}
 	Dictionary convert_to_gate(int64_t id);               // {ok, reason}
 	Dictionary set_gate_locked(int64_t id, bool locked);  // {ok, reason}
-	Dictionary research(int64_t building, const String &tech); // {ok, reason}
-	bool cancel_research(int64_t building);
+	// research(building, key): a fortification stage (sim/fortify) or an
+	// Armory / Market / Temple tech (sim/techs) -> {ok, reason};
+	// cancel_research(building, tech = "": the last queued) refunds it
+	Dictionary research(int64_t building, const String &tech);
+	bool cancel_research(int64_t building, const String &tech);
 	PackedStringArray fort_tech_names() const;
 	Dictionary get_walls() const;                // every wall piece, gate and tower (packed, see PORTING.md)
 	Dictionary get_fortify(int64_t owner) const; // stages, tower numbers, techs and their state
+
+	// --- research, techs, market (sim/techs, Godot-only; PORTING.md "Research, Armory, Market, Temple techs")
+	PackedStringArray tech_names() const;                  // every Armory / Market / Temple tech key (TechId order)
+	Dictionary get_tech_def(const String &tech) const;     // static data (Retold numbers, effects, mapping)
+	Array get_techs(int64_t building) const;               // the building's techs with their state for its owner
+	Array get_owner_techs(int64_t owner, const String &building_type) const; // same by building type (UI menus)
+	Dictionary get_player_techs(int64_t owner) const;      // done, queues, minor gods, fees, flags
+	Array get_research(int64_t building) const;            // the building's research queue
+	Dictionary set_minor_god(int64_t owner, int64_t age, const String &god); // "" = not chosen
+	bool grant_tech(int64_t owner, const String &tech);    // free and instant (scenes, checks)
+	Dictionary get_unit_stats(int64_t id) const;           // a unit's numbers with its owner's techs
+	Dictionary get_market(int64_t owner) const;            // prices, buy / sell rates for that owner, fee
+	Dictionary market_buy(int64_t market, const String &res);  // {ok, reason, gold, amount}
+	Dictionary market_sell(int64_t market, const String &res);
+	Dictionary tribute(int64_t from, int64_t to, const String &res, double amount); // {ok, reason, fee}
+	void set_tech_rules(const Dictionary &opts);           // {heroic_needs_armory: bool}
+	Dictionary get_tech_rules() const;
 
 	// --- economy (sim/economy)
 	Dictionary train(int64_t building, const String &unit_type);

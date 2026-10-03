@@ -98,6 +98,11 @@ struct Projectile {
 	int32_t target, attacker;
 	int owner;
 	double damage, t, dur, arc, dist;
+	// Godot-only (sim/techs, Ballistics): tiles the arrow follows its target
+	// from the aim point (< 0: homing, the browser's arrows); off = the
+	// target is beyond that (a miss)
+	double track = -1, aim_x = 0, aim_z = 0;
+	bool off = false;
 };
 struct StuckArrow { double x, y, z, dx, dy, dz, t; };
 // Scene dressing for the renderer (BattleFX.scar / Debris.drop calls of the

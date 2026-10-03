@@ -27,15 +27,15 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 
 | Piece | GDScript (render / UI) | C++ sim (`native/src/sim/…`) | JS reference |
 |---|---|---|---|
-| core (foundation; skirmish builder: camera, fog pass, playtest) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck, `fog_view.gd` + `fog_of_war.gdshader` (fog-of-war shading, one full-screen pass), `playtest.gd` (scripted skirmish playthrough), `menu_playtest.gd` (the screen flow through real input: menu -> setup -> loading -> match -> Esc menu -> menu, see "Screen flow"), `match_rules.gd` + `match_check.gd` (match settings -> the sim, see "Match rules")) | `core/` (constants, rng, jsmath, bounds, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `match/` (the match setup: seats, teams, difficulty, stockpiles), `fortify/` (walls, gates, towers, their stages: Godot-only, see "Walls, gates, towers"), `sim.{h,cpp}` | `src/core/` |
+| core (foundation; skirmish builder: camera, fog pass, playtest) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck, `fog_view.gd` + `fog_of_war.gdshader` (fog-of-war shading, one full-screen pass), `playtest.gd` (scripted skirmish playthrough), `menu_playtest.gd` (the screen flow through real input: menu -> setup -> loading -> match -> Esc menu -> menu, see "Screen flow"), `match_rules.gd` + `match_check.gd` (match settings -> the sim, see "Match rules")) | `core/` (constants, rng, jsmath, bounds, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `match/` (the match setup: seats, teams, difficulty, stockpiles), `fortify/` (walls, gates, towers, their stages: Godot-only, see "Walls, gates, towers"), `techs/` (research queues, the Armory / Market / Temple techs, market trade, tribute: Godot-only, see "Research, Armory, Market, Temple techs"), `sim.{h,cpp}` | `src/core/` |
 | terrain | `game/terrain/terrain.gd` + `terrain.gdshader` (chunks, paving cobbles / pale stone of MaterialPatches patchGround), `water.gdshader` (Water.js), `props.gdshader` (voxel.gdshader + MultiMesh instance tint, used by trees / gold / berries / ground details); mesher in `native/src/terrain_mesher.cpp` (TerrainMesh.js full port, water depth bake, GroundDetails.js scatter) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (sun + PCSS soft shadows, hemisphere = ambient colour + two unshadowed up/down lights, fill, depth haze following the camera, SSAO, MSAA, `--quality=high\|medium\|low`, `--post=high\|low\|off`), `grade_effect.gd` (CompositorEffect compute pass on the HDR buffer: exposure 2.1 + PBR Neutral + the PostFX.js grade; Godot's tonemap is LINEAR; Compatibility/web falls back to AgX), `sky.gdshader`. MaterialPatches.js canopy / foliage terms not ported yet | none | `src/lighting/` |
-| buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `walls.gd` (Greek walls, pillars and gates with swinging leaves, construction and damage states; models by `../scripts/export-walls.mjs`, see "Walls and gates: the look"), `towers.gd` + `tower_scene.gd` (Greek towers, a model per upgrade stage, construction / damage / upgrade states, the `towers` capture scene; models by `../scripts/export-towers.mjs`, see "Towers: the look"), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
+| buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `walls.gd` (Greek walls, pillars and gates with swinging leaves, construction and damage states; models by `../scripts/export-walls.mjs`, see "Walls and gates: the look"), `towers.gd` + `tower_scene.gd` (Greek towers, a model per upgrade stage, construction / damage / upgrade states, the `towers` capture scene; models by `../scripts/export-towers.mjs`, see "Towers: the look"), `tech_buildings.gd` + `techbuildings_scene.gd` (the Greek Armory and Market, a model per age look plus construction stages, the `techbuildings` capture scene; models by `../scripts/export-techbuildings.mjs`, see "Armory and Market: the look"), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
 | units | `game/units/units.gd` (rigs posed by the full anim.js port, conditional parts, crowd yaw / press / jitter, deaths and corpses, contact shadows), `unit.gdshader` (team lift + rim, hit flash, corpse drain, dithered fade) + `unit_outline.gdshader` (inverted hull, next pass); posing in C++: `native/src/unit_view.cpp` (`AovUnitView`) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
 | combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), `tower_fire.gd` + `tower_flash / tower_puff.gdshader` (tower arrows: loose flash, heavier arrow, tracer, strike; see "Towers: the look"), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported, plus god powers and a wave log, Godot-only; enemy_ai_fort.cpp: the AI's walls, towers and breaches, Godot-only) | `src/combat/` |
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor; Godot-only activity fx: axe / pick chips and dust, sickle chaff, stooks on cut rows, hoof dust, shoal ripples, fish splashes, net ripples, boat wakes; crops sway, `econ_voxel.gdshader`, `fx_chip / fx_puff / fx_ring.gdshader`), buffers built in C++ by `AovEconView` (`native/src/econ_view.{h,cpp}`, render side, reads the sim, never writes it) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
 | godpowers | `game/godpowers/godpowers.gd` (the whole BoltRenderer of effects.js: bolt / sky / zap ribbons, impact flash sprites and decals, scorches with ember cracks (hot orange / red, glowing as long as the scorch lasts), a charcoal ash edge and a hot rim, an expanding impact ring at every strike point (Godot-only; decals are pulled toward the camera so voxel bumps do not swallow them), crater debris, char rims, spark streaks, smoke and flames, the storm funnel (wall, cloud body, dust wall, ground shockwave, rain, energy bands, whirled debris), flyer trails / back lights / drop shadows, meteor fireball and fire, strike / storm point lights and the shadow spot, the full-frame storm grade with light pools; dims the lighting piece's sun / sky / grade while a storm plays), shaders beside it; buffers built in C++ by `AovGodpowerView` (`native/src/godpower_view.{h,cpp}`, render side, reads the sim, never writes it) | `godpowers/` (favor, cooldowns, Lightning Storm, Bolt, Meteor, thrown units: ported) | `src/godpowers/` |
-| ui (HUD, selection, input) | `game/ui/ui.gd` (selection, box / double-click select, smart orders, rally points, control groups, hotkeys, placement ghost, wall drawing (click-drag line ghost, cost, snapping) and the wall / gate / tower commands (see "Walls, gates, towers: placement"), god-power targeting ring, move markers, selection rings (one MultiMesh) + bars, event feed, messages, result card; public: `pieces.ui.selected`, `hover_entity`, `message()`, `feed()`), `hud.gd` (the drawn HUD, two layers with hit zones), `hud_style.gd` (palette, Cinzel / Alegreya fonts in `fonts/`, SVG icons from `icons.gd` = `src/ui/icons.js` rasterised at runtime, draw helpers), `panel.gdshader` (the gilded teal panels), `minimap.gd` + `minimap_ground/units.gdshader` (terrain colours computed in the shader from `get_heights()` / `get_ground()` uploaded as textures, re-uploaded on `building:placed`; unit dots read straight from `get_units()` arrays as data textures: no per-unit script), `portraits.gd` + `portrait.gdshader` (one SubViewport per type / owner, rendered once, unshaded with the browser's three.js hemisphere + sun lighting, no tonemap) | none | `src/ui/` |
+| ui (HUD, selection, input) | `game/ui/ui.gd` (selection, box / double-click select, smart orders, rally points, control groups, hotkeys, placement ghost, wall drawing (click-drag line ghost, cost, snapping) and the wall / gate / tower commands (see "Walls, gates, towers: placement"), god-power targeting ring, move markers, selection rings (one MultiMesh) + bars, event feed, messages, result card; public: `pieces.ui.selected`, `hover_entity`, `message()`, `feed()`), `hud.gd` (the drawn HUD, two layers with hit zones), `hud_style.gd` (palette, Cinzel / Alegreya fonts in `fonts/`, SVG icons from `icons.gd` = `src/ui/icons.js` rasterised at runtime, draw helpers), `panel.gdshader` (the gilded teal panels), `minimap.gd` + `minimap_ground/units.gdshader` (terrain colours computed in the shader from `get_heights()` / `get_ground()` uploaded as textures, re-uploaded on `building:placed`; unit dots read straight from `get_units()` arrays as data textures: no per-unit script), `portraits.gd` + `portrait.gdshader` (one SubViewport per type / owner, rendered once, unshaded with the browser's three.js hemisphere + sun lighting, no tonemap), the research / market panel and tooltips with `tech_icons.gd` + `tech_models.gd` (the tech icons as rendered 3D models; see "Research panel, tooltips, market trade") | none | `src/ui/` |
 | performance (6 teams, 2000 units) | `game/perf/perf.gd` (the render bench, `--renderbench`), and in the render paths of the stress scene: unit LOD + box shadow casters (`game/units`), coarse voxel twins `VoxelModels.coarse()` (tree shadow casters), tight resource / ground-detail buckets (`game/terrain`), economy props frustum culling (`AovEconView`); report in `../docs/godot-stress-report.md` | sim hot paths (with their owners); `native/src/unit_lod.cpp` (`AovUnitView.lod_mesh`) | `docs/stress-report.md` |
 | exports (Windows, macOS, Linux, web) | `export_presets.cfg`, `../scripts/godot-export.sh`, `../.github/workflows/godot.yml`, `native/SConstruct` + `native/aov.gdextension` (platform entries); see "Export" | none | `vite build` |
 | scenes | `AovScenes.set_setup()` from the owning piece, else the C++ setup | `scenes/` (helpers.js, skirmish / town / coast / hud, EconomyScene.js; battle.cpp: BattleScene.js + units/battleHost.js, godpower, stress.js: all ported) | `src/core/scenes/`, `BattleScene.js`, `EconomyScene.js` |
@@ -188,7 +188,10 @@ godot --path godot -- --scene=town [--seed=N] [--mapsize=N] [--units=N] [--playe
   `models` (every exported model on one strip), `walls` (a walled Greek town,
   see "Walls and gates: the look"), `aifort` (two AIs play a match in the
   setup: their own walls, gates, towers and breaches, see "Enemy AI:
-  fortifications") and `menu` (the main menu,
+  fortifications"), `techbuildings` (the Greek Armory and Market, see
+  "Armory and Market: the look"), `techui` (a selected Armory's tech
+  buttons, research queue and a tooltip, see "Research panel, tooltips,
+  market trade") and `menu` (the main menu,
   below). **Without `--scene`** the game opens the main menu; a run with
   `--out`, `--quit` or `--bench` and no `--scene` still gets the skirmish, as
   before (so does the web build's `?scene=` query). Like main.js, main.gd turns
@@ -819,6 +822,81 @@ node scripts/godot-shoot.mjs --scene towers --out shots/godot/towers.png
 node scripts/export-towers.mjs            # re-export godot/assets/models/towers.*
 ```
 
+## Armory and Market: the look (game/buildings/tech_buildings.gd)
+
+The Greek Armory and Market after Age of Mythology: Retold
+(`reference/techs/building_01..03` the Armory, `building_04..06` the
+Market, one per age), drawn by `game/buildings/tech_buildings.gd` (a child
+of the buildings piece; `buildings.gd` hands it the sim's `armory` /
+`market` rows and skips them itself, like the towers). Models: the
+Godot-only `techbuildings` group (`node scripts/export-techbuildings.mjs`,
+~10 s, deterministic; re-run it after changing the script, never hand-edit
+`assets/models/techbuildings.*`): 1/8-tile voxels (the walls' and towers'
+resolution) plus the town's smooth tile roofs (`src/buildings/shapes.js`
+gableRoof / shedRoof / roundColumn with the tile sizes doubled, so tiles
+match the other buildings'), the buildings' palette and weathering, the
+team colour in bands, cloth and shields. Both are 4 x 4 tiles (the sim's
+defs), pivoted at the footprint centre, the front to +z.
+
+- **Armory** (`armory/*`): few, big, clearly modelled pieces so it reads
+  as a forge at game zoom, not a scatter of props. A long whitewashed hall
+  with a dark socle and a **team band**, a terracotta gable roof crossed by
+  two raised pedimented gables, its east gable end in dressed stone (not a
+  bare smooth triangle), a timber porch, a door in a marble frame; three
+  barrels in one group by the front; the open-fronted plank **lean-to
+  smithy** on the east end (a plank gable roof with battens on posts and
+  beams, a dark underside, rafters and an open king-post truss at the end,
+  a board back wall, the forge hearth with glowing coals and a **stone
+  chimney** standing up through the roof, one anvil); in the yard the round
+  **smelting furnace** (two smooth stone drums, a smooth tapering
+  lime-washed bottle kiln, coals glowing in the throat, a stone fire mouth),
+  a stone water trough, a **shield rack** with two hoplite shields (7 x 7
+  pixel-art aspides: bronze rim, team field, raised boss), and one
+  continuous **low yard wall** with a flat pale coping along the front and
+  east edges.
+- **Market** (`market/*`): a two-storey **stoa** (team band at the foot and
+  under the upper floor, windows, pedimented gable roof with a palmette
+  cresting on the ridge), a low columned wing with a pediment to the front
+  whose ridge runs in under the stoa's **projecting first-floor cornice**
+  (the roof junction is hidden), a terrace with an **iron balustrade** and
+  an outside stair, an open court of crates, painted amphorae, barrels and
+  sacks, and three **stalls** (two on the front, one on the east side): a
+  plank counter with a team skirt and three heaped produce crates (red
+  fruit, greens, grapes, oranges, lemons) in front, posts, a small plain
+  tile gable at the back and the **team / white striped awning** sloping
+  out from under its eave, with a scalloped valance.
+- **Roofs**: no antefixes along the eaves (at this size a row of them reads
+  as spikes); palmettes only on the stoa's ridge (`ridgeCrest`) and the
+  Mythic acroteria.
+- **Age looks**: `<type>/a1` (Archaic, Classical: terracotta roofs, red
+  tympana), `a2` (Heroic: pale green glazed roofs, blue tympana, **team
+  finials** on the gables), `a3` (Mythic: marble roofs,
+  gilt acroteria, marble pilasters, the smithy's marble tie beam), chosen by the owner's
+  `get_player(owner).age`.
+- **Construction**: `<type>/s0..s7` (floor(progress * 8), cut from `a1`
+  like `src/buildings/construction.js`: 0 = the staked lot with team
+  pennants and a rope, 1..7 = the work rising inside a timber scaffold with
+  plank walks, braces, a hoist and stacked blocks; the roofs appear at s7).
+- `TechBuildings.model_key(type, built, progress, age)`, `mesh_for(type,
+  age)` (a finished mesh, for portraits and placement ghosts: the ui's
+  `buildings/<type>/0` lookups have no such model), `model_override[id]`
+  (one sim building in another look), `set_static(entries)` (render-only
+  buildings: `{type, owner, x, z, age | key}`).
+
+Capture scene `techbuildings` (`game/buildings/techbuildings_scene.gd`):
+the `town` scene's town with an Armory and a Market side by side on
+cleared lots just south of it, the camera close and high like the
+references. Spawned by the sim when it has the `armory` / `market` types,
+else drawn render-only on the same lots.
+
+```
+node scripts/godot-shoot.mjs --scene techbuildings --out shots/godot/techbuildings.png
+     [--params "techb_age=2"]          # the owner in the Heroic (2) / Mythic (3) age
+     [--params "techb_states=1&cam=40,112,30,42,15"]   # a row: a1 a2 a3 of each, s0, s3, s5
+     [--params "techb_static=1"]       # render-only even when the sim has the types
+node scripts/export-techbuildings.mjs   # re-export godot/assets/models/techbuildings.*
+```
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower
@@ -883,6 +961,473 @@ cursor every frame, `ui._refresh_hover`, so a slot whose command changes
 without a mouse move never keeps the old tooltip).
 `--shots` saves the blocked drag, the green drag, the foundations, the
 gate, the tower ghost and the upgraded tower.
+
+## Research, Armory, Market, Temple techs (native/src/sim/techs)
+
+Godot-only (behind `Sim::godot_rules`; with the rules off nothing here can be
+built, researched or traded and `check-sim.mjs` stays 16/16 bit-exact). The
+Greek tech tree of Age of Mythology: Retold for the Armory, the Market and
+the Temple, with the numbers of `../reference/techs/TECHS.md`. Class `Techs`
+= `Sim::techs` (`techs/techs.{h,cpp}`); run in the buildings step after
+`Fortify::update`.
+
+- **Buildings**: `armory` and `market` (appended to `building_type_names()`,
+  `B_ARMORY` / `B_MARKET`): 150 wood, 40 s, 1200 hp, 4x4, sight 9, Classical
+  Age, villager-built like the others (placement refuses them in the Archaic
+  Age, and always with the rules off). Their models and construction
+  stages are `game/buildings/tech_buildings.gd` (scene `techbuildings`).
+  **The Temple** takes Retold's cost and hp with the rules on (150 wood +
+  150 gold, 1200 hp: `rules_building_cost` / `rules_building_hp`, read by
+  `Buildings::place` / `spawn`, the AI's `try_build` and `get_building_def`);
+  the browser's 150 + 50, 1500 hp stay with the rules off. Its footprint
+  stays 5x6, not Retold's 5x5: the footprint is read by 54 places in the sim
+  (placement, pathing, the start towns' layout, the AI's spots) and by the
+  temple's voxel model, all of which would have to move together behind the
+  flag; the gameplay numbers do.
+  **Armor**: with the rules on the Armory, the Market and the Temple take
+  Retold's 40 % hack / 90 % pierce / 5 % crush (TECHS.md) in place of the
+  browser's flat building factor (x0.35, myth units x1.2), read the way
+  `Fortify::armor_mult` reads an attack: arrows and every building's shot
+  are pierce, myth units and god powers crush, the rest hack
+  (`Techs::building_armor_mult`). A hoplite's blow on one: 9 -> 5.4 (a house:
+  3.15), a toxotes' arrow 7 -> 0.7 (house 2.45), a minotaur's blow 24 ->
+  22.8 (house 28.8). Every other building keeps the browser's factor.
+  **The Heroic Age needs an Armory or a Market** (Retold) with the rules on,
+  by default (`set_tech_rules({heroic_needs_armory: false})` turns it off);
+  the advance is refused with "Requires an Armory or a Market". The enemy AI
+  (Moderate and up) goes on to the Heroic / Mythic Age once its Armory
+  stands (see "Enemy AI: research, ages, Market").
+- **Myth units at the Temple**: with the rules on the Temple trains every
+  Greek myth unit this game has a model for, through the same `train()`:
+  Minotaur (Athena), Cyclops (Ares), Centaur (Hermes) from the Classical Age
+  and the Medusa (Hera) from the Mythic Age (Retold; the browser trains the
+  Minotaur alone, every unit Classical). `get_building_def("temple").trains`
+  = [minotaur, cyclops, centaur, medusa] (hotkeys Q W E R, the HUD lists
+  them), `get_unit_def(t).min_age` / `god` follow the rules. A chosen minor
+  god (`set_minor_god`) allows only his unit ("Requires the minor god Ares");
+  none chosen: all of them, as with the techs. Their stats and costs are the
+  existing unit defs (TECHS.md has no unit numbers). So Sylvan Lore, Will of
+  Kronos and Face of the Gorgon, and the Centaur / Medusa part of Burning
+  Pitch and Sun Ray, act on units a player can really train.
+- **AI research**: the enemy AI builds an Armory and a Market, researches
+  the Armory / Market / Temple techs, advances to the Heroic and Mythic Ages
+  and trades at its Market, scaled by difficulty: see "Enemy AI: research,
+  ages, Market" (`combat/enemy_ai_techs.cpp`, `aitechs_check.gd`).
+- **Research queue** (generalises the fortify stages' one-slot research):
+  every building row has `tech_queue` (`TechItem` {tech, t, total, paid}),
+  up to `TECH_QUEUE_MAX` = 5. `research(building, key)` checks the building
+  (a tech's home, or its "also at": Military Academy for Phobos, Deimos,
+  Sarissa, Aegis, Harvest of Souls; Town Center for Golden Apples), built and
+  alive, the queue, the tech's state, and pays the cost at once; the head
+  progresses (x1.5 at an Armory with Forge of Olympus); `cancel_research(
+  building, key = "": the last queued)` refunds exactly what was paid. Done:
+  the owner's bit, his modifiers recomputed and applied to every unit he owns
+  (hp scaled with the new max, speed, sight) and, through `entity:added`, to
+  every unit spawned later; event `tech:researched` with `a = 100 + TechId`
+  (the fortify stages keep a = 1..6), `id` = the building. One-time; only one
+  copy queued at a time (any building). While a building researches, its
+  training queue waits (one production queue, as in Retold); a destroyed
+  building loses its queue (no refund). The fortify stages are listed by the
+  same `get_techs(building)` for a tower / wall piece and researched by the
+  same `research()`.
+- **States** (`get_techs`): `available`, `locked_age`, `locked_prereq`,
+  `locked_god`, `researching` (head of a queue), `queued`, `done`,
+  `unavailable` (the unit it upgrades is not in this game: no building
+  trains it, or the rules are off), each with a `reason` ("Requires Heroic Age", "Requires Copper
+  Weapons", "No Hypaspist in this game", ...).
+- **Gods**: generic techs need nothing; Olympian Parentage needs the major god
+  Zeus (`Player.god`, every player here); a minor-god tech needs that god for
+  its age once one is chosen with `set_minor_god(owner, age, god)` (Classical
+  athena / hermes / ares / pan, Heroic apollo / dionysus / aphrodite /
+  hestia, Mythic artemis / hera / hephaestus / demeter / persephone). Until a
+  player picks (this game has no age-up god choice yet), every god's techs of
+  that age are open.
+- **Effects** (`TechMods` per player and unit type, read only with the rules
+  on by the system that owns the stat): attack (`Techs::unit_damage`, combat
+  melee / arrows / splash), hack armor (melee blows) and pierce armor (arrows of
+  units and buildings) added to the unit's single armor fraction, capped 0.95
+  (Retold's "-10 % vulnerability" = +0.10), hp, speed, range
+  (`Combat::range_of`), sight, reload (attack cooldown factor), splash radius,
+  divine damage (added after armor, x0.35 on buildings), multipliers vs
+  buildings / myth units (added, as Retold's), arrow speed and tracking
+  (`Combat::fire` / `update_projectiles`), building arrows (Town Center,
+  towers: x weapons in `fire`), building sight and Omniscience and Sun Ray
+  reveals (`FogOfWar::recompute`), favor rate (`Economy` worship),
+  regeneration / healing / poison / timed buffs (`Techs::update`).
+  Unit classes: human soldier = hoplite, toxotes, hippikon; hero = hero;
+  myth = minotaur, cyclops, centaur, medusa; infantry = hoplite; ranged
+  soldier = toxotes. **Retold distances** (range, LOS, radii) are scaled by
+  `DIST_SCALE` = 0.6 (this sim's toxotes range 11 vs Retold's 18, sight 13 vs
+  22); hp, damage, rates and times are Retold's.
+
+| Tech (building, age) | Applied here |
+|---|---|
+| Copper / Bronze / Iron Weapons (Armory, C / H / M; each needs the previous) | +10 % attack each (additive: +30 %): human soldiers, hero, Town Center and tower arrows |
+| Copper / Bronze / Iron Armor | +0.10 hack armor each, hero +0.15 |
+| Copper / Bronze / Iron Shields | +0.10 pierce armor each, hero +0.15 |
+| Ballistics (C) | **arrows now miss**: with the rules on, a toxotes', tower's or Town Center's arrow follows its target only `ARROW_TRACK_BASE` = 1 tile (+ the target's radius) from where it stood when loosed, else it lands there (a stuck arrow); Ballistics +3 tiles (Retold's "+3 track rating"). Myth units' and heroes' shots still home |
+| Burning Pitch (M) | toxotes, centaur, medusa: damage multiplier vs buildings 1 -> 4 |
+| Phobos' Spear of Panic (Ares, C; also Academy) | hoplite +1 divine damage per blow |
+| Deimos' Sword of Dread (Ares) | unavailable: no Hypaspist |
+| Enyo's Bow of Horror (Ares, C) | toxotes +10 %; arrows of toxotes and buildings fly x1.5 faster |
+| Sarissa (Athena, C; also Academy) | hoplite +10 %, range +0.3 (0.5 x 0.6) |
+| Aegis Shield (Athena, C; also Academy) | hoplite +0.15 pierce armor |
+| Sun Ray (Apollo, H) | toxotes, centaur, medusa +15 %; a hit reveals Retold's area 25 x 0.6 = 15 tiles round the target for 6 s (`REVEAL_RADIUS`; a hit within 3 tiles of a live reveal renews it, so a volley is one reveal). Retold's "+20 LOS" for projectiles is that reveal (a projectile has no sight of its own here) |
+| Shafts of Plague (Artemis, M) | toxotes +10 %; hits poison 0.25 hp/s for 6 s (ignores armor, restarts on a new hit) |
+| Forge of Olympus (Hephaestus, M) | Armory techs x0.25 food / wood / gold (favor unchanged), Armory research x1.5 |
+| Olympian Weapons (Hephaestus, M) | Myrmidon / Hetairos / Gastraphetes -> hoplite / hippikon / toxotes: +20 %, +1 multiplier vs myth units |
+| Harvest of Souls (Persephone, M; also Academy) | hoplite: 5 s after a kill x1.15 damage, reload x0.8 |
+| Tax Collectors (Market, H) / Ambassadors (M, needs Tax Collectors) | market fee 30 -> 22.5 -> 15 %; tribute fee 20 -> 10 -> 0 % |
+| Coinage (M) | unavailable: no Caravan |
+| Omniscience (Temple, M) | costs 100 gold x the enemies' living population (at queue time), 4 s; the fog shows every enemy unit's and building's sight to the owner and his allies |
+| Olympian Parentage (Zeus, A) | hero +25 % hp, +1 hp/s |
+| Labyrinth of Minos (Athena, C) | minotaur +35 % hp, +15 % speed |
+| Sylvan Lore (Hermes, C) | centaur +35 % hp, range +1.8, sight +0.6 |
+| Will of Kronos (Ares, C) | cyclops splash radius +0.9 (1.6 -> 2.5) |
+| Hymn of the Wildwood (Pan, C) | each hero heals the owner's units within 3 tiles 0.75 hp/s |
+| Oracle (Apollo, H) | units and buildings +3 sight; `queue_view` flag for the UI |
+| Temple of Healing (Apollo, H) | each Temple heals up to 3 damaged units within 9 tiles (+ half its size) at 15 hp/s, idle ones first, half rate on moving / fighting ones |
+| Golden Apples (Aphrodite, H; also Town Center) | worship favor x1.2 |
+| Dionysia (Dionysus, H) | every unit +5 % hp |
+| Face of the Gorgon (Hera, M) | medusa range +3 |
+| Monstrous Rage (Hera, M) | myth units reload x0.75, speed +15 % |
+| Pious Sacrifice (Persephone, M) | a hoplite's death: the owner's human soldiers within 3 tiles reload -10 % per death (max 5) for 5 s from the last |
+| Winged Messenger, Call of Lykaion, Roar of Orthus, Chthonic Rites, Hallowed Woodlands, Hand / Shoulder of Talos, Flames of Typhon, Enchanted Hymn, Iron Grip | unavailable: their units (Pegasus, Lykaon, Nemean Lion, Hydra, Hamadryad, Colossus, Chimera, Siren, Harpy) are not in this game |
+
+- **Market** (`market_buy(market, res)` / `market_sell(market, res)` ->
+  {ok, reason, gold, amount}): food and wood in lots of 100 for gold (favor
+  and gold: refused, as Retold). One price per resource **shared by every
+  player**, start 100: buy = floor(price x (1 + fee)), sell = floor(price x
+  (1 - fee)) (130 / 70; 122 / 77 with Tax Collectors; 115 / 85 with
+  Ambassadors: Retold's readouts); each buy +2 (`MARKET_STEP`), each sale
+  -2, clamped 25..1000 (60 sales: sell 17 per 100, the floor of the original
+  AoM observation); the price **drifts back** towards 100 at 0.2 per second
+  (`MARKET_DRIFT`). The step is this port's pick within TECHS.md's "about
+  1.5 to 3"; **the drift is a deliberate departure**: TECHS.md says Retold's
+  prices do not recover over time. Here the price is shared by every player
+  and the AIs trade too, so without a drift one player's early sales would
+  leave the price at the floor for the whole match; the slow recovery (20
+  points in 100 s) keeps the Market usable. Set `MARKET_DRIFT` = 0 for
+  Retold's behaviour. A Market with a full research queue
+  cannot trade. `get_market(owner)` = {food / wood: {tradable, price, buy,
+  sell}, favor: {tradable: false}, fee, tribute_fee, lot, base, step, drift,
+  min, max, has_market}.
+- **Tribute** (Retold: only with a finished Market): `tribute(from, to, res,
+  amount)` -> {ok, reason, amount, fee}: the receiver gets the amount, the
+  sender pays it x (1 + fee).
+
+API: `tech_names()`, `get_tech_def(key)` ({key, name, building, also, age,
+age_name, base_cost, time, requires, god, major_god, generic, missing, text
+(Retold's effect), mapping (how it maps here), effects [{kind, units,
+buildings, value, retold}], id, event_a}), `get_techs(building)` (that
+building's techs for its owner: the static data + state, reason, cost (the
+price he would pay now: discounts, Omniscience), at / queue_index / progress
+while queued), `get_owner_techs(owner, building_type)` (the same without a
+building, for menus), `get_research(building)` ([{key, name, t, total,
+progress, paid}]; also `get_building(id).research`), `research(building,
+key)`, `cancel_research(building, key = "")`, `get_player_techs(owner)`
+({done, queue, minor_gods, god, market_fee, tribute_fee, favor_mult,
+building_attack, building_sight, omniscience, queue_view, armory_discount,
+has_market}), `set_minor_god(owner, age, god)`, `grant_tech(owner, key)`
+(free and instant: scenes, checks), `get_unit_stats(id)` ({damage, hp,
+max_hp, speed, range, sight, hack_armor, pierce_armor, reload, splash,
+divine, regen, vs_buildings, vs_myth, track, arrow_speed, poisoned}: the
+tooltip readout), `get_market(owner)`, `market_buy`, `market_sell`,
+`tribute`, `set_tech_rules({heroic_needs_armory})`, `get_tech_rules()`
+({heroic_needs_armory, researched, reveals, reveal_radius}).
+
+```
+godot --headless --path godot -s res://game/core/techs_check.gd [-- --only=defs,buildings,research,locks,weapons,armor,ballistics,armory_gods,temple,myth_units,retold_bld,market,ai,determinism,rules_off --seed=3]
+```
+
+`techs_check.gd` ("TECHS PASS|FAIL <case>", `TECHS_RESULT {json}`, exit =
+failures, ~25 s, 51 cases) measures every effect on real numbers: the
+unit:damaged amount of a real blow / arrow before and after (hoplite 9 ->
+9.9 / 10.8 / 11.7 per weapons tier on a villager, toxotes 7 -> 9.1, hero 28
+-> 36.4, Town Center and tower 6 -> 7.8, minotaur unchanged; an enemy
+hoplite's blow on a hoplite 6.3 -> 5.4 / 4.5 / 3.6 and on the hero 5.4 ->
+1.35 with the armor line; arrows likewise with the shields), hit rates at a
+running villager (20 % without Ballistics, 100 % with), toxotes on a house
+2.45 -> 9.8 with Burning Pitch, a 3 s walk (+15 %), heal / regen / poison /
+favor over time, 3 of 4 hurt villagers healed by a Temple, the fog at the
+enemy's start before and after Omniscience (600 gold for 6 enemy pop),
+prices after each trade, the clamp, the drift and every fee, tribute paid /
+received; plus the queue (paid at queue time, one copy, cancel refunds
+exactly, done after 30 s, event a = 100, existing and newly spawned units
+get it, a Military Academy's hoplite waits for its Sarissa), every lock,
+determinism (two runs bit-equal) and the rules off (nothing built,
+researched, traded). `myth_units` trains the Centaur, Cyclops and Medusa at
+a real Temple with `train()` (no `spawn_unit`), researches Sylvan Lore /
+Will of Kronos / Face of the Gorgon there and measures the trained units
+(centaur 340 -> 459 hp, range 12 -> 13.8, on one trained before and one
+after; cyclops splash 1.6 -> 2.5 and a bystander 2.2 tiles off losing 15 hp;
+medusa range 12 -> 15), the Medusa refused in the Classical Age, a chosen
+minor god's lock. `retold_bld`: the Temple's cost paid and hp, the armor of
+the three buildings on real blows / arrows, the Heroic Age refused without
+an Armory / Market. Sun Ray: with the fog on, a spot 13 tiles past the
+target is seen only while the reveal lasts. `ai`: a Moderate AI (seed 3)
+builds its Armory at 22.5 min and finishes Copper Weapons at 24.5; Easy
+builds none.
+
+## Research panel, tooltips, market trade (game/ui)
+
+The Armory, the Market and the Temple's techs in the HUD, as Age of
+Mythology: Retold's command panel (`reference/techs/ui_01..05`).
+
+- **Build grid**: with villagers selected the grid now has **Armory (U)**
+  and **Market (K)** (after the Military Academy; their portraits are the
+  `techbuildings` models, `portraits.gd`), tooltips with the cost, Retold's
+  help line, hp and age; greyed before the Classical Age ("Requires the
+  Classical Age", also the message of a click / key). Their placement ghost
+  is the Classical model (`VoxelModels.mesh("techbuildings", "<type>/a1")`).
+- **Tech buttons** (`ui._tech_slots`, any finished building of the player
+  whose `get_techs()` is not empty: Armory, Market, Temple, and the techs the
+  Military Academy / Town Center also research): a button shows a tech that
+  is not done, not `unavailable` (its unit is not in this game)
+  and not `locked_god`; a line shows only its next tier (Bronze appears once
+  Copper is done, greyed until the Heroic Age); a god's techs appear from his
+  age on (Retold: with the god; every god's while no minor god is chosen).
+  The Armory's generic lines sit by column in the top row (weapons Q, armor
+  W, shields E, Ballistics R, Burning Pitch T, as `ui_02.jpg`), god techs in
+  rows 2-3; elsewhere techs fill the rows below the train buttons. Hotkeys
+  are the slot's letter, Q W E R T / A S D F G / **Y U I O P** (the third row
+  is not Retold's Z X C V B: Z / C / V are the god powers here), unless a
+  train / age button already has it. Frames: **gold** for generic techs,
+  **purple** for a god's, and every button speaks the state language below
+  ("Command button states"); a tech being researched or queued keeps its
+  button. More techs
+  than free slots (a Mythic Temple with no minor god chosen): the last slot is
+  "More techs (n / m)" and pages.
+- **Icons**: rendered **3D models**, not drawn glyphs. `game/ui/tech_models.gd`
+  builds one small scene per icon from code (lofted blades with a diamond
+  section and crisp ridges, lathed shields / bowls / apples / helmets,
+  parametric discs with relief and painted faces, swept shafts, horns, bows
+  and snakes, bevelled extrusions; materials: polished metal with a hammered
+  normal map, wood grain, leather, cloth, marble, glass, unshaded glowing
+  fire / souls / lightning / venom with alpha). `TechIcons` "the 3D studio"
+  renders them all once: one shared World3D, each model in its own 256 px
+  SubViewport (4x MSAA, transparent) spaced 40 units apart, lit by a softbox
+  panorama sky (the metal's reflections and ambient: a warm softbox up left,
+  a strip light behind right, a soft frontal box, a dark floor), a key light
+  from the top left with soft shadows, a cool fill, a rim omni light behind
+  each model in its tile family's glow, SSAO, filmic tone mapping.
+  `ui.setup` calls `TechIcons.studio_start(self)`, the next drawn frame
+  renders the studio, `studio_poll()` (every ui frame) reads the pictures
+  back two drawn frames later and frees it (a `RenderingServer.force_draw`
+  does not render freshly added viewports), then re-bakes any tile already
+  made, in place (`ImageTexture.update`). Headless (no renderer): nothing is
+  rendered and the SVG glyphs below are the fallback. **No motif is shared
+  between two Armory lines** (each line owns one silhouette, so a button is
+  told apart by its art, not by its frame or pips): **weapons** are swords
+  (copper one leaf-bladed xiphos with a midrib, bronze two crossed, iron two
+  crossed before a labrys), **armor** a muscle cuirass with pectorals, the
+  ribcage arch, abdominals and two beaded bands at the hem (copper plain,
+  bronze with shoulder guards and a gold medallion, iron steel with shoulder
+  guards, gold rivets and pteruges), **shields** a hoplon turned three
+  quarters so its rolled rim and bowl show (never a flat target), copper a
+  raised gold crescent, bronze a gold star on dark blue enamel, iron a
+  silver lambda on crimson with rivets; Ballistics a bronze pair of dividers
+  astride a glowing trajectory ending in an arrowhead on its mark, Burning
+  Pitch a painted clay pot brimming with black pitch, ablaze, the pitch
+  running down its side, Phobos a huge obsidian spearhead (the only spear)
+  cracked with glowing red seams, Deimos a black ram-horned war helm with
+  burning violet eye slits, Enyo a heavy horn recurve with gold bands and
+  tips, drawn, Sarissa a phalanx of five thick parallel lowered pikes (pale ash, broad heads) with red
+  ribbons (a hatch, no shield), Aegis Athena's silver owl with fanned bronze
+  and gold wings and glowing eyes, Sun Ray a blazing sun in a gold ring,
+  Shafts of Plague two arrows dripping green venom, Forge of Olympus an
+  anvil, a hot ingot, the hammer and sparks, Olympian Weapons Zeus' gold
+  keraunos (a ringed grip, three zigzag prongs fanning from each end),
+  Harvest of Souls a scythe and rising souls; Tax Collectors a purse and
+  coins, Ambassadors a sealed scroll, Coinage a stack of staters and an owl
+  coin; Omniscience an eye in gold lids with rays, Olympian Parentage a
+  crested Corinthian helmet, Labyrinth the maze from above, Sylvan Lore an
+  oak sprig, Will of Kronos an hourglass, Hymn Pan's pipes, Oracle the
+  Delphic tripod's vapours, Temple of Healing the Rod of Asclepius, Golden
+  Apples, Dionysia grapes, Face of the Gorgon a bronze gorgoneion with snakes
+  and glowing eyes, Monstrous Rage a bull's head with burning eyes, Pious
+  Sacrifice a marble altar with fluted posts, volutes, garlands and gold
+  rosettes, its log pile ablaze. Materials: every metal carries a wear map
+  (`TechModels._wear()`: tarnish clouds, pits, scratches) on its albedo and
+  roughness over a hammered normal map, and the studio sky has a bright
+  horizon over a dark floor, so curved metal shows a crisp light-over-dark
+  reflection (polished bronze, not plastic); the 256 px render is unsharp-
+  masked after the downscale (`TechIcons._sharpen`) so edges and highlights
+  stay crisp at button size. Iterate with a contact sheet (below).
+  **Aegis** is a living tawny owl (not a statuette, `TechModels.feathers()`:
+  vertex-coloured plumage with a fine bump normal): an egg of layered breast
+  feathers (displaced rows, each tip dark, short broken streaks), a broad
+  head, a pale facial disc ringed by a dark ruff, huge amber eyes with black
+  pupils and a glint, a scowling brow running up into the ear tufts,
+  half-raised barred wings, talons on an olive branch. **Burning Pitch** is a
+  two-handled black-figure amphora (a black foot, a running-wave band on the
+  shoulder, a black neck) brimming with glossy pitch, one run over the lip,
+  ablaze. **Phobos** is a lanceolate war-spear head of black glass whose two
+  cutting edges glow red-hot to the point, a few jagged fractures near the
+  socket (no midrib with side veins: that read as a leaf).
+  A button never shows the bare picture:
+  `TechIcons.tile(name, px, "normal"|"locked")` composites it once (CPU,
+  cached; `prewarm_step()` bakes the set one per frame): **its own painted
+  backdrop** (`TechIcons.BACKDROPS`, `backdrop(name, px)`, cached; one per
+  line, not one vignette per family): a sky gradient, a light pool placed
+  for that picture and a value-noise pattern that says where the tech
+  lives: the weapons a forge (orange heat from below, sparks), armor
+  brushed steel with a window's light, shields the sea, Ballistics an
+  engineer's blueprint grid with a drafting arc, Burning Pitch smoke over a
+  low fire, Phobos a crimson mist, Deimos violet fog, Enyo a dusk skyline
+  over dark hills, Sarissa dusty light shafts, Aegis a starry night with a
+  moon glow, Sun Ray a sunburst, Shafts of Plague venom drips, Olympian
+  Weapons storm clouds, Harvest of Souls an underworld mist, the Labyrinth
+  and Pious Sacrifice stone walls, the gardens out-of-focus leaves, the
+  Market coin bokeh (patterns: embers, streaks, waves, grid, smoke, cracks,
+  mist, horizon, dust, stars, rays, bokeh, blocks, drips, clouds; none red).
+  So five gold buttons in one row differ by their scene before their art
+  (techs_playtest checks it). The studio's rim light takes that backdrop
+  light's colour and side (a forge's orange from below, the moon's blue on
+  the owl), so the model sits lit inside its scene; the halo behind the
+  picture is that light at 12% (not an airbrushed glow), the top sheen 2.5%.
+  The picture's drawn bounds are fitted per icon (`FRAMING`: [fit, dx, dy],
+  default `FIT` 90%; Phobos, Sun Ray and Sarissa fill past the frame as
+  close-ups, the cuirass sits smaller), Lanczos from 256 px, a soft drop
+  shadow and a dark outline round the silhouette so it reads on any
+  backdrop. The SVG fallback
+  (`SVG`, `TEMPLATES`: 24-unit glyphs, embossed from their blurred alpha)
+  and the `g_<god>` emblems, `t_buy` / `t_sell`, `t_time` stay SVG.
+  "locked" is the same tile drained and its values split: the backdrop
+  drops to a dark slate (luminance x 0.42), the picture to a mid grey (x
+  0.64 + 0.07 through a soft S-curve, so it is not silvery), the outline
+  stays dark; the picture keeps 14% of its own hue (a tier's metal 20%), so
+  a greyed flame still reads warmer and brighter than its clay pot. **Sharpness at button size**: every tile is baked at the exact size it
+is drawn (48 px on the grid, 34 px in the queue, 22 px on the card; a 64 px
+tile drawn at 48 went soft), the studio uses ACES tone mapping, a stronger
+key (2.3, specular 1.4) over a lower ambient (0.38) and stronger SSAO, and
+after the downscale `TechIcons._clarity` pushes each channel away from its
+own 2 px blur (local contrast, so folds, rims and engraved faces survive at
+40 px) with a mild saturation lift; the picture fills 90% of the tile
+(`FIT`). Iterate with a contact sheet: after
+  `render_models(host, names)` and two drawn frames `studio_finish()`, then
+  `TechIcons.bake(name, 64, locked)` per name (`TechIcons._glyph3d[name]`
+  is the raw render). No plate is red: red means "can't afford".
+- **Tooltips** (`hud._draw_wide_tooltip`, commands with `wide`): the name and
+  "(hotkey)", "Cost: 100 [food] 100 [gold] 30s [hourglass]" (red where short;
+  the time with Forge of Olympus at the Armory /1.5), Retold's effect text,
+  per-class bullets built from the effects ("Human Soldier: Attack +10%",
+  "Hero: Vulnerability to Hack attacks -15%", "Buildings: Attack +10%"), the
+  lock's reason in red ("Requires Heroic Age", "Requires Copper Weapons"),
+  then age, building, "Also researched at ..." and the god; lines wrap at
+  350 px. A disabled tech's click / key says its lock, else what is short
+  ("Not enough gold").
+- **Research queue on the card** (`ui._research_info`): "Researching <tech>
+  · n%", the queue as tech icons (the head with a progress bar; tooltip:
+  seconds left, click to cancel: `cancel_research(building, key)`, exact
+  refund), and **RESEARCHED**: small dimmed tiles of the techs done at
+  that building with a green check and a green frame (never a buyable gold
+  one). A building's training waits while it researches (sim). The feed
+  says "<tech> researched." (`tech:researched`, a = 100 + id).
+- **Market**: trade buttons in the second row, Buy Food (A), Sell Food (S),
+  Buy Wood (D), Sell Wood (F): the resource, a green / red arrow and the live
+  price in gold on the button (Retold's `ui_01.jpg`), tooltips "Cost: 134
+  [gold]" / "Gives: 72 [gold]"; a click / key trades a lot of 100
+  (`market_buy` / `market_sell`) and says "Bought 100 food for 134 gold". The
+  card shows the exchange: per resource Buy / Sell in gold and how far the
+  price is above / below 100, the lot and the fee (30 %, 22.5 % with Tax
+  Collectors, 15 % with Ambassadors). Market techs in the top row.
+- **Capture scene `techui`** (`ui._techui_setup`; hud on, 1920x1080): the
+  town scene's town in the Heroic Age with an Armory, a Market and its
+  Temple, Copper Weapons and Copper Armor done, Copper Shields (39 %) and
+  Ballistics in the Armory's queue, two Minotaurs training at the Temple, a
+  few trades made, 14 favor left: every state at once (Bronze Weapons /
+  Armor available, Copper Shields researching, Ballistics queued, Burning
+  Pitch locked by the Mythic Age, the god techs short of favor but Enyo's
+  Bow); the Armory selected with the tooltip of its first button (Bronze
+  Weapons) open.
+
+```
+node scripts/godot-shoot.mjs --scene techui --width 1920 --height 1080 --out shots/godot/techui.png
+     [--params "techui_sel=market"]   # market | temple | armory
+     [--params "techui_tip=5"]        # the command slot whose tooltip is open (-1 none)
+```
+
+**Command button states** (`ui._set_state` / `_auto_state`, drawn by
+`hud._draw_cmd_state`): every command carries `state`, the same language for
+techs, train, build and trade buttons at every building, plus `status`
+`{state, text}`, the state in words as the first line of its tooltip,
+coloured by state (`hud.status_color`). **The frame's colour is the state**,
+read before anything else (`hud.frame_of`): gold / purple = buyable, red =
+can't afford, blue = in progress (researching, training, queued), grey =
+locked; the picture backs it (full colour, red cast, blue duotone, slate).
+
+| state | button | tooltip line |
+|---|---|---|
+| `available` | full-colour tile, bright bevelled frame (gold: generic tech, purple: god tech, the god's emblem on its top-left corner); a unit / building portrait keeps the cell's gold edge | "Available · Click to research" (green) |
+| `unaffordable` (`short`: the missing resources) | **the same on every button** (techs, train, build, trades): the whole 3 px bevel turns red (`hud.FRAMES.red`: #ffb4a0 / #ff2a12 / #800c04, inner line #ff6a40) with a red glow into the gap between cells, the picture in full colour under a red cast (8% at the top, 16% at the middle, 42% at the foot); a god tech keeps its purple corner caps and emblem medallion, so it still reads as a god tech | "Can't afford · Need 40 more gold, 5 more favor" (red); the cost's short numbers red |
+| `locked` (`age_req` when an age, else a prerequisite) | the tile desaturated and darkened (`tile(..., "locked")`); a unit / building portrait the same: `hud.locked_portrait(tex)` reads the portrait back once, turns every pixel into the tiles' locked slate grey (luminance x 0.6-0.68) and caches it (a near-black tint for the frame or two before the portrait has rendered), on a grey cell plate (no team teal; mean saturation ~0.18, the same as a locked tech tile); a dim grey frame, a badge centred on the frame's top-right corner (7.5 px radius, mostly over the frame and the gap): the required age's numeral (II / III / IV) or, locked by a prerequisite, a padlock; the hotkey dimmed. A tech locked by a prerequisite is shown only while that prerequisite is researching / queued (`ui._tech_visible`'s `busy`: the line's next step, padlocked, after the buyable buttons), else hidden as in Retold | "Locked · Requires Heroic Age" / "Locked · Requires Copper Shields" (tan) |
+| `researching` / `training` (`progress`, `count`) | "busy", **the same on techs and train buttons**: the whole bevel blue (`hud.FRAMES.blue`: #d8f2ff / #2ea2ff / #0a3a80, inner #7ccaff) with a blue glow in the gap; the picture in the **busy duotone** (`TechIcons.tile(..., "busy")` / `hud.busy_portrait(tex)`, both `TechIcons.busy_image`: luminance mapped navy #06142c to ice #b4dcff, 8% of the hue kept), its full colour coming back clockwise from 12 o'clock as the work runs (`hud._reveal`, a textured fan; its leading edge an ice line), a thick 6 px progress bar on the tile's foot (blue to ice in a dark trough; the hotkey rides above it); a train button's queued count on a blue chip at the top-right corner | "Researching · 39% · 25s left · cancel it from the queue" (blue) |
+| `queued` (`count`: its place) | blue bevel and the busy duotone (no colour yet), an empty dashed 6 px bar on the foot (it waits its turn), its place in the queue on the **blue corner chip** with an hourglass (the training count's chip), never over the picture: a queued Ballistics still shows its dividers | "Queued · 2nd in the queue" (blue-amber) |
+| researched | off the grid (the line's next tier takes the slot); on the card under RESEARCHED with a green check | |
+
+Every tooltip, narrow (train / build / age) or wide (techs, trades), opens
+with that state line right under the name, before the cost and the hotkey.
+
+**Nothing covers the picture** except the work in progress (a researching /
+training / queued tile's 6 px bar on its foot and a researching tile's sweep
+edge). Every other mark rides the frame (its 3 px bevel
+and the 5 px gap between cells):
+an Armory line's **tier notches** set into the frame's top edge (1-3 small
+5x4 px bars in the tier's metal, `tier`; the picture itself tells the tiers
+apart: one sword / two / two and an axe, copper / bronze / steel, and a
+locked tier glyph keeps 20% of its metal's hue), a god tech's **medallion**
+centred on the frame's top-left corner (8 px radius) with its god's emblem
+(`god`; `TechIcons.GODS`: Zeus' bolt, Athena's owl, Apollo's sun, Ares'
+helmet, ...: Greek gods share initials, so no letters), and on every god
+tech, **in every state**, purple **corner caps** (a 3 px L bracket with
+12 px arms, a lit edge and a stud, `hud._god_corners`) on all four corners
+over the state's bevel: a red can't-afford or blue researching god tech
+keeps the god-tech shape, a generic tech has plain corners; locked, the caps
+go slate. A click or key on a
+button that is not available says why (`_deny_text`: the lock, what is
+short, "Copper Weapons: researching, 25s left").
+
+The real-input playtest (`game/core/techs_playtest.gd`; harness shortcuts:
+AI off, resources granted, a hoplite and a hero spawned to measure on, the
+sim stepped fast while frames render):
+
+```
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 1280x720x24" \
+  godot --path godot --rendering-driver vulkan --audio-driver Dummy --resolution 1280x720 \
+  -s res://game/core/techs_playtest.gd -- --scene=skirmish [--shots=/abs/dir]   # "TECHSPLAY ok|FAIL <step>", exit = failures
+```
+
+It is slow under lavapipe: a full run is about 9.5 minutes on 4 cores
+(1-2 s a frame; the last check, "S sells 100 food", lands at ~9m20s), longer
+with another Godot running. Give it `timeout 900` or more and run it alone;
+a 580 s timeout kills it just after "click Buy Food" and looks like a stall.
+Its own watchdog quits with 99 after 1500 s.
+
+It box-selects the villagers, checks the Armory (U) / Market (K) buttons and
+the Armory tooltip's age lock (a click refused with "Requires the Classical
+Age"), H + A advance the age, R + a ground click places a Temple, the Armory
+button + a click an Armory, K + a click a Market (each built by the
+villagers), a click on the Armory: Copper Weapons on Q in a gold frame,
+Burning Pitch greyed "Requires Mythic Age", four or more god techs in purple,
+no Bronze tier; the states (Copper Weapons `available` tier 1, Burning Pitch
+`locked` with `age_req` 3 and "Locked · Requires Mythic Age", the god techs
+with their god); with the favor taken away (harness) a god tech is
+`unaffordable`, short of favor, "Can't afford · Need n more favor"; the
+hover tooltip (cost, 30 s, effect, "Human Soldier: Attack +10%"); a click
+on Copper Weapons pays 100 food + 100 gold and puts it in the card's queue,
+its button `researching` on Q (Q again: refused, nothing paid); its key
+queues Copper Armor (`queued`, "2nd in the queue") and a click on the queue
+icon cancels it (exact refund); when Copper Weapons is done: the feed
+notice, a hoplite's damage x1.1 (`get_unit_stats`), Bronze Weapons on Q
+`locked` "Requires Heroic Age" (tier 2), Copper Weapons off the grid and
+under Researched; in the Heroic Age (harness) with Copper Shields under way,
+Bronze Shields `locked` with the padlock (no `age_req`), "Locked · Requires
+Copper Shields" (then cancelled, the age restored); a click on the
+Temple and Olympian Parentage's hotkey (100 food, 10 favor): the hero's hp
+x1.25; a click on the Market: its rates on the card and the buttons' prices;
+a click on Buy Food (+100 food for the shown price, the price and the label
+move) and S (sells 100 food, the price falls).
 
 ## Conventions
 
@@ -1008,7 +1553,9 @@ gate, the tower ghost and the upgraded tower.
   EconomyView keys), `combat/arrow|debris_*`. Godot-only models (no JS
   builder) are authored in the same format by their own scripts:
   `walls/*` by `scripts/export-walls.mjs` (see "Walls and gates: the look"),
-  `towers/*` by `scripts/export-towers.mjs` (see "Towers: the look").
+  `towers/*` by `scripts/export-towers.mjs` (see "Towers: the look"),
+  `techbuildings/*` by `scripts/export-techbuildings.mjs` (see "Armory and
+  Market: the look").
 - **Unit rigs**: `VoxelModels.rig(type)` = `{voxel, anim, style, euler: "XYZ",
   parts: [{name, anim (channel), joint, parent, parentIdx, coat, portrait,
   conditional, mesh}]}`, parents first. Part world transform =
@@ -1133,6 +1680,16 @@ a, b)`, `place_wall(owner, a, b, builders=[])` -> {ok, reason, ids},
 `convert_to_gate(id)`, `set_gate_locked(id, on)`, `research(building, key)`,
 `cancel_research(building)`, `fort_tech_names()`, `get_walls()`,
 `get_fortify(owner)`; `get_buildings()` also has `fort_open`, `fort_locked`.
+
+Research, techs, market (Godot-only, see "Research, Armory, Market, Temple
+techs"): `research(building, key)` also takes an Armory / Market / Temple
+tech, `cancel_research(building, key="")`, `tech_names()`,
+`get_tech_def(key)`, `get_techs(building)`, `get_owner_techs(owner,
+building_type)`, `get_research(building)`, `get_player_techs(owner)`,
+`set_minor_god(owner, age, god)`, `grant_tech(owner, key)`,
+`get_unit_stats(id)`, `get_market(owner=1)`, `market_buy(market, res)`,
+`market_sell(market, res)`, `tribute(from, to, res, amount)`,
+`set_tech_rules(opts)`, `get_tech_rules()`; `get_building(id).research`.
 
 **Free villager** (Godot-only rule, `Economy::rescue`, checked once a
 second for every player, AI included): a player who still owns a completed
@@ -1372,7 +1929,7 @@ systems'. Stone does not exist here: everything costs wood + gold.
   tower_name, tower {hp, range, damage, cooldown, sight}, techs [{key, name,
   line, level, min_age, time, cost, state: done / available /
   needs_previous / needs_age / researching}], walls, gates, towers}. Events
-  `gate:changed` (a = 0 converted, 1 locked, 2 unlocked), `tech:researched`.
+  `gate:changed` (a = 0 converted, 1 locked, 2 unlocked), `tech:researched` (a = 1..6 a fortify stage, 100 + TechId an Armory / Market / Temple tech: `get_tech_def(key).event_a`).
 Checked by
 `godot --headless --path godot -s res://game/core/walls_check.gd [-- --seed=7 --only=...]`
 ("WALLS PASS|FAIL <case>", `WALLS_RESULT {json}`, exit = failures, ~3 s):
@@ -1516,10 +2073,96 @@ soldier, the match decided; ~30 s). Capture scene `aifort`: a two-AI match playe
 the setup, the camera on the wall piece hit most in the last minute (else
 `aifort_owner`'s Town Center).
 
+**Enemy AI: research, ages, Market** (Godot-only, behind the rules,
+`native/src/sim/combat/enemy_ai_techs.cpp`, called from `EnemyAI::update`
+after the storehouses): the AI uses the tech tree of "Research, Armory,
+Market, Temple techs" the way Retold's AI does, scaled by difficulty
+(`AIParams`, `ai_params(d)`). Deterministic: no rng draw, rows in order.
+
+| | Easy | Moderate (default AI) | Hard | Titan |
+|---|---|---|---|---|
+| Armory | 9 min into the Classical Age, 12 villagers, after its ring / towers | 1.5 min in, 18 villagers, after its ring / towers (at most 7 min more) | 45 s in, 16 villagers | 20 s in, 14 villagers |
+| Market | never | in the Heroic Age, 1 min after its Armory | Classical, 1.5 min after its Armory | Classical, 45 s after its Armory |
+| Ages | Classical only | Heroic from 15 min | Heroic from 13, Mythic from 25 | Heroic from 11, Mythic from 19 |
+| Techs (tier) | 0: Copper Weapons, Copper Armor | 1: + Copper Shields, Labyrinth of Minos, Golden Apples, Bronze Weapons / Armor | 2: + Ballistics, Sarissa, Tax Collectors, Bronze Shields, Sun Ray, Temple of Healing, Iron Weapons / Armor, Monstrous Rage | 3: + Aegis Shield, Oracle, Forge of Olympus (first in the Mythic Age), Iron Shields, Olympian Weapons, Burning Pitch, Ambassadors, Omniscience |
+| Saving (escrow) | 30 s per item, then 150 s at half | 60 s, 90 s at half; age-up 150 s | 120 s, 60 s at half; age-up 240 s | 180 s, 45 s at half; age-up 300 s |
+| Trades | none | glut beyond 1800 | 1400, a lot every 1.5 s | 1100, a lot every 1 s |
+
+- **Gods**: on reaching an age it takes that age's minor god
+  (`Techs::set_minor_god`, only if none is set): Athena (Classical: its
+  minotaurs and hoplites), Aphrodite (Easy / Moderate) or Apollo (Hard /
+  Titan) in the Heroic Age, Hera (Hard) or Hephaestus (Titan) in the Mythic.
+  Only that god's techs open, as for a player.
+- **The plan** (`PLAN`): the Classical Armory line first, then per age its
+  economy techs (Tax Collectors, Golden Apples), its armor / weapon lines
+  (urgent) and its god's techs. Each item has a tier (the lowest
+  `tech_level` that researches it) and, for unit upgrades, the units it
+  needs fielded (Labyrinth / Monstrous Rage: a myth unit; Sarissa / Aegis: a
+  hoplite; Sun Ray / Burning Pitch: a toxotes). Each of its Armory, Market
+  and Temple researches its first open tech of the plan, one at a time (a
+  Temple researching does not train, as for a player). The age-up comes
+  after the urgent techs of the age it is in. Priority: the Armory /
+  Market building, the age-up, the techs in plan order.
+- **Escrow** (what makes it research on time without starving its army):
+  the first item it cannot pay stays in the bank: its academies and Temple
+  train only with that much left over (`escrow_allows`), and when that item
+  lacks gold or wood more villagers go to it (gold share >= 0.3, wood >=
+  0.4); whole for `escrow_max` s per item (`age_escrow_max` for an
+  age-up), then only half of it for `escrow_rest` s (the army may spend the
+  rest). Never with fewer than 8 soldiers or a foe within 26 tiles of its
+  Town Center: the men first (without this rule a starved Hard AI held its
+  last food for a tech and lost its army). A tech it does not save for
+  needs `tech_keep` left over. **Still Archaic past 9 min** (the browser's
+  saving window over and its army eating every bit of food: a Titan seed 2
+  never reached the Classical Age), it saves the 400 food the same way.
+- **Market**: a lot of 100 every `trade_every` s at its Market: gold short
+  for what it saves for (an age-up, a tech): it sells the food / wood it has
+  most to spare beyond that item (no gold mine within 80 tiles: beyond 150,
+  the farms and the woods refill it, the Market is its only gold); food /
+  wood short: it buys with the gold beyond the item + 150; else a food /
+  wood glut beyond `trade_glut` with gold under half of it is sold, and a
+  gold glut buys the food or wood under 150. Never sells 100 for under 45
+  gold nor buys for over 220. Prices are the shared ones (a player sees the
+  AI's trades move them).
+- **Favor**: at its cap (190+ of 200) only one villager keeps praying (the
+  rest gather what the techs and the next age need).
+- `get_ai(owner).techs` = {armories, markets, started, holds, age_holds,
+  sold, bought, gold_in, gold_out, classical_at, heroic_at, mythic_at
+  (s, -1 not yet), last_tech, tech_level, max_age}; `set_ai(owner,
+  {armory_at (0: no research, no later age), max_age, market_age,
+  tech_level, trade_glut})`.
+
+```
+godot --headless --path godot -s res://game/core/aitechs_check.gd [-- --only=ladder,market,determinism,duel --seed=1 --minutes=35]
+```
+
+`aitechs_check.gd` ("AITECHS PASS|FAIL <case>", `AITECHS_RESULT {json}`,
+exit = failures, ~20 s): **ladder** (each difficulty in peace, the other AI
+idle and no waves, 35 min, seed 1): Easy 2 techs (Copper Weapons 29.0 min,
+Copper Armor 31.3), its Armory at 21.7, Classical only, no Market; Moderate
+5 (first 19.5), Armory 15.2, Heroic and its Market at 30.5; Hard 12 (first
+15.8), Armory 14.0, Market 16.7, Heroic 19.2; Titan 21 (first 10.5, median
+3.6 min after reaching each tech's age), Armory 9.3, Market 11.2, Heroic
+14.3, Mythic 24.5, all nine weapons / armor / shields tiers, 28 lots sold
+(its gold mines run dry by 24 min); checked: Easy <= 3 techs, the first
+after 18 min; Moderate more, Heroic, a Market; Hard more, its Market
+sooner; Titan >= Hard, >= 18, median delay <= 4 min, Mythic < 30 min; the
+Armories Titan < Hard < Moderate < Easy. **market** (a Titan given 3000
+food / wood and no gold at its Market sells 24 lots in 60 s, both prices
+fall; given 4000 gold and no food / wood while saving for its age-up buys
+12), **determinism** (two Titan runs, the same techs at the same times, the
+same lots and resources), **duel** (Titan v Moderate, Hard v Easy decided
+by player 1). `match_check.gd --only=difficulty` (the ladder of wins, 21
+duels) still passes, every duel decided within 45 min. `techs_check.gd` `ai`: Moderate's Armory and Copper
+Weapons, Easy's Armory later and at most two techs by 30 min. Capture:
+`node scripts/godot-shoot.mjs --scene aifort --params
+"aifort_ai=titan,hard&aifort_t=22&aifort_focus=town&aifort_owner=1"` (the
+Titan's town at 22 min: Temple, Armory, Market inside its ring).
+
 `set_godot_rules(on)` (default on, kept across `new_game`): off = the
 browser's rules only (no AI god powers, no free villager, no fighting back
 while moving, AI waves attack their target directly, no walls / gates /
-towers, no repair); `simcheck.gd`
+towers, no repair, no Armory / Market, research or trade); `simcheck.gd`
 turns it off for `check-sim.mjs`, and `--godot_rules=0` does it for a run
 (A/B benches: the AI's storms thin the stress armies, so its numbers move).
 
@@ -1677,6 +2320,15 @@ Add methods in `aov_sim.{h,cpp}` next to the piece's section and list them here.
 - Done (fortify sim): walls, gates for allies, towers that shoot, their
   stages, repair, the breach rule, see "Walls, gates, towers"
   (`walls_check.gd`).
+- Done (techs sim): a general research queue, the Armory and the Market,
+  all 47 Greek Armory / Market / Temple techs of Retold (35 with an effect
+  here, 12 unavailable: their units do not exist), the Temple training the
+  Cyclops, Centaur and Medusa those techs upgrade, Retold's Temple numbers
+  and building armor, the Heroic Age's Armory / Market rule, market trade
+  with moving, drifting prices, tribute, arrows that miss without
+  Ballistics, an AI that builds an Armory and researches; see "Research,
+  Armory, Market, Temple techs" (`techs_check.gd`). Not yet: the AI does
+  not use the Market or the Temple's techs.
 - Done (AI fortifications): the enemy AI builds towers, walls its town in
   with gates (every difficulty), upgrades, repairs and patches them, breaks
   enemy walls one piece per group, fears towers when weak; walled-off goals
