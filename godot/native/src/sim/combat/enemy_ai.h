@@ -40,6 +40,7 @@ int ai_difficulty_of(const char *name); // "easy" .. "titan"; anything else: AI_
 struct AIParams {
 	double think = 1;         // s between decisions
 	int max_villagers = 22;   // trains villagers up to this many
+	int villagers_rules = 26; // ... with the Godot rules (an economy that can pay for the Heroic and Mythic Ages on its age plan)
 	int villager_queue = 2;   // at the Town Center
 	int academy_at = 10;      // villagers before the military academy
 	int temple_at = 14;       // ... the temple
@@ -84,7 +85,11 @@ struct AIParams {
 	double escrow_rest = 90;  // ... then this long at half (the army's turn)
 	double age_escrow_max = 150; // s it saves whole for an age-up
 	int max_age = 2;          // advances up to this age (1 Classical .. 3 Mythic)
-	double heroic_at = 900;   // earliest time it advances to the Heroic Age (s)
+	double classical_at = 420; // Godot-only age plan: when it means to reach the Classical Age (s) ...
+	double heroic_at = 900;   // ... the Heroic Age (also the earliest it advances to it)
+	double age_lead = 100;    // it saves the next age's cost from this long before its time (s)
+	int guard = 4;            // soldiers it trains whatever it saves for (Godot-only)
+	int archaic_villagers = 20; // villagers it trains in the Archaic Age whatever it saves for (Godot-only)
 	double mythic_at = 1e9;   // ... the Mythic Age
 	int market_age = 2;       // builds a Market once in this age (4: never)
 	double market_delay = 60; // ... and this long after its Armory stands
@@ -163,6 +168,7 @@ public:
 	// round its Town Center at once (paid); returns the pieces placed
 	int fortify_now(int towers);
 	const std::vector<AIGateGap> &gate_gaps() const { return gaps_; }
+	int saving_for() const { return escrow_item_; } // what it saves for (-1 none; 1000 + building type, 2000 + age, else TechId)
 	int ring_state() const { return ring_state_; }
 	int ring_radius() const { return ring_r_; }
 	int ring_lines_left() const { return (int)ring_lines_.size(); }
@@ -184,6 +190,8 @@ private:
 	void use_powers(const std::vector<int> &army, const std::vector<int> &buildings);
 	std::vector<uint8_t> reach_; // scratch: cells in reach of our army / base
 	void storehouses(int tc, const std::vector<int> &vills, const std::vector<int> &buildings); // Godot-only
+	void finish_sites(const std::vector<int> &vills, const std::vector<int> &buildings); // Godot-only
+	double site_t_ = 0;         // s until the next abandoned-foundation check
 	double store_t_ = 0;        // s until the next storehouse check
 	std::vector<std::pair<int32_t, double>> farm_tries_; // Godot-only: farm foundation -> first time a villager was sent to finish it
 
@@ -196,7 +204,7 @@ private:
 	int escrow_item_ = -1;      // what it is (-1 none; 1000 + building type, 2000 + age, else TechId)
 	double escrow_since_ = 0;   // since when that item has been escrowed
 	double escrow_free_until_ = -1; // escrow at half till then (the army's turn)
-	bool tech_gold_ = false, tech_wood_ = false; // the escrowed item lacks gold / wood (more hands on it)
+	bool tech_gold_ = false, tech_wood_ = false, tech_food_ = false; // the escrowed item lacks gold / wood / food (more hands on it)
 	double trade_t_ = 0;        // s until the next Market trade
 	double armory_up_at_ = -1;  // when its first Armory was seen standing
 	void choose_gods();

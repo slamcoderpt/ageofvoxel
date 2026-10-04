@@ -11,8 +11,9 @@ extends SceneTree
 ##                age), Market lots. Easy researches little and late (<= 3
 ##                techs, the first after 18 min, Classical only, no Market);
 ##                Moderate more than Easy (Heroic, a Market), Hard more than Moderate
-##                (its Market sooner), Titan at least Hard's, >= 18 techs, a
-##                median delay <= 4 min after each age, Mythic before 30 min, every
+##                (its Market sooner), Titan at least Hard's, >= 18 techs, every
+##                age before Hard (on its age plan), a median delay <= 10 min
+##                after each age, Mythic before 30 min, every
 ##                weapons / armor / shields tier, the Armories in the order
 ##                Titan < Hard < Moderate < Easy
 ##   market       a Titan with its Market given a food / wood glut and no
@@ -135,7 +136,11 @@ func _case_ladder() -> void:
 		"moderate_more": m.n > e.n and m.age >= 2 and m.market_min > 0,
 		"hard_more": h.n > m.n and h.age >= 2 and h.market_min > 0 and h.market_min < m.market_min,
 		"titan_most": t.n >= h.n and t.n >= 18 and t.mythic > 0 and t.mythic < 30.0 and titan_lines,
-		"titan_on_time": t.lag_median >= 0 and t.lag_median <= 4.0 and t.first < m.first and t.first < e.first - 8.0,
+		# (on its age plan the Titan reaches every age first and researches
+		# from early on; its median tech lag after each age grows as it reaches
+		# the ages sooner and saves for the next, so it is bounded loosely)
+		"titan_on_time": t.lag_median >= 0 and t.lag_median <= 10.0 and t.first < m.first and t.first < e.first - 8.0
+			and t.classical < h.classical and t.heroic > 0 and t.heroic < h.heroic and t.mythic > 0 and t.mythic < h.mythic,
 		"armory_order": t.armory_min > 0 and t.armory_min <= h.armory_min and h.armory_min <= m.armory_min and m.armory_min < e.armory_min,
 	}
 	var ok := true
@@ -196,6 +201,7 @@ func _case_duel() -> void:
 			row["p%d" % o] = {"techs": sim.get_player_techs(o).done.size(), "age": int(sim.get_player(o).age), "sold": int(tk.sold), "bought": int(tk.bought)}
 		out.append(row)
 		print("AITECHS   duel %s" % JSON.stringify(row))
-		# (a Hard / Easy match can end before the Classical Age: no tech is due then)
-		ok = ok and bool(v.decided) and int(v.winner) == 1 and (int(row.p1.techs) > 0 or int(row.p1.age) == 0)
+		# (a Hard / Easy match can end before the Classical Age, or early in it
+		# on the age plan, its army first, before any tech is due)
+		ok = ok and bool(v.decided) and int(v.winner) == 1 and (int(row.p1.techs) > 0 or int(row.p1.age) == 0 or float(row.minutes) < 20.0)
 	_report("duel", ok, out)

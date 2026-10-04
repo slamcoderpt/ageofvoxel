@@ -645,9 +645,12 @@ Moderate beats Easy in most seeds; peaceful villagers at 6 min /
 population at 9, wave men per minute and casts per minute ordered Easy <
 Moderate < Hard < Titan), **main** (the setup screen's settings through
 main.gd: players, teams, difficulty, colours, resources, speed, fog, the
-team score list). Today: Hard 6/6 over Easy, Titan 5/6 over Moderate (one
-undecided), Hard 4/6 over Moderate, Moderate 3/3 over Easy; peaceful
-villagers at 6 min 14 / 22 / 30 / 35.
+team score list). Ten seeds per pair (the metrics are noisy with fewer), and
+the ordering allows small ties (villagers -0.5, population -3, wave men
+x0.9, casts x0.75): the stronger AIs now spend their early economy on the
+age plan instead of villagers. Today: Hard 10/10 over Easy, Titan 10/10
+over Moderate, Hard 8/10 over Moderate (one lost), Moderate 5/5 over Easy;
+peaceful villagers at 6 min 18 / 27 / 27 / 27.
 
 ## Walls and gates: the look (game/buildings/walls.gd)
 
@@ -2067,9 +2070,10 @@ more than each man on his nearest piece, or only one or two are hit), **gap**
 (that piece pulled down first: in through the opening, nothing destroyed,
 sooner), **fear** (6 men facing three towers are held or sent elsewhere, lose
 <= 2), **determinism**, **matches** (Hard v Hard, Titan v Hard, Hard v Titan
-decided), **siege** (Titan v Titan, seed + 6, favor held at 0 so no Meteor:
-sieges > 0, a wall / pillar / gate piece destroyed with its last hit from a
-soldier, the match decided; ~30 s). Capture scene `aifort`: a two-AI match played `aifort_t` minutes in
+decided), **siege** (Titan v Titan, favor held at 0 so no Meteor, on the
+first seed from seed + 7 where both rings close (on the age plans one side
+can fall before it walls in): sieges > 0, a wall / pillar / gate piece
+destroyed with its last hit from a soldier, the match decided within 75 min). Capture scene `aifort`: a two-AI match played `aifort_t` minutes in
 the setup, the camera on the wall piece hit most in the last minute (else
 `aifort_owner`'s Town Center).
 
@@ -2083,7 +2087,10 @@ Market, Temple techs" the way Retold's AI does, scaled by difficulty
 |---|---|---|---|---|
 | Armory | 9 min into the Classical Age, 12 villagers, after its ring / towers | 1.5 min in, 18 villagers, after its ring / towers (at most 7 min more) | 45 s in, 16 villagers | 20 s in, 14 villagers |
 | Market | never | in the Heroic Age, 1 min after its Armory | Classical, 1.5 min after its Armory | Classical, 45 s after its Armory |
-| Ages | Classical only | Heroic from 15 min | Heroic from 13, Mythic from 25 | Heroic from 11, Mythic from 19 |
+| Age plan (`classical_at` / `heroic_at` / `mythic_at`, saving from `age_lead` s before) | Classical at 11 min, no later age | Classical 7, Heroic 15 | Classical 5.5, Heroic 13, Mythic 23 | Classical 4, Heroic 11, Mythic 19 |
+| Reached (peace, measured) | Classical ~10 | Classical ~8, Heroic ~21 | Classical ~6-7, Heroic ~19, Mythic ~28 | Classical ~5, Heroic ~14, Mythic ~25 |
+| Villagers (Godot rules) | 18 | 26 | 42 | 50 |
+| Guard (soldiers trained whatever it saves) | 4 | 4 | 8 | 8 |
 | Techs (tier) | 0: Copper Weapons, Copper Armor | 1: + Copper Shields, Labyrinth of Minos, Golden Apples, Bronze Weapons / Armor | 2: + Ballistics, Sarissa, Tax Collectors, Bronze Shields, Sun Ray, Temple of Healing, Iron Weapons / Armor, Monstrous Rage | 3: + Aegis Shield, Oracle, Forge of Olympus (first in the Mythic Age), Iron Shields, Olympian Weapons, Burning Pitch, Ambassadors, Omniscience |
 | Saving (escrow) | 30 s per item, then 150 s at half | 60 s, 90 s at half; age-up 150 s | 120 s, 60 s at half; age-up 240 s | 180 s, 45 s at half; age-up 300 s |
 | Trades | none | glut beyond 1800 | 1400, a lot every 1.5 s | 1100, a lot every 1 s |
@@ -2100,9 +2107,36 @@ Market, Temple techs" the way Retold's AI does, scaled by difficulty
   needs fielded (Labyrinth / Monstrous Rage: a myth unit; Sarissa / Aegis: a
   hoplite; Sun Ray / Burning Pitch: a toxotes). Each of its Armory, Market
   and Temple researches its first open tech of the plan, one at a time (a
-  Temple researching does not train, as for a player). The age-up comes
-  after the urgent techs of the age it is in. Priority: the Armory /
-  Market building, the age-up, the techs in plan order.
+  Temple researching does not train, as for a player). Priority: the
+  Armory / Market building, the age-up, the techs in plan order.
+- **The age plan** (`AIParams::classical_at`, `heroic_at`, `mythic_at`,
+  `age_lead`): from `age_lead` s before an age's time it saves that age's
+  cost (escrow item 2000 + age), before the Market and every non-urgent
+  tech (while it saves for an age only the urgent techs are bought); the
+  urgent techs of the age it is in still go first until two minutes past
+  the age's time; it advances as soon as it can pay. The Heroic Age needs
+  an Armory or a Market: the Armory goes up in time for it whatever else
+  waits (`heroic_due`). While it saves for an age the walls and towers go
+  on (fortify gets no "saving"), its villagers keep coming: up to
+  `archaic_villagers` (20, Titan 23) in the Archaic Age, a dozen later,
+  then out of what is left over; and `guard` soldiers (Hard / Titan 8, else
+  4) train whatever it saves (an AI saving for its next age with one
+  spearman at home was overrun and lost half its villagers). A tech or a
+  building it saves for holds farms and storehouses back too (not houses),
+  and villagers only past 30. When the next age lacks food 55 % of the
+  hands go to food; from the Classical Age a fifth stay in the woods at
+  least while wood is short (farms, houses, towers). Measured (aitechs /
+  probes): before it, Hard and Titan AIs ate every bit of food with their
+  armies and most never left the Archaic Age.
+- **Economy for the plan** (Godot rules): villagers up to
+  `villagers_rules` (18 / 26 / 42 / 50; the browser's `max_villagers`
+  14 / 22 / 30 / 34 capped the income below a Heroic Age); from the
+  Classical Age wild food farther than 18 tiles from its Town Center is
+  left for farms (40 villagers fed a town out of a far berry bush and the
+  next age waited minutes for food); a foundation of its own with nobody
+  on it gets the nearest gatherer every 10 s (`finish_sites`: an Armory
+  left a stake in the ground for good kept a whole AI out of the Heroic
+  Age).
 - **Escrow** (what makes it research on time without starving its army):
   the first item it cannot pay stays in the bank: its academies and Temple
   train only with that much left over (`escrow_allows`), and when that item
@@ -2111,10 +2145,10 @@ Market, Temple techs" the way Retold's AI does, scaled by difficulty
   age-up), then only half of it for `escrow_rest` s (the army may spend the
   rest). Never with fewer than 8 soldiers or a foe within 26 tiles of its
   Town Center: the men first (without this rule a starved Hard AI held its
-  last food for a tech and lost its army). A tech it does not save for
-  needs `tech_keep` left over. **Still Archaic past 9 min** (the browser's
-  saving window over and its army eating every bit of food: a Titan seed 2
-  never reached the Classical Age), it saves the 400 food the same way.
+  last food for a tech and lost its army); an age on its plan and the
+  Armory it needs are saved for whatever its army (only foes near stop
+  it), the 400 food of the Classical Age from `classical_at - age_lead`.
+  A tech it does not save for needs `tech_keep` left over.
 - **Market**: a lot of 100 every `trade_every` s at its Market: gold short
   for what it saves for (an age-up, a tech): it sells the food / wood it has
   most to spare beyond that item (no gold mine within 80 tiles: beyond 150,
@@ -2128,7 +2162,8 @@ Market, Temple techs" the way Retold's AI does, scaled by difficulty
   rest gather what the techs and the next age need).
 - `get_ai(owner).techs` = {armories, markets, started, holds, age_holds,
   sold, bought, gold_in, gold_out, classical_at, heroic_at, mythic_at
-  (s, -1 not yet), last_tech, tech_level, max_age}; `set_ai(owner,
+  (s, -1 not yet), last_tech, tech_level, max_age, saving_for (-1 none,
+  1000 + building type, 2000 + age, else a TechId)}; `set_ai(owner,
   {armory_at (0: no research, no later age), max_age, market_age,
   tech_level, trade_glut})`.
 
@@ -2146,7 +2181,8 @@ Copper Armor 31.3), its Armory at 21.7, Classical only, no Market; Moderate
 14.3, Mythic 24.5, all nine weapons / armor / shields tiers, 28 lots sold
 (its gold mines run dry by 24 min); checked: Easy <= 3 techs, the first
 after 18 min; Moderate more, Heroic, a Market; Hard more, its Market
-sooner; Titan >= Hard, >= 18, median delay <= 4 min, Mythic < 30 min; the
+sooner; Titan >= Hard, >= 18, every age before Hard (its age plan), median
+delay <= 10 min, Mythic < 30 min; the
 Armories Titan < Hard < Moderate < Easy. **market** (a Titan given 3000
 food / wood and no gold at its Market sells 24 lots in 60 s, both prices
 fall; given 4000 gold and no food / wood while saving for its age-up buys

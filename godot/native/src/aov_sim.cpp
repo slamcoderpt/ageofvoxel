@@ -1809,6 +1809,7 @@ Dictionary AovSim::get_ai(int64_t owner) const {
 		tk["last_tech"] = ai.techs.last_tech >= 0 ? String(aov::tech_def(ai.techs.last_tech).key) : String();
 		tk["tech_level"] = ai.par.tech_level;
 		tk["max_age"] = ai.par.max_age;
+		tk["saving_for"] = ai.saving_for(); // -1 none, 1000 + building type, 2000 + age, else a TechId
 		d["techs"] = tk;
 		// Godot-only: what it did with fortifications (combat/enemy_ai_fort.cpp)
 		Dictionary f;
