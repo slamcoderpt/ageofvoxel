@@ -22,6 +22,9 @@ static const int METEOR_UNITS = 8;        // ... or enemy units
 static const double BOLT_SPARE_FAVOR = 70; // Bolt a plain (non-myth) unit only with this much favor
 static const int MAX_CENTRES = 64;        // candidate strike points tried per power
 static const double STORE_EVERY = 5;       // Godot-only: s between storehouse checks
+static const int MIN_GUARD = 4;            // Godot-only: soldiers trained whatever it saves for
+static const double SITE_EVERY = 10;       // Godot-only: s between abandoned-foundation checks
+static const double SITE_SAFE = 10;        // ... a foundation with a foe this close waits
 static const double STORE_FAR = 16;        // ... a node this far from every drop-off is far
 static const int STORE_MEN = 3;            // ... and this many villagers working far ones
 static const int STORE_MAX = 4;            // ... storehouses at most
@@ -45,6 +48,7 @@ AIParams ai_params(int d) {
 	if (d == AI_EASY) {
 		p.think = 2;
 		p.max_villagers = 14;
+		p.villagers_rules = 18;
 		p.villager_queue = 1;
 		p.academy_at = 12;
 		p.temple_at = 13;
@@ -60,6 +64,7 @@ AIParams ai_params(int d) {
 		p.age_after = 720;
 	} else if (d == AI_HARD) {
 		p.max_villagers = 30;
+		p.villagers_rules = 42;
 		p.academy_at = 8;
 		p.temple_at = 12;
 		p.academy2_at = 20;
@@ -79,6 +84,7 @@ AIParams ai_params(int d) {
 	} else if (d == AI_TITAN) {
 		p.think = 0.75;
 		p.max_villagers = 34;
+		p.villagers_rules = 50;
 		p.villager_queue = 3;
 		p.academy_at = 8;
 		p.temple_at = 11;
@@ -88,7 +94,7 @@ AIParams ai_params(int d) {
 		p.wave_grow = 6;
 		p.wave_max = 50;
 		p.first_wave = 240;
-		p.aggression = 1.3;
+		p.aggression = 1.45;
 		p.power_every = 1;
 		p.storm_min = 4;
 		p.worshippers = 5;
@@ -143,9 +149,10 @@ AIParams ai_params(int d) {
 		p.escrow_rest = 150;
 		p.max_age = 1;
 		p.market_age = 4;
+		p.classical_at = 660;
 	} else if (d == AI_HARD || d == AI_TITAN) {
 		const bool titan = d == AI_TITAN;
-		p.armory_at = titan ? 14 : 16;
+		p.armory_at = titan ? 10 : 16;
 		p.armory_delay = titan ? 20 : 45;
 		p.fort_first = false;
 		p.tech_level = titan ? 3 : 2;
@@ -154,10 +161,12 @@ AIParams ai_params(int d) {
 		p.escrow_rest = titan ? 45 : 60;
 		p.age_escrow_max = titan ? 300 : 240;
 		p.max_age = 3;
+		p.classical_at = titan ? 240 : 330;
 		p.heroic_at = titan ? 660 : 780;
-		p.mythic_at = titan ? 1140 : 1500;
+		p.mythic_at = titan ? 1140 : 1380;
+		p.age_lead = titan ? 120 : 110;
 		p.market_age = 1;
-		p.market_delay = titan ? 45 : 90;
+		p.market_delay = titan ? 210 : 120;
 		p.trade_glut = titan ? 1100 : 1400;
 		p.trade_every = titan ? 1 : 1.5;
 	}
@@ -205,9 +214,16 @@ void EnemyAI::update(double dt) {
 	// saving food for the Classical Age (minotaurs need it)
 	Cost age_cost;
 	const bool has_age_cost = S.economy.next_age_cost(owner, age_cost);
-	const bool saving = p.age < 1 && !p.advancing && has_age_cost && nv >= 16 && S.time >= 300 && S.time < 540 && !p.can_afford(age_cost);
+	// (Godot-only: it saves for the next age on its age plan instead, the
+	// cost held back from the army and the towers until it can pay:
+	// enemy_ai_techs.cpp; villagers go on whatever it saves for up to 20 in
+	// the Archaic Age, a dozen while it saves for an age later, 30 while it
+	// saves for a tech or a building, then out of what is left over)
+	const bool saving = S.godot_rules ? escrow_item_ >= 2000 && escrow_item_ < 2004
+			: p.age < 1 && !p.advancing && has_age_cost && nv >= 16 && S.time >= 300 && S.time < 540 && !p.can_afford(age_cost);
 	// 1. villagers
-	if (!saving && nv < par.max_villagers && (int)B.queue[tc].size() < par.villager_queue) S.economy.train(tc, U_VILLAGER);
+	if ((S.godot_rules ? escrow_item_ < 0 || nv < (p.age == 0 ? 20 : saving ? 12 : 30) || escrow_allows(unit_def(U_VILLAGER).cost) : !saving) && nv < (S.godot_rules ? par.villagers_rules : par.max_villagers) && (int)B.queue[tc].size() < par.villager_queue)
+		S.economy.train(tc, U_VILLAGER);
 	int counts[3] = { 0, 0, 0 };
 	std::vector<int> by_type[3];
 	for (int v : vills)
@@ -236,6 +252,23 @@ void EnemyAI::update(double dt) {
 		sh[RES_GOLD] = 0.3;
 		sh[RES_FOOD] = std::max(0.25, 1 - sh[RES_WOOD] - sh[RES_GOLD]);
 		sh[RES_WOOD] = 1 - sh[RES_FOOD] - sh[RES_GOLD];
+	}
+	// (Godot-only: the next age waits for food: more hands on food)
+	if (S.godot_rules && tech_food_ && sh[RES_FOOD] < 0.55) {
+		sh[RES_FOOD] = 0.55;
+		const double rest = sh[RES_WOOD] + sh[RES_GOLD];
+		sh[RES_WOOD] = rest > 0 ? 0.45 * sh[RES_WOOD] / rest : 0.2;
+		sh[RES_GOLD] = 1 - sh[RES_FOOD] - sh[RES_WOOD];
+	}
+	// (Godot-only: from the Classical Age farms, houses and towers all want
+	// wood while it saves food and gold for the next age: a fifth of the
+	// hands in the woods at least while it is short)
+	if (S.godot_rules && p.age >= 1 && p.res[RES_WOOD] < 150 && sh[RES_WOOD] < 0.2) {
+		const double take = 0.2 - sh[RES_WOOD];
+		sh[RES_WOOD] = 0.2;
+		if (sh[RES_FOOD] - take >= 0.3) sh[RES_FOOD] -= take;
+		else sh[RES_GOLD] = std::max(0.05, sh[RES_GOLD] - take);
+		sh[RES_FOOD] = 1 - sh[RES_WOOD] - sh[RES_GOLD];
 	}
 	// (Godot-only: the next stretch of the wall ring waits for wood: more
 	// hands in the woods, or the army's toxotes eat every log and the ring
@@ -308,12 +341,16 @@ void EnemyAI::update(double dt) {
 		for (int u : army) home += jsm::hypot(U.x[u] - B.x[tc], U.z[u] - B.z[tc]) < STRAY_DIST;
 	const bool walls_first = S.godot_rules && wall_saving(home);
 	// (Godot-only: what it saves for, an Armory / a Market / the next age / a tech, stays in the bank: enemy_ai_techs.cpp)
+	// (Godot-only: a guard of MIN_GUARD soldiers trains whatever it saves
+	// for: an AI saving for its next age with one spearman at home was
+	// overrun by the first wave and lost half its villagers)
+	const bool guard_short = (int)army.size() < MIN_GUARD;
 	const int pick1 = PICK[(int64_t)std::floor(S.time / 7) % 4], pick2 = PICK[((int64_t)std::floor(S.time / 7) + 1) % 4];
 	if (academy >= 0 && B.built[academy] && (int)B.queue[academy].size() < par.army_queue && (!saving || par.army_while_saving) && !walls_first &&
-			(!S.godot_rules || escrow_allows(unit_def(pick1).cost)))
+			(!S.godot_rules || guard_short || escrow_allows(unit_def(pick1).cost)))
 		S.economy.train(academy, pick1);
 	if (academy2 >= 0 && B.built[academy2] && (int)B.queue[academy2].size() < par.army_queue && (!saving || par.army_while_saving) && !walls_first &&
-			(!S.godot_rules || escrow_allows(unit_def(pick2).cost)))
+			(!S.godot_rules || guard_short || escrow_allows(unit_def(pick2).cost)))
 		S.economy.train(academy2, pick2);
 	if (temple >= 0 && p.age >= 1 && B.queue[temple].size() < 1 && (!S.godot_rules || escrow_allows(unit_def(U_MINOTAUR).cost))) S.economy.train(temple, U_MINOTAUR);
 	// worshippers
@@ -342,17 +379,23 @@ void EnemyAI::update(double dt) {
 		}
 	}
 	// 4. age up
-	if (!p.advancing && p.age < 1 && has_age_cost && S.time >= par.age_after && (p.res[RES_FOOD] > 500 || (nv >= 16 && p.can_afford(age_cost)))) S.economy.advance_age(owner);
+	if (S.godot_rules) {
+		// (Godot-only: on its age plan, as soon as it can pay from its saving's start)
+		if (!p.advancing && p.age < 1 && has_age_cost && S.time >= par.classical_at - par.age_lead && p.can_afford(age_cost)) S.economy.advance_age(owner);
+	} else if (!p.advancing && p.age < 1 && has_age_cost && S.time >= par.age_after && (p.res[RES_FOOD] > 500 || (nv >= 16 && p.can_afford(age_cost))))
+		S.economy.advance_age(owner);
 
 	// Godot-only: a storehouse by a wood line / mine far from every drop-off
 	if (S.godot_rules) storehouses(tc, vills, buildings);
+	// Godot-only: a foundation nobody builds any more gets a villager
+	if (S.godot_rules) finish_sites(vills, buildings);
 	// Godot-only: the Armory, the Market, their techs and the Temple's, the
 	// Heroic / Mythic Ages, Market trades (enemy_ai_techs.cpp)
-	if (S.godot_rules) research(tc, vills, buildings, saving);
+	if (S.godot_rules) research(tc, vills, buildings, false); // (its own savings: the age plan's escrow)
 	// Godot-only: towers, the wall ring, upgrades, repairs; breaking enemy walls, tower fear
 	if (S.godot_rules) {
 		ScopedTimer ft(S.prof.enabled ? &S.prof.sub["ai.fortify"] : nullptr);
-		fortify(tc, vills, army, buildings, saving);
+		fortify(tc, vills, army, buildings, saving && !S.godot_rules); // (the age plan's savings do not hold the walls and towers back)
 	}
 
 	// 5. attack waves
@@ -525,7 +568,11 @@ bool EnemyAI::assign(int v, int res, int tc, const std::vector<int> &buildings) 
 	Sim &S = *sim;
 	Entities &E = S.entities;
 	const BuildingStore &B = E.buildings;
-	int32_t r = S.economy.nearest_resource(B.x[tc], B.z[tc], res, res == RES_GOLD ? 45 : 34);
+	// (Godot-only: wild food farther than 18 from the Town Center is not
+	// worth the walk: a farm is built instead, or 40 villagers fed a whole
+	// town out of a far berry bush and the next age waited minutes for food)
+	const double reach = res == RES_GOLD ? 45 : res == RES_FOOD && S.godot_rules ? 18 : 34;
+	int32_t r = S.economy.nearest_resource(B.x[tc], B.z[tc], res, reach);
 	// Godot-only: the mines and woods by the town worked out, go farther (a
 	// late game without gold or wood within reach would starve and stall)
 	if (!r && S.godot_rules && res != RES_FOOD) r = S.economy.nearest_resource(B.x[tc], B.z[tc], res, 80);
@@ -615,6 +662,37 @@ void EnemyAI::storehouses(int, const std::vector<int> &vills, const std::vector<
 				fort.storehouses++;
 				return;
 			}
+	}
+}
+
+// Godot-only: a foundation of its own (not a farm, nor a wall piece: those
+// have their own builders) with no villager on it, its builder killed or
+// sent elsewhere, gets the nearest gatherer, unless foes stand at it. An
+// Armory left a stake in the ground for good kept a whole AI out of the
+// Heroic Age.
+void EnemyAI::finish_sites(const std::vector<int> &vills, const std::vector<int> &buildings) {
+	Sim &S = *sim;
+	const UnitStore &U = S.entities.units;
+	const BuildingStore &B = S.entities.buildings;
+	site_t_ -= par.think;
+	if (site_t_ > 0) return;
+	site_t_ = SITE_EVERY;
+	for (int b : buildings) {
+		if (B.built[b] || B.dead[b] || building_def(B.type[b]).farm || is_wall_piece(B.type[b])) continue;
+		bool manned = false;
+		for (int v : vills)
+			if (U.order_type[v] == O_BUILD && U.order_target[v] == B.id[b]) { manned = true; break; }
+		if (manned || S.combat.find_enemy_near(B.x[b], B.z[b], owner, SITE_SAFE) >= 0) continue;
+		int best = -1;
+		double bd = INFINITY;
+		for (int v : vills) {
+			if (U.order_type[v] != O_GATHER && U.order_type[v] != O_IDLE) continue;
+			const double d = jsm::hypot(U.x[v] - B.x[b], U.z[v] - B.z[b]);
+			if (d < bd) { bd = d; best = v; }
+		}
+		if (best < 0) return;
+		S.commands.order(best, Order::with_target(O_BUILD, B.id[b]));
+		return; // (one a check)
 	}
 }
 

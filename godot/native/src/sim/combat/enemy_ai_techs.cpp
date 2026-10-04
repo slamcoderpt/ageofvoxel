@@ -134,19 +134,18 @@ void EnemyAI::research(int tc, const std::vector<int> &vills, const std::vector<
 			}
 			ai->tech_gold_ = *item >= 0 && pl.res[RES_GOLD] < esc[RES_GOLD];
 			ai->tech_wood_ = *item >= 0 && pl.res[RES_WOOD] < esc[RES_WOOD];
+			ai->tech_food_ = *item >= 0 && pl.res[RES_FOOD] < esc[RES_FOOD];
 			for (int k = 0; k < RES_COUNT; k++) ai->escrow_[k] = esc[k];
 		}
 	} commit{ this, esc, &esc_item };
 	// (still Archaic past the browser's saving window, 9 min: the army ate
 	// every bit of food and the Classical Age never came; it saves its 400
 	// food like any age-up, the advance itself is update()'s step 4)
-	if (p.age == 0 && !p.advancing && par.escrow_max > 0 && S.time >= std::max(540.0, par.age_after)) {
+	if (p.age == 0 && !p.advancing && par.escrow_max > 0 && S.time >= par.classical_at - par.age_lead) {
 		Cost c;
 		if (S.economy.next_age_cost(owner, c) && !p.can_afford(c)) {
-			int men = 0;
-			for (int r = 0; r < U.size(); r++)
-				if (!U.removed[r] && !U.dead[r] && U.owner[r] == owner && !unit_def(U.type[r]).gatherer) men++;
-			if (men >= ESCROW_MEN && S.combat.find_enemy_near(B.x[tc], B.z[tc], owner, ESCROW_SAFE) < 0) {
+			// (on its age plan: whatever its army, unless foes are in the town)
+			if (S.combat.find_enemy_near(B.x[tc], B.z[tc], owner, ESCROW_SAFE) < 0) {
 				esc_item = 2001;
 				esc[RES_FOOD] = c.v[RES_FOOD];
 				techs.age_holds++;
@@ -173,7 +172,8 @@ void EnemyAI::research(int tc, const std::vector<int> &vills, const std::vector<
 	int men = 0;
 	for (int r = 0; r < U.size(); r++)
 		if (!U.removed[r] && !U.dead[r] && U.owner[r] == owner && !unit_def(U.type[r]).gatherer) men++;
-	const bool threatened = men < ESCROW_MEN || S.combat.find_enemy_near(B.x[tc], B.z[tc], owner, ESCROW_SAFE) >= 0;
+	const bool foes_near = S.combat.find_enemy_near(B.x[tc], B.z[tc], owner, ESCROW_SAFE) >= 0;
+	const bool threatened = men < ESCROW_MEN || foes_near;
 	// the escrow is whole for escrow_max s per item (age_escrow_max for an
 	// age-up), then half of it for escrow_rest s (the army's turn: it spends
 	// what is beyond that half, the rest of the savings stay)
@@ -183,7 +183,7 @@ void EnemyAI::research(int tc, const std::vector<int> &vills, const std::vector<
 			goal_c = c;
 			goal = &goal_c;
 		}
-		if (par.escrow_max <= 0 || threatened) return;
+		if (par.escrow_max <= 0 || (item >= 2000 ? foes_near : threatened)) return; // (an age on its plan: whatever its army)
 		const double limit = item >= 2000 ? par.age_escrow_max : par.escrow_max;
 		if (item == escrow_item_ && S.time - escrow_since_ >= limit) {
 			escrow_free_until_ = S.time + par.escrow_rest;
@@ -203,16 +203,38 @@ void EnemyAI::research(int tc, const std::vector<int> &vills, const std::vector<
 
 	// 1. the Armory
 	const double since_classical = S.time - techs.age_at[1];
+	// (the Heroic Age needs an Armory or a Market: on its age plan the Armory
+	// comes in time for it, whatever else waits)
+	const bool heroic_due = p.age == 1 && par.max_age >= 2 && S.time >= par.heroic_at - par.age_lead - 150;
 	if (!armory_any) {
-		if (academy < 0 || (int)vills.size() < par.armory_at || since_classical < par.armory_delay) return;
+		if (academy < 0 || (!heroic_due && ((int)vills.size() < par.armory_at || since_classical < par.armory_delay))) return;
 		const bool fort_done = !(par.walls && ring_state_ != 3) && fort.towers >= par.towers_max;
-		if (par.fort_first && !fort_done && since_classical < par.armory_delay + par.fort_cap) return; // (the fortifications first)
+		if (!heroic_due && par.fort_first && !fort_done && since_classical < par.armory_delay + par.fort_cap) return; // (the fortifications first)
 		const Cost &c = building_def(B_ARMORY).cost;
 		if (!p.can_afford(c)) save_for(1000 + B_ARMORY, c);
 		else if (try_build(B_ARMORY, pick_builder(vills), tc)) techs.armories++;
 		return;
 	}
 	if (armory >= 0 && armory_up_at_ < 0) armory_up_at_ = S.time;
+	// the next age on its plan comes before the Market and the other techs:
+	// saving from age_lead s before its time
+	{
+		// (the urgent techs of the age it is in go first until the age's time)
+		bool urgent_left = false;
+		for (const AIPlanItem &it : PLAN) {
+			if (!it.urgent || it.tier > par.tech_level || tech_def(it.tech).age > p.age) continue;
+			const int st = S.techs.state(owner, it.tech);
+			if (st == TS_AVAILABLE || st == TS_LOCKED_PREREQ) urgent_left = true;
+		}
+		Cost age_cost;
+		const double age_t = p.age == 1 ? par.heroic_at : par.mythic_at;
+		const bool want_age = !p.advancing && p.age < par.max_age && p.age < 3 && (armory >= 0 || market >= 0) &&
+				(!urgent_left || S.time >= age_t) && S.time >= age_t - par.age_lead && S.economy.next_age_cost(owner, age_cost);
+		if (want_age) {
+			if (affords(age_cost, 0)) S.economy.advance_age(owner);
+			else save_for(2000 + p.age + 1, age_cost);
+		}
+	}
 	// 2. the Market
 	if (!market_any && par.market_age <= 3 && p.age >= par.market_age && armory >= 0 && S.time - armory_up_at_ >= par.market_delay) {
 		const Cost &c = building_def(B_MARKET).cost;
@@ -230,13 +252,6 @@ void EnemyAI::research(int tc, const std::vector<int> &vills, const std::vector<
 	int nc = 0;
 	const int homes[3] = { armory, market, temple };
 	const size_t NPLAN = sizeof(PLAN) / sizeof(PLAN[0]);
-	bool urgent_left = false; // an urgent tech of its age (or earlier) not yet researched
-	for (size_t i = 0; i < NPLAN; i++) {
-		const AIPlanItem &it = PLAN[i];
-		if (!it.urgent || it.tier > par.tech_level || tech_def(it.tech).age > p.age) continue;
-		const int st = S.techs.state(owner, it.tech);
-		if (st == TS_AVAILABLE || st == TS_LOCKED_PREREQ) urgent_left = true;
-	}
 	for (int h = 0; h < 3; h++) {
 		const int b = homes[h];
 		if (b < 0 || !B.tech_queue[b].empty()) continue;
@@ -250,15 +265,9 @@ void EnemyAI::research(int tc, const std::vector<int> &vills, const std::vector<
 		}
 	}
 	std::sort(cand, cand + nc, [](const Cand &a, const Cand &b) { return a.at < b.at; });
-	Cost age_cost;
-	const bool want_age = !p.advancing && p.age < par.max_age && p.age < 3 && armory >= 0 && !urgent_left &&
-			S.time >= (p.age == 1 ? par.heroic_at : par.mythic_at) && S.economy.next_age_cost(owner, age_cost);
-	if (want_age) {
-		if (affords(age_cost, 0)) S.economy.advance_age(owner);
-		else save_for(2000 + p.age + 1, age_cost);
-	}
 	for (int i = 0; i < nc; i++) {
 		const Cand &c = cand[i];
+		if (esc_item >= 2000 && !PLAN[c.at].urgent) continue; // (saving for an age: only the urgent techs)
 		const Cost cost = S.techs.cost_for(owner, c.tech);
 		const double keep = PLAN[c.at].urgent || escrow_item_ == c.tech ? 0 : par.tech_keep; // (one it saved for: nothing left over)
 		if (affords(cost, keep)) {
