@@ -202,6 +202,6 @@ func _case_duel() -> void:
 		out.append(row)
 		print("AITECHS   duel %s" % JSON.stringify(row))
 		# (a Hard / Easy match can end before the Classical Age, or early in it
-		# on the age plan, before any tech is due)
-		ok = ok and bool(v.decided) and int(v.winner) == 1 and (int(row.p1.techs) > 0 or int(row.p1.age) == 0 or float(row.minutes) < 15.0)
+		# on the age plan, its army first, before any tech is due)
+		ok = ok and bool(v.decided) and int(v.winner) == 1 and (int(row.p1.techs) > 0 or int(row.p1.age) == 0 or float(row.minutes) < 20.0)
 	_report("duel", ok, out)

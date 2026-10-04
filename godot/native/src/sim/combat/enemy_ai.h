@@ -88,6 +88,8 @@ struct AIParams {
 	double classical_at = 420; // Godot-only age plan: when it means to reach the Classical Age (s) ...
 	double heroic_at = 900;   // ... the Heroic Age (also the earliest it advances to it)
 	double age_lead = 100;    // it saves the next age's cost from this long before its time (s)
+	int guard = 4;            // soldiers it trains whatever it saves for (Godot-only)
+	int archaic_villagers = 20; // villagers it trains in the Archaic Age whatever it saves for (Godot-only)
 	double mythic_at = 1e9;   // ... the Mythic Age
 	int market_age = 2;       // builds a Market once in this age (4: never)
 	double market_delay = 60; // ... and this long after its Armory stands

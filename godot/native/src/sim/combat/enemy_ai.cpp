@@ -22,7 +22,6 @@ static const int METEOR_UNITS = 8;        // ... or enemy units
 static const double BOLT_SPARE_FAVOR = 70; // Bolt a plain (non-myth) unit only with this much favor
 static const int MAX_CENTRES = 64;        // candidate strike points tried per power
 static const double STORE_EVERY = 5;       // Godot-only: s between storehouse checks
-static const int MIN_GUARD = 4;            // Godot-only: soldiers trained whatever it saves for
 static const double SITE_EVERY = 10;       // Godot-only: s between abandoned-foundation checks
 static const double SITE_SAFE = 10;        // ... a foundation with a foe this close waits
 static const double STORE_FAR = 16;        // ... a node this far from every drop-off is far
@@ -165,6 +164,8 @@ AIParams ai_params(int d) {
 		p.heroic_at = titan ? 660 : 780;
 		p.mythic_at = titan ? 1140 : 1380;
 		p.age_lead = titan ? 120 : 110;
+		p.guard = 8;
+		p.archaic_villagers = titan ? 23 : 20;
 		p.market_age = 1;
 		p.market_delay = titan ? 210 : 120;
 		p.trade_glut = titan ? 1100 : 1400;
@@ -216,13 +217,13 @@ void EnemyAI::update(double dt) {
 	const bool has_age_cost = S.economy.next_age_cost(owner, age_cost);
 	// (Godot-only: it saves for the next age on its age plan instead, the
 	// cost held back from the army and the towers until it can pay:
-	// enemy_ai_techs.cpp; villagers go on whatever it saves for up to 20 in
-	// the Archaic Age, a dozen while it saves for an age later, 30 while it
+	// enemy_ai_techs.cpp; villagers go on whatever it saves for up to
+	// archaic_villagers in the Archaic Age, a dozen while it saves for an age later, 30 while it
 	// saves for a tech or a building, then out of what is left over)
 	const bool saving = S.godot_rules ? escrow_item_ >= 2000 && escrow_item_ < 2004
 			: p.age < 1 && !p.advancing && has_age_cost && nv >= 16 && S.time >= 300 && S.time < 540 && !p.can_afford(age_cost);
 	// 1. villagers
-	if ((S.godot_rules ? escrow_item_ < 0 || nv < (p.age == 0 ? 20 : saving ? 12 : 30) || escrow_allows(unit_def(U_VILLAGER).cost) : !saving) && nv < (S.godot_rules ? par.villagers_rules : par.max_villagers) && (int)B.queue[tc].size() < par.villager_queue)
+	if ((S.godot_rules ? escrow_item_ < 0 || nv < (p.age == 0 ? par.archaic_villagers : saving ? 12 : 30) || escrow_allows(unit_def(U_VILLAGER).cost) : !saving) && nv < (S.godot_rules ? par.villagers_rules : par.max_villagers) && (int)B.queue[tc].size() < par.villager_queue)
 		S.economy.train(tc, U_VILLAGER);
 	int counts[3] = { 0, 0, 0 };
 	std::vector<int> by_type[3];
@@ -341,10 +342,10 @@ void EnemyAI::update(double dt) {
 		for (int u : army) home += jsm::hypot(U.x[u] - B.x[tc], U.z[u] - B.z[tc]) < STRAY_DIST;
 	const bool walls_first = S.godot_rules && wall_saving(home);
 	// (Godot-only: what it saves for, an Armory / a Market / the next age / a tech, stays in the bank: enemy_ai_techs.cpp)
-	// (Godot-only: a guard of MIN_GUARD soldiers trains whatever it saves
+	// (Godot-only: a guard of par.guard soldiers trains whatever it saves
 	// for: an AI saving for its next age with one spearman at home was
 	// overrun by the first wave and lost half its villagers)
-	const bool guard_short = (int)army.size() < MIN_GUARD;
+	const bool guard_short = (int)army.size() < par.guard;
 	const int pick1 = PICK[(int64_t)std::floor(S.time / 7) % 4], pick2 = PICK[((int64_t)std::floor(S.time / 7) + 1) % 4];
 	if (academy >= 0 && B.built[academy] && (int)B.queue[academy].size() < par.army_queue && (!saving || par.army_while_saving) && !walls_first &&
 			(!S.godot_rules || guard_short || escrow_allows(unit_def(pick1).cost)))
@@ -568,10 +569,11 @@ bool EnemyAI::assign(int v, int res, int tc, const std::vector<int> &buildings) 
 	Sim &S = *sim;
 	Entities &E = S.entities;
 	const BuildingStore &B = E.buildings;
-	// (Godot-only: wild food farther than 18 from the Town Center is not
-	// worth the walk: a farm is built instead, or 40 villagers fed a whole
-	// town out of a far berry bush and the next age waited minutes for food)
-	const double reach = res == RES_GOLD ? 45 : res == RES_FOOD && S.godot_rules ? 18 : 34;
+	// (Godot-only: from the Classical Age wild food farther than 18 from the
+	// Town Center is not worth the walk: a farm is built instead, or 40
+	// villagers fed a whole town out of a far berry bush and the next age
+	// waited minutes for food; in the Archaic Age wood is too short for farms)
+	const double reach = res == RES_GOLD ? 45 : res == RES_FOOD && S.godot_rules && S.players[owner].age >= 1 ? 18 : 34;
 	int32_t r = S.economy.nearest_resource(B.x[tc], B.z[tc], res, reach);
 	// Godot-only: the mines and woods by the town worked out, go farther (a
 	// late game without gold or wood within reach would starve and stall)
@@ -727,6 +729,9 @@ bool EnemyAI::try_build(int type, int builder, int tc) {
 	Player &p = S.players[owner];
 	const Cost cost = S.godot_rules ? rules_building_cost(type) : building_def(type).cost; // (Godot-only: Retold's Temple, sim/techs)
 	if (builder < 0 || !p.can_afford(cost)) return false;
+	// (Godot-only: what it saves for stays in the bank: no farm or storehouse
+	// out of the Armory's wood; houses and the saved-for building itself go on)
+	if (S.godot_rules && type != B_HOUSE && escrow_item_ != 1000 + type && !escrow_allows(cost)) return false;
 	int tx, tz;
 	if (!find_spot(type, tc, tx, tz)) return false;
 	p.pay(cost);

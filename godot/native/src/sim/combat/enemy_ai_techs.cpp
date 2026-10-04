@@ -183,7 +183,7 @@ void EnemyAI::research(int tc, const std::vector<int> &vills, const std::vector<
 			goal_c = c;
 			goal = &goal_c;
 		}
-		if (par.escrow_max <= 0 || (item >= 2000 ? foes_near : threatened)) return; // (an age on its plan: whatever its army)
+		if (par.escrow_max <= 0 || (item >= 2000 || item == 1000 + B_ARMORY ? foes_near : threatened)) return; // (an age on its plan, or the Armory it needs: whatever its army)
 		const double limit = item >= 2000 ? par.age_escrow_max : par.escrow_max;
 		if (item == escrow_item_ && S.time - escrow_since_ >= limit) {
 			escrow_free_until_ = S.time + par.escrow_rest;
@@ -219,7 +219,7 @@ void EnemyAI::research(int tc, const std::vector<int> &vills, const std::vector<
 	// the next age on its plan comes before the Market and the other techs:
 	// saving from age_lead s before its time
 	{
-		// (the urgent techs of the age it is in go first until the age's time)
+		// (the urgent techs of the age it is in go first, until two minutes past the age's time)
 		bool urgent_left = false;
 		for (const AIPlanItem &it : PLAN) {
 			if (!it.urgent || it.tier > par.tech_level || tech_def(it.tech).age > p.age) continue;
@@ -229,7 +229,7 @@ void EnemyAI::research(int tc, const std::vector<int> &vills, const std::vector<
 		Cost age_cost;
 		const double age_t = p.age == 1 ? par.heroic_at : par.mythic_at;
 		const bool want_age = !p.advancing && p.age < par.max_age && p.age < 3 && (armory >= 0 || market >= 0) &&
-				(!urgent_left || S.time >= age_t) && S.time >= age_t - par.age_lead && S.economy.next_age_cost(owner, age_cost);
+				(!urgent_left || S.time >= age_t + 120) && S.time >= age_t - par.age_lead && S.economy.next_age_cost(owner, age_cost);
 		if (want_age) {
 			if (affords(age_cost, 0)) S.economy.advance_age(owner);
 			else save_for(2000 + p.age + 1, age_cost);
