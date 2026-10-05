@@ -149,6 +149,7 @@ AovUnitView::Rig AovUnitView::parse_rig(const Dictionary &R, int t) {
 	rig.stride = (float)(double)R.get("stride", 1.0);
 	rig.hover = (float)(double)R.get("hover", 0.0);
 	rig.graze = (bool)R.get("graze", true);
+	{ const Variant sv = R.get("stance", 0.0); rig.stance = sv.get_type() == Variant::BOOL ? ((bool)sv ? 1.0f : 0.0f) : (float)(double)sv; }
 	rig.voxel = (float)(double)R.get("voxel", 0.07);
 	const Array parts = R.get("parts", Array());
 	for (int64_t i = 0; i < parts.size(); i++) {
@@ -741,6 +742,19 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 			set(CH_armL, -0.15, 0.1, 0.12); set(CH_torso, 0.06, 0.2 + S(t * 0.37) * 0.1, -0.04);
 			set(CH_legL, -0.15, 0, 0.1); set(CH_legR, 0.12, 0, -0.02);
 		} else if (hoplite) { set(CH_armL, -0.45, 0.2, 0.32); set(CH_armR, -0.3, 0, -0.3); set(CH_weapon, 0.2, 0, 0.18); }
+		if (rig.stance > 0 && !beast) {
+			// (Egyptian men, rig "stance") a relaxed stride: one foot forward, the
+			// weight on the back leg, the hips turned a little; the slinger lets
+			// the sling hang and sway from a fist held off the hip
+			const bool mr = (id & 1) != 0;
+			const double k = rig.stance;
+			set(CH_legL, (mr ? -0.22 : 0.14) * k, 0, 0.04); set(CH_shinL, (mr ? 0.2 : 0.05) * k);
+			set(CH_legR, (mr ? 0.14 : -0.22) * k, 0, -0.04); set(CH_shinR, (mr ? 0.05 : 0.2) * k);
+			add(CH_torso, 0, (mr ? 0.1 : -0.1) * k, 0);
+			bob = -0.2 * k;
+			if (pose == P_SLING) { set(CH_armR, -0.35 + b * 0.03, 0, -0.26); set(CH_weapon, 0.6 + S(t * 1.6) * 0.25, 0, -0.4); set(CH_armL, -0.12, 0, 0.16); }
+			else if (!hoplite) { add(CH_armL, -0.08, 0, 0.07); add(CH_armR, 0.06, 0, -0.07); }
+		}
 		const bool ordered_attack = U.order_type[row] == aov::O_ATTACK;
 		if (hoplite && (ordered_attack || U.combat_line[row]) && !hero) {
 			const int rv = (int)std::floor(uhash(id, 60 + (int)std::floor(t / 2.7 + uhash(id, 61) * 5)) * 3);

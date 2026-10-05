@@ -1182,9 +1182,8 @@ same channel names, plus:
   pale eye corners, a brow line a value step down above them and a lighter
   nose ridge.
 - **Value separation** (round 6): skin, leather, wood and metal sit 2-3
-  value steps apart: `SKIN` a warm terracotta tan (0xc46e38 ..), bare chests
-  (torso front plane) and limbs `SKIN_FRONT` (0xffa070 ..: they face the
-  camera in shade, and the sand bounce light turns a yellower tan olive),
+  value steps apart: the heads' `SKIN` a warm terracotta tan (0xc46e38 ..),
+  bodies the two flat `PAL_SKIN` tones (see Men's body),
   `LEATHER` / `WOOD` dark walnut (0x54301a / 0x5c3a20 ..), shield backs a
   pale spotted cowhide. Spear points (`spearM`) are leaf-shaped iron-grey
   blades (`BLADE` / `BLADE_EDGE` / `BLADE_DK`): a dark socket, 3 wide across
@@ -1200,9 +1199,9 @@ same channel names, plus:
   a group no man's spear or shield covers a neighbour. Greek rigs have no
   `pose` and keep their idles; combat-line guards are unchanged.
 - **Collision offsets**: long hafts (spear, epsilon axe, ankh staff, crook)
-  are gripped at `GRIP` [-0.6, -6, 0.8] (outside and in front of the fist,
-  not its centre) and shields strapped at `SHIELD_AT` [2.4, -4, 3.5] on the
-  forearm, so posed arms swing them past the torso rather than through it.
+  are gripped at `GRIP_E` [-0.45, -8.5, 0.6] (outside and in front of the
+  fist, not its centre) and shields strapped at `SHIELD_E` [1.9, -5.4, 2.6] on
+  the forearm, so posed arms swing them past the torso rather than through it.
 - **Outline** (`unit_outline.gdshader`, both unit groups): a voxel mesh has a
   copy of every corner per face, so pushing each face out along its own
   normal split the inverted hull into offset squares (jagged black fringes
@@ -1220,23 +1219,42 @@ same channel names, plus:
   light yellow with no blue (`GOLD` 0xe8c400 .., the Pharaoh's `PH_GOLD`
   0xf0c800 ..), the most gold-looking choice next to the team blue; the skin
   is a warm terracotta (see Value separation), apart from the gold by hue.
-- **Figure shape** (`shapeTorso`): after a man's dress is painted on, the
-  waist and belt are cut to 6 voxels under the 8-voxel chest, the top two
-  chest rows are copied one voxel out on each side (squared shoulders, 10
-  wide) and a kilt's hem flares to 10 (an A-line); the arms hang at x 5.8
-  from under the shoulders, clear of the ribs. Used by the Laborer,
-  Spearman, Axeman, Slinger, Mercenary, Priest, the charioteer, Mummy and
-  Minion. The Pharaoh (unit_04) is built by hand: a gold-sashed 4-voxel
-  waist, a team chest under a gold corselet with a team V, squared gold
-  shoulder pads standing out past the torso, a light gold collar ring round
-  a visible 1-voxel neck, an A-line team skirt (5 to 12 wide) with a pleated
-  gold apron and a gold hem band, a tan face block (lighter than his arms)
-  with dark kohl eyes and a dark braided beard banded in gold, his head at
-  1.2x. His crook arm is raised up and out by a part `rest` ([-0.25, 0,
-  -2.25]) and the 2-voxel-thick striped crook counter-turned in the fist
-  ([0, 0, 2.75]) so it stands above the crown, clear of the body; the other
-  fist is held forward and out ([-0.35, 0, 0.42]). The rests compose with
-  the human idle / walk / attack channels (unit_view.cpp: `b * rest`).
+- **Men's body** (round 7, `manTorso` / `manArmM` / `manThighM` /
+  `manShinM` / `manParts` in the exporter): every Egyptian man (Laborer,
+  Spearman, Axeman, Slinger, Mercenary, Priest, Pharaoh, the charioteer,
+  camel / cavalry riders, the mahout, the scorpion man's torso, Mummy,
+  Minion; Anubite, Avenger and Son of Osiris through `beastManParts`, which
+  splits the arms at the elbow for the beast anim's `foreL` / `foreR`) is
+  authored at half the rig voxel (`BODY_SCALE` 0.5, like the heads) with
+  Retold's proportions: the hip at 14 rig voxels (thigh 7, shin 7: the legs
+  are half the figure), a short torso from the hip (rows `TORSO_ROWS`, in
+  half voxels: 10-wide pelvis, 8-wide waist at the belt, 10-wide ribs, a
+  12-wide chest = 1.2-1.3 x the hips, rounded deltoids standing out to 14, a
+  sloping 6-wide trapezius), a 2-row (one rig voxel) neck and the head
+  raised on it at 8.5 (x 0.9 head scale for men). Arms are 3 x 3 half voxels
+  hanging from under the deltoids (pivot at the shoulder, the fist 8.5 rig
+  voxels down: `HAND_E`), legs taper to 2 x 2 ankles over sandalled feet.
+  Skin is two flat tones, no noise (`PAL_SKIN` L 0xec9a50 front / shoulder
+  tops, M 0xbc7038 sides and back, part jitter 0.015): one darker row under
+  the pectorals and at the solar plexus, nothing on the back. Dress is
+  painted in clean bands: `eKilt` (an A-line shendyt 10 -> 12 -> 14 wide,
+  side faces a tone darker than the front, one diagonal wrap fold, a pale
+  hem dipping lower at the front, an optional apron panel standing proud and
+  widening down), `eBelt` (+ a knot / buckle), `eCollar` (the wesekh as a
+  short cape: rings by the distance from the neck over the shoulders and down
+  the chest and back, so the front is a crescent of bands; `paint()` takes
+  `TM` / `TM_SH` for team dye), `eStraps` (the spearman's silver straps),
+  `eSash` (a diagonal strap / quiver belt). The Pharaoh's corselet, shoulder
+  pads, collar ring and A-line skirt and the Priest's robe are painted on
+  the same torso. The old crate body (`torsoBody`, `shapeTorso`, `legsE`,
+  `arms`) is gone.
+- **Stance** (rig field `stance`, unit_view.cpp `Rig::stance`, a number or
+  true = 1): the idle stands in a relaxed stride (one foot forward, the
+  weight on the back leg, the hips turned; mirrored by unit id), x the value
+  (0.3 for the Pharaoh's and Priest's robes, so a leg never leaves the
+  skirt); the slinger lets the sling hang and sway out from a fist held off
+  the hip. Greek rigs have no `stance` and are unchanged; combat-line guards
+  and the hoplite idles override it.
 - **New kinds / channels**: `flyer` (Phoenix, Roc: hover with a bob, wings
   `wingL` / `wingR` beating, faster on the move, a dive with the talons
   forward to strike, a fall when killed), `siege` (Catapult, Siege Tower:
@@ -1246,11 +1264,17 @@ same channel names, plus:
   topple like beasts.
 - **Units** (rig voxel): `laborer` (0.07, bare chest, white kilt, team sash
   and khat, the villager's tools / loads by name: `toolAxe`, `carryWood` ...),
-  `spearman` (bare chest under a crossed harness, shaved head with a side
-  lock, team kilt and armbands, long spear, round-topped team shield),
-  `axeman` (gold scale collar, black and gold nemes, the gold epsilon axe, a
-  gold shield with team bands), `slinger` (leopard-skin vest, short team
-  kilt, sling, pouch), `mercenary` (a Nubian spearman, round team shield),
+  `spearman` (unit_05: bare chest under two silver straps from the shoulders
+  to the belt, shaved head with a side lock, team kilt and wrist bands, long
+  spear, round-topped team shield),
+  `axeman` (unit_02: a broad gold scale collar to mid-chest, team cap
+  sleeves, black and gold nemes, a team kilt with a pointed gold apron, the
+  gold epsilon axe, a gold shield with team bands), `slinger` (unit_06: bare chest under a team
+  broad collar with a white rim, a leopard belt and plain hide front flap
+  over a team kilt, team wrist bands, a bobbed wig; the sling (`slingM`, part
+  scale 0.5 so the cords are thin) hangs from the fist along -y: a team
+  finger loop, two dark cords to a leather cradle round a grey stone, 12 rig
+  voxels long), `mercenary` (a Nubian spearman, round team shield),
   `priest` (white robe and headcloth, gold sun disc and sash, ankh staff),
   `pharaoh` (0.08: the team blue crown with gold discs and uraeus, gold
   corselet, shoulder pads and apron over an A-line team skirt, the striped
