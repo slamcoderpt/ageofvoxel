@@ -1022,15 +1022,20 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   tall back block and a low front room round a small yard behind a clean
   coursed yard wall with a limestone coping and a gap, the awning over the
   yard's jars; three-slit window groups high on all four faces, framed
-  doors, a red-striped cloth awning on poles (`AWN_H`); no roof vents, canopies or stairs;
+  doors, a striped canvas awning on poles (`clothAwning`); no roof vents, canopies or stairs;
   Archaic look `a1` mud brick with a mud gorge and thatch under poles, `a2`
   sandstone with plaster roofs and an ochre band), `granary` 3x3 (after building_05: a coursed sandstone store at the
   back left with a deep cavetto cornice, a framed roof hatch, a door and slit
   in front and a ladder up to the roof; two domed brick silos in a row along
   its east side, a ladder from the roof up to each silo's mouth; a crate of
   grain and a barrel), `lumber_camp` / `mining_camp` 3x3
-  (battered blocks, striped awnings over a log pile / gold ore bins and a
-  trough), `farm` 4x4 (a mud border, an irrigation channel and a shaduf; the
+  (battered blocks under a flared cavetto (`block(..., { flare: true })`)
+  with the painted `CAMP_FRIEZE` (lapis, a pale fillet, red) under it; a
+  canvas awning over the work yard: the Lumber Camp's over a 3-2 stack of
+  big logs (`bigLog`: 3x3 section, pale sapwood ring caps round a dark
+  heart, ends to the open side), crates, a barrel and a saw-pit in front (a
+  dark pit in a timber kerb, a log on bearers, the pit saw through it); the
+  Mining Camp's over gold ore bins, a trough, a sledge of blocks), `farm` 4x4 (a mud border, an irrigation channel and a shaduf; the
   crops are the economy piece's), `temple` 5x6 (a two-tier platform with a
   ramp, a kiosk of painted papyrus columns with screen walls, a naos and
   white drapes, the **major god's statue**: variants `ra` falcon with the
@@ -1060,6 +1065,16 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   0 jars and a basket, 1 crates and sacks, 2 a mud-brick wall run with a gap,
   3 a hand cart, 4 a pen corner, 5 a reed sunshade stall, 6 a woodpile,
   7 a shaded well).
+- **Canvas awnings** (`clothAwning()`: houses, camps, the Town Center; the
+  Market, Armory and Siege Works keep the voxel `awning()` with team
+  stripes): a smooth two-sided sheet drawn by `clothSkin()` (half-voxel
+  quads in `m.skin`, like the battered walls), not voxel slats. It runs from
+  a timber batten on the wall, sloping `drop` voxels to the front, bellied
+  along its run and sagging (`sag`, ~1 voxel) in the middle of every span
+  between the front `posts`; stripes run one way only, wall to front, cream
+  / faded terracotta (`CANVAS`, `CANVAS_T`, `sw` wide); a voxel hem hangs
+  under the front edge, scalloped (2 voxels at every scallop's middle). Not
+  in the construction stages (the cloth goes up when the building is done).
 - **Silos** (`silo()`, the Granary's and the Town Center's): masonry, not
   smooth capsules. A round dark stone plinth; a drum of plastered mud brick
   in courses of 1.5 voxels (bricks in a running bond, darker head joints, a

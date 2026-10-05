@@ -164,7 +164,7 @@ const TEAL = { glow: 0.7 };
 const TEAMB = -7;
 // Records the coordinates it was given (construction stages are cut from it).
 class Rec extends VoxelModel {
-  constructor(W, D) { super(); this.coords = []; this.W = W; this.D = D; this.paths = []; this.blocks = []; this.feet = []; }
+  constructor(W, D) { super(); this.coords = []; this.W = W; this.D = D; this.paths = []; this.blocks = []; this.feet = []; this.cloths = []; }
   set(x, y, z, color, opts) {
     if (typeof color === 'function') color = color(x, y, z);
     if (color === null || color === undefined) return this;
@@ -417,7 +417,7 @@ function bandColor(kind, x, z) {
   if (kind === 'lapis') return (x + z) % 5 === 0 ? shade(LAPIS, 0.78) : LAPIS;
   return null;
 }
-function block(m, x0, z0, x1, z1, y0, h, { wall = SAND, socle = 1, frieze = 0, band = 'ochre', cornice = true, roofC = PLASTER, rim = true, batter = 0, parapet = true, solid = true, rimC = LIP, flute = true, torus = true, gorge = null, lipOut = 1, plinth = true } = {}) {
+function block(m, x0, z0, x1, z1, y0, h, { wall = SAND, socle = 1, frieze = 0, band = 'ochre', cornice = true, roofC = PLASTER, rim = true, batter = 0, parapet = true, solid = true, rimC = LIP, flute = true, torus = true, gorge = null, lipOut = 1, plinth = true, flare = false } = {}) {
   const [gA, gB] = gorge || [GORGE, GORGE_L];
   if (parapet === false) cornice = false;
   const baseH = y0 === 1 && plinth && h >= 6 ? BASE_H : 0;
@@ -475,13 +475,25 @@ function block(m, x0, z0, x1, z1, y0, h, { wall = SAND, socle = 1, frieze = 0, b
       if (e === 0) m.set(x, top, z, shade(flute && ((x + z) & 1) ? gA : gB, 0.86));
     }
   }
-  const c0 = a0 - lipOut, c1 = a1 + lipOut, d0 = b0 - lipOut, d1 = b1 + lipOut;
+  // a flared cavetto (flare): a second gorge row two voxels out over the
+  // first, fluted and lit, the lip slab flush with it above, so from above
+  // the cornice reads as a two-row stepped flare under a pale lip, not a slab
+  let ly = top + 1, lo = lipOut;
+  if (flare && lipOut > 1) {
+    for (let x = a0 - 2; x <= a1 + 1; x++) for (let z = b0 - 2; z <= b1 + 1; z++) {
+      const e = Math.min(x - a0 + 2, a1 + 1 - x, z - b0 + 2, b1 + 1 - z);
+      const g = flute && ((x + z) & 1) ? gA : gB;
+      m.set(x, top + 1, z, e === 0 ? g : e === 1 ? shade(g, 0.9) : SAND_D(x, top + 1, z));
+    }
+    ly = top + 2;
+  }
+  const c0 = a0 - lo, c1 = a1 + lo, d0 = b0 - lo, d1 = b1 + lo;
   for (let x = c0; x < c1; x++) for (let z = d0; z < d1; z++) {
     const e = Math.min(x - c0, c1 - 1 - x, z - d0, d1 - 1 - z);
-    m.set(x, top + 1, z, e === 0 ? rimC : (e === 1 && rim) ? TEAM : roofC);
+    m.set(x, ly, z, e === 0 ? rimC : (e === 1 && rim) ? TEAM : roofC);
   }
-  m.lastTop = { c0, c1, d0, d1, y: top + 1 };
-  return top + 2;
+  m.lastTop = { c0, c1, d0, d1, y: ly };
+  return ly + 1;
 }
 // the gorge cornice lip under a roof (a shadowed row projecting one voxel at y)
 function lip(m, x0, z0, x1, z1, y, c = LIME_S) {
@@ -515,6 +527,52 @@ function awning(m, face, f, a0, a1, yTop, depth, drop, colors, { sw = 2, posts =
     }
   }
   if (posts) for (const a of [a0, a1 - 1]) for (let y = ground; y < yTop - drop; y++) put(a, y, depth, POLE);
+}
+// a canvas awning (the camps' work-yard cloth): a smooth sheet of canvas
+// (drawn by skin() as a curved surface, not voxel slats) from the wall at the
+// top of row yTop, sloping `drop` voxels down to the front `depth` voxels
+// out, bellied a little along its run and sagging one voxel in the middle of
+// every span between the front posts (`posts`, positions along a). Stripes
+// run one way only, wall to front (cream / faded terracotta, `sw` wide); a
+// voxel hem hangs under the front edge, scalloped (two voxels deep at the
+// middle of every scallop); voxel posts carry the front edge.
+const CANVAS = [0xe6d9bd, 0xe1d3b5, 0xeadfc6];
+const CANVAS_T = [0xb7735a, 0xae6c53, 0xbb7860];
+const CANVAS_HEM = 0x9a5a44;
+function clothAwning(m, face, f, a0, a1, yTop, depth, drop, { posts = null, sw = 2, sag = 1, belly = 0.6, ground = 1, stripes = [CANVAS, CANVAS_T], hem = CANVAS_HEM } = {}) {
+  const P = posts || [a0, a1 - 1];
+  const C = { face, f, a0, a1, yTop, depth, drop, P, sw, sag, belly, stripes };
+  // the sheet's height at (a, d): a along the wall, d out from the wall face
+  // (0 .. depth), continuous; posts stand at cell centres
+  C.y = (a, d) => {
+    const u = Math.max(0, Math.min(1, d / depth));
+    let sp = 0;
+    for (let i = 0; i + 1 < P.length; i++) {
+      const p0 = P[i] + 0.5, p1 = P[i + 1] + 0.5;
+      if (a >= p0 && a <= p1) { sp = Math.sin(Math.PI * (a - p0) / (p1 - p0)); break; }
+    }
+    return yTop + 1 - drop * u - belly * Math.sin(Math.PI * u) - sag * sp * Math.pow(u, 0.7);
+  };
+  m.cloths.push(C);
+  const put = (a, y, d, c) => {
+    if (face === '+z') m.set(a, y, f + d, c);
+    else if (face === '-z') m.set(a, y, f - d, c);
+    else if (face === '+x') m.set(f + d, y, a, c);
+    else m.set(f - d, y, a, c);
+  };
+  // the hem: a rolled edge under the front, scalloped
+  for (let a = a0; a < a1; a++) {
+    const ye = Math.ceil(C.y(a + 0.5, depth) - 0.05) - 1, k = (a - a0) % 4;
+    put(a, ye, depth, hem);
+    if (k === 1 || k === 2) put(a, ye - 1, depth, shade(hem, 0.92));
+  }
+  // the front posts, each poking a voxel through the cloth
+  for (const a of P) {
+    const ye = Math.ceil(C.y(a + 0.5, depth));
+    for (let y = ground; y <= ye; y++) put(a, y, depth, POLE);
+  }
+  // the batten the cloth is nailed to along the wall
+  for (let a = a0; a < a1; a++) put(a, yTop, 1, DARKWOOD);
 }
 // a palm: a ringed trunk curving toward (lx, lz) and a crown of long arching
 // fronds: a midrib with sparse leaflets hanging from it, the tips drooping
@@ -747,6 +805,19 @@ function log(m, x0, y, z0, len, along = 'z', r = 1) {
   for (let s = 0; s < len; s++) for (let a = 0; a <= r; a++) for (let b = 0; b <= r; b++) {
     const end = s === 0 || s === len - 1;
     const c = end ? ENDGRAIN : BARK(s, y + b, a);
+    if (along === 'z') m.set(x0 + a, y + b, z0 + s, c); else m.set(x0 + s, y + b, z0 + a, c);
+  }
+}
+// a big log (3 x 3 section, the corners a darker bark so it reads round) with
+// lighter end caps: a pale sapwood ring round a darker heart
+const RINGCAP = (x, y, z) => pick(hash3(x, y, z, 69), [0xe0c48e, 0xd8bb84, 0xe6cb98]);
+function bigLog(m, x0, y, z0, len, along = 'z') {
+  for (let s = 0; s < len; s++) for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) {
+    const corner = (a !== 1) && (b !== 1), mid = a === 1 && b === 1;
+    const end = s === 0 || s === len - 1;
+    let c;
+    if (end) c = corner ? 0x6c4a2c : mid ? 0xa8773f : RINGCAP(s, y + b, a);
+    else c = corner ? shade(BARK(s, y + b, a), 0.82) : BARK(s, y + b, a);
     if (along === 'z') m.set(x0 + a, y + b, z0 + s, c); else m.set(x0 + s, y + b, z0 + a, c);
   }
 }
@@ -1052,6 +1123,36 @@ function skin(m) {
     }
   }
 }
+// the canvas sheets (clothAwning): a heightfield of half-voxel quads,
+// two-sided (the underside a hair lower), coloured per stripe
+function clothSkin(m) {
+  const S2 = m.skin;
+  const _k = new THREE_Color();
+  for (const C of m.cloths) {
+    const { face, f, a0, a1, depth, sw, stripes } = C;
+    const sg = face[0] === '+' ? 1 : -1, alongX = face[1] === 'z';
+    const wall = f + (sg > 0 ? 1 : 0);                  // the wall's outer plane
+    const P = (a, d, y) => { const D = wall + sg * d; return alongX ? [a, y, D] : [D, y, a]; };
+    const N = 2, du = 1 / N;
+    for (let a = a0; a < a1; a += du) for (let d = 0; d < depth - 1e-6; d += du) {
+      const ac = Math.floor(a);
+      const tones = stripes[Math.floor((ac - a0) / sw) % stripes.length];
+      const c = tones[Math.floor(hash3(ac, Math.floor(d), f, 67) * tones.length) % tones.length];
+      const q = [[a, d], [a + du, d], [a + du, d + du], [a, d + du]].map(([u, v]) => P(u, v, C.y(u, v)));
+      // the normal of the quad (up-facing)
+      const ux = q[2][0] - q[0][0], uy = q[2][1] - q[0][1], uz = q[2][2] - q[0][2];
+      const vx = q[3][0] - q[1][0], vy = q[3][1] - q[1][1], vz = q[3][2] - q[1][2];
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      if (ny < 0) { nx = -nx; ny = -ny; nz = -nz; }
+      const nl = Math.hypot(nx, ny, nz) || 1;
+      _k.setHex(c);
+      const col = [_k.r, _k.g, _k.b];
+      const emit = (pts, nrm, cc) => { for (const i of [0, 1, 2, 0, 2, 3]) { S2.pos.push(...pts[i]); S2.nor.push(...nrm); S2.col.push(...cc); S2.team.push(0); } };
+      emit(q, [nx / nl, ny / nl, nz / nl], col);
+      emit(q.map(([x, y, z]) => [x, y - 0.06, z]), [-nx / nl, -ny / nl, -nz / nl], col.map((v) => v * 0.8));
+    }
+  }
+}
 // winding: every quad is emitted in the order the mesher expects (counter-
 // clockwise seen from outside, before the index flip in Group.add); flip the
 // quads whose geometric normal disagrees with the outward normal
@@ -1328,7 +1429,6 @@ function dummy(m, x, z) {
 // door portal; an L of a tall back block and a low front room round a small
 // walled yard. age 1 (Archaic): mud brick with a mud gorge and palm-thatch
 // roofs under poles; age 2+: coursed sandstone with plaster decks.
-const AWN_H = [CLOTH, STRIPE_R];
 // a clean low yard wall along an axis-aligned polyline: coursed, an even
 // height, a pale coping one voxel wider, `gaps` = cells left open ([x, z])
 function yardWall(m, pts, h, wall, cap, gaps = []) {
@@ -1362,7 +1462,7 @@ function house(v, age) {
     hw('+x', 13, 7);
     hw('-z', 11, 10); hw('-x', 6, 10);
     // the awning on the side room's front over the jars and a crate
-    awning(m, '+z', 13, 14, 21, 6, 5, 2, AWN_H, { sw: 1 });
+    clothAwning(m, '+z', 13, 14, 21, 6, 5, 2, { sw: 1, sag: 0.7, belly: 0.4 });
     pots(m, 15.5, 17.5, 2, 1); crate(m, 18, 1, 17, 3, 3, 3);
   } else if (v === 1) {
     // the main block, an upper room on its roof, a projecting door portal
@@ -1373,7 +1473,7 @@ function house(v, age) {
     win(m, '+z', 6, t, { n: 3, h: 3 });
     hw('+x', 11, 9);
     hw('-z', 14, 9); hw('-x', 6, 9);
-    awning(m, '+z', 12, 3, 11, 6, 5, 2, AWN_H, { sw: 1 });
+    clothAwning(m, '+z', 12, 3, 11, 6, 5, 2, { sw: 1, sag: 0.7, belly: 0.4 });
     basket(m, 4, 17, 'orange'); jar(m, 8.5, 1, 18.5, 0xb8683e);
   } else {
     // an L: a tall back block and a low front room round a small walled yard
@@ -1384,7 +1484,7 @@ function house(v, age) {
     hw('+x', 9, 9);
     hw('-z', 17, 10); hw('-z', 9, 10); hw('-x', 14, 7); hw('-x', 5, 10);
     yardWall(m, [[11, 21], [21, 21], [21, 12]], 4, W, arch ? MUDCAP : LIME, [[15, 21], [16, 21], [17, 21]]);
-    awning(m, '+x', 10, 13, 19, 6, 4, 2, AWN_H, { sw: 1 });
+    clothAwning(m, '+x', 10, 13, 19, 6, 4, 2, { sw: 1, sag: 0.7, belly: 0.4 });
     pots(m, 12.5, 14.5, 3, 2); basket(m, 18, 14, 'green');
   }
   return m;
@@ -1419,29 +1519,53 @@ function granary() {
   return m;
 }
 
-// Lumber Camp (3 x 3; building_06): a steeply battered block with a thin
-// lapis band, a faded striped cloth on poles over a big log pile, a sawhorse,
-// a stump with an axe, crates and barrels.
+// the camps' painted frieze under a flared cornice (rows top first): lapis,
+// a pale fillet, red, a pale fillet
+const CAMP_FRIEZE = [(x, y, z) => ((x + z) % 5 === 0 ? shade(LAPIS, 0.8) : LAPIS), FRIEZE_SEP, (x, y, z) => ((x + z) % 5 === 0 ? shade(RED_M, 0.8) : RED_M), FRIEZE_SEP];
+// Lumber Camp (3 x 3; building_06): a steeply battered block under a flared
+// cavetto with a painted lapis / red frieze, a canvas awning sloping from its
+// east face to a row of posts (sagging between them, a scalloped hem) over
+// the camp's stock: a stack of big logs showing their pale ring ends, a
+// saw-pit in front with a log on trestles and a pit saw through it, crates,
+// a barrel, a sheerlegs hoist behind.
 function lumberCamp() {
   const m = lot(24, 24);
-  const t = block(m, 2, 3, 13, 15, 1, 12, { wall: WASH, roofC: MUDROOF, rimC: LIME, gorge: [0x8a5e38, 0x946640], torus: false, lipOut: 2, batter: 5, band: null });
+  block(m, 2, 3, 13, 15, 1, 13, { wall: WASH, roofC: MUDROOF, rimC: LIME, gorge: [0xc9ab7c, 0xd6ba8c], torus: false, lipOut: 2, batter: 5, band: null, flare: true });
+  // the painted frieze under the cornice: lapis, a pale fillet, red, pale
+  bands(m, 0, 0, 16, 18, 13, CAMP_FRIEZE);
   door(m, '+z', 6, 3, 1, 6);
-  slit(m, '+x', 7, 7, 2, 1);
-  // the cloth from the block's east face over the log pile
-  const yTop = t - 5, f = 12 - Math.floor((yTop - 1) / 5);
-  awning(m, '+x', f, 6, 17, yTop, 22 - f, 4, [STRIPE_M, CLOTH, CLOTH, STRIPE_T, CLOTH], { sw: 1 });
-  // the log pile (along z) under it, stacked 4-3-2
-  for (const [row, n] of [[0, 4], [1, 3], [2, 2]]) for (let i = 0; i < n; i++) log(m, 13 + i * 2 + row, 1 + row * 2, 6, 12 - row, 'z', 1);
-  log(m, 15, 1, 21, 8, 'x', 1);
-  // a sawhorse with a log on it
-  for (const x of [17, 21]) { m.line(x, 1, 18, x, 4, 19, POLE); m.line(x, 1, 20, x, 4, 19, POLE); }
-  log(m, 16, 4, 19, 7, 'x', 1);
-  // the camp's tall element: a timber sheerlegs (an A-frame hoist) over the
-  // pile with a log slung from its head
-  for (const x of [14, 22]) m.line(x, 1, 2, 18, 22, 2, POLE);
-  m.box(17, 22, 1, 3, 1, 3, DARKWOOD);
-  for (let y = 12; y < 22; y++) m.set(18, y, 2, 0xcdb98a);
-  log(m, 15, 10, 2, 7, 'x', 1);
+  slit(m, '+x', 7, 6, 2, 1);
+  // the canvas from the block's east face over the stock
+  const yTop = 10, f = 12 - Math.floor((yTop - 1) / 5);
+  clothAwning(m, '+x', f, 4, 19, yTop, 22 - f, 2.5, { posts: [4, 11, 18], sw: 2, belly: 0.5, sag: 1.2 });
+  // the stock: big logs stacked 3-2 along z under the canvas, their pale
+  // ring ends out at the open side, facing the street
+  for (const [row, xs] of [[0, [13, 16, 19]], [1, [14, 17]]]) for (const x of xs) bigLog(m, x, 1 + row * 3, 6 + row, 10 - row, 'z');
+  // chocks at the stack's foot
+  for (const x of [12, 22]) m.set(x, 1, 14, DARKWOOD);
+  // crates by the door
+  crate(m, 10, 1, 18, 3, 3, 3, 0xb08850);
+  crate(m, 10, 4, 18, 3, 2, 3, 0xa27c48);
+  crate(m, 1, 1, 18, 3, 3, 3, 0xb08850);
+  barrel(m, 4.5, 1, 22, 4, 1.4);
+  // the saw-pit in front: a dark pit in a timber kerb, a trimmed log on
+  // bearers across it, the pit saw standing through the log, a tiller handle
+  // across its top, sawdust by the pit
+  for (let x = 14; x < 23; x++) for (let z = 18; z < 24; z++) {
+    const rim = x === 14 || x === 22 || z === 18 || z === 23;
+    m.set(x, 0, z, rim ? PLANK(x, 0, z) : (x === 15 || x === 21 || z === 19 || z === 22) ? 0x2e241c : DARK);
+  }
+  for (const x of [15, 21]) for (let z = 19; z < 23; z++) m.set(x, 1, z, DARKWOOD);
+  log(m, 13, 2, 20, 11, 'x', 1);
+  for (const x of [17, 18]) for (let y = 1; y < 8; y++) m.set(x, y, 20, (y === 1 || x === 18) ? 0x4e4a45 : 0x77726a);
+  for (let z = 19; z < 22; z++) m.set(17, 8, z, POLE);
+  for (const [x, z] of [[17, 23], [19, 23], [13, 21], [23, 20]]) if (!m.has(x, 0, z)) m.set(x, 0, z, 0xd9c08a);
+  // the camp's tall element: a timber sheerlegs (an A-frame hoist) behind
+  // the stack with a log slung from its head
+  for (const x of [13, 22]) m.line(x, 1, 1, 17, 22, 1, POLE);
+  m.box(16, 22, 0, 3, 1, 3, DARKWOOD);
+  for (let y = 13; y < 22; y++) m.set(17, y, 1, 0xcdb98a);
+  log(m, 14, 11, 1, 7, 'x', 1);
   return m;
 }
 
@@ -1450,10 +1574,12 @@ function lumberCamp() {
 // a rack of picks.
 function miningCamp() {
   const m = lot(24, 24);
-  const t = block(m, 8, 3, 18, 14, 1, 12, { wall: WASH, roofC: MUDROOF, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 5, band: null });
+  block(m, 8, 3, 18, 14, 1, 12, { wall: WASH, roofC: MUDROOF, rimC: LIME, gorge: [0xc9ab7c, 0xd6ba8c], torus: false, lipOut: 2, batter: 5, band: null, flare: true });
+  // the painted frieze under the flared cornice (as the Lumber Camp's)
+  bands(m, 0, 0, 22, 18, 12, CAMP_FRIEZE);
   door(m, '+z', 11, 4, 1, 7);
-  const yTop = t - 5, f = 8 + Math.floor((yTop - 1) / 5);
-  awning(m, '-x', f, 5, 15, yTop, f - 1, 3, [CLOTH, STRIPE_T, CLOTH], { sw: 2 });
+  const yTop = 9, f = 8 + Math.floor((yTop - 1) / 5);
+  clothAwning(m, '-x', f, 5, 15, yTop, f - 1, 3, { sw: 2, sag: 1 });
   // ore bins under the awning
   for (let x = 1; x < 7; x++) for (let z = 7; z < 15; z++) for (let y = 1; y < 4; y++) {
     const rim = x === 1 || x === 6 || z === 7 || z === 14;
@@ -1474,8 +1600,8 @@ function miningCamp() {
   for (let z = 6; z < 16; z++) m.set(3, 22, z, DARKWOOD);
   m.line(3, 14, 6, 3, 21, 10, POLE); m.line(3, 14, 15, 3, 21, 11, POLE);
   wheel(m, 4, 19, 10, 2, 'z');
-  for (let y = 9; y < 21; y++) m.set(4, y, 10, 0xcdb98a);
-  m.box(3, 6, 9, 3, 3, 3, PLANK); m.box(4, 9, 10, 1, 1, 1, GOLDORE);
+  for (let y = 14; y < 21; y++) m.set(4, y, 10, 0xcdb98a);
+  m.box(3, 11, 9, 3, 3, 3, PLANK); m.box(4, 14, 10, 1, 1, 1, GOLDORE);
   // a rack of picks against the block
   for (let i = 0; i < 3; i++) { m.line(9 + i * 2, 1, 15, 9 + i * 2, 6, 14, 0x7a5230); m.set(8 + i * 2, 6, 14, STEEL); m.set(10 + i * 2, 6, 14, STEEL); }
   return m;
@@ -1528,13 +1654,13 @@ function townCenter() {
   door(m, '+z', 23, 4, 1, 8, { lattice: true, sun: true, deep: 3, frame: SAND });
   slit(m, '+z', 11, 9, 3, 1); slit(m, '+z', 18, 9, 3, 1); slit(m, '+x', 13, 9, 3, 1); slit(m, '+x', 20, 9, 3, 1);
   beams(m, '+x', 11, 25, 13, 3);
-  awning(m, '+z', 25, 9, 16, 11, 7, 4, [STRIPE_M, CLOTH, CLOTH], { sw: 1 });
+  clothAwning(m, '+z', 25, 9, 16, 11, 7, 4, { sw: 1, stripes: [CANVAS_T, CANVAS, CANVAS], sag: 0.8 });
   // the east block (dark mud brick, a pale lip) with an awning over its door
   const mb = { wall: MUDB, batter: 6, band: null, roofC: MUDROOF, rimC: LIME, lipOut: 2, gorge: [0x8a5e38, 0x946640], torus: false };
   block(m, 35, 8, 48, 22, 1, 12, mb);
   door(m, '+z', 39, 4, 1, 7, { deep: 3 });
   slit(m, '+x', 12, 6, 3, 1); slit(m, '+x', 17, 6, 3, 1);
-  awning(m, '-x', 36, 11, 20, 9, 5, 3, [STRIPE_M, CLOTH, CLOTH], { sw: 1 });
+  clothAwning(m, '-x', 36, 11, 20, 9, 5, 3, { sw: 1, stripes: [CANVAS_T, CANVAS, CANVAS], sag: 0.8 });
   // the front-right room (mud brick)
   block(m, 36, 29, 47, 39, 1, 10, mb);
   door(m, '+z', 42, 3, 1, 6, { deep: 3 });
@@ -2264,6 +2390,7 @@ for (const [type, T] of Object.entries(TYPES)) {
       if (T.settle !== false) settle(full);
       weather(full);
       skin(full);
+      clothSkin(full);
       g.add(`${type}/${vn}/a${age}`, geo(full, 11 + vi * 3 + age));
       if (vi === 0 && ai === 0 && T.stages !== false) {
         for (const k of g.extra.stage_keys) {
