@@ -12,6 +12,8 @@ extends RefCounted
 ##     [--params "egt_god=isis"]          # the major god (temple, Monument to the Gods): ra | isis | set
 ##     [--params "egt_age=1"]             # the owner's age (houses: 1 mud brick + thatch, 2+ whitewashed)
 ##     [--params "egt_states=1"]          # a row of construction stages (s0 s2 s4 s6) and looks instead
+##     [--params "egt_row=house/0/a2,house/1/a2"]  # a framed row of the given model keys instead
+##     [--params "egt_yaw=208"]           # the framing camera's yaw (degrees, default 28: the front)
 ##     [--params "egt_static=1"]          # render-only even when the sim has the types
 ##     [--params "egt_sand=0"]            # keep the map's ground (no sand)
 ##     [--params "egt_details=1"]         # keep the map's ground details (pebbles, tufts)
@@ -83,7 +85,18 @@ static func scene_setup(game: Node) -> Dictionary:
 		sim.set_player_age(1, age)
 	view.force_owner[1] = true
 	var lots := []
-	if states:
+	var row_keys := str(game.args.get("egt_row", ""))
+	if row_keys != "":
+		# a framed row of given model keys side by side (look reviews):
+		# egt_row=house/0/a2,house/1/a2,granary/0/a1
+		var x := -6
+		for k in row_keys.split(","):
+			var t := k.split("/")[0]
+			var T: Dictionary = EgyptBuildingsRef.types().get(t, {"w": 3, "h": 3})
+			lots.append([t, x, 0, {"key": k}])
+			x += int(T.w) + 1
+		states = true
+	elif states:
 		var row := [["town_center", "s/town_center/s0"], ["town_center", "s/town_center/s2"], ["town_center", "s/town_center/s4"],
 			["town_center", "s/town_center/s6"], ["town_center", ""], ["house", "house/0/a1"], ["house", "house/1/a1"], ["house", "house/2/a2"],
 			["temple", "s/temple/s4"], ["migdol", "s/migdol/s6"], ["monument_gods", "monument_gods/isis/a1"], ["monument_gods", "monument_gods/set/a1"]]
@@ -147,13 +160,19 @@ static func scene_setup(game: Node) -> Dictionary:
 	var terrain = game.pieces.get("terrain")
 	if terrain != null and not AovArgs.flag(game.args, "egt_details", false) and terrain.get("_det_root") != null:
 		terrain._det_root.visible = false
+	if row_keys != "" and lots.size() > 0 and not game.args.has("cam"):
+		var x0 := float(cx - 6)
+		var x1 := float(cx + int(lots[-1][1]) + int(EgyptBuildingsRef.types().get(lots[-1][0], {"w": 3}).w))
+		var span := x1 - x0
+		focus = Vector2((x0 + x1) * 0.5, cz + 1.5)
+		game.args["cam"] = "%f,%f,%f,%f,%f" % [focus.x, focus.y, maxf(8.0, 2.0 + span * 0.7), 44.0, float(game.args.get("egt_yaw", 28.0))]
 	ctx["focus"] = focus
 	if focus_size == 0.0 and not states and not game.args.has("cam"):
 		# the whole settlement, like reference/egypt/building_01
 		game.args["cam"] = "%f,%f,%f,%f,%f" % [cx - 1.0, cz + 0.5, 44.0, 50.0, 30.0]
 	if focus_size > 0.0 and not game.args.has("cam"):
 		# frame one building like Retold's building views (high, close)
-		game.args["cam"] = "%f,%f,%f,%f,%f" % [focus.x, focus.y, maxf(14.0, 5.0 + focus_size * 2.0), 44.0, 28.0]
+		game.args["cam"] = "%f,%f,%f,%f,%f" % [focus.x, focus.y, maxf(14.0, 5.0 + focus_size * 2.0), 44.0, float(game.args.get("egt_yaw", 28.0))]
 	print("egypt_town: %d buildings (%s), age %d, god %s, focus %s, sand %s" % [lots.size(), "sim" if use_sim else "render-only", age, god, focus_type if focus_type != "" else "town", sim.has_method("paint_ground")])
 	return ctx
 

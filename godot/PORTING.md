@@ -913,8 +913,8 @@ deterministic; re-run it after changing the script, never hand-edit
 `assets/models/egypt*`): 1/8-tile voxels (the walls', towers' and tech
 buildings' resolution, the same mesher, jitter, weathering and team voxels),
 a few smooth parts (the silos), pivoted at the footprint centre, the front to
-+z. The palette: whitewashed plaster walls (`WASH`, houses, camps, Granary,
-Armory), warm sandstone ashlar (pylons, plinths), pale limestone cornices
++z. The palette: pale coursed sandstone walls (`WASH`, houses, camps, Granary,
+Armory, Sentry Tower), warm sandstone ashlar (pylons, plinths), pale limestone cornices
 and copings, dark plaster / mud roof decks, mud brick and palm thatch
 (Archaic houses), painted friezes (blue / red / ochre), gilt, dark basalt.
 - **Three values per lot** (so a town never reads as one tan mass): the
@@ -923,13 +923,30 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   `MUDROOF`) framed by the brightest line, the pale cornice `LIP`, so every
   roof is a dark inset in a bright frame; the ground under and round a
   building (`SPLASH`, `WORN` paths, `EARTH` yards, `PAVE`) a step or two
-  darker than the walls and than the terrain's dirt. A **plinth line**
-  (`plinths()`, `PLINTH`): a clean one-voxel darker stone step round the
-  foot of every ground-level block (not in front of doors).
+  darker than the walls and than the terrain's dirt. A **base course**
+  (`plinths()`, `PLINTH`, `BASE_H` = 2): every ground-level block's first
+  two rows are dark brown stone, ringed one voxel out by the same stone (not
+  in front of doors), and left as voxels under the battered skin (which
+  starts above them), so every building stands on a crisp dark course
+  darker than both its walls and the apron.
+- **Coursed walls** (`coursed()`: `WASH`, `SAND`, `LIME`): the stone courses
+  read from the RTS camera: three-voxel courses in three sand tones in an
+  A B A C rhythm, each course's bottom row a darker bed joint, blocks in a
+  running bond (head joints a shade darker), a small per-block wobble; no
+  wall is a single-tone plane. The skin's per-cell colour jitter is +-2 %.
+- **Windows and doors**: `slit()` cuts the opening one voxel into the wall
+  (a dark recess, a hole in the skin, not a painted dot) under a limestone
+  lintel one voxel proud and a voxel wider each side, on a shadowed sill;
+  `win()` groups three slits with wall mullions under one lintel (houses,
+  the Sentry Tower: the windows sit high, under the band). No lone dark
+  voxels anywhere on a face: painted bands and friezes use tones of their
+  own paint and pale separators, never ink dots (rows of single dark voxels
+  under a cornice read as eyes and the houses as faces), the winged sun's
+  wings are solid. `door()` frames: jambs one voxel proud, the lintel proud
+  and a voxel wider each side, a second shadowed course over it.
 - **A tall element per function** (read at a glance): the Town Center's
-  painted pylon gate and Ra statue, the house's **wind-catcher** (`malqaf()`:
-  a roof vent with a sloping hood and a dark mouth), upper room or roof
-  canopy, the Granary's tall domed silos, the Lumber Camp's timber
+  painted pylon gate and Ra statue, the house's **red-striped cloth
+  awning** on poles over its jars (and an upper room or a walled yard), the Granary's tall domed silos, the Lumber Camp's timber
   sheerlegs with a slung log, the Mining Camp's headframe with a pulley and
   an ore bucket, the Temple's papyrus colonnade and gilt-tipped obelisk
   pair at the ramp foot, the Barracks' tall banner masts, the Market's
@@ -947,7 +964,7 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   default, 3 to 4 on the Town Center and Barracks gates) into the wall with
   **near-black reveals** (jambs, soffit) and a dark leaf at the back, framed
   in limestone with a projecting lintel, some with a gilt winged sun; slit
-  windows; palm-log beam ends under the cornice (`beams()`). `lipOut: 2` is
+  windows (houses have no beam ends: their dark dots read as eyes). `lipOut: 2` is
   the **deep cornice**: a shadowed gorge row flaring one voxel out at the
   wall top and the pale lip two voxels out, so each roof edge throws a dark
   line and every block's silhouette stands off the ground and its
@@ -997,10 +1014,15 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   pylons with a 4-voxel black passage and a dark leaf under the lintel
   bridge and its winged sun, a big and a small **domed silo** (front left), awnings, a
   fire bowl, a basin, a palm, the gilt **falcon-headed Ra** with his sun
-  disc on a plinth at the front left), `house` 3x3 (three plans: a box with
-  a side room and a wind-catcher, an L round a projecting door portal with
-  an upper room, a tall one with a clean outside stair behind a parapet and
-  a striped roof canopy; beam ends, a plain cloth awning;
+  disc on a plinth at the front left), `house` 3x3 (three plans after
+  building_04, each block on its base course under a deep cavetto cornice
+  (`lipOut: 2`): a main block with a lower side room and the awning on the
+  side room's front; a main block with an upper room on its roof (its own
+  window) and a projecting door portal, the awning on the front; an L of a
+  tall back block and a low front room round a small yard behind a clean
+  coursed yard wall with a limestone coping and a gap, the awning over the
+  yard's jars; three-slit window groups high on all four faces, framed
+  doors, a red-striped cloth awning on poles (`AWN_H`); no roof vents, canopies or stairs;
   Archaic look `a1` mud brick with a mud gorge and thatch under poles, `a2`
   sandstone with plaster roofs and an ochre band), `granary` 3x3 (a hut with a roof hatch and a ladder, two ribbed
   domed silos, a grain bin, sacks), `lumber_camp` / `mining_camp` 3x3
@@ -1076,6 +1098,8 @@ node scripts/godot-shoot.mjs --scene egypt_town --out shots/godot/egypt_town.png
      [--params "egt_god=isis"]         # ra | isis | set (temple statue, Monument to the Gods)
      [--params "egt_age=1"]            # the owner's age (1: Archaic houses)
      [--params "egt_states=1"]         # a row of construction stages and variants
+     [--params "egt_row=house/0/a2,house/1/a2,house/2/a2"]   # a framed row of model keys (look reviews)
+     [--params "egt_yaw=208"]          # the framing camera's yaw for egt_focus / egt_row (default 28)
      [--params "egt_static=1"]         # render-only even where the sim has the types
      [--params "egt_details=1"]        # keep the map's pebbles and tufts
 node scripts/export-egypt.mjs          # re-export godot/assets/models/egypt*.{json,bin.gz}
