@@ -25,7 +25,7 @@ extends RefCounted
 const LAYOUT := [
 	["town_center", -3, -3, {}],
 	["temple", -2, -15, {}],
-	["obelisk", -4, -8, {}], ["obelisk", 3, -8, {}], ["obelisk", -5, 4, {}], ["obelisk", 5, 4, {}],
+	["obelisk", -4, -6, {}], ["obelisk", 3, -6, {}], ["obelisk", -5, 4, {}], ["obelisk", 5, 4, {}],
 	# the west quarter: two rows of houses on their lanes, a lane's width apart
 	# so every house stands on its own plinth line
 	["house", -19, -8, {"variant": 1}], ["house", -15, -8, {"variant": 0}], ["house", -11, -8, {"variant": 2}],

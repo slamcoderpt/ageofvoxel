@@ -1047,9 +1047,23 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   crates, barrels, a crate of ore and lumps of ore (`oreLump`) in front, so
   every prop touches the block or the ground apron, none floats), `farm` 4x4 (a mud border, an irrigation channel and a shaduf; the
   crops are the economy piece's), `temple` 5x6 (a two-tier platform with a
-  ramp, a kiosk of painted papyrus columns with screen walls, a naos and
-  white drapes, the **major god's statue**: variants `ra` falcon with the
-  disc, `isis` winged with horns and disc, `set` the Set animal), `eg_barracks`
+  ramp; a square kiosk after building_08: twelve clean sandstone papyrus
+  columns, 3x3 voxels on a 6-voxel pitch so every gap is an even 3-voxel
+  dark slot (the front middle one the entrance on the ramp's axis, the dark
+  naos door behind it), each with a dark foot, a plain shaft with faint drum
+  joints, one lapis neck band, a flared limestone bell capital and a dark
+  abacus; over them one tidy 2-row painted strip (a red fillet, lapis panels
+  split every fourth voxel), a torus roll, the cavetto gorge flaring one
+  voxel out (its shaded underside is the roof's shadow line), the lip slab
+  with the team line round a darker jointed deck and a low inner parapet
+  step; no screen walls or drapes; a darker naos and floor so the slots read
+  dark; two plain tapering limestone obelisks with gilt pyramidions at the
+  ramp foot; the **major god's statue** (stout, h 30, crook and flail held
+  to the chest, no tall sceptre; a dark team apron): variants `ra` falcon
+  with the disc, `isis` winged with horns and disc, `set` the Set animal;
+  the discs are round, sampled round their true centre by `sunDisc`, two
+  voxels deep with a thin gold rim; in egypt_town the processional way's
+  obelisks stand two tiles out from the temple's front corners), `eg_barracks`
   5x5 (thick battered ranges round a drill yard, a raised gatehouse with a
   latticed door, team banners on poles, a rack of spears and shields),
   `migdol` 7x7 (a tall battered limestone keep with a tiled roof, four taller

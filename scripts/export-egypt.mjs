@@ -969,13 +969,8 @@ function figure(m, cx, y, cz, o = {}) {
     B(-2.4, hy - 1.2, 0.6, -1.4, hy - 0.8, 1.9, INK); B(1.4, hy - 1.2, 0.6, 2.4, hy - 0.8, 1.9, INK);
     B(-0.4, hy + 3.6, 1.2, 0.4, hy + 4.4, 1.9, gold);      // uraeus
   } else if (crown === 'disc') {
-    // the sun disc (Ra): a red disc rimmed in gold, standing behind the head
-    const r = 3.2 * s, yc = y + (hy + 6.6) * s, zc = Math.round(cz - 0.4 * s * dir);
-    for (let i = -Math.ceil(r) - 1; i <= Math.ceil(r); i++) for (let j = -Math.ceil(r) - 1; j <= Math.ceil(r); j++) {
-      const d = Math.hypot(i + 0.5, j + 0.5);
-      if (d > r + 0.3) continue;
-      m.set(cx + i, Math.round(yc + j), zc, d > r - 0.9 ? gold : 0xc8402a);
-    }
+    // the sun disc (Ra): a round red disc rimmed in gold, standing behind the head
+    sunDisc(m, cx, y + (hy + 7.2) * s, Math.floor(cz - 0.4 * s * dir), 4.0 * s, gold);
     B(-0.5, hy + 3.2, 0.6, 0.5, hy + 4.4, 1.6, gold);
   } else if (crown === 'atef' || crown === 'tall') {
     B(-1.8, hy + 2.6, -1.1, 1.8, hy + 5, 1.4, gold);
@@ -990,11 +985,7 @@ function figure(m, cx, y, cz, o = {}) {
     B(-0.9, hy + 3.8, -0.6, 0.9, hy + 4.6, 0.8, gold);
     B(-3.2, hy + 4.4, -0.3, -2.2, hy + 7.6, 0.5, gold); B(2.2, hy + 4.4, -0.3, 3.2, hy + 7.6, 0.5, gold);
     B(-3.2, hy + 4.4, -0.3, 3.2, hy + 5.2, 0.5, gold);
-    const r = 2.1 * s, yc = y + (hy + 6.6) * s, zc = Math.round(cz - 0.2 * s * dir);
-    for (let i = -Math.ceil(r) - 1; i <= Math.ceil(r); i++) for (let j = -Math.ceil(r) - 1; j <= Math.ceil(r); j++) {
-      const d = Math.hypot(i + 0.5, j + 0.5);
-      if (d <= r + 0.3) m.set(cx + i, Math.round(yc + j), zc, d > r - 0.8 ? gold : 0xc8402a);
-    }
+    sunDisc(m, cx, y + (hy + 6.8) * s, Math.floor(cz - 0.2 * s * dir), 2.9 * s, gold);
   } else if (crown === 'set') {
     B(-2.2, hy - 2.5, -1.3, 2.2, hy + 2.6, 0.6, gold);
     B(-1.4, hy + 3, -0.6, 1.4, hy + 4, 0.8, gold);
@@ -1002,6 +993,18 @@ function figure(m, cx, y, cz, o = {}) {
     B(-2.3, hy + 1.4, -1.6, 2.3, hy + 4.0, 1.3, gold);
     B(-2.5, hy - 3.6, -0.6, -1.5, hy + 2, 1.5, gold); B(1.5, hy - 3.6, -0.6, 2.5, hy + 2, 1.5, gold);
     B(-1.2, hy + 4, -0.8, 1.2, hy + 5, 1.0, gold);
+  }
+}
+// a sun disc in the XY plane, two voxels deep: sampled at voxel centres round
+// the true centre (xc, yc), a thin gold rim round a red face, so it reads as a
+// disc and not as a voxel cross
+function sunDisc(m, xc, yc, zc, r, gold = GILT) {
+  for (let X = Math.floor(xc - r - 1); X <= Math.ceil(xc + r + 1); X++) for (let Y = Math.floor(yc - r - 1); Y <= Math.ceil(yc + r + 1); Y++) {
+    const d = Math.hypot(X + 0.5 - xc, Y + 0.5 - yc);
+    if (d > r) continue;
+    const rim = d > r - 0.85;
+    m.set(X, Y, zc, rim ? gold : 0xc8402a);
+    m.set(X, Y, zc - 1, rim ? GILT_D : 0xa83420);
   }
 }
 // a plinth: a gilt-framed block with team panels low down, dark or stone faces
@@ -1735,88 +1738,108 @@ function temple(god) {
     for (let x = 15; x < 25; x++) for (let y = 1; y <= yTop; y++) m.set(x, y, z, y === yTop ? LIME(x, y, z) : SAND(x, y, z));
     for (const x of [14, 25]) for (let y = 1; y <= yTop + 1; y++) m.set(x, y, z, y === yTop + 1 ? LIME_S : SAND_D(x, y, z));
   }
-  // the kiosk: 4 x 4 papyrus columns round [10, 30) x [10, 28)
+  // the kiosk (building_08): a square colonnade of twelve clean sandstone
+  // papyrus columns round [9, 31) x [8, 30), 3 x 3 voxels each on a 6-voxel
+  // pitch, so every gap is an even 3-voxel dark slot (the front middle one is
+  // the entrance, on the ramp's axis, the dark naos door behind it). Each
+  // column: a dark foot, a plain shaft with faint drum joints, one lapis band
+  // at the neck, a flared limestone bell capital and a dark abacus under the
+  // architrave. Above: one tidy 2-row painted strip (a red fillet, lapis
+  // panels), a torus roll, the cavetto gorge flaring one voxel out with its
+  // shadowed underside, and the lip slab with the team line round a darker deck.
   const fl = 7;
   const colH = 13;
-  const cols = [10, 16, 22, 27];
-  const colsZ = [10, 15, 20, 25];
-  const column = (x, z) => {
-    for (let y = fl; y < fl + colH; y++) {
-      const r = y - fl;
-      const capital = r >= colH - 3;
-      const w = capital ? (r === colH - 1 ? 5 : 4) : 3;
-      const o = capital ? (w === 5 ? -1 : -0.5) : 0;
-      for (let i = 0; i < w; i++) for (let k = 0; k < w; k++) {
-        const X = Math.round(x + o + i - (w === 4 ? 0 : 0)), Z = Math.round(z + o + k);
-        let c = LIME(X, y, Z);
-        // the temple's colour: papyrus capitals in green and lapis under a red
-        // band, shafts banded lapis / red with a column of glyphs, ochre feet
-        const front = i === w - 1 || k === w - 1;
-        if (capital) c = r === colH - 1 ? LIME(X, y, Z) : r === colH - 2 ? RED : ((i + k) & 1 ? GREENP : BLUEP);
-        else if (r === 0) c = SAND_D(X, y, Z);
-        else if (r <= 2) c = OCHRE;
-        else if (r % 4 === 0) c = BLUEP;
-        else if (r % 4 === 1) c = RED;
-        else if (front && (i + k) % 2 === 1) c = (r & 1) ? INK : OCHRE;
+  const K0 = 9, K1 = 31, L0 = 8, L1 = 30;           // the kiosk's outer bounds (x, z)
+  const pitch = [10, 16, 22, 28];                   // column starts along x
+  const pitchZ = [9, 15, 21, 27];                   // column starts along z
+  const SHAFT = [0xe2c491, 0xd3b27e];               // the faces, the arrises
+  const LAPIS_N = 0x2f5f9e;
+  const column = (x0, z0) => {
+    for (let r = 0; r < colH; r++) {
+      const y = fl + r;
+      // the bell capital flares to 5 x 5 (corners clipped on its lower row)
+      const flare = r === colH - 3 || r === colH - 2;
+      const ext = flare ? 1 : 0;
+      for (let i = -ext; i < 3 + ext; i++) for (let k = -ext; k < 3 + ext; k++) {
+        const X = x0 + i, Z = z0 + k;
+        const edgeI = i < 0 || i > 2, edgeK = k < 0 || k > 2;
+        if (r === colH - 3 && edgeI && edgeK) continue;
+        let c;
+        if (r === 0) c = SAND_D(X, y, Z);                                   // the foot
+        else if (r === colH - 1) c = (i === 1 && k === 1) ? SAND_D(X, y, Z) : shade(0xc9a874, 0.86);  // the abacus
+        else if (flare) c = r === colH - 2 ? (edgeI || edgeK ? 0xefe2c4 : 0xe8d9b8) : (edgeI || edgeK ? 0xe3d3b0 : 0xd8c6a0);
+        else if (r === colH - 4) c = LAPIS_N;                                // the neck band
+        else {
+          c = (i === 1 || k === 1) ? SHAFT[0] : SHAFT[1];                 // rounded: darker arrises
+          if (r % 4 === 0) c = shade(c, 0.93);                               // drum joints
+        }
         m.set(X, y, Z, c);
       }
     }
   };
-  for (const x of cols) { column(x, colsZ[0]); column(x, colsZ[3]); }
-  for (const z of [colsZ[1], colsZ[2]]) { column(cols[0], z); column(cols[3], z); }
-  // screen walls between the columns (half height, with painted reliefs), open in the front middle
-  const screen = (xa, xb, za, zb) => {
-    for (let x = xa; x < xb; x++) for (let z = za; z < zb; z++) for (let y = fl; y < fl + 5; y++) m.set(x, y, z, y === fl + 4 ? LIME(x, y, z) : y === fl + 3 ? RED_M : (y === fl + 1 || y === fl + 2) && (x + z) % 3 === 0 ? (((x + z) & 1) ? BLUEP : OCHRE) : SAND(x, y, z));
-  };
-  screen(10, 13, 13, 15); screen(10, 13, 18, 20); screen(10, 13, 23, 25);
-  screen(27, 30, 13, 15); screen(27, 30, 18, 20); screen(27, 30, 23, 25);
-  // the naos inside with its door
-  block(m, 14, 12, 26, 23, fl, 9, { frieze: 2, parapet: false, band: false });
-  door(m, '+z', 18, 4, fl, 6, { sun: false });
-  // architrave and roof
+  for (const x of pitch) { column(x, pitchZ[0]); column(x, pitchZ[3]); }
+  for (const z of [pitchZ[1], pitchZ[2]]) { column(pitch[0], z); column(pitch[3], z); }
+  // the floor under the roof in a darker flagging, so the slots read dark
+  for (let x = K0; x < K1; x++) for (let z = L0; z < L1; z++) m.set(x, fl - 1, z, shade(PAVE(x, fl - 1, z), 0.8));
+  // the naos inside, in a darker sandstone, with its door on the entrance axis
+  const NAOS = (x, y, z) => shade(SAND_D(x, y, z), 0.82);
+  block(m, 14, 13, 26, 24, fl, 11, { wall: NAOS, socle: 1, frieze: 0, band: null, parapet: false, rim: false, roofC: NAOS, rimC: NAOS, plinth: false, torus: false });
+  door(m, '+z', 19, 3, fl, 7, { sun: false, lintel: true });
+  // the architrave: one 2-row painted strip under the cornice (a red fillet,
+  // then lapis panels split by pale separators every fourth voxel)
   const ay = fl + colH;
-  for (let x = 9; x < 31; x++) for (let z = 9; z < 29; z++) {
-    const e = Math.min(x - 9, 30 - x, z - 9, 28 - z);
-    if (e > 2) continue;
-    for (let y = ay; y < ay + 2; y++) m.set(x, y, z, y === ay ? (((x + z) % 6) < 3 ? RED : BLUEP) : LIME(x, y, z));
+  for (let x = K0; x < K1; x++) for (let z = L0; z < L1; z++) {
+    const e = Math.min(x - K0, K1 - 1 - x, z - L0, L1 - 1 - z);
+    if (e > 3) { m.set(x, ay + 1, z, shade(0xb39a74, 0.72)); continue; }   // the coffered ceiling
+    const u = (e === 0 && (z === L0 || z === L1 - 1)) ? x : z;
+    m.set(x, ay, z, e === 0 ? RED_M : SAND_D(x, ay, z));
+    m.set(x, ay + 1, z, e === 0 ? ((u % 4 === 0) ? FRIEZE_SEP : LAPIS) : SAND_D(x, ay + 1, z));
   }
-  for (let x = 9; x < 31; x++) for (let z = 9; z < 29; z++) {
-    const e = Math.min(x - 9, 30 - x, z - 9, 28 - z);
-    if (e > 2) m.set(x, ay + 1, z, PLASTER);
+  // the cornice: a torus roll flush with the strip, the gorge foot (fluted),
+  // the gorge flaring one voxel out (its underside throws the shadow line),
+  // then the lip slab with the team line and the deck
+  for (let x = K0; x < K1; x++) for (let z = L0; z < L1; z++) {
+    const e = Math.min(x - K0, K1 - 1 - x, z - L0, L1 - 1 - z);
+    m.set(x, ay + 2, z, e === 0 ? ROLL : SAND_D(x, ay + 2, z));
+    m.set(x, ay + 3, z, e === 0 ? (((x + z) & 1) ? GORGE : GORGE_L) : SAND_D(x, ay + 3, z));
   }
-  lip(m, 9, 9, 31, 29, ay + 2, LIME_S);
-  for (let x = 8; x < 32; x++) for (let z = 8; z < 30; z++) {
-    const e = Math.min(x - 8, 31 - x, z - 8, 29 - z);
-    m.set(x, ay + 2, z, e === 0 ? LIME(x, ay + 2, z) : PLASTER(x, ay + 2, z));
-    if (e === 0) m.set(x, ay + 3, z, LIME(x, ay + 3, z));
-    else if (e === 1) m.set(x, ay + 3, z, TEAM);
+  const ROOFDECK = (x, y, z) => { const c = pick(hash3(x >> 1, y, z >> 1, 77), [0xc9b593, 0xc2ae8b, 0xcdb998]); return ((x - K0) % 6 === 4 || (z - L0) % 6 === 4) ? shade(c, 0.9) : c; };
+  for (let x = K0 - 1; x <= K1; x++) for (let z = L0 - 1; z <= L1; z++) {
+    const e = Math.min(x - K0 + 1, K1 - x, z - L0 + 1, L1 - z);
+    m.set(x, ay + 4, z, e === 0 ? shade(((x + z) & 1) ? GORGE : GORGE_L, 0.84) : SAND_D(x, ay + 4, z));
+    m.set(x, ay + 5, z, e === 0 ? LIP(x, ay + 5, z) : e === 1 ? TEAM : ROOFDECK(x, ay + 5, z));
   }
-  // the drapes: white cloth from the front architrave swept to the outer columns
-  for (const [x0, dir] of [[13, -1], [26, 1]]) {
-    for (let y = fl + 1; y < ay; y++) {
-      const t = (ay - y) / (ay - fl);
-      const x = Math.round(x0 + dir * 3 * Math.sin(t * Math.PI * 0.5));
-      m.set(x, y, 29, CLOTH); m.set(x + (dir > 0 ? -1 : 1), y, 29, CLOTH);
-      if (t > 0.4) m.set(x + dir, y, 29, CLOTH);
-    }
+  // a low parapet step round the deck, inside the team line
+  for (let x = K0 + 1; x < K1 - 1; x++) for (let z = L0 + 1; z < L1 - 1; z++) {
+    const e = Math.min(x - K0 - 1, K1 - 2 - x, z - L0 - 1, L1 - 2 - z);
+    if (e === 1) m.set(x, ay + 6, z, LIP(x, ay + 6, z));
   }
   // the god statue on its plinth at the front left (on tier 1)
-  const py = plinth(m, 2, 30, 11, 38, 4, 8, { face: SAND, frame: LIME });
+  const py = plinth(m, 2, 30, 11, 38, 4, 6, { face: SAND, frame: LIME });
   const G = {
-    ra: { head: 'falcon', crown: 'disc', arms: 'staff', skin: GILT, kilt: CLOTH },
+    // crook and flail held to the chest (no tall sceptre: from above it read as a banner pole)
+    ra: { head: 'falcon', crown: 'disc', arms: 'crossed', skin: GILT, kilt: CLOTH },
     isis: { head: 'human', crown: 'horns', arms: 'wings', skin: GILT, kilt: CLOTH, pose: 'dress' },
-    set: { head: 'jackal', crown: 'set', arms: 'staff', skin: BASALT, kilt: GILT },
+    set: { head: 'jackal', crown: 'set', arms: 'crossed', skin: BASALT, kilt: GILT },
   }[god];
-  figure(m, 6.5, py, 34, { h: 26, gold: GILT_L, kiltFront: TEAMB, pose: 'stride', ...G });
+  // stout (h 30: the body reads as a statue from the RTS camera, not a pole),
+  // the team colour only as a dark apron, not a bright banner-like panel
+  figure(m, 6.5, py, 34, { h: 30, gold: GILT_L, kiltFront: TEAM, pose: 'stride', ...G });
   pottedPalm(m, 33, 4, 35);
-  // the temple's second tall element: a pair of gilt-tipped obelisks at the ramp foot
+  // the temple's second tall element: a pair of limestone obelisks at the
+  // ramp foot on stepped bases, tapering 3 x 3 -> 2 x 2, gilt pyramidions
   for (const ox of [10, 28]) {
-    m.box(ox - 1, 1, 42, 4, 2, 4, LIME);
-    for (let y = 3; y < 28; y++) {
-      const w = y < 25 ? 2 : 1, o = y < 25 ? 0 : 0.5;
-      for (let i = 0; i < 2; i++) for (let k = 0; k < 2; k++) if (w === 2 || (i === 0 && k === 0)) m.set(ox + i, y, 43 + k, y >= 24 ? GILT : (y % 5 === 0 ? INK : SAND(ox + i, y, 43 + k)));
-      void o;
+    m.box(ox - 2, 1, 41, 5, 1, 5, SAND_D);
+    m.box(ox - 1, 2, 42, 3, 1, 3, GILT_D);
+    for (let y = 3; y < 23; y++) {
+      const w = y < 14 ? 3 : 2;
+      for (let i = 0; i < w; i++) for (let k = 0; k < w; k++) {
+        const X = ox - 1 + i + (w === 2 ? 0 : 0), Z = 42 + k;
+        m.set(X, y, Z, (i === w - 1 && k === w - 1) ? 0xd8c8a6 : LIME(X, y, Z));
+      }
     }
+    for (let i = 0; i < 2; i++) for (let k = 0; k < 2; k++) m.set(ox - 1 + i, 23, 42 + k, (i + k) === 2 ? GILT_D : GILT);
+    m.set(ox - 1, 24, 42, GILT_L);
   }
   return m;
 }
