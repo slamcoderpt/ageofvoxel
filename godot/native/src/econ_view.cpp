@@ -425,7 +425,7 @@ Dictionary AovEconView::update(double alpha, bool paused, int64_t local_player, 
 			const double p = t * 10;
 			const double sc = 0.93 + uhash(id, 7) * 0.13;
 			const double bob = (1 - std::abs(std::cos(p))) * 0.08 * sc;
-			const double k = std::min(1.0, U.carry_amount[i] / std::max(1.0, aov::unit_def(U.type[i]).carry_cap));
+			const double k = std::min(1.0, U.carry_amount[i] / std::max(1.0, aov::unit_carry_cap(U.type[i], U.carry_type[i])));
 			const double y0 = map.height_at(ux, uz) + bob;
 			const double s = (0.75 + 0.35 * k) * sc;
 			const double sway = std::sin(p) * 0.05;

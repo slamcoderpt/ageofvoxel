@@ -1287,7 +1287,8 @@ func _info_for() -> Dictionary:
 			var carry: int = u.carry[i]
 			var amt := float(u.carry_amount[i])
 			if carry < 3 and amt > 0:
-				d.stats.append([RES_NAMES[carry], str(int(amt)), "/ 10"])
+				var caps: Dictionary = ud.get("carry", {})
+				d.stats.append([RES_NAMES[carry], str(int(amt)), "/ %d" % int(caps.get(RES_NAMES[carry], 10))])
 			var ot: int = u.order[i]
 			if ot == 0:
 				d.tasks.append("Idle")

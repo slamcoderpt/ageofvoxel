@@ -12,7 +12,7 @@
 //   civ's types; Town Center, House, Farm, Temple, Armory, Market, walls,
 //   gates and towers are both civs' (an Egyptian one costs gold, never wood).
 // - Egyptian economy: Laborers (gather x0.9, build x0.75, never worship, a
-//   cap of 100), separate drop sites (Granary food, Lumber Camp wood, Mining
+//   cap of 100, carry 15 food / 10 wood / 10 gold as Retold, LABORER_CARRY), separate drop sites (Granary food, Lumber Camp wood, Mining
 //   Camp gold; the Town Center takes all), favor only from the five
 //   Monuments (built in order, one each, a constant trickle), free Houses /
 //   drop sites / Armory / Market, gold Town Center / Farm / Temple /
@@ -123,6 +123,18 @@ inline int monument_index(int btype) { return is_monument(btype) ? btype - B_MON
 constexpr double LABORER_GATHER = 0.9;   // x a Greek villager's rate (farms too)
 constexpr double LABORER_BUILD = 0.75;   // work rate on a site (x4/3 the build time)
 constexpr int LABORER_CAP = 100;
+// Carry capacity (Retold, EGYPT.md 1.2): a Laborer carries 15 food, 10 wood,
+// 10 gold; a Greek villager 10 of each (units/defs.h carry_cap). The +5 per
+// wood / gold tech and +15 food with Husbandry are not in this game (no
+// gather techs exist here for either civ: Husbandry, Hand Axe, Pickaxe ...).
+constexpr double LABORER_CARRY[3] = { 15, 10, 10 }; // food, wood, gold
+// What a unit carries of resource rt (RES_FOOD..RES_GOLD) before it walks to
+// drop it: the def's carry_cap (10 if none), the Laborer's per resource.
+inline double unit_carry_cap(int utype, int rt) {
+	if (utype == U_LABORER && rt >= RES_FOOD && rt <= RES_GOLD) return LABORER_CARRY[rt];
+	const double c = unit_def(utype).carry_cap;
+	return c != 0 ? c : 10;
+}
 constexpr double EMPOWER_SPEED = 0.75;   // +75 % build / train / research
 constexpr double EMPOWER_DROP = 0.20;    // +20 % resources dropped
 constexpr double EMPOWER_FAVOR = 0.20;   // +20 % Monument favor

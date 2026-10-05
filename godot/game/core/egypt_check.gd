@@ -12,6 +12,9 @@ extends SceneTree
 ##                wood, gold and food per worker (Laborers x0.9), each civ's drop sites
 ##                (Granary food only, Lumber Camp wood, Mining Camp gold), favor from 3
 ##                worshippers vs the five Monuments (39 / min), Laborers never worship
+##   carry        Retold's carry: a Laborer takes 15 food / 10 wood / 10 gold to a drop site, a
+##                villager 10 of each (defs, the peak load measured on berries / a farm / a deer
+##                / a tree / a mine), and the food per minute it gives on berries
 ##   units        each Egyptian unit's live stats (get_unit_stats), its bonus measured on
 ##                a first blow, and its counter matchup fought at equal cost
 ##   pop          population mapped as the browser maps the Greeks (Retold's soldier pop
@@ -42,7 +45,7 @@ extends SceneTree
 ##   civcosts     Retold's Egyptian prices / times where they differ from the Greek ones:
 ##                Watch Tower 50 w + 100 g, Fortified Wall 500 f + 400 g, Citadel Wall 800 f +
 ##                500 g; one Laborer builds the TC in 200 s, a Farm in 13.3, a tower in 80;
-##                Laborer armor 25 / 35 % (x0.75), drop-site LOS 5.4
+##                Laborer armor 25 / 35 % (x0.75), drop-site, Barracks and Siege Works LOS 5.4
 ##   locks        civ locks (builds, trains, techs both ways), Monument order and limit, the
 ##                TC's Priests need a Temple, Laborer cap, Mercenary limit, Mythic needs a
 ##                Migdol, a Laborer cannot build an Obelisk, a Priest only that
@@ -200,7 +203,7 @@ func _build_time(sim: Object, b: int, max_s := 200.0) -> float:
 
 func _run() -> void:
 	var t0 := Time.get_ticks_msec()
-	for c in ["defs", "match", "economy", "units", "pop", "limits", "pharaoh", "priest", "gods", "auras", "set", "civcosts", "locks", "determinism", "rules_off"]:
+	for c in ["defs", "match", "economy", "carry", "units", "pop", "limits", "pharaoh", "priest", "gods", "auras", "set", "civcosts", "locks", "determinism", "rules_off"]:
 		if _want(c):
 			call("_case_" + c)
 	result["ms"] = Time.get_ticks_msec() - t0
@@ -376,6 +379,96 @@ func _case_economy() -> void:
 	sim.tick(1)
 	var w_ok: bool = sim.order(lab, {"type": "worship", "target": tm})
 	_check("economy.no_worship", not w_ok and str(sim.get_unit(lab).order) != "worship", {"order_accepted": w_ok})
+
+# carry ---------------------------------------------------------------------------------
+
+## The largest load each unit in ids carried over `seconds` (polled every 1/6 s), per resource.
+func _peak_loads(sim: Object, ids: Array, seconds: float) -> Dictionary:
+	var peak := {}
+	for id in ids:
+		peak[id] = 0.0
+	for _i in int(seconds * 6):
+		sim.tick(FPS / 6)
+		var u: Dictionary = sim.get_units()
+		var uid: PackedInt32Array = u.ids
+		for id in ids:
+			var k := uid.bsearch(int(id))
+			if k < int(u.count) and uid[k] == int(id):
+				peak[id] = maxf(peak[id], float(u.carry_amount[k]))
+	return peak
+
+func _case_carry() -> void:
+	# defs: Retold's Laborer carries 15 food / 10 wood / 10 gold, the Greek villager 10 of each
+	var sim := _fresh("zeus", "ra", seed_arg, 1, "standard")
+	var lab_def: Dictionary = sim.get_unit_def("laborer")
+	var vil_def: Dictionary = sim.get_unit_def("villager")
+	_check("carry.defs", lab_def.get("carry", {}) == {"food": 15.0, "wood": 10.0, "gold": 10.0}
+		and vil_def.get("carry", {}) == {"food": 10.0, "wood": 10.0, "gold": 10.0},
+		{"laborer": lab_def.get("carry"), "villager": vil_def.get("carry")})
+	# measured: each worker's peak load on berries, a farm, a deer, a tree, a gold mine
+	var rows := {}
+	var ids := []
+	var want := {}
+	for side in [[1, "villager", -1], [2, "laborer", 1]]:
+		var owner: int = side[0]
+		var x0: int = side[2] * 10
+		var drop := "granary" if owner == 2 else "storehouse"
+		_b(sim, drop, owner, x0, 0)
+		if owner == 2:
+			_b(sim, "lumber_camp", owner, x0, -9)
+			_b(sim, "mining_camp", owner, x0, 9)
+		else:
+			_b(sim, "storehouse", owner, x0, -9)
+			_b(sim, "storehouse", owner, x0, 9)
+		var n_berry := int(sim.spawn_resource("berry", C.x + x0 + 4, C.y, 0))
+		var n_deer := int(sim.spawn_resource("deer", C.x + x0 - 4, C.y + 3, 0))
+		var n_tree := int(sim.spawn_resource("tree", C.x + x0 + 4, C.y - 9, 0))
+		var n_gold := int(sim.spawn_resource("gold", C.x + x0 + 4, C.y + 9, 0))
+		var farm := _b(sim, "farm", owner, x0 - 5, -4)
+		sim.tick(1)
+		var w := {}
+		for k in ["berry", "farm", "hunt", "wood", "gold"]:
+			w[k] = _u(sim, side[1], owner, x0 + 2.0, 1.0 if k != "wood" else -7.0)
+		sim.tick(1)
+		sim.order_gather(PackedInt32Array([w.berry]), n_berry)
+		sim.order_gather(PackedInt32Array([w.farm]), farm)
+		sim.order_gather(PackedInt32Array([w.hunt]), n_deer)
+		sim.order_gather(PackedInt32Array([w.wood]), n_tree)
+		sim.order_gather(PackedInt32Array([w.gold]), n_gold)
+		for k in w:
+			ids.append(w[k])
+			rows["%s.%s" % [side[1], k]] = w[k]
+			want[w[k]] = (15.0 if owner == 2 and k in ["berry", "farm", "hunt"] else 10.0)
+	var peak := _peak_loads(sim, ids, 90.0)
+	var got := {}
+	var ok := true
+	for k in rows:
+		var id: int = rows[k]
+		got[k] = [_r(peak[id], 2), want[id]]
+		ok = ok and peak[id] > want[id] - 0.6 and peak[id] <= want[id] + 1e-6
+	_check("carry.measured", ok, {"peak load [measured, want]": got})
+	# what it buys on berries 5 min from a Granary 8 tiles off: food per worker per minute
+	var sim2 := _fresh("zeus", "isis", seed_arg, 1, "standard")
+	var fpm := {}
+	for side in [[1, "villager", "storehouse", -1], [2, "laborer", "granary", 1]]:
+		var owner: int = side[0]
+		var x0: int = side[3] * 10
+		sim2.set_player_resources(owner, {"food": 0, "wood": 0, "gold": 0, "favor": 0})
+		_b(sim2, side[2], owner, x0, -8)
+		for i in 6:
+			sim2.spawn_resource("berry", C.x + x0 - 1 + (i % 3), C.y + 2 + i / 3, 0)
+		sim2.tick(1)
+		var ws := []
+		for i in 2:
+			ws.append(_u(sim2, side[1], owner, x0 + i - 0.5, -4.0))
+		sim2.tick(1)
+		sim2.order_gather(PackedInt32Array(ws), int(sim2.nearest_resource(C.x + x0, C.y + 2, "food", 3)))
+	_step(sim2, 300.0)
+	for o in [1, 2]:
+		fpm[o] = _r(float(sim2.get_player(o).food) / 2.0 / 5.0, 2)
+	# Isis (no berry bonus): the rate is x0.9 and the walk 5 % slower, but 1.5x the load
+	# means a third fewer walks per food, so the Laborer ends above x0.9 of the villager
+	_check("carry.berries_5min", fpm[2] > fpm[1] * 0.9, {"food/min/worker [villager, laborer]": [fpm[1], fpm[2]], "ratio": _r(fpm[2] / maxf(0.01, fpm[1]))})
 
 # units ----------------------------------------------------------------------------------
 
@@ -1559,7 +1652,7 @@ func _case_civcosts() -> void:
 	ok = ok and _near(r.ra["town_center (get_building_def)"], 200.0, 0.01) and _near(r.ra["farm (get_building_def)"], 13.33, 0.01)
 	_check("civcosts.build_times", ok, r)
 
-	# the Laborer's armor (25 / 35 % x0.75) against the villager's 0; drop-site LOS 5.4
+	# the Laborer's armor (25 / 35 % x0.75) against the villager's 0; drop-site / Barracks / Siege Works LOS 5.4
 	r = {}
 	var sim := _fresh("zeus", "ra", seed_arg, 1)
 	var lb := _u(sim, "laborer", 2, 0.0, 0.0)
@@ -1574,7 +1667,9 @@ func _case_civcosts() -> void:
 	r["hoplite blow on a villager"] = _r(_first_hit(sim, h2, vl), 3)
 	r["drop sites LOS"] = [sim.get_building_def("granary", 2).sight, sim.get_building_def("lumber_camp", 2).sight, sim.get_building_def("mining_camp", 2).sight]
 	ok = _near(r["hoplite blow on a laborer"], 9 * (1 - 0.1875), 0.01) and _near(r["hoplite blow on a villager"], 9.0, 0.01)
+	r["barracks / siege works LOS"] = [sim.get_building_def("eg_barracks", 2).sight, sim.get_building_def("siege_works", 2).sight]
 	ok = ok and _near(r["toxotes arrow on a laborer"], 7 * (1 - 0.2625), 0.01) and r["drop sites LOS"] == [5.4, 5.4, 5.4]
+	ok = ok and r["barracks / siege works LOS"] == [5.4, 5.4]
 	_check("civcosts.laborer_armor_los", ok, r)
 
 # determinism ------------------------------------------------------------------------------

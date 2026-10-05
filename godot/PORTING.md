@@ -1886,7 +1886,14 @@ techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
   farms `FARM_RATE` x0.9), build at 0.75 (a site's rate is (1 / time) x
   n^0.75 x the builders' mean work rate: a House is 15 s for a villager, 20 s
   for a Laborer, Retold's x4/3), never worship (the order is refused), a cap
-  of 100 (living + queued). Drop sites: Granary (food), Lumber Camp (wood),
+  of 100 (living + queued). Carry (Retold, EGYPT.md 1.2): a Laborer takes
+  15 food, 10 wood, 10 gold to a drop site (`LABORER_CARRY`,
+  `unit_carry_cap`; berries, farms, hunt and carcasses alike), a Greek
+  villager 10 of each as before; `get_unit_def(t).carry` gives it per
+  resource and the unit panel shows "/ 15" or "/ 10". Retold's +5 wood / gold
+  carry per gather tech and +15 food with Husbandry are not in this game:
+  neither civ has gather techs here (Husbandry, Hand Axe, Pickaxe ... are
+  not built), so the base values hold all match. Drop sites: Granary (food), Lumber Camp (wood),
   Mining Camp (gold), all free; the Town Center takes everything. Favor only
   from the five Monuments (one each, in order: a later one needs every
   earlier one standing, a foundation will do), 4.5 / 6 / 7.5 / 9 / 12 per
@@ -1999,8 +2006,9 @@ techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
   (Retold's 150 base), a Farm in 13.3 s (10 base), a Sentry Tower in 80 s
   (60 base) (`civ_build_time`, the row's `fort_build_time`; the Greeks keep
   this sim's 60 / 12 / 30); the other shared types' base times are Retold's
-  already (House 15, Temple 40, Armory / Market 40). Drop sites' LOS 5.4
-  (9 x 0.6). The Stone Wall, Guard and Ballista Tower stages keep the Greek
+  already (House 15, Temple 40, Armory / Market 40). Drop sites', the
+  Barracks' and the Siege Works' LOS 5.4 (Retold's 9 x 0.6; the Migdol 18,
+  the Obelisk 19.2, the Monuments 5.4 by the same rule). The Stone Wall, Guard and Ballista Tower stages keep the Greek
   prices (EGYPT.md gives none); the Citadel Wall and Ballista Tower are not
   Egyptian-only here.
 - **Mapping Retold onto this sim** (`civ.h` head, `egypt_unit(t).mapping`

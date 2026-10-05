@@ -121,11 +121,11 @@ inline const BuildingDef *building_defs() {
 			false, 0, 0, 0, "O", 0, 1 },
 		{ "obelisk", "Obelisk", 1, 1, 62.5, Cost(0, 0, 10, 0), 12, 0, 19.2, 0, { -1 }, false, false, false, false,
 			false, 0, 0, 0, "J", 0, 1 },
-		{ "eg_barracks", "Barracks", 5, 5, 1500, Cost(0, 0, 75, 0), 25, 0, 8, 0, { U_SPEARMAN, U_AXEMAN, U_SLINGER, -1 }, false, false, false, false,
+		{ "eg_barracks", "Barracks", 5, 5, 1500, Cost(0, 0, 75, 0), 25, 0, 5.4, 0, { U_SPEARMAN, U_AXEMAN, U_SLINGER, -1 }, false, false, false, false,
 			false, 0, 0, 0, "B", 1, 1 },
 		{ "migdol", "Migdol Stronghold", 6, 6, 4062.5, Cost(0, 0, 500, 0), 115, 0, 18, 0, { U_CHARIOT_ARCHER, U_CAMEL_RIDER, U_WAR_ELEPHANT, -1 }, false, false, false, false,
 			true, 10.35, 12, 1.6, "I", 2, 1 },
-		{ "siege_works", "Siege Works", 5, 5, 1500, Cost(0, 0, 75, 0), 40, 0, 8, 0, { U_SIEGE_TOWER, U_CATAPULT, -1 }, false, false, false, false,
+		{ "siege_works", "Siege Works", 5, 5, 1500, Cost(0, 0, 75, 0), 40, 0, 5.4, 0, { U_SIEGE_TOWER, U_CATAPULT, -1 }, false, false, false, false,
 			false, 0, 0, 0, "H", 2, 1 },
 	};
 	// clang-format on

@@ -494,6 +494,11 @@ Dictionary AovSim::get_unit_def(const String &type) const {
 	atk["projectile"] = u.attack.projectile ? "arrow" : "";
 	d["attack"] = atk;
 	d["armor"] = u.armor;
+	if (u.gatherer) { // what it carries per resource before a drop (sim/civ: the Laborer's 15 food)
+		Dictionary carry;
+		for (int k = aov::RES_FOOD; k <= aov::RES_GOLD; k++) carry[aov::res_name(k)] = aov::unit_carry_cap(t, k);
+		d["carry"] = carry;
+	}
 	civ_unit_def(t, d); // (Godot-only, sim/civ: civ, hack / pierce armor, stand-in, Retold, per age)
 	return d;
 }

@@ -510,7 +510,8 @@ void Economy::update_gatherer(int r, double dt) {
 		return;
 	}
 	const UnitDef &ud = unit_def(U.type[r]);
-	const double cap = ud.carry_cap != 0 ? ud.carry_cap : 10;
+	// (Godot-only, sim/civ: a Laborer carries 15 food, 10 wood / gold; Laborers exist only with the rules on)
+	const double cap = U.type[r] == U_LABORER ? unit_carry_cap(U_LABORER, U.econ_res_type[r]) : ud.carry_cap != 0 ? ud.carry_cap : 10;
 	const int ph = U.econ_phase[r];
 	if (ph == EP_TO_RES || ph == EP_GATHERING) {
 		int32_t tid = U.econ_res[r];
