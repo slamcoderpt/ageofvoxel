@@ -22,7 +22,7 @@
 //   color     uint8 x4 RGBA8: sRGB colour with the per-voxel jitter and the
 //             baked AO applied (the browser's linear vertex colour, encoded
 //             to sRGB so 8 bits do not band), A = 255
-//   extra     uint8 x4: (team * 255, glow * 255, 0, 0). team 1 = multiply the
+//   extra     uint8 x4: (team * 255, glow * 255, outline code (units, see outline-codes.mjs), 0). team 1 = multiply the
 //             albedo by the owner colour; glow = emissive (browser: emission =
 //             albedo * glow * 2.5)
 //   index     int32, triangles already in Godot's winding (clockwise front
@@ -36,6 +36,7 @@ import fs from 'node:fs';
 import zlib from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { outlineCodes } from './outline-codes.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -75,7 +76,10 @@ class Group {
     const a = geo.attributes;
     const n = a.position.count;
     const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Uint8Array(n * 4), ext = new Uint8Array(n * 4);
+    // units: extra.b = the outline push per corner (outline-codes.mjs; Godot only, the browser ignores it)
+    const codes = this.name === 'units' && a.normal ? outlineCodes(geo) : null;
     for (let i = 0; i < n; i++) {
+      if (codes) ext[i * 4 + 2] = codes[i];
       pos[i * 3] = a.position.getX(i); pos[i * 3 + 1] = a.position.getY(i); pos[i * 3 + 2] = a.position.getZ(i);
       if (a.normal) { nor[i * 3] = a.normal.getX(i); nor[i * 3 + 1] = a.normal.getY(i); nor[i * 3 + 2] = a.normal.getZ(i); }
       if (a.color) { col[i * 4] = u8(toSRGB(a.color.getX(i))); col[i * 4 + 1] = u8(toSRGB(a.color.getY(i))); col[i * 4 + 2] = u8(toSRGB(a.color.getZ(i))); }

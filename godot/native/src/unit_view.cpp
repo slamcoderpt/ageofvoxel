@@ -164,6 +164,8 @@ AovUnitView::Rig AovUnitView::parse_rig(const Dictionary &R, int t) {
 		p.parent = (int)(int64_t)P.get("parentIdx", -1);
 		const Array j = P.get("joint", Array());
 		if (j.size() >= 3) p.joint = Vector3((real_t)(double)j[0], (real_t)(double)j[1], (real_t)(double)j[2]) * rig.voxel;
+		const Array rest = P.get("rest", Array());
+		if (rest.size() >= 3) { p.has_rest = true; p.rest = euler((double)rest[0], (double)rest[1], (double)rest[2]); }
 		p.coat = (bool)P.get("coat", false);
 		const bool cond = (bool)P.get("conditional", false);
 		const std::string &n = p.name;
@@ -1301,6 +1303,7 @@ Dictionary AovUnitView::update(double dt, double alpha, int64_t local_player, co
 			const Transform3D &parent = p.parent >= 0 ? world[p.parent] : root;
 			Basis b;
 			if (p.channel >= 0) b = euler(rot3[p.channel][0], rot3[p.channel][1], rot3[p.channel][2]);
+			if (p.has_rest) b = b * p.rest;
 			world[pi] = parent * Transform3D(b, p.joint);
 			bool show = true;
 			switch (p.rule) {

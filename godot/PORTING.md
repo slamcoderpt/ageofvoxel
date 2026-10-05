@@ -1163,6 +1163,10 @@ same channel names, plus:
   the `neck` channel, a tail arching over the back), `wadjet` (serpent:
   coil, hood, team wings with red bars), `phoenix`, `roc` (flyers; the roc
   carries a basket).
+- **`baboon_of_set`** (sim type, Set's starting scout; four-legged rig 0.06,
+  anim `horse`, gait 1.3): an olive-grey baboon with a pale cape over the high
+  shoulders, a back sloping to a red rump, a long dark muzzle with amber eyes,
+  an arching tail, a team collar with a gold amulet; in the myth lineup.
 - **`units.gd draw_as(unit_id, type)`**: draws and poses one sim unit with
   another rig (AovUnitView `add_rig(rig)` appends a render-only rig and its
   part buffers, `set_rig_override(id, rig)`); the sim still runs it as its
@@ -1753,8 +1757,8 @@ techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
 - **Start** (Retold): Town Center, `villagers - 2` Laborers (3 of the
   default 5), the Pharaoh, a Priest, and for Set a Baboon of Set (the
   scout animal: `baboon_of_set`, 20 hp, 3 hack, speed 3.3 x0.65, class
-  infantry as this sim has no animal class, LOS 12 assumed; drawn with the
-  Anubite's rig until it has its own). Stockpile: Retold's 200 f / 100 w /
+  infantry as this sim has no animal class, LOS 12 assumed; drawn with its
+  own `baboon_of_set` rig in `egypt_units`). Stockpile: Retold's 200 f / 100 w /
   50 g / 0 favor on "standard" (the Greeks' 300 / 300 / 200 / 20), i.e. the
   setup's stockpile x `EGYPT_START_RES` (2/3, 1/3, 1/4, 0): "low" 100 / 50 /
   25, "high" 667 / 333 / 187.5; "deathmatch" keeps its 10000s (favor 0); an

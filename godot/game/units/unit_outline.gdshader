@@ -9,8 +9,19 @@ uniform float width = 0.045;
 uniform vec3 line_color : source_color = vec3(0.078, 0.051, 0.031);
 varying float v_fade;
 
+// CUSTOM1.b (Egyptian unit meshes, export-egypt-units.mjs): a per-corner push
+// direction, every copy of a corner moved alike so the hull stays closed (no
+// stair-stepped fringes along the voxel edges); 0 = along the face normal.
+// CUSTOM1.a: this mesh's width factor (0 = 1).
 void vertex() {
-	VERTEX += NORMAL * width;
+	vec3 dir = NORMAL;
+	float code = floor(CUSTOM1.b * 255.0 + 0.5);
+	if (code > 0.5) {
+		code -= 1.0;
+		dir = vec3(mod(code, 3.0), mod(floor(code / 3.0), 3.0), floor(code / 9.0)) - 1.0;
+	}
+	float k = CUSTOM1.a > 0.002 ? CUSTOM1.a : 1.0;
+	VERTEX += dir * width * k;
 	v_fade = COLOR.a;
 }
 

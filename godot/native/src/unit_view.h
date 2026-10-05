@@ -53,6 +53,7 @@ public:
 		int rule = 0;      // show rule (see unit_view.cpp)
 		int rule_v = 0, rule_n = 0; // (R_VARY: shown when the unit's id hashes to rule_v of rule_n)
 		bool weapon = false; // anim channel 'weapon' (dropped by the dead)
+		bool has_rest = false; Basis rest; // rig "rest" [x, y, z] (radians): a fixed turn after the pose (Egyptian heads tilt to the camera)
 	};
 	struct Rig {
 		int kind = 0; // K_HUMAN, K_ARCHER, K_BEAST, K_HORSE, K_CENTAUR, K_MEDUSA, K_FLYER, K_SIEGE

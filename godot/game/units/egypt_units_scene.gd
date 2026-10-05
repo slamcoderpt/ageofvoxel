@@ -18,10 +18,12 @@ extends RefCounted
 ##     [--params "eu_focus=anubite"]   # four of one type from four sides, framed close (the wiki "views")
 ##     [--params "eu_state=walk"]      # lineup / focus: idle (default) | walk | attack | die
 ##     [--params "eu_t=3"]             # seconds the sim runs after the setup (battle: 5, eco: 9)
+##     [--params "eu_one=axeman&eu_turn=30"]  # one unit framed close, turned from the camera (model checks)
+##     [--params "eu_zoom=0.6"]        # scale the camera distance of any group
 
 const HUMANS := ["laborer", "spearman", "axeman", "slinger", "mercenary", "priest", "pharaoh"]
 const MOUNTED := ["chariot_archer", "camel_rider", "war_elephant", "mercenary_cavalry", "catapult", "siege_tower"]
-const MYTH := ["anubite", "avenger", "mummy", "minion", "son_of_osiris", "scorpion_man", "sphinx", "petsuchos", "scarab", "wadjet", "phoenix", "roc"]
+const MYTH := ["anubite", "avenger", "mummy", "minion", "son_of_osiris", "scorpion_man", "sphinx", "petsuchos", "scarab", "wadjet", "phoenix", "roc", "baboon_of_set"]
 ## the sim unit a render-only myth unit rides on (until the sim has its type)
 const STAND_IN := {"anubite": "minotaur", "avenger": "minotaur", "mummy": "medusa", "minion": "minotaur", "son_of_osiris": "hero",
 	"scorpion_man": "minotaur", "sphinx": "minotaur", "petsuchos": "medusa", "scarab": "cyclops", "wadjet": "medusa",
@@ -69,7 +71,13 @@ static func scene_setup(game: Node) -> Dictionary:
 	var focus := Vector2(cx, cz)
 	var cam_dist := 30.0
 	var cam_pitch := 44.0
-	if focus_type != "":
+	var one := str(game.args.get("eu_one", ""))
+	if one != "":
+		# one man framed close, turned eu_turn degrees from facing the camera (model checks)
+		spawn.call(one, 1, Vector2(cx, cz), yaw + deg_to_rad(float(game.args.get("eu_turn", 0.0))))
+		cam_dist = 4.0 + float(GAP.get(one, 1.0)) * 1.5
+		cam_pitch = 40.0
+	elif focus_type != "":
 		# four of one type from four sides (Retold's wiki "views")
 		var size := float(GAP.get(focus_type, 1.6))
 		for k in 4:
@@ -149,7 +157,8 @@ static func scene_setup(game: Node) -> Dictionary:
 		cam_dist = 34.0
 		cam_pitch = 46.0
 	# states for the lineups: walk on the spot, attack a dummy, fall
-	if group in ["all", "foot", "mounted", "myth"] or focus_type != "":
+	cam_dist *= float(game.args.get("eu_zoom", 1.0))
+	if group in ["all", "foot", "mounted", "myth"] or focus_type != "" or one != "":
 		match state:
 			"walk":
 				for e in spawned:
