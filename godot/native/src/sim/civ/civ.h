@@ -200,6 +200,15 @@ constexpr double LABORER_BOW_RANGE = 12 * 0.6; //   range 12,
 constexpr double LABORER_BOW_RELOAD = 2 * 1.15; //   ROF 2
 // Egyptian costs of the fortification stages where Retold gives them their own (fortify.h FT_*)
 Cost civ_fort_tech_cost(int civ, int tech);
+// research time of a fortification stage (Retold's Egyptian Citadel Wall 50 s; the Greek 60)
+double civ_fort_tech_time(int civ, int tech);
+// Egyptian walls (EGYPT.md 2, Stone Wall): from the Classical Age, which gives the
+// Stone Wall stage for free (Retold has no Stone Wall research; the Greeks here
+// research it, 150 w + 100 g); priced per piece as Retold's segments: a pillar
+// (connector) 3 g, a segment of 1 tile (short) 6 g, 2-3 tiles (medium) 9 g, 4 tiles
+// (long, WALL_SEGMENT_MAX) 15 g. has = false: not Egyptian (the per-tile price)
+constexpr int EGYPT_WALL_AGE = 1;
+Cost civ_wall_piece_cost(int civ, int type, int tiles);
 // Egyptian base build times of the shared types where Retold differs from this sim's Greek
 // one (Town Center 150, Farm 10, Sentry Tower 60); 0 = the def's
 double civ_build_time(int civ, int btype);

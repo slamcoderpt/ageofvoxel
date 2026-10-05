@@ -2023,9 +2023,30 @@ techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
   this sim's 60 / 12 / 30); the other shared types' base times are Retold's
   already (House 15, Temple 40, Armory / Market 40). Drop sites', the
   Barracks' and the Siege Works' LOS 5.4 (Retold's 9 x 0.6; the Migdol 18,
-  the Obelisk 19.2, the Monuments 5.4 by the same rule). The Stone Wall, Guard and Ballista Tower stages keep the Greek
+  the Obelisk 19.2, the Monuments 5.4 by the same rule). The Guard and Ballista Tower stages keep the Greek
   prices (EGYPT.md gives none); the Citadel Wall and Ballista Tower are not
   Egyptian-only here.
+- **Egyptian walls** (EGYPT.md 2, Stone Wall; `civ_wall_piece_cost`,
+  `civ_fort_tech_time`, `EGYPT_WALL_AGE`, `Fortify::grant_level`): an
+  Egyptian builds walls from the Classical Age (`plan_wall` / `place_wall`
+  in the Archaic: "Requires Classical Age"), and reaching it (a real age-up
+  or `set_player_age`) gives him the Stone Wall stage free: Retold has no
+  Stone Wall research (its walls are stone from the Classical Age), while
+  this sim's Greeks still research it (150 w + 100 g, 40 s) from their
+  Archaic Wooden Wall (`get_fortify` lists the Egyptian `stone_wall` as done,
+  cost {}). Pieces are priced as Retold's segments, gold only: a pillar (the
+  connector) 3 g, a segment of 1 tile (short) 6 g, 2-3 tiles (medium) 9 g, 4
+  tiles (`WALL_SEGMENT_MAX`, long) 15 g (an 11-tile line, pillar-4-pillar-4-
+  pillar, is 39 g; the Greek pays 4 w + 2 g a tile, 44 w + 22 g). The
+  Fortified Wall is 500 f + 400 g and 50 s, the Citadel Wall 800 f + 500 g
+  and 50 s (the Greek 60 s). Hp and armor stay this sim's shared wall stages
+  (Stone 450 per tile, Fortified 700, Citadel 1000, pillars x1.5; `Fortify::armor_mult`
+  on wall pieces: x0.15 arrows, x0.6 blows, not on siege, myth units or god
+  powers): Retold gives the Greek and the Egyptian Stone Wall the same 1,200 hp
+  and 55 / 90 / 5 % armor, and this sim's tile walls already map that wall for
+  the Greeks, so both civs share the mapping. Gates keep the shared
+  conversion (its wood paid in gold by an Egyptian). egypt_check
+  `civcosts.walls` measures it on both civs.
 - **Mapping Retold onto this sim** (`civ.h` head, `egypt_unit(t).mapping`
   per unit): hp and damage as Retold; speed x0.65 (the Laborer: the
   villager's 2.7 / 4.0 ratio); range and LOS x0.6 (`DIST_SCALE`); reload

@@ -413,6 +413,7 @@ bool EnemyAI::plan_ring(int tc) {
 bool EnemyAI::place_ring_line(bool instant, const std::vector<int> &builders) {
 	Sim &S = *sim;
 	Player &p = S.players[owner];
+	if (S.civs.civ(owner) == CIV_EGYPT && p.age < EGYPT_WALL_AGE) return false; // (sim/civ: Egyptian walls from the Classical Age; the ring waits)
 	while (!ring_lines_.empty()) {
 		const std::array<int, 4> l = ring_lines_.front();
 		const WallPlan plan = S.fortify.plan_wall(owner, l[0], l[1], l[2], l[3], true);

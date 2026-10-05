@@ -1671,6 +1671,60 @@ func _case_civcosts() -> void:
 			ok = ok and row["watch tower paid [f, w, g]"] == [0.0, 100.0, 100.0] and costs.fortified_wall == {"wood": 250.0, "gold": 200.0}
 	_check("civcosts.fort_upgrades", ok, r)
 
+	# Egyptian walls (EGYPT.md 2 Stone Wall): from the Classical Age, which gives the Stone Wall
+	# stage free (a real age-up and set_player_age); priced per piece as Retold's segments
+	# (pillar 3 g, 1 tile 6 g, 2-3 tiles 9 g, 4 tiles 15 g); Citadel Wall 50 s (Greek 60 s)
+	r = {}
+	ok = true
+	for g in ["ra", "zeus"]:
+		var sim := _fresh(g, "zeus", seed_arg, 0)
+		var row := {}
+		var a := Vector2i(C.x - 12, C.y + 8)
+		var bb := Vector2i(C.x - 2, C.y + 8)
+		var p0: Dictionary = sim.plan_wall(1, a, bb)
+		row["archaic plan"] = {"valid": p0.valid, "reason": p0.reason, "cost": p0.cost}
+		row["archaic stage"] = sim.get_fortify(1).wall_name
+		for hx in [-16, -12, -8, -4]:
+			_b(sim, "house", 1, hx, -14)
+		_b(sim, "temple", 1, 10, -10)
+		sim.tick(1)
+		var adv: Dictionary = sim.advance_age(1)
+		for t in 150 * FPS:
+			sim.tick(1)
+			if int(sim.get_player(1).age) >= 1:
+				break
+		sim.tick(1)
+		row["advance"] = adv.get("ok", adv)
+		row["classical (real age-up) stage"] = [sim.get_fortify(1).wall_name, sim.get_fortify(1).wall_tile_hp]
+		var p1: Dictionary = sim.plan_wall(1, a, bb)
+		var want := 0.0
+		var kinds := []
+		var pc: PackedInt32Array = p1.pieces
+		for i in range(0, pc.size(), 5):
+			var n: int = maxi(pc[i + 3], pc[i + 4])
+			var pil: bool = pc[i] == 7 # (B_WALL_PILLAR, buildings/defs.h)
+			kinds.append(n)
+			want += 3.0 if pil else (15.0 if n >= 4 else 9.0 if n >= 2 else 6.0)
+		row["classical plan"] = {"valid": p1.valid, "reason": p1.reason, "cost": p1.cost, "pieces (tiles)": kinds, "new_tiles": p1.new_tiles}
+		var g0: Dictionary = _res(sim, 1)
+		var pl: Dictionary = sim.place_wall(1, a, bb, PackedInt32Array())
+		var g1: Dictionary = _res(sim, 1)
+		row["paid [w, g]"] = [_r(g0.wood - g1.wood), _r(g0.gold - g1.gold)]
+		var times := {}
+		for e in sim.get_fortify(1).techs:
+			times[e.key] = [e.time, e.state]
+		row["stages [time, state]"] = times
+		r[g] = row
+		if g == "ra":
+			row["want (Retold segments)"] = want
+			ok = ok and not bool(p0.valid) and str(p0.reason) == "Requires Classical Age"
+			ok = ok and row["classical (real age-up) stage"][0] == "Stone Wall" and bool(p1.valid) and _near(float(p1.cost.get("gold", 0.0)), want) and not p1.cost.has("wood")
+			ok = ok and _near(g0.gold - g1.gold, want) and times.stone_wall[1] == "done" and _near(times.citadel_wall[0], 50.0) and sim.get_fortify(1).techs[0].cost.is_empty()
+		else:
+			ok = ok and bool(p0.valid) and row["classical (real age-up) stage"][0] == "Wooden Wall" and times.stone_wall[1] == "available"
+			ok = ok and _near(times.citadel_wall[0], 60.0) and _near(g0.wood - g1.wood, 4.0 * int(p1.new_tiles))
+	_check("civcosts.walls", ok, r)
+
 	# one worker's build time: Egyptian (Retold base x4/3) vs Greek
 	r = {}
 	ok = true

@@ -179,12 +179,24 @@ int converted_type(int wild) { return wild == R_DEER ? U_DEER_OF_SET : wild == R
 
 Cost civ_fort_tech_cost(int civ, int tech) {
 	if (civ == CIV_EGYPT) switch (tech) { // (EGYPT.md 2: Retold's Egyptian prices)
+		case FT_STONE_WALL: return Cost(); // (given free in the Classical Age: civ_wall_piece_cost)
 		case FT_WATCH_TOWER: return Cost(0, 50, 100, 0);
 		case FT_FORTIFIED_WALL: return Cost(500, 0, 400, 0);
 		case FT_CITADEL_WALL: return Cost(800, 0, 500, 0);
 		default: break;
 	}
 	return fort_tech_def(tech).cost;
+}
+
+double civ_fort_tech_time(int civ, int tech) {
+	if (civ == CIV_EGYPT && tech == FT_CITADEL_WALL) return 50; // (EGYPT.md 2: Citadel Wall 50 s)
+	return fort_tech_def(tech).time;
+}
+
+Cost civ_wall_piece_cost(int civ, int type, int tiles) {
+	if (civ != CIV_EGYPT) return Cost();
+	if (type == B_WALL_PILLAR) return Cost(0, 0, 3, 0);
+	return Cost(0, 0, tiles >= WALL_SEGMENT_MAX ? 15 : tiles >= 2 ? 9 : 6, 0);
 }
 
 double civ_build_time(int civ, int btype) {
@@ -440,6 +452,7 @@ void Civs::on_age(int owner) {
 	for (int r = 0; r < U.size(); r++)
 		if (!U.removed[r] && U.owner[r] == owner && hero_age(U.type[r])) hero_age_stats(r, age - 1, age);
 	if (civ(owner) == CIV_EGYPT && god_is(owner, "set")) age_gift_spawn(owner, age);
+	if (civ(owner) == CIV_EGYPT && age >= EGYPT_WALL_AGE) sim->fortify.grant_level(owner, 0, 1); // (Stone Wall from the Classical Age)
 }
 
 void Civs::age_set(int owner, int from, int to) {
@@ -449,6 +462,7 @@ void Civs::age_set(int owner, int from, int to) {
 		if (!U.removed[r] && U.owner[r] == owner && hero_age(U.type[r])) hero_age_stats(r, from, to);
 	if (civ(owner) == CIV_EGYPT && god_is(owner, "set"))
 		for (int a = from + 1; a <= to; a++) age_gift_spawn(owner, a);
+	if (civ(owner) == CIV_EGYPT && to >= EGYPT_WALL_AGE) sim->fortify.grant_level(owner, 0, 1);
 }
 
 std::vector<int32_t> Civs::age_gift_spawn(int owner, int age) {

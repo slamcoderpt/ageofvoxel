@@ -131,6 +131,8 @@ public:
 	// state of a tech for an owner: 0 done, 1 available, 2 needs the previous
 	// stage, 3 needs an age, 4 being researched
 	int tech_state(int owner, int tech) const;
+	// (sim/civ) a stage given without research: the Egyptians' Stone Wall in the Classical Age
+	void grant_level(int owner, int line, int level) { set_level(owner, line, level); }
 
 	// stats of a piece for its owner's stage
 	double piece_max_hp(int type, int owner, int tiles) const;

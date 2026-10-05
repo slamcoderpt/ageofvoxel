@@ -1203,7 +1203,7 @@ Dictionary AovSim::get_fortify(int64_t owner) const {
 		e["line"] = td.line ? "tower" : "wall";
 		e["level"] = td.level;
 		e["min_age"] = td.min_age;
-		e["time"] = td.time;
+		e["time"] = aov::civ_fort_tech_time(sim_.civs.civ(o), t); // (sim/civ: Egyptian Citadel 50 s)
 		e["cost"] = cost_dict(aov::civ_fort_tech_cost(sim_.civs.civ(o), t)); // (sim/civ: the Egyptians' own prices)
 		e["state"] = STATES[F.tech_state(o, t)];
 		techs.push_back(e);
@@ -1335,7 +1335,7 @@ Array AovSim::get_techs(int64_t building) const {
 			e["age_name"] = aov::AGES[td.min_age];
 			e["cost"] = cost_dict(aov::civ_fort_tech_cost(sim_.civs.civ(owner), t)); // (sim/civ: the Egyptians' own prices)
 			e["base_cost"] = cost_dict(aov::civ_fort_tech_cost(sim_.civs.civ(owner), t));
-			e["time"] = td.time;
+			e["time"] = aov::civ_fort_tech_time(sim_.civs.civ(owner), t); // (sim/civ)
 			e["requires"] = td.level > 1 ? String(aov::fort_tech_def(t - 1).key) : String();
 			e["generic"] = true;
 			e["fort"] = true;

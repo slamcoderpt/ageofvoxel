@@ -221,9 +221,16 @@ WallPlan Fortify::plan_wall(int owner, int tx0, int tz0, int tx1, int tz1, bool 
 		}
 		a = b;
 	}
-	const Cost tc = civ_building_cost(sim->civs.civ(owner), B_WALL); // (sim/civ: an Egyptian wall costs gold, no wood)
+	const int pciv = sim->civs.civ(owner);
+	const Cost tc = civ_building_cost(pciv, B_WALL); // (sim/civ: an Egyptian wall costs gold, no wood)
 	P.cost = Cost(0, tc.v[RES_WOOD] * P.new_tiles, tc.v[RES_GOLD] * P.new_tiles, 0);
-	if (P.on_building > 0 && !through_buildings) P.reason = "A building is in the way";
+	if (pciv == CIV_EGYPT) { // (sim/civ: Retold's Egyptian segment prices, civ_wall_piece_cost)
+		double g = 0;
+		for (const auto &pc : P.pieces) g += civ_wall_piece_cost(pciv, pc.type, std::max(pc.w, pc.h)).v[RES_GOLD];
+		P.cost = Cost(0, 0, g, 0);
+	}
+	if (pciv == CIV_EGYPT && sim->players[owner].age < EGYPT_WALL_AGE) P.reason = std::string("Requires ") + AGES[EGYPT_WALL_AGE] + " Age";
+	else if (P.on_building > 0 && !through_buildings) P.reason = "A building is in the way";
 	else if (P.pieces.empty()) P.reason = "Cannot build a wall there";
 	else if (!sim->players[owner].can_afford(P.cost)) P.reason = "Not enough resources";
 	else P.valid = true;
@@ -416,7 +423,7 @@ FortResult Fortify::research(int32_t id, int tech) {
 	if (!sim->players[owner].pay(civ_fort_tech_cost(sim->civs.civ(owner), tech))) { r.reason = "Not enough resources"; return r; } // (sim/civ: the Egyptians' own prices)
 	B.fort_tech[b] = (uint8_t)tech;
 	B.fort_tech_t[b] = 0;
-	B.fort_tech_total[b] = d.time;
+	B.fort_tech_total[b] = civ_fort_tech_time(sim->civs.civ(owner), tech); // (sim/civ: Egyptian Citadel 50 s)
 	r.ok = true;
 	return r;
 }
