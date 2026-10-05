@@ -62,7 +62,7 @@ function masonry(tonesA, tonesB, { len = 8, course = 4, bed = 0.84, head = 0.9, 
   };
 }
 // warm sandstone ashlar (Retold's walls: a light, slightly orange sandstone in big courses)
-const SAND = masonry([0xe2c491, 0xd9b984, 0xe8cc9c], [0xd6b47f, 0xdfc08c, 0xcfab76], { len: 7, course: 3, bed: 0.84, head: 0.9, grime: 3, seed: 5 });
+const SAND = masonry([0xe2c491, 0xd9b984, 0xe8cc9c], [0xd6b47f, 0xdfc08c, 0xcfab76], { len: 7, course: 3, bed: 0.8, head: 0.88, grime: 3, seed: 5 });
 const SAND_D = masonry([0xc9a26d, 0xbf9862, 0xd1aa76], [0xb98f5b, 0xc49c68, 0xcca572], { len: 6, course: 3, bed: 0.82, head: 0.88, grime: 0, seed: 9 });
 // pale limestone (cornices, copings, columns, the migdol)
 const LIME = masonry([0xf1e6cf, 0xe9ddc3, 0xf5ecd8], [0xe6d9bd, 0xede2ca, 0xdfd1b4], { len: 9, course: 3, bed: 0.86, head: 0.92, grime: 3, seed: 11 });
@@ -267,6 +267,8 @@ function block(m, x0, z0, x1, z1, y0, h, { wall = SAND, socle = 1, frieze = 2, b
         const u = (x + z) % FRIEZE.length;
         c = (t === (band ? 1 : 0) + frieze - 1 && frieze > 1) ? (u % 3 === 0 ? INK : OCHRE) : FRIEZE[u];
       } else c = typeof wall === 'function' ? wall(x, y, z) : wall;
+      const corner = (x === a0 || x === a1 - 1) && (z === b0 || z === b1 - 1);
+      if (corner && y - y0 >= socle && t >= (band ? 1 : 0) + frieze && wall !== LIME) c = LIME(x, y, z);   // the torus moulding
       m.set(x, y, z, dEdge > 1 ? SAND_D(x, y, z) : c);
     }
   }
@@ -317,33 +319,38 @@ function awning(m, face, f, a0, a1, yTop, depth, drop, colors, { sw = 2, posts =
   }
   if (posts) for (const a of [a0, a1 - 1]) for (let y = ground; y < yTop - drop; y++) put(a, y, depth, POLE);
 }
-// a palm: a ringed trunk leaning toward (lx, lz) and a crown of drooping fronds
+// a palm: a ringed trunk curving toward (lx, lz) and a crown of long arching
+// fronds: a midrib with sparse leaflets hanging from it, the tips drooping
+const FROND_D = (x, y, z) => pick(hash3(x, y, z, 38), [0x3c6e28, 0x467a2e, 0x355f24]);
 function palm(m, x, y, z, h = 22, { lx = 1, lz = 0, fronds = 9, len = 8, dates = true } = {}) {
   let px = x, pz = z;
   for (let j = 0; j < h; j++) {
     const t = j / h;
     px = x + Math.round(lx * 3 * t * t);
     pz = z + Math.round(lz * 3 * t * t);
-    const w = j < 3 ? 2 : 1;
-    for (let a = 0; a <= w - 1 + (j < 3 ? 0 : 1); a++) for (let b = 0; b <= (j < 3 ? 1 : 1); b++) m.set(px + a, y + j, pz + b, PALM_T(px, y + j, pz));
+    const ring = (j % 3 === 0);
+    const c = ring ? 0x5e4630 : PALM_T(px, y + j, pz);
+    m.set(px, y + j, pz, c); m.set(px + 1, y + j, pz, c); m.set(px, y + j, pz + 1, c); m.set(px + 1, y + j, pz + 1, c);
+    if (j < 2) { m.set(px - 1, y + j, pz, c); m.set(px + 2, y + j, pz + 1, c); m.set(px, y + j, pz - 1, c); m.set(px + 1, y + j, pz + 2, c); }
   }
   const cy = y + h, cx = px + 1, cz = pz + 1;
-  m.box(cx - 1, cy, cz - 1, 2, 2, 2, 0x5e7a2c);
-  if (dates) { m.set(cx - 2, cy - 1, cz, 0x9a5a22); m.set(cx + 1, cy - 1, cz - 2, 0x9a5a22); m.set(cx, cy - 1, cz + 1, 0x8a4a1a); }
+  m.box(cx - 1, cy, cz - 1, 2, 2, 2, 0x6e7a30);
+  if (dates) { m.set(cx - 2, cy - 1, cz, 0xb8742a); m.set(cx - 2, cy - 2, cz, 0x9a5a22); m.set(cx + 1, cy - 1, cz - 2, 0xb8742a); m.set(cx, cy - 1, cz + 1, 0x9a5a22); }
   for (let k = 0; k < fronds; k++) {
-    const ang = (k / fronds) * Math.PI * 2 + 0.3;
+    const ang = (k / fronds) * Math.PI * 2 + 0.3 + hash3(x, k, z, 3) * 0.4;
     const dx = Math.cos(ang), dz = Math.sin(ang);
-    const L = len + (k % 3 === 0 ? 1 : k % 3 === 1 ? -1 : 0);
-    for (let s = 0; s <= L; s++) {
-      const t = s / L;
-      const fx = cx + dx * s, fz = cz + dz * s, fy = cy + 1 + 2.2 * t - 6.5 * t * t;
-      const X = Math.round(fx - 0.5), Z = Math.round(fz - 0.5), Y = Math.round(fy);
-      m.set(X, Y, Z, FROND);
-      if (s > 1 && s < L - 1) {
-        // leaflets either side
-        const sx = Math.round(-dz), sz = Math.round(dx);
-        m.set(X + sx, Y - 1, Z + sz, FROND);
-        m.set(X - sx, Y - 1, Z - sz, FROND);
+    const L = len + Math.round((hash3(x, k, z, 5) - 0.5) * 3);
+    const up = 2.6 + hash3(x, k, z, 7) * 1.4;
+    const sx = -dz, sz = dx;
+    for (let s = 0; s <= L * 2; s++) {
+      const t = s / (L * 2);
+      const fx = cx + dx * t * L, fz = cz + dz * t * L, fy = cy + 1 + up * t * 2 - (up + 5.5) * t * t * 1.6;
+      const X = Math.round(fx - 0.5), Y = Math.round(fy), Z = Math.round(fz - 0.5);
+      m.set(X, Y, Z, k & 1 ? FROND_D : FROND);
+      // leaflets hang below the midrib on both sides, longest mid-frond
+      if (s % 3 === 1 && t > 0.2 && t < 0.9) {
+        m.set(Math.round(fx - 0.5 + sx), Y - 1, Math.round(fz - 0.5 + sz), FROND);
+        m.set(Math.round(fx - 0.5 - sx), Y - 1, Math.round(fz - 0.5 - sz), FROND);
       }
     }
   }
@@ -360,23 +367,51 @@ function pottedPalm(m, x, y, z) {
   }
   m.box(Math.floor(x) - 1, y + 3, Math.floor(z) - 1, 2, 2, 2, 0x5e7a2c);
 }
-// a domed clay silo (the granary's, the TC's): a bellied body with wooden ribs,
-// a dome and an open neck with a rim
-function silo(m, cx, cz, y, R, H, { ribs = 6, dome = 0.62 } = {}) {
-  const Hd = Math.round(R * dome);
-  const rib = (x, yy, z) => {
-    const a = Math.atan2(z + 0.5 - cz, x + 0.5 - cx);
-    const k = ((a / (Math.PI * 2)) * ribs + ribs + 0.25) % 1;
-    return k < 0.16 ? (hash3(x, yy, z, 52) < 0.5 ? 0x6e5236 : 0x7a5c3c) : null;
-  };
-  const body = (x, yy, z) => rib(x, yy, z) ?? (yy % 3 === 0 ? shade(CLAY(x, yy, z), 0.9) : CLAY(x, yy, z));
-  lathe(m, cx, cz, y, y + H, (yy) => R * (0.86 + 0.14 * Math.sin(Math.PI * (yy - y + 0.5) / H)), body);
-  // dome ring band then the cap
-  lathe(m, cx, cz, y + H, y + H + 1, () => R * 0.9 + 0.3, 0x8a6a48);
-  lathe(m, cx, cz, y + H + 1, y + H + 1 + Hd, (yy) => { const t = (yy - y - H - 0.5) / Hd; return R * 0.9 * Math.sqrt(Math.max(0, 1 - t * t)); },
-    (x, yy, z) => CLAY(x, yy, z), { hollow: 0 });
-  const nr = Math.max(1.6, R * 0.32);
-  lathe(m, cx, cz, y + H + Hd, y + H + Hd + 2, () => nr + 0.6, (x, yy, z) => shade(CLAY(x, yy, z), 1.04), { hollow: 1, inner: DARK });
+// a smooth frustum round (cx, cz) from (y0, r0) to (y1, r1) (shapes.js polys):
+// `color(segment, band)`
+function frustum(m, cx, cz, y0, y1, r0, r1, color, { segs = 24, bands = 1 } = {}) {
+  for (let k = 0; k < bands; k++) {
+    const ya = y0 + (y1 - y0) * k / bands, yb = y0 + (y1 - y0) * (k + 1) / bands;
+    const ra = r0 + (r1 - r0) * k / bands, rb = r0 + (r1 - r0) * (k + 1) / bands;
+    for (let s = 0; s < segs; s++) {
+      const b0 = (s / segs) * Math.PI * 2, b1 = ((s + 1) / segs) * Math.PI * 2;
+      const p = (b, y, r) => [cx + Math.cos(b) * r, y, cz + Math.sin(b) * r];
+      const sl = (r0 - r1) / (y1 - y0);
+      const n = (b) => { const v = [Math.cos(b), sl, Math.sin(b)]; const l = Math.hypot(...v); return v.map((q) => q / l); };
+      poly(m, [p(b0, ya, ra), p(b1, ya, ra), p(b1, yb, rb), p(b0, yb, rb)], color(s, k), { normals: [n(b0), n(b1), n(b1), n(b0)], shade: [0.94, 0.94, 1, 1] });
+    }
+  }
+}
+// a domed clay silo (the granary's, the TC's): a smooth bellied body of lime-
+// washed clay with dark wooden ribs, a dome with a rim band and a small capped
+// neck. A voxel core inside keeps it solid for the AO, the construction cut
+// and the stages (which show the core rising).
+const SILO_T = [0xe2c896, 0xdcc08c, 0xe8d0a0];
+const SILO_RIB = 0x8a6844;
+function silo(m, cx, cz, y, R, H, { ribs = 8, dome = 0.7 } = {}) {
+  lathe(m, cx, cz, y, y + H, () => R * 0.8, CLAY);
+  const segs = ribs * 4;
+  const col = (s, k) => (s % 4 === 0 ? SILO_RIB : SILO_T[(k + (s >> 2)) % SILO_T.length]);
+  const prof = [0.86, 0.95, 1.0, 1.0, 0.97, 0.92];
+  for (let i = 0; i + 1 < prof.length; i++) {
+    frustum(m, cx, cz, y + (H * i) / (prof.length - 1), y + (H * (i + 1)) / (prof.length - 1), R * prof[i], R * prof[i + 1], (s) => col(s, i), { segs });
+  }
+  // the band at the dome's foot
+  frustum(m, cx, cz, y + H, y + H + 0.7, R * 0.95, R * 0.95, () => SILO_RIB, { segs });
+  // the dome: rings of quads up to the neck
+  const Rd = R * 0.93, Hd = R * dome;
+  const rings = 6, neck = Math.max(1.2, R * 0.26);
+  for (let i = 0; i < rings; i++) {
+    const a0 = (i / rings) * Math.PI / 2, a1 = ((i + 1) / rings) * Math.PI / 2;
+    const r0 = Math.max(neck, Math.cos(a0) * Rd), r1 = Math.max(neck, Math.cos(a1) * Rd);
+    const y0 = y + H + 0.7 + Math.sin(a0) * Hd, y1 = y + H + 0.7 + Math.sin(a1) * Hd;
+    if (r0 <= neck + 1e-6) break;
+    frustum(m, cx, cz, y0, y1, r0, r1, (s) => (s % 4 === 0 ? SILO_RIB : SILO_T[(i + 1 + (s >> 2)) % SILO_T.length]), { segs });
+  }
+  const ny = y + H + 0.7 + Hd;
+  frustum(m, cx, cz, ny - 0.3, ny + 0.9, neck + 0.5, neck + 0.4, () => 0xcfb084, { segs: 16 });
+  S.cylinder(m, cx, ny + 0.9, cz, neck + 0.6, 0.5, 0x9a7a52, { segs: 16, cap: true });
+  lathe(m, cx, cz, y + H, Math.floor(ny), (yy) => Math.max(0, Rd * 0.85 * Math.sqrt(Math.max(0, 1 - ((yy - y - H) / Hd) ** 2)) - 0.6), CLAY);
 }
 // a log: a cylinder of bark along x or z, end grain at both ends
 function log(m, x0, y, z0, len, along = 'z', r = 1) {
@@ -1327,25 +1362,55 @@ function wonder() {
   // the plinth: two steps
   block(m, 8, 4, 58, 44, 1, 8, { wall: LIME, frieze: 0, roofC: LIME, rim: false, parapet: false });
   block(m, 12, 6, 54, 40, 9, 4, { wall: LIME, frieze: 0, roofC: LIME, rim: false, parapet: false, band: false });
-  // the sphinx: lion body lying toward +z, the head in a nemes
+  // the sphinx: a lion lying toward +z on the plinth, the head in a striped nemes
   const sy = 14;
   const SPH = (x, y, z) => pick(hash3(x, y >> 1, z, 81), [0xe8dcc0, 0xdfd1b2, 0xece2ca, 0xd6c6a4]);
-  for (let x = 20; x < 46; x++) for (let z = 8; z < 38; z++) for (let y = sy; y < sy + 14; y++) {
-    const dx = (x + 0.5 - 33) / 11, dz = (z + 0.5 - 20) / 13, dy = (y + 0.5 - sy) / 13;
-    if (dx * dx + dz * dz * 0.9 + (dy * dy) * 1.2 < 1 && y >= sy) m.set(x, y, z, SPH(x, y, z));
+  const SPH_D = (x, y, z) => shade(SPH(x, y, z), 0.86);
+  const X0 = 33;
+  for (let z = 8; z < 32; z++) {
+    const t = (z - 8) / 24;
+    const wx = 7.5 - 1.2 * Math.sin(t * Math.PI);            // the waist narrows
+    const hy = 7 + 4 * t;                                     // rising to the shoulders
+    for (let x = X0 - 9; x < X0 + 9; x++) for (let y = sy; y < sy + 12; y++) {
+      const dx = (x + 0.5 - X0) / wx, dy = (y + 0.5 - sy) / hy;
+      if (dx * dx + dy * dy <= 1) m.set(x, y, z, SPH(x, y, z));
+    }
   }
-  // the front legs/paws stretched forward
-  for (const px of [23, 37]) for (let z = 26; z < 41; z++) for (let y = sy; y < sy + 4; y++) for (let x = px; x < px + 6; x++) m.set(x, y, z, SPH(x, y, z));
-  // the chest and head
-  for (let x = 27; x < 39; x++) for (let z = 28; z < 34; z++) for (let y = sy; y < sy + 20; y++) m.set(x, y, z, SPH(x, y, z));
-  for (let x = 26; x < 40; x++) for (let z = 26; z < 36; z++) for (let y = sy + 20; y < sy + 30; y++) {
-    const nem = (x < 28 || x > 37 || z < 29);
-    if (nem && y > sy + 27 && (x < 27 || x > 38)) continue;
-    m.set(x, y, z, nem ? ((y & 1) ? 0xd8c8a6 : 0xc8b690) : SPH(x, y, z));
+  // haunches (folded hind legs) and the tail curled along the right flank
+  for (const sx of [-1, 1]) for (let z = 9; z < 22; z++) for (let y = sy; y < sy + 6; y++) for (let k = 0; k < 3; k++) {
+    const x = X0 + sx * (7 + k);
+    const dz = (z - 15) / 7, dy = (y - sy) / 6;
+    if (dz * dz + dy * dy <= 1) m.set(sx > 0 ? x - 1 : x, y, z, SPH_D(x, y, z));
   }
-  for (let x = 30; x < 36; x++) for (let y = sy + 21; y < sy + 27; y++) m.set(x, y, 36, SPH(x, y, 36));
-  m.box(32, sy + 23, 37, 2, 2, 1, SPH); m.box(31, sy + 26, 36, 1, 1, 1, INK); m.box(34, sy + 26, 36, 1, 1, 1, INK);
-  m.box(32, sy + 28, 36, 2, 2, 1, GILT);
+  for (let z = 10; z < 24; z++) m.set(X0 + 9, sy + 1, z, SPH_D(X0 + 9, sy, z));
+  // the forelegs stretched forward with paws
+  for (const x0 of [X0 - 8, X0 + 3]) for (let z = 26; z < 45; z++) for (let y = sy; y < sy + 4; y++) for (let x = x0; x < x0 + 5; x++) {
+    if (y === sy + 3 && (x === x0 || x === x0 + 4)) continue;
+    m.set(x, y, z, z >= 42 && (x - x0) % 2 === 1 && y < sy + 2 ? SPH_D(x, y, z) : SPH(x, y, z));
+  }
+  // the chest
+  for (let x = X0 - 6; x < X0 + 6; x++) for (let z = 28; z < 35; z++) for (let y = sy; y < sy + 17; y++) {
+    if (z === 34 && y < sy + 4) continue;
+    m.set(x, y, z, SPH(x, y, z));
+  }
+  // the nemes: a trapezoid of stripes over the shoulders, lappets down the chest
+  for (let y = sy + 12; y < sy + 27; y++) {
+    const r = y - sy - 12;
+    const half = r < 6 ? 8 : Math.max(4, 8 - (r - 6) * 0.45);
+    for (let x = Math.round(X0 - half); x < Math.round(X0 + half); x++) for (let z = 27; z < 35; z++) {
+      const inner = x >= X0 - 4 && x < X0 + 4 && z >= 33;
+      if (inner && y < sy + 25) continue;              // the face is cut in below
+      m.set(x, y, z, (y & 1) ? 0xd8c69e : 0xbfa57a);
+    }
+  }
+  for (const lx of [X0 - 6, X0 + 4]) for (let y = sy + 8; y < sy + 18; y++) for (let x = lx; x < lx + 2; x++) m.set(x, y, 35, (y & 1) ? 0xd8c69e : 0xbfa57a);
+  // the face, the uraeus, the beard
+  for (let x = X0 - 4; x < X0 + 4; x++) for (let y = sy + 15; y < sy + 25; y++) m.set(x, y, 35, SPH(x, y, 35));
+  for (let x = X0 - 3; x < X0 + 3; x++) for (let y = sy + 16; y < sy + 25; y++) m.set(x, y, 36, SPH(x, y, 36));
+  m.set(X0 - 3, sy + 21, 37, INK); m.set(X0 + 2, sy + 21, 37, INK);
+  m.box(X0 - 1, sy + 18, 37, 2, 3, 1, SPH); m.box(X0 - 1, sy + 16, 37, 2, 1, 1, 0xb08a64);
+  m.box(X0 - 1, sy + 11, 36, 2, 5, 1, SPH_D);
+  m.box(X0 - 1, sy + 25, 36, 2, 2, 1, GILT);
   // a gilded shrine with a pharaoh figure between the paws
   plinth(m, 30, 36, 36, 42, sy, 4, { face: GILT_D, frame: GILT, team: true });
   figure(m, 33, sy + 5, 39, { h: 9, skin: GILT, gold: GILT_L, kilt: GILT, kiltFront: TEAM, arms: 'crossed', pose: 'stand', crown: 'nemes' });

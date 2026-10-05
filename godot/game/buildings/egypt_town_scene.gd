@@ -97,6 +97,8 @@ static func scene_setup(game: Node) -> Dictionary:
 		statics.append(e)
 	for k in PALMS.size():
 		var p: Array = PALMS[k]
+		if focus_size > 0.0 and Vector2(cx + p[0] + 0.5, cz + p[1] + 0.5).distance_to(focus) < focus_size * 0.5 + 4.0:
+			continue   # keep the framed building clear
 		statics.append({"type": "palm", "owner": 1, "x": cx + p[0] + 0.5, "z": cz + p[1] + 0.5, "variant": k % 3, "yaw": float(k) * 1.3})
 	view.set_static(statics)
 	ctx["focus"] = focus

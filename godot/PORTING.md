@@ -30,7 +30,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | core (foundation; skirmish builder: camera, fog pass, playtest) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck, `fog_view.gd` + `fog_of_war.gdshader` (fog-of-war shading, one full-screen pass), `playtest.gd` (scripted skirmish playthrough), `menu_playtest.gd` (the screen flow through real input: menu -> setup -> loading -> match -> Esc menu -> menu, see "Screen flow"), `match_rules.gd` + `match_check.gd` (match settings -> the sim, see "Match rules")) | `core/` (constants, rng, jsmath, bounds, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `match/` (the match setup: seats, teams, difficulty, stockpiles), `fortify/` (walls, gates, towers, their stages: Godot-only, see "Walls, gates, towers"), `techs/` (research queues, the Armory / Market / Temple techs, market trade, tribute: Godot-only, see "Research, Armory, Market, Temple techs"), `sim.{h,cpp}` | `src/core/` |
 | terrain | `game/terrain/terrain.gd` + `terrain.gdshader` (chunks, paving cobbles / pale stone of MaterialPatches patchGround), `water.gdshader` (Water.js), `props.gdshader` (voxel.gdshader + MultiMesh instance tint, used by trees / gold / berries / ground details); mesher in `native/src/terrain_mesher.cpp` (TerrainMesh.js full port, water depth bake, GroundDetails.js scatter) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (sun + PCSS soft shadows, hemisphere = ambient colour + two unshadowed up/down lights, fill, depth haze following the camera, SSAO, MSAA, `--quality=high\|medium\|low`, `--post=high\|low\|off`), `grade_effect.gd` (CompositorEffect compute pass on the HDR buffer: exposure 2.1 + PBR Neutral + the PostFX.js grade; Godot's tonemap is LINEAR; Compatibility/web falls back to AgX), `sky.gdshader`. MaterialPatches.js canopy / foliage terms not ported yet | none | `src/lighting/` |
-| buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `walls.gd` (Greek walls, pillars and gates with swinging leaves, construction and damage states; models by `../scripts/export-walls.mjs`, see "Walls and gates: the look"), `towers.gd` + `tower_scene.gd` (Greek towers, a model per upgrade stage, construction / damage / upgrade states, the `towers` capture scene; models by `../scripts/export-towers.mjs`, see "Towers: the look"), `tech_buildings.gd` + `techbuildings_scene.gd` (the Greek Armory and Market, a model per age look plus construction stages, the `techbuildings` capture scene; models by `../scripts/export-techbuildings.mjs`, see "Armory and Market: the look"), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
+| buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `walls.gd` (Greek walls, pillars and gates with swinging leaves, construction and damage states; models by `../scripts/export-walls.mjs`, see "Walls and gates: the look"), `towers.gd` + `tower_scene.gd` (Greek towers, a model per upgrade stage, construction / damage / upgrade states, the `towers` capture scene; models by `../scripts/export-towers.mjs`, see "Towers: the look"), `tech_buildings.gd` + `techbuildings_scene.gd` (the Greek Armory and Market, a model per age look plus construction stages, the `techbuildings` capture scene; models by `../scripts/export-techbuildings.mjs`, see "Armory and Market: the look"), `egypt_buildings.gd` + `egypt_town_scene.gd` (every Egyptian building, construction stages, the `egypt_town` capture scene; models by `../scripts/export-egypt.mjs`, see "Egyptian buildings: the look"), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
 | units | `game/units/units.gd` (rigs posed by the full anim.js port, conditional parts, crowd yaw / press / jitter, deaths and corpses, contact shadows), `unit.gdshader` (team lift + rim, hit flash, corpse drain, dithered fade) + `unit_outline.gdshader` (inverted hull, next pass); posing in C++: `native/src/unit_view.cpp` (`AovUnitView`) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
 | combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), `tower_fire.gd` + `tower_flash / tower_puff.gdshader` (tower arrows: loose flash, heavier arrow, tracer, strike; see "Towers: the look"), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported, plus god powers and a wave log, Godot-only; enemy_ai_fort.cpp: the AI's walls, towers and breaches, Godot-only) | `src/combat/` |
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor; Godot-only activity fx: axe / pick chips and dust, sickle chaff, stooks on cut rows, hoof dust, shoal ripples, fish splashes, net ripples, boat wakes; crops sway, `econ_voxel.gdshader`, `fx_chip / fx_puff / fx_ring.gdshader`), buffers built in C++ by `AovEconView` (`native/src/econ_view.{h,cpp}`, render side, reads the sim, never writes it) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
@@ -189,7 +189,8 @@ godot --path godot -- --scene=town [--seed=N] [--mapsize=N] [--units=N] [--playe
   see "Walls and gates: the look"), `aifort` (two AIs play a match in the
   setup: their own walls, gates, towers and breaches, see "Enemy AI:
   fortifications"), `techbuildings` (the Greek Armory and Market, see
-  "Armory and Market: the look"), `techui` (a selected Armory's tech
+  "Armory and Market: the look"), `egypt_town` (every Egyptian building in a town, see
+  "Egyptian buildings: the look"), `techui` (a selected Armory's tech
   buttons, research queue and a tooltip, see "Research panel, tooltips,
   market trade") and `menu` (the main menu,
   below). **Without `--scene`** the game opens the main menu; a run with
@@ -898,6 +899,101 @@ node scripts/godot-shoot.mjs --scene techbuildings --out shots/godot/techbuildin
      [--params "techb_states=1&cam=40,112,30,42,15"]   # a row: a1 a2 a3 of each, s0, s3, s5
      [--params "techb_static=1"]       # render-only even when the sim has the types
 node scripts/export-techbuildings.mjs   # re-export godot/assets/models/techbuildings.*
+```
+
+## Egyptian buildings: the look (game/buildings/egypt_buildings.gd)
+
+Every Egyptian building of Age of Mythology: Retold (`reference/egypt/
+building_01..23`, EGYPT.md section 2) in this game's voxel style, drawn by
+`game/buildings/egypt_buildings.gd` (a child of the buildings piece). Models:
+the Godot-only groups `egypt` (finished looks) and `egypt_stages`
+(construction), both written by `node scripts/export-egypt.mjs` (~20 s,
+deterministic; re-run it after changing the script, never hand-edit
+`assets/models/egypt*`): 1/8-tile voxels (the walls', towers' and tech
+buildings' resolution, the same mesher, jitter, weathering and team voxels),
+a few smooth parts (the silos), pivoted at the footprint centre, the front to
++z. The palette: warm sandstone ashlar, pale limestone cornices and copings,
+whitewashed plaster roofs, mud brick and palm thatch (Archaic houses),
+painted friezes (blue / red / ochre), gilt, dark basalt.
+
+- **The Egyptian block** (`block()`): a flat roof of plaster inside a pale
+  parapet with the **team line** inset on the rim (Retold's blue roof rim),
+  a projecting cornice, a **team band** under it, a painted frieze, pale
+  corner torus mouldings, a darker socle, optionally battered walls (pylons,
+  the Migdol, the camps). Doors are recessed in limestone frames with a
+  projecting lintel, some with a **gilt winged sun** above; slit windows.
+- **Types** (the sim's keys, `sim/civ`; footprints as `buildings/defs.h`):
+  `town_center` 7x7 (a walled compound: a two-storey hall with a latticed
+  door, an east block, a front room, a battered pylon gateway with painted
+  reliefs and a winged sun, a big and a small **domed silo**, awnings, a
+  fire bowl, a basin, a palm, the gilt **falcon-headed Ra** with his sun
+  disc on a plinth at the front left), `house` 3x3 (three plans: boxes with
+  an upper room, striped awnings on poles, crates, jars, a walled yard with
+  a palm; Archaic look `a1` mud brick + thatch, `a2` whitewashed with
+  friezes), `granary` 3x3 (a hut with a roof hatch and a ladder, two ribbed
+  domed silos, a grain bin, sacks), `lumber_camp` / `mining_camp` 3x3
+  (battered blocks, striped awnings over a log pile / gold ore bins and a
+  trough), `farm` 4x4 (a mud border, an irrigation channel and a shaduf; the
+  crops are the economy piece's), `temple` 5x6 (a two-tier platform with a
+  ramp, a kiosk of painted papyrus columns with screen walls, a naos and
+  white drapes, the **major god's statue**: variants `ra` falcon with the
+  disc, `isis` winged with horns and disc, `set` the Set animal), `eg_barracks`
+  5x5 (thick battered ranges round a drill yard, a raised gatehouse with a
+  latticed door, team banners on poles, a rack of spears and shields),
+  `migdol` 7x7 (a tall battered limestone keep with a tiled roof, four taller
+  corner turrets whose team rim runs only along their two outer sides, slit
+  windows in threes, a projecting gate front with a deep gate and a gilt
+  winged scarab, latticed windows, a cart wheel), `siege_works` 7x7 (two
+  tall workshop towers, a colonnade with green-footed columns under a long
+  multicolour awning, wheels, barrels, a catapult arm, a siege-tower frame),
+  `armory` / `market` 4x4 (Retold's Egyptian ones: a forge under a dark
+  striped awning with a stepped chimney furnace, a trough and a gilt ankh /
+  a hall with three stalls of **team / white striped awnings** over produce),
+  `obelisk` 1x1 (a gilt-panelled spire, four prongs holding a glowing teal
+  flame), the five **Monuments** (`monument_villagers` kneeling with bowls,
+  `monument_soldiers` mummiform with crook and flail, `monument_priests`
+  striding in a nemes, `monument_pharaohs` a king and queen, all dark basalt
+  and gold on gilt plinths with team panels; `monument_gods` 4x4 with
+  variants `ra` / `isis` / `set`, Eye of Horus panels and glowing sun bowls).
+  Render-only (no sim type yet): `lighthouse` 3x3 (the Pharos: a battered
+  tower, an octagonal storey, a columned lantern with a fire), `wonder` 8x8
+  (a sphinx on a stepped plinth behind a pylon gate with gold reliefs and
+  hieroglyph columns, obelisks, column drums), `sentry_tower`, `palm`
+  (3 variants, scene dressing).
+- **Keys**: `<type>/<variant>/a<age>` finished (the highest listed age look
+  <= the owner's age), `<type>/s<k>` in `egypt_stages` (k = floor(progress
+  * 8) rounded down to 0, 2, 4, 6: 0 = the staked lot with team pennants and
+  mud bricks, then the work rising in a palm-wood scaffold with a mud-brick
+  ramp; smooth parts appear when finished). The manifest's `types` lists
+  each type's footprint, variants and ages; `stage_keys` the stages.
+- **Who draws what**: `buildings.gd` asks `egypt.owns(type, civ, owner)` per
+  row of `get_buildings()` (its `civ` column: 1 = Egyptian) and skips those
+  rows (and their Greek town props); `tech_buildings.gd` skips an Egyptian
+  owner's Armory / Market the same way; the Egyptian-only keys are always
+  drawn here. Variants: houses by the sim's variant (% 3) and yaw, temple and
+  Monument to the Gods by the owner's `god`. A sim footprint that differs from
+  the model's is fitted with a uniform scale. Walls, gates and towers of an
+  Egyptian player are still drawn Greek by walls.gd / towers.gd.
+- API: `EgyptBuildings.model_key(type, variant, built, progress, age, god)`,
+  `mesh_for(type, age, god, variant)` (portraits, placement ghosts),
+  `force_owner[owner] = true` (draw that owner's buildings Egyptian),
+  `model_override[id]`, `set_static(entries)` (render-only:
+  `{type, owner, x, z, key | variant, age, god, built, progress, yaw, scale}`).
+
+Capture scene `egypt_town` (`game/buildings/egypt_town_scene.gd`): a whole
+Egyptian town on the flat start of a battle map (worn earth with a paved
+core, painted with `AovSim.paint_ground`; sand reads as beach on low ground),
+palms, every building: player 1 is made Egyptian and the sim's types are
+spawned, the rest (lighthouse, wonder, palms) drawn render-only.
+
+```
+node scripts/godot-shoot.mjs --scene egypt_town --out shots/godot/egypt_town.png    # the whole town
+     [--params "egt_focus=migdol"]     # frame one building (any type above), palms cleared round it
+     [--params "egt_god=isis"]         # ra | isis | set (temple statue, Monument to the Gods)
+     [--params "egt_age=1"]            # the owner's age (1: Archaic houses)
+     [--params "egt_states=1"]         # a row of construction stages and variants
+     [--params "egt_static=1"]         # render-only even where the sim has the types
+node scripts/export-egypt.mjs          # re-export godot/assets/models/egypt*.{json,bin.gz}
 ```
 
 ## Walls, gates, towers: placement (game/ui)
@@ -1765,7 +1861,7 @@ Entities: `unit_type_names()` (type index -> key), `get_unit_def(key)`,
 unknown type; see "Map bounds"), `spawn_block(type, owner,
 count, x, z, cols=0, spacing=1, rot=0, jitter=0.15)` -> ids (helpers.js
 spawnBlock; units that could not be placed are left out), `spawn_resource(type, tx, tz, variant=0)` (0 off the map), `remove_resource(id)`,
-`clear_rect(tx, tz, w, h)`, `kill_unit(id, killer=0)` (combat.kill: dead,
+`clear_rect(tx, tz, w, h)`, `paint_ground(tx, tz, w, h, ground)` (Godot-only scene tool: `GameMap::paint_tiles`, render only; 1 dirt, 2 sand, 4 paved), `kill_unit(id, killer=0)` (combat.kill: dead,
 idle, corpse hold, `entity:died`), `entity_kind(id)` (0
 none, 1 unit, 2 building, 3 resource), `get_unit_count()`, `get_unit(id)`
 (one unit as a Dictionary incl. its remaining path: UI / debugging only),
