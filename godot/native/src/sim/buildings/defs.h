@@ -103,11 +103,11 @@ inline const BuildingDef *building_defs() {
 		// says: hp x1.25, footprint ~x1.2-1.5 (the Greek counterpart's where there
 		// is one: drop sites = Storehouse, Barracks = Academy), LOS x0.6, Retold's
 		// base build time, which the Laborer's 0.75 work rate turns into Retold's x4/3)
-		{ "granary", "Granary", 3, 3, 500, Cost(), 15, 0, 6, 1 << RES_FOOD, { -1 }, false, false, false, false,
+		{ "granary", "Granary", 3, 3, 500, Cost(), 15, 0, 5.4, 1 << RES_FOOD, { -1 }, false, false, false, false,
 			false, 0, 0, 0, "D", 0, 1 },
-		{ "lumber_camp", "Lumber Camp", 3, 3, 500, Cost(), 15, 0, 6, 1 << RES_WOOD, { -1 }, false, false, false, false,
+		{ "lumber_camp", "Lumber Camp", 3, 3, 500, Cost(), 15, 0, 5.4, 1 << RES_WOOD, { -1 }, false, false, false, false,
 			false, 0, 0, 0, "L", 0, 1 },
-		{ "mining_camp", "Mining Camp", 3, 3, 500, Cost(), 15, 0, 6, 1 << RES_GOLD, { -1 }, false, false, false, false,
+		{ "mining_camp", "Mining Camp", 3, 3, 500, Cost(), 15, 0, 5.4, 1 << RES_GOLD, { -1 }, false, false, false, false,
 			false, 0, 0, 0, "M", 0, 1 },
 		{ "monument_villagers", "Monument to Villagers", 2, 2, 562.5, Cost(50, 0, 50, 0), 20, 0, 5.4, 0, { -1 }, false, false, false, false,
 			false, 0, 0, 0, "O", 0, 1 },

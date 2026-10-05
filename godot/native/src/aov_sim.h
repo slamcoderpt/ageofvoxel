@@ -222,6 +222,11 @@ public:
 	Dictionary get_civ_state(int64_t owner) const;            // monuments, favor rate, empowered, Pharaoh, Laborers
 	Dictionary get_civ_fx() const;                            // heals [healer, target]*, empowers [unit, building, strength]*, mandjet [monument, building]*
 	Dictionary shield_check(int64_t caster, double x, double z) const; // {ok, reason, by}: Isis' Divine Shield at a god power's target
+	// Set's Animals of Set: the Pharaoh's summons, the Priests' conversions
+	Array get_summon_menu(int64_t pharaoh) const;             // [{type, name, cost, time, age, pop, ok, reason}] for Set's Pharaoh
+	Dictionary summon_animal(int64_t pharaoh, const String &type); // {ok, reason}: pays the favor, queues it on him
+	Array get_summons(int64_t owner) const;                   // [{pharaoh, type, t, total}] in queue order
+	void order_convert(const PackedInt32Array &ids, int64_t animal); // Set's Priests on a wild animal (resource id)
 
 	// --- events: [{type: "entity:added", id, kind, other, owner, a, x, z, amount}], cleared on read
 	Array take_events();

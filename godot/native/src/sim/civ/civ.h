@@ -36,8 +36,9 @@
 //   (Town Center / Temple / Academy ratio 3000 / 2400 = 1500 / 1200),
 //   footprint ~x1.2-1.5 (Monuments 2x2 / 3x3, Migdol 6x6, Siege Works 5x5),
 //   Retold armor (hack / pierce / crush); shared types keep
-//   the Greek building's hp, size and base time (Retold gives both civs the
-//   same) and take the Egyptian cost.
+//   the Greek building's hp and size (Retold gives both civs the same), take the
+//   Egyptian cost and Retold's base build time where this sim's Greek one differs
+//   (civ_build_time: Town Center, Farm, tower). Set's Animals of Set: below.
 //
 // Deterministic: no rng draw; iteration in row (= id) order.
 #pragma once
@@ -138,9 +139,49 @@ constexpr double EGYPT_START_RES[4] = { 200.0 / 300, 100.0 / 300, 50.0 / 200, 0 
 constexpr double FAVOR_CAP = 200;        // the Greek favor cap of this sim
 constexpr double SIEGE_CRUSH_ARMOR = 0.05; // a browser building's crush armor vs siege (Retold buildings: 5-10 %)
 
+// ---- Set's Animals of Set (EGYPT.md 1.5, 1.6, 3.2, 4 Set; the Retold wiki's Animal of Set
+// tables for the numbers EGYPT.md leaves out) ------------------------------------------------
+// - Set's Pharaoh summons them for favor (Civs::summon): one at a time per Pharaoh, a few
+//   seconds each, while he keeps doing whatever he does (no order: a queue of his own);
+//   which ones grows with the age (Archaic Baboon; Classical Gazelle, Hyena; Heroic
+//   Giraffe, Crocodile; Mythic Hippopotamus, Rhinoceros, Elephant).
+// - Each age-up gives 3 at the Temple (Classical 2 Gazelles + 1 Hyena, Heroic 2 Giraffes +
+//   1 Crocodile, Mythic 2 Hippos + 1 Rhino; none built: the home Town Center).
+// - Set's Priests convert a wild animal (O_CONVERT, range 10 x0.6): this sim's deer and boar
+//   become a Deer / Boar of Set after Retold's 35 / 50 s, keeping 75 % of their food.
+// - An Animal of Set that dies leaves a carcass with its food (Laborers butcher it); in the
+//   Archaic Age they hit at 10 % (Retold); x0.5 vs buildings (the Elephant x1.5); Laborers
+//   shoot them with their anti-animal bow (12 pierce, range 12 x0.6, ROF 2 x1.15).
+struct SetAnimal {
+	int age;              // summon age (-1: not summoned: converted only)
+	double food;          // the carcass it leaves
+	int wild;             // converted from (R_DEER / R_BOAR), -1 none
+};
+const SetAnimal *set_animal(int type); // nullptr: not an Animal of Set
+constexpr int SET_SUMMONS[] = { U_BABOON, U_GAZELLE_OF_SET, U_HYENA_OF_SET, U_GIRAFFE_OF_SET, U_CROCODILE_OF_SET,
+	U_HIPPO_OF_SET, U_RHINO_OF_SET, U_ELEPHANT_OF_SET, -1 };
+// the age-up gift at the Temple, per age reached (1 Classical .. 3 Mythic), -1 terminated
+const int *set_age_animals(int age);
+int converted_type(int wild_res_type);        // R_DEER -> U_DEER_OF_SET, R_BOAR -> U_BOAR_OF_SET, -1 none
+constexpr double CONVERT_RANGE = 10 * 0.6;    // Retold 10 x DIST_SCALE
+constexpr double CONVERT_FOOD = 0.75;         // a converted animal keeps 75 % of its food
+constexpr double SET_ANIMAL_ARCHAIC = 0.1;    // Archaic: -90 % attack
+constexpr int SUMMON_QUEUE = 5;               // per Pharaoh
+constexpr double LABORER_BOW_DAMAGE = 12;     // Laborers vs animals: 12 pierce,
+constexpr double LABORER_BOW_RANGE = 12 * 0.6; //   range 12,
+constexpr double LABORER_BOW_RELOAD = 2 * 1.15; //   ROF 2
+// Egyptian costs of the fortification stages where Retold gives them their own (fortify.h FT_*)
+Cost civ_fort_tech_cost(int civ, int tech);
+// Egyptian base build times of the shared types where Retold differs from this sim's Greek
+// one (Town Center 150, Farm 10, Sentry Tower 60); 0 = the def's
+double civ_build_time(int civ, int btype);
+
+struct Summon { int owner; int32_t pharaoh; uint8_t type; double t, total; Cost paid; };
+
 struct CivStart { int32_t tc = 0, pharaoh = 0, priest = 0, baboon = 0; std::vector<int32_t> workers; };
 struct SceneCtx;
 SceneCtx egypt_scene_setup(Sim &sim); // the "egypt" scene (egypt_scene.cpp; scenes::setup dispatches)
+SceneCtx egypt_set_scene_setup(Sim &sim); // the "egypt_set" scene: Set's Animals of Set
 
 // ---- the system ------------------------------------------------------------------------
 class Civs {
@@ -155,6 +196,11 @@ public:
 	double isis_healed[MAX_PLAYERS] = {}; // hp Isis' empowered Monuments healed this game (checks, readout)
 	double devotee_saved[MAX_PLAYERS] = {}; // resources Set's Devotees saved this game
 	int shield_refused[MAX_PLAYERS] = {}; // enemy god powers Isis' shields refused (per shield owner)
+	int summoned[MAX_PLAYERS] = {};       // Animals of Set summoned by the Pharaoh this game
+	int converted[MAX_PLAYERS] = {};      // wild animals Set's Priests converted
+	int age_gift[MAX_PLAYERS] = {};       // Animals of Set the age-ups gave
+	double carcass_food[MAX_PLAYERS] = {}; // food the dead Animals of Set left
+	std::vector<Summon> summons;          // queued summons, in order (the head of each Pharaoh's runs)
 	// per building row, rebuilt each tick: the Monument (id) whose Mandjet empowers it (0 = none)
 	std::vector<int32_t> mandjet_by;
 
@@ -207,8 +253,19 @@ public:
 	double empower_favor(int owner) const;         // +20 % (Isis +100 %) per unit of empowerment
 	double empower_strength(int urow) const;
 
+	// Set's Animals of Set
+	bool can_summon(int owner, int type, std::string *why = nullptr) const; // age, god, favor, pop
+	bool summon(int urow, int type, std::string *why = nullptr);  // Set's Pharaoh: queue a summon (pays)
+	int summon_pop(int owner) const;              // pop of the queued summons (Economy::recount)
+	bool can_convert(int urow) const;             // a Priest of Set
+	bool laborer_bow(int urow, int32_t target) const; // a Laborer shooting an Animal of Set
+	// the age changed outside an age-up (AovSim.set_player_age): the per-age steps
+	void age_set(int owner, int from, int to);
+	std::vector<int32_t> age_gift_spawn(int owner, int age); // the 3 animals at the Temple
+
 private:
 	void on_age(int owner);
+	void update_set(double dt);                   // summons, conversions
 	void hero_age_stats(int urow, int from_age, int to_age);
 	void auras(double dt);                         // Mandjet, Isis' Monument healing
 };

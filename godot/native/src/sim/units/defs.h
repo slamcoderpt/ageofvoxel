@@ -11,12 +11,17 @@ namespace aov {
 // CLS_SIEGE and the types from U_LABORER on are Godot-only (sim/civ: the
 // Egyptians of Age of Mythology: Retold, only with Sim::godot_rules; see
 // civ/civ.h for how Retold's numbers map onto these stats).
-enum UnitClass : uint8_t { CLS_VILLAGER, CLS_INFANTRY, CLS_ARCHER, CLS_CAVALRY, CLS_MYTH, CLS_HERO, CLS_SIEGE, CLS_COUNT };
+// CLS_ANIMAL: Set's Animals of Set (summoned, age-up, converted wild animals).
+enum UnitClass : uint8_t { CLS_VILLAGER, CLS_INFANTRY, CLS_ARCHER, CLS_CAVALRY, CLS_MYTH, CLS_HERO, CLS_SIEGE, CLS_ANIMAL, CLS_COUNT };
 enum UnitType : uint8_t { U_VILLAGER, U_HOPLITE, U_TOXOTES, U_HIPPIKON, U_MINOTAUR, U_HERO, U_CYCLOPS, U_CENTAUR, U_MEDUSA,
 	// Egyptian (Godot-only, sim/civ)
 	U_LABORER, U_SPEARMAN, U_AXEMAN, U_SLINGER, U_CHARIOT_ARCHER, U_CAMEL_RIDER, U_WAR_ELEPHANT, U_SIEGE_TOWER, U_CATAPULT,
 	U_MERCENARY, U_MERCENARY_CAVALRY, U_PRIEST, U_PHARAOH, U_BABOON,
+	// Set's Animals of Set (sim/civ): the Pharaoh's summons / age-up gifts, then the converted wild animals
+	U_GAZELLE_OF_SET, U_HYENA_OF_SET, U_GIRAFFE_OF_SET, U_CROCODILE_OF_SET, U_HIPPO_OF_SET, U_RHINO_OF_SET, U_ELEPHANT_OF_SET,
+	U_DEER_OF_SET, U_BOAR_OF_SET,
 	U_TYPE_COUNT };
+inline bool is_set_animal(int t) { return t >= U_BABOON && t <= U_BOAR_OF_SET; }
 constexpr int U_GREEK_COUNT = U_LABORER; // the browser's types (Greek); the rest are Egyptian
 inline bool is_egypt_unit(int t) { return t >= U_LABORER && t < U_TYPE_COUNT; }
 
@@ -70,7 +75,7 @@ inline const UnitDef *unit_defs() {
 		// armor here is the hack armor; the pierce armor is in civ.h (egypt_unit)
 		// bonus: villager, infantry, archer, cavalry, myth, hero, siege
 		{ "laborer", "Laborer", CLS_VILLAGER, 55, 2.565, 0.32, 8.4, 1, Cost(50, 0, 0, 0), 11.33, "Q", true, true, false, false, 0,
-			true, { 6, 0.5, 1.5, 0, false }, 0, { 0 }, { 0.675, 0.54, 0.495 }, 10 },
+			true, { 6, 0.5, 1.5, 0, false }, 0.1875, { 0 }, { 0.675, 0.54, 0.495 }, 10 },
 		{ "spearman", "Spearman", CLS_INFANTRY, 85, 3.25, 0.42, 9.6, 2, Cost(50, 0, 25, 0), 12.5, "Q", false, false, false, false, 1,
 			true, { 6, 0.6, 1.15, 0, false }, 0.30, { 0, 0, 0, 2.0, 0, 0, 0 }, { 0 }, 0 },
 		{ "axeman", "Axeman", CLS_INFANTRY, 85, 2.795, 0.42, 9.6, 2, Cost(40, 0, 30, 0), 11.5, "W", false, false, false, false, 1,
@@ -95,9 +100,30 @@ inline const UnitDef *unit_defs() {
 			true, { 0.5, 3.0, 0.92, 0, true }, 0.075, { 0, 0, 0, 0, 5.0, 0, 0 }, { 0 }, 0 },
 		{ "pharaoh", "Pharaoh", CLS_HERO, 100, 2.6, 0.4, 10.8, 0, Cost(), 0, "", false, false, false, true, 0,
 			true, { 3, 1.8, 1.15, 0, true }, 0.1125, { 0, 0, 0, 0, 2.5, 0, 0 }, { 0 }, 0 },
-		// Set's starting scout (an Animal of Set: this sim has no animal class, infantry)
-		{ "baboon_of_set", "Baboon of Set", CLS_INFANTRY, 20, 2.145, 0.3, 12, 1, Cost(0, 0, 0, 3), 0, "", false, false, false, false, 0,
-			true, { 3, 0.6, 1.15, 0, false }, 0, { 0 }, { 0 }, 0 },
+		// Animals of Set (Set only; Retold's numbers as the others: speed x0.65, LOS x0.6,
+		// reload x1.15, hack armor x0.75; train_time = the summon (converted: the conversion)
+		// time; food on death and the summon age in civ.h set_animal())
+		{ "baboon_of_set", "Baboon of Set", CLS_ANIMAL, 20, 2.145, 0.3, 9.6, 1, Cost(0, 0, 0, 3), 3, "", false, false, false, false, 0,
+			true, { 3, 0.6, 1.15, 0, false }, 0.2625, { 0 }, { 0 }, 0 },
+		{ "gazelle_of_set", "Gazelle of Set", CLS_ANIMAL, 15, 2.6, 0.4, 8.4, 1, Cost(0, 0, 0, 3), 3, "", false, false, false, false, 1,
+			true, { 3.5, 0.6, 1.265, 0, false }, 0.2625, { 0 }, { 0 }, 0 },
+		{ "hyena_of_set", "Hyena of Set", CLS_ANIMAL, 45, 2.6, 0.34, 8.4, 1, Cost(0, 0, 0, 4), 4, "", false, false, false, false, 1,
+			true, { 7, 0.6, 2.07, 0, false }, 0.15, { 0 }, { 0 }, 0 },
+		{ "giraffe_of_set", "Giraffe of Set", CLS_ANIMAL, 25, 2.6, 0.45, 8.4, 1, Cost(0, 0, 0, 5), 4, "", false, false, false, false, 2,
+			true, { 5, 0.6, 1.61, 0, false }, 0.2625, { 0 }, { 0 }, 0 },
+		{ "crocodile_of_set", "Crocodile of Set", CLS_ANIMAL, 70, 2.145, 0.45, 8.4, 1, Cost(0, 0, 0, 6), 4, "", false, false, false, false, 2,
+			true, { 9, 0.6, 1.495, 0, false }, 0.075, { 0 }, { 0 }, 0 },
+		{ "hippo_of_set", "Hippopotamus of Set", CLS_ANIMAL, 100, 2.6, 0.6, 8.4, 2, Cost(0, 0, 0, 7), 6, "", false, false, false, false, 3,
+			true, { 6, 0.6, 1.15, 0, false }, 0.075, { 0 }, { 0 }, 0 },
+		{ "rhino_of_set", "Rhinoceros of Set", CLS_ANIMAL, 135, 2.6, 0.7, 8.4, 2, Cost(0, 0, 0, 9), 6, "", false, false, false, false, 3,
+			true, { 8, 0.6, 1.265, 0, false }, 0.225, { 0 }, { 0 }, 0 },
+		{ "elephant_of_set", "Elephant of Set", CLS_ANIMAL, 270, 2.145, 0.95, 8.4, 2, Cost(0, 0, 0, 14), 8, "", false, false, false, false, 3,
+			true, { 10, 0.8, 1.61, 0, false }, 0.15, { 0 }, { 0 }, 0 },
+		// converted by Set's Priests (this sim's wild deer / boar; Retold's Deer / Boar of Set)
+		{ "deer_of_set", "Deer of Set", CLS_ANIMAL, 15, 2.6, 0.4, 8.4, 1, Cost(), 35, "", false, false, false, false, 0,
+			true, { 3, 0.6, 1.265, 0, false }, 0.2625, { 0 }, { 0 }, 0 },
+		{ "boar_of_set", "Boar of Set", CLS_ANIMAL, 70, 3.25, 0.5, 8.4, 2, Cost(), 50, "", false, false, false, false, 0,
+			true, { 6, 0.6, 1.15, 0, false }, 0.15, { 0 }, { 0 }, 0 },
 	};
 	// clang-format on
 	return D;

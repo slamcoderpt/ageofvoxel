@@ -564,7 +564,7 @@ void economy_after(Sim &sim, const SceneCtx &ctx) {
 
 bool has(const std::string &n) {
 	return n == "skirmish" || n == "town" || n == "coast" || n == "hud" || n == "economy" || n == "battle" || n == "godpower" ||
-			n == "stress" || n == "egypt"; // (egypt: Godot-only, sim/civ/egypt_scene.cpp)
+			n == "stress" || n == "egypt" || n == "egypt_set"; // (egypt, egypt_set: Godot-only, sim/civ/egypt_scene.cpp)
 }
 
 SceneCtx setup(Sim &sim, const std::string &name, const SceneOpts &opts) {
@@ -572,6 +572,7 @@ SceneCtx setup(Sim &sim, const std::string &name, const SceneOpts &opts) {
 	if (name == "godpower") return godpower_setup(sim);
 	if (name == "stress") return stress_setup(sim, opts.units, opts.fort);
 	if (name == "egypt") return egypt_scene_setup(sim);
+	if (name == "egypt_set") return egypt_set_scene_setup(sim);
 	SceneCtx ctx;
 	const auto &starts = sim.world.starts;
 	if (starts.size() < 2) return ctx;

@@ -731,7 +731,7 @@ void EnemyAI::upgrade(const std::vector<int> &buildings, bool saving) {
 		for (int b : buildings)
 			if (B.built[b] && !B.fort_tech[b] && (line == 1 ? B.type[b] == B_TOWER : is_wall_piece(B.type[b]))) { at = b; break; }
 		if (at < 0) continue;
-		const Cost &c = fort_tech_def(tech).cost;
+		const Cost c = civ_fort_tech_cost(S.civs.civ(owner), tech); // (sim/civ: the Egyptians' own prices)
 		if (p.res[RES_WOOD] < c.v[RES_WOOD] + UPGRADE_KEEP_WOOD || p.res[RES_GOLD] < c.v[RES_GOLD] + UPGRADE_KEEP_GOLD) {
 			// (Godot AI: the academies wait a while for it, more hands on
 			// gold; then it is bought whenever there is enough to spare)

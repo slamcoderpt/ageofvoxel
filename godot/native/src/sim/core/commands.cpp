@@ -137,6 +137,9 @@ void Commands::smart(const std::vector<int> &rows, double x, double z, int32_t t
 		if (owner < 0) owner = U.owner[r];
 		const UnitDef &d = unit_def(U.type[r]);
 		if (ts >= 0 && !tdead && target_id != U.id[r]) {
+			// (Godot-only, sim/civ: a Priest of Set converts a live wild animal)
+			if (tk == K_RESOURCE && sim->godot_rules && is_egypt_unit(U.type[r]) && sim->civs.can_convert(r) &&
+					is_animal_type(E.resources.type[ts]) && E.resources.alive[ts] && try_order(r, O_CONVERT)) continue;
 			if (tk == K_RESOURCE && d.gatherer && try_order(r, O_GATHER)) continue;
 			if (sim->is_enemy(U.owner[r], towner) && d.has_attack && try_order(r, O_ATTACK)) continue;
 			// (Godot-only, sim/civ: the Pharaoh / Ra's Priest empowers his own buildings but a Farm;

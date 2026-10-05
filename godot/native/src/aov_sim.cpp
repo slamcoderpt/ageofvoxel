@@ -464,7 +464,7 @@ Dictionary AovSim::get_unit_def(const String &type) const {
 	int t = aov::unit_type_of(type.utf8().get_data());
 	if (t < 0) return d;
 	const aov::UnitDef &u = aov::unit_def(t);
-	static const char *cls[] = { "villager", "infantry", "archer", "cavalry", "myth", "hero", "siege" };
+	static const char *cls[] = { "villager", "infantry", "archer", "cavalry", "myth", "hero", "siege", "animal" };
 	d["type"] = t;
 	d["key"] = u.key;
 	d["name"] = u.name;
@@ -1199,7 +1199,7 @@ Dictionary AovSim::get_fortify(int64_t owner) const {
 		e["level"] = td.level;
 		e["min_age"] = td.min_age;
 		e["time"] = td.time;
-		e["cost"] = cost_dict(td.cost);
+		e["cost"] = cost_dict(aov::civ_fort_tech_cost(sim_.civs.civ(o), t)); // (sim/civ: the Egyptians' own prices)
 		e["state"] = STATES[F.tech_state(o, t)];
 		techs.push_back(e);
 	}
@@ -1328,8 +1328,8 @@ Array AovSim::get_techs(int64_t building) const {
 			e["building"] = td.line ? "tower" : "wall";
 			e["age"] = td.min_age;
 			e["age_name"] = aov::AGES[td.min_age];
-			e["cost"] = cost_dict(td.cost);
-			e["base_cost"] = cost_dict(td.cost);
+			e["cost"] = cost_dict(aov::civ_fort_tech_cost(sim_.civs.civ(owner), t)); // (sim/civ: the Egyptians' own prices)
+			e["base_cost"] = cost_dict(aov::civ_fort_tech_cost(sim_.civs.civ(owner), t));
 			e["time"] = td.time;
 			e["requires"] = td.level > 1 ? String(aov::fort_tech_def(t - 1).key) : String();
 			e["generic"] = true;
@@ -1583,7 +1583,9 @@ void AovSim::set_player_resources(int64_t owner, const Dictionary &res) {
 
 void AovSim::set_player_age(int64_t owner, int64_t age) {
 	if (owner < 0 || owner >= aov::MAX_PLAYERS || !sim_.players[owner].exists) return;
+	const int from = sim_.players[owner].age;
 	sim_.players[owner].age = (int)std::max<int64_t>(0, std::min<int64_t>(3, age));
+	sim_.civs.age_set((int)owner, from, sim_.players[owner].age); // (Godot-only, sim/civ: hero ages, Set's age-up animals)
 }
 
 PackedInt32Array AovSim::spawn_herd(const String &type, double x, double z, int64_t n) {

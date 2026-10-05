@@ -17,6 +17,10 @@ void AovSim::_bind_civ_methods() {
 	ClassDB::bind_method(D_METHOD("get_civ_state", "owner"), &AovSim::get_civ_state);
 	ClassDB::bind_method(D_METHOD("get_civ_fx"), &AovSim::get_civ_fx);
 	ClassDB::bind_method(D_METHOD("shield_check", "caster", "x", "z"), &AovSim::shield_check);
+	ClassDB::bind_method(D_METHOD("get_summon_menu", "pharaoh"), &AovSim::get_summon_menu);
+	ClassDB::bind_method(D_METHOD("summon_animal", "pharaoh", "type"), &AovSim::summon_animal);
+	ClassDB::bind_method(D_METHOD("get_summons", "owner"), &AovSim::get_summons);
+	ClassDB::bind_method(D_METHOD("order_convert", "ids", "animal"), &AovSim::order_convert);
 }
 
 static Dictionary civ_cost_dict(const aov::Cost &c) {
@@ -60,6 +64,24 @@ void AovSim::civ_unit_def(int t, Dictionary &d) const {
 		d["by_age"] = a;
 	}
 	d["empowers"] = t == aov::U_PHARAOH ? 1.0 : t == aov::U_PRIEST ? aov::RA_PRIEST_EMPOWER : 0.0; // (the Priest: Ra's only)
+	if (const aov::SetAnimal *sa = aov::set_animal(t)) { // (Set's Animals of Set)
+		d["animal_of_set"] = true;
+		d["food"] = sa->food;
+		d["summon_age"] = sa->age; // -1: converted only
+		if (sa->wild >= 0) {
+			d["converted_from"] = aov::resource_def(sa->wild).key;
+			d["convert_time"] = aov::unit_def(t).train_time;
+		} else d["summon_time"] = aov::unit_def(t).train_time;
+		d["archaic_attack"] = aov::SET_ANIMAL_ARCHAIC;
+	}
+	if (t == aov::U_LABORER) {
+		Dictionary bow;
+		bow["damage"] = aov::LABORER_BOW_DAMAGE;
+		bow["range"] = aov::LABORER_BOW_RANGE;
+		bow["cooldown"] = aov::LABORER_BOW_RELOAD;
+		d["vs_animals"] = bow;
+	}
+	if (t == aov::U_PRIEST) d["convert_range"] = aov::CONVERT_RANGE; // (Set's)
 }
 
 void AovSim::civ_building_def(int t, int civ, Dictionary &d) const {
@@ -88,7 +110,9 @@ void AovSim::civ_building_def(int t, int civ, Dictionary &d) const {
 		for (const int *u = aov::civ_trains(c, t); *u >= 0; u++) tr.push_back(aov::unit_def(*u).key);
 		e["trains"] = tr;
 		// one builder's time: a Laborer works at 0.75 (the Obelisk: a Priest, 1)
-		e["build_time"] = aov::building_def(t).build_time / (c == aov::CIV_EGYPT && t != aov::B_OBELISK ? aov::LABORER_BUILD : 1.0);
+		const double bt = aov::civ_build_time(c, t) > 0 ? aov::civ_build_time(c, t) : aov::building_def(t).build_time; // (Retold's Egyptian base times)
+		e["base_build_time"] = bt;
+		e["build_time"] = bt / (c == aov::CIV_EGYPT && t != aov::B_OBELISK ? aov::LABORER_BUILD : 1.0);
 		by[aov::civ_key(c)] = e;
 	}
 	d["by_civ"] = by;
@@ -252,6 +276,19 @@ Dictionary AovSim::get_civ_state(int64_t owner) const {
 	d["laborers"] = C.count_type(o, aov::U_LABORER);
 	d["laborer_cap"] = aov::LABORER_CAP;
 	d["home_tc"] = C.home_tc[o];
+	// Set's Animals of Set
+	d["summoned"] = C.summoned[o];
+	d["converted"] = C.converted[o];
+	d["age_gift"] = C.age_gift[o];
+	d["carcass_food"] = C.carcass_food[o];
+	Dictionary animals;
+	for (int r = 0; r < U.size(); r++)
+		if (!U.removed[r] && !U.dead[r] && U.owner[r] == o && aov::is_set_animal(U.type[r])) {
+			const String k = aov::unit_def(U.type[r]).key;
+			animals[k] = (int)animals.get(k, 0) + 1;
+		}
+	d["animals_of_set"] = animals;
+	d["summon_pop"] = C.summon_pop(o);
 	return d;
 }
 
@@ -286,6 +323,21 @@ Dictionary AovSim::get_civ_fx() const {
 	d["empowers"] = emp_ids;
 	d["empower_strength"] = emp_k;
 	d["mandjet"] = mandjet;
+	// Set's Priests converting: [priest, animal (resource id)]*, progress 0..1
+	PackedInt32Array conv;
+	PackedFloat32Array conv_k;
+	const aov::ResourceStore &R = sim_.entities.resources;
+	for (int r = 0; r < U.size(); r++) {
+		if (U.removed[r] || U.dead[r] || U.order_type[r] != aov::O_CONVERT || U.moving[r]) continue;
+		const int a = sim_.entities.resource_slot(U.order_target[r]);
+		const int t = a >= 0 ? aov::converted_type(R.type[a]) : -1;
+		if (t < 0 || U.order_x[r] <= 0) continue;
+		conv.push_back(U.id[r]);
+		conv.push_back(U.order_target[r]);
+		conv_k.push_back((float)std::min(1.0, U.order_x[r] / aov::unit_def(t).train_time));
+	}
+	d["converts"] = conv;
+	d["convert_progress"] = conv_k;
 	return d;
 }
 
@@ -297,4 +349,61 @@ Dictionary AovSim::shield_check(int64_t caster, double x, double z) const {
 	d["reason"] = String(why.c_str());
 	d["by"] = by;
 	return d;
+}
+
+// ---- Set's Animals of Set --------------------------------------------------------------------
+
+Array AovSim::get_summon_menu(int64_t pharaoh) const {
+	Array out;
+	const int r = sim_.entities.unit_slot((int32_t)pharaoh);
+	if (r < 0 || sim_.entities.units.type[r] != aov::U_PHARAOH) return out;
+	const int o = sim_.entities.units.owner[r];
+	if (sim_.civs.civ(o) != aov::CIV_EGYPT || !sim_.civs.god_is(o, "set")) return out;
+	for (const int *t = aov::SET_SUMMONS; *t >= 0; t++) {
+		const aov::UnitDef &u = aov::unit_def(*t);
+		Dictionary e;
+		std::string why;
+		e["type"] = u.key;
+		e["name"] = u.name;
+		e["cost"] = civ_cost_dict(u.cost);
+		e["time"] = u.train_time;
+		e["age"] = aov::set_animal(*t)->age;
+		e["pop"] = u.pop;
+		e["ok"] = sim_.civs.can_summon(o, *t, &why);
+		e["reason"] = String(why.c_str());
+		out.push_back(e);
+	}
+	return out;
+}
+
+Dictionary AovSim::summon_animal(int64_t pharaoh, const String &type) {
+	Dictionary d;
+	std::string why;
+	const int t = aov::unit_type_of(type.utf8().get_data());
+	const int r = sim_.entities.unit_slot((int32_t)pharaoh);
+	const bool ok = t >= 0 && r >= 0 && sim_.civs.summon(r, t, &why);
+	d["ok"] = ok;
+	d["reason"] = String(ok ? "" : why.empty() ? "Cannot summon" : why.c_str());
+	return d;
+}
+
+Array AovSim::get_summons(int64_t owner) const {
+	Array out;
+	for (const aov::Summon &q : sim_.civs.summons) {
+		if (q.owner != (int)owner) continue;
+		Dictionary e;
+		e["pharaoh"] = q.pharaoh;
+		e["type"] = aov::unit_def(q.type).key;
+		e["t"] = q.t;
+		e["total"] = q.total;
+		out.push_back(e);
+	}
+	return out;
+}
+
+void AovSim::order_convert(const PackedInt32Array &ids, int64_t animal) {
+	for (int64_t i = 0; i < ids.size(); i++) {
+		const int r = sim_.entities.unit_slot(ids[i]);
+		if (r >= 0) sim_.commands.order(r, aov::Order::with_target(aov::O_CONVERT, (int32_t)animal));
+	}
 }

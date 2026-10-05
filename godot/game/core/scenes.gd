@@ -67,6 +67,11 @@ static var SCENES := {
 	# Monuments, his army in ranks with Priests healing; a Greek player 2.
 	"egypt": {"preset": "skirmish", "seed": 7, "hud": true, "reveal_all": true, "fast_forward": 4.0,
 		"camera": {"distance": 40.0, "pitch": 48.0, "yaw": 25.0}},
+	# Godot-only: Set's Animals of Set (sim/civ/egypt_scene.cpp): the age-ups' animals
+	# at the Temple, the Pharaoh summoning, a Priest converting deer, Laborers
+	# butchering a fallen Gazelle of Set.
+	"egypt_set": {"preset": "skirmish", "seed": 7, "hud": true, "reveal_all": true, "fast_forward": 5.0,
+		"camera": {"distance": 20.0, "pitch": 50.0, "yaw": 20.0}},
 	# Godot-only: an Egyptian town with every Egyptian building on desert ground
 	# (game/buildings/egypt_town_scene.gd, egypt_buildings.gd); egt_focus=<type>
 	# frames one building like reference/egypt/building_02..21.

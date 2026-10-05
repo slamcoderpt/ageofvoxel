@@ -740,7 +740,9 @@ void Combat::update(double dt) {
 				sim->commands.idle(r);
 			continue;
 		}
-		const double range = range_of(r);
+		// (Godot-only, sim/civ: a Laborer shoots an Animal of Set with his anti-animal bow)
+		const bool bow = sim->godot_rules && tk == K_UNIT && sim->civs.laborer_bow(r, tid);
+		const double range = bow ? LABORER_BOW_RANGE : range_of(r);
 		const double dist = sim->movement.distance_to(r, tid) - U.radius[r];
 		if (U.am_resume[r]) { // a foe out of sight for a while: walk on
 			if (dist > U.sight[r]) {
@@ -788,7 +790,12 @@ void Combat::update(double dt) {
 		U.anim_want[r] = A_ATTACK;
 		if (U.attack_cd[r] <= 0) {
 			const UnitAttack &a = def.attack;
-			U.attack_cd[r] = a.cooldown * (0.85 + 0.3 * sim->rng.next());
+			U.attack_cd[r] = (bow ? LABORER_BOW_RELOAD : a.cooldown) * (0.85 + 0.3 * sim->rng.next());
+			if (bow) { // (sim/civ: 12 pierce, an arrow)
+				U.anim_attack_t[r] = 0;
+				fire(U.id[r], tid, LABORER_BOW_DAMAGE, 1.3);
+				continue;
+			}
 			// (Godot-only, sim/techs: the owner's upgrades on damage, reload, splash)
 			const bool tech = sim->godot_rules;
 			if (tech) U.attack_cd[r] *= sim->techs.reload_mult(r);

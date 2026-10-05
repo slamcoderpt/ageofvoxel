@@ -7,6 +7,7 @@
 #include <cstring>
 
 #include "../core/jsmath.h"
+#include "../fortify/fortify.h"
 #include "../sim.h"
 
 namespace aov {
@@ -54,9 +55,9 @@ int building_civ(int type) {
 const EgyptUnit *egypt_unit(int type) {
 	// pierce armor, crush vs buildings, x vs buildings, decay, limit, heal, stand-in, Retold, mapping
 	static const EgyptUnit T[U_TYPE_COUNT - U_LABORER] = {
-		{ 0, 0, 0, 0, LABORER_CAP, 0, "villager",
-			"Laborer: 50 f, 1 pop, 17 s, 55 hp, 6 hack, armor 25/35/99, speed 3.8, LOS 14; gathers 10 % slower, builds 25 % slower, never worships; cap 100",
-			"hp, damage as Retold; train 17 x 10/15 (the Greek villager here trains in 10 s for Retold's 15); speed x the villager's 2.7/4.0; LOS x0.6; armor 0 like this sim's villager; gather = the villager's x0.9; build work rate 0.75" },
+		{ 0.2625, 0, 0, 0, LABORER_CAP, 0, "villager",
+			"Laborer: 50 f, 1 pop, 17 s, 55 hp, 6 hack; 12 pierce vs animals (range 12, ROF 2), x4 vs towers, armor 25/35/99, speed 3.8, LOS 14; gathers 10 % slower, builds 25 % slower, never worships; cap 100",
+			"hp, damage as Retold; train 17 x 10/15 (the Greek villager here trains in 10 s for Retold's 15); speed x the villager's 2.7/4.0; LOS x0.6; armor x0.75 as the soldiers (hack 0.1875 / pierce 0.2625); the anti-animal bow vs Animals of Set: 12 per 2.3 s at 7.2 (wild deer / boar: this sim's hunting spear, as the villager's); gather = the villager's x0.9; build work rate 0.75" },
 		{ 0.075, 0, 0, 0, 0, 0, "hoplite",
 			"Spearman: 50 f + 25 g, 2 pop, 12.5 s, 85 hp, 6 hack, x2 vs cavalry, armor 40/10/99, speed 5.0, LOS 16",
 			"armor x0.75 (hack 0.30 / pierce 0.075), speed x0.65, reach 0.75 x0.8, reload x1.15, LOS x0.6" },
@@ -93,16 +94,49 @@ const EgyptUnit *egypt_unit(int type) {
 		{ 0.225, 0, 0, 0, 1, 10, "hero",
 			"Pharaoh: free, 0 pop, 100 hp (110 / 125 / 145), 3 attack (13.2 / 15 / 17.4), range 3 (12 / 18 / 20), x2.5 vs myth, armor 15/30/99, heals 10 hp/s, empowers, respawns at the TC after 90 s",
 			"per age as the Priest; empower in sim/civ (O_EMPOWER)" },
-		{ 0, 0, 0, 0, 0, 0, "anubite",
-			"Baboon of Set: 3 favor, 1 pop, 20 hp, 3 hack, speed 3.3; Set's starting scout (Archaic Animal of Set)",
-			"hp, damage as Retold; speed x0.65; class infantry (this sim has no animal class); LOS 12 (20 m x0.6: EGYPT.md gives none); armor 0; Set's start only (the Pharaoh's summons are not in this game)" },
+		{ 0.0375, 0, 0.5, 0, 0, 0, "baboon_of_set",
+			"Baboon of Set: 3 favor, 3 s, 1 pop, 20 hp, 3 hack (0.3 Archaic), ROF 1, armor 35/5/99, speed 3.3, LOS 16, food 93.75; Set's starting scout, the Archaic summon",
+			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food" },
+		{ 0, 0, 0.5, 0, 0, 0, "baboon_of_set",
+			"Gazelle of Set: 3 favor, 3 s, 1 pop, 15 hp, 3.5 hack, ROF 1.1, armor 35/0/99, speed 4, LOS 14, food 150; Classical summon, 2 at the Temple on reaching Classical",
+			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food" },
+		{ 0.225, 0, 0.5, 0, 0, 0, "baboon_of_set",
+			"Hyena of Set: 4 favor, 4 s, 1 pop, 45 hp, 7 hack, ROF 1.8, armor 20/30/99, speed 4, LOS 14, food 93.75; Classical summon, 1 at the Temple on reaching Classical",
+			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food" },
+		{ 0.0375, 0, 0.5, 0, 0, 0, "baboon_of_set",
+			"Giraffe of Set: 5 favor, 4 s, 1 pop, 25 hp, 5 hack, ROF 1.4, armor 35/5/99, speed 4, LOS 14, food 300; Heroic summon, 2 at the Temple on reaching Heroic",
+			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food" },
+		{ 0.225, 0, 0.5, 0, 0, 0, "petsuchos",
+			"Crocodile of Set: 6 favor, 4 s, 1 pop, 70 hp, 9 hack, ROF 1.3, armor 10/30/99, speed 3.3, LOS 14, food 187.5; Heroic summon, 1 at the Temple on reaching Heroic",
+			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food" },
+		{ 0.15, 0, 0.5, 0, 0, 0, "baboon_of_set",
+			"Hippopotamus of Set: 7 favor, 6 s, 2 pop, 100 hp, 6 hack, ROF 1, armor 10/20/99, speed 4, LOS 14, food 375; Mythic summon, 2 at the Temple on reaching Mythic",
+			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food" },
+		{ 0.30, 0, 0.5, 0, 0, 0, "baboon_of_set",
+			"Rhinoceros of Set: 9 favor, 6 s, 2 pop, 135 hp, 8 hack, ROF 1.1, armor 30/40/99, speed 4, LOS 14, food 487.5; Mythic summon, 1 at the Temple on reaching Mythic",
+			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food" },
+		{ 0.30, 0, 1.5, 0, 0, 0, "war_elephant",
+			"Elephant of Set: 14 favor, 8 s, 2 pop, 270 hp, 10 hack, ROF 1.4, x1.5 vs buildings, armor 20/40/99, speed 3.3, LOS 14, food 675; Mythic summon (Retold)",
+			"as the other Animals of Set but x1.5 vs buildings; reach 0.8 (size 1.49)" },
+		{ 0, 0, 0.5, 0, 0, 0, "baboon_of_set",
+			"Deer of Set: a wild Deer a Priest of Set converted (35 s at range 10); 1 pop, 15 hp, 3 hack, ROF 1.1, armor 35/0/99, speed 4, LOS 14; keeps 75 % of the Deer's food",
+			"as the Animals of Set; food 75 = 75 % of this sim's deer (100)" },
+		{ 0.225, 0, 0.5, 0, 0, 0, "baboon_of_set",
+			"Boar of Set: a wild Boar a Priest of Set converted (50 s at range 10); 2 pop, 70 hp, 6 hack, ROF 1, armor 20/30/99, speed 5, LOS 14; keeps 75 % of the Boar's food",
+			"as the Animals of Set; food 187.5 = 75 % of this sim's boar (250)" },
 	};
 	return is_egypt_unit(type) ? &T[type - U_LABORER] : nullptr;
 }
 
 std::string unit_plural(int type) {
 	const std::string n = unit_def(type).name;
-	if (type == U_BABOON) return "Baboons of Set";
+	if (is_set_animal(type)) { // "Baboons of Set", "Hippopotami of Set"
+		std::string k = n.substr(0, n.size() - 7);
+		if (type == U_HIPPO_OF_SET) return "Hippopotami of Set";
+		if (k.size() && k.back() == 's') k += "es";
+		else k += "s";
+		return k + " of Set";
+	}
 	if (type == U_MERCENARY_CAVALRY) return n; // (a collective)
 	if (n.size() > 1 && n.back() == 'y' && !std::strchr("aeiou", n[n.size() - 2])) return n.substr(0, n.size() - 1) + "ies";
 	if (n.size() && (n.back() == 's' || n.back() == 'x')) return n + "es";
@@ -113,6 +147,54 @@ const HeroAge *hero_age(int type) {
 	static const HeroAge PRIEST = { { 80, 88, 100, 116 }, { 0.5, 2.2, 2.5, 2.9 }, { 3.0, 7.2, 9.6, 12 }, { 8.4, 8.4, 10.8, 13.2 } };
 	static const HeroAge PHARAOH = { { 100, 110, 125, 145 }, { 3, 13.2, 15, 17.4 }, { 1.8, 7.2, 10.8, 12 }, { 10.8, 10.8, 14.4, 15.6 } };
 	return type == U_PRIEST ? &PRIEST : type == U_PHARAOH ? &PHARAOH : nullptr;
+}
+
+// ---- Set's Animals of Set -----------------------------------------------------------------
+
+const SetAnimal *set_animal(int type) {
+	// summon age, food (Retold's Amount; converted: 75 % of this sim's wild animal), converted from
+	static const SetAnimal T[] = {
+		{ 0, 93.75, -1 },  // Baboon
+		{ 1, 150, -1 },    // Gazelle
+		{ 1, 93.75, -1 },  // Hyena
+		{ 2, 300, -1 },    // Giraffe
+		{ 2, 187.5, -1 },  // Crocodile
+		{ 3, 375, -1 },    // Hippopotamus
+		{ 3, 487.5, -1 },  // Rhinoceros
+		{ 3, 675, -1 },    // Elephant
+		{ -1, 100 * CONVERT_FOOD, R_DEER },
+		{ -1, 250 * CONVERT_FOOD, R_BOAR },
+	};
+	return is_set_animal(type) ? &T[type - U_BABOON] : nullptr;
+}
+
+const int *set_age_animals(int age) {
+	static const int NONE[] = { -1 };
+	static const int A[4][4] = { { -1 }, { U_GAZELLE_OF_SET, U_GAZELLE_OF_SET, U_HYENA_OF_SET, -1 },
+		{ U_GIRAFFE_OF_SET, U_GIRAFFE_OF_SET, U_CROCODILE_OF_SET, -1 }, { U_HIPPO_OF_SET, U_HIPPO_OF_SET, U_RHINO_OF_SET, -1 } };
+	return age >= 1 && age <= 3 ? A[age] : NONE;
+}
+
+int converted_type(int wild) { return wild == R_DEER ? U_DEER_OF_SET : wild == R_BOAR ? U_BOAR_OF_SET : -1; }
+
+Cost civ_fort_tech_cost(int civ, int tech) {
+	if (civ == CIV_EGYPT) switch (tech) { // (EGYPT.md 2: Retold's Egyptian prices)
+		case FT_WATCH_TOWER: return Cost(0, 50, 100, 0);
+		case FT_FORTIFIED_WALL: return Cost(500, 0, 400, 0);
+		case FT_CITADEL_WALL: return Cost(800, 0, 500, 0);
+		default: break;
+	}
+	return fort_tech_def(tech).cost;
+}
+
+double civ_build_time(int civ, int btype) {
+	if (civ != CIV_EGYPT) return 0;
+	switch (btype) { // Retold's base times (a Laborer: x4/3: 200 / 13.33 / 80 s)
+		case B_TOWN_CENTER: return 150;
+		case B_FARM: return 10;
+		case B_TOWER: return 60;
+		default: return 0;
+	}
 }
 
 // ---- buildings per civ -------------------------------------------------------------------
@@ -224,6 +306,8 @@ void Civs::init(Sim *s) {
 		shield_refused[i] = 0;
 	}
 	mandjet_by.clear();
+	summons.clear();
+	for (int i = 0; i < MAX_PLAYERS; i++) summoned[i] = converted[i] = age_gift[i] = 0, carcass_food[i] = 0;
 	s->commands.register_handler(O_EMPOWER, [this](int r, const Order &o) {
 		if (!rules() || !can_empower(r)) return false;
 		Entities &E = sim->entities;
@@ -257,6 +341,46 @@ void Civs::init(Sim *s) {
 	});
 	s->events.on(EV_AGE_ADVANCED, [this](const Event &e) {
 		if (rules()) on_age(e.owner);
+	});
+	// Set's Priests convert a wild animal (EGYPT.md 1.6): walk into range 6, then channel
+	s->commands.register_handler(O_CONVERT, [this](int r, const Order &o) {
+		if (!rules() || !can_convert(r)) return false;
+		Entities &E = sim->entities;
+		const int a = E.resource_slot(o.target);
+		const ResourceStore &R = E.resources;
+		if (a < 0 || R.removed[a] || !is_animal_type(R.type[a]) || !R.alive[a]) return false;
+		UnitStore &U = E.units;
+		U.order_x[r] = 0; // progress (s)
+		U.order_c[r] = 0;
+		sim->movement.move_to(r, R.x[a], R.z[a], nullptr, CONVERT_RANGE - 0.5);
+		return true;
+	});
+	// an Animal of Set that dies leaves a carcass with its food (Retold: hunt for the Laborers)
+	s->events.on(EV_ENTITY_DIED, [this](const Event &e) {
+		if (!rules() || e.kind != K_UNIT) return;
+		const int r = sim->entities.unit_slot(e.id);
+		if (r < 0) return;
+		const UnitStore &U = sim->entities.units;
+		const SetAnimal *sa = set_animal(U.type[r]);
+		if (!sa) return;
+		const int wild = U.type[r] == U_BOAR_OF_SET || unit_def(U.type[r]).pop > 1 ? R_BOAR : R_DEER;
+		const int32_t cid = sim->economy.wildlife.spawn(wild, U.x[r], U.z[r], -1, U.rot[r]);
+		const int c = sim->entities.resource_slot(cid);
+		if (c < 0) return;
+		ResourceStore &R = sim->entities.resources;
+		R.alive[c] = 0;
+		R.hp[c] = 0;
+		R.amount[c] = R.max_amount[c] = sa->food;
+		if (U.owner[r] > 0 && U.owner[r] < MAX_PLAYERS) carcass_food[U.owner[r]] += sa->food;
+	});
+	// Retold's Egyptian base build times for the shared types that differ (fort_build_time: the row's own)
+	s->events.on(EV_BUILDING_PLACED, [this](const Event &e) {
+		if (!rules()) return;
+		const int b = sim->entities.building_slot(e.id);
+		if (b < 0) return;
+		BuildingStore &B = sim->entities.buildings;
+		const double t = civ_build_time(civ(B.owner[b]), B.type[b]);
+		if (t > 0) B.fort_build_time[b] = t;
 	});
 }
 
@@ -308,6 +432,39 @@ void Civs::on_age(int owner) {
 	const int age = sim->players[owner].age;
 	for (int r = 0; r < U.size(); r++)
 		if (!U.removed[r] && U.owner[r] == owner && hero_age(U.type[r])) hero_age_stats(r, age - 1, age);
+	if (civ(owner) == CIV_EGYPT && god_is(owner, "set")) age_gift_spawn(owner, age);
+}
+
+void Civs::age_set(int owner, int from, int to) {
+	if (!rules() || owner <= 0 || owner >= MAX_PLAYERS || from == to) return;
+	UnitStore &U = sim->entities.units;
+	for (int r = 0; r < U.size(); r++)
+		if (!U.removed[r] && U.owner[r] == owner && hero_age(U.type[r])) hero_age_stats(r, from, to);
+	if (civ(owner) == CIV_EGYPT && god_is(owner, "set"))
+		for (int a = from + 1; a <= to; a++) age_gift_spawn(owner, a);
+}
+
+std::vector<int32_t> Civs::age_gift_spawn(int owner, int age) {
+	std::vector<int32_t> out;
+	const BuildingStore &B = sim->entities.buildings;
+	int at = -1; // the first standing Temple, else the home (any) Town Center
+	for (int b = 0; b < B.size() && at < 0; b++)
+		if (!B.removed[b] && !B.dead[b] && B.built[b] && B.owner[b] == owner && B.type[b] == B_TEMPLE) at = b;
+	if (at < 0) {
+		at = sim->entities.building_slot(home_tc[owner]);
+		if (at >= 0 && (B.dead[at] || B.owner[at] != owner)) at = -1;
+		for (int b = 0; b < B.size() && at < 0; b++)
+			if (!B.removed[b] && !B.dead[b] && B.built[b] && B.owner[b] == owner && B.type[b] == B_TOWN_CENTER) at = b;
+	}
+	if (at < 0) return out;
+	for (const int *t = set_age_animals(age); *t >= 0; t++) {
+		const int r = sim->economy.spawn_from_building(at, *t);
+		if (r >= 0) {
+			out.push_back(sim->entities.units.id[r]);
+			age_gift[owner]++;
+		}
+	}
+	return out;
 }
 
 int Civs::count_type(int owner, int type, bool queued) const {
@@ -445,7 +602,7 @@ double Civs::base_damage(int r) const {
 	const UnitStore &U = sim->entities.units;
 	const int t = U.type[r];
 	const HeroAge *h = hero_age(t);
-	if (!h) return unit_def(t).attack.damage;
+	if (!h) return unit_def(t).attack.damage * (is_set_animal(t) && sim->players[U.owner[r]].age <= 0 ? SET_ANIMAL_ARCHAIC : 1);
 	return h->damage[std::max(0, std::min(3, sim->players[U.owner[r]].age))];
 }
 
@@ -569,6 +726,157 @@ void Civs::auras(double dt) {
 	}
 }
 
+// ---- Set's Animals of Set ----------------------------------------------------------------------
+
+bool Civs::can_summon(int owner, int type, std::string *why) const {
+	auto no = [&](const std::string &m) { if (why) *why = m; return false; };
+	if (why) why->clear();
+	if (!rules()) return no("Not in this game");
+	const SetAnimal *sa = set_animal(type);
+	if (!sa || sa->age < 0) return no("Cannot be summoned");
+	if (owner <= 0 || owner >= MAX_PLAYERS || civ(owner) != CIV_EGYPT || !god_is(owner, "set")) return no("Only Set's Pharaoh summons Animals of Set");
+	const Player &p = sim->players[owner];
+	if (p.age < sa->age) return no(std::string("Requires ") + AGES[sa->age] + " Age");
+	if (p.pop + unit_def(type).pop > p.pop_cap) return no("Need more houses");
+	if (!p.can_afford(unit_def(type).cost)) return no("Not enough favor");
+	return true;
+}
+
+bool Civs::summon(int r, int type, std::string *why) {
+	UnitStore &U = sim->entities.units;
+	if (r < 0 || r >= U.size() || U.removed[r] || U.dead[r] || U.type[r] != U_PHARAOH) {
+		if (why) *why = "Only the Pharaoh summons";
+		return false;
+	}
+	const int owner = U.owner[r];
+	sim->economy.recount();
+	if (!can_summon(owner, type, why)) return false;
+	int queued = 0;
+	for (const Summon &q : summons)
+		if (q.pharaoh == U.id[r]) queued++;
+	if (queued >= SUMMON_QUEUE) {
+		if (why) *why = "Queue full";
+		return false;
+	}
+	Player &p = sim->players[owner];
+	const Cost c = unit_def(type).cost;
+	p.pay(c);
+	p.pop += unit_def(type).pop;
+	summons.push_back({ owner, U.id[r], (uint8_t)type, 0, unit_def(type).train_time, c });
+	Event e;
+	e.type = EV_RESOURCES_CHANGED;
+	e.owner = owner;
+	sim->events.emit(e);
+	return true;
+}
+
+int Civs::summon_pop(int owner) const {
+	int n = 0;
+	for (const Summon &q : summons)
+		if (q.owner == owner) n += unit_def(q.type).pop;
+	return n;
+}
+
+bool Civs::can_convert(int r) const {
+	const UnitStore &U = sim->entities.units;
+	return U.type[r] == U_PRIEST && civ(U.owner[r]) == CIV_EGYPT && god_is(U.owner[r], "set");
+}
+
+bool Civs::laborer_bow(int r, int32_t tid) const {
+	const UnitStore &U = sim->entities.units;
+	if (U.type[r] != U_LABORER) return false;
+	const int t = sim->entities.unit_slot(tid);
+	return t >= 0 && is_set_animal(U.type[t]);
+}
+
+void Civs::update_set(double dt) {
+	Entities &E = sim->entities;
+	UnitStore &U = E.units;
+	// 1. summons: the head of each Pharaoh's queue runs (he goes on with whatever he does)
+	std::vector<int32_t> running;
+	for (size_t i = 0; i < summons.size();) {
+		Summon &q = summons[i];
+		const int r = E.unit_slot(q.pharaoh);
+		if (r < 0 || U.dead[r] || U.removed[r]) { // he fell: the queue is lost, its favor back
+			sim->players[q.owner].refund(q.paid);
+			summons.erase(summons.begin() + i);
+			continue;
+		}
+		if (std::find(running.begin(), running.end(), q.pharaoh) != running.end()) { i++; continue; }
+		running.push_back(q.pharaoh);
+		q.t += dt;
+		if (q.t < q.total) { i++; continue; }
+		int tx, tz; // beside him
+		const double a = U.rot[r] + 1.9;
+		const double fx = U.x[r] + jsm::sin(a) * 1.2, fz = U.z[r] + jsm::cos(a) * 1.2;
+		if (!sim->pathfinder.nearest_walkable((int)std::floor(fx), (int)std::floor(fz), 6, tx, tz)) {
+			tx = (int)std::floor(U.x[r]);
+			tz = (int)std::floor(U.z[r]);
+		}
+		const int type = q.type, owner = q.owner;
+		summons.erase(summons.begin() + i);
+		const int u = sim->units.spawn(type, owner, tx + 0.5, tz + 0.5, U.rot[r]);
+		if (u >= 0) {
+			summoned[owner]++;
+			Event e;
+			e.type = EV_UNIT_TRAINED;
+			e.kind = K_UNIT;
+			e.id = U.id[u];
+			e.owner = owner;
+			e.a = type;
+			e.x = U.x[u];
+			e.z = U.z[u];
+			sim->events.emit(e);
+		}
+	}
+	// 2. conversions: a Priest of Set in range of his wild animal channels; the animal becomes his
+	ResourceStore &R = E.resources;
+	Movement &mv = sim->movement;
+	for (int r = 0; r < U.size(); r++) {
+		if (U.removed[r] || U.dead[r] || U.order_type[r] != O_CONVERT) continue;
+		const int32_t aid = U.order_target[r];
+		const int a = E.resource_slot(aid);
+		if (a < 0 || R.removed[a] || !R.alive[a] || !is_animal_type(R.type[a])) {
+			sim->commands.idle(r);
+			continue;
+		}
+		const double d = jsm::hypot(R.x[a] - U.x[r], R.z[a] - U.z[r]) - R.radius[a];
+		if (d > CONVERT_RANGE) { // (the animal grazed off: after it, the progress kept)
+			if (!U.moving[r]) {
+				mv.move_to(r, R.x[a], R.z[a], nullptr, CONVERT_RANGE - 1.5);
+				if (!U.moving[r] && ++U.order_c[r] > 40) sim->commands.idle(r); // (unreachable)
+			}
+			continue;
+		}
+		U.order_c[r] = 0;
+		if (U.moving[r]) mv.stop(r);
+		U.rot[r] = jsm::atan2(R.x[a] - U.x[r], R.z[a] - U.z[r]);
+		U.anim_want[r] = A_WORSHIP;
+		const int type = converted_type(R.type[a]);
+		U.order_x[r] += dt;
+		if (type < 0 || U.order_x[r] < unit_def(type).train_time) continue;
+		const int owner = U.owner[r];
+		const double x = R.x[a], z = R.z[a], rot = R.rot[a];
+		sim->remove_resource(aid);
+		const int u = sim->units.spawn(type, owner, x, z, rot);
+		if (u >= 0) {
+			converted[owner]++;
+			Event e;
+			e.type = EV_UNIT_TRAINED;
+			e.kind = K_UNIT;
+			e.id = U.id[u];
+			e.owner = owner;
+			e.a = type;
+			e.other = aid;
+			e.x = x;
+			e.z = z;
+			sim->events.emit(e);
+		}
+		// (other Priests on it go idle next tick: the animal is gone)
+		sim->commands.idle(r);
+	}
+}
+
 // ---- tick ------------------------------------------------------------------------------------
 
 void Civs::update(double dt) {
@@ -581,6 +889,7 @@ void Civs::update(double dt) {
 	bool any_egypt = false;
 	for (int o = 1; o < MAX_PLAYERS; o++) any_egypt |= sim->players[o].exists && sim->players[o].civ == CIV_EGYPT;
 	if (!any_egypt) return; // (a Greek game: nothing to do; Egyptian units of a test still need an Egyptian owner)
+	update_set(dt); // (Set: summons, conversions)
 
 	// 1. empowerment: a Pharaoh (or Ra's Priest) standing at the building he was sent to
 	for (int b = 0; b < B.size(); b++) B.civ_empower[b] = 0;

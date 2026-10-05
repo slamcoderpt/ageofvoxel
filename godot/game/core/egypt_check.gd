@@ -27,6 +27,16 @@ extends SceneTree
 ##                favor), Isis' Divine Shield (no enemy god power in 15 / 30 tiles, 1 hp/s
 ##                healing in 30 tiles, favor +100 % empowered: 9 / min vs Ra's 5.4), Set's
 ##                Devotees (Barracks / Migdol near a Monument train at -10 %, refunds alike)
+##   set          Set's Animals of Set (EGYPT.md 1.5, 1.6, 3.2, 4): the Pharaoh's summon menu by
+##                age, favor paid, summon time, a queue that does not stop him, refusals
+##                (Ra, a Greek, no favor, the age); the 3 animals at the Temple on each age-up
+##                (a real age-up and set_player_age); a Priest converting a deer (35 s) and a
+##                boar (50 s) at range 6, the animal's 75 % food in its carcass, butchered by a
+##                Laborer; Archaic x0.1 attack; each animal's stats; Laborers' bow vs animals
+##   civcosts     Retold's Egyptian prices / times where they differ from the Greek ones:
+##                Watch Tower 50 w + 100 g, Fortified Wall 500 f + 400 g, Citadel Wall 800 f +
+##                500 g; one Laborer builds the TC in 200 s, a Farm in 13.3, a tower in 80;
+##                Laborer armor 25 / 35 % (x0.75), drop-site LOS 5.4
 ##   locks        civ locks (builds, trains, techs both ways), Monument order and limit, the
 ##                TC's Priests need a Temple, Laborer cap, Mercenary limit, Mythic needs a
 ##                Migdol, a Laborer cannot build an Obelisk, a Priest only that
@@ -184,7 +194,7 @@ func _build_time(sim: Object, b: int, max_s := 200.0) -> float:
 
 func _run() -> void:
 	var t0 := Time.get_ticks_msec()
-	for c in ["defs", "match", "economy", "units", "pharaoh", "priest", "gods", "auras", "locks", "determinism", "rules_off"]:
+	for c in ["defs", "match", "economy", "units", "pharaoh", "priest", "gods", "auras", "set", "civcosts", "locks", "determinism", "rules_off"]:
 		if _want(c):
 			call("_case_" + c)
 	result["ms"] = Time.get_ticks_msec() - t0
@@ -217,7 +227,7 @@ func _case_defs() -> void:
 	ok = ok and float(sim.get_unit_def("war_elephant").hp) == 450 and int(sim.get_unit_def("pharaoh").pop) == 0 and float(sim.get_unit_def("priest").cost.gold) == 100
 	var bb: Dictionary = sim.get_unit_def("baboon_of_set")
 	ok = ok and float(bb.hp) == 20 and float(bb.attack.damage) == 3 and float(bb.cost.favor) == 3 and int(bb.pop) == 1 and str(bb.civ) == "egyptian"
-	_check("defs.units", ok and units.size() == 14, units)
+	_check("defs.units", ok and units.size() == 23, units)
 	# every Egyptian building's numbers (for an Egyptian owner)
 	var blds := {}
 	for t in e.build_menu:
@@ -930,6 +940,8 @@ func _case_auras() -> void:
 		var dbk := _b(sim, "eg_barracks", 2, -8, -4)
 		var dfar := _b(sim, "eg_barracks", 2, 12, -4)
 		var dmg := _b(sim, "migdol", 2, -8, 6)
+		for hx in [-16, -12, -8]: # (pop room: Set's age-ups gave him 9 Animals of Set)
+			_b(sim, "house", 2, hx, 16)
 		sim.tick(1)
 		var paid := func(b: int, t: String) -> Array:
 			var a: Dictionary = _res(sim, 2)
@@ -1060,6 +1072,349 @@ func _case_locks() -> void:
 	ok = ok and r["mythic without migdol"] == "Requires a Migdol Stronghold" and bool(r["mythic with migdol"])
 	_check("locks", ok, r)
 
+# Set's Animals of Set -------------------------------------------------------------------------
+
+func _menu_row(menu: Array, t: String) -> Dictionary:
+	for e in menu:
+		if str(e.type) == t:
+			return e
+	return {}
+
+func _near_count(sim: Object, owner: int, types: Array, x: float, z: float, rad: float) -> Dictionary:
+	var out := {}
+	for t in types:
+		var n := 0
+		for id in _units_of(sim, owner, t):
+			var u: Dictionary = sim.get_unit(id)
+			if Vector2(float(u.x), float(u.z)).distance_to(Vector2(x, z)) <= rad:
+				n += 1
+		if n:
+			out[t] = n
+	return out
+
+func _carcass_near(sim: Object, x: float, z: float, rad := 2.0) -> Dictionary:
+	var R: Dictionary = sim.get_resources()
+	var best := {}
+	for i in R.count:
+		var tn: String = R.type_names[R.type[i]]
+		if tn != "deer" and tn != "boar":
+			continue
+		var tx := float(R.tile[i * 2]) + 0.5
+		var tz := float(R.tile[i * 2 + 1]) + 0.5
+		if Vector2(tx, tz).distance_to(Vector2(x, z)) <= rad + 1.0 and int(R.ids[i]) > int(best.get("id", 0)):
+			best = {"id": int(R.ids[i]), "type": tn, "amount": float(R.amount[i])}
+	return best
+
+func _case_set() -> void:
+	const ANIMALS := ["baboon_of_set", "gazelle_of_set", "hyena_of_set", "giraffe_of_set", "crocodile_of_set", "hippo_of_set", "rhino_of_set", "elephant_of_set", "deer_of_set", "boar_of_set"]
+	# --- the Pharaoh's summons: menu by age, favor, time, a queue that does not stop him
+	var r := {}
+	var sim := _fresh("ra", "set", seed_arg, 0)
+	sim.set_player_resources(2, {"favor": 100.0})
+	var ph: int = _units_of(sim, 2, "pharaoh")[0]
+	sim.tick(1)
+	var menu: Array = sim.get_summon_menu(ph)
+	r["menu archaic"] = menu.map(func(e): return "%s %s %s" % [e.type, JSON.stringify(e.cost), "ok" if e.ok else e.reason])
+	var ok: bool = menu.size() == 8 and bool(_menu_row(menu, "baboon_of_set").ok) and str(_menu_row(menu, "gazelle_of_set").reason) == "Requires Classical Age"
+	ok = ok and float(_menu_row(menu, "elephant_of_set").cost.favor) == 14 and float(_menu_row(menu, "hyena_of_set").time) == 4
+	r["ra's pharaoh menu"] = sim.get_summon_menu(_units_of(sim, 1, "pharaoh")[0]).size()
+	r["ra's pharaoh summons"] = sim.summon_animal(_units_of(sim, 1, "pharaoh")[0], "baboon_of_set")
+	r["archaic gazelle"] = sim.summon_animal(ph, "gazelle_of_set")
+	ok = ok and int(r["ra's pharaoh menu"]) == 0 and not bool(r["ra's pharaoh summons"].ok) and str(r["archaic gazelle"].reason) == "Requires Classical Age"
+	# he walks off while two Baboons are summoned one after the other
+	var b0 := _units_of(sim, 2, "baboon_of_set").size()
+	var f0: float = _res(sim, 2).favor
+	var ph0: Dictionary = sim.get_unit(ph)
+	sim.order(ph, {"type": "move", "x": C.x + 10.0, "z": C.y + 0.0})
+	var s1: Dictionary = sim.summon_animal(ph, "baboon_of_set")
+	var s2: Dictionary = sim.summon_animal(ph, "baboon_of_set")
+	r["favor paid for 2"] = _r(f0 - _res(sim, 2).favor, 2)
+	r["queued"] = sim.get_summons(2).size()
+	r["pop with the queue"] = int(sim.get_player(2).pop)
+	var times := []
+	var nb := b0
+	for t in 9 * FPS:
+		sim.tick(1)
+		var n := _units_of(sim, 2, "baboon_of_set").size()
+		if n > nb:
+			times.append(_r((t + 1) / float(FPS), 2))
+			nb = n
+	var phu: Dictionary = sim.get_unit(ph)
+	r["baboons appeared at [s]"] = times
+	var walked := Vector2(float(phu.x), float(phu.z)).distance_to(Vector2(float(ph0.x), float(ph0.z)))
+	r["pharaoh while summoning: order, walked"] = [str(phu.order), _r(walked, 1)]
+	r["summoned"] = sim.get_civ_state(2).summoned
+	ok = ok and bool(s1.ok) and bool(s2.ok) and r["favor paid for 2"] == 6.0 and int(r.queued) == 2 and times.size() == 2
+	ok = ok and str(phu.order) == "move" and walked > 10.0
+	ok = ok and times.size() == 2 and _near(times[0], 3.0, 0.1) and _near(times[1], 6.0, 0.1) and int(r.summoned) == 2
+	# no favor; the Mythic list, the Elephant of Set
+	sim.set_player_resources(2, {"favor": 2.0})
+	r["no favor"] = sim.summon_animal(ph, "baboon_of_set")
+	sim.set_player_resources(2, {"favor": 100.0})
+	sim.set_player_age(2, 3)
+	var houses := 0
+	for hx in [-16, -12, -8, -4]:
+		_b(sim, "house", 2, hx, 14)
+	sim.tick(1)
+	f0 = _res(sim, 2).favor
+	r["mythic elephant"] = sim.summon_animal(ph, "elephant_of_set")
+	r["elephant favor"] = _r(f0 - _res(sim, 2).favor, 2)
+	var ne := 0
+	var t_el := -1.0
+	for t in 10 * FPS:
+		sim.tick(1)
+		if _units_of(sim, 2, "elephant_of_set").size() > 0:
+			t_el = _r((t + 1) / float(FPS), 2)
+			break
+	r["elephant after [s]"] = t_el
+	r["menu mythic ok"] = sim.get_summon_menu(ph).filter(func(e): return e.ok).map(func(e): return e.type)
+	ok = ok and str(r["no favor"].reason) == "Not enough favor" and bool(r["mythic elephant"].ok) and r["elephant favor"] == 14.0 and _near(t_el, 8.0, 0.05)
+	ok = ok and r["menu mythic ok"].size() == 8
+	_check("set.summon", ok, r)
+
+	# --- the age-ups: 3 Animals of Set at the Temple (a real age-up, then set_player_age); Ra: none
+	r = {}
+	ok = true
+	for g in ["set", "ra"]:
+		sim = _fresh("zeus", g, seed_arg, 0, "deathmatch")
+		var tm := _b(sim, "temple", 2, 0, 0)
+		var tb: Dictionary = sim.get_building(tm)
+		for hx in [-16, -12, -8, -4]:
+			_b(sim, "house", 2, hx, 14)
+		sim.tick(1)
+		var row := {}
+		var adv: Dictionary = sim.advance_age(2)
+		for t in 120 * FPS:
+			sim.tick(1)
+			if int(sim.get_player(2).age) >= 1:
+				break
+		sim.tick(2)
+		row["classical: at the temple"] = _near_count(sim, 2, ANIMALS, float(tb.x), float(tb.z), 9.0)
+		sim.set_player_age(2, 3)
+		sim.tick(2)
+		row["after set_player_age(3): at the temple"] = _near_count(sim, 2, ANIMALS, float(tb.x), float(tb.z), 9.0)
+		row["age_gift"] = sim.get_civ_state(2).age_gift
+		row["advance"] = adv
+		r[g] = row
+		if g == "set":
+			ok = ok and row["classical: at the temple"] == {"gazelle_of_set": 2, "hyena_of_set": 1}
+			ok = ok and row["after set_player_age(3): at the temple"] == {"gazelle_of_set": 2, "hyena_of_set": 1, "giraffe_of_set": 2, "crocodile_of_set": 1, "hippo_of_set": 2, "rhino_of_set": 1}
+			ok = ok and int(row.age_gift) == 9
+		else:
+			ok = ok and row["classical: at the temple"].is_empty() and row["after set_player_age(3): at the temple"].is_empty() and int(row.age_gift) == 0
+	_check("set.age_gifts", ok, r)
+
+	# --- Set's Priests convert wild animals: range 6, 35 s a deer, 50 s a boar; 75 % food kept
+	r = {}
+	sim = _fresh("zeus", "set", seed_arg, 0)
+	var pr := _u(sim, "priest", 2, -12.0, 0.0)
+	var deer: PackedInt32Array = sim.spawn_herd("deer", C.x + 0.0, C.y + 0.0, 1)
+	var boar: PackedInt32Array = sim.spawn_herd("boar", C.x + 0.0, C.y + 8.0, 1)
+	var rpr := _u(sim, "priest", 1, 17.0, 17.0)
+	var hop0 := _u(sim, "hoplite", 1, 17.0, 15.0)
+	sim.tick(1)
+	r["greek priest? (a hoplite) convert order"] = sim.order(hop0, {"type": "convert", "target": deer[0]})
+	sim.order_convert(PackedInt32Array([pr]), deer[0])
+	var dist_at := -1.0
+	var chan := 0   # ticks the Priest channels (in range; the deer may graze off and he follows)
+	var t_d := -1.0
+	for t in 70 * FPS:
+		sim.tick(1)
+		var u: Dictionary = sim.get_unit(pr)
+		if str(u.anim) == "worship":
+			chan += 1
+			if dist_at < 0:
+				var R: Dictionary = sim.get_resources()
+				for i in R.count:
+					if int(R.ids[i]) == deer[0]:
+						dist_at = _r(Vector2(float(u.x), float(u.z)).distance_to(Vector2(float(R.tile[i * 2]) + 0.5, float(R.tile[i * 2 + 1]) + 0.5)), 1)
+		if _units_of(sim, 2, "deer_of_set").size() > 0:
+			t_d = (t + 1) / float(FPS)
+			break
+	r["deer: converted at [s] (walk + channel)"] = _r(t_d, 2)
+	r["deer: priest distance when he starts (<= 6)"] = dist_at
+	r["deer: channelled [s]"] = _r(chan / float(FPS), 2)
+	var dos: Array = _units_of(sim, 2, "deer_of_set")
+	r["deer of set"] = dos.size()
+	var deer_gone := true
+	var Rs: Dictionary = sim.get_resources()
+	for i in Rs.count:
+		if int(Rs.ids[i]) == deer[0]:
+			deer_gone = false
+	r["the wild deer is gone"] = deer_gone
+	ok = dos.size() == 1 and deer_gone and _near(chan / float(FPS), 35.0, 0.1) and dist_at <= 7.0 and not bool(r["greek priest? (a hoplite) convert order"])
+	# the boar: 50 s
+	sim.order_convert(PackedInt32Array([pr]), boar[0])
+	chan = 0
+	for t in 90 * FPS:
+		sim.tick(1)
+		if str(sim.get_unit(pr).anim) == "worship":
+			chan += 1
+		if _units_of(sim, 2, "boar_of_set").size() > 0:
+			break
+	r["boar: channelled [s]"] = _r(chan / float(FPS), 2)
+	ok = ok and _near(chan / float(FPS), 50.0, 0.1) and int(sim.get_civ_state(2).converted) == 2
+	# the converted deer dies: a carcass with 75 % of the deer's 100 food; a Laborer butchers it
+	var du: Dictionary = sim.get_unit(dos[0])
+	sim.kill_unit(dos[0], 0)
+	sim.tick(1)
+	var cc := _carcass_near(sim, float(du.x), float(du.z))
+	r["carcass"] = cc
+	var lab := _u(sim, "laborer", 2, float(du.x) - C.x + 1.0, float(du.z) - C.y)
+	_b(sim, "granary", 2, int(float(du.x) - C.x) - 5, int(float(du.z) - C.y) - 1)
+	sim.tick(1)
+	var f_before: float = _res(sim, 2).food
+	if cc.has("id"):
+		sim.order_gather(PackedInt32Array([lab]), cc.id)
+	_step(sim, 150.0)
+	var left := -1.0
+	var R2: Dictionary = sim.get_resources()
+	for i in R2.count:
+		if cc.has("id") and int(R2.ids[i]) == cc.id:
+			left = float(R2.amount[i])
+	r["carcass left after 150 s (-1: butchered, gone)"] = left
+	r["food the laborer brought (it, then whatever next)"] = _r(_res(sim, 2).food - f_before, 2)
+	r["carcass_food"] = sim.get_civ_state(2).carcass_food
+	ok = ok and cc.has("id") and _near(float(cc.amount), 75.0) and str(cc.type) == "deer" and left == -1.0 and float(r["food the laborer brought (it, then whatever next)"]) >= 74.4
+	# Ra's Priest cannot convert
+	var dh: PackedInt32Array = sim.spawn_herd("deer", C.x + 14.0, C.y + 14.0, 1)
+	r["a Greek-owned priest's convert order"] = sim.order(rpr, {"type": "convert", "target": dh[0]})
+	var sr := _fresh("zeus", "ra", seed_arg, 0)
+	var rp: int = _units_of(sr, 2, "priest")[0]
+	var dr: PackedInt32Array = sr.spawn_herd("deer", C.x + 0.0, C.y + 0.0, 1)
+	r["ra's priest convert order"] = sr.order(rp, {"type": "convert", "target": dr[0]})
+	ok = ok and not bool(r["a Greek-owned priest's convert order"]) and not bool(r["ra's priest convert order"])
+	_check("set.convert", ok, r)
+
+	# --- each animal's live stats; Archaic x0.1 attack; Laborers' bow vs animals (12 pierce at 7.2)
+	r = {}
+	ok = true
+	var want := {"baboon_of_set": [20, 3, 3], "gazelle_of_set": [15, 3.5, 3], "hyena_of_set": [45, 7, 4], "giraffe_of_set": [25, 5, 5],
+		"crocodile_of_set": [70, 9, 6], "hippo_of_set": [100, 6, 7], "rhino_of_set": [135, 8, 9], "elephant_of_set": [270, 10, 14],
+		"deer_of_set": [15, 3, 0], "boar_of_set": [70, 6, 0]}
+	sim = _fresh("zeus", "set", seed_arg, 1)
+	var st := {}
+	for t in want:
+		var d: Dictionary = sim.get_unit_def(t)
+		var id := _u(sim, t, 2, 0.0, 0.0)
+		var s: Dictionary = sim.get_unit_stats(id)
+		st[t] = {"hp": d.hp, "damage": s.get("damage", d.attack.damage), "favor": d.cost.get("favor", 0.0), "pop": d.pop, "speed": d.speed,
+			"hack": d.hack_armor, "pierce": d.pierce_armor, "food": d.food, "class": d["class"]}
+		ok = ok and float(d.hp) == want[t][0] and _near(float(st[t].damage), want[t][1]) and float(st[t].favor) == want[t][2] and str(d["class"]) == "animal"
+		sim.kill_unit(id, 0)
+	r["stats"] = st
+	# Archaic vs Classical: a Hyena's first blow on a hoplite (hack 0.30)
+	for age in [0, 1]:
+		sim = _fresh("zeus", "set", seed_arg, age)
+		var hy := _u(sim, "hyena_of_set", 2, 0.0, 0.0)
+		var hop := _u(sim, "hoplite", 1, 1.0, 0.0)
+		sim.tick(1)
+		r["hyena blow on a hoplite, age %d" % age] = _r(_first_hit(sim, hy, hop), 3)
+	ok = ok and _near(r["hyena blow on a hoplite, age 0"], 0.7 * 0.7, 0.01) and _near(r["hyena blow on a hoplite, age 1"], 7 * 0.7, 0.01)
+	# the Laborer's bow: 12 pierce vs a Hyena (pierce 0.225) from 7 tiles; his blow on a hoplite stays 6 hack
+	sim = _fresh("ra", "set", seed_arg, 1)
+	var hy2 := _u(sim, "hyena_of_set", 2, 0.0, 0.0)
+	var lb := _u(sim, "laborer", 1, -7.0, 0.0)
+	sim.tick(1)
+	var lx: float = float(sim.get_unit(lb).x)
+	r["laborer bow on a hyena"] = _r(_first_hit(sim, lb, hy2), 3)
+	r["laborer moved before shooting"] = _r(absf(float(sim.get_unit(lb).x) - lx), 2)
+	ok = ok and _near(r["laborer bow on a hyena"], 12 * (1 - 0.225), 0.01) and r["laborer moved before shooting"] < 0.5
+	# a fight: 4 Laborers (Ra) against 2 Hyenas of Set (Set), 60 s
+	sim = _fresh("ra", "set", seed_arg, 1)
+	var labs := []
+	var hys := []
+	for i in 4:
+		labs.append(_u(sim, "laborer", 1, -6.0, -3.0 + 2.0 * i))
+	for i in 2:
+		hys.append(_u(sim, "hyena_of_set", 2, 6.0, -1.0 + 2.0 * i))
+	sim.tick(1)
+	sim.order_attack_move(PackedInt32Array(hys), C.x - 6.0, C.y + 0.0)
+	for l in labs:
+		sim.order(l, {"type": "attack", "target": hys[0]})
+	for t in 60 * FPS:
+		sim.tick(1)
+		if t % 15 == 0:
+			for l in labs:
+				if _alive(sim, l) and str(sim.get_unit(l).order) != "attack":
+					for h in hys:
+						if _alive(sim, h):
+							sim.order(l, {"type": "attack", "target": h})
+							break
+	r["fight 4 laborers vs 2 hyenas: laborers left"] = labs.filter(func(x): return _alive(sim, x)).size()
+	r["fight: hyenas left"] = hys.filter(func(x): return _alive(sim, x)).size()
+	ok = ok and int(r["fight: hyenas left"]) == 0 and int(r["fight 4 laborers vs 2 hyenas: laborers left"]) >= 2
+	_check("set.animals", ok, r)
+
+# Egyptian prices and times where Retold differs ---------------------------------------------
+
+func _case_civcosts() -> void:
+	var r := {}
+	var ok := true
+	for g in ["ra", "zeus"]:
+		var sim := _fresh(g, "zeus", seed_arg, 3)
+		var row := {}
+		var tw := _b(sim, "tower", 1, 0, 0)
+		var wl: Dictionary = sim.place_wall(1, Vector2i(C.x - 10, C.y + 8), Vector2i(C.x - 4, C.y + 8), PackedInt32Array())
+		sim.tick(1)
+		var a: Dictionary = _res(sim, 1)
+		row["watch_tower"] = sim.research(tw, "watch_tower")
+		var b: Dictionary = _res(sim, 1)
+		row["watch tower paid [f, w, g]"] = [_r(a.food - b.food), _r(a.wood - b.wood), _r(a.gold - b.gold)]
+		sim.cancel_research(tw, "watch_tower")
+		var c: Dictionary = _res(sim, 1)
+		row["refund [f, w, g]"] = [_r(c.food - b.food), _r(c.wood - b.wood), _r(c.gold - b.gold)]
+		var fort: Dictionary = sim.get_fortify(1)
+		var costs := {}
+		for e in fort.techs:
+			costs[e.key] = e.cost
+		row["costs"] = costs
+		r[g] = row
+		if g == "ra":
+			ok = ok and row["watch tower paid [f, w, g]"] == [0.0, 50.0, 100.0] and row["refund [f, w, g]"] == [0.0, 50.0, 100.0]
+			ok = ok and costs.fortified_wall == {"food": 500.0, "gold": 400.0} and costs.citadel_wall == {"food": 800.0, "gold": 500.0}
+		else:
+			ok = ok and row["watch tower paid [f, w, g]"] == [0.0, 100.0, 100.0] and costs.fortified_wall == {"wood": 250.0, "gold": 200.0}
+	_check("civcosts.fort_upgrades", ok, r)
+
+	# one worker's build time: Egyptian (Retold base x4/3) vs Greek
+	r = {}
+	ok = true
+	for g in ["ra", "zeus"]:
+		var row := {}
+		for t in ["town_center", "farm", "tower", "house"]:
+			var sim := _fresh(g, "zeus", seed_arg, 1)
+			var site := _b(sim, t, 1, 0, 0, false)
+			var wk := _u(sim, "laborer" if g == "ra" else "villager", 1, -3.0, -3.0)
+			sim.tick(1)
+			sim.order_build(PackedInt32Array([wk]), site)
+			row[t] = _r(_build_time(sim, site, 260.0), 1)
+			row[t + " (get_building_def)"] = _r(float(sim.get_building_def(t, 1).get("by_civ", {}).get("egyptian" if g == "ra" else "greek", {}).get("build_time", -1)), 2)
+		r[g] = row
+	# (the walk to the site is in the measure: up to ~2 s)
+	ok = _near(r.ra.town_center, 200.0, 3.0) and _near(r.ra.farm, 13.3, 2.5) and _near(r.ra.tower, 80.0, 3.0) and _near(r.ra.house, 20.0, 2.5)
+	ok = ok and _near(r.zeus.town_center, 60.0, 3.0) and _near(r.zeus.tower, 30.0, 3.0)
+	ok = ok and _near(r.ra["town_center (get_building_def)"], 200.0, 0.01) and _near(r.ra["farm (get_building_def)"], 13.33, 0.01)
+	_check("civcosts.build_times", ok, r)
+
+	# the Laborer's armor (25 / 35 % x0.75) against the villager's 0; drop-site LOS 5.4
+	r = {}
+	var sim := _fresh("zeus", "ra", seed_arg, 1)
+	var lb := _u(sim, "laborer", 2, 0.0, 0.0)
+	var vl := _u(sim, "villager", 1, 0.0, 14.0)
+	var h1 := _u(sim, "hoplite", 1, 1.0, 0.0)
+	var h2 := _u(sim, "hoplite", 2, 1.0, 14.0)
+	var tx1 := _u(sim, "toxotes", 1, -6.0, 0.0)
+	sim.tick(1)
+	r["toxotes arrow on a laborer"] = _r(_first_hit(sim, tx1, lb), 3)
+	sim.order_idle(PackedInt32Array([tx1]))
+	r["hoplite blow on a laborer"] = _r(_first_hit(sim, h1, lb), 3)
+	r["hoplite blow on a villager"] = _r(_first_hit(sim, h2, vl), 3)
+	r["drop sites LOS"] = [sim.get_building_def("granary", 2).sight, sim.get_building_def("lumber_camp", 2).sight, sim.get_building_def("mining_camp", 2).sight]
+	ok = _near(r["hoplite blow on a laborer"], 9 * (1 - 0.1875), 0.01) and _near(r["hoplite blow on a villager"], 9.0, 0.01)
+	ok = ok and _near(r["toxotes arrow on a laborer"], 7 * (1 - 0.2625), 0.01) and r["drop sites LOS"] == [5.4, 5.4, 5.4]
+	_check("civcosts.laborer_armor_los", ok, r)
+
 # determinism ------------------------------------------------------------------------------
 
 func _scenario() -> String:
@@ -1079,10 +1434,42 @@ func _scenario() -> String:
 	_step(sim, 120.0)
 	return "%d %s %s" % [sim.units_hash(), JSON.stringify(_res(sim, 1)), JSON.stringify(_res(sim, 2))]
 
+## Set against a Greek: summons while the Pharaoh walks, a Priest converting, the age-up gift, a fight with animals
+func _scenario_set() -> String:
+	var sim := _fresh("zeus", "set", seed_arg + 2, 0, "high")
+	_econ_side(sim, 1, false, -1)
+	_econ_side(sim, 2, true, 1)
+	sim.set_player_resources(2, {"favor": 60.0})
+	var ph: int = _units_of(sim, 2, "pharaoh")[0]
+	var pr := _u(sim, "priest", 2, 6.0, -14.0)
+	var deer: PackedInt32Array = sim.spawn_herd("deer", C.x + 10.0, C.y - 14.0, 3)
+	for hx in [12, 16]:
+		_b(sim, "house", 2, hx, 6)
+	sim.tick(1)
+	sim.order(ph, {"type": "move", "x": C.x + 4.0, "z": C.y + 18.0})
+	for i in 3:
+		sim.summon_animal(ph, "baboon_of_set")
+	sim.order_convert(PackedInt32Array([pr]), deer[0])
+	var a := []
+	for i in 4:
+		a.append(_u(sim, "hoplite", 1, -4.0 + (i % 2), 18.0 + i / 2))
+	_step(sim, 20.0)
+	sim.set_player_age(2, 1)
+	var b: Array = _units_of(sim, 2, "baboon_of_set") + _units_of(sim, 2, "gazelle_of_set") + _units_of(sim, 2, "hyena_of_set")
+	sim.order_attack_move(PackedInt32Array(b), C.x - 6.0, C.y + 18.0)
+	sim.order_attack_move(PackedInt32Array(a), C.x + 6.0, C.y + 18.0)
+	_step(sim, 100.0)
+	var cs: Dictionary = sim.get_civ_state(2)
+	return "%d %s %s summoned %d converted %d gift %d carcass %.2f" % [sim.units_hash(), JSON.stringify(_res(sim, 1)), JSON.stringify(_res(sim, 2)),
+		cs.summoned, cs.converted, cs.age_gift, cs.carcass_food]
+
 func _case_determinism() -> void:
 	var a := _scenario()
 	var b := _scenario()
 	_check("determinism", a == b, {"a": a, "b": b})
+	a = _scenario_set()
+	b = _scenario_set()
+	_check("determinism.set", a == b and a.contains("summoned 3") and a.contains("gift 3"), {"a": a, "b": b})
 
 # rules off --------------------------------------------------------------------------------
 
@@ -1101,6 +1488,9 @@ func _case_rules_off() -> void:
 	var tr: Dictionary = sim.train(tc[0], "laborer")
 	var vills := _units_of(sim, 1, "villager")
 	var emp: bool = sim.order(vills[0], {"type": "empower", "target": tc[0]})
+	var hy := int(sim.spawn_unit("hyena_of_set", 1, tx, tz, 0.0))
+	var conv: bool = sim.order(vills[0], {"type": "convert", "target": 1})
+	var sm: Dictionary = sim.summon_animal(vills[0], "baboon_of_set")
 	sim.set_godot_rules(true)
-	_check("rules_off", bool(r.ok) and civ == "greek" and lab == 0 and gran == 0 and placed == 0 and not bool(tr.ok) and not emp and vills.size() == 5,
-		{"civ": civ, "spawn laborer": lab, "spawn granary": gran, "place granary": placed, "train laborer": tr.reason, "empower": emp, "villagers": vills.size()})
+	_check("rules_off", bool(r.ok) and civ == "greek" and lab == 0 and gran == 0 and placed == 0 and not bool(tr.ok) and not emp and vills.size() == 5 and hy == 0 and not conv and not bool(sm.ok),
+		{"spawn hyena_of_set": hy, "convert": conv, "summon": sm, "civ": civ, "spawn laborer": lab, "spawn granary": gran, "place granary": placed, "train laborer": tr.reason, "empower": emp, "villagers": vills.size()})

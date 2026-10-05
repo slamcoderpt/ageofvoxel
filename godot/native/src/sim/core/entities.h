@@ -48,9 +48,10 @@ enum Kind : uint8_t { K_NONE = 0, K_UNIT = 1, K_BUILDING = 2, K_RESOURCE = 3 };
 // O_ATTACK_MOVE is Godot-only (combat.h: walk to order_x / order_z, fighting
 // what comes into sight on the way).
 // O_EMPOWER is Godot-only (sim/civ: the Pharaoh, Ra's Priests on a building).
-enum OrderType : uint8_t { O_IDLE, O_MOVE, O_GATHER, O_DROPOFF, O_WORSHIP, O_BUILD, O_ATTACK, O_ATTACK_MOVE, O_EMPOWER, O_TYPE_COUNT };
+// O_CONVERT is Godot-only (sim/civ: Set's Priests on a wild animal; order_x = progress s).
+enum OrderType : uint8_t { O_IDLE, O_MOVE, O_GATHER, O_DROPOFF, O_WORSHIP, O_BUILD, O_ATTACK, O_ATTACK_MOVE, O_EMPOWER, O_CONVERT, O_TYPE_COUNT };
 inline const char *order_name(int t) {
-	static const char *n[] = { "idle", "move", "gather", "dropoff", "worship", "build", "attack", "attack_move", "empower" };
+	static const char *n[] = { "idle", "move", "gather", "dropoff", "worship", "build", "attack", "attack_move", "empower", "convert" };
 	return t >= 0 && t < O_TYPE_COUNT ? n[t] : "?";
 }
 

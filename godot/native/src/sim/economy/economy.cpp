@@ -414,6 +414,8 @@ void Economy::recount() {
 		if (B.built[b] && d.pop) p.pop_cap += sim->godot_rules ? d.pop + sim->civs.pop_bonus(B.owner[b], B.type[b]) : d.pop; // (sim/civ: Isis' TC +5)
 		for (const TrainItem &q : B.queue[b]) p.pop += unit_def(q.type).pop;
 	}
+	if (sim->godot_rules) // (Godot-only, sim/civ: Set's Pharaoh's queued summons)
+		for (const Summon &q : sim->civs.summons) sim->players[q.owner].pop += unit_def(q.type).pop;
 	for (auto &p : sim->players) p.pop_cap = std::min(POP_MAX, p.pop_cap);
 }
 

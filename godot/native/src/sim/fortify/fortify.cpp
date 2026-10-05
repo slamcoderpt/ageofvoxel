@@ -413,7 +413,7 @@ FortResult Fortify::research(int32_t id, int tech) {
 		case 4: r.reason = "Already being researched"; return r;
 		default: break;
 	}
-	if (!sim->players[owner].pay(d.cost)) { r.reason = "Not enough resources"; return r; }
+	if (!sim->players[owner].pay(civ_fort_tech_cost(sim->civs.civ(owner), tech))) { r.reason = "Not enough resources"; return r; } // (sim/civ: the Egyptians' own prices)
 	B.fort_tech[b] = (uint8_t)tech;
 	B.fort_tech_t[b] = 0;
 	B.fort_tech_total[b] = d.time;
@@ -426,7 +426,7 @@ bool Fortify::cancel_research(int32_t id) {
 	const int b = E.building_slot(id);
 	BuildingStore &B = E.buildings;
 	if (b < 0 || !B.fort_tech[b]) return false;
-	sim->players[B.owner[b]].refund(fort_tech_def(B.fort_tech[b]).cost);
+	sim->players[B.owner[b]].refund(civ_fort_tech_cost(sim->civs.civ(B.owner[b]), B.fort_tech[b])); // (sim/civ)
 	B.fort_tech[b] = 0;
 	B.fort_tech_t[b] = B.fort_tech_total[b] = 0;
 	return true;

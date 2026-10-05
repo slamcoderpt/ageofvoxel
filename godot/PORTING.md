@@ -1780,9 +1780,8 @@ techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
   Slingers and Chariot Archers). Unit masks are 32 bits now (`UnitMask`).
 - **Start** (Retold): Town Center, `villagers - 2` Laborers (3 of the
   default 5), the Pharaoh, a Priest, and for Set a Baboon of Set (the
-  scout animal: `baboon_of_set`, 20 hp, 3 hack, speed 3.3 x0.65, class
-  infantry as this sim has no animal class, LOS 12 assumed; drawn with its
-  own `baboon_of_set` rig in `egypt_units`). Stockpile: Retold's 200 f / 100 w /
+  scout animal, an Animal of Set: below; drawn with its own `baboon_of_set`
+  rig in `egypt_units`). Stockpile: Retold's 200 f / 100 w /
   50 g / 0 favor on "standard" (the Greeks' 300 / 300 / 200 / 20), i.e. the
   setup's stockpile x `EGYPT_START_RES` (2/3, 1/3, 1/4, 0): "low" 100 / 50 /
   25, "high" 667 / 333 / 187.5; "deathmatch" keeps its 10000s (favor 0); an
@@ -1799,7 +1798,8 @@ techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
   needs a Migdol Stronghold (and the Heroic an Armory or a Market, as the
   Greeks). The free worker of `Economy::rescue` is a Laborer.
 - **The Pharaoh** (one, free, 0 pop, not trainable; respawns at his home
-  Town Center, else any, 90 s after he fell): `O_EMPOWER` (order type
+  Town Center, else any, 90 s after he fell; Set's summons Animals of Set,
+  below): `O_EMPOWER` (order type
   "empower", `order_empower(ids, building)`, a right-click on an own
   building but a Farm) walks him to the building; standing within 2 tiles of
   it he empowers it (`B.civ_empower`, 1; Ra's Priests 0.6; several do not
@@ -1838,19 +1838,83 @@ techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
     Monument trains at -10 % (all resources; EGYPT.md gives no distance,
     Mandjet's 30 m is used); no stacking; a cancelled unit refunds what was
     paid (`TrainItem::cost_mult`).
-  - Not yet: Set's other Animals (the Pharaoh's summons, three per age-up)
-    and conversions, the god powers (Rain, Prosperity, Vision) and the
-    unique techs. The setup screen's
+  - Not yet: the god powers (Rain, Prosperity, Vision) and the unique techs
+    (another piece's). The setup screen's
   pantheon picker (game/menu/setup) still lists the Egyptians as "not in the
   game yet": a match config with `god: "ra" | "isis" | "set"` (main.gd's
   `match` arg, `start_match`) plays them already.
+- **Set's Animals of Set** (EGYPT.md 1.5, 1.6, 3.2, 4 Set; the numbers
+  EGYPT.md leaves out from the Retold wiki's Animal of Set tables, as of
+  update 19.12998): class `CLS_ANIMAL` ("animal"), Egyptian types from
+  `U_BABOON` to `U_BOAR_OF_SET` (`is_set_animal`, `set_animal(t)`: summon
+  age, food, converted from).
+  - **Summons**: Set's Pharaoh summons them for favor
+    (`Civs::summon`, `summon_animal(pharaoh, type)`, `get_summon_menu(pharaoh)`):
+    no order, a queue of his own (5 at most, one at a time, the head runs)
+    that never interrupts what he does (he walks, empowers, heals, fights on);
+    the animal appears beside him after its summon time; pop is counted while
+    queued (`Economy::recount` adds `Civs::summons`), the favor is paid on
+    queueing and refunded if he falls. By age: Archaic Baboon (3 favor, 3 s);
+    Classical Gazelle (3, 3 s), Hyena (4, 4 s); Heroic Giraffe (5, 4 s),
+    Crocodile (6, 4 s); Mythic Hippopotamus (7, 6 s, 2 pop), Rhinoceros (9,
+    6 s, 2 pop), Elephant (14, 8 s, 2 pop). Refused: another god's or a
+    Greek's Pharaoh ("Only Set's Pharaoh summons Animals of Set"), the age
+    ("Requires Classical Age"), "Need more houses", "Not enough favor",
+    "Queue full".
+  - **Age-ups**: on each age-up (`age:advanced`, and `set_player_age` through
+    `Civs::age_set`, which also applies the Pharaoh's / Priests' per-age hp
+    and LOS) Set gets 3 at his first standing Temple (none: the home Town
+    Center): Classical 2 Gazelles + 1 Hyena, Heroic 2 Giraffes + 1 Crocodile,
+    Mythic 2 Hippos + 1 Rhino (`set_age_animals`), free.
+  - **Conversion**: Set's Priests convert a live wild animal (`O_CONVERT`,
+    order type "convert", `order_convert(ids, animal)`, a right-click on a
+    deer or boar): he walks within 6 tiles (Retold 10 x 0.6), channels
+    (`order_x` = seconds, kept if the animal grazes off and he follows) for
+    Retold's 35 s (deer) / 50 s (boar), and the animal becomes his Deer /
+    Boar of Set (Retold's converted stats) where it stood. Another god's
+    Priest, a Greek or any other unit cannot (the order is refused).
+  - **Food**: an Animal of Set that dies leaves a carcass (a dead deer, or a
+    boar for the 2-pop ones) with its food: Retold's Amount for the summoned
+    (Baboon 93.75, Gazelle 150, Hyena 93.75, Giraffe 300, Crocodile 187.5,
+    Hippo 375, Rhino 487.5, Elephant 675), and for the converted 75 % of this
+    sim's wild animal (deer 100 -> 75, boar 250 -> 187.5); Laborers butcher
+    it like any hunt.
+  - **Stats** (mapped as the other units): Baboon 20 hp / 3 hack / ROF 1 /
+    35-5 % armor, Gazelle 15 / 3.5 / 1.1 / 35-0, Hyena 45 / 7 / 1.8 / 20-30,
+    Giraffe 25 / 5 / 1.4 / 35-5, Crocodile 70 / 9 / 1.3 / 10-30, Hippo 100 /
+    6 / 1 / 10-20, Rhino 135 / 8 / 1.1 / 30-40, Elephant 270 / 10 / 1.4 /
+    20-40, Deer 15 / 3 / 1.1 / 35-0, Boar 70 / 6 / 1 / 20-30; speed (3.3 / 4 /
+    5) x0.65, LOS (16 / 14) x0.6, reload x1.15, armor x0.75; in the Archaic
+    Age they hit at 10 % (Retold's -90 %); x0.5 vs buildings (the Elephant
+    x1.5). They can be healed (Retold). No Armory upgrades (Retold).
+  - **Laborers' bow**: a Laborer attacking an Animal of Set shoots Retold's
+    anti-animal attack, 12 pierce at 7.2 tiles (12 x 0.6) every 2.3 s (ROF
+    2 x 1.15), an arrow; wild deer / boar are still hunted with this sim's
+    spear (3 per 1.5 s at 3.4 tiles, the villager's).
+  - The renderer draws them with stand-in rigs (`stand_in`: `baboon_of_set`,
+    the Crocodile `petsuchos`, the Elephant `war_elephant`) until their
+    models exist; `get_civ_fx()` has `converts` [priest, animal]* and
+    `convert_progress` (0..1) for a conversion effect.
+- **Retold's Egyptian prices and times where they differ from the Greek
+  ones**: the Watch Tower costs an Egyptian 50 w + 100 g (Greek 100 + 100),
+  the Fortified Wall 500 f + 400 g, the Citadel Wall 800 f + 500 g
+  (`civ_fort_tech_cost`: research, refund, `get_fortify`, `get_techs` and the
+  AI's wall / tower upgrades); one Laborer builds a Town Center in 200 s
+  (Retold's 150 base), a Farm in 13.3 s (10 base), a Sentry Tower in 80 s
+  (60 base) (`civ_build_time`, the row's `fort_build_time`; the Greeks keep
+  this sim's 60 / 12 / 30); the other shared types' base times are Retold's
+  already (House 15, Temple 40, Armory / Market 40). Drop sites' LOS 5.4
+  (9 x 0.6). The Stone Wall, Guard and Ballista Tower stages keep the Greek
+  prices (EGYPT.md gives none); the Citadel Wall and Ballista Tower are not
+  Egyptian-only here.
 - **Mapping Retold onto this sim** (`civ.h` head, `egypt_unit(t).mapping`
   per unit): hp and damage as Retold; speed x0.65 (the Laborer: the
   villager's 2.7 / 4.0 ratio); range and LOS x0.6 (`DIST_SCALE`); reload
   x1.15; armor: Egyptian units have a hack (`UnitDef.armor`) and a pierce
   armor (`EgyptUnit.pierce_armor`) = Retold's x0.75 (the hoplite's 0.30 is
   Retold's 40 % hack), read by `Techs::unit_armor` (arrows pierce, blows
-  hack); the Laborer keeps the villager's 0; train time as Retold (the
+  hack); the Laborer too (25 / 35 % -> hack 0.1875, pierce 0.2625; the Greek
+  villager keeps 0); train time as Retold (the
   Laborer 17 x 10 / 15, as the villager's 10 s for Retold's 15). Bonuses are
   the class multipliers (Spearman x2 cavalry, Axeman x4 infantry, Slinger
   x2.25 archers, Chariot Archer x1.5 infantry, Camel Rider x2 cavalry and
@@ -1861,7 +1925,8 @@ techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
   and 200 crush vs buildings, a Siege Tower 9 vs units and 59.1 crush per hit
   vs buildings (Retold's 180 / 3.5 s at a 1.15 s reload), crush less the
   building's crush armor (5 %), not the browser's flat x0.35. Buildings: the
-  shared types keep the Greek building's hp, footprint and base build time;
+  shared types keep the Greek building's hp and footprint (base build times:
+  Retold's, above);
   the Egyptian ones take Retold hp x1.25 (the TC / Temple / Academy ratio),
   footprints of the models (drop sites 3x3, Monuments 2x2 / 3x3, Barracks
   5x5, Migdol 6x6, Siege Works 5x5, Obelisk 1x1), Retold armor (40 / 90 / 5,
@@ -1870,14 +1935,20 @@ techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
   TC's 2 x 10 in Retold, on this sim's TC arrow of 6). Mercenaries lose 2.5 /
   4 hp/s (limits 12 / 8). Not in this game (yet): ships and the Dock,
   Caravans, the Lighthouse, the Wonder, the per-line Medium / Heavy / Champion
-  upgrades and Levy / Conscript techs, relics, Set's animals, the Egyptian
-  minor gods, their god powers and myth units.
+  upgrades and Levy / Conscript techs, relics, the Egyptian minor gods,
+  their god powers and myth units (other pieces'); the wild animals other than
+  deer and boar (this sim has only those two to convert).
 - **Scene `egypt`** (`sim/civ/egypt_scene.cpp`, entry in
   `game/core/scenes.gd`): player 1 Egyptian (Ra, Mythic) at the first start,
   Laborers at a Lumber Camp (empowered by the Pharaoh), a Mining Camp and a
   Granary, Houses, the five Monuments, an Obelisk, Temple, Barracks, Migdol,
   his army in ranks with two Priests healing wounded Spearmen; a Greek player
   2. `node scripts/godot-shoot.mjs --scene egypt --out shots/godot/egypt-scene.png`.
+- **Scene `egypt_set`** (same file): a Set player reaching the Heroic Age
+  at his Temple (the two age-ups' 6 animals there), the Pharaoh walking by
+  and summoning a Baboon, a Hyena and a Crocodile, a Priest converting a deer
+  herd, Laborers butchering a fallen Gazelle of Set by a Granary; a Greek
+  player 2. `node scripts/godot-shoot.mjs --scene egypt_set`.
 - **Renderer**: every Egyptian unit has its own rig now ("Egyptian units and
   myth units: the look"); a type without one falls back as before: `units.gd` draws an Egyptian unit
   with its Greek stand-in's rig (`get_unit_def(t).stand_in`) and
@@ -1906,9 +1977,19 @@ there (Devotees applied) and `devotees` (the Monument); `get_civ_fx().mandjet`
 [monument, building]*; `shield_check(caster, x, z)` ({ok, reason, by}: a god
 power's target under a Divine Shield); `get_techs(building)` /
 `get_owner_techs(owner, type)` list only the owner's civ's techs (`tech_civ`).
+Set's animals: `get_summon_menu(pharaoh)` ([{type, name, cost, time, age,
+pop, ok, reason}]), `summon_animal(pharaoh, type)` ({ok, reason}),
+`get_summons(owner)` ([{pharaoh, type, t, total}]), `order_convert(ids,
+animal)`; `get_civ_state` also `summoned`, `converted`, `age_gift`,
+`carcass_food`, `animals_of_set` ({type: n}), `summon_pop`; `get_unit_def`
+of an animal: `animal_of_set`, `food`, `summon_age`, `summon_time` or
+`converted_from` / `convert_time`, `archaic_attack`; of the Laborer:
+`vs_animals` {damage, range, cooldown}; of the Priest: `convert_range`;
+`get_building_def(...).by_civ[civ]` has `base_build_time` and `build_time`
+(one builder).
 
 ```
-godot --headless --path godot -s res://game/core/egypt_check.gd [-- --only=defs,match,economy,units,pharaoh,priest,gods,auras,locks,determinism,rules_off]   # ~10 s
+godot --headless --path godot -s res://game/core/egypt_check.gd [-- --only=defs,match,economy,units,pharaoh,priest,gods,auras,set,civcosts,locks,determinism,rules_off]   # ~1 min
 ```
 
 `egypt_check.gd` ("EGYPT PASS|FAIL <case>", `EGYPT_RESULT {json}`, exit =
@@ -1941,8 +2022,24 @@ two, 0 at 32 tiles; Devotees: Set's Spearman 45 f + 22.5 g near, 50 + 25
 far, Camel Rider 45 + 63 at the Migdol, refund 45 + 22.5, Ra's in full);
 the Egyptian stockpile 200 / 100 / 50 / 0 and Set's Baboon; the Laborer's
 6.72 on a tower against the villager's 0.84; the limit message "Limit of 12
-Mercenaries"; a mixed Greek + Egyptian match twice, bit-equal;
-rules off refuses.
+Mercenaries"; Set's animals (`set.*`: the summon menu by age, 3 + 3 favor and
+Baboons at 3.0 / 6.1 s while the Pharaoh walks on, an Elephant of Set 14
+favor in 8 s, refusals; 2 Gazelles + 1 Hyena at the Temple on a real
+Classical age-up, then Heroic and Mythic's on `set_player_age(3)`, none for
+Ra; a Priest channelling 35.0 s on a deer from 5.6 tiles and 50.0 s on a
+boar, the wild deer gone, its Deer of Set's carcass 75 food butchered by a
+Laborer, refused for Ra's Priest, a Greek-owned one and a hoplite; every
+animal's stats, a Hyena's blow on a hoplite 0.49 Archaic / 4.9 Classical, a
+Laborer's arrow 9.3 on a Hyena from 7 tiles without walking, 4 Laborers
+shoot down 2 Hyenas and all live); Retold's Egyptian prices (`civcosts.*`:
+Watch Tower 50 w + 100 g paid and refunded, Fortified / Citadel Wall 500 f +
+400 g / 800 f + 500 g, Greek 100 + 100 and 250 w + 200 g; one Laborer's TC
+201 s, Farm 14.7, tower 81, House 21 with the walk, the villager's 61 / 13 /
+31; a hoplite's blow 7.31 on a Laborer vs 9 on a villager, a toxotes arrow
+5.16; drop sites' LOS 5.4); a mixed Greek + Egyptian match twice, bit-equal,
+and a Set match with summons, a conversion, an age-up gift and an animal
+fight twice, bit-equal; rules off refuses (no Animal of Set spawns, no
+convert, no summon).
 
 ## Conventions
 
