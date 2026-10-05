@@ -1620,6 +1620,12 @@ techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
   Caravans, the Lighthouse, the Wonder, the per-line Medium / Heavy / Champion
   upgrades and Levy / Conscript techs, relics, Set's animals, the Egyptian
   minor gods, their god powers and myth units.
+- **Scene `egypt`** (`sim/civ/egypt_scene.cpp`, entry in
+  `game/core/scenes.gd`): player 1 Egyptian (Ra, Mythic) at the first start,
+  Laborers at a Lumber Camp (empowered by the Pharaoh), a Mining Camp and a
+  Granary, Houses, the five Monuments, an Obelisk, Temple, Barracks, Migdol,
+  his army in ranks with two Priests healing wounded Spearmen; a Greek player
+  2. `node scripts/godot-shoot.mjs --scene egypt --out shots/godot/egypt-scene.png`.
 - **Renderer**: until a type has its model, `units.gd` draws an Egyptian unit
   with its Greek stand-in's rig (`get_unit_def(t).stand_in`) and
   `buildings.gd` an Egyptian building with its stand-in model or a sandstone

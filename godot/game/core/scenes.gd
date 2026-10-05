@@ -62,6 +62,11 @@ static var SCENES := {
 	# the camera close and high like reference/techs/building_01 / building_04.
 	"techbuildings": {"preset": "skirmish", "seed": 7, "hud": false, "reveal_all": true, "fast_forward": 0.0,
 		"camera": {"distance": 17.0, "pitch": 45.0, "yaw": 22.0, "focus_dx": -0.3, "focus_dz": -1.2}},
+	# Godot-only: an Egyptian (Ra, Mythic) player at play (sim/civ/egypt_scene.cpp):
+	# Laborers at their drop sites, the Pharaoh empowering the Lumber Camp, the
+	# Monuments, his army in ranks with Priests healing; a Greek player 2.
+	"egypt": {"preset": "skirmish", "seed": 7, "hud": true, "reveal_all": true, "fast_forward": 4.0,
+		"camera": {"distance": 40.0, "pitch": 48.0, "yaw": 25.0}},
 	# Godot-only: an Egyptian town with every Egyptian building on desert ground
 	# (game/buildings/egypt_town_scene.gd, egypt_buildings.gd); egt_focus=<type>
 	# frames one building like reference/egypt/building_02..21.

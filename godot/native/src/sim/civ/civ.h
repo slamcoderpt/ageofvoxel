@@ -121,6 +121,8 @@ constexpr double FAVOR_CAP = 200;        // the Greek favor cap of this sim
 constexpr double SIEGE_CRUSH_ARMOR = 0.05; // a browser building's crush armor vs siege (Retold buildings: 5-10 %)
 
 struct CivStart { int32_t tc = 0, pharaoh = 0, priest = 0; std::vector<int32_t> workers; };
+struct SceneCtx;
+SceneCtx egypt_scene_setup(Sim &sim); // the "egypt" scene (egypt_scene.cpp; scenes::setup dispatches)
 
 // ---- the system ------------------------------------------------------------------------
 class Civs {
