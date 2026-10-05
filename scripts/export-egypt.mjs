@@ -1930,20 +1930,8 @@ function temple(god) {
   figure(m, 6.5, py, 34, { h: 30, gold: GILT_L, kiltFront: TEAM, pose: 'stride', ...G });
   pottedPalm(m, 33, 4, 35);
   // the temple's second tall element: a pair of limestone obelisks at the
-  // ramp foot on stepped bases, tapering 3 x 3 -> 2 x 2, gilt pyramidions
-  for (const ox of [10, 28]) {
-    m.box(ox - 2, 1, 41, 5, 1, 5, SAND_D);
-    m.box(ox - 1, 2, 42, 3, 1, 3, GILT_D);
-    for (let y = 3; y < 23; y++) {
-      const w = y < 14 ? 3 : 2;
-      for (let i = 0; i < w; i++) for (let k = 0; k < w; k++) {
-        const X = ox - 1 + i + (w === 2 ? 0 : 0), Z = 42 + k;
-        m.set(X, y, Z, (i === w - 1 && k === w - 1) ? 0xd8c8a6 : LIME(X, y, Z));
-      }
-    }
-    for (let i = 0; i < 2; i++) for (let k = 0; k < 2; k++) m.set(ox - 1 + i, 23, 42 + k, (i + k) === 2 ? GILT_D : GILT);
-    m.set(ox - 1, 24, 42, GILT_L);
-  }
+  // ramp foot on stepped bases, smoothly tapering, gold pyramidions
+  for (const ox of [10, 28]) smallObelisk(m, ox + 1, 43, 1, 20);
   return m;
 }
 
@@ -2239,35 +2227,95 @@ function siegeWorks() {
   return m;
 }
 
-// Obelisk (1 x 1; building_12): a slim tapering spire with gilt panels on a
-// stepped base, four prongs holding a glowing teal flame bowl at the top.
+// Obelisk (1 x 1, drawn over 1.5 x 1.5 like the sentry tower; building_12):
+// a landmark read at a glance. A stepped plinth: a dark base course and a
+// 10-wide sandstone tier with a limestone tread, an 8-wide tier carrying a
+// painted hieroglyph band, a fluted cavetto row and a limestone cornice lip
+// overhanging it by a voxel (a team line round its top), a limestone die.
+// On it the shaft: one smoothly tapering square needle (a battered block
+// under skin(), 6 voxels wide at the foot, ~3 at the top) in coursed
+// sandstone, a team ring at its foot, a deep gold recessed panel down each
+// face carved with registers of lapis / dark gold hieroglyphs, a gilt trim
+// band where the panels stop, a second under the tip, and a clean smooth
+// electrum pyramidion.
+// deep golds: under the sun's tonemapping a pale gilt washes out to sand, so
+// the obelisk's gold is a saturated, darker leaf (lit faces still read gold)
+const OB_GOLD = 0xd6aa00, OB_GOLD_L = 0xf4cc00, OB_GOLD_D = 0x8e6800, OB_PANEL = 0xe6b800, OB_INK = 0x3a2606;
 function obelisk() {
-  const m = lot(8, 8, SANDGROUND);
-  m.box(0, 1, 0, 8, 1, 8, LIME); m.box(1, 2, 1, 6, 1, 6, GILT);
-  const H = 30;
-  for (let y = 3; y < H; y++) {
-    const t = (y - 3) / (H - 3);
-    const w = t < 0.45 ? 6 : t < 0.8 ? 4 : 4;
-    const o = (8 - w) / 2;
-    for (let x = o; x < o + w; x++) for (let z = o; z < o + w; z++) {
-      const edge = x === o || x === o + w - 1 || z === o || z === o + w - 1;
-      if (!edge) { m.set(x, y, z, SAND_D(x, y, z)); continue; }
-      const corner = (x === o || x === o + w - 1) && (z === o || z === o + w - 1);
-      let c = corner ? SAND(x, y, z) : (y % 6 === 0 ? OCHRE : GILT);
-      if (y === 3 || y === 15 || y === 16) c = GILT_D;
+  const m = lot(12, 12, SANDGROUND);
+  const ring = (y, a, b, f) => { for (let x = a; x < b; x++) for (let z = a; z < b; z++) m.set(x, y, z, f(x, z, Math.min(x - a, b - 1 - x, z - a, b - 1 - z))); };
+  // the plinth: two tiers and a cornice lip
+  ring(1, 1, 11, (x, z) => PLINTH(x, 1, z));
+  ring(2, 1, 11, (x, z) => SAND(x, 2, z));
+  ring(3, 1, 11, (x, z, e) => (e === 0 ? LIME(x, 3, z) : SAND_D(x, 3, z)));
+  ring(4, 2, 10, (x, z) => SAND(x, 4, z));
+  // the hieroglyph band: cartouche-like panels of lapis and red signs on ochre between pale frames
+  const HB = [LIME_S, OCHRE_M, LAPIS, OCHRE_M, RED_M, OCHRE_M, LAPIS, LIME_S];
+  ring(5, 2, 10, (x, z, e) => (e === 0 ? HB[(x === 2 || x === 9) ? z - 2 : x - 2] : SAND_D(x, 5, z)));
+  ring(6, 2, 10, (x, z, e) => (e === 0 ? (((x + z) & 1) ? GORGE : GORGE_L) : SAND_D(x, 6, z)));
+  ring(7, 1, 11, (x, z, e) => (e === 1 ? TEAM : LIP(x, 7, z)));
+  ring(8, 3, 9, (x, z) => LIME(x, 8, z));
+  // the shaft: voxels x/z 4..8 to y 28, 5..7 above, skinned as one taper
+  const Y0 = 9, H = 28, B = 20, TOP = Y0 + H;
+  m.blocks.push({ x0: 4, z0: 4, x1: 8, z1: 8, y0: Y0, h: H, b: B, base: 0 });
+  const P0 = 11, P1 = 27;           // the recessed panels' rows
+  const glyph = (x, y, z) => {
+    const r = (y - P0) % 4;
+    if (r === 0) return OB_GOLD_D;                                      // the register rule
+    const g = Math.floor((y - P0) / 4), s = (x + z) & 1;
+    const sign = [[1, 1, 0], [0, 1, 1], [1, 0, 1], [1, 1, 1]][g % 4];
+    return sign[r - 1] && ((r + s + g) & 1) ? (g & 1 ? LAPIS : OB_INK) : OB_PANEL;
+  };
+  for (let y = Y0; y < TOP; y++) {
+    const k = y - Y0 >= B ? 1 : 0;
+    const a = 4 + k, b = 8 - k;
+    for (let x = a; x < b; x++) for (let z = a; z < b; z++) {
+      const core = x > a && x < b - 1 && z > a && z < b - 1;
+      const panel = k === 0 && y >= P0 && y < P1;
+      if (panel && !core && !((x === a || x === b - 1) && (z === a || z === b - 1))) continue;   // cut: the recess
+      let c;
+      if (core) c = panel ? glyph(x, y, z) : SAND_D(x, y, z);
+      else if (y === Y0) c = TEAM;
+      else if (y === P1 || y === TOP - 2) c = OB_GOLD;
+      else c = SAND(x, y, z);
       m.set(x, y, z, c);
     }
   }
-  // four prongs flaring out to hold the bowl
-  for (let y = H; y < H + 5; y++) {
-    const d = Math.floor((y - H) / 2);
-    for (const [a, b] of [[2 - d, 2 - d], [5 + d, 2 - d], [2 - d, 5 + d], [5 + d, 5 + d]]) m.set(a, y, b, y === H + 4 ? GILT : SAND(a, y, b));
+  // the pyramidion: an electrum voxel core under a smooth four-sided cap
+  for (let x = 5; x < 7; x++) for (let z = 5; z < 7; z++) m.set(x, TOP, z, OB_GOLD);
+  const hw = 2 + 1 - H / B, cx = 6, cz = 6, ap = [cx, TOP + 3.4, cz];   // hw: the skin's half-width at TOP
+  const sq = [[cx - hw, cz - hw], [cx + hw, cz - hw], [cx + hw, cz + hw], [cx - hw, cz + hw]];
+  const lit = [OB_GOLD_L, OB_GOLD, OB_GOLD, OB_GOLD_L];
+  for (let i = 0; i < 4; i++) {
+    const [ax, az] = sq[i], [bx, bz] = sq[(i + 1) % 4];
+    const mx = (ax + bx) / 2 - cx, mz = (az + bz) / 2 - cz;
+    poly(m, [[ax, TOP, az], [bx, TOP, bz], ap], lit[i], { out: [mx, 0.6, mz] });
   }
-  // the bowl and the teal flame
-  lathe(m, 4, 4, H + 4, H + 6, (y) => (y === H + 4 ? 2.4 : 3.2), GILT_D, { hollow: 1, inner: 0x7fe8e0 });
-  lathe(m, 4, 4, H + 5, H + 8, (y) => 2.2 - (y - H - 5) * 0.7, 0x9ff2ea);
-  for (const v of m.coords) { const p = m.get(...v); if (p && (p.c === 0x9ff2ea || p.c === 0x7fe8e0)) p.glow = TEAL.glow; }
+  poly(m, sq.map(([x, z]) => [x, TOP, z]), OB_GOLD_D, { out: [0, -1, 0] });
   return m;
+}
+
+// a small processional obelisk (the temple's ramp pair, the wonder's door
+// pair): a stepped two-tier base, a 2 x 2 voxel shaft skinned as one smooth
+// taper (4 voxels at the foot to ~1.5 under the tip) with a team ring at the
+// foot and a gold band under the tip, and a smooth gold pyramidion. (cx, cz):
+// the shaft's centre (a voxel corner).
+function smallObelisk(m, cx, cz, y0, h = 20) {
+  m.box(cx - 3, y0, cz - 3, 6, 1, 6, SAND_D);
+  m.box(cx - 2, y0 + 1, cz - 2, 4, 1, 4, LIME);
+  const Y0 = y0 + 2, B = 16, TOP = Y0 + h;
+  m.blocks.push({ x0: cx - 1, z0: cz - 1, x1: cx + 1, z1: cz + 1, y0: Y0, h, b: B, base: 0 });
+  for (let y = Y0; y < TOP; y++) for (let x = cx - 1; x < cx + 1; x++) for (let z = cz - 1; z < cz + 1; z++) {
+    m.set(x, y, z, y === Y0 ? TEAM : y === TOP - 2 ? OB_GOLD : LIME(x, y, z));
+  }
+  const hw = 1 + 1 - h / B, ap = [cx, TOP + 2.2, cz];
+  const sq = [[cx - hw, cz - hw], [cx + hw, cz - hw], [cx + hw, cz + hw], [cx - hw, cz + hw]];
+  const lit = [OB_GOLD_L, OB_GOLD, OB_GOLD, OB_GOLD_L];
+  for (let i = 0; i < 4; i++) {
+    const [ax, az] = sq[i], [bx, bz] = sq[(i + 1) % 4];
+    poly(m, [[ax, TOP, az], [bx, TOP, bz], ap], lit[i], { out: [(ax + bx) / 2 - cx, 0.6, (az + bz) / 2 - cz] });
+  }
+  poly(m, sq.map(([x, z]) => [x, TOP, z]), OB_GOLD_D, { out: [0, -1, 0] });
 }
 
 // Monuments (building_13..17): dark basalt and gold statues on gilt
@@ -2539,10 +2587,7 @@ function wonder() {
   block(m, 28, 46, 36, 52, 1, 18, { wall: LIME, frieze: 2 });
   door(m, '+z', 30, 4, 1, 12, { sun: true });
   // two obelisks by the door
-  for (const ox of [25, 37]) for (let y = 1; y < 30; y++) {
-    const w = y < 24 ? 2 : 1;
-    for (let i = 0; i < w; i++) for (let k = 0; k < 2; k++) m.set(ox + i + (w === 1 ? 0 : 0), y, 53 + k, y >= 26 ? GILT : (y % 4 === 0 ? GILT : LIME(ox, y, 53)));
-  }
+  for (const ox of [25, 37]) smallObelisk(m, ox + 1, 54, 1, 27);
   // column drums before the gate
   for (const [x, z] of [[18, 58], [44, 58], [20, 62], [42, 62]]) {
     lathe(m, x, z, 1, 10, () => 1.9, (xx, y, zz) => (y > 7 ? GREENP : y % 3 === 0 ? RED : LIME(xx, y, zz)));
@@ -2669,7 +2714,7 @@ const TYPES = {
   siege_works: { w: 7, h: 7, variants: ['0'], ages: [1], build: () => siegeWorks() },
   armory: { w: 4, h: 4, variants: ['0'], ages: [1], build: () => armory() },
   market: { w: 4, h: 4, variants: ['0'], ages: [1], build: () => market() },
-  obelisk: { w: 1, h: 1, variants: ['0'], ages: [1], build: () => obelisk() },
+  obelisk: { w: 1, h: 1, variants: ['0'], ages: [1], build: () => obelisk(), draw: 1.5 },
   monument_villagers: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(1) },
   monument_soldiers: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(2) },
   monument_priests: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(3) },

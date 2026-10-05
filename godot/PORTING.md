@@ -1105,8 +1105,8 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   voxel out (its shaded underside is the roof's shadow line), the lip slab
   with the team line round a darker jointed deck and a low inner parapet
   step; no screen walls or drapes; a darker naos and floor so the slots read
-  dark; two plain tapering limestone obelisks with gilt pyramidions at the
-  ramp foot; the **major god's statue** (stout, h 30, crook and flail held
+  dark; two smoothly tapering limestone obelisks (`smallObelisk`) with gold
+  pyramidions at the ramp foot; the **major god's statue** (stout, h 30, crook and flail held
   to the chest, no tall sceptre; a dark team apron): variants `ra` falcon
   with the disc, `isis` winged with horns and disc, `set` the Set animal;
   the discs are round, sampled round their true centre by `sunDisc`, two
@@ -1144,8 +1144,20 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   `armory` / `market` 4x4 (Retold's Egyptian ones: a forge under a dark
   striped awning with a stepped chimney furnace, a trough and a gilt ankh /
   a hall with three stalls of **team / white striped awnings** over produce),
-  `obelisk` 1x1 (a gilt-panelled spire, four prongs holding a glowing teal
-  flame), the five **Monuments** (`monument_villagers` kneeling with bowls,
+  `obelisk` 1x1, drawn over 1.5 x 1.5 like the sentry tower (round 13, the
+  town's landmark: a stepped plinth of a dark base course, a 10-wide tier
+  with a limestone tread, an 8-wide tier with a painted lapis / red / ochre
+  hieroglyph band, a fluted cavetto row and a limestone cornice lip
+  overhanging it by a voxel with the team line round its top, a limestone
+  die; the shaft one smooth taper, a battered block under `skin()` (6
+  voxels at the foot to ~3 at the top), coursed sandstone with a team ring
+  at its foot, a recessed gold panel down every face carved in registers of
+  lapis / dark gold signs (skin()'s one-voxel recesses), gold trim bands
+  where the panels stop and under the tip, and a smooth four-sided gold
+  pyramidion (polys over a gold voxel core); its golds `OB_GOLD*` are pure
+  yellows with no blue, since AgX at exposure 2 turns pale or orange gilt
+  to cream / salmon; `smallObelisk()` is the same needle at 2 x 2 voxels for
+  the temple's ramp pair and the wonder's door pair), the five **Monuments** (`monument_villagers` kneeling with bowls,
   `monument_soldiers` mummiform with crook and flail, `monument_priests`
   striding in a nemes, `monument_pharaohs` a king and queen, all dark basalt
   and gold on gilt plinths with team panels; `monument_gods` 4x4 with
