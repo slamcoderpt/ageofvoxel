@@ -917,21 +917,51 @@ a few smooth parts (the silos), pivoted at the footprint centre, the front to
 whitewashed plaster roofs, mud brick and palm thatch (Archaic houses),
 painted friezes (blue / red / ochre), gilt, dark basalt.
 
-- **The Egyptian block** (`block()`): a flat roof of plaster inside a pale
-  parapet with the **team line** inset on the rim (Retold's blue roof rim),
-  a projecting cornice, a **team band** under it, a painted frieze, pale
-  corner torus mouldings, a darker socle, optionally battered walls (pylons,
-  the Migdol, the camps). Doors are recessed in limestone frames with a
-  projecting lintel, some with a **gilt winged sun** above; slit windows.
+- **The Egyptian block** (`block()`): a flat plaster roof (palm thatch under
+  poles on Archaic houses) inside a **cavetto cornice** (the wall's top row
+  fluted, the warm-limestone lip flaring one voxel out), a thin **team line**
+  one voxel inside the lip, a torus roll under the cornice, one thin `band`
+  (ochre dashes by default, `'team'` a dark lapis line on the TC, pylons,
+  Migdol, barracks, `'lapis'` on the Armory), an optional muted painted
+  frieze, pale corner torus mouldings, a darker socle and **battered walls**
+  (inset one voxel every `batter` rows). Doors are recessed in limestone
+  frames with a projecting lintel, some with a gilt winged sun; slit windows;
+  palm-log beam ends under the cornice (`beams()`).
+- **Smooth battered walls** (`skin()`): voxels draw a batter as stairs that
+  read as a ziggurat, so every battered face of every block is covered by a
+  smooth sloping plane through the steps' outer edges, one quad per voxel
+  cell coloured by the masonry voxel behind it (courses, bands, friezes, door
+  frames, slits and team voxels carry through), with holes at recesses
+  (doors) and gaps where something stands against the wall (porches,
+  lintels, beams, adjoining blocks). Finished models only (construction
+  stages keep the stepped voxels).
+- **Two team strengths**: `TEAM` voxels (roof lines, lapis bands, plinth
+  panels) are weathered to a dark warm grey and tinted at 0.62, so the
+  owner's colour is a thin dark lapis / maroon line, never the loudest thing;
+  `TEAMB` (bright) is kept for **one feature per function**: the Market's
+  striped awnings, the Barracks' and Migdol's banners, the statues' kilts,
+  the construction pennants. Other strong colour is saved for the Temple's
+  painted columns (papyrus capitals, lapis / red bands, glyph columns) and
+  the relief bands on its platform, the Armory's forge glow.
+- **Settled into the ground**: no square slab under a model; `settle()` lays a
+  ragged packed-earth apron under and round whatever stands (fading out in
+  3 voxels, a darker sand splash against the walls) and **worn paths** from
+  every ground-level door (registered by `door()`) to the lot edge; yards,
+  threshing floors and paving are ragged `patch()`es. The ground row is
+  pivoted 0.1 tile down (it sits 0.025 above the terrain: a decal, no plinth
+  edge). Every lot carries **clutter** where the walls meet the street:
+  `pots()` clusters, baskets of produce, crates, sacks, barrels, low
+  **mud-brick walls** (`mudFence()`), log piles, racks.
 - **Types** (the sim's keys, `sim/civ`; footprints as `buildings/defs.h`):
   `town_center` 7x7 (a walled compound: a two-storey hall with a latticed
   door, an east block, a front room, a battered pylon gateway with painted
   reliefs and a winged sun, a big and a small **domed silo**, awnings, a
   fire bowl, a basin, a palm, the gilt **falcon-headed Ra** with his sun
   disc on a plinth at the front left), `house` 3x3 (three plans: boxes with
-  an upper room, striped awnings on poles, crates, jars, a walled yard with
-  a palm; Archaic look `a1` mud brick + thatch, `a2` whitewashed with
-  friezes), `granary` 3x3 (a hut with a roof hatch and a ladder, two ribbed
+  a side room or an L round a projecting door portal, beam ends, palm-thatch
+  lean-tos, yard walls, a tall one with an outside stair and a roof sunshade;
+  Archaic look `a1` mud brick with a mud gorge and thatch under poles, `a2`
+  sandstone with plaster roofs and an ochre band), `granary` 3x3 (a hut with a roof hatch and a ladder, two ribbed
   domed silos, a grain bin, sacks), `lumber_camp` / `mining_camp` 3x3
   (battered blocks, striped awnings over a log pile / gold ore bins and a
   trough), `farm` 4x4 (a mud border, an irrigation channel and a shaduf; the
@@ -960,7 +990,10 @@ painted friezes (blue / red / ochre), gilt, dark basalt.
   tower, an octagonal storey, a columned lantern with a fire), `wonder` 8x8
   (a sphinx on a stepped plinth behind a pylon gate with gold reliefs and
   hieroglyph columns, obelisks, column drums), `sentry_tower`, `palm`
-  (3 variants, scene dressing).
+  (3 variants, scene dressing), `clutter` 2x2 (street dressing, 8 variants:
+  0 jars and a basket, 1 crates and sacks, 2 a mud-brick wall run with a gap,
+  3 a hand cart, 4 a pen corner, 5 a reed sunshade stall, 6 a woodpile,
+  7 a shaded well).
 - **Keys**: `<type>/<variant>/a<age>` finished (the highest listed age look
   <= the owner's age), `<type>/s<k>` in `egypt_stages` (k = floor(progress
   * 8) rounded down to 0, 2, 4, 6: 0 = the staked lot with team pennants and
@@ -982,10 +1015,16 @@ painted friezes (blue / red / ochre), gilt, dark basalt.
   `{type, owner, x, z, key | variant, age, god, built, progress, yaw, scale}`).
 
 Capture scene `egypt_town` (`game/buildings/egypt_town_scene.gd`): a whole
-Egyptian town on the flat start of a battle map (worn earth with a paved
-core, painted with `AovSim.paint_ground`; sand reads as beach on low ground),
-palms, every building: player 1 is made Egyptian and the sim's types are
-spawned, the rest (lighthouse, wonder, palms) drawn render-only.
+Egyptian settlement on the flat start of a battle map, laid out like
+`reference/egypt/building_01`: houses in touching rows along paved lanes,
+the Town Center on its plaza at the end of the main street, the temple up a
+processional way between obelisks, the military quarter east, the camps by
+their fields, street clutter between the buildings (`CLUTTER`), palms. The
+ground is painted after the spawns (a spawn lays its own square of dirt):
+worn earth everywhere, `LANES` paved (`AovSim.paint_ground`; sand reads as
+beach on low ground). Player 1 is made Egyptian and the sim's types are
+spawned, the rest (lighthouse, wonder, palms, clutter) drawn render-only.
+The whole-town camera is set by the scene (`cam` overrides it).
 
 ```
 node scripts/godot-shoot.mjs --scene egypt_town --out shots/godot/egypt_town.png    # the whole town
@@ -1656,7 +1695,14 @@ techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
   soldiers and heroes: `M_EG_HUMAN`, `M_HERO`; Ballistics / Burning Pitch to
   Slingers and Chariot Archers). Unit masks are 32 bits now (`UnitMask`).
 - **Start** (Retold): Town Center, `villagers - 2` Laborers (3 of the
-  default 5), the Pharaoh, a Priest; the setup's stockpile but no favor.
+  default 5), the Pharaoh, a Priest, and for Set a Baboon of Set (the
+  scout animal: `baboon_of_set`, 20 hp, 3 hack, speed 3.3 x0.65, class
+  infantry as this sim has no animal class, LOS 12 assumed; drawn with the
+  Anubite's rig until it has its own). Stockpile: Retold's 200 f / 100 w /
+  50 g / 0 favor on "standard" (the Greeks' 300 / 300 / 200 / 20), i.e. the
+  setup's stockpile x `EGYPT_START_RES` (2/3, 1/3, 1/4, 0): "low" 100 / 50 /
+  25, "high" 667 / 333 / 187.5; "deathmatch" keeps its 10000s (favor 0); an
+  AI's difficulty bonus is added on top as for the Greeks.
 - **Economy**: Laborers gather x0.9 (their rates are the villager's x0.9,
   farms `FARM_RATE` x0.9), build at 0.75 (a site's rate is (1 / time) x
   n^0.75 x the builders' mean work rate: a House is 15 s for a villager, 20 s
@@ -1687,9 +1733,30 @@ techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
   Priests empower (60 %); Isis: a Town Center +5 pop (20), techs -10 % food /
   wood / gold (not favor, not age-ups), Obelisks 5 gold and built 40 %
   faster by her Priests; Set: Spearman / Axeman / Slinger +5 % speed,
-  Barracks / Siege Works / Migdol -25 % gold. Not yet: the Monument auras
-  (Mandjet, Divine Shield, Devotees), Set's animals and conversions, the god
-  powers (Rain, Prosperity, Vision) and the unique techs. The setup screen's
+  Barracks / Siege Works / Migdol -25 % gold, the starting Baboon.
+- **Monument auras** (EGYPT.md 1.4 and 4, `Civs::auras / shield_allows /
+  train_cost_mult`; Retold metres x0.6, measured from the Monument's
+  footprint, built Monuments only):
+  - Ra's **Mandjet**: a Monument the Pharaoh himself empowers (full
+    strength; a Ra Priest's 60 % does not count) lends 60 % empowerment to
+    every other building of his within 18 tiles (30 m), other Monuments
+    included, Farms not: +45 % train / build / research, +12 % drops and
+    Monument favor. No stacking (the strongest empowerment of a building
+    wins), no chaining. `Civs::mandjet_by[row]` = the lending Monument.
+  - Isis' **Divine Shield**: no enemy god power can be cast within 15 tiles
+    (25 m) of a Monument, 30 tiles (50 m) when it is empowered
+    (`GodPowers::cast` refuses: nothing paid, no cooldown); her own and her
+    allies' powers are not blocked. An empowered Monument heals her units
+    and her allies' (not siege) within 30 tiles at 1 hp/s, half if busy,
+    stacking across Monuments; its favor is +100 % (`ISIS_EMPOWER_FAVOR`)
+    instead of +20 %: Monument to Villagers 4.5 -> 9 / min (Ra / Set 5.4).
+  - Set's **Devotees**: a Barracks or Migdol of his within 18 tiles of a
+    Monument trains at -10 % (all resources; EGYPT.md gives no distance,
+    Mandjet's 30 m is used); no stacking; a cancelled unit refunds what was
+    paid (`TrainItem::cost_mult`).
+  - Not yet: Set's other Animals (the Pharaoh's summons, three per age-up)
+    and conversions, the god powers (Rain, Prosperity, Vision) and the
+    unique techs. The setup screen's
   pantheon picker (game/menu/setup) still lists the Egyptians as "not in the
   game yet": a match config with `god: "ra" | "isis" | "set"` (main.gd's
   `match` arg, `start_match`) plays them already.
@@ -1704,7 +1771,8 @@ techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
   the class multipliers (Spearman x2 cavalry, Axeman x4 infantry, Slinger
   x2.25 archers, Chariot Archer x1.5 infantry, Camel Rider x2 cavalry and
   x1.25 archers, War Elephant x1.5 archers and x4 vs buildings, Priest x5 /
-  Pharaoh x2.5 myth). Siege: a Catapult stone is 42 vs units (40 pierce + 200
+  Pharaoh x2.5 myth); the Laborer's x4 vs towers multiplies his blow on a
+  tower (6 x 0.35 x the tower's armor: 6.72, a villager's 0.84). Siege: a Catapult stone is 42 vs units (40 pierce + 200
   crush x the 1 % human crush vulnerability; no area, no minimum range here)
   and 200 crush vs buildings, a Siege Tower 9 vs units and 59.1 crush per hit
   vs buildings (Retold's 180 / 3.5 s at a 1.15 s reload), crush less the
@@ -1746,11 +1814,17 @@ owner = 0)` (owner > 0: his civ's cost and trains; plus civ, stand_in,
 armor, by_civ {greek|egyptian: {cost, trains, build_time for one builder}},
 monument / favor_per_min), `get_unit_def(type)` (plus civ, hack_armor,
 pierce_armor, stand_in, retold, mapping, limit, heal, decay, by_age),
-`get_player(id)` (plus civ, civ_id); `get_techs(building)` /
+`get_player(id)` (plus civ, civ_id); `get_civ_state` also gives `god`,
+`empower_favor`, `mandjet` ([{id, type, by}]), `shields` ([{id, x, z,
+radius, heals}]), `devotees` ([{id, type, by, cost_mult}]), `isis_healed`,
+`devotee_saved`, `shield_refused`; `get_trains` gives each unit's `cost`
+there (Devotees applied) and `devotees` (the Monument); `get_civ_fx().mandjet`
+[monument, building]*; `shield_check(caster, x, z)` ({ok, reason, by}: a god
+power's target under a Divine Shield); `get_techs(building)` /
 `get_owner_techs(owner, type)` list only the owner's civ's techs (`tech_civ`).
 
 ```
-godot --headless --path godot -s res://game/core/egypt_check.gd [-- --only=defs,match,economy,units,pharaoh,priest,gods,locks,determinism,rules_off]   # ~10 s
+godot --headless --path godot -s res://game/core/egypt_check.gd [-- --only=defs,match,economy,units,pharaoh,priest,gods,auras,locks,determinism,rules_off]   # ~10 s
 ```
 
 `egypt_check.gd` ("EGYPT PASS|FAIL <case>", `EGYPT_RESULT {json}`, exit =
@@ -1771,7 +1845,19 @@ stats by age; healing 7.5 / 10 / 3.75 hp/s; the civ locks both ways,
 Monument order, the TC's Priests, Mercenary and Laborer limits, a Migdol
 for Mythic, builders; the major gods' passives (Ra's berries 0.877 vs 0.675
 food/s, camel 155.25 hp, Set's Spearman 3.41 speed and 56.25-gold Barracks,
-Isis' 20-pop TC, 90 / 90 Copper Weapons and 5-gold Obelisk); a mixed Greek + Egyptian match twice, bit-equal;
+Isis' 20-pop TC, 90 / 90 Copper Weapons and 5-gold Obelisk); the Monument
+auras (empowered Monument to Villagers 5.4 / min for Ra and Set, 9.0 for
+Isis, measured over 30 s; Mandjet: Monument 2 and a Barracks 9 tiles off at
+0.6, a Barracks 26 tiles off and a Farm not, favor 12.12 / min, 3 Spearmen
+37.6 -> 25.9 s, none from a Ra Priest's or an Isis Pharaoh's Monument;
+Divine Shield: a Greek Bolt refused at 10 tiles (no favor paid) and cast at
+20, refused at 20 / 29 once empowered and allowed at 31; Isis' healing 0 /
+1 / 2 hp/s with 0 / 1 / 2 empowered Monuments, 1 for a walking man under
+two, 0 at 32 tiles; Devotees: Set's Spearman 45 f + 22.5 g near, 50 + 25
+far, Camel Rider 45 + 63 at the Migdol, refund 45 + 22.5, Ra's in full);
+the Egyptian stockpile 200 / 100 / 50 / 0 and Set's Baboon; the Laborer's
+6.72 on a tower against the villager's 0.84; the limit message "Limit of 12
+Mercenaries"; a mixed Greek + Egyptian match twice, bit-equal;
 rules off refuses.
 
 ## Conventions

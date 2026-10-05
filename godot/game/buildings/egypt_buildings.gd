@@ -13,7 +13,8 @@ extends Node3D
 ## monument_soldiers, monument_priests, monument_pharaohs, monument_gods,
 ## obelisk, eg_barracks, migdol, siege_works) and, for an Egyptian owner, the
 ## shared ones (town_center, house, farm, temple, armory, market); plus
-## render-only lighthouse, wonder and sentry_tower (set_static).
+## render-only lighthouse, wonder, sentry_tower, palm and clutter (street
+## dressing: jars, crates, mud-brick walls, carts, stalls; set_static).
 ## Variants: house = the sim's variant % 3; temple and monument_gods = the
 ## owner's major god (ra / isis / set). A building whose sim footprint is not
 ## the model's is scaled uniformly to fit.
