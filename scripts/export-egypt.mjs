@@ -557,8 +557,9 @@ function figure(m, cx, y, cz, o = {}) {
     B(0.5, hy + 3, -0.4, 1.7, hy + 7, 0.6, skin);
     B(-2.2, hy - 2.5, -1.3, 2.2, hy + 2.2, 0.4, gold);
   } else {
-    B(-1.6, hy, -1.1, 1.6, hy + 3.4, 1.7, skin);          // the face
-    B(-0.4, hy + 1.2, 1.7, 0.4, hy + 2.2, 2.3, skin);      // nose
+    B(-2, hy, -1.3, 2, hy + 3.8, 1.8, skin);              // the face
+    B(-0.5, hy + 1.2, 1.8, 0.5, hy + 2.4, 2.5, skin);      // nose
+    B(-1.4, hy + 2.4, 1.7, -0.6, hy + 3, 1.9, gold); B(0.6, hy + 2.4, 1.7, 1.4, hy + 3, 1.9, gold);   // kohl-lined eyes
   }
   if (crown === 'nemes') {
     B(-2.3, hy + 1.6, -1.6, 2.3, hy + 4.4, 1.2, gold);
@@ -910,7 +911,7 @@ function townCenter() {
   palm(m, 8, 1, 28, 21, { lx: 0.3, lz: 1, len: 7 });
   // the Ra statue on its plinth at the front-left corner (outside the wall line)
   const py = plinth(m, 2, 46, 12, 54, 1, 7, { face: SAND, frame: LIME, team: true });
-  figure(m, 7, py, 50, { h: 26, skin: GILT, gold: GILT_L, kilt: CLOTH, kiltFront: TEAM, head: 'falcon', crown: 'disc', arms: 'staff', pose: 'stride' });
+  figure(m, 7, py, 50, { h: 34, skin: GILT, gold: GILT_L, kilt: CLOTH, kiltFront: TEAM, head: 'falcon', crown: 'disc', arms: 'staff', pose: 'stride' });
   return m;
 }
 
@@ -964,7 +965,6 @@ function temple(god) {
   const screen = (xa, xb, za, zb) => {
     for (let x = xa; x < xb; x++) for (let z = za; z < zb; z++) for (let y = fl; y < fl + 5; y++) m.set(x, y, z, y === fl + 4 ? LIME(x, y, z) : y === fl + 3 ? TEAM : SAND(x, y, z));
   };
-  screen(13, 16, 26, 28); screen(25, 27, 26, 28);
   screen(10, 13, 13, 15); screen(10, 13, 18, 20); screen(10, 13, 23, 25);
   screen(27, 30, 13, 15); screen(27, 30, 18, 20); screen(27, 30, 23, 25);
   // the naos inside with its door
