@@ -1157,11 +1157,24 @@ same channel names, plus:
   `priest` (white robe and headcloth, gold sun disc and sash, ankh staff),
   `pharaoh` (0.08: the team blue crown with gold discs and uraeus, gold
   corselet and apron over a long team skirt, striped crook), `chariot_archer`
-  (white horse in a striped blanket and team collar, two-wheeled silver car
-  with a team front, an archer in silver scale and a helmet; anim `centaur`
-  = horse legs + archer arms; the horse's neck is arched high with the head
-  out in front of the chest, the belly tucked up so daylight shows between
-  the fore and hind legs), `camel_rider` (0.09, the rider at 0.065 / 0.09
+  (white horse in a striped blanket and team collar, hitched to an Egyptian
+  chariot: a D-shaped car open at the back (an 11-voxel front, sides sweeping
+  down to the back), its breastwork in the army's colour inside gold rims and
+  struts with a gold sun disc, the car's rim 3 voxels above the wheels; two
+  six-spoke wheels (radius 5.8, light spokes in a dark felloe, a silver hub)
+  on the axle at the back of the car; two 2 x 2 shafts from under the floor
+  along the horse's flanks to yoke saddles at its shoulders, the yoke across
+  the withers, a team breast strap with gold studs; the archer bare-chested
+  in a gold / team broad collar and a white kilt, a quiver on his back, a
+  striped helmet over a face with 2-voxel dark eyes and a nose shadow (head
+  style `charioteer`, x 1.15), a short 1-voxel recurved bow canted outwards
+  (`rest: [0, 0, -0.7]`) so it never stands up through his head; anim
+  `centaur` = horse legs + archer arms; the horse's neck is arched high,
+  5 voxels wide at the base with a dark grey mane falling to the off side and
+  splayed ears (`horseNeck({ thick })`, a neck and not a pole seen from
+  behind), the belly tucked up; pose `chariot` (unit_view.cpp horse_pose)
+  makes the idle horse stand mid-stride: near foreleg lifted and pawing,
+  a hind leg set back, head up), `camel_rider` (0.09, the rider at 0.065 / 0.09
   so the camel dominates: a sandy-brown hide distinct from the rider's
   bronze skin, a lighter belly and legs, a darker muzzle; one high hump under
   a domed white cloth with a broad team border and an ochre zigzag hem; a

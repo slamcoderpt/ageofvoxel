@@ -367,6 +367,14 @@ function headE(style) {
     m.box(-1, 6, 6, 9, 1, 1, SILVER_DK);
     m.box(3, 6, -2, 1, 4, 9, TEAM).remove(3, 6, 6).remove(3, 9, 7).remove(3, 9, -2);
     m.box(-1, 0, 3, 1, 3, 3, SILVER).box(7, 0, 3, 1, 3, 3, SILVER).box(0, 1, -1, 7, 2, 1, SILVER_DK);
+  } else if (style === 'charioteer') {
+    // a striped bronze and team helmet cap over an open face: big dark kohl
+    // eyes (2 voxels each) and a shadow beside the nose, readable at RTS zoom
+    capN(m, (x, y, z) => (y >= 8 ? (x & 1) : (y & 1)) ? TEAM : BRONZE(x, y, z), { y0: 5, front: 6, top: 8 });
+    m.box(0, 6, 6, 7, 1, 1, GOLD).set(3, 8, 7, GOLD(0, 0, 0)).set(3, 7, 7, GOLD(1, 0, 0));
+    m.set(1, 4, 5, DARK).set(2, 4, 5, DARK).set(4, 4, 5, DARK).set(5, 4, 5, DARK);
+    m.set(2, 3, 5, 0x4a2814).set(2, 2, 5, 0x5a321c).set(4, 2, 5, SKIN_SH);
+    m.box(-1, 2, 1, 1, 3, 3, BRONZE).box(7, 2, 1, 1, 3, 3, BRONZE);   // cheek flaps behind the face
   } else if (style === 'camel') {
     nemesN(m, LINEN, TEAM, { chest: 7 });
   } else if (style === 'priest') {
@@ -730,22 +738,29 @@ function horseBody(C) {
   for (let z = 7; z < 15; z++) m.carve(0, -2, z, 7, 3 + (z > 8 && z < 13 ? 1 : 0), 1);
   return m;
 }
-function horseNeck(C, MANE, { bridle = TEAM, collar: col = null } = {}) {
+function horseNeck(C, MANE, { bridle = TEAM, collar: col = null, thick = false } = {}) {
   const m = new VoxelModel();
   // an arched neck carried high (the crest up to y 13), the head out in
-  // front of the chest at ~40 degrees, clear of the forelegs
+  // front of the chest at ~40 degrees, clear of the forelegs; "thick": a
+  // neck 5 wide at the base, 4 up the middle (so a horse seen from behind
+  // shows a neck, not a pole)
   const pts = [[0, 1.5, 3.2], [4, 2.4, 2.8], [8.5, 3.6, 2.3], [12.5, 5.2, 1.9]];
-  for (let i = 0; i < pts.length - 1; i++) capsuleYZ(m, 0, 3, pts[i][0], pts[i][1], pts[i][2], pts[i + 1][0], pts[i + 1][1], pts[i + 1][2], C);
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x0, w] = thick ? (i === 0 ? [-1, 5] : i === 1 ? [-1, 5] : [0, 3]) : [0, 3];
+    capsuleYZ(m, x0, w, pts[i][0], pts[i][1], pts[i][2], pts[i + 1][0], pts[i + 1][1], pts[i + 1][2], C);
+  }
   capsuleYZ(m, 0, 3, 13, 6, 2.2, 10, 11.5, 1.5, C);
   capsuleYZ(m, 0, 3, 12, 7, 1.6, 10.5, 8.8, 1.6, C);
   capsuleYZ(m, 0, 3, 10, 11.5, 1.5, 9.6, 12.4, 1.2, 0x6f675f);
   m.set(0, 9, 12, DARK).set(2, 9, 12, DARK).set(-1, 12, 7, DARK).set(3, 12, 7, DARK);
   m.set(0, 15, 5, C).set(0, 16, 5, C).set(2, 15, 5, C).set(2, 16, 5, C);
+  if (thick) m.set(-1, 15, 5, C).set(-1, 16, 4, 0x8a847c).set(3, 15, 5, C).set(3, 16, 4, 0x8a847c).set(1, 14, 3, MANE).set(1, 14, 4, MANE);   // pricked ears splayed (a Y seen from behind), a forelock
   for (let y = 1; y <= 14; y++) {
     let z = -8;
     while (z < 12 && !m.has(1, y, z)) z++;
     if (z >= 12) continue;
-    m.set(1, y, z - 1, MANE).set(1, y, z, MANE);
+    if (thick) m.set(1, y, z - 1, MANE).set(2, y, z - 1, MANE).set(3, y, z, MANE).set(3, y, z + 1, MANE);   // the mane falls to the off side
+    else m.set(1, y, z - 1, MANE).set(1, y, z, MANE);
   }
   m.line(-1, 13, 6, -1, 10, 10, bridle).line(3, 13, 6, 3, 10, 10, bridle).box(0, 14, 6, 3, 1, 1, bridle).box(-1, 10, 11, 5, 1, 1, bridle);
   m.set(-1, 11, 9, GOLD(1, 1, 1)).set(3, 11, 9, GOLD(2, 1, 1));
@@ -802,50 +817,104 @@ function riderLegsM({ y = 11, x0 = -2, x1 = 7, skin = SKIN, kiltC = TEAM, len = 
 }
 function riderTorso(build) { const m = build(); m.carve(-2, -6, -3, 12, 5, 10); return m; }
 
-// Chariot Archer: a white horse in a striped blanket with a team collar
-// pulling a two-wheeled silver chariot with a team front; an archer in silver
-// scale armour and a rounded helmet draws his bow standing in the car.
+// Chariot Archer (unit_03): a white horse in a striped blanket and a team
+// collar, hitched by two shafts and a yoke on its withers to an Egyptian
+// chariot: a D-shaped car open at the back, its breastwork painted in the
+// army's colour inside gold rims and struts (a gold sun disc on the front),
+// standing on two big six-spoke wheels at the rear axle (the wheel as tall
+// as the archer's waist above the floor). The archer: bronze, bare-chested
+// under a gold and team broad collar, a white kilt, a quiver on his back, a
+// striped helmet over a face with dark eyes, a short recurved bow held canted
+// away from the head. The horse stands mid-stride, a foreleg lifted and the
+// head high (pose "chariot", unit_view.cpp).
+// Chariot space: the floor at y 0 (6 voxels off the ground at the axle), +z
+// forward; the horse's withers at about (y 12.5, z 27), its chest at z 32.
 {
-  const C = WHITE_COAT, MANE = pick3(13, 0xbab4aa, 0xa8a298, 0xcac4ba);
+  const C = WHITE_COAT, MANE = pick3(13, 0x6e6862, 0x5e5852, 0x7c766e);   // a dark grey mane on the white horse
   const car = new VoxelModel();
-  // the car: floor, a curved breastwork (team panel, silver rim), an open back
-  for (let x = -4; x <= 4; x++) for (let z = -3; z <= 3; z++) car.set(x, 0, z, WOOD_DK);
-  for (let x = -4; x <= 4; x++) for (let y = 1; y <= 7; y++) {
-    const zf = 3 - Math.round((x * x) / 10);
-    const c = y === 7 || Math.abs(x) === 4 ? SILVER(x, y, zf) : (y >= 3 && y <= 5 && Math.abs(x) <= 2 ? TEAM : SILVER(x, y, zf));
-    car.set(x, y, zf, c);
-    if (Math.abs(x) >= 3) for (let z = -2; z < zf; z++) if (y <= 5) car.set(x, y, z, z === -2 ? SILVER_DK : SILVER(x, y, z));
+  const zf = (x) => 4 - Math.round((x * x) / 9);          // the D's rounded front, flat open back at z -4
+  const top = (z) => (z >= 0 ? 9 : 9 - Math.round(-z * 0.6));   // the sides sweep down towards the back
+  for (let x = -5; x <= 5; x++) for (let z = -4; z <= zf(x); z++) car.set(x, 0, z, (x + z) & 1 ? WOOD_DK : LEATHER_DK);
+  const inD = (x, z) => Math.abs(x) <= 5 && z >= -4 && z <= zf(x);
+  for (let x = -5; x <= 5; x++) for (let z = -4; z <= zf(x); z++) {
+    if (inD(x + 1, z) && inD(x - 1, z) && inD(x, z + 1)) continue;   // walls on the D's rim; the back stays open
+    const h = top(z);
+    for (let y = 1; y <= h; y++) {
+      let c;
+      if (y === h) c = GOLD(x, y, z);                                     // the gold rim
+      else if (y === 1) c = GOLD_DK;                                      // a dark gold foot band
+      else if ((Math.abs(x) === 5 && (z === 2 || z === -2)) || (z === zf(x) && (x === -3 || x === 3))) c = GOLD(x, y, z);   // gold struts
+      else c = TEAM;
+      if (c === TEAM && y === h - 1) tset(car, x, y, z, TEAM_SHADE); else car.set(x, y, z, c);
+    }
   }
-  car.set(0, 4, 4, GOLD(0, 4, 4)).set(-1, 4, 4, GOLD(0, 4, 5)).set(1, 4, 4, GOLD(0, 4, 6));
-  // the pole forward to the yoke, the axle
-  for (let z = 4; z <= 21; z++) car.set(0, -1 + Math.round(Math.max(0, z - 10) * 0.4), z, WOOD_DK);
-  car.box(-4, 4, 21, 9, 1, 1, WOOD_DK);   // the yoke
-  car.box(-6, -3, -1, 13, 1, 1, SILVER_DK);
+  // a gold sun disc on the breastwork, the rear grab posts
+  for (let x = -1; x <= 1; x++) for (let y = 3; y <= 5; y++) if (x * x + (y - 4) * (y - 4) <= 1) car.set(x, y, zf(x) + 1, GOLD(x, y, 9), { glow: 0.1 });
+  car.set(0, 4, zf(0) + 1, 0xf0d040, { glow: 0.2 });
+  for (const x of [-5, 5]) car.box(x, top(-4) + 1, -4, 1, 2, 1, GOLD).set(x - Math.sign(x), top(-4) + 2, -4, GOLD(x, 0, 0));
+  // the axle (the car rides on it at the back), the hub stubs
+  car.box(-8, -1, -3, 17, 1, 1, SILVER_DK);
+  // two shafts (2 x 2) from under the car along the horse's flanks, up to the
+  // yoke saddle at its shoulders; the yoke across the withers, a breast strap
+  for (const s of [-1, 1]) {
+    const xs = s < 0 ? -6 : 5;
+    for (let z = -2; z <= 27; z++) {
+      const y = z < 4 ? -2 : -2 + Math.round((z - 4) * 0.42);
+      car.box(xs, y, z, 2, 2, 1, (z & 3) === 0 && z > 4 ? WOOD_DK : WOOD(xs, y, z));
+    }
+    car.box(xs, 7, 26, 2, 5, 1, LEATHER_DK);                          // the yoke saddle down the shoulder
+    // the breast strap round the chest, team with gold studs
+    for (let z = 27; z <= 32; z++) car.set(s < 0 ? -5 : 5, 8 - Math.round((z - 27) * 0.3), z, TEAM);
+    car.set(s < 0 ? -5 : 5, 7, 29, GOLD(0, 7, 29));
+  }
+  for (let x = -4; x <= 4; x++) { car.set(x, 6, 33, TEAM); if (!(x & 1)) car.set(x, 5, 33, GOLD(x, 5, 33)); }
+  car.box(-6, 12, 25, 13, 2, 2, WOOD_DK);                              // the yoke on the withers
+  car.box(-7, 12, 25, 1, 2, 2, GOLD).box(7, 12, 25, 1, 2, 2, GOLD).set(0, 14, 26, GOLD(3, 1, 1));
+  // wheels: six spokes, a dark felloe 2 wide, a silver hub standing out
   const wheel = new VoxelModel();
-  for (let y = -5; y <= 5; y++) for (let z = -5; z <= 5; z++) {
+  const R = 5.8, SPOKE = 0xc09458;   // light ash spokes against the dark felloe
+  for (let y = -7; y <= 7; y++) for (let z = -7; z <= 7; z++) {
     const d = Math.hypot(y, z);
-    if (d > 5.4) continue;
-    if (d > 4.4) wheel.set(0, y, z, (y + z) % 3 ? WOOD : WOOD_DK);
-    else if (d < 1.2) wheel.set(0, y, z, SILVER(0, y, z));
-    else if (y === 0 || z === 0 || Math.abs(y) === Math.abs(z)) wheel.set(0, y, z, WOOD_DK);
+    if (d > R) continue;
+    if (d > R - 1.3) { wheel.set(0, y, z, (Math.round(Math.atan2(y, z) * 4) & 1) ? WOOD_DK : LEATHER_DK).set(1, y, z, WOOD_DK); continue; }
+    if (d < 1.5) { wheel.box(-1, y, z, 4, 1, 1, SILVER(0, y, z)); continue; }
+    const a = Math.atan2(y, z);
+    const k = Math.round(a / (Math.PI / 3)) * (Math.PI / 3);
+    const off = Math.abs(Math.sin(a - k)) * d;
+    if (off < 0.62) wheel.set(0, y, z, SPOKE).set(1, y, z, SPOKE);
   }
-  const t = riderTorso(() => { const m = torsoBody(SKIN); scaleArmor(m); collar(m, [GOLD, TEAM, GOLD]); kilt(m, { len: 4 }); m.box(0, 0, -1, 8, 1, 6, LEATHER_DK); return m; });
+  wheel.set(-2, 0, 0, SILVER_DK).set(3, 0, 0, SILVER_DK);
+  // the archer: bare bronze chest, a broad collar, a white kilt, a quiver
+  const t = torsoBody(SKIN);
+  kilt(t, { len: 4, color: LINEN, hem: GOLD, belt: TEAM });
+  for (let i = 1; i <= 4; i++) for (let x = 0; x < 8; x += 2) if (t.has(x, -i, 4)) t.set(x, -i, 4, LINEN_SH);
+  collar(t, [GOLD, TEAM, GOLD, TEAM]);
+  t.line(0, 7, 4, 7, 1, 4, LEATHER_DK);                                   // the quiver strap
+  t.box(5, 3, -2, 2, 7, 1, TEAM).box(5, 2, -2, 2, 1, 1, GOLD).box(5, 10, -2, 2, 1, 1, GOLD);
+  t.set(5, 11, -2, 0xf4f0e8).set(6, 11, -2, 0xf4f0e8);
   const standLegs = new VoxelModel();
-  for (const x of [-2, 1]) standLegs.box(x, 0, -1, 2, 10, 2, SKIN).box(x, 9, -1, 2, 2, 2, TEAM).box(x, 0, -1, 2, 1, 3, SANDAL);
+  for (const x of [-2, 1]) standLegs.box(x, 0, -1, 2, 8, 2, SKIN).box(x, 0, -1, 2, 1, 3, SANDAL);
+  // a short recurved bow (19 tall, 1 voxel thin), gold tips, a thin string
+  const bow = new VoxelModel();
+  for (let y = -9; y <= 9; y++) {
+    const z = Math.round(3 - (y * y) / 30 + (Math.abs(y) >= 8 ? 1 : 0));
+    bow.set(0, y, z, Math.abs(y) < 2 ? LEATHER : Math.abs(y) >= 8 ? GOLD(0, y, 0) : WOOD_DK);
+  }
+  for (let y = -8; y <= 8; y++) bow.set(0, y, 0, 0xe8e0cc);
   rig('chariot_archer', { voxel: 0.07, anim: 'centaur', style: 'chariot', pose: 'chariot', graze: false }, [
     part('body', horseBody(C), [3, 0, 10.5], [0, 10, 12], null, { coat: true }),
-    part('barding', stripedBlanket({ z0: 7, z1: 14, low: 5, top: 9 }), [3, 0, 10.5], [0, 0, 0], 'body'),
-    part('neck', horseNeck(C, MANE, { collar: TEAM }), [1.5, 0, 2], [0, 5.5, 8], 'body', { coat: true }),
+    part('barding', stripedBlanket({ z0: 7, z1: 14, low: 5, top: 9, colors: [TEAM, TEAM_TRIM, OCHRE, RED] }), [3, 0, 10.5], [0, 0, 0], 'body'),
+    part('neck', horseNeck(C, MANE, { collar: TEAM, thick: true }), [1.5, 0, 2], [0, 5.5, 8], 'body', { coat: true }),
     part('tail', horseTail(MANE), [1, 0, 0], [0, 7, -10], 'body', { coat: true }),
     ...horseLegs(C, {}),
-    part('chariot', car, [0, 0, 0], [0, -5, -24], 'body'),
-    part('wheelL', wheel, [0, 0, 0], [6, -3, -1], 'chariot', { anim: 'wheel' }),
-    part('wheelR', wheel, [0, 0, 0], [-6, -3, -1], 'chariot', { anim: 'wheel' }),
-    part('riderLegs', standLegs, [0, 0, 0], [0, 1, 0], 'chariot'),
-    part('torso', t, [4, 0, 2], [0, 12, 0], 'chariot'),
-    head('helmet'),
-    ...arms({ bracer: TEAM, band: SILVER }),
-    part('weapon', bowM(), [0, 0, 0], HAND, 'armL'),
+    part('chariot', car, [0, 0, 0], [0, -3.8, -22], 'body'),
+    part('wheelL', wheel, [1, 0.5, 0.5], [7.5, -0.5, -2.5], 'chariot', { anim: 'wheel' }),
+    part('wheelR', wheel, [1, 0.5, 0.5], [-6.5, -0.5, -2.5], 'chariot', { anim: 'wheel' }),
+    part('riderLegs', standLegs, [0, 0, 0], [0, 1, -1], 'chariot'),
+    part('torso', t, [4, 0, 2], [0, 13, -1], 'chariot'),
+    { ...headPart('charioteer', [0, 10, 0.2], 'torso', 1.15) },
+    ...arms({ band: TEAM, bracer: LEATHER }),
+    part('weapon', bow, [0, 0, 0], HAND, 'armL', { rest: [0, 0, -0.7] }),
     part('arrow', arrowM(), [0, 0, 0], HAND, 'armR', { conditional: true, portrait: false }),
   ]);
 }

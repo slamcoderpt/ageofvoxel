@@ -433,6 +433,14 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 				const double g = rig.graze ? smooth((S(t * 0.19 + id) - 0.7) * 5) : 0.0;
 				add(CH_neck, g * 0.75);
 				set(CH_legFL, -0.05); set(CH_legBR, 0.08); set(CH_cannonBR, 0.35);
+				if (pose == P_CHARIOT) {
+					// (Egyptian chariot horse) stands mid-stride, head high: a
+					// foreleg lifted and pawing, a hind leg set back
+					const double paw = S(t * 1.1 + id) * 0.08;
+					set(CH_legFL, -0.62 + paw); set(CH_cannonFL, 1.35 + paw);
+					set(CH_legFR, 0.12); set(CH_legBL, -0.18); set(CH_legBR, 0.22); set(CH_cannonBR, 0.3);
+					set(CH_neck, -0.04 + S(t * 0.8) * 0.04);
+				}
 			}
 			set(CH_tail, -0.2 + S(t * 1.3) * 0.05, S(t * 0.9) * 0.25);
 			set(CH_torso, 0.02 + S(t * 1.6) * 0.015);
