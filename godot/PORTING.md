@@ -1316,9 +1316,16 @@ same channel names, plus:
   rider's bare legs astride the cloth, a team tunic, a team-crowned linen
   nemes with lappets, a silver hooked sword held forward from the fist),
   `mercenary_cavalry` (dark barded horse, Nubian rider; shares the horse
-  neck and belly of the chariot horse), `war_elephant` (0.1: grey elephant, cow-hide cloth, team pad, a
-  wooden howdah, a silver and gold forehead plate with a team lozenge,
-  trunk, tusks, ears; a mahout at 0.7 x), `catapult` (0.09), `siege_tower`
+  neck and belly of the chariot horse), `war_elephant` (0.1, unit_07: flat warm mid-grey skin, dark enough
+  that the grade keeps it grey; a cow-hide saddle cloth over the back only,
+  following the barrel down to a team hem high on the flanks, so grey shows
+  on the sides and legs; team pad, a wooden howdah; the head one solid grey
+  mass set forward of the shoulders (part `neck`, its root sunk into them):
+  a domed brow with a gold band, a trunk of five stepped segments hanging to
+  the ground and curling forward, two ivory tusks from its base, and two
+  big flat ear slabs a shade darker as their own parts `earL` / `earR`
+  hinged at the skull and turned out by a `rest` yaw / roll; `graze: false`
+  so the idle head stays up; a mahout at 0.7 x), `catapult` (0.09), `siege_tower`
   (0.1, team hides, a ladder).
 - **Myth units** (no sim type yet: drawn on stand-in sim units, below):
   `anubite` (beast, jackal head under a team headcloth, linen straps, two

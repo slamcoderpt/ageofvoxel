@@ -1291,25 +1291,45 @@ function riderLegsM({ y = 11, x0 = -2, x1 = 7, skin = SKIN, kiltC = TEAM, len = 
   ]);
 }
 
-// War Elephant: a grey elephant (rig voxel 0.1) with a cow-hide cloth, a team
-// saddle pad, a wooden howdah and a gold-and-team forehead plate; a mahout
-// with a spear on its neck (rider parts at 0.7 x, the human voxel size).
+// War Elephant (unit_07): a grey elephant (rig voxel 0.1). Flat mid-grey skin
+// (cool, dark enough that the warm grade keeps it grey) with faint wrinkle
+// rows; a cow-hide saddle cloth over the back only (it follows the barrel and
+// stops at a team hem high on the flanks, so grey shows on the sides and
+// legs), a team saddle pad, a wooden howdah. The head is one solid grey mass
+// set forward of the shoulders and joined to them: a domed brow, two big flat
+// ear slabs a shade darker flaring out from the sides of the skull, a tapered
+// trunk of five stepped segments hanging to the ground and curling forward at
+// the tip, two bright ivory tusks out of the trunk's base; a narrow team brow
+// band with gold studs. A mahout with a spear on its neck (rider parts at
+// 0.7 x, the human voxel size). Idle: no grazing (graze false).
 {
-  const G = pick3(16, 0x9a958f, 0x8c8781, 0xa6a19a, 0.5, 0.85), GD = 0x6e6a66;
+  const G = (x, y, z) => (hash3(x, y, z, 16) < 0.1 ? 0x6a6664 : 0x726e6b);
+  const GH = 0x7a7673;   // the head one flat grey, a touch lighter (it faces the camera)
+  const GE = 0x76726f, GEI = 0x6e6a67, GW = 0x625e5b, NAIL = 0xd8d0c0, IVORY = 0xfffaee, IVORY_SH = 0xece2cc;
   const body = new VoxelModel();
   body.ellipsoid(5.5, 6, 9.5, 5.6, 5.8, 9.2, G);
   body.ellipsoid(5.5, 7, 15, 5.4, 6, 4.4, G);    // the high shoulders
   body.ellipsoid(5.5, 6, 3.5, 5.2, 5.4, 4, G);
+  for (let y = 1; y <= 9; y += 3) for (let z = 1; z <= 19; z++) for (const x of [0, 11]) if (body.has(x, y, z) && (z % 5)) body.set(x, y, z, GW);   // wrinkle rows
+  // the saddle cloth: on the back, draped down the barrel to y 7, a team hem
   const cloth = new VoxelModel();
-  const HIDE = (x, y, z) => (hash3(x >> 1, y >> 1, z >> 1, 91) < 0.35 ? 0x8a4a22 : 0xf0e8d8);
-  for (let z = 4; z <= 15; z++) for (let x = -1; x <= 12; x++) {
+  const HIDE = (x, y, z) => (hash3(x >> 1, y >> 1, z >> 1, 91) < 0.33 ? 0x7a3e1c : 0xeee6d8);
+  const Z0 = 4, Z1 = 15, LOW = 7;
+  for (let z = Z0; z <= Z1; z++) for (let x = 0; x <= 11; x++) {
     let top = -1;
-    for (let y = 16; y >= 0; y--) if (body.has(Math.min(11, Math.max(0, x)), y, z)) { top = y; break; }
+    for (let y = 16; y >= 0; y--) if (body.has(x, y, z)) { top = y; break; }
     if (top < 0) continue;
-    if (x >= 0 && x <= 11) cloth.set(x, top + 1, z, HIDE(x, top, z));
+    cloth.set(x, top + 1, z, HIDE(x, top, z));
   }
-  for (let z = 4; z <= 15; z++) for (let y = 4; y <= 11; y++) { cloth.set(-1, y, z, HIDE(0, y, z)); cloth.set(12, y, z, HIDE(1, y, z)); }
-  for (let z = 4; z <= 15; z++) { cloth.set(-1, 3, z, TEAM_TRIM); cloth.set(12, 3, z, TEAM_TRIM); }
+  for (let z = Z0; z <= Z1; z++) for (let y = LOW; y <= 13; y++) for (const s of [-1, 1]) {
+    let xb = s < 0 ? 0 : 11;
+    while (xb >= 0 && xb <= 11 && !body.has(xb, y, z)) xb -= s;
+    if (xb < 0 || xb > 11) continue;
+    const x = xb + s;
+    if (cloth.has(x, y, z) || body.has(x, y, z)) continue;
+    const end = z === Z0 || z === Z1;
+    cloth.set(x, y, z, y === LOW ? TEAM_TRIM : y === LOW + 1 || end ? TEAM : HIDE(x, y, z));
+  }
   // team pad and the howdah: a wooden box with corner posts and a team rail
   const how = new VoxelModel();
   how.box(0, 0, 0, 12, 2, 10, TEAM);
@@ -1322,47 +1342,62 @@ function riderLegsM({ y = 11, x0 = -2, x1 = 7, skin = SKIN, kiltC = TEAM, len = 
   }
   for (const [x, z] of [[1, 1], [10, 1], [1, 8], [10, 8]]) how.box(x, 7, z, 1, 2, 1, WOOD_DK);
   how.set(5, 3, 2, 0x8a6a3a).set(6, 3, 6, 0xb08a4a).set(4, 3, 5, STONE(1, 1, 1));   // pots, a basket
-  how.line(-1, 3, 5, -1, -6, 5, LEATHER_DK).line(12, 3, 5, 12, -6, 5, LEATHER_DK);   // girth ropes
+  how.line(-1, 1, 5, -1, -3, 5, LEATHER_DK).line(12, 1, 5, 12, -3, 5, LEATHER_DK);   // girth ropes down to the cloth
+  // the head, in its own frame: x 0..11 (centre 5.5), the joint at (5.5, 0, 0)
+  // sits at the front of the shoulders; the skull's back sinks into them
   const headM = new VoxelModel();
-  headM.ellipsoid(5.5, 7, 3, 4.2, 4.6, 3.6, G);
-  // the trunk: down and slightly forward, curled at the tip
-  tube(headM, [5.5, 5, 5], [5.5, -2, 8], 2.2, 1.6, G);
-  tube(headM, [5.5, -2, 8], [5.5, -8, 8.5], 1.6, 1.2, G);
-  tube(headM, [5.5, -8, 8.5], [5.5, -9.5, 10], 1.2, 1.0, GD);
-  for (let y = -7; y <= 4; y += 2) band(headM, y, GD);
-  // tusks
-  tube(headM, [3.2, 3, 5], [2.6, -1, 10], 0.9, 0.6, 0xf0e8d4);
-  tube(headM, [7.8, 3, 5], [8.4, -1, 10], 0.9, 0.6, 0xf0e8d4);
-  headM.set(3, 7, 6, DARK).set(8, 7, 6, DARK);
-  // the forehead plate: silver-gold with a team lozenge and gold studs
-  for (let y = 5; y <= 11; y++) for (let x = 2; x <= 9; x++) {
-    let z = 10; while (z > -2 && !headM.has(x, y, z)) z--;
-    if (z <= -2) continue;
-    const d = Math.abs(x - 5.5) + Math.abs(y - 8.5) * 0.8;
-    headM.set(x, y, z + 1, d < 2.2 ? TEAM : d < 2.9 ? GOLD(x, y, z) : (x === 2 || x === 9 || y === 5 || y === 11) ? GOLD(x, y, z) : SILVER(x, y, z));
+  headM.ellipsoid(5.5, 0, -1, 4.6, 4.6, 3.6, G);       // the neck root inside the shoulders
+  headM.ellipsoid(5.5, 0.5, 3, 4.3, 4.6, 3.8, GH);     // the skull
+  headM.ellipsoid(5.5, 3.2, 3.2, 4.2, 2.8, 3.4, GH);    // the domed brow
+  headM.ellipsoid(5.5, -2.5, 4.8, 3, 2.6, 2.6, GH);    // the cheeks / trunk root
+  // the trunk: five stepped segments, each narrower, down to the ground and
+  // curling forward (and up) at the tip; a darker crease between segments
+  const SEG = [[4, 4, -3, 5, 3], [4, 3, -6, 6, 3], [4.5, 2, -9, 6, 3], [4.5, 2, -11, 7, 2], [5, 1, -12, 8, 1]];
+  for (const [x0, w, y0, z0, d] of SEG) {
+    headM.box(Math.round(x0), y0, z0, w, 3, d, GH);
   }
-  // ears: big flat flaps
-  for (const s of [-1, 1]) {
-    const x = s < 0 ? 0 : 11;
-    for (let y = 2; y <= 11; y++) for (let z = -3; z <= 3; z++) {
-      const dy = (y - 7) / 5, dz = z / 3.5;
-      if (dy * dy + dz * dz > 1) continue;
-      headM.set(x + s, y, z, (y + z) % 4 === 0 ? GD : G(x, y, z));
-      if (dy * dy + dz * dz > 0.55) headM.set(x + 2 * s, y, z, G(x, y, z + 1));
+  headM.box(4, -12, 7, 3, 2, 2, GH);                     // the curl
+  headM.box(5, -12, 9, 2, 1, 2, GH).box(5, -11, 10, 2, 1, 1, GH);
+  // tusks: bright ivory prongs out of the trunk's base, forward then up
+  for (const x of [2.5, 8.5]) {
+    tube(headM, [x, -3.5, 5], [x, -5.5, 8.5], 1.05, 0.9, IVORY_SH);
+    tube(headM, [x, -5.5, 8.5], [x, -3.8, 10.8], 0.85, 0.3, IVORY);
+  }
+  // eyes, a dark crease under the brow
+  headM.set(2, 1, 5, DARK).set(9, 1, 5, DARK).set(2, 2, 5, GE).set(9, 2, 5, GE);
+  // a gold brow band across the domes
+  for (let x = 1; x <= 10; x++) {
+    let z = 10; while (z > -2 && !headM.has(x, 3, z)) z--;
+    if (z > -2) headM.set(x, 3, z, GOLD(x, 3, z));
+  }
+  // ears: big flat slabs (2 thick) one shade darker, separate parts hinged at
+  // the sides of the skull and turned out (rest yaw) so the back edge flares
+  // away from the head; rounded, with a lobe hanging below the jaw
+  const ear = (s) => {
+    const m = new VoxelModel();
+    for (let y = -7; y <= 5; y++) for (let z = -7; z <= 0; z++) {
+      const dy = (y + 0.5) / 5.2, dz = (z + 2.8) / 3.2;
+      const lobe = y < 0 && y >= -7 && z >= -3 && z <= -1 && (y + 7) >= (-1 - z);
+      if (dy * dy + dz * dz > 1 && !lobe) continue;
+      m.set(0, y, z, s > 0 ? GE : GEI).set(1, y, z, s > 0 ? GEI : GE);
     }
-  }
+    return m;
+  };
   const legUp = new VoxelModel().box(0, 0, 0, 4, 6, 4, G);
-  const legLow = new VoxelModel().box(0, 1, 0, 4, 6, 4, G).box(0, 0, 0, 4, 1, 4, GD).set(0, 0, 4, 0xe8e0cc).set(1, 0, 4, 0xe8e0cc).set(2, 0, 4, 0xe8e0cc).set(3, 0, 4, 0xe8e0cc);
+  const legLow = new VoxelModel().box(0, 1, 0, 4, 6, 4, G).box(0, 0, 0, 4, 1, 4, GW);
+  for (let x = 0; x < 4; x += 2) legLow.set(x, 0, 4, NAIL).set(x + 1, 0, 4, GW);   // toenails
   band(legLow, 5, GOLD_DK); band(legLow, 4, GOLD);
   const R = 0.7;   // mahout scale
   const t = manTorso();
   eKilt(t, { len: 6 }); eBelt(t, GOLD, GOLD_DK); eCollar(t, [GOLD, TM, GOLD], { r0: 2.6 });
-  rig('war_elephant', { voxel: 0.1, anim: 'horse', style: 'elephant', gait: 0.55, stride: 0.6 }, [
+  rig('war_elephant', { voxel: 0.1, anim: 'horse', style: 'elephant', gait: 0.55, stride: 0.6, graze: false }, [
     part('body', body, [5.5, 0, 9.5], [0, 9, 0], null),
     part('barding', cloth, [5.5, 0, 9.5], [0, 0, 0], 'body'),
-    part('howdah', how, [6, 0, 5], [0, 12, -2], 'body'),
-    part('riderLegs', riderLegsM({ y: 13, x0: 2, x1: 9, z: 13, len: 5, sandal: false }), [5.5, 0, 9.5], [0, 0, 0], 'body'),
-    part('neck', headM, [5.5, 6, 0], [0, 6, 16], 'body'),
+    part('howdah', how, [6, 0, 5], [0, 12, -3], 'body'),
+    part('riderLegs', riderLegsM({ y: 13, x0: 2, x1: 9, z: 12, len: 5, sandal: false }), [5.5, 0, 9.5], [0, 0, 0], 'body'),
+    part('neck', headM, [5.5, 0, 0], [0, 8, 10], 'body'),
+    part('earL', ear(1), [0, 0, 0], [5, 1, 2.5], 'neck', { rest: [0, -0.5, 0.35] }),
+    part('earR', ear(-1), [2, 0, 0], [-5, 1, 2.5], 'neck', { rest: [0, 0.5, -0.35] }),
     part('tail', new VoxelModel().box(0, -8, 0, 1, 8, 1, G).box(-1, -10, 0, 3, 2, 1, HAIR), [0.5, 0, 0.5], [0, 9, -9], 'body'),
     part('legFL', legUp, [2, 6, 2], [3.5, 3, 5.5], 'body'),
     part('cannonFL', legLow, [2, 7, 2], [0, -5, 0], 'legFL'),
@@ -1372,7 +1407,7 @@ function riderLegsM({ y = 11, x0 = -2, x1 = 7, skin = SKIN, kiltC = TEAM, len = 
     part('cannonBL', legLow, [2, 7, 2], [0, -5, 0], 'legBL'),
     part('legBR', legUp, [2, 6, 2], [-3.5, 3, -5.5], 'body'),
     part('cannonBR', legLow, [2, 7, 2], [0, -5, 0], 'legBR'),
-    ...riderMan({ torso: t, s: R, torsoJoint: [0, 13, 4], torsoParent: 'body', head: 'mahout', arm: { bracer: TEAM } }),
+    ...riderMan({ torso: t, s: R, torsoJoint: [0, 13, 3], torsoParent: 'body', head: 'mahout', arm: { bracer: TEAM } }),
     part('weapon', spearM(28), [0, 0, 0], sc(HAND_E, R), 'armR', { scale: R }),
   ]);
 }
