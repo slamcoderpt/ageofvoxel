@@ -29,6 +29,7 @@ struct MatchPlayer {
 	int team = 0;            // <= 0: a team of his own
 	int64_t color = -1;      // 0xRRGGBB (-1: PLAYER_COLORS[id])
 	std::string god = "Zeus";
+	int civ = -1;            // (Godot-only, sim/civ) CIV_GREEK / CIV_EGYPT; -1: from the god
 };
 
 struct MatchConfig {

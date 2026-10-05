@@ -56,7 +56,7 @@ struct AIPlanItem {
 	int tech;
 	int tier;      // lowest tech_level that researches it
 	bool urgent;   // its academies wait for it
-	uint16_t units; // only once it fields one of these (0: always)
+	UnitMask units; // only once it fields one of these (0: always)
 };
 
 // In order: the Classical Armory line first, then each age's economy techs,
@@ -244,7 +244,7 @@ void EnemyAI::research(int tc, const std::vector<int> &vills, const std::vector<
 	// 3. techs (each building its first open tech of the plan) and the next
 	// age, in the plan's order: the age-up comes after the urgent techs of
 	// the age it is in
-	uint16_t fielded = 0;
+	UnitMask fielded = 0;
 	for (int r = 0; r < U.size(); r++)
 		if (!U.removed[r] && !U.dead[r] && U.owner[r] == owner) fielded |= UM(U.type[r]);
 	struct Cand { size_t at; int b; int tech; };

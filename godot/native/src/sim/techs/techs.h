@@ -68,6 +68,8 @@ enum TechId : uint8_t {
 	T_GOLDEN_APPLES, T_ROAR_OF_ORTHUS, T_DIONYSIA, T_CHTHONIC_RITES, T_HALLOWED_WOODLANDS,
 	T_FACE_OF_THE_GORGON, T_MONSTROUS_RAGE, T_HAND_OF_TALOS, T_SHOULDER_OF_TALOS, T_FLAMES_OF_TYPHON,
 	T_ENCHANTED_HYMN, T_PIOUS_SACRIFICE, T_IRON_GRIP,
+	// Temple, Egyptian (sim/civ)
+	T_HANDS_OF_THE_PHARAOH,
 	T_COUNT,
 	T_NONE = 255
 };
@@ -104,18 +106,26 @@ enum TechEffectKind : uint8_t {
 	TE_COUNT
 };
 
-// unit type masks (bit per UnitType)
-constexpr uint16_t UM(int t) { return (uint16_t)(1u << t); }
-constexpr uint16_t M_VILLAGER = UM(U_VILLAGER);
-constexpr uint16_t M_HOPLITE = UM(U_HOPLITE), M_TOXOTES = UM(U_TOXOTES), M_HIPPIKON = UM(U_HIPPIKON);
-constexpr uint16_t M_HUMAN = M_HOPLITE | M_TOXOTES | M_HIPPIKON; // "human soldier"
-constexpr uint16_t M_HERO = UM(U_HERO);
-constexpr uint16_t M_MYTH = UM(U_MINOTAUR) | UM(U_CYCLOPS) | UM(U_CENTAUR) | UM(U_MEDUSA);
-constexpr uint16_t M_ALL = (uint16_t)((1u << U_TYPE_COUNT) - 1);
+// unit type masks (bit per UnitType; 32 bits since the Egyptian types, sim/civ)
+using UnitMask = uint32_t;
+static_assert(U_TYPE_COUNT <= 32, "UnitMask holds 32 unit types");
+constexpr UnitMask UM(int t) { return (UnitMask)(1u << t); }
+constexpr UnitMask M_VILLAGER = UM(U_VILLAGER);
+constexpr UnitMask M_HOPLITE = UM(U_HOPLITE), M_TOXOTES = UM(U_TOXOTES), M_HIPPIKON = UM(U_HIPPIKON);
+// Egyptian human soldiers (sim/civ): the generic Armory lines apply to them as to
+// the Greeks' (Retold); 'ranged soldiers' (Ballistics, Burning Pitch) are the
+// slinger and the chariot archer
+constexpr UnitMask M_EG_INFANTRY = UM(U_SPEARMAN) | UM(U_AXEMAN) | UM(U_MERCENARY);
+constexpr UnitMask M_EG_RANGED = UM(U_SLINGER) | UM(U_CHARIOT_ARCHER);
+constexpr UnitMask M_EG_HUMAN = M_EG_INFANTRY | M_EG_RANGED | UM(U_CAMEL_RIDER) | UM(U_WAR_ELEPHANT) | UM(U_MERCENARY_CAVALRY);
+constexpr UnitMask M_HUMAN = M_HOPLITE | M_TOXOTES | M_HIPPIKON | M_EG_HUMAN; // "human soldier"
+constexpr UnitMask M_HERO = UM(U_HERO) | UM(U_PRIEST) | UM(U_PHARAOH);
+constexpr UnitMask M_MYTH = UM(U_MINOTAUR) | UM(U_CYCLOPS) | UM(U_CENTAUR) | UM(U_MEDUSA);
+constexpr UnitMask M_ALL = (UnitMask)((1ull << U_TYPE_COUNT) - 1);
 
 struct TechEffect {
 	uint8_t kind = TE_NONE;
-	uint16_t units = 0;     // unit types it applies to
+	UnitMask units = 0;     // unit types it applies to
 	bool buildings = false; // also the owner's shooting buildings / all buildings (sight)
 	double v = 0;           // the value applied in this sim
 	double retold = 0;      // Retold's number when it differs (distances scaled by DIST_SCALE), else = v
@@ -187,6 +197,8 @@ bool rules_trains(int building_type, int type); // the building's trains list wi
 // browser's flat building factor (0.35, myth units 1.2)
 constexpr double RETOLD_BLD_HACK = 0.40, RETOLD_BLD_PIERCE = 0.90, RETOLD_BLD_CRUSH = 0.05;
 inline bool retold_armored(int building_type) { return building_type == B_ARMORY || building_type == B_MARKET || building_type == B_TEMPLE; }
+// ... and every Egyptian building of its own (sim/civ, civ_building_armor)
+inline bool rules_armored(int building_type) { return retold_armored(building_type) || is_egypt_building(building_type); }
 // Retold's Temple with the rules on: 150 wood + 150 gold, 1200 hp (the browser: 150 + 50, 1500)
 inline Cost rules_building_cost(int type) { return type == B_TEMPLE ? Cost(0, 150, 150, 0) : building_def(type).cost; }
 inline double rules_building_hp(int type) { return type == B_TEMPLE ? 1200 : building_def(type).hp; }
@@ -248,7 +260,7 @@ public:
 	// may `owner` train myth unit `type` (his minor god for its age)? reason when not
 	bool god_allows_unit(int owner, int type, std::string *reason = nullptr) const;
 	// the multiplier on a blow / arrow against an Armory / Market / Temple (Retold armor)
-	double building_armor_mult(const Hitter &a, uint8_t kind) const;
+	double building_armor_mult(const Hitter &a, uint8_t kind, int building_type = B_ARMORY) const;
 
 	// market and tribute
 	double buy_price(int owner, int res) const;  // gold for MARKET_LOT

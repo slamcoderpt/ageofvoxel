@@ -148,6 +148,11 @@ func setup(g: Node) -> void:
 	var rigs := []
 	for t in _types:
 		var rig := VoxelModels.rig(t)
+		if rig.is_empty():
+			# (sim/civ) an Egyptian type with no model yet: its Greek stand-in's rig
+			var si := str(game.sim.get_unit_def(t).get("stand_in", ""))
+			if si != "":
+				rig = VoxelModels.rig(si)
 		rigs.append(rig)
 		if rig.is_empty():
 			continue

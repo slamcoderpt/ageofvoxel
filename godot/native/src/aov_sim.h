@@ -28,6 +28,9 @@ class AovSim : public RefCounted {
 
 protected:
 	static void _bind_methods();
+	static void _bind_civ_methods(); // aov_sim_civ.cpp
+	void civ_unit_def(int type, Dictionary &d) const;
+	void civ_building_def(int type, int civ, Dictionary &d) const;
 
 public:
 	aov::Sim &sim() { return sim_; }
@@ -84,6 +87,18 @@ public:
 	int64_t spawn_resource(const String &type, int64_t tx, int64_t tz, int64_t variant);
 	void remove_resource(int64_t id) { sim_.remove_resource((int32_t)id); }
 	void clear_rect(int64_t tx, int64_t tz, int64_t w, int64_t h) { sim_.clear_rect((int)tx, (int)tz, (int)w, (int)h); }
+	// Godot-only scene tool (the egypt_town capture): paint the ground kind
+	// (core/game_map.h Ground: 2 sand, 4 paved...) of a tile rect, render only
+	// (no walkability change); the terrain re-meshes the dirty columns.
+	void paint_ground(int64_t tx, int64_t tz, int64_t w, int64_t h, int64_t ground) {
+		aov::GameMap &M = sim_.map();
+		const int c0x = std::max(0, (int)tx * M.cps), c0z = std::max(0, (int)tz * M.cps);
+		const int c1x = std::min(M.cols, (int)(tx + w) * M.cps), c1z = std::min(M.cols, (int)(tz + h) * M.cps);
+		if (c1x <= c0x || c1z <= c0z) return;
+		for (int z = c0z; z < c1z; z++)
+			for (int x = c0x; x < c1x; x++) M.ground[(size_t)z * M.cols + x] = (uint8_t)ground;
+		M.mark_dirty(c0x, c0z, c1x - 1, c1z - 1);
+	}
 	void kill_unit(int64_t id, int64_t killer); // combat.kill
 	int64_t entity_kind(int64_t id) const { return sim_.entities.slot((int32_t)id) >= 0 ? sim_.entities.kind((int32_t)id) : 0; }
 	int64_t get_unit_count() const { return sim_.entities.count_units(); }
@@ -108,7 +123,7 @@ public:
 
 	// --- buildings (sim/buildings; see PORTING.md "AovSim API")
 	PackedStringArray building_type_names() const;
-	Dictionary get_building_def(const String &type) const;
+	Dictionary get_building_def(const String &type, int64_t owner = 0) const; // owner > 0: his civ's cost / trains (sim/civ)
 	int64_t spawn_building(const String &type, int64_t owner, int64_t tx, int64_t tz, bool built, bool site);
 	bool can_place(const String &type, int64_t tx, int64_t tz) const;
 	int64_t place_building(const String &type, int64_t owner, int64_t tx, int64_t tz, const PackedInt32Array &builders);
@@ -203,6 +218,17 @@ public:
 	bool has_scene_setup(const String &name) const;
 	Dictionary setup_scene(const String &name, const Dictionary &opts); // -> ctx {focus: Vector2, ...}; opts {units}
 	void scene_after(const String &name);        // the scene's after(), once the fast-forward is done
+
+	// --- civilizations (sim/civ, Godot-only; PORTING.md "Civilizations, the Egyptians")
+	PackedStringArray civ_names() const;                      // "greek", "egyptian"
+	Dictionary get_civ(const String &civ) const;              // {key, name, gods, build_menu, units, buildings}
+	bool set_player_civ(int64_t owner, const String &civ);    // scenes / checks (the match sets it from the god)
+	PackedStringArray get_build_menu(int64_t owner) const;    // the owner's civ's build menu
+	Dictionary can_build(int64_t owner, const String &type) const; // {ok, reason}: civ, age, Monument order
+	Array get_trains(int64_t building) const;                 // [{type, ok, reason}] for its owner
+	void order_empower(const PackedInt32Array &ids, int64_t building); // Pharaoh / Ra's Priests
+	Dictionary get_civ_state(int64_t owner) const;            // monuments, favor rate, empowered, Pharaoh, Laborers
+	Dictionary get_civ_fx() const;                            // heals [healer, target]*, empowers [unit, building, strength]*
 
 	// --- events: [{type: "entity:added", id, kind, other, owner, a, x, z, amount}], cleared on read
 	Array take_events();

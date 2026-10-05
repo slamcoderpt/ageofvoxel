@@ -355,16 +355,24 @@ void Combat::damage(int32_t tid, double amount, const Hitter &a, uint8_t kind) {
 	double dmg = amount;
 	if (ad && td && ad->bonus[td->cls] != 0) dmg *= ad->bonus[td->cls];
 	if (sim->godot_rules && ad) dmg *= sim->techs.vs_mult(a.row, tk, t); // (Godot-only: Burning Pitch, Olympian Weapons)
+	bool siege = false; // (Godot-only, sim/civ: Egyptian siege's crush vs a building)
 	if (tk == K_BUILDING) {
-		if (sim->godot_rules && retold_armored(B.type[t])) dmg *= sim->techs.building_armor_mult(a, kind); // (Godot-only: Retold's Armory / Market / Temple armor, sim/techs)
+		const EgyptUnit *eu = sim->godot_rules && ad ? egypt_unit(U.type[a.row]) : nullptr;
+		if (eu && eu->crush_vs_building > 0) {
+			// the crush part of the attack (with the attack upgrades' factor), less the building's crush armor
+			const CivArmor ar = civ_building_armor(B.type[t]);
+			siege = true;
+			dmg = eu->crush_vs_building * (amount / ad->attack.damage) * (1 - (ar.retold ? ar.crush : SIEGE_CRUSH_ARMOR));
+		} else if (sim->godot_rules && rules_armored(B.type[t])) dmg *= sim->techs.building_armor_mult(a, kind, B.type[t]); // (Godot-only: Retold's Armory / Market / Temple armor, sim/techs; the Egyptian buildings', sim/civ)
 		else dmg *= (ad && ad->cls == CLS_MYTH) || a.myth_class ? 1.2 : 0.35;
+		if (eu && eu->vs_buildings > 0) dmg *= eu->vs_buildings; // (War Elephant x4)
 	}
 	if (sim->godot_rules) {
 		// Godot-only: a building's arrows (Town Center, towers) never hurt a
 		// friend, whatever happened in flight; walls / towers have their own armor
 		const int towner = tk == K_UNIT ? U.owner[t] : B.owner[t];
 		if (a.kind == K_BUILDING && !sim->is_enemy(a.owner, towner)) return;
-		if (tk == K_BUILDING && is_fort_type(B.type[t])) dmg *= sim->fortify.armor_mult(t, a, kind);
+		if (tk == K_BUILDING && is_fort_type(B.type[t]) && !siege) dmg *= sim->fortify.armor_mult(t, a, kind);
 	}
 	if (sim->godot_rules) {
 		// Godot-only (sim/techs): hack / pierce armor from the Armory, then
@@ -627,7 +635,7 @@ void Combat::update(double dt) {
 		U.attack_cd[r] = std::max(0.0, U.attack_cd[r] - dt);
 		const int ot = U.order_type[r];
 		// auto-acquire for idle soldiers
-		if (ot == O_IDLE && scan && !def.gatherer) {
+		if (ot == O_IDLE && scan && !def.gatherer && !(sim->godot_rules && U.civ_heal[r])) { // (sim/civ: a Priest healing keeps at it)
 			const int e = pick_target(r, U.combat_leash[r] != 0 ? U.combat_leash[r] : U.sight[r]);
 			if (e >= 0) {
 				Order o = Order::with_target(O_ATTACK, U.id[e]);
@@ -813,6 +821,7 @@ void Combat::update(double dt) {
 		const int e = find_enemy_near(B.x[b], B.z[b], B.owner[b], d.attack_range + B.w[b] / 2.0);
 		if (e >= 0) {
 			B.attack_cd[b] = d.attack_cooldown;
+			if (sim->godot_rules && B.civ_empower[b] > 0) B.attack_cd[b] *= sim->civs.reload_mult(b); // (sim/civ: empowered, x0.75)
 			fire(B.id[b], U.id[e], d.attack_damage, 4);
 		}
 	}

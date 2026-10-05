@@ -15,12 +15,12 @@ namespace aov {
 // ---- data -------------------------------------------------------------------
 
 namespace {
-constexpr TechEffect E(uint8_t k, uint16_t u, bool b, double v, double retold) { return TechEffect{ k, u, b, v, retold }; }
-constexpr TechEffect E(uint8_t k, uint16_t u, bool b, double v) { return TechEffect{ k, u, b, v, v }; }
+constexpr TechEffect E(uint8_t k, UnitMask u, bool b, double v, double retold) { return TechEffect{ k, u, b, v, retold }; }
+constexpr TechEffect E(uint8_t k, UnitMask u, bool b, double v) { return TechEffect{ k, u, b, v, v }; }
 constexpr TechEffect N{};
 constexpr double D = DIST_SCALE;
-constexpr uint16_t M_MINO = UM(U_MINOTAUR), M_CYCLOPS = UM(U_CYCLOPS), M_CENTAUR = UM(U_CENTAUR), M_MEDUSA = UM(U_MEDUSA);
-constexpr uint16_t M_RANGED_MYTH = M_CENTAUR | M_MEDUSA;
+constexpr UnitMask M_MINO = UM(U_MINOTAUR), M_CYCLOPS = UM(U_CYCLOPS), M_CENTAUR = UM(U_CENTAUR), M_MEDUSA = UM(U_MEDUSA);
+constexpr UnitMask M_RANGED_MYTH = M_CENTAUR | M_MEDUSA;
 const char *const CLASSICAL_GODS[] = { "athena", "hermes", "ares", "pan", nullptr };
 const char *const HEROIC_GODS[] = { "apollo", "dionysus", "aphrodite", "hestia", nullptr };
 const char *const MYTHIC_GODS[] = { "artemis", "hera", "hephaestus", "demeter", "persephone", nullptr };
@@ -75,12 +75,12 @@ const TechDef &tech_def(int t) {
 			{ E(TE_PIERCE_ARMOR, M_HUMAN, false, 0.10), E(TE_PIERCE_ARMOR, M_HERO, false, 0.15), N, N }, nullptr,
 			"Human soldiers -10% pierce vulnerability, heroes -15%", "stacks" },
 		{ "ballistics", "Ballistics", TH_ARMORY, -1, 1, Cost(0, 150, 150, 0), 50, -1, nullptr, false,
-			{ E(TE_TRACK, M_TOXOTES, true, 3), N, N, N }, nullptr,
+			{ E(TE_TRACK, M_TOXOTES | M_EG_RANGED, true, 3), N, N, N }, nullptr,
 			"Ranged soldiers and buildings lead their shots: +3 track rating",
 			"with the rules on, arrows of toxotes, towers and Town Centers follow a moving target only ARROW_TRACK_BASE (1) tile "
 			"from where it stood when loosed and miss beyond it; Ballistics adds 3 tiles (myth units' and heroes' arrows home)" },
 		{ "burning_pitch", "Burning Pitch", TH_ARMORY, -1, 3, Cost(0, 500, 300, 0), 40, -1, nullptr, false,
-			{ E(TE_VS_BUILDINGS, M_TOXOTES | M_RANGED_MYTH, false, 3.0), N, N, N }, nullptr,
+			{ E(TE_VS_BUILDINGS, M_TOXOTES | M_EG_RANGED | M_RANGED_MYTH, false, 3.0), N, N, N }, nullptr,
 			"Ranged soldiers +3.0x damage vs buildings (Centaur, Medusa too)",
 			"the damage multiplier vs buildings goes 1 -> 4 (on top of the building's armor: x0.35, or Retold's 90 % pierce on an Armory / Market / Temple); ships: none here" },
 		// ---- Armory: Greek god techs ----------------------------------------------------------------
@@ -200,6 +200,11 @@ const TechDef &tech_def(int t) {
 		{ "iron_grip", "Iron Grip", TH_TEMPLE, -1, 3, Cost(150, 150, 0, 20), 30, -1, "demeter", false,
 			{ N, N, N, N }, "Harpy",
 			"Harpy -> Nephelean Harpy: +10% speed, Drop", "" },
+		// ---- Temple: Egyptian (sim/civ; EGYPT.md 1.6, 6) ------------------------------------------------
+		{ "hands_of_the_pharaoh", "Hands of the Pharaoh", TH_TEMPLE, -1, 0, Cost(0, 0, 75, 0), 10, -1, nullptr, false,
+			{ E(TE_RANGE, UM(U_PRIEST), false, 3 * D, 3), E(TE_SIGHT, UM(U_PRIEST), false, 3 * D, 3), N, N }, nullptr,
+			"Priests +3 range, +3 LOS; they can carry relics and Auto Scout",
+			"range / LOS +3 x DIST_SCALE = +1.8 tiles; relics and Auto Scout: none here" },
 	};
 	// clang-format on
 	return T[t >= 0 && t < T_COUNT ? t : 0];
@@ -278,6 +283,10 @@ int Techs::state(int owner, int t, std::string *reason) const {
 	if (!sim->godot_rules) { why("Not in this game"); return TS_UNAVAILABLE; }
 	if (d.missing) { why(std::string("No ") + d.missing + " in this game"); return TS_UNAVAILABLE; }
 	const Player &p = sim->players[owner];
+	{ // (sim/civ) a civ's techs: the Greek god techs and Temple techs are the Greeks', Hands of the Pharaoh the Egyptians'
+		const int tc = t == T_HANDS_OF_THE_PHARAOH ? CIV_EGYPT : (d.god || d.home == TH_TEMPLE) ? CIV_GREEK : -1;
+		if (tc >= 0 && tc != p.civ) { why(std::string("Not a technology of the ") + civ_name(p.civ)); return TS_UNAVAILABLE; }
+	}
 	if (d.god) {
 		if (d.major) {
 			if (lower(p.god) != d.god) { why(std::string("Requires ") + (char)std::toupper(d.god[0]) + (d.god + 1)); return TS_LOCKED_GOD; }
@@ -487,7 +496,7 @@ void Techs::apply_unit(int r, const TechMods &old, const TechMods &cur) {
 double Techs::unit_damage(int r) const {
 	const UnitStore &U = sim->entities.units;
 	const int t = U.type[r], o = U.owner[r];
-	double d = unit_def(t).attack.damage * (1 + mods[o].attack[t]);
+	double d = sim->civs.base_damage(r) * (1 + mods[o].attack[t]); // (sim/civ: Priest / Pharaoh by age; else the def's)
 	if (mods[o].frenzy[t] && U.tech_frenzy_t[r] >= sim->time) d *= FRENZY_DAMAGE;
 	return d;
 }
@@ -503,7 +512,8 @@ double Techs::reload_mult(int r) const {
 
 double Techs::range_add(int r) const {
 	const UnitStore &U = sim->entities.units;
-	return mods[U.owner[r]].range[U.type[r]];
+	const double h = is_egypt_unit(U.type[r]) ? sim->civs.range_add(r) : 0; // (sim/civ: Priest / Pharaoh by age)
+	return mods[U.owner[r]].range[U.type[r]] + h;
 }
 
 double Techs::splash_add(int r) const {
@@ -519,6 +529,7 @@ double Techs::unit_armor(int tr, const Hitter &a, uint8_t kind) const {
 	if (a.kind == 0 && kind != DK_ARROW) return armor; // (god powers; an arrow whose shooter is gone is still an arrow)
 	bool arrow = kind == DK_ARROW || a.kind == K_BUILDING;
 	if (!arrow && a.kind == K_UNIT && a.row >= 0 && a.row < U.size()) arrow = unit_def(U.type[a.row]).attack.projectile;
+	if (arrow && is_egypt_unit(t)) armor = sim->civs.base_pierce(tr); // (sim/civ: Egyptian units have a hack and a pierce armor)
 	const double add = arrow ? mods[o].pierce[t] : mods[o].hack[t];
 	if (add == 0) return armor;
 	return std::min(ARMOR_CAP, armor + add);
@@ -614,7 +625,7 @@ bool Techs::god_allows_unit(int owner, int type, std::string *reason) const {
 	return false;
 }
 
-double Techs::building_armor_mult(const Hitter &a, uint8_t kind) const {
+double Techs::building_armor_mult(const Hitter &a, uint8_t kind, int btype) const {
 	// the attack's type, as Fortify::armor_mult reads it: arrows (and every
 	// building's shot) pierce, myth units and god powers crush, the rest hack
 	const Entities &E = sim->entities;
@@ -624,8 +635,9 @@ double Techs::building_armor_mult(const Hitter &a, uint8_t kind) const {
 		arrow = arrow || d.attack.projectile;
 		myth = myth || d.cls == CLS_MYTH;
 	}
-	if (myth || (pseudo && !arrow)) return 1 - RETOLD_BLD_CRUSH;
-	return 1 - (arrow ? RETOLD_BLD_PIERCE : RETOLD_BLD_HACK);
+	const CivArmor ar = civ_building_armor(btype); // (sim/civ: the Egyptian buildings' own Retold armor)
+	if (myth || (pseudo && !arrow)) return 1 - ar.crush;
+	return 1 - (arrow ? ar.pierce : ar.hack);
 }
 
 bool Techs::omniscient(int fog_owner) const {
@@ -645,10 +657,10 @@ UnitStats Techs::stats(int r) const {
 	s.hp = U.hp[r];
 	s.max_hp = U.max_hp[r];
 	s.speed = U.speed[r];
-	s.range = (d.has_attack ? d.attack.range : 0.5) + (on ? m.range[t] : 0);
+	s.range = (d.has_attack ? d.attack.range : 0.5) + (on ? range_add(r) : 0);
 	s.sight = U.sight[r];
 	s.hack_armor = on ? std::min(ARMOR_CAP, d.armor + m.hack[t]) : d.armor;
-	s.pierce_armor = on ? std::min(ARMOR_CAP, d.armor + m.pierce[t]) : d.armor;
+	s.pierce_armor = on ? std::min(ARMOR_CAP, (is_egypt_unit(t) ? sim->civs.base_pierce(r) : d.armor) + m.pierce[t]) : d.armor;
 	s.reload = d.attack.cooldown * (on ? reload_mult(r) : 1);
 	s.splash = d.attack.splash + (on ? m.splash[t] : 0);
 	s.divine = on ? m.divine[t] : 0;
@@ -812,7 +824,8 @@ void Techs::update(double dt) {
 		if (B.removed[b] || B.dead[b] || !B.built[b] || B.tech_queue[b].empty()) continue;
 		TechItem &q = B.tech_queue[b][0];
 		const int owner = B.owner[b];
-		const double rate = B.type[b] == B_ARMORY && mods[owner].armory_discount ? 1.5 : 1.0; // (Forge of Olympus)
+		double rate = B.type[b] == B_ARMORY && mods[owner].armory_discount ? 1.5 : 1.0; // (Forge of Olympus)
+		if (B.civ_empower[b] > 0) rate *= sim->civs.research_mult(b); // (sim/civ: the Pharaoh's empowerment)
 		q.t += dt * rate;
 		if (q.t >= q.total) {
 			const int t = q.tech;

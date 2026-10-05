@@ -46,9 +46,10 @@ enum Kind : uint8_t { K_NONE = 0, K_UNIT = 1, K_BUILDING = 2, K_RESOURCE = 3 };
 // Order types (u.order.type). Handlers are registered in Commands.
 // O_ATTACK_MOVE is Godot-only (combat.h: walk to order_x / order_z, fighting
 // what comes into sight on the way).
-enum OrderType : uint8_t { O_IDLE, O_MOVE, O_GATHER, O_DROPOFF, O_WORSHIP, O_BUILD, O_ATTACK, O_ATTACK_MOVE, O_TYPE_COUNT };
+// O_EMPOWER is Godot-only (sim/civ: the Pharaoh, Ra's Priests on a building).
+enum OrderType : uint8_t { O_IDLE, O_MOVE, O_GATHER, O_DROPOFF, O_WORSHIP, O_BUILD, O_ATTACK, O_ATTACK_MOVE, O_EMPOWER, O_TYPE_COUNT };
 inline const char *order_name(int t) {
-	static const char *n[] = { "idle", "move", "gather", "dropoff", "worship", "build", "attack", "attack_move" };
+	static const char *n[] = { "idle", "move", "gather", "dropoff", "worship", "build", "attack", "attack_move", "empower" };
 	return t >= 0 && t < O_TYPE_COUNT ? n[t] : "?";
 }
 
@@ -180,7 +181,9 @@ enum UnitFlag : uint8_t { UF_MOVING = 1, UF_DEAD = 2, UF_ARRIVED = 4, UF_CARRY =
 	X(uint8_t, tech_poison_by, 0) /* the poisoner's owner */                   \
 	X(double, tech_frenzy_t, -1)  /* Harvest of Souls: game time it ends */    \
 	X(uint8_t, tech_pious_n, 0)   /* Pious Sacrifice stacks (0..5) */          \
-	X(double, tech_pious_t, -1)   /* game time the stacks end */
+	X(double, tech_pious_t, -1)   /* game time the stacks end */              \
+	/* civ (sim/civ, Godot-only): the ally a Priest / Pharaoh heals this tick */ \
+	X(int32_t, civ_heal, 0)
 
 #define AOV_BUILDING_COLUMNS(X)                                                \
 	X(int32_t, id, 0)                                                          \
@@ -231,7 +234,9 @@ enum UnitFlag : uint8_t { UF_MOVING = 1, UF_DEAD = 2, UF_ARRIVED = 4, UF_CARRY =
 	X(double, fort_tech_t, 0)                                                  \
 	X(double, fort_tech_total, 0)                                              \
 	/* techs (sim/techs, Godot-only): the research queue (Armory, Market, Temple, ...) */ \
-	X(TechQueue, tech_queue, TechQueue())
+	X(TechQueue, tech_queue, TechQueue())                                      \
+	/* civ (sim/civ, Godot-only): empowerment this tick (Pharaoh 1, Ra's Priest 0.6) */ \
+	X(double, civ_empower, 0)
 
 enum BuildingDefFlag : uint8_t { BF_WORSHIP = 1, BF_FARM = 2, BF_DROPOFF = 4 };
 enum EconPhase : uint8_t { EP_NONE, EP_TO_RES, EP_GATHERING, EP_TO_DROP, EP_TO_TEMPLE };

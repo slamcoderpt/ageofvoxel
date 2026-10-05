@@ -139,10 +139,17 @@ void Commands::smart(const std::vector<int> &rows, double x, double z, int32_t t
 		if (ts >= 0 && !tdead && target_id != U.id[r]) {
 			if (tk == K_RESOURCE && d.gatherer && try_order(r, O_GATHER)) continue;
 			if (sim->is_enemy(U.owner[r], towner) && d.has_attack && try_order(r, O_ATTACK)) continue;
-			if (tk == K_BUILDING && towner == U.owner[r] && d.builder) {
+			// (Godot-only, sim/civ: the Pharaoh / Ra's Priest empowers his own buildings but a Farm;
+			// a Priest builds only Obelisks, a Laborer never worships)
+			const bool civ_rules = sim->godot_rules && is_egypt_unit(U.type[r]);
+			if (civ_rules && tk == K_BUILDING && sim->is_ally(towner, U.owner[r]) && sim->civs.can_empower(r) &&
+					!(E.buildings.def_flags[ts] & BF_FARM) && !(U.type[r] == U_PRIEST && !E.buildings.built[ts] && E.buildings.type[ts] == B_OBELISK)) {
+				if (try_order(r, O_EMPOWER)) continue;
+			}
+			if (tk == K_BUILDING && towner == U.owner[r] && d.builder && !(civ_rules && !unit_can_build(U.type[r], E.buildings.type[ts]))) {
 				const BuildingStore &B = E.buildings;
 				if (!B.built[ts]) { if (try_order(r, O_BUILD)) continue; }
-				else if (B.def_flags[ts] & BF_WORSHIP) { if (try_order(r, O_WORSHIP)) continue; }
+				else if ((B.def_flags[ts] & BF_WORSHIP) && !(civ_rules && U.type[r] == U_LABORER)) { if (try_order(r, O_WORSHIP)) continue; }
 				else if (B.def_flags[ts] & BF_FARM) { if (try_order(r, O_GATHER)) continue; }
 				else if (U.carry_amount[r] > 0 && (B.def_flags[ts] & BF_DROPOFF)) { if (try_order(r, O_DROPOFF)) continue; }
 				else if (sim->godot_rules && B.hp[ts] < B.max_hp[ts]) { if (try_order(r, O_BUILD)) continue; } // repair (Godot-only)

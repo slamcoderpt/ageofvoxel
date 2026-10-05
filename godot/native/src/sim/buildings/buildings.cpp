@@ -17,6 +17,9 @@ void Buildings::init(Sim *s) {
 		const BuildingStore &B = E.buildings;
 		if (b < 0 || B.owner[b] != E.units.owner[r]) return false;
 		if (B.built[b] && !(sim->godot_rules && !B.dead[b] && B.hp[b] < B.max_hp[b])) return false; // (Godot-only: repair)
+		// (Godot-only, sim/civ: a Greek villager builds no Egyptian building, a Laborer no Obelisk, a Priest only that)
+		const int ut = E.units.type[r];
+		if (sim->godot_rules && (is_egypt_unit(ut) || is_egypt_building(B.type[b])) && !unit_can_build(ut, B.type[b])) return false;
 		GoalRect g{ (double)B.tx[b], (double)B.tz[b], (double)B.w[b], (double)B.h[b] };
 		sim->movement.move_to(r, B.x[b], B.z[b], &g);
 		return true;
@@ -280,9 +283,12 @@ int32_t Buildings::place(int type, int owner, int tx, int tz, const std::vector<
 	if (type < 0 || type >= B_TYPE_COUNT || owner < 0 || owner >= MAX_PLAYERS || !sim->players[owner].exists) return 0;
 	const BuildingDef &def = building_def(type);
 	Player &p = sim->players[owner];
-	const Cost cost = sim->godot_rules ? rules_building_cost(type) : def.cost; // (Godot-only: Retold's Temple, sim/techs)
+	// (Godot-only: Retold's Temple, sim/techs; each civ's costs, sim/civ)
+	const Cost cost = sim->godot_rules ? civ_building_cost(p.civ, type) : def.cost;
 	if (!can_place(type, tx, tz) || !p.can_afford(cost)) return 0;
 	if (sim->godot_rules && p.age < def.min_age) return 0; // (Godot-only: the fortifications' ages)
+	if (sim->godot_rules && !sim->civs.can_build(owner, type)) return 0; // (Godot-only, sim/civ: civ, Monument order)
+	if (!sim->godot_rules && is_egypt_building(type)) return 0; // (Godot-only types)
 	if (!sim->godot_rules && is_tech_building(type)) return 0; // (Godot-only: Armory, Market)
 	if (!p.pay(cost)) return 0;
 	const int b = spawn(type, owner, tx, tz, false);
@@ -334,6 +340,9 @@ void Buildings::update(double dt) {
 	Movement &mv = sim->movement;
 	// tally builders per site, in first-seen order (the JS Map)
 	std::vector<std::pair<int32_t, int>> builders, repairs;
+	// (Godot-only, sim/civ: the builders' summed work rate per site: a Laborer 0.75)
+	std::vector<double> work, rwork;
+	const bool civ_rules = sim->godot_rules;
 	const int n = U.size();
 	for (int u = 0; u < n; u++) {
 		if (U.removed[u] || U.dead[u] || U.order_type[u] != O_BUILD) continue;
@@ -354,24 +363,34 @@ void Buildings::update(double dt) {
 		U.rot[u] = jsm::atan2(B.x[b] - U.x[u], B.z[b] - U.z[u]);
 		U.anim_want[u] = A_BUILD;
 		auto &list = repair ? repairs : builders;
+		auto &wl = repair ? rwork : work;
+		const double wr = civ_rules ? sim->civs.work_rate(u, b) : 1;
 		bool found = false;
-		for (auto &kv : list)
-			if (kv.first == bid) { kv.second++; found = true; break; }
-		if (!found) list.push_back({ bid, 1 });
+		for (size_t i = 0; i < list.size(); i++)
+			if (list[i].first == bid) { list[i].second++; wl[i] += wr; found = true; break; }
+		if (!found) { list.push_back({ bid, 1 }); wl.push_back(wr); }
 	}
 	// repair (Godot-only): free, half the build rate, more hands faster (the same n^0.75)
-	for (const auto &kv : repairs) {
+	for (size_t i = 0; i < repairs.size(); i++) {
+		const auto &kv = repairs[i];
 		const int b = E.building_slot(kv.first);
 		if (b < 0) continue;
 		const double bt = B.fort_build_time[b] > 0 ? B.fort_build_time[b] : building_def(B.type[b]).build_time;
-		B.hp[b] = std::min(B.max_hp[b], B.hp[b] + B.max_hp[b] / std::max(1.0, bt) * REPAIR_RATE * jsm::pow(kv.second, 0.75) * dt);
+		double k = 1; // (sim/civ: the builders' mean work rate, the Pharaoh's empowerment)
+		if (civ_rules) k = rwork[i] / kv.second * sim->civs.build_mult(b);
+		B.hp[b] = std::min(B.max_hp[b], B.hp[b] + B.max_hp[b] / std::max(1.0, bt) * REPAIR_RATE * jsm::pow(kv.second, 0.75) * k * dt);
 	}
-	for (const auto &kv : builders) {
+	for (size_t i = 0; i < builders.size(); i++) {
+		const auto &kv = builders[i];
 		const int b = E.building_slot(kv.first);
 		if (b < 0) continue;
 		// (fortify: a wall piece's time scales with its length; 0 = the def's)
 		const double bt = B.fort_build_time[b] > 0 ? B.fort_build_time[b] : building_def(B.type[b]).build_time;
-		const double rate = (1 / bt) * jsm::pow(kv.second, 0.75);
+		double rate = (1 / bt) * jsm::pow(kv.second, 0.75);
+		if (civ_rules) { // (sim/civ: Laborers build at 0.75, an empowered site +75 %)
+			const double k = work[i] / kv.second * sim->civs.build_mult(b);
+			if (k != 1) rate *= k;
+		}
 		const double before = B.progress[b];
 		B.progress[b] = std::min(1.0, B.progress[b] + rate * dt);
 		B.hp[b] = std::min(B.max_hp[b], B.hp[b] + (B.progress[b] - before) * B.max_hp[b] * 0.9);

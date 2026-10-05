@@ -221,7 +221,7 @@ WallPlan Fortify::plan_wall(int owner, int tx0, int tz0, int tx1, int tz1, bool 
 		}
 		a = b;
 	}
-	const Cost &tc = building_def(B_WALL).cost;
+	const Cost tc = civ_building_cost(sim->civs.civ(owner), B_WALL); // (sim/civ: an Egyptian wall costs gold, no wood)
 	P.cost = Cost(0, tc.v[RES_WOOD] * P.new_tiles, tc.v[RES_GOLD] * P.new_tiles, 0);
 	if (P.on_building > 0 && !through_buildings) P.reason = "A building is in the way";
 	else if (P.pieces.empty()) P.reason = "Cannot build a wall there";
@@ -331,7 +331,7 @@ FortResult Fortify::convert_to_gate(int32_t id) {
 	if (!B.built[b]) { r.reason = "Finish the wall first"; return r; }
 	Player *p = sim->player(B.owner[b]);
 	if (!p) { r.reason = "No owner"; return r; }
-	if (!p->pay(building_def(B_GATE).cost)) { r.reason = "Not enough resources"; return r; }
+	if (!p->pay(civ_building_cost(sim->civs.civ(B.owner[b]), B_GATE))) { r.reason = "Not enough resources"; return r; } // (sim/civ: Egyptian: gold)
 	const double frac = B.max_hp[b] > 0 ? B.hp[b] / B.max_hp[b] : 1;
 	B.type[b] = B_GATE;
 	B.max_hp[b] = piece_max_hp(B_GATE, B.owner[b], B.w[b] * B.h[b]);
@@ -555,6 +555,7 @@ void Fortify::update(double dt) {
 			const int e = sim->combat.find_enemy_near(B.x[b], B.z[b], owner, st.range + B.w[b] / 2.0);
 			if (e >= 0) {
 				B.attack_cd[b] = st.cooldown;
+				if (B.civ_empower[b] > 0) B.attack_cd[b] *= sim->civs.reload_mult(b); // (sim/civ: empowered, x0.75)
 				sim->combat.fire(B.id[b], U.id[e], st.damage, TOWER_ARROW_Y);
 			}
 		} else if (type == B_GATE) {

@@ -10,6 +10,7 @@ using namespace godot;
 
 void AovSim::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("version"), &AovSim::version);
+	_bind_civ_methods(); // (aov_sim_civ.cpp: sim/civ)
 	ClassDB::bind_method(D_METHOD("new_game", "seed", "map_size", "preset", "players"), &AovSim::new_game, DEFVAL(128), DEFVAL("skirmish"), DEFVAL(2));
 	ClassDB::bind_method(D_METHOD("tick", "n"), &AovSim::tick, DEFVAL(1));
 	ClassDB::bind_method(D_METHOD("get_tick"), &AovSim::get_tick);
@@ -60,6 +61,7 @@ void AovSim::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("spawn_resource", "type", "tx", "tz", "variant"), &AovSim::spawn_resource, DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("remove_resource", "id"), &AovSim::remove_resource);
 	ClassDB::bind_method(D_METHOD("clear_rect", "tx", "tz", "w", "h"), &AovSim::clear_rect);
+	ClassDB::bind_method(D_METHOD("paint_ground", "tx", "tz", "w", "h", "ground"), &AovSim::paint_ground); // (Godot-only scene tool)
 	ClassDB::bind_method(D_METHOD("kill_unit", "id", "killer"), &AovSim::kill_unit, DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("entity_kind", "id"), &AovSim::entity_kind);
 	ClassDB::bind_method(D_METHOD("get_unit_count"), &AovSim::get_unit_count);
@@ -81,7 +83,7 @@ void AovSim::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_group_paths", "min_units"), &AovSim::set_group_paths);
 	// buildings
 	ClassDB::bind_method(D_METHOD("building_type_names"), &AovSim::building_type_names);
-	ClassDB::bind_method(D_METHOD("get_building_def", "type"), &AovSim::get_building_def);
+	ClassDB::bind_method(D_METHOD("get_building_def", "type", "owner"), &AovSim::get_building_def, DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("spawn_building", "type", "owner", "tx", "tz", "built", "site"), &AovSim::spawn_building, DEFVAL(true), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("can_place", "type", "tx", "tz"), &AovSim::can_place);
 	ClassDB::bind_method(D_METHOD("place_building", "type", "owner", "tx", "tz", "builders"), &AovSim::place_building, DEFVAL(PackedInt32Array()));
@@ -382,6 +384,8 @@ Dictionary AovSim::get_player(int64_t id) const {
 	d["human"] = p.human;
 	d["difficulty"] = String(aov::ai_difficulty_name(p.difficulty));
 	d["gather_mult"] = p.gather_mult;
+	d["civ"] = aov::civ_key(p.civ); // (Godot-only, sim/civ)
+	d["civ_id"] = p.civ;
 	return d;
 }
 
@@ -410,6 +414,7 @@ static aov::MatchConfig match_config(const Dictionary &cfg) {
 		mp.color = (int64_t)p.get("color", -1);
 		mp.god = std::string(String(p.get("god", "Zeus")).utf8().get_data());
 		if (!mp.god.empty()) mp.god[0] = (char)std::toupper((unsigned char)mp.god[0]);
+		if (p.has("civ")) mp.civ = aov::civ_of_key(String(p["civ"]).utf8().get_data()); // (sim/civ; default: from the god)
 		c.players.push_back(mp);
 	}
 	return c;
@@ -459,7 +464,7 @@ Dictionary AovSim::get_unit_def(const String &type) const {
 	int t = aov::unit_type_of(type.utf8().get_data());
 	if (t < 0) return d;
 	const aov::UnitDef &u = aov::unit_def(t);
-	static const char *cls[] = { "villager", "infantry", "archer", "cavalry", "myth", "hero" };
+	static const char *cls[] = { "villager", "infantry", "archer", "cavalry", "myth", "hero", "siege" };
 	d["type"] = t;
 	d["key"] = u.key;
 	d["name"] = u.name;
@@ -489,6 +494,7 @@ Dictionary AovSim::get_unit_def(const String &type) const {
 	atk["projectile"] = u.attack.projectile ? "arrow" : "";
 	d["attack"] = atk;
 	d["armor"] = u.armor;
+	civ_unit_def(t, d); // (Godot-only, sim/civ: civ, hack / pierce armor, stand-in, Retold, per age)
 	return d;
 }
 
@@ -503,6 +509,7 @@ int64_t AovSim::spawn_unit(const String &type, int64_t owner, double x, double z
 		ERR_PRINT("AovSim.spawn_unit: unknown unit type " + type);
 		return -1;
 	}
+	if (!sim_.godot_rules && aov::is_egypt_unit(t)) return 0; // (Godot-only types, sim/civ)
 	int r = sim_.units.spawn(t, (int)owner, x, z, rot);
 	return r < 0 ? 0 : sim_.entities.units.id[r];
 }
@@ -516,6 +523,7 @@ PackedInt32Array AovSim::spawn_block(const String &type, int64_t owner, int64_t 
 		ERR_PRINT("AovSim.spawn_block: unknown unit type " + type);
 		return out;
 	}
+	if (!sim_.godot_rules && aov::is_egypt_unit(t)) return out; // (Godot-only types, sim/civ)
 	for (int32_t id : sim_.spawn_block(t, (int)owner, (int)count, x, z, (int)cols, spacing, rot, jitter)) out.push_back(id);
 	return out;
 }
@@ -706,6 +714,12 @@ Dictionary AovSim::get_buildings() const {
 	// fortify (Godot-only): gate leaves 0 closed .. 1 open, gate locked (get_walls() has the rest)
 	d["fort_open"] = packed_rows<double, PackedFloat32Array>(B.removed, B.fort_open);
 	d["fort_locked"] = packed_rows<uint8_t, PackedByteArray>(B.removed, B.fort_locked);
+	// civ (Godot-only, sim/civ): the Pharaoh's empowerment (0 .. 1), the owner's civilization (0 Greek, 1 Egyptian)
+	d["empower"] = packed_rows<double, PackedFloat32Array>(B.removed, B.civ_empower);
+	PackedByteArray bciv;
+	for (int r = 0; r < B.size(); r++)
+		if (!B.removed[r]) bciv.push_back(sim_.civs.civ(B.owner[r]));
+	d["civ"] = bciv;
 	PackedFloat32Array stock, rally;
 	PackedByteArray qlen;
 	for (int r = 0; r < B.size(); r++) {
@@ -916,11 +930,13 @@ PackedStringArray AovSim::building_type_names() const {
 	return out;
 }
 
-Dictionary AovSim::get_building_def(const String &type) const {
+Dictionary AovSim::get_building_def(const String &type, int64_t owner) const {
 	Dictionary d;
 	const int t = aov::building_type_of(type.utf8().get_data());
 	if (t < 0) return d;
 	const aov::BuildingDef &b = aov::building_def(t);
+	// (Godot-only, sim/civ: an owner's civ costs and trains; owner 0: the type's own civ, Greek for a shared one)
+	const int civ = owner > 0 ? sim_.civs.civ((int)owner) : std::max(0, aov::building_civ(t));
 	d["type"] = t;
 	d["key"] = b.key;
 	d["name"] = b.name;
@@ -928,7 +944,7 @@ Dictionary AovSim::get_building_def(const String &type) const {
 	d["h"] = b.h;
 	// (Godot-only, sim/techs: Retold's Temple cost / hp, its myth units)
 	d["hp"] = sim_.godot_rules ? aov::rules_building_hp(t) : b.hp;
-	d["cost"] = cost_dict(sim_.godot_rules ? aov::rules_building_cost(t) : b.cost);
+	d["cost"] = cost_dict(sim_.godot_rules ? aov::civ_building_cost(civ, t) : b.cost);
 	d["build_time"] = b.build_time;
 	d["pop"] = b.pop;
 	d["sight"] = b.sight;
@@ -936,8 +952,7 @@ Dictionary AovSim::get_building_def(const String &type) const {
 	for (int k = 0; k < 3; k++)
 		if (b.drops(k)) drop.push_back(aov::res_name(k));
 	if (sim_.godot_rules) {
-		for (int u = 0; u < aov::U_TYPE_COUNT; u++)
-			if (aov::rules_trains(t, u)) trains.push_back(aov::unit_def(u).key);
+		for (const int *u = aov::civ_trains(civ, t); *u >= 0; u++) trains.push_back(aov::unit_def(*u).key);
 	} else
 		for (int i = 0; i < 4 && b.trains[i] >= 0; i++) trains.push_back(aov::unit_def(b.trains[i]).key);
 	d["dropoff"] = drop;
@@ -949,6 +964,7 @@ Dictionary AovSim::get_building_def(const String &type) const {
 	d["hotkey"] = b.hotkey;
 	d["min_age"] = b.min_age;
 	d["variants"] = b.variants;
+	civ_building_def(t, civ, d); // (Godot-only, sim/civ)
 	return d;
 }
 
@@ -958,6 +974,7 @@ int64_t AovSim::spawn_building(const String &type, int64_t owner, int64_t tx, in
 		ERR_PRINT("AovSim.spawn_building: unknown building type " + type);
 		return 0;
 	}
+	if (!sim_.godot_rules && aov::is_egypt_building(t)) return 0; // (Godot-only types, sim/civ)
 	// bounds: a footprint not wholly on the map is refused (0), like can_place
 	if (!sim_.map().rect_in_tiles(tx, tz, aov::building_def(t).w, aov::building_def(t).h)) return 0;
 	const int b = sim_.buildings.spawn(t, (int)owner, (int)tx, (int)tz, built, site);
@@ -1202,7 +1219,7 @@ static const char *tech_effect_name(int k) {
 	return k >= 0 && k < aov::TE_COUNT ? n[k] : "?";
 }
 
-static PackedStringArray unit_mask_names(uint16_t m) {
+static PackedStringArray unit_mask_names(aov::UnitMask m) {
 	PackedStringArray out;
 	for (int u = 0; u < aov::U_TYPE_COUNT; u++)
 		if ((m >> u) & 1) out.push_back(aov::unit_def(u).key);

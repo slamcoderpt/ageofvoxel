@@ -44,6 +44,9 @@ struct Player {
 	double gather_mult = 1;
 	int difficulty = -1;
 	bool human = false;
+	// Godot-only (sim/civ): the civilization, set at match setup from the major
+	// god (CIV_GREEK 0 = the browser's game, CIV_EGYPT 1)
+	uint8_t civ = 0;
 
 	void init(int id_, const std::string &name_, bool ai) {
 		*this = Player();

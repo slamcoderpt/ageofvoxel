@@ -83,12 +83,18 @@ MatchResult Sim::setup_match(const MatchConfig &cfg) {
 		p.human = mp.human;
 		if (mp.color >= 0) p.color = (uint32_t)mp.color;
 		if (!mp.god.empty()) p.god = mp.god;
+		// (Godot-only, sim/civ: the civilization comes with the major god; the browser's game is all Greek)
+		if (godot_rules) {
+			const int c = mp.civ >= 0 ? mp.civ : civ_of_god(p.god);
+			p.civ = (uint8_t)(c < 0 ? CIV_GREEK : c);
+		}
 		team[id] = teams[i];
 		const int d = mp.human ? AI_DEFAULT : std::max(0, std::min(3, mp.difficulty));
 		p.difficulty = d;
 		const AIParams par = ai_params(d);
 		p.gather_mult = par.gather_mult;
 		for (int k = 0; k < 4; k++) p.res[k] = stock[k] + (k < 3 ? par.bonus_res : 0);
+		if (p.civ == CIV_EGYPT) p.res[RES_FAVOR] = 0; // (sim/civ: Retold's Egyptians start without favor: no worship, Monuments)
 		if (mp.human && !local_player) local_player = id;
 	}
 	if (!local_player) local_player = ids[0];
@@ -101,10 +107,12 @@ MatchResult Sim::setup_match(const MatchConfig &cfg) {
 		const Start *st = nullptr;
 		for (const Start &s : world.starts)
 			if (s.owner == ids[i]) st = &s;
-		const scenes::StartResult sr = scenes::standard_start(*this, ids[i], *st, cfg.villagers);
-		res.tcs[i] = sr.tc;
+		int32_t tc = 0;
+		if (players[ids[i]].civ == CIV_EGYPT) tc = civs.egypt_start(ids[i], *st, cfg.villagers).tc; // (sim/civ: 3 Laborers, the Pharaoh, a Priest)
+		else tc = scenes::standard_start(*this, ids[i], *st, cfg.villagers).tc;
+		res.tcs[i] = tc;
 		if (ids[i] == local_player) {
-			const int b = entities.building_slot(sr.tc);
+			const int b = entities.building_slot(tc);
 			if (b >= 0) {
 				res.focus_x = entities.buildings.x[b];
 				res.focus_z = entities.buildings.z[b];

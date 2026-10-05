@@ -30,6 +30,7 @@
 #include "core/rng.h"
 #include "core/victory.h"
 #include "buildings/buildings.h"
+#include "civ/civ.h"
 #include "economy/economy.h"
 #include "fortify/fortify.h"
 #include "godpowers/godpowers.h"
@@ -73,6 +74,7 @@ public:
 	GodPowers godpowers;
 	Fortify fortify; // walls, gates, towers (Godot-only, fortify/fortify.h)
 	Techs techs;     // research, Armory / Market / Temple techs, trade (Godot-only, techs/techs.h)
+	Civs civs;       // civilizations, the Egyptians (Godot-only, civ/civ.h)
 	FogOfWar fog;
 	Victory victory;
 	SceneCtx scene; // the last scene setup's context (AovSim.setup_scene)

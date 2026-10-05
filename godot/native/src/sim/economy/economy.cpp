@@ -47,6 +47,7 @@ void Economy::init(Sim *s) {
 		const int b = E.building_slot(o.target);
 		UnitStore &U = E.units;
 		if (b < 0 || !building_def(E.buildings.type[b]).worship || !unit_def(U.type[r]).gatherer) return false;
+		if (sim->godot_rules && U.type[r] == U_LABORER) return false; // (Godot-only, sim/civ: Egyptians do not worship)
 		set_econ(r, EP_TO_TEMPLE, 0, RES_NONE, 0, NAN);
 		U.econ_temple[r] = E.buildings.id[b];
 		const BuildingStore &B = E.buildings;
@@ -238,12 +239,17 @@ Result Economy::train(int b, int type) {
 	// (Godot-only, sim/techs: the Temple also trains the Cyclops, Centaur and
 	// Medusa; the Medusa from the Mythic Age; a chosen minor god's unit only)
 	const bool rules = sim->godot_rules;
-	if (!B.built[b] || !(rules ? rules_trains(B.type[b], type) : building_def(B.type[b]).trains_type(type))) return { false, "Cannot train here" };
+	if (!rules && is_egypt_unit(type)) return { false, "Cannot train here" }; // (Godot-only types)
+	// (Godot-only, sim/civ: each civ's lists, rules_trains for the Greeks; then its conditions)
+	std::string civ_why;
+	const int civ_check = rules ? sim->civs.train_check(b, type, &civ_why) : 0;
+	if (!B.built[b] || (rules ? civ_check == 1 : !building_def(B.type[b]).trains_type(type))) return { false, B.built[b] && rules ? civ_why : "Cannot train here" };
 	const int min_age = rules ? rules_min_age(type) : def.min_age;
 	if (min_age > p.age) return { false, std::string("Requires ") + AGES[min_age] + " Age" };
 	if (rules) {
 		std::string why;
 		if (!sim->techs.god_allows_unit(B.owner[b], type, &why)) return { false, why };
+		if (civ_check) return { false, civ_why }; // (Temple for the TC's Priests, unit limits)
 	}
 	if (B.queue[b].size() >= 10) return { false, "Queue full" };
 	recount();
@@ -281,21 +287,22 @@ void Economy::rescue() {
 	int tc[MAX_PLAYERS];
 	for (int &t : tc) t = -1;
 	for (int r = 0; r < U.size(); r++)
-		if (!U.removed[r] && !U.dead[r] && U.type[r] == U_VILLAGER) has_villager[U.owner[r]] = true;
+		if (!U.removed[r] && !U.dead[r] && (U.type[r] == U_VILLAGER || U.type[r] == U_LABORER)) has_villager[U.owner[r]] = true; // (sim/civ: a Laborer too)
 	for (int b = 0; b < B.size(); b++) {
 		if (B.removed[b] || B.dead[b]) continue;
 		const int o = B.owner[b];
 		for (const TrainItem &q : B.queue[b])
-			if (q.type == U_VILLAGER) has_villager[o] = true;
+			if (q.type == U_VILLAGER || q.type == U_LABORER) has_villager[o] = true;
 		if (tc[o] < 0 && B.type[b] == B_TOWN_CENTER && B.built[b]) tc[o] = b;
 	}
-	const UnitDef &vd = unit_def(U_VILLAGER);
 	for (int id = 1; id < MAX_PLAYERS; id++) {
 		Player &p = sim->players[id];
+		const int worker = p.civ == CIV_EGYPT ? U_LABORER : U_VILLAGER; // (sim/civ)
+		const UnitDef &vd = unit_def(worker);
 		if (!p.exists || has_villager[id] || tc[id] < 0 || p.can_afford(vd.cost)) continue;
 		const int b = tc[id];
 		TrainItem it;
-		it.type = (uint8_t)U_VILLAGER;
+		it.type = (uint8_t)worker;
 		it.total = vd.train_time;
 		it.free = true;
 		B.queue[b].insert(B.queue[b].begin(), it);
@@ -335,6 +342,8 @@ Result Economy::advance_age(int owner) {
 			if (!B.removed[b] && !B.dead[b] && B.owner[b] == owner && B.built[b] && is_tech_building(B.type[b])) ok = true;
 		if (!ok) return { false, "Requires an Armory or a Market" };
 	}
+	// (Godot-only, sim/civ: the Egyptians' Mythic Age needs their fortress, a Migdol Stronghold, Retold)
+	if (sim->godot_rules && p.civ == CIV_EGYPT && p.age + 1 == 3 && !sim->civs.has_built(owner, B_MIGDOL)) return { false, "Requires a Migdol Stronghold" };
 	if (!p.pay(cost)) return { false, "Not enough resources" };
 	p.advancing = true;
 	p.advancing_t = 0;
@@ -446,7 +455,8 @@ void Economy::update(double dt) {
 		if (B.removed[b] || !B.built[b] || B.queue[b].empty()) continue;
 		if (sim->techs.training_paused(b)) continue; // (Godot-only: researching here, sim/techs)
 		TrainItem &q = B.queue[b][0];
-		q.t += dt;
+		if (sim->godot_rules && B.civ_empower[b] > 0) q.t += dt * sim->civs.train_mult(b, q.type); // (Godot-only, sim/civ: empowered +75 %)
+		else q.t += dt;
 		if (q.t >= q.total) {
 			const int type = q.type;
 			B.queue[b].erase(B.queue[b].begin());
@@ -570,7 +580,10 @@ void Economy::update_gatherer(int r, double dt) {
 		U.anim_want[r] = A_GATHER;
 		const int rt = U.econ_res_type[r];
 		double base;
-		if (farm) base = FARM_RATE;
+		if (farm) {
+			base = FARM_RATE;
+			if (sim->godot_rules && U.type[r] == U_LABORER) base *= LABORER_GATHER; // (Godot-only, sim/civ: Laborers farm 10 % slower)
+		}
 		else if (animal) base = ud.gather_rate[RES_FOOD] * 1.35;
 		else base = rt <= RES_GOLD ? ud.gather_rate[rt] : NAN;
 		double rate = base * dt;
@@ -607,7 +620,13 @@ void Economy::update_gatherer(int r, double dt) {
 		Player &p = sim->players[U.owner[r]];
 		const int ct = U.carry_type[r];
 		if (U.carry_amount[r] > 0 && ct != RES_NONE) {
-			p.res[ct] += std::floor(U.carry_amount[r] * 100) / 100;
+			// (Godot-only, sim/civ: a drop site empowered by the Pharaoh gives +20 %)
+			const double dm = sim->godot_rules && B.civ_empower[d] > 0 ? sim->civs.drop_mult(d) : 1;
+			if (dm != 1) {
+				p.res[ct] += std::floor(U.carry_amount[r] * dm * 100) / 100;
+				sim->civs.drop_bonus[U.owner[r]] += U.carry_amount[r] * (dm - 1);
+			} else
+				p.res[ct] += std::floor(U.carry_amount[r] * 100) / 100;
 			int kind;
 			if (ct == RES_WOOD) kind = ST_WOOD;
 			else if (ct == RES_GOLD) kind = ST_GOLD;

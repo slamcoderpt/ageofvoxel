@@ -25,7 +25,18 @@ namespace aov {
 // Armory and Market: 150 wood, 40 s, 1200 hp, 4x4, Classical Age): the
 // Armory researches the weapon / armor / shield lines, the Market trades
 // food and wood for gold and researches its economic techs.
-enum BuildingType : uint8_t { B_TOWN_CENTER, B_HOUSE, B_STOREHOUSE, B_FARM, B_TEMPLE, B_BARRACKS, B_WALL, B_WALL_PILLAR, B_GATE, B_TOWER, B_ARMORY, B_MARKET, B_TYPE_COUNT };
+// B_GRANARY .. B_SIEGE_WORKS are Godot-only too (sim/civ: the Egyptian
+// buildings of Retold; only an Egyptian player places them). The shared
+// types (Town Center, House, Farm, Temple, Armory, Market, walls, towers)
+// are both civilizations': their cost per civ is civ_building_cost().
+enum BuildingType : uint8_t { B_TOWN_CENTER, B_HOUSE, B_STOREHOUSE, B_FARM, B_TEMPLE, B_BARRACKS, B_WALL, B_WALL_PILLAR, B_GATE, B_TOWER, B_ARMORY, B_MARKET,
+	// Egyptian (Godot-only, sim/civ)
+	B_GRANARY, B_LUMBER_CAMP, B_MINING_CAMP,
+	B_MONUMENT_VILLAGERS, B_MONUMENT_SOLDIERS, B_MONUMENT_PRIESTS, B_MONUMENT_PHARAOHS, B_MONUMENT_GODS,
+	B_OBELISK, B_EG_BARRACKS, B_MIGDOL, B_SIEGE_WORKS,
+	B_TYPE_COUNT };
+inline bool is_egypt_building(int t) { return t >= B_GRANARY && t < B_TYPE_COUNT; }
+inline bool is_monument(int t) { return t >= B_MONUMENT_VILLAGERS && t <= B_MONUMENT_GODS; }
 inline bool is_wall_piece(int t) { return t == B_WALL || t == B_WALL_PILLAR || t == B_GATE; }
 inline bool is_fort_type(int t) { return t >= B_WALL && t <= B_TOWER; }
 inline bool is_tech_building(int t) { return t == B_ARMORY || t == B_MARKET; } // (Godot-only, sim/techs)
@@ -88,6 +99,34 @@ inline const BuildingDef *building_defs() {
 			false, 0, 0, 0, "U", 1, 1 },
 		{ "market", "Market", 4, 4, 1200, Cost(0, 150, 0, 0), 40, 0, 9, 0, { -1 }, false, false, false, false,
 			false, 0, 0, 0, "K", 1, 1 },
+		// ---- Egyptian (Godot-only, sim/civ; Retold's numbers mapped as civ/civ.h
+		// says: hp x1.25, footprint ~x1.2-1.5 (the Greek counterpart's where there
+		// is one: drop sites = Storehouse, Barracks = Academy), LOS x0.6, Retold's
+		// base build time, which the Laborer's 0.75 work rate turns into Retold's x4/3)
+		{ "granary", "Granary", 3, 3, 500, Cost(), 15, 0, 6, 1 << RES_FOOD, { -1 }, false, false, false, false,
+			false, 0, 0, 0, "D", 0, 1 },
+		{ "lumber_camp", "Lumber Camp", 3, 3, 500, Cost(), 15, 0, 6, 1 << RES_WOOD, { -1 }, false, false, false, false,
+			false, 0, 0, 0, "L", 0, 1 },
+		{ "mining_camp", "Mining Camp", 3, 3, 500, Cost(), 15, 0, 6, 1 << RES_GOLD, { -1 }, false, false, false, false,
+			false, 0, 0, 0, "M", 0, 1 },
+		{ "monument_villagers", "Monument to Villagers", 2, 2, 562.5, Cost(50, 0, 50, 0), 20, 0, 5.4, 0, { -1 }, false, false, false, false,
+			false, 0, 0, 0, "O", 0, 1 },
+		{ "monument_soldiers", "Monument to Soldiers", 2, 2, 562.5, Cost(100, 0, 100, 0), 30, 0, 5.4, 0, { -1 }, false, false, false, false,
+			false, 0, 0, 0, "O", 0, 1 },
+		{ "monument_priests", "Monument to Priests", 2, 2, 750, Cost(200, 0, 200, 0), 40, 0, 5.4, 0, { -1 }, false, false, false, false,
+			false, 0, 0, 0, "O", 0, 1 },
+		{ "monument_pharaohs", "Monument to Pharaohs", 3, 3, 1000, Cost(300, 0, 300, 0), 50, 0, 5.4, 0, { -1 }, false, false, false, false,
+			false, 0, 0, 0, "O", 0, 1 },
+		{ "monument_gods", "Monument to Gods", 3, 3, 1500, Cost(600, 0, 600, 0), 60, 0, 5.4, 0, { -1 }, false, false, false, false,
+			false, 0, 0, 0, "O", 0, 1 },
+		{ "obelisk", "Obelisk", 1, 1, 62.5, Cost(0, 0, 10, 0), 12, 0, 19.2, 0, { -1 }, false, false, false, false,
+			false, 0, 0, 0, "J", 0, 1 },
+		{ "eg_barracks", "Barracks", 5, 5, 1500, Cost(0, 0, 75, 0), 25, 0, 8, 0, { U_SPEARMAN, U_AXEMAN, U_SLINGER, -1 }, false, false, false, false,
+			false, 0, 0, 0, "B", 1, 1 },
+		{ "migdol", "Migdol Stronghold", 6, 6, 4062.5, Cost(0, 0, 500, 0), 115, 0, 18, 0, { U_CHARIOT_ARCHER, U_CAMEL_RIDER, U_WAR_ELEPHANT, -1 }, false, false, false, false,
+			true, 10.35, 12, 1.6, "I", 2, 1 },
+		{ "siege_works", "Siege Works", 5, 5, 1500, Cost(0, 0, 75, 0), 40, 0, 8, 0, { U_SIEGE_TOWER, U_CATAPULT, -1 }, false, false, false, false,
+			false, 0, 0, 0, "H", 2, 1 },
 	};
 	// clang-format on
 	return D;
