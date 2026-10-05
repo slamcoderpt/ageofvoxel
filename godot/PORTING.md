@@ -1281,6 +1281,29 @@ same channel names, plus:
   dark sienna (0.29, 0.14, 0.06), not the Greeks' near-black, so the line
   round each arm, kilt and head reads as shade and the figure no longer looks
   like a paper cut-out; Greek meshes (factor 0) are unchanged.
+- **Joined limbs, lapis dye, warm fill** (round 11, the Chariot Archer
+  first): every man's arm (`manArmM`) has a shoulder head one voxel inward,
+  sunk into the torso's deltoid, so no gap or seam opens at the armpit; the
+  pectoral shadow is one unbroken row (two patches and a solar-plexus mark
+  read as a face on the chest); `PAL_SKIN` is a step redder (0xec8c46 ..) so
+  skin stays warm brown in shade. `unit.gdshader`, for meshes with a width
+  factor (Egyptian only; Greek meshes take the old path unchanged): the
+  player dye is taken down to a mineral pigment (`eg_dye_base` x peak +
+  `eg_dye_k` x dye: blue renders lapis, about 0x4e59b5 lit, red a brick),
+  shaded a step darker on downward faces (x0.62) and half a step on sides
+  (x0.84), with no extra saturation / contrast and a small emissive lift
+  (`eg_team_lift` 0.06), so cloth reads lit cloth rather than glowing
+  plastic; a warm fill (`eg_fill` 0.2) on the non-dye colours keeps a chest
+  turned from the sun skin-brown rather than grey-olive. The Chariot Archer:
+  arms split at the elbow (`archerArms`: upper arm + forearm overlapping two
+  rows at a rounded elbow, channels foreL / foreR), a single flush wesekh
+  (gold, lapis, gold), a white linen kilt (`KILT_LINEN`), a leather quiver,
+  a half-voxel recurve bow (`recurveBowM`: honey wood limbs 2 x 2, a dark
+  grip, ivory tips, a 1-voxel linen string) in the left fist; the pose
+  (unit_view.cpp archer_upper, pose `chariot`) holds the bow upright at the
+  side on a bent arm with the right forearm bent across to the string at
+  rest, and to shoot the bow arm goes straight out and the right elbow draws
+  back to shoulder height with the arrow along the forearm.
 - **Palette**: the grade's exposure and warm chroma limiter (grade_effect.gd)
   take about half the chroma of any warm colour: a deep gold (0xd2a400) reads
   olive-khaki, an orange gold (0xffb000) peach like the skin. The gold is a
@@ -1448,6 +1471,8 @@ node scripts/godot-shoot.mjs --scene egypt_units --out shots/godot/egypt_units.p
      [--params "eu_yaw=28"]           # camera yaw (the rows face it)
      [--params "eu_one=axeman&eu_turn=30"]  # one unit framed close, turned from the camera (model checks)
      [--params "eu_zoom=0.75"]        # scale the camera distance of any group
+     [--params "eu_ax=-0.8&eu_az=-1.7&eu_pitch=36"]  # shift the framed point (world x / z), camera pitch
+                                      # (eu_one=chariot_archer&eu_turn=30&eu_zoom=0.62 + these: the archer close)
 node scripts/export-egypt-units.mjs   # re-export godot/assets/models/egypt_units.{json,bin.gz}
 ```
 

@@ -20,6 +20,7 @@ extends RefCounted
 ##     [--params "eu_t=3"]             # seconds the sim runs after the setup (battle: 5, eco: 9)
 ##     [--params "eu_one=axeman&eu_turn=30"]  # one unit framed close, turned from the camera (model checks)
 ##     [--params "eu_zoom=0.6"]        # scale the camera distance of any group
+##     [--params "eu_ax=0.5&eu_az=-1&eu_pitch=30"]  # shift the framed point (world x / z), camera pitch
 
 const HUMANS := ["laborer", "spearman", "axeman", "slinger", "mercenary", "priest", "pharaoh"]
 const MOUNTED := ["chariot_archer", "camel_rider", "war_elephant", "mercenary_cavalry", "catapult", "siege_tower"]
@@ -190,6 +191,9 @@ static func scene_setup(game: Node) -> Dictionary:
 			m += Vector2(float(u.x), float(u.z))
 		if spawned.size() > 0:
 			focus = m / spawned.size()
+	# eu_ax / eu_az: shift the framed point (world units), eu_pitch: camera pitch
+	focus += Vector2(float(game.args.get("eu_ax", 0.0)), float(game.args.get("eu_az", 0.0)))
+	cam_pitch = float(game.args.get("eu_pitch", cam_pitch))
 	if not game.args.has("cam"):
 		game.args["cam"] = "%f,%f,%f,%f,%f" % [focus.x, focus.y, cam_dist, cam_pitch, rad_to_deg(yaw)]
 	print("egypt_units: %d units (%s%s), state %s, %.1f s" % [spawned.size(), group, (" focus " + focus_type) if focus_type != "" else "", state, t])

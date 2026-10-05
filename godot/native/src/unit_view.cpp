@@ -372,6 +372,31 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 	const double extend = a_ < 0.45 ? ext0 : 0, wind = a_ < 0.45 ? 0 : wind0;
 
 	auto archer_upper = [&](int vv) -> bool {
+		if (pose == P_CHARIOT) {
+			// (Egyptian chariot archer: arms split at the elbow, foreL / foreR)
+			// at rest the bow is held upright before the body on a bent left
+			// arm, the right hand on the string with the elbow bent; to shoot
+			// the bow arm goes out straight at the target and the right elbow
+			// draws back to shoulder height, the hand at the cheek
+			if (st == aov::A_DIE) return false;
+			if (attacking) {
+				const double span = std::max(0.35, cd * 0.8 - 0.45);
+				const double draw = a_ < 0.45 ? 1.0 - smooth(a_ / 0.2) : smooth((a_ - 0.45) / span);
+				set(CH_torso, 0.02, 0.45, 0);
+				set(CH_head, 0, -0.4);
+				set(CH_armL, -1.5, -0.25, 0.08); set(CH_foreL, -0.05);
+				set(CH_weapon, 1.5);
+				set(CH_armR, ease(-1.25, -0.2, draw), ease(0.55, -0.55, draw), ease(0.0, -1.35, draw));
+				set(CH_foreR, ease(-0.5, -2.1, draw));
+				set(CH_arrow, 1.57);
+				return true;
+			}
+			const double b = S(t * 1.7) * 0.03;
+			set(CH_armL, -0.25 + b, 0, 0.3); set(CH_foreL, -0.95);
+			set(CH_weapon, 1.2, 0, -0.3);
+			set(CH_armR, -0.35 + b, 0.95, -0.05); set(CH_foreR, -1.45);
+			return true;
+		}
 		if (pose == P_SLING) {
 			// (Egyptian slinger) whirl the sling over the head, then a long
 			// overarm release towards the target; the free arm points at it
@@ -474,7 +499,7 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 		const double bob = horse_pose();
 		set(CH_shield, 0);
 		if (!archer_upper(v % 2)) { if (st != aov::A_DIE) { set(CH_armL, -0.3, 0, 0.1); set(CH_weapon, 0.3); set(CH_armR, -0.2, 0, -0.1); } }
-		if (attacking) set(CH_arrow, 1.55 - out[CH_armR][0], 0, 0);
+		if (attacking && pose != P_CHARIOT) set(CH_arrow, 1.55 - out[CH_armR][0], 0, 0);
 		add(CH_torso, -0.3 * rec);
 		bob_out = (float)bob;
 		fwd_out = (float)(-0.1 * rec);

@@ -400,7 +400,9 @@ const MAN = { hip: 14, shin: -7, legX: 1.25, armX: 4, armY: 6.25, headY: 8.5, he
 const HAND_E = [0, -8.5, 0];           // the fist (arm joint -> fist centre)
 const GRIP_E = [-0.45, -8.5, 0.6];     // a haft held just outside / in front of the fist
 const SHIELD_E = [1.9, -5.4, 2.6];     // a shield strapped on the forearm, clear of the body
-const PAL_SKIN = { L: 0xec9a50, M: 0xbc7038, D: 0x8c4c22 };
+// (round 11) a step redder, so the skin stays warm brown in the sky-lit shade
+// instead of going olive-khaki beside the gold
+const PAL_SKIN = { L: 0xec8c46, M: 0xb46232, D: 0x844222 };
 const PAL_DARK = { L: 0x80543a, M: 0x5e3a26, D: 0x3e2618 };
 // [width, zBack, zFront] per torso row (y = 0 at the hip joint)
 const TORSO_ROWS = {
@@ -428,8 +430,9 @@ function manTorso(pal = PAL_SKIN) {
       if (z === z1 && !(ex && w >= 8)) c = pal.L;
       if (y >= 13) c = pal.L;                            // the lit tops of the shoulders
       if (y >= 15) c = z === z1 ? pal.L : pal.M;         // the neck
-      if (z === z1 && y === 9 && ax >= 1 && ax <= 5) c = pal.M;   // the shadow under the pectorals
-      if (z === z1 && y === 7 && ax <= 1) c = pal.M;               // the solar plexus
+      // the shadow under the pectorals: one unbroken row (two dark patches
+      // and a solar plexus mark read as a face painted on the chest)
+      if (z === z1 && y === 9 && ax <= 5) c = pal.M;
       if (z === z0 && y <= 1) c = pal.D;
       m.set(x, y, z, c);
     }
@@ -550,6 +553,13 @@ function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, 
     if ((y === 14 || y === 17) && z !== 0) continue;
     const c = sleeve || (y === 17 || z === 1 ? pal.L : pal.M);
     if (c === TEAM) tset(m, 2 * out, y, z, z === 1 ? 0xffffff : TEAM_SHADE); else m.set(2 * out, y, z, c);
+  }
+  // (round 11) the shoulder head reaches one voxel in, into the torso's
+  // deltoid, so the arm joins the body with no gap or seam at the armpit
+  for (let y = 13; y <= 17; y++) for (let z = -1; z <= 1; z++) {
+    if ((y === 13 || y === 17) && z !== 0) continue;
+    const c = sleeve || (y >= 16 || z === 1 ? pal.L : pal.M);
+    if (c === TEAM) tset(m, -2 * out, y, z, TEAM_SHADE); else m.set(-2 * out, y, z, c);
   }
   return bendArm(m, bend);
 }
@@ -842,6 +852,56 @@ function basketM(fill) {
   if (fill === 'gold') m.box(1, 3, 1, 4, 1, 2, GOLD, { glow: 0.12 }).box(2, 4, 1, 2, 1, 2, GOLD, { glow: 0.12 });
   else m.box(1, 3, 1, 4, 1, 2, 0xc0a040).box(2, 4, 1, 2, 1, 2, 0xd8b850).set(1, 4, 2, 0x5a8a2c);
   m.box(0, 4, 0, 1, 3, 1, LEATHER).box(5, 4, 0, 1, 3, 1, LEATHER);
+  return m;
+}
+
+// ---- the archer's arms and bow (round 11) -----------------------------------------
+// white linen for a kilt: warm, so the sky light keeps it linen-white, not grey
+const KILT_LINEN = pick3(87, 0xfaf2e0, 0xf2e8d2, 0xfff8ea, 0.55, 0.85);
+const KILT_LINEN_SH = 0xd6c8a8;
+// arms split at the elbow (manArmM halves): the upper arm (shoulder to the
+// elbow, y 9..18) and the forearm (y 0..10) overlapping at a rounded elbow
+// (the forearm's top two rows sit inside the upper arm's bottom ones), so a
+// bent arm (channels foreL / foreR) stays one closed limb; the forearm turns
+// about the elbow's middle (pivot y 9.5)
+const FORE_FIST = [0, -4.25, 0];
+function archerArms(o = {}, pal = PAL_SKIN) {
+  const X = { scale: BODY_SCALE, jitter: 0.015 };
+  const out = [];
+  for (const side of ['L', 'R']) {
+    const a = manArmM({ pal, ...o, side }), up = new VoxelModel(), lo = new VoxelModel();
+    for (const [k, v] of a.vox) {
+      const y = ((k >> 10) & 1023) - 512;
+      if (y >= 9) up.vox.set(k, v);
+      if (y <= 10) lo.vox.set(k, { ...v });
+    }
+    // the elbow knob behind the joint: closes the back of the bend
+    for (const y of [9, 10]) for (const x of [-1, 0, 1]) if (!lo.has(x, y, -2) && Math.abs(x) < 1) lo.set(x, y, -2, pal.M);
+    const sx = side === 'L' ? MAN.armX : -MAN.armX;
+    out.push(part(`arm${side}`, up, [0.5, 18.5, 0.5], [sx, MAN.armY, 0], 'torso', X));
+    out.push(part(`fore${side}`, lo, [0.5, 9.5, 0.5], [0, -4.5, 0], `arm${side}`, X));
+  }
+  return out;
+}
+// a recurved composite bow at half the rig voxel (part scale 0.5): limbs of
+// honey-brown wood 2 x 2 thin, a dark leather grip at the fist, ivory horn
+// tips curling forward, and a 1-voxel linen string; grip at the origin, the
+// belly bowing forward (+z), the string behind it (z -5), along +y
+const BOW_WOOD = pick3(88, 0x9a6232, 0x8c582c, 0xa66c38);
+const BOW_WOOD_DK = 0x5e3618;
+function recurveBowM() {
+  const m = new VoxelModel();
+  const H = 19;
+  for (let y = -H; y <= H; y++) {
+    const ay = Math.abs(y);
+    let z = Math.round(-(y * y) / 72);                 // limbs sweeping back from the grip
+    if (ay >= H - 3) z += ay - (H - 3);                // the tips recurve forward
+    const c = ay <= 2 ? LEATHER_DK : ay >= H - 2 ? 0xf0e6cc : (ay & 3) === 0 ? BOW_WOOD_DK : BOW_WOOD(0, y, 0);
+    m.set(0, y, z, c).set(1, y, z, c);
+    if (ay <= 2) m.set(0, y, z + 1, LEATHER).set(1, y, z + 1, LEATHER);   // the grip wraps the belly
+  }
+  const zs = Math.round(-((H - 4) * (H - 4)) / 72);   // the string's nocks
+  for (let y = -(H - 4); y <= H - 4; y++) m.set(0, y, zs - 1, 0xf2ead6);
   return m;
 }
 
@@ -1195,23 +1255,23 @@ function riderLegsM({ y = 11, x0 = -2, x1 = 7, skin = SKIN, kiltC = TEAM, len = 
     if (off < 0.62) wheel.set(0, y, z, SPOKE).set(1, y, z, SPOKE);
   }
   wheel.set(-2, 0, 0, SILVER_DK).set(3, 0, 0, SILVER_DK);
-  // the archer: bare bronze chest, a broad collar, a white kilt, a quiver
+  // the archer (round 11): one joined body, not loose blocks. Bronze skin,
+  // a single wesekh band lying flush on the chest (gold, lapis, gold), a
+  // white linen kilt, a dark leather quiver strap; the arms split at the elbow
+  // (archerArms: upper arm and forearm overlapping at a rounded elbow, the
+  // shoulder head sunk a voxel into the deltoid) so the bow arm bends and the
+  // right hand rests on the string at a bent elbow (pose "chariot",
+  // unit_view.cpp archer_upper)
   const t = manTorso();
-  eKilt(t, { color: 0xf4eee0, side: LINEN_SH, hem: GOLD, len: 6 });
+  eKilt(t, { color: KILT_LINEN, side: KILT_LINEN_SH, hem: KILT_LINEN_SH, len: 6, fold: true });
   eBelt(t, TEAM, GOLD);
-  eCollar(t, [GOLD, TM, TM, GOLD, TM_SH], { r0: 2.6 });
-  eSash(t, LEATHER_DK);
-  t.box(2, 2, -6, 3, 12, 2, TEAM).box(2, 2, -6, 3, 1, 2, GOLD).box(2, 13, -6, 3, 1, 2, GOLD);   // the quiver on the back
+  eCollar(t, [ANKH_L, TM, ANKH_L], { r0: 2.4 });
+  t.box(2, 3, -6, 3, 11, 2, LEATHER).box(2, 3, -6, 3, 1, 2, LEATHER_DK).box(2, 13, -6, 3, 1, 2, LEATHER_DK);   // the quiver on the back
   for (const x of [2, 4]) t.set(x, 14, -6, 0xf4f0e8).set(x, 15, -5, 0xf4f0e8);
   const standLegs = new VoxelModel();
-  for (const x of [-2, 1]) standLegs.box(x, 0, -1, 2, 14, 2, SKIN_FRONT).box(x, 0, -1, 2, 1, 3, SANDAL).box(x, 10, -1, 2, 4, 2, 0xf4eee0);
-  // a short recurved bow (19 tall, 1 voxel thin), gold tips, a thin string
-  const bow = new VoxelModel();
-  for (let y = -9; y <= 9; y++) {
-    const z = Math.round(3 - (y * y) / 30 + (Math.abs(y) >= 8 ? 1 : 0));
-    bow.set(0, y, z, Math.abs(y) < 2 ? LEATHER : Math.abs(y) >= 8 ? GOLD(0, y, 0) : WOOD_DK);
-  }
-  for (let y = -8; y <= 8; y++) bow.set(0, y, 0, 0xe8e0cc);
+  for (const x of [-2, 1]) standLegs.box(x, 0, -1, 2, 14, 2, SKIN_FRONT).box(x, 0, -1, 2, 1, 3, SANDAL).box(x, 10, -1, 2, 4, 2, KILT_LINEN);
+  const rider = riderMan({ torso: t, torsoJoint: [0, 14.5, -1], torsoParent: 'chariot', head: 'charioteer', headScale: 1.0 })
+    .filter((p) => p.name !== 'armL' && p.name !== 'armR');
   rig('chariot_archer', { voxel: 0.07, anim: 'centaur', style: 'chariot', pose: 'chariot', graze: false }, [
     part('body', horseBody(C), [3, 0, 10.5], [0, 10, 12], null, { coat: true }),
     part('barding', stripedBlanket({ z0: 7, z1: 14, low: 5, top: 9, colors: [TEAM, TEAM_TRIM, OCHRE, RED] }), [3, 0, 10.5], [0, 0, 0], 'body'),
@@ -1222,9 +1282,10 @@ function riderLegsM({ y = 11, x0 = -2, x1 = 7, skin = SKIN, kiltC = TEAM, len = 
     part('wheelL', wheel, [1, 0.5, 0.5], [7.5, -0.5, -2.5], 'chariot', { anim: 'wheel' }),
     part('wheelR', wheel, [1, 0.5, 0.5], [-6.5, -0.5, -2.5], 'chariot', { anim: 'wheel' }),
     part('riderLegs', standLegs, [0, 0, 0], [0, 1, -1], 'chariot'),
-    ...riderMan({ torso: t, torsoJoint: [0, 14.5, -1], torsoParent: 'chariot', head: 'charioteer', headScale: 1.0, arm: { band: TEAM, bracer: LEATHER } }),
-    part('weapon', bow, [0, 0, 0], HAND_E, 'armL', { rest: [0, 0, -0.7] }),
-    part('arrow', arrowM(), [0, 0, 0], HAND_E, 'armR', { conditional: true, portrait: false }),
+    ...rider,
+    ...archerArms({ band: TEAM, bracer: LEATHER }),
+    part('weapon', recurveBowM(), [0.5, 0, 0], FORE_FIST, 'foreL', { scale: 0.5, jitter: 0.015 }),
+    part('arrow', arrowM(), [0, 0, 0], FORE_FIST, 'foreR', { conditional: true, portrait: false }),
   ]);
 }
 
