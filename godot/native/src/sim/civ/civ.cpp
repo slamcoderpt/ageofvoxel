@@ -57,64 +57,64 @@ const EgyptUnit *egypt_unit(int type) {
 	static const EgyptUnit T[U_TYPE_COUNT - U_LABORER] = {
 		{ 0.2625, 0, 0, 0, LABORER_CAP, 0, "villager",
 			"Laborer: 50 f, 1 pop, 17 s, 55 hp, 6 hack; 12 pierce vs animals (range 12, ROF 2), x4 vs towers, armor 25/35/99, speed 3.8, LOS 14; gathers 10 % slower, builds 25 % slower, never worships; cap 100",
-			"hp, damage as Retold; train 17 x 10/15 (the Greek villager here trains in 10 s for Retold's 15); speed x the villager's 2.7/4.0; LOS x0.6; armor x0.75 as the soldiers (hack 0.1875 / pierce 0.2625); the anti-animal bow vs Animals of Set: 12 per 2.3 s at 7.2 (wild deer / boar: this sim's hunting spear, as the villager's); gather = the villager's x0.9; build work rate 0.75" },
+			"hp, damage as Retold; train 17 x 10/15 (the Greek villager here trains in 10 s for Retold's 15); speed x the villager's 2.7/4.0; LOS x0.6; armor x0.75 as the soldiers (hack 0.1875 / pierce 0.2625); the anti-animal bow vs Animals of Set: 12 per 2.3 s at 7.2 (wild deer / boar: this sim's hunting spear, as the villager's); gather = the villager's x0.9; build work rate 0.75; pop 1 as Retold (the villager's 1)" },
 		{ 0.075, 0, 0, 0, 0, 0, "hoplite",
 			"Spearman: 50 f + 25 g, 2 pop, 12.5 s, 85 hp, 6 hack, x2 vs cavalry, armor 40/10/99, speed 5.0, LOS 16",
-			"armor x0.75 (hack 0.30 / pierce 0.075), speed x0.65, reach 0.75 x0.8, reload x1.15, LOS x0.6" },
+			"armor x0.75 (hack 0.30 / pierce 0.075), speed x0.65, reach 0.75 x0.8, reload x1.15, LOS x0.6; pop 2 -> 1 (Retold's halved, rounded up, as this sim's hoplite / toxotes 2 -> 1, hippikon 3 -> 2)" },
 		{ 0.075, 0, 0, 0, 0, 0, "hoplite",
 			"Axeman: 40 f + 30 g, 2 pop, 11.5 s, 85 hp, 5 hack, x4 vs infantry, armor 40/10/99, speed 4.3, LOS 16",
-			"as the Spearman" },
+			"as the Spearman (pop 2 -> 1)" },
 		{ 0.30, 0, 0, 0, 0, 0, "toxotes",
 			"Slinger: 55 w + 25 g, 2 pop, 13.5 s, 60 hp, 4 pierce, range 17, x2.25 vs ranged soldiers, armor 15/40/99, speed 4.0, LOS 19",
-			"range / LOS x0.6; 'ranged soldiers' = the archer class (toxotes, slinger); armor x0.75" },
+			"range / LOS x0.6; 'ranged soldiers' = the archer class (toxotes, slinger); armor x0.75; pop 2 -> 1; stands and shoots as every ranged unit here (no kiting), so infantry that reaches it wins at equal cost (as the toxotes vs the hoplite)" },
 		{ 0.15, 0, 0, 0, 0, 0, "hippikon",
 			"Chariot Archer: 100 w + 40 g, 3 pop, 8 s, 95 hp, 11 pierce, range 19, ROF 1.5, x1.5 vs infantry, armor 15/20/99, speed 5.0, LOS 21",
-			"a ranged cavalry unit: class cavalry (spearmen and camels counter it), arrows; reload 1.5 x1.15" },
+			"a ranged cavalry unit: class cavalry (spearmen and camels counter it), arrows; reload 1.5 x1.15; pop 3 -> 2 (as the hippikon)" },
 		{ 0.30, 0, 0, 0, 0, 0, "hippikon",
 			"Camel Rider: 50 f + 70 g, 3 pop, 6.5 s, 135 hp, 8 hack, x2 vs cavalry, x1.25 vs ranged soldiers, armor 15/40/99, speed 6.0, LOS 16",
-			"both multipliers kept (cavalry x2, archer class x1.25)" },
+			"both multipliers kept (cavalry x2, archer class x1.25); pop 3 -> 2 (as the hippikon)" },
 		{ 0.375, 0, 4, 0, 0, 0, "cyclops",
 			"War Elephant: 180 f + 70 g, 5 pop, 14 s, 450 hp, 22 hack (small splash), ROF 1.4, x4 vs buildings, x1.5 vs ranged soldiers, armor 25/50/99, speed 2.9, size 1.49",
-			"splash 0.8 tiles (Retold's 'small'), x4 on the building factor (0.35, or Retold armor)" },
+			"splash 0.8 tiles (Retold's 'small'), x4 on the building factor (0.35, or Retold armor); pop 5 -> 3 (halved, rounded up)" },
 		{ 0.675, 59.1, 0, 0, 0, 0, "hippikon",
 			"Siege Tower: 200 w + 100 g, 3 pop, 15 s, 400 hp, 180 crush ram vs buildings (ROF 3.5, range 3) + 3 arrows x 3 pierce vs units (range 12), armor 5/90/85, speed 2.9",
-			"one attack (this sim has one per unit): 9 vs units, 59.1 crush per 1.15 s hit vs buildings (= Retold's 180 / 3.5 s), reach 1.8 (Retold's ram 3 x0.6); crush ignores the building's flat 0.35 factor, takes its crush armor" },
+			"one attack (this sim has one per unit): 9 vs units, 59.1 crush per 1.15 s hit vs buildings (= Retold's 180 / 3.5 s), reach 1.8 (Retold's ram 3 x0.6); crush ignores the building's flat 0.35 factor, takes its crush armor; pop 3 -> 2" },
 		{ 0.675, 200, 0, 0, 0, 0, "cyclops",
 			"Catapult: 200 w + 200 g, 5 pop, 26.5 s, 115 hp, 200 crush + 40 pierce, area 8, range 10-28, ROF 4, armor 30/90/85, speed 2.4, LOS 36, x2.5 vs ships",
-			"vs units 42 (40 pierce + 200 crush x Retold's 1 % human crush vulnerability), no area (no splash on this sim's projectiles), no minimum range; 200 crush vs buildings" },
+			"vs units 42 (40 pierce + 200 crush x Retold's 1 % human crush vulnerability), no area (no splash on this sim's projectiles), no minimum range; 200 crush vs buildings; pop 5 -> 3" },
 		{ 0.1125, 0, 0, 2.5, 12, 0, "hoplite",
 			"Mercenary: 90 g, 0 pop, 1 s, 90 hp losing 2.5 hp/s, 7 hack, x1.5 vs cavalry, armor 35/15/99, speed 4.3, limit 12, at the Town Center",
-			"decay as Retold; limit counts living + queued" },
+			"decay as Retold; limit counts living + queued; 0 pop as Retold" },
 		{ 0.2625, 0, 0, 4, 8, 0, "hippikon",
 			"Mercenary Cavalry: 120 g, 0 pop, 2 s, 160 hp losing 4 hp/s, 8 hack, x1.5 vs ranged soldiers, armor 20/35/99, speed 5.3, LOS 12, limit 8, Heroic",
 			"decay as Retold" },
 		{ 0.0075, 0, 0, 0, 0, 7.5, "villager",
 			"Priest: 100 g, 2 pop, 10 s, 80 hp (88 / 100 / 116), 0.5 attack (2.2 / 2.5 / 2.9), range 5 (12 / 16 / 20), x5 vs myth, armor 10/1/99, heals 7.5 hp/s at 10, builds Obelisks",
-			"hp / damage / range / LOS per age as Retold (range, LOS x0.6); heal range 6; heals half on a busy target; Heka's divine damage: the x5 vs myth only" },
+			"hp / damage / range / LOS per age as Retold (range, LOS x0.6); heal range 6; heals half on a busy target; Heka's divine damage: the x5 vs myth only; pop 2 -> 1 (as the soldiers)" },
 		{ 0.225, 0, 0, 0, 1, 10, "hero",
 			"Pharaoh: free, 0 pop, 100 hp (110 / 125 / 145), 3 attack (13.2 / 15 / 17.4), range 3 (12 / 18 / 20), x2.5 vs myth, armor 15/30/99, heals 10 hp/s, empowers, respawns at the TC after 90 s",
 			"per age as the Priest; empower in sim/civ (O_EMPOWER)" },
 		{ 0.0375, 0, 0.5, 0, 0, 0, "baboon_of_set",
 			"Baboon of Set: 3 favor, 3 s, 1 pop, 20 hp, 3 hack (0.3 Archaic), ROF 1, armor 35/5/99, speed 3.3, LOS 16, food 93.75; Set's starting scout, the Archaic summon",
-			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food" },
+			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food; pop as Retold (summoned for favor like the myth units, whose pop this sim does not halve)" },
 		{ 0, 0, 0.5, 0, 0, 0, "baboon_of_set",
 			"Gazelle of Set: 3 favor, 3 s, 1 pop, 15 hp, 3.5 hack, ROF 1.1, armor 35/0/99, speed 4, LOS 14, food 150; Classical summon, 2 at the Temple on reaching Classical",
-			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food" },
+			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food; pop as Retold (summoned for favor like the myth units, whose pop this sim does not halve)" },
 		{ 0.225, 0, 0.5, 0, 0, 0, "baboon_of_set",
 			"Hyena of Set: 4 favor, 4 s, 1 pop, 45 hp, 7 hack, ROF 1.8, armor 20/30/99, speed 4, LOS 14, food 93.75; Classical summon, 1 at the Temple on reaching Classical",
-			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food" },
+			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food; pop as Retold (summoned for favor like the myth units, whose pop this sim does not halve)" },
 		{ 0.0375, 0, 0.5, 0, 0, 0, "baboon_of_set",
 			"Giraffe of Set: 5 favor, 4 s, 1 pop, 25 hp, 5 hack, ROF 1.4, armor 35/5/99, speed 4, LOS 14, food 300; Heroic summon, 2 at the Temple on reaching Heroic",
-			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food" },
+			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food; pop as Retold (summoned for favor like the myth units, whose pop this sim does not halve)" },
 		{ 0.225, 0, 0.5, 0, 0, 0, "petsuchos",
 			"Crocodile of Set: 6 favor, 4 s, 1 pop, 70 hp, 9 hack, ROF 1.3, armor 10/30/99, speed 3.3, LOS 14, food 187.5; Heroic summon, 1 at the Temple on reaching Heroic",
-			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food" },
+			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food; pop as Retold (summoned for favor like the myth units, whose pop this sim does not halve)" },
 		{ 0.15, 0, 0.5, 0, 0, 0, "baboon_of_set",
 			"Hippopotamus of Set: 7 favor, 6 s, 2 pop, 100 hp, 6 hack, ROF 1, armor 10/20/99, speed 4, LOS 14, food 375; Mythic summon, 2 at the Temple on reaching Mythic",
-			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food" },
+			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food; pop as Retold (summoned for favor like the myth units, whose pop this sim does not halve)" },
 		{ 0.30, 0, 0.5, 0, 0, 0, "baboon_of_set",
 			"Rhinoceros of Set: 9 favor, 6 s, 2 pop, 135 hp, 8 hack, ROF 1.1, armor 30/40/99, speed 4, LOS 14, food 487.5; Mythic summon, 1 at the Temple on reaching Mythic",
-			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food" },
+			"hp, damage as Retold (x0.1 in the Archaic Age); class animal; speed x0.65, LOS x0.6, reload x1.15, armor x0.75; x0.5 vs buildings; dies into a carcass with its food; pop as Retold (summoned for favor like the myth units, whose pop this sim does not halve)" },
 		{ 0.30, 0, 1.5, 0, 0, 0, "war_elephant",
 			"Elephant of Set: 14 favor, 8 s, 2 pop, 270 hp, 10 hack, ROF 1.4, x1.5 vs buildings, armor 20/40/99, speed 3.3, LOS 14, food 675; Mythic summon (Retold)",
 			"as the other Animals of Set but x1.5 vs buildings; reach 0.8 (size 1.49)" },
@@ -282,6 +282,13 @@ const int *civ_trains(int civ, int btype) {
 		greek_ready = true;
 	}
 	return greek[btype];
+}
+
+int civ_building_limit(int civ, int btype) {
+	if (civ != CIV_EGYPT) return 0;
+	if (is_monument(btype)) return 1;
+	if (btype == B_MIGDOL) return MIGDOL_LIMIT;
+	return 0;
 }
 
 bool unit_can_build(int utype, int btype) {
@@ -498,6 +505,14 @@ bool Civs::can_build(int owner, int btype, std::string *why) const {
 	if (!rules()) return true;
 	const int age = owner > 0 && owner < MAX_PLAYERS ? sim->players[owner].age : 0;
 	if (age < building_def(btype).min_age) return no(std::string("Requires ") + AGES[building_def(btype).min_age] + " Age");
+	const int lim = civ_building_limit(c, btype);
+	if (lim > 1) { // (the Monuments' one each: below, with their order)
+		const BuildingStore &B = sim->entities.buildings;
+		int n = 0;
+		for (int b = 0; b < B.size(); b++)
+			if (!B.removed[b] && !B.dead[b] && B.owner[b] == owner && B.type[b] == btype) n++;
+		if (n >= lim) return no(std::string("Limit of ") + std::to_string(lim) + " " + building_def(btype).name + "s");
+	}
 	const int mi = monument_index(btype);
 	if (mi >= 0) {
 		// one of each, in order: every earlier Monument must stand (a foundation will do, Retold)

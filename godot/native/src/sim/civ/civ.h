@@ -39,6 +39,18 @@
 //   the Greek building's hp and size (Retold gives both civs the same), take the
 //   Egyptian cost and Retold's base build time where this sim's Greek one differs
 //   (civ_build_time: Town Center, Farm, tower). Set's Animals of Set: below.
+//   Population: the browser halves Retold's human-soldier pop, rounding up (Retold
+//   hoplite / toxotes 2 -> 1, hippikon 3 -> 2; the villager keeps 1; both civs share
+//   Retold's caps: TC 15, House 10, POP_MAX 300), so the Egyptian ones do too:
+//   Spearman / Axeman / Slinger / Priest 2 -> 1, Chariot Archer / Camel Rider /
+//   Siege Tower 3 -> 2, War Elephant / Catapult 5 -> 3; the Laborer 1, Mercenaries and
+//   the Pharaoh 0 as Retold; the Animals of Set keep Retold's 1-2 (summoned for favor,
+//   as the myth units, whose pop this sim does not halve). Ranged units stand and
+//   shoot (no kiting) whatever the civ: at equal cost infantry that reaches them
+//   wins (toxotes vs hoplites, Slingers or Chariot Archers vs Spearmen / Axemen).
+//   Building limits (civ_building_limit, Retold): one of each Monument, 15 Migdols.
+//   The shared types' Retold limits (House 16, Sentry Tower 30, one TC in the
+//   Archaic Age) are not applied: this sim's Greeks have none and keep playing as today.
 //
 // Deterministic: no rng draw; iteration in row (= id) order.
 #pragma once
@@ -96,6 +108,9 @@ const char *building_stand_in(int type);    // a Greek building type the rendere
 const int *civ_build_menu(int civ);
 // the unit types a building of `civ` can train (rules on), -1 terminated
 const int *civ_trains(int civ, int btype);
+// the most of a type a civ may own (standing + foundations), 0 = no limit (rules on)
+int civ_building_limit(int civ, int btype);
+constexpr int MIGDOL_LIMIT = 15;
 // which builders: villager -> Greek / shared, laborer -> Egyptian / shared but the
 // Obelisk, priest -> the Obelisk alone
 bool unit_can_build(int utype, int btype);

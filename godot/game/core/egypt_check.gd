@@ -14,6 +14,12 @@ extends SceneTree
 ##                worshippers vs the five Monuments (39 / min), Laborers never worship
 ##   units        each Egyptian unit's live stats (get_unit_stats), its bonus measured on
 ##                a first blow, and its counter matchup fought at equal cost
+##   pop          population mapped as the browser maps the Greeks (Retold's soldier pop
+##                halved, rounded up): each unit's pop; 10 hoplites and 10 Spearmen add 10
+##                each; the same cap trains as many Spearmen as hoplites; the counters
+##                fought at equal POPULATION; ranged units vs infantry (no kiting) reported
+##   limits       Retold's building limits: 15 Migdols (foundations count), one of each
+##                Monument; the shared types' limits not applied (as the Greeks here)
 ##   pharaoh      empower measured before / after: gather (drop +20 %), train (+75 %, not
 ##                Laborers), build (+75 %), research (+75 %), Monument favor (+20 %);
 ##                Laborer build 0.75; respawn at the Town Center after 90 s; stats by age
@@ -194,7 +200,7 @@ func _build_time(sim: Object, b: int, max_s := 200.0) -> float:
 
 func _run() -> void:
 	var t0 := Time.get_ticks_msec()
-	for c in ["defs", "match", "economy", "units", "pharaoh", "priest", "gods", "auras", "set", "civcosts", "locks", "determinism", "rules_off"]:
+	for c in ["defs", "match", "economy", "units", "pop", "limits", "pharaoh", "priest", "gods", "auras", "set", "civcosts", "locks", "determinism", "rules_off"]:
 		if _want(c):
 			call("_case_" + c)
 	result["ms"] = Time.get_ticks_msec() - t0
@@ -490,6 +496,162 @@ func _case_units() -> void:
 	fights["chariot_archer vs axeman (reported)"] = _fight("chariot_archer", "axeman", 900.0, "ra", "ra")
 	fights["toxotes vs hoplite (reported, the Greek counterpart)"] = _fight("toxotes", "hoplite", 900.0, "zeus", "zeus")
 	_check("units.counters", ok, fights)
+
+# pop -----------------------------------------------------------------------------------------
+
+## na `a` (owner 1, god g1) against nb `b` (owner 2, god g2), attack-moving at each other
+## (hold_a: side a stands its ground, the other side walks in from beyond its range)
+func _fight_n(a: String, na: int, b: String, nb: int, g1 := "ra", g2 := "zeus", hold_a := false) -> Dictionary:
+	var sim := _fresh(g1, g2, seed_arg, 3)
+	var A := []
+	var Bs := []
+	for i in na:
+		A.append(_u(sim, a, 1, -9.0 - (i / 5) * 1.4, -3.0 + (i % 5) * 1.4))
+	for i in nb:
+		Bs.append(_u(sim, b, 2, 9.0 + (i / 5) * 1.4, -3.0 + (i % 5) * 1.4))
+	sim.tick(1)
+	if not hold_a:
+		sim.order_attack_move(PackedInt32Array(A), C.x + 12.0, C.y)
+	sim.order_attack_move(PackedInt32Array(Bs), C.x - 12.0, C.y)
+	var la := na
+	var lb := nb
+	var t := 0.0
+	while t < 150.0:
+		_step(sim, 1.0)
+		t += 1.0
+		la = 0
+		lb = 0
+		for id in A:
+			la += int(_alive(sim, id))
+		for id in Bs:
+			lb += int(_alive(sim, id))
+		if la == 0 or lb == 0:
+			break
+	return {"a": "%d %s" % [na, a], "b": "%d %s" % [nb, b], "left": [la, lb], "s": t,
+		"winner": a if lb == 0 and la > 0 else b if la == 0 and lb > 0 else "none"}
+
+func _case_pop() -> void:
+	var sim := _fresh("zeus", "ra", seed_arg, 3)
+	sim.tick(30)
+	# each unit's pop: Retold's halved, rounded up (the browser's hoplite / toxotes 2 -> 1, hippikon 3 -> 2)
+	var want := {"villager": 1, "hoplite": 1, "toxotes": 1, "hippikon": 2,
+		"laborer": 1, "spearman": 1, "axeman": 1, "slinger": 1, "chariot_archer": 2, "camel_rider": 2, "war_elephant": 3,
+		"siege_tower": 2, "catapult": 3, "priest": 1, "mercenary": 0, "mercenary_cavalry": 0, "pharaoh": 0}
+	var got := {}
+	var ok := true
+	for t in want:
+		got[t] = int(sim.get_unit_def(t).pop)
+		ok = ok and got[t] == want[t]
+	_check("pop.defs", ok, {"pop": got, "want": want})
+	# 10 hoplites for the Greek, 10 Spearmen for the Egyptian: +10 each; 5 hippikons / 5 Chariot Archers: +10 each
+	var p0 := [int(sim.get_player(1).pop), int(sim.get_player(2).pop)]
+	for i in 10:
+		_u(sim, "hoplite", 1, -12.0 + (i % 5) * 1.2, -12.0 + (i / 5) * 1.2)
+		_u(sim, "spearman", 2, 6.0 + (i % 5) * 1.2, -12.0 + (i / 5) * 1.2)
+	sim.tick(2)
+	var p1 := [int(sim.get_player(1).pop), int(sim.get_player(2).pop)]
+	for i in 5:
+		_u(sim, "hippikon", 1, -12.0 + i * 1.6, -8.0)
+		_u(sim, "chariot_archer", 2, 6.0 + i * 1.6, -8.0)
+	sim.tick(2)
+	var p2 := [int(sim.get_player(1).pop), int(sim.get_player(2).pop)]
+	var r := {"10 hoplites": p1[0] - p0[0], "10 spearmen": p1[1] - p0[1], "5 hippikons": p2[0] - p1[0], "5 chariot archers": p2[1] - p1[1]}
+	ok = r["10 hoplites"] == 10 and r["10 spearmen"] == 10 and r["5 hippikons"] == 10 and r["5 chariot archers"] == 10
+	_check("pop.spawned", ok, r)
+	# the same cap: a fresh match, each side 40 pop of room (cap raised by Houses), trains
+	# hoplites at an Academy / Spearmen at a Barracks until "Need more houses"
+	var s2 := _fresh("zeus", "ra", seed_arg, 3)
+	var room := {}
+	var trained := {}
+	var reason := {}
+	for o in [1, 2]:
+		var bt := "barracks" if o == 1 else "eg_barracks"
+		var ut := "hoplite" if o == 1 else "spearman"
+		var bx := -16 if o == 1 else 8
+		for h in 4:
+			_b(s2, "house", o, bx + h * 3, 10)
+		var bs := []
+		for k in 6:   # (a queue holds 10: six buildings)
+			bs.append(_b(s2, bt, o, bx + (k % 2) * 6, -18 + (k / 2) * 6))
+		s2.tick(30)
+		var p: Dictionary = s2.get_player(o)
+		room[o] = int(p.pop_cap) - int(p.pop)
+		var n := 0
+		var last := ""
+		for b in bs:
+			for i in 12:
+				var t: Dictionary = s2.train(b, ut)
+				if not bool(t.ok):
+					last = str(t.reason)
+					break
+				n += 1
+			if last == "Need more houses":
+				break
+		trained[ut] = n
+		reason[ut] = last
+	var r2 := {"room": room, "trained": trained, "refused": reason}
+	ok = trained.hoplite == room[1] and trained.spearman == room[2] and reason.spearman == "Need more houses"
+	_check("pop.same_cap", ok, r2)
+	# counters at equal POPULATION (10 pop a side): the counter wins, as at equal cost
+	var fights := {}
+	ok = true
+	for f in [["spearman", 10, "hippikon", 5, "zeus"], ["axeman", 10, "hoplite", 10, "zeus"], ["slinger", 10, "toxotes", 10, "zeus"],
+			["camel_rider", 5, "hippikon", 5, "zeus"], ["camel_rider", 5, "chariot_archer", 5, "ra"], ["hippikon", 5, "slinger", 10, "ra"],
+			["axeman", 10, "spearman", 10, "ra"]]:
+		var g2: String = f[4]
+		var g1 := "zeus" if f[0] in ["hoplite", "toxotes", "hippikon"] else "ra"
+		var fr := _fight_n(f[0], f[1], f[2], f[3], g1, g2)
+		fights["%s x%d vs %s x%d" % [f[0], f[1], f[2], f[3]]] = fr
+		ok = ok and fr.winner == f[0]
+	# reported: the critic's equal-pop line (a Spearman is an anti-cavalry 75-resource unit, the
+	# hoplite a 90-resource line infantry with 35 more hp and 3 more damage: the hoplite wins
+	# man for man, as Retold's hoplite beats its Spearman), and War Elephants against toxotes
+	fights["spearman x10 vs hoplite x10 (reported)"] = _fight_n("spearman", 10, "hoplite", 10, "ra", "zeus")
+	fights["war_elephant x3 vs toxotes x9 (reported)"] = _fight_n("war_elephant", 3, "toxotes", 9, "ra", "zeus")
+	_check("pop.counters", ok, fights)
+	# ranged vs infantry: this sim's ranged units stand and shoot (no kiting), both civs alike;
+	# infantry that reaches them wins. Slingers holding while Spearmen walk in from 18 tiles,
+	# and the Greek pair the same way (reported, not asserted)
+	var rv := {}
+	rv["slinger x10 hold vs spearman x10"] = _fight_n("slinger", 10, "spearman", 10, "ra", "ra", true)
+	rv["toxotes x10 hold vs hoplite x10 (Greek)"] = _fight_n("toxotes", 10, "hoplite", 10, "zeus", "zeus", true)
+	rv["slinger x10 vs toxotes x10 hold"] = _fight_n("slinger", 10, "toxotes", 10, "ra", "zeus")
+	_check("pop.ranged_vs_infantry", true, rv)
+
+# limits ---------------------------------------------------------------------------------------
+
+func _case_limits() -> void:
+	var sim := _fresh("zeus", "ra", seed_arg, 3)
+	var r := {}
+	var migs := []
+	for i in 14:
+		migs.append(_b(sim, "migdol", 2, -18 + (i % 5) * 7, -18 + (i / 5) * 7))
+	sim.tick(1)
+	r["migdols"] = _buildings_of(sim, 2, "migdol").size()
+	r["can_build 15th"] = sim.can_build(2, "migdol")
+	var lb := _u(sim, "laborer", 2, 0.0, 6.0)
+	sim.tick(1)
+	# the 15th as a foundation: it counts
+	r["place 15th"] = int(sim.place_building("migdol", 2, C.x + 10, C.y + 4, PackedInt32Array([lb])))
+	sim.tick(1)
+	r["can_build 16th"] = sim.can_build(2, "migdol")
+	r["place 16th"] = int(sim.place_building("migdol", 2, C.x + 10, C.y + 12, PackedInt32Array([lb])))
+	var lim = sim.get_building_def("migdol", 2).by_civ.egyptian.get("limit", 0)
+	r["def limit"] = lim
+	var ok: bool = r["migdols"] == 14 and bool(r["can_build 15th"].ok) and r["place 15th"] > 0
+	ok = ok and not bool(r["can_build 16th"].ok) and str(r["can_build 16th"].reason) == "Limit of 15 Migdol Strongholds" and r["place 16th"] == 0 and int(lim) == 15
+	# a lost Migdol frees a slot
+	sim.destroy_building(migs[0])
+	sim.tick(2)
+	r["can_build after one fell"] = sim.can_build(2, "migdol")
+	ok = ok and bool(r["can_build after one fell"].ok)
+	# shared types: no limit for either civ (as this sim's Greeks), reported
+	for i in 31:
+		_b(sim, "tower", 2, 14 + (i % 4) * 2, -18 + (i / 4) * 2)
+	sim.tick(1)
+	r["egyptian towers"] = _buildings_of(sim, 2, "tower").size()
+	r["can_build 32nd tower (no limit, as the Greeks)"] = sim.can_build(2, "tower")
+	_check("limits.migdol", ok, r)
 
 # pharaoh ------------------------------------------------------------------------------------
 

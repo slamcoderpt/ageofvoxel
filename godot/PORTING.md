@@ -1993,7 +1993,26 @@ techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
   the class multipliers (Spearman x2 cavalry, Axeman x4 infantry, Slinger
   x2.25 archers, Chariot Archer x1.5 infantry, Camel Rider x2 cavalry and
   x1.25 archers, War Elephant x1.5 archers and x4 vs buildings, Priest x5 /
-  Pharaoh x2.5 myth); the Laborer's x4 vs towers multiplies his blow on a
+  Pharaoh x2.5 myth). Population: the browser halves Retold's human-soldier
+  pop, rounding up (Retold hoplite / toxotes 2 -> 1, hippikon 3 -> 2, the
+  villager 1), under Retold's caps (TC 15, House 10, `POP_MAX` 300, the same
+  for both civs), so the Egyptian ones are mapped alike: Spearman / Axeman /
+  Slinger / Priest 2 -> 1, Chariot Archer / Camel Rider / Siege Tower 3 -> 2,
+  War Elephant / Catapult 5 -> 3; the Laborer 1, Mercenaries and the Pharaoh
+  0 as Retold; the Animals of Set keep Retold's 1 / 2 (summoned for favor, as
+  the myth units, whose pop this sim does not halve). Under the same cap an
+  Egyptian fields as many men as a Greek. Ranged units (toxotes, Slingers,
+  Chariot Archers) stand and shoot, they never kite, whatever the civ: at
+  equal cost or pop, infantry that reaches them wins (10 Slingers lose to 10
+  Spearmen as 10 toxotes to 10 hoplites; Retold's own numbers give the same
+  for a fight without micro: a Slinger's 4 pierce on a Spearman's 10 % is
+  3.6 hp/s, 8 of them kill one Spearman in the ~3.4 s he walks 17 m, then
+  lose the melee); Slingers beat archers (x2.25). Building limits
+  (`civ_building_limit`, `can_build`, `by_civ.egyptian.limit`): one of each
+  Monument (in order) and 15 Migdols, standing or foundations; the shared
+  types' Retold limits (House 16, Sentry Tower 30, one TC in the Archaic
+  Age) are not applied, because this sim's Greeks have none and must play
+  as today. The Laborer's x4 vs towers multiplies his blow on a
   tower (6 x 0.35 x the tower's armor: 6.72, a villager's 0.84). Siege: a Catapult stone is 42 vs units (40 pierce + 200
   crush x the 1 % human crush vulnerability; no area, no minimum range here)
   and 200 crush vs buildings, a Siege Tower 9 vs units and 59.1 crush per hit
@@ -2063,7 +2082,7 @@ of an animal: `animal_of_set`, `food`, `summon_age`, `summon_time` or
 (one builder).
 
 ```
-godot --headless --path godot -s res://game/core/egypt_check.gd [-- --only=defs,match,economy,units,pharaoh,priest,gods,auras,set,civcosts,locks,determinism,rules_off]   # ~1 min
+godot --headless --path godot -s res://game/core/egypt_check.gd [-- --only=defs,match,economy,units,pop,limits,pharaoh,priest,gods,auras,set,civcosts,locks,determinism,rules_off]   # ~1 min
 ```
 
 `egypt_check.gd` ("EGYPT PASS|FAIL <case>", `EGYPT_RESULT {json}`, exit =
@@ -2076,7 +2095,19 @@ its counters fought at equal cost (900 resources: Spearmen beat hippikons,
 Axemen hoplites and Spearmen, Slingers toxotes, Camel Riders hippikons and
 Chariot Archers, hippikons Slingers, War Elephants toxotes; reported: this
 sim's archers do not kite, so Chariot Archers lose a straight fight to
-infantry as the Greek toxotes does); the Pharaoh's empower measured
+infantry as the Greek toxotes does); population (`pop`): each unit's pop
+(Spearman / Axeman / Slinger / Priest 1, Chariot Archer / Camel Rider /
+Siege Tower 2, War Elephant / Catapult 3), 10 hoplites and 10 Spearmen add
+10 each, the same room under the cap trains as many Spearmen as hoplites
+(50 / 51, refused "Need more houses"), the counters again at equal pop (10
+Spearmen beat 5 hippikons 10 left, 10 Axemen 10 hoplites 9 left, 10
+Slingers 10 toxotes, 5 Camel Riders 5 hippikons and 5 Chariot Archers, 5
+hippikons 10 Slingers, 10 Axemen 10 Spearmen; reported: 10 Spearmen lose to
+10 hoplites 0 / 8, 3 War Elephants beat 9 toxotes), and ranged vs infantry
+reported (10 Slingers holding lose to 10 Spearmen walking in 0 / 7, as 10
+toxotes to 10 hoplites 0 / 10); limits (`limits`): 14 Migdols built and a
+15th foundation, the 16th refused "Limit of 15 Migdol Strongholds", a fallen
+one frees a slot, 31 Egyptian towers and a 32nd allowed; the Pharaoh's empower measured
 (wood x1.20, 3 Spearmen 37.6 -> 21.5 s and Laborers unchanged, a House 20 ->
 11.46 s for a Laborer (15 s for a villager), Copper Weapons 30 -> 17.2 s,
 Monument 4.5 -> 5.4 favor / min), his respawn at the TC at 90 s and his
