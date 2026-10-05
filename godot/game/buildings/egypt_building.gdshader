@@ -30,6 +30,13 @@ uniform vec3 ambient_lin = vec3(0.083, 0.116, 0.150);   // the Environment's amb
 uniform vec3 bounce_color : source_color = vec3(1.0, 0.78, 0.52);
 uniform float bounce = 0.10;         // sand bounce at the foot (x albedo)
 uniform float bounce_h = 1.1;        // fades out this many model units (tiles) up
+// gilt: voxels painted a blue-free yellow gold (the statues' regalia, the
+// obelisks' pyramidia) are lit as metal: darker in shade, a tinted sun
+// highlight on faces turned between the sun and the eye
+uniform float gold_shade = 0.5;      // x the shade light on gilt
+uniform float gold_spec = 0.8;       // the highlight's strength (x albedo, so it stays gold)
+uniform float gold_shine = 6.0;      // its exponent
+uniform float gold_diffuse = 0.8;    // x the plain sun term on gilt (the rest comes from the highlight)
 
 varying vec3 v_albedo;
 varying float v_team;
@@ -38,6 +45,7 @@ varying vec3 v_team_col;
 varying float v_flash;
 varying float v_ao;
 varying float v_low;
+varying float v_gold;
 
 vec3 srgb_to_linear(vec3 c) {
 	return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
@@ -58,6 +66,9 @@ void vertex() {
 	s *= mix(1.0, pale_scale, smoothstep(pale_from, pale_to, mx));
 	v_albedo = srgb_to_linear(s);
 	v_team = CUSTOM1.r;
+	// gilt: no blue, green well under red but not a red (lapis, team, sand and red ochre all fail)
+	vec3 a = v_albedo;
+	v_gold = step(a.b, a.r * 0.06) * step(a.r * 0.3, a.g) * step(a.g, a.r * 0.8) * step(0.03, a.r) * (1.0 - step(0.01, CUSTOM1.r));
 	v_glow = CUSTOM1.g;
 	v_ao = 1.0 - ao_strength * mix(1.0, ao_up, max(NORMAL.y, 0.0)) * pow(clamp(CUSTOM1.b, 0.0, 1.0), ao_power);
 	// sand bounce: low on the model, on faces turned sideways or down
@@ -79,7 +90,7 @@ void fragment() {
 	// the ambient, warmed (render_mode ambient_light_disabled drops the cool one)
 	// team voxels keep the cool shade light (the owner's colour stays a lapis / maroon line, not brown)
 	float sw = shade_warm * (1.0 - v_team);
-	vec3 amb = mix(ambient_lin, lum(ambient_lin) * warm() * shade_gain, sw);
+	vec3 amb = mix(ambient_lin, lum(ambient_lin) * warm() * shade_gain, sw) * mix(1.0, gold_shade, v_gold);
 	vec3 b = srgb_to_linear(bounce_color) * bounce * v_low;
 	EMISSION = c * v_ao * (amb + b) + c * v_glow * glow_gain + vec3(1.0, 0.95, 0.85) * v_flash;
 }
@@ -91,6 +102,10 @@ void light() {
 	// halves (the ground half has a negative energy) are cool
 	if (abs(lc.b) > abs(lc.r)) {
 		lc = mix(lc, lum(lc) * warm() * shade_gain, shade_warm * (1.0 - v_team));
+		DIFFUSE_LIGHT += lc * ATTENUATION * ndl * mix(1.0, gold_shade, v_gold);
+	} else {
+		vec3 hv = normalize(LIGHT + VIEW);
+		float sp = pow(max(dot(NORMAL, hv), 0.0), gold_shine) * gold_spec * v_gold;
+		DIFFUSE_LIGHT += lc * ATTENUATION * (ndl * mix(1.0, gold_diffuse, v_gold) + sp * step(0.0, dot(NORMAL, LIGHT)));
 	}
-	DIFFUSE_LIGHT += lc * ATTENUATION * ndl;
 }

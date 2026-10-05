@@ -16,6 +16,8 @@ extends RefCounted
 ##     [--params "egt_yaw=208"]           # the framing camera's yaw (degrees, default 28: the front)
 ##     [--params "egt_pitch=30"]          # the framing camera's pitch (degrees, default 44)
 ##     [--params "egt_dist=20"]           # the framing camera's distance (tiles)
+##     [--params "egt_lift=2"]            # aim this many tiles above the ground (tall statues at low pitches)
+##     [--params "egt_dx=-2&egt_dz=4"]    # shift the framed point (tiles), e.g. onto a building's statue
 ##     [--params "egt_static=1"]          # render-only even when the sim has the types
 ##     [--params "egt_sand=0"]            # keep the map's ground (no sand)
 ##     [--params "egt_details=1"]         # keep the map's ground details (pebbles, tufts)
@@ -176,7 +178,23 @@ static func scene_setup(game: Node) -> Dictionary:
 	if focus_size > 0.0 and not game.args.has("cam"):
 		# frame one building like Retold's building views (high, close)
 		game.args["cam"] = "%f,%f,%f,%f,%f" % [focus.x, focus.y, float(game.args.get("egt_dist", maxf(14.0, 5.0 + focus_size * 2.0))), float(game.args.get("egt_pitch", 44.0)), float(game.args.get("egt_yaw", 28.0))]
+	if (game.args.has("egt_lift") or game.args.has("egt_dx") or game.args.has("egt_dz")) and game.args.has("cam"):
+		game.args["cam"] = _lift_cam(str(game.args.cam), float(game.args.get("egt_lift", 0.0)), float(game.args.get("egt_dx", 0.0)), float(game.args.get("egt_dz", 0.0)))
 	print("egypt_town: %d buildings (%s), age %d, god %s, focus %s, sand %s" % [lots.size(), "sim" if use_sim else "render-only", age, god, focus_type if focus_type != "" else "town", sim.has_method("paint_ground")])
 	return ctx
+
+# aim the camera at a point lift tiles above its ground target: the target
+# slides away from the camera by lift / tan(pitch) and the distance grows so
+# the camera stays put relative to that raised aim point
+static func _lift_cam(cam: String, lift: float, dx := 0.0, dz := 0.0) -> String:
+	var c := cam.split(",")
+	if c.size() < 5:
+		return cam
+	var pitch := deg_to_rad(float(c[3]))
+	var yaw := deg_to_rad(float(c[4]))
+	var slide := lift / maxf(tan(pitch), 0.05)
+	var x := float(c[0]) + dx - sin(yaw) * slide
+	var z := float(c[1]) + dz - cos(yaw) * slide
+	return "%f,%f,%f,%f,%f" % [x, z, float(c[2]) + lift / maxf(sin(pitch), 0.05), float(c[3]), float(c[4])]
 
 const EgyptBuildingsRef = preload("res://game/buildings/egypt_buildings.gd")

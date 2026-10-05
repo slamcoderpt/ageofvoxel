@@ -866,11 +866,324 @@ function banner(m, x, y, z, h = 20, face = '+z') {
 }
 
 // ---- statues -------------------------------------------------------------------
-// A standing (or kneeling) figure facing +z on (cx, y, cz) (cx, cz on voxel
-// boundaries), modelled on a 24-voxel-high canon scaled by h / 24.
-// skin: basalt or gilt; head: human | falcon | jackal | cow; crown: nemes | disc | atef | horns | none
-// arms: side | staff | crossed | bowls | wings; pose: stride | stand | kneel | mummy | dress
+// Statue palette: a blue-black basalt (so it stays stone, not olive, under the
+// warm shade) and pure-yellow golds that AgX keeps gold; lapis, turquoise and
+// limestone inlay for the collar, nemes stripes, eyes and cartouches.
+const ST_SKIN = (x, y, z) => pick(hash3(x, y, z, 72), [0x28303c, 0x232b36, 0x2e3644, 0x252d39]);
+const SG = 0xa87400, SG_L = 0xd09a00, SG_D = 0x6a4600;   // deep: AgX washes bright yellows to cream in the sun
+const ST_LAPIS = 0x2454b4, ST_TURQ = 0x1f9e90, ST_WHITE = 0xeee6d2, ST_RED = 0xb8301e;
+const goldOf = (g) => (g === GILT ? SG : g === GILT_L ? SG_L : g === GILT_D ? SG_D : g);
+
+// A standing (striding, kneeling, mummiform or robed) god or king facing +z on
+// (cx, y, cz), modelled on a 24-unit canon scaled by h / 24 voxels. Every part
+// is a sampled solid (elliptic frusta, ellipsoids, tapered capsules, boxes)
+// tested at voxel centres, so limbs can run on the diagonal (arms crossed over
+// the chest) and heads get real shapes: a jackal's snout and tapering ears, a
+// falcon's hooked beak, a striped nemes flaring to the shoulders. A separate
+// broad collar is laid one voxel proud of the chest, the waist steps in under
+// a gold belt over a pleated kilt. Figures under 14 voxels use figureBlocky.
+// skin: basalt or gilt; head: human | falcon | jackal; crown: nemes | disc | atef | tall | horns | set | vulture | none
+// arms: side | staff | crossed | bowls | wings | embrace; pose: stride | stand | kneel | mummy | dress
 function figure(m, cx, y, cz, o = {}) {
+  const { h = 24 } = o;
+  if (h < 14) return figureBlocky(m, cx, y, cz, o);
+  const { kiltFront = TEAMB, head = 'human', crown = 'nemes', arms = 'side', pose = 'stride', dir = 1 } = o;
+  const skin = o.skin === undefined || o.skin === BASALT ? ST_SKIN : goldOf(o.skin);
+  const gilt = typeof skin === 'number' && (skin === SG || skin === SG_L);   // a gold body: accents in lapis
+  const gold = goldOf(o.gold ?? GILT);
+  const kilt = o.kilt === undefined ? gold : goldOf(o.kilt);
+  const s = h / 24;
+  const V = new Map();
+  const K = (X, Y, Z) => ((X + 512) * 2048 + (Y + 512)) * 2048 + (Z + 512);
+  const put = (X, Y, Z, c) => V.set(K(X, Y, Z), [X, Y, Z, c]);
+  const canon = (X, Y, Z) => [(X + 0.5 - cx) / s, (Y + 0.5 - y) / s, (Z + 0.5 - cz) * dir / s];
+  const fill = (u0, u1, v0, v1, w0, w1, inside, col) => {
+    const X0 = Math.floor(cx + u0 * s) - 1, X1 = Math.ceil(cx + u1 * s) + 1;
+    const Y0 = Math.max(Math.floor(y + v0 * s) - 1, y), Y1 = Math.ceil(y + v1 * s) + 1;
+    const za = cz + w0 * s * dir, zb = cz + w1 * s * dir;
+    const Z0 = Math.floor(Math.min(za, zb)) - 1, Z1 = Math.ceil(Math.max(za, zb)) + 1;
+    for (let X = X0; X <= X1; X++) for (let Y = Y0; Y <= Y1; Y++) for (let Z = Z0; Z <= Z1; Z++) {
+      const [u, v, w] = canon(X, Y, Z);
+      const r = inside(u, v, w);
+      if (r === false) continue;
+      const c = typeof col === 'function' ? col(u, v, w, X, Y, Z, r) : col;
+      if (c !== null && c !== undefined) put(X, Y, Z, c);
+    }
+  };
+  const e = 0.3 / s;   // half a voxel's slack so thin parts never vanish between voxel centres
+  const ell = (uc, wc, v0, v1, rx0, rz0, rx1, rz1, col) => {
+    const R = Math.max(rx0, rx1) + e, Q = Math.max(rz0, rz1) + e;
+    fill(uc - R, uc + R, v0, v1, wc - Q, wc + Q, (u, v, w) => {
+      if (v < v0 || v >= v1) return false;
+      const t = (v - v0) / (v1 - v0), rx = rx0 + (rx1 - rx0) * t + e, rz = rz0 + (rz1 - rz0) * t + e;
+      return ((u - uc) / rx) ** 2 + ((w - wc) / rz) ** 2 <= 1 ? t : false;
+    }, col);
+  };
+  const blob = (uc, vc, wc, rx, ry, rz, col, keep = null) => fill(uc - rx - e, uc + rx + e, vc - ry - e, vc + ry + e, wc - rz - e, wc + rz + e,
+    (u, v, w) => (((u - uc) / (rx + e)) ** 2 + ((v - vc) / (ry + e)) ** 2 + ((w - wc) / (rz + e)) ** 2 <= 1 && (!keep || keep(u, v, w)) ? 0 : false), col);
+  // a tapered capsule from a to b; col(u, v, w, X, Y, Z, t) sees t along it
+  const seg = (a, b, r0, r1, col) => {
+    const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], L2 = d[0] * d[0] + d[1] * d[1] + d[2] * d[2] || 1e-6, R = Math.max(r0, r1) + 0.7 / s;
+    fill(Math.min(a[0], b[0]) - R, Math.max(a[0], b[0]) + R, Math.min(a[1], b[1]) - R, Math.max(a[1], b[1]) + R, Math.min(a[2], b[2]) - R, Math.max(a[2], b[2]) + R, (u, v, w) => {
+      const t = Math.max(0, Math.min(1, ((u - a[0]) * d[0] + (v - a[1]) * d[1] + (w - a[2]) * d[2]) / L2));
+      const q = Math.hypot(u - a[0] - d[0] * t, v - a[1] - d[1] * t, w - a[2] - d[2] * t);
+      return q * s <= Math.max((r0 + (r1 - r0) * t) * s, 0.62) ? t : false;
+    }, col);
+  };
+  const box = (u0, u1, v0, v1, w0, w1, col) => {
+    const gu = Math.max(0, (1 / s - (u1 - u0)) / 2), gv = Math.max(0, (1 / s - (v1 - v0)) / 2), gw = Math.max(0, (1 / s - (w1 - w0)) / 2);
+    fill(u0 - gu, u1 + gu, v0 - gv, v1 + gv, Math.min(w0, w1) - gw, Math.max(w0, w1) + gw,
+      (u, v, w) => (u >= u0 - gu && u < u1 + gu && v >= v0 - gv && v < v1 + gv && w >= Math.min(w0, w1) - gw && w < Math.max(w0, w1) + gw ? 0 : false), col);
+  };
+  const base = (c, X, Y, Z) => (typeof c === 'function' ? c(X, Y, Z) : c);
+  const sk = (u, v, w, X, Y, Z) => base(skin, X, Y, Z);
+  const accent = gilt ? ST_LAPIS : gold;              // jewellery on the body
+  // bands along a capsule (staves, flail strands): gold / lapis
+  const banded = (n, c1 = gold, c2 = ST_LAPIS) => (u, v, w, X, Y, Z, t) => (Math.floor(t * n) & 1 ? c2 : c1);
+  // an arm with an armlet high on the upper arm and a bracelet at the wrist
+  const arm = (S, E, W, rU = 0.86, rF = 0.66) => {
+    seg(S, E, rU, rU * 0.86, sk);
+    seg(E, W, rU * 0.84, rF, (u, v, w, X, Y, Z, t) => (t > 0.74 && t < 0.88 ? accent : base(skin, X, Y, Z)));
+    blob(W[0], W[1], W[2], rF + 0.05, rF + 0.08, rF + 0.05, sk);
+  };
+  const kn = pose === 'kneel' ? -7.4 : 0;
+  const U = (p) => [p[0], p[1] + kn, p[2]];   // upper-body points drop when kneeling
+
+  // ---- the lower body
+  const pleat = (u, v, w, X, Y, Z) => {
+    const c0 = base(kilt, X, Y, Z);
+    if (v < (pose === 'kneel' ? 1.7 : 8.95)) return typeof c0 === 'number' && (c0 === SG || c0 === SG_L) ? SG_L : shade(c0, 1.06);
+    const a = Math.atan2(u, w);
+    return Math.floor((a + Math.PI) / (2 * Math.PI) * 16) & 1 ? shade(c0, 0.8) : c0;
+  };
+  if (pose === 'mummy') {
+    // the wrapped Osiride body: feet on a block, gold bands, the shroud tapering in to the ankles
+    box(-1.7, 1.7, 0, 0.8, -1.2, 2.2, sk);
+    ell(0, 0.1, 0.6, 13.6, 1.7, 1.35, 2.5, 1.55, (u, v, w, X, Y, Z) => ((v % 3.1) < 0.55 && v > 1.5 ? gold : base(skin, X, Y, Z)));
+    ell(0, 0.05, 13.6, 17.2, 2.5, 1.55, 3.2, 1.6, sk);
+  } else if (pose === 'dress') {
+    // a sheath dress from the bust to the ankles, flaring a little at the hem
+    box(-1.5, -0.3, 0, 0.7, -0.6, 2.0, sk); box(0.3, 1.5, 0, 0.7, -0.6, 2.0, sk);
+    ell(0, 0.15, 0.6, 9.5, 2.25, 1.6, 2.4, 1.6, (u, v, w, X, Y, Z) => (v < 1.2 ? SG_L : pleat(u, v + 9, w, X, Y, Z)));
+    ell(0, 0.1, 9.5, 13.0, 2.45, 1.6, 2.2, 1.4, (u, v, w, X, Y, Z) => pleat(u, v, w, X, Y, Z));
+    ell(0, 0.05, 13.0, 17.2, 2.2, 1.4, 3.0, 1.5, (u, v, w, X, Y, Z) => (v < 15.6 ? pleat(u, v, w, X, Y, Z) : base(skin, X, Y, Z)));
+  } else if (pose === 'kneel') {
+    // kneeling on the heels: shins folded back on the plinth, thighs forward to the knees
+    for (const sx of [-1, 1]) {
+      seg([sx * 1.3, 0.95, 3.0], [sx * 1.3, 0.85, -1.6], 0.95, 0.8, sk);
+      seg([sx * 1.25, 2.7, -0.1], [sx * 1.3, 2.1, 3.1], 1.2, 1.0, sk);
+    }
+    ell(0, 0.5, 1.3, 5.3, 3.0, 2.4, 2.5, 1.65, pleat);
+  } else {
+    const f = pose === 'stride' ? 2.0 : 0;
+    for (const sx of [-1, 1]) {
+      const ff = sx < 0 ? f : 0;
+      const A = [sx * 1.35, 0.9, 0.25 + ff], Kn = [sx * 1.35, 5.6, 0.2 + ff * 0.55], H = [sx * 1.25, 10.2, 0.1];
+      box(sx * 1.35 - 0.78, sx * 1.35 + 0.78, 0, 0.85, A[2] - 1.0, A[2] + 1.95, sk);   // the foot
+      seg(A, Kn, 0.62, 0.86, sk);
+      seg(Kn, H, 0.88, 1.22, sk);
+    }
+    ell(0, 0.2, 8.4, 12.9, 3.15, 2.05, 2.45, 1.55, pleat);   // the pleated shendyt, flaring at the hem
+    if (kiltFront !== null) {
+      // the stiff front apron: the owner's colour framed in gold
+      box(-0.95, 0.95, 8.0, 12.5, 1.2, 2.45, (u, v, w) => (Math.abs(u) > 0.62 || v < 8.45 ? SG_L : kiltFront));
+    }
+  }
+  if (pose !== 'mummy' && pose !== 'dress') {
+    // the waist steps in above the kilt, then the torso widens to the shoulders
+    ell(0, 0.05, 13.3 + kn, 17.2 + kn, 2.15, 1.35, 3.2, 1.55, sk);
+  }
+  if (pose !== 'mummy') ell(0, 0.08, 12.55 + kn, 13.45 + kn, 2.55, 1.65, 2.5, 1.62, (u, v, w) => (w > 1.25 && Math.abs(u) < 0.45 ? ST_LAPIS : gold)); // the belt
+  ell(0, 0.05, 17.2 + kn, 18.7 + kn, 3.2, 1.55, 2.0, 1.25, sk);
+  for (const sx of [-1, 1]) blob(sx * 3.05, 17.3 + kn, 0.05, 1.15, 1.05, 1.15, sk);
+
+  // ---- the broad collar (wesekh): rings of gold, lapis and turquoise round
+  // the neck, laid one voxel proud of the chest, shoulders and back
+  {
+    const ny = 19.3 + kn, rings = [[1.55, null], [2.15, SG_L], [2.65, ST_LAPIS], [3.15, gold], [3.75, 'drop']];
+    const ring = (u, v, w) => {
+      if (v < 15.4 + kn || v > ny) return null;
+      const d = Math.hypot(u, (v - ny) * 1.3, w * 1.05);
+      for (const [r, c] of rings) if (d < r) return c === 'drop' ? (Math.floor(Math.atan2(u, w) * 6) & 1 ? gold : ST_LAPIS) : c;
+      return null;
+    };
+    const add = [];
+    for (const [X, Y, Z] of V.values()) {
+      const [u, v, w] = canon(X, Y, Z);
+      const c = ring(u, v, w);
+      if (!c) continue;
+      put(X, Y, Z, c);
+      for (const [dx, dy, dz] of [[0, 1, 0], [0, 0, dir], [1, 0, 0], [-1, 0, 0], [0, 0, -dir]]) if (!V.has(K(X + dx, Y + dy, Z + dz))) add.push([X + dx, Y + dy, Z + dz, c]);
+    }
+    for (const [X, Y, Z, c] of add) put(X, Y, Z, c);
+  }
+
+  // ---- arms and regalia
+  if (arms === 'crossed') {
+    // Osiris' pose: forearms crossed high on the chest, the crook (heka) and
+    // the flail (nekhakha) in gold banded with lapis, held up over the shoulders
+    arm(U([-3.15, 17.2, 0.1]), U([-3.45, 13.9, 0.9]), U([1.0, 16.3, 2.45]));
+    arm(U([3.15, 17.2, 0.1]), U([3.45, 13.9, 0.9]), U([-1.0, 15.3, 2.8]));
+    const cg = gilt ? SG_D : gold;
+    // both held tight to the chest: the shafts end at the shoulders, the
+    // crook's hook curling out over the right shoulder, the flail's three
+    // strands hanging down over the left one (nothing stands up by the head)
+    seg(U([0.3, 14.2, 2.75]), U([2.1, 18.5, 2.3]), 0.4, 0.4, cg);
+    seg(U([2.1, 18.5, 2.3]), U([2.75, 19.25, 2.2]), 0.36, 0.36, cg);
+    seg(U([2.75, 19.25, 2.2]), U([3.5, 19.05, 2.15]), 0.36, 0.36, cg);
+    seg(U([3.5, 19.05, 2.15]), U([3.75, 18.2, 2.1]), 0.36, 0.32, cg);
+    seg(U([-0.4, 14.0, 3.05]), U([-2.05, 18.3, 2.5]), 0.4, 0.4, cg);
+    blob(...U([-2.1, 18.45, 2.5]), 0.46, 0.46, 0.46, SG_L);
+    for (const tip of [[-2.9, 16.4, 2.2], [-3.35, 16.7, 2.6], [-2.5, 16.2, 3.0]]) seg(U([-2.15, 18.3, 2.5]), U(tip), 0.32, 0.28, banded(3, SG_L, cg));
+  } else if (arms === 'side' || arms === 'staff' || arms === 'embrace') {
+    arm([-3.15, 17.2 + kn, 0.1], [-3.45, 13.5 + kn, 0.25], [-3.45, 10.4 + kn, 0.5]);
+    if (arms === 'side') arm([3.15, 17.2 + kn, 0.1], [3.45, 13.5 + kn, 0.25], [3.45, 10.4 + kn, 0.5]);
+    else if (arms === 'staff') {
+      // the forearm forward, the was-sceptre upright in the fist
+      arm([3.15, 17.2 + kn, 0.1], [3.45, 13.8 + kn, 0.2], [3.5, 14.0 + kn, 2.75]);
+      seg([3.5, 0.3, 2.95], [3.5, 26.6, 2.95], 0.34, 0.34, (u, v, w, X, Y, Z, t) => (t > 0.5 && t < 0.54 ? ST_LAPIS : gilt ? SG_D : gold));
+      seg([3.5, 26.6, 2.95], [3.5, 27.3, 4.4], 0.34, 0.26, gilt ? SG_D : gold);
+      seg([3.5, 0.3, 2.95], [3.0, 0, 2.95], 0.26, 0.26, gold); seg([3.5, 0.3, 2.95], [4.0, 0, 2.95], 0.26, 0.26, gold);
+    } else arm([3.15, 17.2 + kn, 0.1], [3.45, 14.6 + kn, -0.3], [5.2, 15.4 + kn, -1.5]);
+  } else if (arms === 'bowls') {
+    // forearms forward offering a gold bowl
+    arm(U([-3.15, 17.2, 0.1]), U([-3.3, 14.0, 1.0]), U([-1.9, 14.3, 3.3]));
+    arm(U([3.15, 17.2, 0.1]), U([3.3, 14.0, 1.0]), U([1.9, 14.3, 3.3]));
+    ell(0, 3.6, 14.3 + kn, 15.7 + kn, 1.6, 1.15, 2.3, 1.55, (u, v, w) => (v > 15.25 + kn && Math.hypot(u / 2.3, (w - 3.6) / 1.55) < 0.62 ? SG_D : SG_L));
+  } else if (arms === 'wings') {
+    // Isis: arms out and down, long feathered wings hanging from them
+    arm(U([-3.15, 17.2, 0.1]), U([-4.6, 15.6, 0.3]), U([-6.0, 13.6, 0.9]));
+    arm(U([3.15, 17.2, 0.1]), U([4.6, 15.6, 0.3]), U([6.0, 13.6, 0.9]));
+    fill(-8.8, 8.8, 2 + kn, 18.2 + kn, -0.7, 0.55, (u, v, w) => {
+      const a = Math.abs(u) - 3.4;
+      if (a < 0 || a > 5.2 || w < -0.65 || w > 0.5) return false;
+      const top = 17.8 + kn - a * 0.38, bot = 12.6 + kn - a * 1.75;
+      return v <= top && v >= bot ? (top - v) : false;
+    }, (u, v, w, X, Y, Z, dt) => {
+      const a = Math.abs(u) - 3.4;
+      if (dt < 0.6) return SG_L;                                   // the leading edge
+      if (dt < 2.6) return (Math.floor(a * 2.2) + Math.floor(v * 2.2)) & 1 ? ST_LAPIS : gold; // scale-like coverts
+      return Math.floor(a * 1.8) & 1 ? SG_D : gold;                 // long primaries
+    });
+  }
+
+  // ---- neck and head (hy: the chin)
+  seg([0, 18.3 + kn, 0.15], [0, 20.1 + kn, 0.3], 0.84, 0.8, sk);
+  const hy = 19.7 + kn;
+  // a striped tripartite wig (falcon, jackal and goddess heads): lappets down
+  // in front of the shoulders and a mass behind, gold and lapis
+  // mostly lapis with thin gold stripes, so it stays one mass apart from the gold collar and face
+  const wigCol = (u, v, w) => (((Math.floor(v * 1.6) % 3) + 3) % 3 === 0 ? gold : ST_LAPIS);
+  const wig = () => {
+    blob(0, hy + 1.5, -0.55, 1.8, 2.35, 1.35, wigCol);
+    // lappets ending on the collar's upper edge (not over it), a gold tip band
+    for (const sx of [-1, 1]) box(sx > 0 ? 1.2 : -2.1, sx > 0 ? 2.1 : -1.2, hy - 1.7, hy + 2.3, -0.4, 1.45, (u, v, w) => (v < hy - 1.25 ? SG_L : wigCol(u, v, w)));
+  };
+  if (crown === 'disc' || crown === 'horns' || crown === 'set' || crown === 'vulture' || (head !== 'human' && crown !== 'nemes')) wig();
+  if (head === 'falcon') {
+    // Horus' head: gold feathers on a stone body (a stone beak on a gilt one),
+    // a strong hooked beak, ringed eyes and the dark malar stripe under them
+    const fh = gilt ? sk : gold, dk = gilt ? ST_SKIN : INK;
+    blob(0, hy + 1.95, 0.2, 1.45, 1.8, 1.55, fh);
+    seg([0, hy + 2.35, 1.2], [0, hy + 2.05, 3.35], 0.62, 0.42, dk);         // the beak
+    seg([0, hy + 2.05, 3.35], [0, hy + 1.0, 3.15], 0.4, 0.26, dk);          // its hooked tip
+    seg([0, hy + 2.7, 1.25], [0, hy + 2.55, 2.0], 0.5, 0.4, SG_L);          // the cere
+    for (const sx of [-1, 1]) {
+      box(sx > 0 ? 0.55 : -1.35, sx > 0 ? 1.35 : -0.55, hy + 2.15, hy + 2.95, 0.95, 1.6, ST_WHITE);  // eyes
+      box(sx > 0 ? 0.75 : -1.15, sx > 0 ? 1.15 : -0.75, hy + 2.3, hy + 2.8, 1.25, 1.7, dk);         // pupils
+      box(sx > 0 ? 0.8 : -1.2, sx > 0 ? 1.2 : -0.8, hy + 0.7, hy + 2.15, 1.0, 1.5, dk);            // the malar stripe
+    }
+  } else if (head === 'jackal') {
+    blob(0, hy + 2.2, -0.05, 1.32, 1.55, 1.5, sk);
+    seg([0, hy + 2.15, 0.9], [0, hy + 1.45, 4.7], 0.98, 0.5, sk);          // the long snout
+    seg([0, hy + 0.95, 1.1], [0, hy + 1.05, 3.9], 0.5, 0.36, sk);           // the lower jaw
+    blob(0, hy + 1.6, 4.7, 0.42, 0.4, 0.36, gilt ? INK : SG_D);             // the nose
+    for (const sx of [-1, 1]) {
+      box(sx > 0 ? 0.45 : -1.1, sx > 0 ? 1.1 : -0.45, hy + 2.45, hy + 3.0, 1.0, 1.55, SG_L);   // gold eyes
+    }
+    // tall flat ears tapering to points, standing forward of the wig, the
+    // hollow front face gilt inside a stone rim
+    const eb = hy + 2.9, eh = 4.0;
+    fill(-2.4, 2.4, eb - 0.1, eb + eh + 0.2, -1.1, 0.4, (u, v, w) => {
+      const t = (v - eb) / eh;
+      if (t < 0 || t > 1 || w < -0.85 || w > 0.15) return false;
+      return Math.abs(Math.abs(u) - (0.95 + 0.3 * t)) <= 0.85 * (1 - t) + 0.08 ? t : false;
+    }, (u, v, w, X, Y, Z, t) => (w > -0.25 && Math.abs(Math.abs(u) - (0.95 + 0.3 * t)) < 0.85 * (1 - t) - 0.32 ? SG_L : base(skin, X, Y, Z)));
+  } else {
+    blob(0, hy + 1.9, 0.35, 1.4, 1.9, 1.55, sk);
+    box(-0.3, 0.3, hy + 1.3, hy + 2.5, 1.6, 2.15, sk);                        // nose
+    for (const sx of [-1, 1]) box(sx > 0 ? 0.35 : -0.95, sx > 0 ? 0.95 : -0.35, hy + 2.35, hy + 2.7, 1.4, 1.95, gilt ? ST_LAPIS : SG_D);  // kohl-lined eyes, inlaid dark (white eyes stared like a robot's)
+    if (pose !== 'dress') seg([0, hy + 0.45, 1.45], [0, hy - 0.95, 1.7], 0.4, 0.33, banded(5, gold, ST_LAPIS));          // the false beard
+  }
+  const uraeus = (vb, wb) => { seg([0, vb, wb], [0, vb + 0.95, wb + 0.25], 0.34, 0.3, SG_L); blob(0, vb + 1.0, wb + 0.3, 0.32, 0.3, 0.3, ST_RED); };
+  if (crown === 'nemes') {
+    // the striped royal headcloth: a cap over the brow, wings flaring out to
+    // the shoulders behind the face, lappets down the chest, a tail behind
+    const nem = (u, v, w) => (v > hy + 3.2 && v < hy + 3.7 && w > 0.4 ? SG_L : v < hy - 2.75 ? SG_L : (Math.floor((v - hy) * 1.3) & 1 ? ST_LAPIS : gold));
+    blob(0, hy + 2.35, 0.05, 1.72, 2.05, 1.85, nem, (u, v, w) => !(w > 0.5 && v < hy + 3.2 && Math.abs(u) < 1.3));
+    fill(-3.1, 3.1, hy - 1.7, hy + 3.0, -1.35, 0.95, (u, v, w) => {
+      const au = Math.abs(u);
+      return au >= 1.25 && au <= 1.6 + (hy + 3.0 - v) * 0.33 && v >= hy - 1.7 && v <= hy + 3.0 && w >= -1.35 && w <= 0.95 ? 0 : false;
+    }, nem);
+    for (const sx of [-1, 1]) box(sx > 0 ? 1.3 : -2.25, sx > 0 ? 2.25 : -1.3, hy - 3.4, hy + 0.6, 0.45, 2.0, nem);
+    seg([0, hy + 1.6, -1.5], [0, hy - 2.6, -1.75], 0.78, 0.6, nem);
+    uraeus(hy + 3.4, 1.75);
+  } else if (crown === 'disc') {
+    uraeus(hy + 3.3, 1.35);
+  } else if (crown === 'atef' || crown === 'tall') {
+    // the white crown in gold: a tall bulb with a knob, lapis band at the brow;
+    // the atef adds two striped plumes and ram's horns
+    ell(0, 0.0, hy + 2.9, hy + 8.6, 1.5, 1.45, 0.6, 0.6, (u, v) => (v < hy + 3.5 ? ST_LAPIS : gold));
+    blob(0, hy + 8.75, 0, 0.62, 0.55, 0.62, SG_L);
+    if (crown === 'atef') for (const sx of [-1, 1]) {
+      box(sx > 0 ? 1.4 : -2.05, sx > 0 ? 2.05 : -1.4, hy + 3.4, hy + 8.9, -0.35, 0.35, (u, v) => (Math.floor(v * 1.4) & 1 ? ST_LAPIS : gold));
+      seg([sx * 1.2, hy + 3.3, 0.4], [sx * 2.7, hy + 3.0, 0.9], 0.4, 0.22, SG_D);
+    }
+    uraeus(hy + 3.2, 1.45);
+  } else if (crown === 'horns') {
+    // Isis: the modius, cow horns cupping a sun disc
+    ell(0, -0.1, hy + 3.4, hy + 4.4, 1.25, 1.25, 1.3, 1.3, SG_L);
+    for (const sx of [-1, 1]) {
+      const p = [[0.6, 4.3], [2.0, 4.9], [2.5, 6.4], [2.1, 7.9], [1.5, 8.6]];
+      for (let i = 0; i < p.length - 1; i++) seg([sx * p[i][0], hy + p[i][1], -0.1], [sx * p[i + 1][0], hy + p[i + 1][1], -0.1], 0.36, 0.32, gold);
+    }
+    uraeus(hy + 3.1, 1.45);
+  } else if (crown === 'vulture') {
+    ell(0, -0.1, hy + 3.4, hy + 4.6, 1.2, 1.2, 1.3, 1.3, (u, v) => (v > hy + 4.2 ? SG_L : ST_LAPIS));
+    uraeus(hy + 3.1, 1.45);
+  } else if (crown === 'set') {
+    blob(0, hy + 3.55, -0.1, 1.1, 0.35, 1.1, SG_L);   // a gold fillet over the brow
+  }
+
+  for (const [X, Y, Z, c] of V.values()) m.set(X, Y, Z, c);
+  if (crown === 'disc') sunDisc(m, cx, y + (hy + 6.1) * s, Math.floor(cz - 0.35 * s * dir), 2.8 * s, SG);
+  else if (crown === 'horns') sunDisc(m, cx, y + (hy + 6.6) * s, Math.floor(cz - 0.1 * s * dir), 1.85 * s, SG);
+}
+// A statue drawn at half voxels inside a full-voxel building (the Town
+// Center's and the Temple's gods): the figure goes into its own model at
+// twice the resolution, recorded on m.fine, and geo() meshes it at VOX / 2 and
+// merges it into the building's mesh at the same place. (cx, y, cz) and o.h
+// are in the building's voxels. Construction stages leave it out (it stands
+// when the building is finished).
+function fineFigure(m, cx, y, cz, o = {}) {
+  const sub = new Rec(m.W * 2, m.D * 2);
+  figure(sub, cx * 2, y * 2, cz * 2, { ...o, h: (o.h ?? 24) * 2 });
+  (m.fine ??= []).push({ m: sub, k: 2 });
+}
+// A statue and its black-and-gold plinth (monPlinth: a raised cartouche on
+// every face, the owner's line under a gold cornice, a notched die) drawn at
+// half voxels inside a full-voxel building, on the box [x0, x1) x [z0, z1)
+// from y0, h voxels high (building voxels); the figure stands centred on it.
+function fineStatue(m, x0, z0, x1, z1, y0, h, o = {}, seed = 0) {
+  const sub = new Rec(m.W * 2, m.D * 2);
+  const py = monPlinth(sub, x0 * 2, z0 * 2, x1 * 2, z1 * 2, y0 * 2, h * 2 - 3, { seed });
+  const pd = monDie(sub, x0 * 2 + 3, z0 * 2 + 3, x1 * 2 - 3, z1 * 2 - 3, py, 2);
+  figure(sub, x0 + x1, pd, z0 + z1 - 0.5, { ...o, h: (o.h ?? 24) * 2 });
+  (m.fine ??= []).push({ m: sub, k: 2 });
+}
+// The old box-built figure, kept for tiny statues (under 14 voxels, e.g. the
+// Wonder's door kings) where sampled solids would come out as lumps.
+function figureBlocky(m, cx, y, cz, o = {}) {
   const { h = 24, skin = BASALT, gold = GILT, kilt = GILT, kiltFront = TEAMB, head = 'human', crown = 'nemes', arms = 'side', pose = 'stride', dir = 1 } = o;
   const s = h / 24;
   const B = (xa, ya, za, xb, yb, zb, c) => {
@@ -1808,8 +2121,10 @@ function townCenter() {
   palm(m, 8, 1, 28, 21, { lx: 0.3, lz: 1, len: 7 });
   // outside the walls: pots by the gate, a basket, a cart wheel
   // the Ra statue on its plinth at the front-left corner (outside the wall line)
-  const py = plinth(m, 2, 45, 12, 54, 1, 7, { face: SAND, frame: LIME, team: true });
-  figure(m, 7, py, 49.5, { h: 34, skin: GILT, gold: GILT_L, kilt: CLOTH, kiltFront: TEAMB, head: 'falcon', crown: 'disc', arms: 'staff', pose: 'stride' });
+  // (half voxels: a gold-feathered falcon head with a dark hooked beak, the
+  // sun disc, a striped wig, a broad collar, crook and flail crossed on the
+  // chest, a pleated gold kilt under a belt, a cartouche on every plinth face)
+  fineStatue(m, 2, 45, 12, 54, 1, 9, { h: 25, skin: BASALT, gold: GILT_L, kilt: GILT, kiltFront: TEAMB, head: 'falcon', crown: 'disc', arms: 'crossed', pose: 'stride' }, 1);
   return m;
 }
 
@@ -1918,16 +2233,16 @@ function temple(god) {
     if (e === 1) m.set(x, ay + 6, z, LIP(x, ay + 6, z));
   }
   // the god statue on its plinth at the front left (on tier 1)
-  const py = plinth(m, 2, 30, 11, 38, 4, 6, { face: SAND, frame: LIME });
   const G = {
     // crook and flail held to the chest (no tall sceptre: from above it read as a banner pole)
-    ra: { head: 'falcon', crown: 'disc', arms: 'crossed', skin: GILT, kilt: CLOTH },
-    isis: { head: 'human', crown: 'horns', arms: 'wings', skin: GILT, kilt: CLOTH, pose: 'dress' },
+    // dark stone and gold like the Monuments (a gilt body read as sand in the sun)
+    ra: { head: 'falcon', crown: 'disc', arms: 'crossed', skin: BASALT, kilt: GILT },
+    isis: { head: 'human', crown: 'horns', arms: 'wings', skin: BASALT, kilt: GILT, pose: 'dress' },
     set: { head: 'jackal', crown: 'set', arms: 'crossed', skin: BASALT, kilt: GILT },
   }[god];
   // stout (h 30: the body reads as a statue from the RTS camera, not a pole),
   // the team colour only as a dark apron, not a bright banner-like panel
-  figure(m, 6.5, py, 34, { h: 30, gold: GILT_L, kiltFront: TEAM, pose: 'stride', ...G });
+  fineStatue(m, 2, 30, 11, 38, 4, 7, { h: 30, gold: GILT_L, kiltFront: TEAM, pose: 'stride', ...G }, 2);
   pottedPalm(m, 33, 4, 35);
   // the temple's second tall element: a pair of limestone obelisks at the
   // ramp foot on stepped bases, smoothly tapering, gold pyramidions
@@ -2318,46 +2633,166 @@ function smallObelisk(m, cx, cz, y0, h = 20) {
   poly(m, sq.map(([x, z]) => [x, TOP, z]), OB_GOLD_D, { out: [0, -1, 0] });
 }
 
-// Monuments (building_13..17): dark basalt and gold statues on gilt
-// plinths with team panels. 1 to Villagers (kneeling), 2 to Soldiers
-// (mummiform), 3 to Priests (striding), 4 to Pharaohs (a king and queen),
-// 5 to the Gods (Ra falcon, Set, Isis winged; Eye of Horus panels and
-// glowing sun bowls at the corners).
+// Monuments (building_13..17): dark basalt statues with gold regalia on
+// black-and-gold plinths. 1 to Villagers (kneeling with an offering bowl),
+// 2 to Soldiers (Osiride: mummiform, crook and flail), 3 to Priests (striding
+// in a nemes), 4 to Pharaohs (a king and queen), 5 to the Gods (falcon Ra,
+// jackal Set, winged Isis; Eye of Horus panels and glowing sun bowls at the
+// corners). Modelled at half voxels (1/16 tile: `fine: 2` in TYPES) so the
+// statues get snouts, pointed ears, a striped nemes and crossed regalia.
+// Each plinth face carries a raised gold cartouche (limestone field, lapis and
+// red signs, the shen bar under it); the owner's colour runs as one line
+// under the cornice.
+const CART_GLYPHS = [
+  ['.r.', 'rrr', '.r.'],               // the sun disc
+  ['.b.', 'b.b', '.b.', 'bbb', '.b.'], // an ankh
+  ['b.b', '.b.'],                      // water
+  ['k.k', 'kkk', '.k.'],               // a scarab
+  ['.b.', 'bb.', '.b.', '.b.'],        // a reed
+];
+// a voxel on face f of the box [x0, x1) x [z0, z1): a = along the face (left
+// to right seen from outside), out = 0 the face itself, 1 one voxel proud
+function faceXZ(f, x0, z0, x1, z1, a, out) {
+  if (f === '+z') return [x0 + a, z1 - 1 + out];
+  if (f === '-z') return [x1 - 1 - a, z0 - out];
+  if (f === '+x') return [x1 - 1 + out, z1 - 1 - a];
+  return [x0 - out, z0 + a];
+}
+// a raised cartouche centred at a0 (along the face), rows r0 .. r0 + ch
+function cartouche(m, f, x0, z0, x1, z1, y0, a0, r0, cw, ch, seed = 0) {
+  const at = (a, r, c, out = 1) => { const [x, z] = faceXZ(f, x0, z0, x1, z1, a, out); m.set(x, y0 + r, z, c); };
+  const ax = a0 - (cw - 1) / 2;
+  // the shen bar it stands on
+  for (let i = -1; i <= cw; i++) at(Math.round(ax + i), r0, SG_D);
+  // a tall oval: straight sides, rounded ends two rows deep
+  const rad = (cw - 1) / 2, top = r0 + ch, ry = 2.2, cyT = top - ry + 0.5, cyB = r0 + 1 + ry - 0.5;
+  for (let r = r0 + 1; r <= top; r++) for (let i = 0; i < cw; i++) {
+    const du = (i - rad) / (rad + 0.45);
+    const dv = r > cyT ? (r - cyT) / ry : r < cyB ? (cyB - r) / ry : 0;
+    const d = Math.hypot(du, dv);
+    if (d > 1) continue;
+    const edge = i === 0 || i === cw - 1 || r === top || r === r0 + 1 || Math.hypot((i - rad) / (rad - 0.55), dv * ry / (ry - 0.9)) > 1;
+    at(Math.round(ax + i), r, edge ? SG_L : 0xe8dcb8);
+  }
+  // signs stacked down the field
+  let r = top - 2, k = seed;
+  for (let n = 0; n < 6; n++) {
+    const g = CART_GLYPHS[k % CART_GLYPHS.length];
+    if (r - g.length + 1 < r0 + 2) break;
+    g.forEach((row, j) => {
+      for (let i = 0; i < row.length; i++) {
+        const ch2 = row[i]; if (ch2 === '.') continue;
+        at(Math.round(ax + (cw - row.length) / 2 + i), r - j, ch2 === 'r' ? ST_RED : ch2 === 'b' ? ST_LAPIS : 0x2a2420);
+      }
+    });
+    r -= g.length + 1; k += 2;
+  }
+}
+// the Eye of Horus in gold inside a framed panel, flush on the face
+function eyePanel(m, f, x0, z0, x1, z1, y0, a0, r0) {
+  const EYE = [
+    '....GGGGGGGG....',
+    '..GG........GG..',
+    '.G...LLLLL....G.',
+    'GGGGGLLKKLLGGGGG',
+    '.....LLLLL......',
+    '......G...G.....',
+    '.....G.....G....',
+    '....G.......GG..',
+  ];
+  const at = (a, r, c) => { const [x, z] = faceXZ(f, x0, z0, x1, z1, a, 0); m.set(x, y0 + r, z, c); };
+  const W = EYE[0].length + 4, H = EYE.length + 4;
+  for (let i = 0; i < W; i++) for (let j = 0; j < H; j++) {
+    const a = a0 - W / 2 + i;
+    const edge = i === 0 || j === 0 || i === W - 1 || j === H - 1;
+    let c = edge ? SG : 0x1e242c;
+    const ch = (EYE[H - 3 - j] || '')[i - 2];
+    if (!edge && ch && ch !== '.') c = ch === 'K' ? 0x141414 : ch === 'L' ? ST_WHITE : SG_L;
+    at(Math.round(a), r0 + j, c);
+  }
+}
+// a black-and-gold plinth: gold corner posts and base, basalt faces with a
+// raised cartouche (or Eye of Horus panels), a team line under a gold
+// cornice that overhangs a voxel, a dark deck. Returns the deck top.
+function monPlinth(m, x0, z0, x1, z1, y0, h, { faces = {}, seed = 0 } = {}) {
+  for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) {
+    const ex = x <= x0 + 1 || x >= x1 - 2, ez = z <= z0 + 1 || z >= z1 - 2;
+    const sx = x === x0 || x === x1 - 1, sz = z === z0 || z === z1 - 1;
+    if (!sx && !sz) continue;
+    const r = y - y0;
+    let c = BASALT(x, y, z);
+    if (ex && ez) c = r === h - 1 ? SG_L : SG;                  // corner posts
+    else if (r <= 1) c = r === 0 ? SG_D : SG;                   // the base course
+    else if (r === h - 1) c = SG;
+    else if (r === h - 2) c = TEAM;                             // the owner's line
+    m.set(x, y, z, c);
+  }
+  m.box(x0 + 1, y0, z0 + 1, x1 - x0 - 2, h, z1 - z0 - 2, DARK2);
+  // the cornice: overhangs a voxel, gold edge round a dark deck
+  for (let x = x0 - 1; x <= x1; x++) for (let z = z0 - 1; z <= z1; z++) {
+    const e = x === x0 - 1 || x === x1 || z === z0 - 1 || z === z1;
+    m.set(x, y0 + h, z, e ? SG_L : (x === x0 || x === x1 - 1 || z === z0 || z === z1 - 1 ? SG : BASALT(x, y0 + h, z)));
+  }
+  for (const f of ['+z', '-z', '+x', '-x']) {
+    const L = f === '+z' || f === '-z' ? x1 - x0 : z1 - z0;
+    const kind = faces[f] ?? 'cart';
+    if (kind === 'cart') cartouche(m, f, x0, z0, x1, z1, y0, (L - 1) / 2, 2, 7, h - 5, seed + f.length + (f[1] === 'x' ? 1 : 0));
+    else if (kind === 'cart2') for (const k of [-1, 1]) cartouche(m, f, x0, z0, x1, z1, y0, (L - 1) / 2 + k * 6, 2, 7, h - 5, seed + (k > 0 ? 1 : 0));
+    else if (kind === 'eye') {
+      eyePanel(m, f, x0, z0, x1, z1, y0, L / 2, 3);
+      if (L >= 40) for (const k of [-1, 1]) cartouche(m, f, x0, z0, x1, z1, y0, (L - 1) / 2 + k * 15, 2, 7, h - 5, seed + (k > 0 ? 3 : 0));
+    }
+  }
+  return y0 + h + 1;
+}
+// a die on the deck: gold, its sides a frieze of dark notches, a pale lip
+function monDie(m, x0, z0, x1, z1, y0, h) {
+  for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) {
+    const sx = x === x0 || x === x1 - 1, sz = z === z0 || z === z1 - 1;
+    if (!sx && !sz) { m.set(x, y, z, DARK2); continue; }
+    const r = y - y0, a = sx && sz ? 0 : sx ? z : x;
+    m.set(x, y, z, r === h - 1 ? SG_L : r === 0 ? SG_D : (a & 1 ? 0x1e242c : SG));
+  }
+  for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) m.set(x, y0 + h, z, x === x0 || z === z0 || x === x1 - 1 || z === z1 - 1 ? SG_L : BASALT(x, y0 + h, z));
+  return y0 + h + 1;
+}
 function monument(kind, god = 'ra') {
   if (kind <= 3) {
-    const m = lot(16, 16, EARTH);
-    const py = plinth(m, 3, 3, 13, 13, 1, kind === 3 ? 7 : 6, { face: BASALT, frame: GILT, eye: false });
+    const m = lot(32, 32, EARTH);
+    const py = monPlinth(m, 6, 6, 26, 26, 1, 14, { seed: kind });
+    const pd = monDie(m, 10, 10, 22, 22, py, 3);
     const o = [
       null,
-      { pose: 'kneel', arms: 'bowls', crown: 'atef', kilt: GILT, kiltFront: null, h: 22 },
-      { pose: 'mummy', arms: 'crossed', crown: 'tall', h: 22 },
-      { pose: 'stride', arms: 'side', crown: 'nemes', kilt: GILT, kiltFront: TEAMB, h: 22 },
+      { pose: 'kneel', arms: 'bowls', crown: 'nemes', kiltFront: null, h: 46 },
+      { pose: 'mummy', arms: 'crossed', crown: 'tall', h: 46 },
+      { pose: 'stride', arms: 'crossed', crown: 'nemes', kiltFront: TEAMB, h: 46 },
     ][kind];
-    figure(m, 8, py, 8, { skin: BASALT, gold: GILT, ...o });
+    figure(m, 16, pd, 15.5, { skin: BASALT, gold: GILT, kilt: GILT, ...o });
     return m;
   }
-  const m = lot(kind === 5 ? 32 : 24, kind === 5 ? 32 : 24, EARTH);
   if (kind === 4) {
-    const py = plinth(m, 3, 3, 21, 21, 1, 6, { face: BASALT, frame: GILT });
-    const py2 = plinth(m, 5, 5, 19, 19, py, 2, { face: BASALT, frame: GILT, team: false });
-    figure(m, 9, py2, 12, { h: 24, skin: BASALT, gold: GILT, kilt: GILT, kiltFront: TEAMB, crown: 'atef', arms: 'side', pose: 'stand' });
-    figure(m, 15.5, py2, 11.5, { h: 21, skin: BASALT, gold: GILT, kilt: GILT, crown: 'vulture', arms: 'embrace', pose: 'dress' });
+    const m = lot(48, 48, EARTH);
+    const py = monPlinth(m, 5, 6, 43, 42, 1, 14, { faces: { '+z': 'cart2', '-z': 'cart2' }, seed: 4 });
+    const pd = monDie(m, 9, 11, 39, 37, py, 3);
+    figure(m, 18, pd, 24, { h: 50, skin: BASALT, gold: GILT, kilt: GILT, kiltFront: TEAMB, crown: 'nemes', arms: 'crossed', pose: 'stand' });
+    figure(m, 30.5, pd, 23.5, { h: 44, skin: BASALT, gold: GILT, kilt: GILT, crown: 'vulture', arms: 'embrace', pose: 'dress' });
     return m;
   }
-  const py = plinth(m, 6, 6, 26, 26, 1, 9, { face: BASALT, frame: GILT, eye: true });
-  const py2 = plinth(m, 10, 10, 22, 22, py, 3, { face: BASALT, frame: GILT, team: false });
+  const m = lot(64, 64, EARTH);
+  const py = monPlinth(m, 12, 12, 52, 52, 1, 18, { faces: { '+z': 'eye', '-z': 'eye', '+x': 'eye', '-x': 'eye' }, seed: 5 });
+  const pd = monDie(m, 20, 20, 44, 44, py, 5);
   const G = {
     ra: { head: 'falcon', crown: 'disc', arms: 'staff', pose: 'stride' },
     set: { head: 'jackal', crown: 'set', arms: 'staff', pose: 'stand' },
     isis: { head: 'human', crown: 'horns', arms: 'wings', pose: 'dress' },
   }[god];
-  figure(m, 16, py2, 16, { h: 30, skin: BASALT, gold: GILT_L, kilt: GILT, kiltFront: TEAMB, ...G });
+  figure(m, 32, pd, 31.5, { h: 60, skin: BASALT, gold: GILT_L, kilt: GILT, kiltFront: TEAMB, ...G });
   // the sun bowls at the corners, glowing
-  for (const [x, z] of [[2, 2], [29, 2], [2, 29], [29, 29]]) {
-    lathe(m, x + 0.5, z + 0.5, 1, 3, (y) => (y === 1 ? 1.4 : 2.2), GILT_D, { hollow: 1, inner: FIRE[2] });
-    m.set(x, 2, z, FIRE[3], FG);
+  for (const [x, z] of [[5, 5], [58, 5], [5, 58], [58, 58]]) {
+    lathe(m, x + 0.5, z + 0.5, 1, 6, (y) => (y <= 2 ? 2.8 : 4.4), SG_D, { hollow: 1.6, inner: FIRE[2] });
+    lathe(m, x + 0.5, z + 0.5, 1, 4, () => 2.4, FIRE[3], { hollow: 0 });
   }
-  for (const v of m.coords) { const p = m.get(...v); if (p && p.c === FIRE[2]) p.glow = FG.glow; }
+  for (const v of m.coords) { const p = m.get(...v); if (p && (p.c === FIRE[2] || p.c === FIRE[3])) p.glow = FG.glow; }
   return m;
 }
 
@@ -2715,11 +3150,11 @@ const TYPES = {
   armory: { w: 4, h: 4, variants: ['0'], ages: [1], build: () => armory() },
   market: { w: 4, h: 4, variants: ['0'], ages: [1], build: () => market() },
   obelisk: { w: 1, h: 1, variants: ['0'], ages: [1], build: () => obelisk(), draw: 1.5 },
-  monument_villagers: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(1) },
-  monument_soldiers: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(2) },
-  monument_priests: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(3) },
-  monument_pharaohs: { w: 3, h: 3, variants: ['0'], ages: [1], build: () => monument(4) },
-  monument_gods: { w: 4, h: 4, variants: ['ra', 'isis', 'set'], ages: [1], build: (v) => monument(5, ['ra', 'isis', 'set'][v]) },
+  monument_villagers: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(1), fine: 2 },
+  monument_soldiers: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(2), fine: 2 },
+  monument_priests: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(3), fine: 2 },
+  monument_pharaohs: { w: 3, h: 3, variants: ['0'], ages: [1], build: () => monument(4), fine: 2 },
+  monument_gods: { w: 4, h: 4, variants: ['ra', 'isis', 'set'], ages: [1], build: (v) => monument(5, ['ra', 'isis', 'set'][v]), fine: 2 },
   lighthouse: { w: 3, h: 3, variants: ['0'], ages: [1], build: () => lighthouse() },
   sentry_tower: { w: 1, h: 1, variants: ['0'], ages: [1], build: () => tower(), draw: 1.5 },
   wonder: { w: 8, h: 8, variants: ['0'], ages: [1], build: () => wonder() },
@@ -2727,6 +3162,20 @@ const TYPES = {
   clutter: { w: 2, h: 2, variants: ['0', '1', '2', '3', '4', '5', '6', '7'], ages: [1], build: (v) => clutter(v), stages: false },
 };
 
+// --preview <type>[:variant] --preview-out <file.json>: dump one model's
+// voxels (half-voxel insets included, scaled) as [x, y, z, size, rgb] for a
+// quick offline look (no export)
+if (argOf('preview', '')) {
+  const [pt, pv] = argOf('preview', '').split(':');
+  const full = TYPES[pt].build(+(pv || 0), 1);
+  const out = [];
+  const dump = (mm, k) => { for (const [x, y, z] of mm.coords) { const v = mm.get(x, y, z); if (v) out.push([x / k, y / k, z / k, 1 / k, v.team ? 0x2850c8 : v.c]); } };
+  dump(full, 1);
+  for (const f of full.fine || []) dump(f.m, f.k);
+  fs.writeFileSync(argOf('preview-out', 'preview.json'), JSON.stringify(out));
+  console.log(`preview ${pt}: ${out.length} voxels`);
+  process.exit(0);
+}
 fs.mkdirSync(OUT, { recursive: true });
 // two groups: the finished looks ("egypt", loaded when an Egyptian building
 // is drawn) and the construction stages ("egypt_stages", only while one is
@@ -2738,9 +3187,29 @@ g.extra.voxel = gs.extra.voxel = VOX;
 g.extra.stages = gs.extra.stages = STAGES;
 g.extra.stage_keys = [0, 2, 4, 6];
 g.extra.types = {};
-const geo = (m, seed = 7) => {
+// concatenate two indexed geometries with the same attributes
+function mergeGeo(a, b) {
+  const g = new THREE_BufferGeometry();
+  const na = a.attributes.position.count;
+  for (const k of ['position', 'normal', 'color', 'team', 'glow']) {
+    const A = a.attributes[k], B = b.attributes[k], w = A.itemSize;
+    const out = new Float32Array((na + B.count) * w);
+    out.set(A.array.subarray(0, na * w), 0);
+    out.set(B.array.subarray(0, B.count * w), na * w);
+    g.setAttribute(k, new THREE_BufferAttribute(out, w));
+  }
+  const ia = a.index.array, ib = b.index.array, idx = new Uint32Array(ia.length + ib.length);
+  idx.set(ia, 0);
+  for (let i = 0; i < ib.length; i++) idx[ia.length + i] = ib[i] + na;
+  g.setIndex(new THREE_IndexAttribute(idx, 1));
+  return g;
+}
+const geo = (m, seed = 7, vox = VOX) => {
   const pivot = [m.W / 2, 0.8, m.D / 2];   // the ground row sinks to 0.025 above the terrain: a decal, no plinth
-  return withSkin(S.withExtras(buildVoxelGeometry(m, { size: VOX, pivot, jitter: 0.05, seed }), m, VOX, pivot, { maxY: m.extraMaxY ?? Infinity }), m, VOX, pivot);
+  let out = withSkin(S.withExtras(buildVoxelGeometry(m, { size: vox, pivot, jitter: 0.05, seed }), m, vox, pivot, { maxY: m.extraMaxY ?? Infinity }), m, vox, pivot);
+  // half-voxel insets (fineFigure): sub-voxel u lands at parent voxel u / k
+  for (const f of m.fine || []) out = mergeGeo(out, buildVoxelGeometry(f.m, { size: vox / f.k, pivot: pivot.map((v) => v * f.k), jitter: 0.03, seed }));
+  return out;
 };
 const t0 = Date.now();
 for (const [type, T] of Object.entries(TYPES)) {
@@ -2753,12 +3222,12 @@ for (const [type, T] of Object.entries(TYPES)) {
       weather(full);
       skin(full);
       clothSkin(full);
-      g.add(`${type}/${vn}/a${age}`, geo(full, 11 + vi * 3 + age));
+      g.add(`${type}/${vn}/a${age}`, geo(full, 11 + vi * 3 + age, VOX / (T.fine || 1)));
       if (vi === 0 && ai === 0 && T.stages !== false) {
         for (const k of g.extra.stage_keys) {
           const sm = stage(full, k);
           sm.W = full.W; sm.D = full.D;
-          gs.add(`${type}/s${k}`, geo(sm, 11 + age));
+          gs.add(`${type}/s${k}`, geo(sm, 11 + age, VOX / (T.fine || 1)));
         }
       }
     });

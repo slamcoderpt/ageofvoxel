@@ -1170,6 +1170,40 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   0 jars and a basket, 1 crates and sacks, 2 a mud-brick wall run with a gap,
   3 a hand cart, 4 a pen corner, 5 a reed sunshade stall, 6 a woodpile,
   7 a shaded well).
+- **Statues** (round 14, `figure()` in export-egypt.mjs): every god / king
+  statue of 14+ voxels is sampled from solids (elliptic frusta, ellipsoids,
+  tapered capsules, boxes tested at voxel centres) on a 24-unit canon, so
+  limbs run on the diagonal and heads have real shapes: a jackal's long
+  snout and jaw with flat pointed ears (gilt inside a stone rim), a falcon's
+  gold-feathered head with a dark hooked beak, gold cere, eyes and the dark
+  malar stripe, a nemes striped gold / lapis flaring to the shoulders with
+  lappets and a uraeus; a mostly-lapis tripartite wig whose lappets end on
+  the collar; a separate broad collar (gold / lapis / gold rings and a drop
+  row) laid one voxel proud of the chest; the waist stepping in over a gold
+  belt and a pleated kilt with the team apron; arms crossed on the chest
+  holding a solid gold crook (its hook over the right shoulder) and flail
+  (strands over the left), nothing standing up beside the head. Bodies are
+  blue-black basalt (`ST_SKIN`), golds `SG*` deep pure yellows; human eyes
+  are dark inlays (white ones stared like a robot's). Under 14 voxels the old
+  box figure (`figureBlocky`) is kept. The Monuments are modelled at half
+  voxels (`fine: 2` in TYPES) on black-and-gold plinths (`monPlinth`: gold
+  posts and base, the owner's line under an overhanging gold cornice, a
+  raised `cartouche()` on every face, limestone field, lapis / red signs on a
+  shen bar; Eye of Horus panels on the Monument to the Gods) and a notched
+  die (`monDie`). The Town Center's falcon-headed Ra (crossed crook and flail)
+  and the Temple's god are `fineStatue()`s: the statue and its cartouche
+  plinth go into a half-voxel sub-model on `m.fine`, which `geo()` meshes at
+  VOX / 2 and merges (`mergeGeo`) into the building's mesh in place;
+  construction stages leave it out. `--preview <type>[:variant]
+  --preview-out f.json` dumps one model's voxels (insets included) without
+  exporting, for a quick offline look.
+- **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
+  yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
+  shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8
+  plus a sun highlight on faces between the sun and the eye (`gold_spec`
+  0.8, `gold_shine` 6), tinted by the albedo so it stays gold. The grade's
+  warm chroma limiter still takes half of any gold's chroma, so the golds
+  read by value against the dark basalt, not by saturation.
 - **Canvas awnings** (`clothAwning()`: houses, camps, the Town Center, the
   Siege Works; the Market and Armory keep the voxel `awning()` with team
   stripes): a smooth two-sided sheet drawn by `clothSkin()` (half-voxel
@@ -1237,6 +1271,8 @@ node scripts/godot-shoot.mjs --scene egypt_town --out shots/godot/egypt_town.png
      [--params "egt_yaw=208"]          # the framing camera's yaw for egt_focus / egt_row (default 28)
      [--params "egt_pitch=30"]         # the framing camera's pitch for egt_focus / egt_row (default 44)
      [--params "egt_dist=13"]          # the framing camera's distance (default 5 + 2 x tiles for a focus, by the row's span for a row)
+     [--params "egt_lift=3"]           # aim this many tiles above the ground (statues at low pitches; the target slides away, the distance grows)
+     [--params "egt_dx=-2.6&egt_dz=4.7"]   # shift the framed point (tiles), e.g. onto the Town Center's statue
      [--params "egt_static=1"]         # render-only even where the sim has the types
      [--params "egt_details=1"]        # keep the map's pebbles and tufts
 node scripts/export-egypt.mjs          # re-export godot/assets/models/egypt*.{json,bin.gz}
