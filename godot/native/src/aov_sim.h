@@ -90,15 +90,7 @@ public:
 	// Godot-only scene tool (the egypt_town capture): paint the ground kind
 	// (core/game_map.h Ground: 2 sand, 4 paved...) of a tile rect, render only
 	// (no walkability change); the terrain re-meshes the dirty columns.
-	void paint_ground(int64_t tx, int64_t tz, int64_t w, int64_t h, int64_t ground) {
-		aov::GameMap &M = sim_.map();
-		const int c0x = std::max(0, (int)tx * M.cps), c0z = std::max(0, (int)tz * M.cps);
-		const int c1x = std::min(M.cols, (int)(tx + w) * M.cps), c1z = std::min(M.cols, (int)(tz + h) * M.cps);
-		if (c1x <= c0x || c1z <= c0z) return;
-		for (int z = c0z; z < c1z; z++)
-			for (int x = c0x; x < c1x; x++) M.ground[(size_t)z * M.cols + x] = (uint8_t)ground;
-		M.mark_dirty(c0x, c0z, c1x - 1, c1z - 1);
-	}
+	void paint_ground(int64_t tx, int64_t tz, int64_t w, int64_t h, int64_t ground) { sim_.map().paint_tiles((int)tx, (int)tz, (int)w, (int)h, (int)ground); }
 	void kill_unit(int64_t id, int64_t killer); // combat.kill
 	int64_t entity_kind(int64_t id) const { return sim_.entities.slot((int32_t)id) >= 0 ? sim_.entities.kind((int32_t)id) : 0; }
 	int64_t get_unit_count() const { return sim_.entities.count_units(); }

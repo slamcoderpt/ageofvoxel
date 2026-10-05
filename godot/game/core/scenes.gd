@@ -62,6 +62,11 @@ static var SCENES := {
 	# the camera close and high like reference/techs/building_01 / building_04.
 	"techbuildings": {"preset": "skirmish", "seed": 7, "hud": false, "reveal_all": true, "fast_forward": 0.0,
 		"camera": {"distance": 17.0, "pitch": 45.0, "yaw": 22.0, "focus_dx": -0.3, "focus_dz": -1.2}},
+	# Godot-only: an Egyptian town with every Egyptian building on desert ground
+	# (game/buildings/egypt_town_scene.gd, egypt_buildings.gd); egt_focus=<type>
+	# frames one building like reference/egypt/building_02..21.
+	"egypt_town": {"preset": "battle", "seed": 1, "hud": false, "reveal_all": true, "fast_forward": 0.0,
+		"camera": {"distance": 64.0, "pitch": 50.0, "yaw": 30.0}},
 	# Godot-only: the research panel (game/ui/ui.gd _techui_setup): a selected
 	# Armory with its tech buttons, the research queue and a tech tooltip open
 	# (techui_sel=market | temple, techui_tip=<slot>).

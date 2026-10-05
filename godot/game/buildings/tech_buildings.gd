@@ -30,6 +30,7 @@ const STAGES := 8
 const LOCAL_PLAYER := 1
 
 var game: Node = null
+var egypt: Node3D = null   # egypt_buildings.gd: Egyptian owners' Armories / Markets are drawn there
 var model_override := {}   # building id -> model key (scenes)
 var _colors: Array = []
 var _mats := {}
@@ -73,6 +74,7 @@ func from_buildings(B: Dictionary, names: PackedStringArray) -> void:
 		return
 	var n: int = B.count
 	var types: PackedByteArray = B.type
+	var civs: PackedByteArray = B.get("civ", PackedByteArray())
 	var seen := {}
 	var ages := {}
 	var fv: int = game.sim.fog_version()
@@ -81,6 +83,8 @@ func from_buildings(B: Dictionary, names: PackedStringArray) -> void:
 	for i in n:
 		var type := names[types[i]]
 		if not handles(type):
+			continue
+		if egypt != null and egypt.owns(type, int(civs[i]) if i < civs.size() else 0, int(B.owner[i])):
 			continue
 		var id: int = B.ids[i]
 		seen[id] = true

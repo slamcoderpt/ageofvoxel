@@ -20,6 +20,7 @@ const Walls = preload("res://game/buildings/walls.gd")
 const Towers = preload("res://game/buildings/towers.gd")
 const TowerScene = preload("res://game/buildings/tower_scene.gd")
 const TechBuildings = preload("res://game/buildings/tech_buildings.gd")
+const EgyptBuildings = preload("res://game/buildings/egypt_buildings.gd")
 
 var game: Node = null
 var _nodes := {}      # id -> {mi: MeshInstance3D, key: String}
@@ -31,6 +32,7 @@ var _fog_version := -1
 var walls: Node3D = null   # walls.gd: walls and gates (sim types "*wall*" / "*gate*", or walls.set_static())
 var towers: Node3D = null  # towers.gd: the sim's "tower" rows, one model per upgrade stage
 var techb: Node3D = null   # tech_buildings.gd: the Armory and the Market ("armory" / "market" rows, set_static())
+var egypt: Node3D = null   # egypt_buildings.gd: every Egyptian owner's building with a model (egypt.owns()), set_static()
 
 func setup(g: Node) -> void:
 	game = g
@@ -55,6 +57,12 @@ func setup(g: Node) -> void:
 	add_child(techb)
 	techb.setup(game, PLAYER_COLORS)
 	AovScenes.set_setup("techbuildings", preload("res://game/buildings/techbuildings_scene.gd").scene_setup)
+	egypt = EgyptBuildings.new()
+	egypt.name = "egypt"
+	add_child(egypt)
+	egypt.setup(game, PLAYER_COLORS)
+	techb.egypt = egypt
+	AovScenes.set_setup("egypt_town", preload("res://game/buildings/egypt_town_scene.gd").scene_setup)
 
 func _material(owner: int) -> ShaderMaterial:
 	if not _mats.has(owner):
@@ -75,6 +83,8 @@ func frame(dt: float, _alpha: float) -> void:
 	var variant: PackedInt32Array = B.variant
 	var yaw: PackedFloat32Array = B.yaw
 	var setback: PackedFloat32Array = B.setback
+	var civs: PackedByteArray = B.get("civ", PackedByteArray())
+	egypt.begin_frame()
 	var seen := {}
 	var sig := n
 	var fog_changed := false
@@ -93,6 +103,8 @@ func frame(dt: float, _alpha: float) -> void:
 		if not built[i]:
 			key = "%s/%d/%d" % [type, v, mini(STAGES - 1, floori(progress[i] * STAGES))]
 			group = "construction"
+		if egypt.owns(type, civs[i] if i < civs.size() else 0, owners[i]):
+			continue   # egypt_buildings.gd
 		if Walls.handles(type):
 			continue   # walls.gd
 		if Towers.handles(type):
@@ -129,6 +141,7 @@ func frame(dt: float, _alpha: float) -> void:
 	walls.frame(dt)
 	towers.from_buildings(B, _names)
 	techb.from_buildings(B, _names)
+	egypt.from_buildings(B, _names)
 	if sig != _sig:
 		_sig = sig
 		_props.rebuild(_prop_buildings(B))
@@ -143,7 +156,10 @@ func _prop_buildings(B: Dictionary) -> Array:
 	var out := []
 	var rect: PackedInt32Array = B.rect
 	var tcs := []
+	var civs: PackedByteArray = B.get("civ", PackedByteArray())
 	for i in B.count:
+		if egypt.owns(_names[B.type[i]], civs[i] if i < civs.size() else 0, B.owner[i]):
+			continue   # no Greek town dressing round an Egyptian building
 		var b := {"id": B.ids[i], "type": _names[B.type[i]], "owner": B.owner[i],
 			"tx": rect[i * 4], "tz": rect[i * 4 + 1], "w": rect[i * 4 + 2], "h": rect[i * 4 + 3],
 			"built": B.built[i] != 0, "variant": B.variant[i], "temenos": null}
