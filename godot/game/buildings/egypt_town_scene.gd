@@ -148,7 +148,7 @@ static func scene_setup(game: Node) -> Dictionary:
 		game.args["cam"] = "%f,%f,%f,%f,%f" % [cx - 1.0, cz + 0.5, 44.0, 50.0, 30.0]
 	if focus_size > 0.0 and not game.args.has("cam"):
 		# frame one building like Retold's building views (high, close)
-		game.args["cam"] = "%f,%f,%f,%f,%f" % [focus.x, focus.y, maxf(14.0, 5.0 + focus_size * 2.6), 44.0, 28.0]
+		game.args["cam"] = "%f,%f,%f,%f,%f" % [focus.x, focus.y, maxf(14.0, 5.0 + focus_size * 2.0), 44.0, 28.0]
 	print("egypt_town: %d buildings (%s), age %d, god %s, focus %s, sand %s" % [lots.size(), "sim" if use_sim else "render-only", age, god, focus_type if focus_type != "" else "town", sim.has_method("paint_ground")])
 	return ctx
 

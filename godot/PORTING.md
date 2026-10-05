@@ -31,7 +31,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | terrain | `game/terrain/terrain.gd` + `terrain.gdshader` (chunks, paving cobbles / pale stone of MaterialPatches patchGround), `water.gdshader` (Water.js), `props.gdshader` (voxel.gdshader + MultiMesh instance tint, used by trees / gold / berries / ground details); mesher in `native/src/terrain_mesher.cpp` (TerrainMesh.js full port, water depth bake, GroundDetails.js scatter) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (sun + PCSS soft shadows, hemisphere = ambient colour + two unshadowed up/down lights, fill, depth haze following the camera, SSAO, MSAA, `--quality=high\|medium\|low`, `--post=high\|low\|off`), `grade_effect.gd` (CompositorEffect compute pass on the HDR buffer: exposure 2.1 + PBR Neutral + the PostFX.js grade; Godot's tonemap is LINEAR; Compatibility/web falls back to AgX), `sky.gdshader`. MaterialPatches.js canopy / foliage terms not ported yet | none | `src/lighting/` |
 | buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `walls.gd` (Greek walls, pillars and gates with swinging leaves, construction and damage states; models by `../scripts/export-walls.mjs`, see "Walls and gates: the look"), `towers.gd` + `tower_scene.gd` (Greek towers, a model per upgrade stage, construction / damage / upgrade states, the `towers` capture scene; models by `../scripts/export-towers.mjs`, see "Towers: the look"), `tech_buildings.gd` + `techbuildings_scene.gd` (the Greek Armory and Market, a model per age look plus construction stages, the `techbuildings` capture scene; models by `../scripts/export-techbuildings.mjs`, see "Armory and Market: the look"), `egypt_buildings.gd` + `egypt_town_scene.gd` (every Egyptian building, construction stages, the `egypt_town` capture scene; models by `../scripts/export-egypt.mjs`, see "Egyptian buildings: the look"), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
-| units | `game/units/units.gd` (rigs posed by the full anim.js port, conditional parts, crowd yaw / press / jitter, deaths and corpses, contact shadows), `unit.gdshader` (team lift + rim, hit flash, corpse drain, dithered fade) + `unit_outline.gdshader` (inverted hull, next pass); posing in C++: `native/src/unit_view.cpp` (`AovUnitView`) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
+| units | `game/units/units.gd` (rigs posed by the full anim.js port, conditional parts, crowd yaw / press / jitter, deaths and corpses, contact shadows), `unit.gdshader` (team lift + rim, hit flash, corpse drain, dithered fade) + `unit_outline.gdshader` (inverted hull, next pass; per-corner push directions in CUSTOM1.b keep the hull closed, see "Egyptian units and myth units: the look"); posing in C++: `native/src/unit_view.cpp` (`AovUnitView`) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
 | combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), `tower_fire.gd` + `tower_flash / tower_puff.gdshader` (tower arrows: loose flash, heavier arrow, tracer, strike; see "Towers: the look"), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported, plus god powers and a wave log, Godot-only; enemy_ai_fort.cpp: the AI's walls, towers and breaches, Godot-only) | `src/combat/` |
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor; Godot-only activity fx: axe / pick chips and dust, sickle chaff, stooks on cut rows, hoof dust, shoal ripples, fish splashes, net ripples, boat wakes; crops sway, `econ_voxel.gdshader`, `fx_chip / fx_puff / fx_ring.gdshader`), buffers built in C++ by `AovEconView` (`native/src/econ_view.{h,cpp}`, render side, reads the sim, never writes it) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
 | godpowers | `game/godpowers/godpowers.gd` (the whole BoltRenderer of effects.js: bolt / sky / zap ribbons, impact flash sprites and decals, scorches with ember cracks (hot orange / red, glowing as long as the scorch lasts), a charcoal ash edge and a hot rim, an expanding impact ring at every strike point (Godot-only; decals are pulled toward the camera so voxel bumps do not swallow them), crater debris, char rims, spark streaks, smoke and flames, the storm funnel (wall, cloud body, dust wall, ground shockwave, rain, energy bands, whirled debris), flyer trails / back lights / drop shadows, meteor fireball and fire, strike / storm point lights and the shadow spot, the full-frame storm grade with light pools; dims the lighting piece's sun / sky / grade while a storm plays), shaders beside it; buffers built in C++ by `AovGodpowerView` (`native/src/godpower_view.{h,cpp}`, render side, reads the sim, never writes it) | `godpowers/` (favor, cooldowns, Lightning Storm, Bolt, Meteor, thrown units: ported) | `src/godpowers/` |
@@ -921,12 +921,30 @@ painted friezes (blue / red / ochre), gilt, dark basalt.
   poles on Archaic houses) inside a **cavetto cornice** (the wall's top row
   fluted, the warm-limestone lip flaring one voxel out), a thin **team line**
   one voxel inside the lip, a torus roll under the cornice, one thin `band`
-  (ochre dashes by default, `'team'` a dark lapis line on the TC, pylons,
-  Migdol, barracks, `'lapis'` on the Armory), an optional muted painted
+  (ochre dashes by default, `'team'` a dark lapis line on the
+  Migdol, `'lapis'` on the Armory), an optional muted painted
   frieze, pale corner torus mouldings, a darker socle and **battered walls**
-  (inset one voxel every `batter` rows). Doors are recessed in limestone
-  frames with a projecting lintel, some with a gilt winged sun; slit windows;
-  palm-log beam ends under the cornice (`beams()`).
+  (inset one voxel every `batter` rows). Doors are cut `deep` voxels (2 by
+  default, 3 to 4 on the Town Center and Barracks gates) into the wall with
+  **near-black reveals** (jambs, soffit) and a dark leaf at the back, framed
+  in limestone with a projecting lintel, some with a gilt winged sun; slit
+  windows; palm-log beam ends under the cornice (`beams()`). `lipOut: 2` is
+  the **deep cornice**: a shadowed gorge row flaring one voxel out at the
+  wall top and the pale lip two voxels out, so each roof edge throws a dark
+  line and every block's silhouette stands off the ground and its
+  neighbours (TC blocks and pylons, camps, Granary, Barracks, Armory,
+  Market).
+- **Value steps per structure** (so a compound never reads as one tan mass):
+  `LIME` pale limestone for the chief block (the TC hall, the Market hall,
+  the Barracks gatehouse, Migdol, Siege Works) with a pale tiled roof,
+  `OCHRE_W` warm ochre sandstone for enclosure walls, the Barracks ranges
+  and the Mining Camp, `MUDB` dark mud brick with a darker `MUDROOF` and a
+  pale lime lip for the lesser buildings (the TC's side rooms, Granary
+  store, Lumber Camp, Armory), `SAND` for houses and pylons, `FLAG` cool grey
+  flagstones in the TC courtyard. `bands()` paints wide rows round a
+  block's outer shell: the TC pylons carry red, ochre and turquoise bands
+  between ink rules over turquoise / ochre relief panels; the team colour
+  stays on the roof lines only.
 - **Smooth battered walls** (`skin()`): voxels draw a batter as stairs that
   read as a ziggurat, so every battered face of every block is covered by a
   smooth sloping plane through the steps' outer edges, one quad per voxel
@@ -953,9 +971,12 @@ painted friezes (blue / red / ochre), gilt, dark basalt.
   `pots()` clusters, baskets of produce, crates, sacks, barrels, low
   **mud-brick walls** (`mudFence()`), log piles, racks.
 - **Types** (the sim's keys, `sim/civ`; footprints as `buildings/defs.h`):
-  `town_center` 7x7 (a walled compound: a two-storey hall with a latticed
-  door, an east block, a front room, a battered pylon gateway with painted
-  reliefs and a winged sun, a big and a small **domed silo**, awnings, a
+  `town_center` 7x7 (a walled compound: low ochre enclosure walls with
+  corner piers, a pale limestone two-storey hall with a deep latticed door
+  on the courtyard, a mud-brick east block and front-right room, a battered
+  sandstone pylon gateway with wide painted bands, a gate block between the
+  pylons with a 4-voxel black passage and a dark leaf under the lintel
+  bridge and its winged sun, a big and a small **domed silo** (front left), awnings, a
   fire bowl, a basin, a palm, the gilt **falcon-headed Ra** with his sun
   disc on a plinth at the front left), `house` 3x3 (three plans: boxes with
   a side room or an L round a projecting door portal, beam ends, palm-thatch
@@ -1028,7 +1049,7 @@ The whole-town camera is set by the scene (`cam` overrides it).
 
 ```
 node scripts/godot-shoot.mjs --scene egypt_town --out shots/godot/egypt_town.png    # the whole town
-     [--params "egt_focus=migdol"]     # frame one building (any type above), palms cleared round it
+     [--params "egt_focus=migdol"]     # frame one building (any type above, close: distance 5 + 2 x tiles), palms cleared round it
      [--params "egt_god=isis"]         # ra | isis | set (temple statue, Monument to the Gods)
      [--params "egt_age=1"]            # the owner's age (1: Archaic houses)
      [--params "egt_states=1"]         # a row of construction stages and variants
@@ -1061,7 +1082,40 @@ same channel names, plus:
   centaur kinds: no head-down grazing dip at idle, for harnessed and ridden
   mounts: the chariot horse, the camel; Rig::graze in unit_view.cpp, default
   true so the Greek horses are unchanged); per part `vary: [k, n]`
-  (shown for the units whose id hashes to k of n, rule `R_VARY`).
+  (shown for the units whose id hashes to k of n, rule `R_VARY`) and
+  `rest: [x, y, z]` (radians, Part::rest in unit_view.cpp: a fixed turn
+  applied after the channel's pose; the Egyptian heads carry [-0.22, 0, 0],
+  chin up towards the camera; no Greek rig has it).
+- **Heads** (`faceN` / `nemesN` / `capN` / `headE` in the exporter): authored
+  at half the body's voxel (`HEAD_SCALE` 0.5, pivot [3.5, 0, 3]) so a head is
+  about a sixth of the figure (Retold's proportions) and still has a face:
+  a 7 x 8 x 6 skull with rounded edges and a narrowing jaw, kohl eyes (white
+  + dark), a kohl brow, a nose ridge standing one voxel out of the face, cheek
+  hollows, a mouth, ears. Headdresses break the box: the nemes (axeman, camel
+  rider, mummy, sphinx) has a domed crown striped front-to-back on top (so the
+  top reads as cloth, not a flat lid), a gold brow band, side wings flaring
+  out and down to the shoulders and two lappets laid forward over the
+  shoulders and down the chest in front of the collar; the khat (laborer) a
+  bag at the nape; the priest a headcloth to the shoulders and a sun disc; the
+  pharaoh's khepresh swells up and back; the spearman a shaved crown, team
+  band and side lock.
+- **Collision offsets**: long hafts (spear, epsilon axe, ankh staff, crook)
+  are gripped at `GRIP` [-0.6, -6, 0.8] (outside and in front of the fist,
+  not its centre) and shields strapped at `SHIELD_AT` [2.4, -4, 3.5] on the
+  forearm, so posed arms swing them past the torso rather than through it.
+- **Outline** (`unit_outline.gdshader`, both unit groups): a voxel mesh has a
+  copy of every corner per face, so pushing each face out along its own
+  normal split the inverted hull into offset squares (jagged black fringes
+  and splinters along every voxel edge and step). `scripts/outline-codes.mjs`
+  gives every copy of a corner the same push, the sum of the distinct face
+  normals there (-1 / 0 / 1 per axis, one byte in `extra.b` = CUSTOM1.b), so
+  the hull stays closed; `export-models.mjs` writes it for the Greek `units`
+  group (only units.bin.gz changes), `export-egypt-units.mjs` for its own.
+  `extra.a` = a per-mesh width factor (0 = 1, the Greeks'): Egyptian bodies
+  0.75, gear 0.6, the half-size heads 0.5, so a line never swallows a face.
+- **Palette**: the grade's exposure and warm chroma limiter (grade_effect.gd)
+  wash bright golds and light skin to cream, so the gold is a deep yellow
+  (0xd2a400 ..) and the skin a darker bronze (0x94572f ..).
 - **New kinds / channels**: `flyer` (Phoenix, Roc: hover with a bob, wings
   `wingL` / `wingR` beating, faster on the move, a dive with the talons
   forward to strike, a fall when killed), `siege` (Catapult, Siege Tower:
@@ -1132,6 +1186,8 @@ node scripts/godot-shoot.mjs --scene egypt_units --out shots/godot/egypt_units.p
      [--params "eu_state=walk"]       # with a lineup / focus: idle | walk | attack | die
      [--params "eu_t=3"]              # seconds of sim after the setup
      [--params "eu_yaw=28"]           # camera yaw (the rows face it)
+     [--params "eu_one=axeman&eu_turn=30"]  # one unit framed close, turned from the camera (model checks)
+     [--params "eu_zoom=0.75"]        # scale the camera distance of any group
 node scripts/export-egypt-units.mjs   # re-export godot/assets/models/egypt_units.{json,bin.gz}
 ```
 

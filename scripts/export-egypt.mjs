@@ -217,21 +217,31 @@ function paint(m, face, u0, yTop, rows, pal) {
     }
   });
 }
-// a door recessed into a face: frame of limestone jambs and a projecting lintel
-function door(m, face, u0, w, y0, h, { lintel = true, sun = false, lattice = false, frame = LIME } = {}) {
+// a door recessed into a face: frame of limestone jambs and a projecting
+// lintel, the opening cut `deep` voxels into the wall with near-black reveals
+// (jambs, soffit) and a dark door leaf (or an open black passage, leaf: false)
+// at the back, so a doorway reads as a deep shadowed hole at any distance
+const REVEAL = 0x1c1714, REVEAL2 = 0x262019;
+function door(m, face, u0, w, y0, h, { lintel = true, sun = false, lattice = false, frame = LIME, deep = 2, leaf = true } = {}) {
   const dir = face === '+z' || face === '-x' ? 1 : -1;
   const n = OUT_N[face];
   for (let i = -1; i <= w; i++) for (let y = y0; y <= y0 + h; y++) {
     const u = u0 + i * dir;
     const p = outer(m, face, u, y, lim(m));
     if (!p) continue;
-    if (i === -1 || i === w || y === y0 + h) { m.set(p[0], p[1], p[2], frame); continue; }
-    m.remove(p[0], p[1], p[2]);
-    const q = [p[0] - n[0], p[1], p[2] - n[2]];
-    let c = DOOR(q[0], q[1], q[2]);
-    if (lattice && ((i & 1) || ((y - y0) % 3 === 0))) c = shade(c, 0.6);
-    else if (!lattice && (i === (w >> 1) && w > 3)) c = shade(c, 0.75);
+    if (i === -1 || i === w || y === y0 + h) {
+      m.set(p[0], p[1], p[2], frame);
+      // the reveal behind the frame: near-black where the opening exposes it
+      for (let d = 1; d < deep; d++) { const r = [p[0] - n[0] * d, p[1], p[2] - n[2] * d]; if (m.has(...r)) m.set(r[0], r[1], r[2], REVEAL2); }
+      continue;
+    }
+    for (let d = 0; d < deep; d++) m.remove(p[0] - n[0] * d, p[1], p[2] - n[2] * d);
+    const q = [p[0] - n[0] * deep, p[1], p[2] - n[2] * deep];
+    let c = leaf ? shade(DOOR(q[0], q[1], q[2]), 0.62) : REVEAL;
+    if (leaf && lattice && ((i & 1) || ((y - y0) % 3 === 0))) c = REVEAL;
+    else if (leaf && !lattice && (i === (w >> 1) && w > 3)) c = REVEAL2;
     m.set(q[0], q[1], q[2], c);
+    if (y === y0 && y0 > 1) for (let d = 0; d < deep; d++) { const f = [p[0] - n[0] * d, y0 - 1, p[2] - n[2] * d]; if (m.has(...f)) m.set(f[0], f[1], f[2], REVEAL2); }
   }
   if (y0 <= 1 && m.paths) {
     const p = outer(m, face, u0 + ((w >> 1) * dir), y0 + h, lim(m)) || outer(m, face, u0, y0 + h + 1, lim(m));
@@ -276,6 +286,35 @@ const LAPIS = 0x34558a, RED_M = 0x9c4a32, OCHRE_M = 0xc4923c, GORGE = 0xcdb184, 
 // the cornice lip: a warm limestone, a shade lighter than the walls (not white)
 const LIP = masonry([0xe6cfa2, 0xdfc799, 0xead5aa], [0xdcc494, 0xe3cb9d, 0xd8bf8f], { len: 6, course: 3, bed: 0.94, head: 0.95, grime: 0, seed: 12 });
 const FRIEZE = [INK, RED_M, RED_M, INK, LAPIS, LAPIS, INK, OCHRE_M, OCHRE_M];
+// value steps, so the parts of a compound read apart: a pale limestone for the
+// chief block, a warm ochre sandstone for enclosure walls, a dark mud brick
+// for the lesser buildings, a cool grey flagstone for courtyards
+const OCHRE_W = masonry([0xcd9450, 0xc38a48, 0xd49c58], [0xbd8444, 0xc8904c, 0xb47c3e], { len: 8, course: 3, bed: 0.82, head: 0.88, grime: 3, seed: 21 });
+const MUDB = masonry([0xa47448, 0x9a6b40, 0xad7c4f], [0x93653c, 0x9f7046, 0xa8784c], { len: 4, course: 2, bed: 0.84, head: 0.9, grime: 2, seed: 23 });
+const MUDROOF = (x, y, z) => { const c = pick(hash3(x >> 1, y, z >> 1, 24), [0xb99468, 0xb08b60, 0xc09c70]); return (x % 5 === 0 || z % 5 === 0) ? shade(c, 0.93) : c; };
+const FLAG = (x, y, z) => {
+  const u = Math.floor((x + ((z >> 2) & 1) * 3) / 5), v = z >> 2;
+  let c = pick(hash3(u, v, 9, 29), [0xa89d88, 0x9e937e, 0xb2a790, 0x978b76]);
+  if ((x + ((z >> 2) & 1) * 3) % 5 === 0 || z % 4 === 0) c = shade(c, 0.8);
+  return c;
+};
+const TURQ = 0x2f9c94, TURQ_L = 0x52b8ad, RED_B = 0xb03a26, OCHRE_B = 0xe0a83a;
+// wide painted bands round a block's outer shell: rows (top first) of colours
+// or (x, y, z) => colour, applied to every exposed voxel of rows yTop.. inside
+// the given box (the skin carries them onto battered faces)
+function bands(m, x0, z0, x1, z1, yTop, rows) {
+  rows.forEach((c, j) => {
+    const y = yTop - j;
+    if (c === null) return;
+    for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) {
+      if (!m.has(x, y, z)) continue;
+      if (m.has(x + 1, y, z) && m.has(x - 1, y, z) && m.has(x, y, z + 1) && m.has(x, y, z - 1)) continue;
+      const v = m.get(x, y, z);
+      if (v.team) continue;
+      m.set(x, y, z, typeof c === 'function' ? c(x, y, z) : c);
+    }
+  });
+}
 function bandColor(kind, x, z) {
   if (kind === 'team') return TEAM;
   if (kind === 'teamb') return TEAMB;
@@ -284,7 +323,7 @@ function bandColor(kind, x, z) {
   if (kind === 'lapis') return (x + z) % 5 === 0 ? INK : LAPIS;
   return null;
 }
-function block(m, x0, z0, x1, z1, y0, h, { wall = SAND, socle = 1, frieze = 0, band = 'ochre', cornice = true, roofC = PLASTER, rim = true, batter = 0, parapet = true, solid = true, rimC = LIP, flute = true, torus = true, gorge = null } = {}) {
+function block(m, x0, z0, x1, z1, y0, h, { wall = SAND, socle = 1, frieze = 0, band = 'ochre', cornice = true, roofC = PLASTER, rim = true, batter = 0, parapet = true, solid = true, rimC = LIP, flute = true, torus = true, gorge = null, lipOut = 1 } = {}) {
   const [gA, gB] = gorge || [GORGE, GORGE_L];
   if (parapet === false) cornice = false;
   if (batter && m.blocks) m.blocks.push({ x0, z0, x1, z1, y0, h, b: batter });
@@ -331,7 +370,16 @@ function block(m, x0, z0, x1, z1, y0, h, { wall = SAND, socle = 1, frieze = 0, b
     const e = Math.min(x - a0, a1 - 1 - x, z - b0, b1 - 1 - z);
     m.set(x, top, z, e === 0 ? (flute && ((x + z) & 1) ? gA : gB) : SAND_D(x, top, z));
   }
-  const c0 = a0 - 1, c1 = a1 + 1, d0 = b0 - 1, d1 = b1 + 1;
+  // a deep cornice (lipOut 2): the cavetto flares one voxel out at the wall's
+  // top row in a shadowed gorge, the lip two voxels out above it, so the roof
+  // edge throws a dark line round the block and stands off its neighbours
+  if (lipOut > 1) {
+    for (let x = a0 - 1; x <= a1; x++) for (let z = b0 - 1; z <= b1; z++) {
+      const e = Math.min(x - a0 + 1, a1 - x, z - b0 + 1, b1 - z);
+      if (e === 0) m.set(x, top, z, shade(flute && ((x + z) & 1) ? gA : gB, 0.74));
+    }
+  }
+  const c0 = a0 - lipOut, c1 = a1 + lipOut, d0 = b0 - lipOut, d1 = b1 + lipOut;
   for (let x = c0; x < c1; x++) for (let z = d0; z < d1; z++) {
     const e = Math.min(x - c0, c1 - 1 - x, z - d0, d1 - 1 - z);
     m.set(x, top + 1, z, e === 0 ? rimC : (e === 1 && rim) ? TEAM : roofC);
@@ -1094,7 +1142,7 @@ function house(v, age) {
 // threshing floor with a grain heap, sacks and a winnowing basket.
 function granary() {
   const m = lot(24, 24);
-  const t = block(m, 2, 2, 14, 12, 1, 9, { batter: 5, band: 'ochre' });
+  const t = block(m, 2, 2, 14, 12, 1, 9, { wall: MUDB, roofC: MUDROOF, rimC: LIME, gorge: [0x8a5e38, 0x946640], torus: false, lipOut: 2, batter: 5, band: null });
   const T = m.lastTop;
   for (let x = T.c0 + 3; x < T.c0 + 7; x++) for (let z = T.d0 + 3; z < T.d0 + 6; z++) m.set(x, t - 1, z, DARK);   // the roof hatch
   for (let x = T.c0 + 2; x < T.c0 + 8; x++) for (const z of [T.d0 + 2, T.d0 + 6]) m.set(x, t, z, 0x8a6a48);
@@ -1118,7 +1166,7 @@ function granary() {
 // a stump with an axe, crates and barrels.
 function lumberCamp() {
   const m = lot(24, 24);
-  const t = block(m, 2, 3, 13, 15, 1, 12, { batter: 5, band: 'team' });
+  const t = block(m, 2, 3, 13, 15, 1, 12, { wall: MUDB, roofC: MUDROOF, rimC: LIME, gorge: [0x8a5e38, 0x946640], torus: false, lipOut: 2, batter: 5, band: null });
   door(m, '+z', 6, 3, 1, 6);
   slit(m, '+x', 7, 7, 2, 1);
   // the cloth from the block's east face over the log pile
@@ -1144,7 +1192,7 @@ function lumberCamp() {
 // a rack of picks.
 function miningCamp() {
   const m = lot(24, 24);
-  const t = block(m, 8, 3, 18, 14, 1, 12, { batter: 5, band: 'ochre' });
+  const t = block(m, 8, 3, 18, 14, 1, 12, { wall: OCHRE_W, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 5, band: null });
   door(m, '+z', 11, 4, 1, 7);
   const yTop = t - 5, f = 8 + Math.floor((yTop - 1) / 5);
   awning(m, '-x', f, 5, 15, yTop, f - 1, 3, [CLOTH, STRIPE_T, CLOTH], { sw: 2 });
@@ -1180,55 +1228,69 @@ function miningCamp() {
 function townCenter() {
   const N = 56;
   const m = lot(N, N);
-  patch(m, 6, 6, 50, 50, PAVE, { rag: 1, seed: 1 });
-  // the enclosure walls (battered blocks) with the gate gap on the front
-  const wo = { batter: 4, band: null, rim: false, torus: false, socle: 1 };
-  block(m, 4, 4, 52, 7, 1, 8, wo);
-  block(m, 4, 4, 7, 52, 1, 8, wo);
-  block(m, 49, 4, 52, 52, 1, 8, wo);
-  block(m, 4, 49, 18, 52, 1, 8, wo);
-  block(m, 38, 49, 52, 52, 1, 8, wo);
-  for (const [px, pz] of [[2, 2], [48, 2], [48, 48]]) block(m, px, pz, px + 6, pz + 6, 1, 11, { batter: 5, band: 'team', torus: false });
-  // the gateway: two battered pylon towers with a lintel bridge, painted
-  block(m, 16, 45, 25, 54, 1, 17, { batter: 4, band: 'team', frieze: 1 });
-  block(m, 31, 45, 40, 54, 1, 17, { batter: 4, band: 'team', frieze: 1 });
-  for (let x = 22; x < 34; x++) for (let z = 48; z < 52; z++) for (let y = 12; y < 16; y++) m.set(x, y, z, y === 15 ? LIME(x, y, z) : y === 12 ? LIME_S : SAND(x, y, z));
-  paint(m, '+z', 24, 14, ['GG.GGG.GG', '.GGGRGGG.'], { G: GILT, R: RED });
-  for (const px of [18, 33]) {
-    paint(m, '+z', px + 1, 11, ['.O.', 'OOO', '.O.', 'BOB', 'B.B', 'B.B', 'K.K'], { O: OCHRE, B: BLUEP, K: INK });
-    paint(m, '+z', px + 4, 11, ['K', '.', 'R', 'K', '.', 'B', 'K'], { K: INK, R: RED, B: BLUEP });
+  // the courtyard: cool grey flagstones, a value apart from every wall
+  patch(m, 6, 6, 50, 50, FLAG, { rag: 1, seed: 1 });
+  // the enclosure walls (battered, warm ochre sandstone, a pale coping) with
+  // the gate gap on the front
+  const wo = { wall: OCHRE_W, batter: 4, band: null, rim: false, torus: false, socle: 1, rimC: LIME, gorge: [0xb98a52, 0xc4965c] };
+  block(m, 4, 4, 52, 7, 1, 6, wo);
+  block(m, 4, 4, 7, 52, 1, 6, wo);
+  block(m, 49, 4, 52, 52, 1, 6, wo);
+  block(m, 4, 49, 18, 52, 1, 6, wo);
+  block(m, 38, 49, 52, 52, 1, 6, wo);
+  for (const [px, pz] of [[2, 2], [48, 2], [48, 48]]) block(m, px, pz, px + 6, pz + 6, 1, 9, { wall: OCHRE_W, batter: 5, band: null, torus: false, rimC: LIME });
+  // the gateway: two battered sandstone pylons with wide painted bands (red,
+  // ochre, turquoise between ink rules) over relief panels, a gate block
+  // between them with a deep black passage and a dark leaf, the lintel bridge
+  // with the gilt winged sun
+  const PB = [INK, RED_B, RED_B, INK, OCHRE_B, OCHRE_B, INK, TURQ, TURQ, INK];
+  for (const [x0, x1] of [[14, 25], [31, 42]]) {
+    block(m, x0, 44, x1, 54, 1, 20, { batter: 8, band: null, frieze: 0, lipOut: 2 });
+    bands(m, x0, 44, x1, 54, 19, PB);
   }
-  // the main hall (two storeys) at the back left, its door to the courtyard
-  const t1 = block(m, 8, 8, 30, 27, 1, 15, { batter: 6, band: 'team' });
-  block(m, 13, 11, 25, 21, t1 - 1, 6, { batter: 4, band: null });
-  door(m, '+z', 17, 4, 1, 8, { lattice: true, sun: true });
-  slit(m, '+z', 11, 9, 3, 1); slit(m, '+z', 25, 9, 3, 1); slit(m, '+x', 13, 9, 3, 1); slit(m, '+x', 20, 9, 3, 1);
+  for (let x = 24; x < 32; x++) for (let z = 46; z < 52; z++) for (let y = 1; y < 14; y++) m.set(x, y, z, y === 1 ? SAND_D(x, y, z) : SAND(x, y, z));
+  for (let x = 23; x < 33; x++) for (let z = 46; z < 53; z++) for (let y = 14; y < 18; y++) m.set(x, y, z, y === 17 ? LIME(x, y, z) : y === 14 ? LIME_S : y === 16 ? TURQ : SAND(x, y, z));
+  for (let x = 22; x < 34; x++) for (let z = 45; z < 54; z++) { const e = Math.min(x - 22, 33 - x, z - 45, 53 - z); m.set(x, 18, z, e === 0 ? LIME(x, 18, z) : PLASTER(x, 18, z)); }
+  door(m, '+z', 26, 4, 1, 11, { deep: 4, frame: LIME, lintel: false });
+  for (let y = 1; y < 11; y++) for (let x = 26; x < 30; x++) m.set(x, y, 47, x === 27 || x === 28 ? REVEAL : shade(DOOR(x, y, 47), 0.5));
+  paint(m, '+z', 24, 16, ['GG.GGG.GG', '.GGGRGGG.'], { G: GILT, R: RED });
+  for (const px of [16, 34]) {
+    paint(m, '+z', px + 1, 9, ['.O.', 'OOO', '.O.', 'BOB', 'B.B', 'B.B', 'K.K'], { O: OCHRE, B: TURQ, K: INK });
+    paint(m, '+z', px + 5, 9, ['K', '.', 'R', 'K', '.', 'B', 'K'], { K: INK, R: RED, B: TURQ });
+  }
+  // the main hall (two storeys, pale limestone, a pale tiled roof inside the
+  // team rim) at the back left, its deep latticed door on the courtyard
+  const t1 = block(m, 8, 8, 30, 27, 1, 15, { wall: LIME, batter: 6, band: null, roofC: ROOFTILE, lipOut: 2, rimC: LIME, gorge: [0xd2c4a4, 0xdccfb2] });
+  block(m, 13, 11, 25, 21, t1 - 1, 6, { wall: LIME, batter: 4, band: null, roofC: ROOFTILE, lipOut: 2, rimC: LIME, gorge: [0xd2c4a4, 0xdccfb2] });
+  door(m, '+z', 23, 4, 1, 8, { lattice: true, sun: true, deep: 3, frame: SAND });
+  slit(m, '+z', 11, 9, 3, 1); slit(m, '+z', 18, 9, 3, 1); slit(m, '+x', 13, 9, 3, 1); slit(m, '+x', 20, 9, 3, 1);
   beams(m, '+x', 11, 25, 13, 3);
   awning(m, '+z', 25, 9, 16, 11, 7, 4, [STRIPE_M, CLOTH, CLOTH], { sw: 1 });
-  // the east block with an awning over its door
-  block(m, 35, 8, 48, 22, 1, 12, { batter: 6 });
-  door(m, '+z', 39, 4, 1, 7);
+  // the east block (dark mud brick, a pale lip) with an awning over its door
+  const mb = { wall: MUDB, batter: 6, band: null, roofC: MUDROOF, rimC: LIME, lipOut: 2, gorge: [0x8a5e38, 0x946640], torus: false };
+  block(m, 35, 8, 48, 22, 1, 12, mb);
+  door(m, '+z', 39, 4, 1, 7, { deep: 3 });
   slit(m, '+x', 12, 6, 3, 1); slit(m, '+x', 17, 6, 3, 1);
   awning(m, '-x', 36, 11, 20, 9, 5, 3, [STRIPE_M, CLOTH, CLOTH], { sw: 1 });
-  // the front-left room
-  block(m, 8, 32, 21, 45, 1, 10, { batter: 6 });
-  door(m, '+x', 41, 3, 1, 6);
-  slit(m, '+z', 11, 6, 2, 1); slit(m, '+z', 16, 6, 2, 1);
-  beams(m, '+z', 9, 20, 8, 3);
-  // the big domed silo (front right) and a smaller one
-  silo(m, 42, 39, 1, 6.2, 13);
-  silo(m, 44.5, 28.5, 1, 4.2, 9);
+  // the front-right room (mud brick)
+  block(m, 36, 29, 47, 39, 1, 10, mb);
+  door(m, '+z', 42, 3, 1, 6, { deep: 3 });
+  slit(m, '+x', 31, 6, 2, 1); slit(m, '+x', 35, 6, 2, 1);
+  beams(m, '+x', 30, 38, 8, 3);
+  // the big domed silo (front left) and a smaller one
+  silo(m, 14.5, 36.5, 1, 6, 13);
+  silo(m, 23.5, 31.5, 1, 3.6, 9);
   // the courtyard: a fire pit, a basin, jars, crates, a palm
   m.box(27, 1, 34, 5, 1, 5, LIME); m.box(28, 1, 35, 3, 1, 3, DARK);
   m.set(29, 2, 36, FIRE[3], FG); m.set(28, 2, 36, FIRE[1], FG); m.set(29, 2, 35, FIRE[2], FG); m.set(30, 2, 37, FIRE[0], FG); m.set(29, 3, 36, FIRE[2], FG);
   for (let x = 33; x < 38; x++) for (let z = 25; z < 29; z++) m.set(x, 1, z, x === 33 || x === 37 || z === 25 || z === 28 ? LIME : WATER);
-  pots(m, 23.5, 29.5, 4, 0); jar(m, 32.5, 1, 31.5, 0xb8683e, true);
-  barrel(m, 33, 1, 41, 4, 1.4); barrel(m, 35.5, 1, 43.5, 4, 1.4);
+  pots(m, 27.5, 41.5, 4, 0); jar(m, 32.5, 1, 31.5, 0xb8683e, true);
+  barrel(m, 34.5, 1, 41.5, 4, 1.4); barrel(m, 37.5, 1, 42, 4, 1.4);
   crate(m, 23, 1, 40, 3, 3, 3); crate(m, 24, 4, 41, 2, 2, 2, 0xa77a48);
-  goodsBox(m, 36, 1, 33, 4, 3, 'grain'); basket(m, 40, 46, 'green'); basket(m, 43, 46, 'date');
+  goodsBox(m, 40, 1, 40, 4, 3, 'grain'); basket(m, 44, 43, 'green'); basket(m, 46, 40, 'date');
   palm(m, 8, 1, 28, 21, { lx: 0.3, lz: 1, len: 7 });
   // outside the walls: pots by the gate, a basket, a cart wheel
-  pots(m, 41.5, 53, 3, 2); sack(m, 13, 1, 53);
+  pots(m, 45.5, 53, 3, 2); sack(m, 13, 1, 53);
   // the Ra statue on its plinth at the front-left corner (outside the wall line)
   const py = plinth(m, 2, 45, 12, 54, 1, 7, { face: SAND, frame: LIME, team: true });
   figure(m, 7, py, 49.5, { h: 34, skin: GILT, gold: GILT_L, kilt: CLOTH, kiltFront: TEAMB, head: 'falcon', crown: 'disc', arms: 'staff', pose: 'stride' });
@@ -1352,16 +1414,16 @@ function barracks() {
   const m = lot(W, W, EARTH);
   patch(m, 11, 15, 33, 38, EARTH, { seed: 5 });
   // back range, west range, a lower east range
-  block(m, 2, 2, 38, 14, 1, 12, { batter: 5, band: 'team' });
-  block(m, 2, 13, 12, 36, 1, 11, { batter: 5 });
-  block(m, 30, 13, 38, 28, 1, 9, { batter: 5 });
+  block(m, 2, 2, 38, 14, 1, 12, { wall: OCHRE_W, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 5, band: null });
+  block(m, 2, 13, 12, 36, 1, 11, { wall: OCHRE_W, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 5, band: null });
+  block(m, 30, 13, 38, 28, 1, 9, { wall: OCHRE_W, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 5, band: null });
   // the raised gatehouse in the middle of the back range
-  const tg = block(m, 14, 6, 27, 17, 1, 16, { batter: 5, band: 'team', frieze: 1 });
+  const tg = block(m, 14, 6, 27, 17, 1, 16, { wall: LIME, roofC: ROOFTILE, rimC: LIME, gorge: [0xd2c4a4, 0xdccfb2], lipOut: 2, batter: 5, band: 'red', frieze: 1 });
   block(m, 17, 8, 24, 14, tg - 1, 4, { batter: 0, band: null });
-  door(m, '+z', 18, 5, 1, 9, { lattice: true, sun: true });
+  door(m, '+z', 18, 5, 1, 9, { lattice: true, sun: true, deep: 3 });
   // corner piers at the yard entrance with the banners
-  block(m, 8, 33, 15, 40, 1, 12, { batter: 5 });
-  block(m, 30, 27, 37, 34, 1, 12, { batter: 5 });
+  block(m, 8, 33, 15, 40, 1, 12, { wall: OCHRE_W, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 5, band: null });
+  block(m, 30, 27, 37, 34, 1, 12, { wall: OCHRE_W, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 5, band: null });
   banner(m, 15, 1, 38, 24);
   banner(m, 37, 1, 31, 24, '+x');
   banner(m, 27, 1, 17, 26);
@@ -1555,8 +1617,8 @@ function monument(kind, god = 'ra') {
 function armory() {
   const m = lot(32, 32);
   patch(m, 17, 3, 31, 23, EARTH, { seed: 4 });
-  block(m, 2, 4, 19, 16, 1, 13, { batter: 6, band: 'lapis', frieze: 1 });
-  block(m, 27, 4, 31, 22, 1, 10, { batter: 0, band: 'lapis' });
+  block(m, 2, 4, 19, 16, 1, 13, { wall: MUDB, roofC: MUDROOF, rimC: LIME, gorge: [0x8a5e38, 0x946640], torus: false, lipOut: 2, batter: 6, band: 'lapis', frieze: 1 });
+  block(m, 27, 4, 31, 22, 1, 10, { wall: MUDB, roofC: MUDROOF, rimC: LIME, gorge: [0x8a5e38, 0x946640], torus: false, lipOut: 2, batter: 0, band: null });
   door(m, '+z', 8, 4, 1, 8);
   slit(m, '+z', 4, 7, 3, 1); slit(m, '+z', 15, 7, 3, 1);
   // the forge frame: posts and beams, the dark striped awning over it
@@ -1600,8 +1662,8 @@ function armory() {
 function market() {
   const m = lot(32, 32);
   patch(m, 1, 16, 31, 31, PAVE, { seed: 2 });
-  block(m, 2, 2, 24, 15, 1, 14, { batter: 6, band: 'ochre', frieze: 1 });
-  block(m, 9, 13, 16, 18, 1, 11, { batter: 0, band: 'ochre', rim: false });
+  block(m, 2, 2, 24, 15, 1, 14, { wall: LIME, roofC: ROOFTILE, rimC: LIME, gorge: [0xd2c4a4, 0xdccfb2], lipOut: 2, batter: 6, band: 'ochre', frieze: 1 });
+  block(m, 9, 13, 16, 18, 1, 11, { wall: SAND, batter: 0, band: 'ochre', rim: false });
   door(m, '+z', 11, 3, 1, 8);
   slit(m, '+x', 5, 9, 3, 1); slit(m, '+x', 10, 9, 3, 1);
   block(m, 24, 15, 29, 21, 1, 12, { batter: 0, band: null, rim: false });
