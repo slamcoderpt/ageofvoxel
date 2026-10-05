@@ -1323,12 +1323,19 @@ same channel names, plus:
   a hind leg set back, head up), `camel_rider` (0.09, the rider at 0.065 / 0.09
   so the camel dominates: a sandy-brown hide distinct from the rider's
   bronze skin, a lighter belly and legs, a darker muzzle; one high hump under
-  a domed white cloth with a broad team border and an ochre zigzag hem; a
-  long S-curved neck that dips from the chest and rises above the rider's
-  knees to a small head with ears and a narrow muzzle, a team scarf at the
-  throat; long thin legs with knobby knees / hocks and broad pads; the
-  rider's bare legs astride the cloth, a team tunic, a team-crowned linen
-  nemes with lappets, a silver hooked sword held forward from the fist),
+  one flat team-colour saddle cloth (round 9: flat vertical side walls that
+  round in over the back, a single tan trim row at the hem, no tufts, stripes
+  or bags); a long S-curved neck that dips from the chest and rises above the
+  rider's knees to a small head with ears and a narrow muzzle, a team scarf at
+  the throat; long thin legs with knobby knees / hocks and broad pads. The
+  rider sits a voxel higher on the cloth and is set apart from it by value:
+  a flat white kilt and a dark leather corslet / belt between the team tunic's
+  shoulders and the blue cloth; his legs are their own part (`riderLegs`, half
+  camel voxels, own outline), each a bent two-segment limb: a white-kilted
+  thigh out and forward over the cloth, a knee, a bare shin down the flank
+  clear of the cloth, a darker foot; a team-crowned linen nemes; one straight
+  2 x 2 metal-grey sword with a light honed edge over a gold guard, tilted
+  forward and out of the fist by its part `rest`),
   `mercenary_cavalry` (dark barded horse, Nubian rider; shares the horse
   neck and belly of the chariot horse), `war_elephant` (0.1, unit_07: flat warm mid-grey skin, dark enough
   that the grade keeps it grey; a cow-hide saddle cloth over the back only,
