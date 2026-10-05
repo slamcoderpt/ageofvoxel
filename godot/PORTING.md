@@ -913,9 +913,28 @@ deterministic; re-run it after changing the script, never hand-edit
 `assets/models/egypt*`): 1/8-tile voxels (the walls', towers' and tech
 buildings' resolution, the same mesher, jitter, weathering and team voxels),
 a few smooth parts (the silos), pivoted at the footprint centre, the front to
-+z. The palette: warm sandstone ashlar, pale limestone cornices and copings,
-whitewashed plaster roofs, mud brick and palm thatch (Archaic houses),
-painted friezes (blue / red / ochre), gilt, dark basalt.
++z. The palette: whitewashed plaster walls (`WASH`, houses, camps, Granary,
+Armory), warm sandstone ashlar (pylons, plinths), pale limestone cornices
+and copings, dark plaster / mud roof decks, mud brick and palm thatch
+(Archaic houses), painted friezes (blue / red / ochre), gilt, dark basalt.
+- **Three values per lot** (so a town never reads as one tan mass): the
+  walls are the lightest (whitewash / limestone), the **roof deck** two
+  steps darker (`PLASTER` a warm grey-brown deck, `ROOFTILE` a darker tile,
+  `MUDROOF`) framed by the brightest line, the pale cornice `LIP`, so every
+  roof is a dark inset in a bright frame; the ground under and round a
+  building (`SPLASH`, `WORN` paths, `EARTH` yards, `PAVE`) a step or two
+  darker than the walls and than the terrain's dirt. A **plinth line**
+  (`plinths()`, `PLINTH`): a clean one-voxel darker stone step round the
+  foot of every ground-level block (not in front of doors).
+- **A tall element per function** (read at a glance): the Town Center's
+  painted pylon gate and Ra statue, the house's **wind-catcher** (`malqaf()`:
+  a roof vent with a sloping hood and a dark mouth), upper room or roof
+  canopy, the Granary's tall domed silos, the Lumber Camp's timber
+  sheerlegs with a slung log, the Mining Camp's headframe with a pulley and
+  an ore bucket, the Temple's papyrus colonnade and gilt-tipped obelisk
+  pair at the ramp foot, the Barracks' tall banner masts, the Market's
+  **columned portico** standing above its hall, the Armory's tall chimney
+  furnace, the Migdol's keep and turrets.
 
 - **The Egyptian block** (`block()`): a flat plaster roof (palm thatch under
   poles on Archaic houses) inside a **cavetto cornice** (the wall's top row
@@ -939,8 +958,8 @@ painted friezes (blue / red / ochre), gilt, dark basalt.
   the Barracks gatehouse, Migdol, Siege Works) with a pale tiled roof,
   `OCHRE_W` warm ochre sandstone for enclosure walls, the Barracks ranges
   and the Mining Camp, `MUDB` dark mud brick with a darker `MUDROOF` and a
-  pale lime lip for the lesser buildings (the TC's side rooms, Granary
-  store, Lumber Camp, Armory), `SAND` for houses and pylons, `FLAG` cool grey
+  pale lime lip for the TC's side rooms, `WASH` whitewash for houses, the
+  camps, the Granary store and the Armory, `SAND` for pylons, `FLAG` cool grey
   flagstones in the TC courtyard. `bands()` paints wide rows round a
   block's outer shell: the TC pylons carry red, ochre and turquoise bands
   between ink rules over turquoise / ochre relief panels; the team colour
@@ -961,15 +980,15 @@ painted friezes (blue / red / ochre), gilt, dark basalt.
   the construction pennants. Other strong colour is saved for the Temple's
   painted columns (papyrus capitals, lapis / red bands, glyph columns) and
   the relief bands on its platform, the Armory's forge glow.
-- **Settled into the ground**: no square slab under a model; `settle()` lays a
-  ragged packed-earth apron under and round whatever stands (fading out in
-  3 voxels, a darker sand splash against the walls) and **worn paths** from
-  every ground-level door (registered by `door()`) to the lot edge; yards,
+- **Settled into the ground**: no square slab under a model; `settle()` lays
+  the plinth line, then a clean straight-edged apron of darker packed earth
+  under and one voxel round whatever stands and **worn paths** from every
+  ground-level door (registered by `door()`) to the lot edge; yards,
   threshing floors and paving are ragged `patch()`es. The ground row is
-  pivoted 0.1 tile down (it sits 0.025 above the terrain: a decal, no plinth
-  edge). Every lot carries **clutter** where the walls meet the street:
-  `pots()` clusters, baskets of produce, crates, sacks, barrels, low
-  **mud-brick walls** (`mudFence()`), log piles, racks.
+  pivoted 0.1 tile down (it sits 0.025 above the terrain: a decal). Clutter
+  is **sparse** (one crate stack, a basket or a jar per small lot, the
+  working props of each function: log pile, ore bins, racks, counters), so
+  the doors, plinths and footprints stay clear.
 - **Types** (the sim's keys, `sim/civ`; footprints as `buildings/defs.h`):
   `town_center` 7x7 (a walled compound: low ochre enclosure walls with
   corner piers, a pale limestone two-storey hall with a deep latticed door
@@ -978,9 +997,10 @@ painted friezes (blue / red / ochre), gilt, dark basalt.
   pylons with a 4-voxel black passage and a dark leaf under the lintel
   bridge and its winged sun, a big and a small **domed silo** (front left), awnings, a
   fire bowl, a basin, a palm, the gilt **falcon-headed Ra** with his sun
-  disc on a plinth at the front left), `house` 3x3 (three plans: boxes with
-  a side room or an L round a projecting door portal, beam ends, palm-thatch
-  lean-tos, yard walls, a tall one with an outside stair and a roof sunshade;
+  disc on a plinth at the front left), `house` 3x3 (three plans: a box with
+  a side room and a wind-catcher, an L round a projecting door portal with
+  an upper room, a tall one with a clean outside stair behind a parapet and
+  a striped roof canopy; beam ends, a plain cloth awning;
   Archaic look `a1` mud brick with a mud gorge and thatch under poles, `a2`
   sandstone with plaster roofs and an ochre band), `granary` 3x3 (a hut with a roof hatch and a ladder, two ribbed
   domed silos, a grain bin, sacks), `lumber_camp` / `mining_camp` 3x3
@@ -1043,7 +1063,10 @@ processional way between obelisks, the military quarter east, the camps by
 their fields, street clutter between the buildings (`CLUTTER`), palms. The
 ground is painted after the spawns (a spawn lays its own square of dirt):
 worn earth everywhere, `LANES` paved (`AovSim.paint_ground`; sand reads as
-beach on low ground). Player 1 is made Egyptian and the sim's types are
+beach on low ground), and the map's ground details (pebbles, tufts) are
+hidden so the ground is clean like Retold's (`egt_details=1` keeps them).
+Houses stand a lane's width (one tile) apart, palms only at the quarters'
+edges, the street clutter sparse. Player 1 is made Egyptian and the sim's types are
 spawned, the rest (lighthouse, wonder, palms, clutter) drawn render-only.
 The whole-town camera is set by the scene (`cam` overrides it).
 
@@ -1054,6 +1077,7 @@ node scripts/godot-shoot.mjs --scene egypt_town --out shots/godot/egypt_town.png
      [--params "egt_age=1"]            # the owner's age (1: Archaic houses)
      [--params "egt_states=1"]         # a row of construction stages and variants
      [--params "egt_static=1"]         # render-only even where the sim has the types
+     [--params "egt_details=1"]        # keep the map's pebbles and tufts
 node scripts/export-egypt.mjs          # re-export godot/assets/models/egypt*.{json,bin.gz}
 ```
 

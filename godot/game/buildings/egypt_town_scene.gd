@@ -14,6 +14,7 @@ extends RefCounted
 ##     [--params "egt_states=1"]          # a row of construction stages (s0 s2 s4 s6) and looks instead
 ##     [--params "egt_static=1"]          # render-only even when the sim has the types
 ##     [--params "egt_sand=0"]            # keep the map's ground (no sand)
+##     [--params "egt_details=1"]         # keep the map's ground details (pebbles, tufts)
 
 ## [type, tile x, tile z (top-left, relative to the town centre), extra]:
 ## a settlement, not a catalogue: houses in touching rows along paved lanes,
@@ -23,34 +24,33 @@ const LAYOUT := [
 	["town_center", -3, -3, {}],
 	["temple", -2, -15, {}],
 	["obelisk", -4, -8, {}], ["obelisk", 3, -8, {}], ["obelisk", -5, 4, {}], ["obelisk", 5, 4, {}],
-	# the west quarter: two rows of houses back to back on their lanes
-	["house", -17, -8, {"variant": 1}], ["house", -14, -8, {"variant": 0}], ["house", -11, -8, {"variant": 1}], ["house", -8, -8, {"variant": 2}],
-	["house", -14, -2, {"variant": 2}], ["house", -11, -2, {"variant": 0}], ["house", -7, -2, {"variant": 1}],
-	["house", -12, -12, {"variant": 2}], ["house", -9, -12, {"variant": 0}],
-	["granary", -18, -2, {}], ["lumber_camp", -22, -9, {}],
-	["farm", -23, 2, {}], ["farm", -19, 8, {}], ["farm", -23, 7, {}],
+	# the west quarter: two rows of houses on their lanes, a lane's width apart
+	# so every house stands on its own plinth line
+	["house", -19, -8, {"variant": 1}], ["house", -15, -8, {"variant": 0}], ["house", -11, -8, {"variant": 2}],
+	["house", -15, -2, {"variant": 2}], ["house", -11, -2, {"variant": 0}], ["house", -7, -2, {"variant": 1}],
+	["house", -13, -12, {"variant": 0}], ["house", -9, -12, {"variant": 1}],
+	["granary", -19, -2, {}], ["lumber_camp", -24, -9, {}],
+	["farm", -24, 2, {}], ["farm", -19, 8, {}], ["farm", -24, 7, {}],
 	# the south quarter on the main street: the market, houses, the monuments
-	["market", -11, 8, {}], ["house", -6, 9, {"variant": 1}], ["house", 4, 9, {"variant": 2}], ["house", 7, 9, {"variant": 0}],
-	["armory", -1, 9, {}],
+	["market", -12, 8, {}], ["house", -7, 9, {"variant": 1}], ["house", 4, 9, {"variant": 2}], ["house", 8, 9, {"variant": 0}],
+	["armory", -2, 9, {}],
 	["monument_villagers", -9, 15, {}], ["monument_soldiers", -6, 15, {}], ["monument_priests", -3, 15, {}],
 	["monument_pharaohs", 1, 15, {}], ["monument_gods", 5, 15, {}],
 	# the military quarter east
-	["eg_barracks", 7, -8, {}], ["siege_works", 13, -9, {}], ["migdol", 14, -1, {}], ["mining_camp", 21, 6, {}],
-	["house", 7, -2, {"variant": 2}], ["house", 10, -2, {"variant": 1}], ["house", 10, 9, {"variant": 1}],
+	["eg_barracks", 7, -8, {}], ["siege_works", 13, -9, {}], ["migdol", 15, -1, {}], ["mining_camp", 22, 7, {}],
+	["house", 7, -2, {"variant": 2}], ["house", 11, -2, {"variant": 1}], ["house", 12, 9, {"variant": 1}],
 	["lighthouse", -14, -16, {}], ["wonder", -25, -20, {}],
 ]
-const PALMS := [[-17, -12], [-18, -6], [-5, -16], [11, -12], [4, -17], [-15, 12], [12, 13], [22, -8], [-26, -1], [-1, 7],
-	[2, 8], [-16, 3], [20, 13], [-19, -12], [19, -3], [-17, 13], [2, 21], [11, 7], [-6, -11], [5, -12]]
-## street clutter between the buildings: [tile x, tile z (centre), variant, yaw]
+## palms at the edges of the quarters (not over the lanes: their shadows would
+## lie across the buildings)
+const PALMS := [[-17, -12], [-5, -16], [11, -12], [4, -17], [-15, 12], [12, 13], [22, -8], [-26, -1],
+	[-16, 4], [20, 13], [-19, -12], [19, -3], [-17, 13], [2, 21]]
+## street clutter between the buildings, sparse: [tile x, tile z (centre), variant, yaw]
 ## (clutter variants, export-egypt.mjs: 0 jars, 1 crates + sacks, 2 mud-brick
 ## wall run, 3 hand cart, 4 pen corner, 5 reed sunshade stall, 6 woodpile, 7 well)
 const CLUTTER := [
-	[-15.5, -4.0, 0, 0.0], [-9.5, -4.2, 1, 1.6], [-5.5, -4.0, 3, 0.0], [-16.5, 2.0, 4, 0.0], [-12.0, 2.0, 2, 0.0],
-	[-8.5, 2.0, 0, 2.0], [-7.0, 6.5, 5, 0.0], [-13.5, 6.5, 1, 0.5], [-3.5, 6.2, 0, 1.0], [3.5, 7.2, 3, 1.57],
-	[9.0, 6.8, 1, 0.0], [-20.0, -5.5, 6, 0.0], [-20.5, 0.3, 7, 0.0], [12.8, 1.2, 1, 2.4], [11.0, 4.5, 4, 3.14],
-	[6.0, -10.0, 2, 0.0], [-17.0, -9.0, 0, 0.8], [18.5, 6.5, 6, 1.57], [0.0, 14.0, 0, 0.0], [-11.0, 13.0, 2, 1.57],
-	[-4.5, -10.5, 1, 0.3], [13.5, 12.5, 0, 0.0], [-8.0, 13.0, 1, 0.0], [3.5, 13.2, 4, 1.57], [-14.0, -10.0, 6, 0.0], [-7.0, -14.0, 0, 0.0],
-	[7.0, 3.0, 5, 1.57], [-16.0, 9.5, 0, 0.0], [16.5, 10.0, 3, 0.0],
+	[-5.5, -4.0, 3, 0.0], [-7.0, 6.5, 5, 0.0], [3.5, 7.2, 3, 1.57], [-21.0, 0.3, 7, 0.0],
+	[6.0, -10.0, 2, 0.0], [-11.0, 13.0, 2, 1.57], [3.5, 13.2, 4, 1.57], [16.5, 10.5, 3, 0.0],
 ]
 ## paved lanes (tile rects relative to the centre: x, z, w, h), the rest worn earth
 const LANES := [
@@ -142,6 +142,11 @@ static func scene_setup(game: Node) -> Dictionary:
 			continue   # keep the framed building clear
 		statics.append({"type": "palm", "owner": 1, "x": cx + p[0] + 0.5, "z": cz + p[1] + 0.5, "variant": k % 3, "yaw": float(k) * 1.3})
 	view.set_static(statics)
+	# Retold's town ground is clean sand: hide the map's pebbles and tufts
+	# (terrain.gd ground details) so only the buildings carry detail
+	var terrain = game.pieces.get("terrain")
+	if terrain != null and not AovArgs.flag(game.args, "egt_details", false) and terrain.get("_det_root") != null:
+		terrain._det_root.visible = false
 	ctx["focus"] = focus
 	if focus_size == 0.0 and not states and not game.args.has("cam"):
 		# the whole settlement, like reference/egypt/building_01
