@@ -103,9 +103,9 @@ const pick3 = (seed, a, b, c, pa = 0.5, pb = 0.85) => (x, y, z) => { const h = h
 // steps above the leather and the hafts (LEATHER, WOOD), so a bare arm never
 // melts into a strap, a shaft or a shield back; the face plane a step lighter
 // again (SKIN_FACE) so the dark eyes, brow and hairline read on it
-const SKIN = pick3(3, 0xc46e38, 0xba6632, 0xcc7840);
+const SKIN = pick3(3, 0x9e5832, 0x96522e, 0xa45e36);   // (round 12) a step browner, to sit on the bodies
 const SKIN_SH = 0x8e4a24;
-const SKIN_FACE = pick3(35, 0xeca062, 0xe4985a, 0xf2a86a);
+const SKIN_FACE = pick3(35, 0xbe7848, 0xb67244, 0xc47e4c);
 // bare chests and limbs, seen in shade from the camera: a redder light tone,
 // so the sand-coloured bounce light leaves them warm terracotta, not olive
 const SKIN_FRONT = pick3(36, 0xffa070, 0xf89868, 0xffa878);
@@ -292,12 +292,12 @@ function headE(style) {
     m.set(2, 3, 5, SKIN_FACE(2, 3, 5)).set(4, 3, 5, SKIN_FACE(4, 3, 5));
   }
   if (style === 'laborer') {
-    // a white linen khat bound with a team band, gathered into a bag at the nape
-    capN(m, LINEN, { y0: 5, front: 6, top: 8 });
-    ringN(m, 6, TEAM);
-    for (let x = 0; x <= 6; x++) tset(m, x, 6, 6, TEAM_SHADE);
-    m.box(1, 1, -2, 5, 5, 1, LINEN).box(2, -1, -2, 3, 2, 1, LINEN_SH);
-    m.box(-1, 3, 0, 1, 3, 3, LINEN).box(7, 3, 0, 1, 3, 3, LINEN);
+    // (round 12, unit_11) close-cropped black hair with a clear hairline,
+    // full at the back of the skull, no headcloth
+    capN(m, HAIR, { y0: 6, front: 7, top: 8 });
+    for (let x = 0; x <= 6; x++) m.set(x, 7, 5, HAIR);
+    for (let z = 0; z <= 4; z++) m.set(-1, 5, z, HAIR).set(7, 5, z, HAIR);
+    m.box(0, 3, -1, 7, 3, 1, HAIR);
   } else if (style === 'spear') {
     // close-cropped black hair (a clear hairline over the light face), a team
     // headband and one long braided side lock
@@ -402,7 +402,12 @@ const GRIP_E = [-0.45, -8.5, 0.6];     // a haft held just outside / in front of
 const SHIELD_E = [1.9, -5.4, 2.6];     // a shield strapped on the forearm, clear of the body
 // (round 11) a step redder, so the skin stays warm brown in the sky-lit shade
 // instead of going olive-khaki beside the gold
-const PAL_SKIN = { L: 0xec8c46, M: 0xb46232, D: 0x844222 };
+// (round 12) a sun-browned skin, not salmon: four tones (H the lit shoulder
+// tops, L fronts, M sides / back, D the inner faces under the arms, the inner
+// legs and under the chest)
+// (round 12b) a step darker and browner again: L 0xbc7442 still graded to a
+// salmon peach on the lit fronts, Retold's labourers are a mid brown
+const PAL_SKIN = { H: 0xa26c42, L: 0x8e5634, M: 0x6a3a22, D: 0x4c2816 };
 const PAL_DARK = { L: 0x80543a, M: 0x5e3a26, D: 0x3e2618 };
 // [width, zBack, zFront] per torso row (y = 0 at the hip joint)
 const TORSO_ROWS = {
@@ -428,11 +433,16 @@ function manTorso(pal = PAL_SKIN) {
       const ax = Math.abs(x + 0.5);
       let c = pal.M;
       if (z === z1 && !(ex && w >= 8)) c = pal.L;
-      if (y >= 13) c = pal.L;                            // the lit tops of the shoulders
+      // (round 12) the flanks under the arms a tone darker (D)
+      if (ex && y >= 6 && y <= 11) c = pal.D;
+      if (y >= 13) c = palH(pal);                        // the lit tops of the shoulders
       if (y >= 15) c = z === z1 ? pal.L : pal.M;         // the neck
       // the shadow under the pectorals: one unbroken row (two dark patches
-      // and a solar plexus mark read as a face painted on the chest)
-      if (z === z1 && y === 9 && ax <= 5) c = pal.M;
+      // and a solar plexus mark read as a face painted on the chest), the
+      // ribs below it a side tone
+      // (round 12b) the side tone, not D, and only under the pecs: a full dark
+      // row read as a seam cutting the torso in two
+      if (z === z1 && y === 9 && ax <= 4) c = pal.M;
       if (z === z0 && y <= 1) c = pal.D;
       m.set(x, y, z, c);
     }
@@ -440,7 +450,7 @@ function manTorso(pal = PAL_SKIN) {
   // rounded deltoids standing out past the chest: the arms hang from under them
   for (const x of [-7, 6]) for (let y = 10; y <= 13; y++) for (let z = -2; z <= 1; z++) {
     if ((y === 10 || y === 13) && (z === -2 || z === 1)) continue;
-    m.set(x, y, z, y >= 12 || z === 1 ? pal.L : pal.M);
+    m.set(x, y, z, y >= 12 ? palH(pal) : z === 1 ? pal.L : pal.M);
   }
   return m;
 }
@@ -464,8 +474,10 @@ const teamTone = (m, x, y, z, base) => tset(m, x, y, z, base);
 function eKilt(m, { color = TEAM, len = 8, hem = TEAM_TRIM, side = TEAM_SHADE, apron = null, apronEdge = null, fold = true } = {}) {
   for (let y = 1; y >= -len - 1; y--) {
     const i = 1 - y;
-    const w = i < 4 ? 10 : i < 8 ? 12 : 14;
-    const z0 = i < 6 ? -3 : -4, z1 = i < 6 ? 2 : 3;
+    // (round 12) a short trapezoid flaring from the belt: wider and deeper
+    // every few rows, so the hem stands out past the hips
+    const w = i < 2 ? 10 : i < 5 ? 12 : 14;
+    const z0 = i < 5 ? -3 : -4, z1 = 2 + (i >= 2 ? 1 : 0) + (i >= 5 ? 1 : 0);
     for (let x = -w / 2; x < w / 2; x++) for (let z = z0; z <= z1; z++) {
       const ax = Math.abs(x + 0.5);
       if (y === -len - 1 && (ax > 3 || z < z1 - 1)) continue;       // the front dips lower
@@ -474,9 +486,12 @@ function eKilt(m, { color = TEAM, len = 8, hem = TEAM_TRIM, side = TEAM_SHADE, a
       const isHem = hem && (y === -len - 1 || (y === -len && ax > 3) || (y === -len && z < z1 - 1));
       const isSide = ex || z === z0;
       const isFold = fold && z === z1 && Math.round(-2 - (1 - y) * 0.45) === x;
+      // the belt's shadow: the row under the belt a tone down all round
+      const isShadow = i === 0;
+      const dk = isSide || isFold || isShadow;
       if (isHem) { m.set(x, y, z, hem); continue; }
-      if (color === TEAM) tset(m, x, y, z, isSide || isFold ? side : 0xffffff);
-      else m.set(x, y, z, isSide || isFold ? side : solid(color, x, y, z));
+      if (color === TEAM) tset(m, x, y, z, dk ? (isSide && (isFold || isShadow) ? 0x8a8a8a : side) : 0xffffff);
+      else m.set(x, y, z, dk ? side : solid(color, x, y, z));
     }
   }
   if (apron) {
@@ -529,38 +544,52 @@ function eStraps(m, color, stud) {
   if (stud) for (const x of [-4, 3]) m.set(x, 11, 4, stud).set(x, 11, -5, stud);
   return m;
 }
-// Arm (half voxels): x -1..1, z -1..1 (front z = 1), the fist at y 0..2, the
-// forearm, elbow and upper arm up to a deltoid cap that bulges outwards;
-// pivot [0.5, 18.5, 0.5] at the shoulder joint. Two flat tones: the front
-// and the cap's top light, the rest the side tone.
+// (round 12) the limbs are round, tapering sections of one flesh mass, not
+// sticks: each row a filled ellipse (half-extents rx / rz about z = cz) on the
+// voxel grid, so a 5-wide row is an octagon, a 3-wide one a square or a plus;
+// four flat skin tones by the face a voxel is on: H (the lit tops of the
+// shoulders), L (the front), M (the sides and back), D (the inner faces:
+// under the arms, the inner thighs and calves)
+const lighten = (c, k = 0.16) => { const r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255; const f = (v) => Math.min(255, Math.round(v + (255 - v) * k)); return (f(r) << 16) | (f(g) << 8) | f(b); };
+const palH = (pal) => pal.H ?? lighten(pal.L);
+function limbRows(m, rows, tone) {
+  for (const [y, rx, rz, cz = 0] of rows) for (let x = -3; x <= 3; x++) for (let z = -4; z <= 4; z++) {
+    const nx = x / rx, nz = (z - cz) / rz;
+    if (nx * nx + nz * nz > 1) continue;
+    const c = tone(x, y, z, nx, nz);
+    if (c === null || c === undefined) continue;
+    if (c === TEAM) tset(m, x, y, z, nz > 0.45 ? 0xffffff : TEAM_SHADE);
+    else m.set(x, y, z, solid(c, x, y, z));
+  }
+  return m;
+}
+// Arm (half voxels), the shoulder joint at pivot [0.5, 18.5, 0.5]: a round
+// shoulder cap, a 5-wide deltoid / biceps (y 13..17) whose inner column sits
+// inside the torso's deltoid (no gap at the armpit), tapering through the
+// upper arm to a 3-wide elbow (y 9..10), a 3-wide forearm narrowing to the
+// wrist (y 3..4) and a 3 x 3 fist (y 0..2): the upper arm two voxels thicker
+// than the forearm. Tones: the cap's top H, fronts L, sides / back M, the
+// inner face (towards the body) D.
+const ARM_ROWS = [
+  [18, 1.6, 1.6], [17, 2.3, 2.0], [16, 2.4, 2.3], [15, 2.4, 2.3], [14, 2.4, 2.3], [13, 2.3, 2.1],
+  [12, 2.0, 2.0], [11, 2.0, 2.0], [10, 1.6, 1.6], [9, 1.6, 1.6],
+  [8, 1.6, 1.6], [7, 1.6, 1.6], [6, 1.6, 1.6], [5, 1.6, 1.6], [4, 1.6, 1.6], [3, 1.6, 1.6],
+  [2, 1.6, 1.6], [1, 1.6, 1.6], [0, 1.6, 1.6],
+];
 function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, sleeve = null, fist = null, bend = 0 } = {}) {
   const m = new VoxelModel();
-  const out = side === 'L' ? 1 : -1;
-  for (let y = 0; y <= 18; y++) for (let x = -1; x <= 1; x++) for (let z = -1; z <= 1; z++) {
-    const corner = Math.abs(x) === 1 && Math.abs(z) === 1;
-    if (corner && (y <= 8 || y === 18)) continue;        // a rounded forearm and cap
-    if (corner && z === -1 && x === -out) continue;
-    let c = z === 1 ? pal.L : pal.M;
-    if (y <= 2) c = fist || (z === 1 ? pal.L : pal.M);
-    if (y === 18) c = pal.L;
+  const out = side === 'L' ? 1 : -1, H = palH(pal);
+  limbRows(m, ARM_ROWS, (x, y, z, nx, nz) => {
+    const inner = nx * out < -0.55, front = nz > 0.45;
+    let c = front ? pal.L : inner ? pal.D : pal.M;
+    if (y >= 16 && nz > -0.6 && !inner) c = H;            // the lit shoulder cap
+    if (y >= 17) c = inner ? pal.M : H;
+    if (y <= 2) c = fist || (front ? pal.L : pal.M);
     if (bracer && y >= 3 && y <= 6) c = bracer;
     if (bnd && y >= 12 && y <= 13) c = bnd;
     if (sleeve && y >= 13) c = sleeve;
-    if (c === TEAM) tset(m, x, y, z, z === 1 ? 0xffffff : TEAM_SHADE); else m.set(x, y, z, c);
-  }
-  // the deltoid's outer bulge
-  for (let y = 14; y <= 17; y++) for (let z = -1; z <= 1; z++) {
-    if ((y === 14 || y === 17) && z !== 0) continue;
-    const c = sleeve || (y === 17 || z === 1 ? pal.L : pal.M);
-    if (c === TEAM) tset(m, 2 * out, y, z, z === 1 ? 0xffffff : TEAM_SHADE); else m.set(2 * out, y, z, c);
-  }
-  // (round 11) the shoulder head reaches one voxel in, into the torso's
-  // deltoid, so the arm joins the body with no gap or seam at the armpit
-  for (let y = 13; y <= 17; y++) for (let z = -1; z <= 1; z++) {
-    if ((y === 13 || y === 17) && z !== 0) continue;
-    const c = sleeve || (y >= 16 || z === 1 ? pal.L : pal.M);
-    if (c === TEAM) tset(m, -2 * out, y, z, TEAM_SHADE); else m.set(-2 * out, y, z, c);
-  }
+    return c;
+  });
   return bendArm(m, bend);
 }
 // bend an arm (manArmM, half voxels) at the elbow: the forearm (y <= 9) turns
@@ -586,35 +615,48 @@ function bendArm(m, a) {
   return m;
 }
 const armFist = (a) => [0, (ELBOW_Y - 8 * Math.cos(a) - 18.5) * BODY_SCALE, 8 * Math.sin(a) * BODY_SCALE];
-// Thigh / shin (half voxels): x -2..1, z -2..1, y 0..13 (pivot [0, 14, 0] at
-// the hip / knee); the shin narrows to a 2 x 2 ankle over a sandalled foot.
-function manThighM({ pal = PAL_SKIN, kilt = null } = {}) {
+// Thigh / shin (half voxels), pivot [0.5, 14, 0.5] at the hip / knee: the
+// thigh a 5-wide rounded section (the two thighs meet under the pelvis, no
+// gap) tapering to a 3-wide knee (y 0..2) that sits inside the shin's 4-5
+// wide top (the knee rows overlap, so a bent knee stays closed); the shin a
+// calf bulging back, narrowing to the ankle over a straight foot (toes
+// forward, not turned in). side 'L' | 'R' picks the inner face (tone D).
+const LEG_PIVOT = [0.5, 14, 0.5];
+const THIGH_ROWS = [
+  [13, 2.5, 2.4], [12, 2.5, 2.4], [11, 2.5, 2.4], [10, 2.5, 2.4], [9, 2.4, 2.3], [8, 2.4, 2.3], [7, 2.3, 2.2],
+  [6, 2.3, 2.2], [5, 2.2, 2.1], [4, 2.0, 2.0], [3, 2.0, 2.0], [2, 2.0, 2.0], [1, 2.0, 2.0], [0, 2.0, 2.0],
+];
+function manThighM({ pal = PAL_SKIN, kilt = null, side = 'L' } = {}) {
   const m = new VoxelModel();
-  for (let y = 0; y <= 13; y++) for (let x = -2; x <= 1; x++) for (let z = -2; z <= 1; z++) {
-    if ((x === -2 || x === 1) && (z === -2 || z === 1) && y < 11) continue;
-    let c = z === 1 ? pal.L : pal.M;
-    if (kilt && y >= 9) { if (kilt === TEAM) { tset(m, x, y, z, 0xffffff); continue; } c = kilt; }
-    m.set(x, y, z, c);
-  }
-  m.set(-1, 1, 2, pal.L).set(0, 1, 2, pal.L);   // the kneecap
+  const out = side === 'L' ? 1 : -1;
+  limbRows(m, THIGH_ROWS, (x, y, z, nx, nz) => {
+    if (kilt && y >= 9) return kilt;
+    const inner = nx * out < -0.55;
+    return nz > 0.45 ? pal.L : inner ? pal.D : pal.M;
+  });
+  if (!kilt) m.set(0, 1, 2, palH(pal)).set(0, 2, 2, pal.L);   // the kneecap
+  else m.set(0, 1, 2, palH(pal));
   return m;
 }
-function manShinM({ pal = PAL_SKIN, sandal = SANDAL, band: bnd = null, wrap = null, foot = null } = {}) {
+const SHIN_ROWS = [
+  [13, 2.0, 2.0], [12, 2.1, 2.1], [11, 2.2, 2.4, -0.3], [10, 2.2, 2.5, -0.5], [9, 2.0, 2.4, -0.5], [8, 2.0, 2.3, -0.4],
+  [7, 1.8, 2.0, -0.2], [6, 1.7, 1.8], [5, 1.6, 1.6], [4, 1.6, 1.6], [3, 1.6, 1.6], [2, 1.6, 1.6],
+];
+function manShinM({ pal = PAL_SKIN, sandal = SANDAL, band: bnd = null, wrap = null, foot = null, side = 'L' } = {}) {
   const m = new VoxelModel();
-  const W = (x, y, z, c) => m.set(x, y, z, wrap ? ((y >> 1) & 1 ? solid(wrap, x, y, z) : LINEN_SH) : c);
-  for (let y = 9; y <= 13; y++) for (let x = -2; x <= 1; x++) for (let z = -2; z <= 1; z++) {
-    if ((x === -2 || x === 1) && (z === -2 || z === 1)) continue;
-    W(x, y, z, z === 1 ? pal.L : pal.M);
-  }
-  for (let y = 9; y <= 12; y++) m.set(-1, y, -3, pal.M).set(0, y, -3, pal.M);   // the calf
-  for (let y = 5; y <= 8; y++) for (let x = -1; x <= 0; x++) for (let z = -2; z <= 1; z++) W(x, y, z, z === 1 ? pal.L : pal.M);
-  for (let y = 2; y <= 4; y++) for (let x = -1; x <= 0; x++) for (let z = -1; z <= 0; z++) W(x, y, z, z === 0 ? pal.L : pal.M);
-  if (bnd) for (let x = -2; x <= 1; x++) for (let z = -2; z <= 1; z++) if (m.has(x, 11, z)) m.set(x, 11, z, bnd);
-  // the foot: a sole and a foot over it, toes forward
+  const out = side === 'L' ? 1 : -1;
+  limbRows(m, SHIN_ROWS, (x, y, z, nx, nz) => {
+    if (wrap) return (y >> 1) & 1 ? wrap : LINEN_SH;
+    if (bnd && y === 11) return bnd;
+    const inner = nx * out < -0.55;
+    return nz > 0.45 ? pal.L : inner ? pal.D : pal.M;
+  });
+  // the foot: a sole and the foot over it, straight forward
   const F = foot || pal.M;
-  m.box(-2, 0, -2, 4, 1, 7, sandal || F);
-  m.box(-1, 1, -1, 2, 1, 5, F).set(-2, 1, 2, F).set(1, 1, 2, F).set(-2, 1, 3, F).set(1, 1, 3, F);
-  if (sandal) m.set(-1, 1, 1, sandal).set(0, 1, 1, sandal).set(-1, 2, -1, sandal).set(0, 2, -1, sandal);
+  m.box(-1, 0, -2, 3, 1, 6, sandal || F);
+  m.box(-1, 1, -1, 3, 1, 4, F).set(0, 1, 3, F);
+  if (!foot) m.set(0, 1, 2, pal.L).set(0, 1, 1, pal.L);
+  if (sandal) m.set(-1, 1, 1, sandal).set(1, 1, 1, sandal).set(0, 2, -1, sandal);
   return m;
 }
 // a myth warrior on the men's body with a beast's head (a rig-voxel model,
@@ -623,8 +665,9 @@ function manShinM({ pal = PAL_SKIN, sandal = SANDAL, band: bnd = null, wrap = nu
 // at BEAST_FIST of the forearm
 const BEAST_FIST = [0, -3.75, 0.3];
 function beastManParts({ torso, pal = PAL_SKIN, head: hm, headPivot = [2.5, 0, 2.5], headScale = 0.62, headZ = 0.5, arm = {}, leg = {}, shin = null }) {
-  const X = { scale: BODY_SCALE, jitter: 0.015 };
-  const th = manThighM({ pal, ...leg }), sh = shin || manShinM({ pal, ...leg });
+  const X = { scale: BODY_SCALE, jitter: 0.015, ao: false };
+  const thL = manThighM({ pal, ...leg, side: 'L' }), thR = manThighM({ pal, ...leg, side: 'R' });
+  const shL = shin || manShinM({ pal, ...leg, side: 'L' }), shR = shin || manShinM({ pal, ...leg, side: 'R' });
   const split = (side) => {
     const a = manArmM({ pal, ...arm, side }), up = new VoxelModel(), lo = new VoxelModel();
     for (const [k, v] of a.vox) (((k >> 10) & 1023) - 512 >= 9 ? up : lo).vox.set(k, v);
@@ -632,10 +675,10 @@ function beastManParts({ torso, pal = PAL_SKIN, head: hm, headPivot = [2.5, 0, 2
   };
   const [uL, lL] = split('L'), [uR, lR] = split('R');
   return [
-    part('legL', th, [0, 14, 0], [MAN.legX, MAN.hip, 0], null, X),
-    part('shinL', sh, [0, 14, 0], [0, MAN.shin, 0], 'legL', X),
-    part('legR', th, [0, 14, 0], [-MAN.legX, MAN.hip, 0], null, X),
-    part('shinR', sh, [0, 14, 0], [0, MAN.shin, 0], 'legR', X),
+    part('legL', thL, LEG_PIVOT, [MAN.legX, MAN.hip, 0], null, X),
+    part('shinL', shL, LEG_PIVOT, [0, MAN.shin, 0], 'legL', X),
+    part('legR', thR, LEG_PIVOT, [-MAN.legX, MAN.hip, 0], null, X),
+    part('shinR', shR, LEG_PIVOT, [0, MAN.shin, 0], 'legR', X),
     part('torso', torso, [0, 0, 0], [0, MAN.hip, 0], null, X),
     part('head', hm, headPivot, [0, MAN.headY, headZ], 'torso', { scale: headScale }),
     part('armL', uL, [0.5, 18.5, 0.5], [MAN.armX, MAN.armY, 0], 'torso', X),
@@ -662,21 +705,34 @@ function eSash(m, color, x0 = -5, x1 = 4, y0 = 13, y1 = 3) {
 // the parts of a standing Egyptian man; s scales a rider (joints and voxels)
 function manParts({ torso, head: hs, headScale = 0.9, headZ = MAN.headZ, pal = PAL_SKIN, arm = {}, armL = {}, armR = {}, leg = {}, s = 1,
   legs = true, torsoJoint = null, torsoParent = null, restL = null, restR = null, liftL = 0, liftR = 0 } = {}) {
-  const S = BODY_SCALE * s, X = { scale: S, jitter: 0.015 };   // flat tones: almost no per-voxel jitter
+  // (round 12) no baked corner AO on the men's bodies: on the rounded limb
+  // sections it drew dark grooves down every arm and leg (a stick-built doll);
+  // the scene's light shades the round forms instead
+  const S = BODY_SCALE * s, X = { scale: S, jitter: 0.015, ao: false };   // flat tones: almost no per-voxel jitter
   const P = [];
   if (legs) {
-    const th = manThighM({ pal, ...leg }), sh = manShinM({ pal, ...leg });
     P.push(
-      part('legL', th, [0, 14, 0], sc([MAN.legX, MAN.hip, 0], s), null, X),
-      part('shinL', sh, [0, 14, 0], sc([0, MAN.shin, 0], s), 'legL', X),
-      part('legR', th, [0, 14, 0], sc([-MAN.legX, MAN.hip, 0], s), null, X),
-      part('shinR', sh, [0, 14, 0], sc([0, MAN.shin, 0], s), 'legR', X),
+      part('legL', manThighM({ pal, ...leg, side: 'L' }), LEG_PIVOT, sc([MAN.legX, MAN.hip, 0], s), null, X),
+      part('shinL', manShinM({ pal, ...leg, side: 'L' }), LEG_PIVOT, sc([0, MAN.shin, 0], s), 'legL', X),
+      part('legR', manThighM({ pal, ...leg, side: 'R' }), LEG_PIVOT, sc([-MAN.legX, MAN.hip, 0], s), null, X),
+      part('shinR', manShinM({ pal, ...leg, side: 'R' }), LEG_PIVOT, sc([0, MAN.shin, 0], s), 'legR', X),
     );
   }
   P.push(part('torso', torso, [0, 0, 0], torsoJoint || sc([0, MAN.hip, 0], s), torsoParent, X));
   P.push(headPart(hs, sc([0, MAN.headY, headZ], s), 'torso', headScale * s));
-  P.push(part('armL', manArmM({ pal, ...arm, ...armL, side: 'L' }), [0.5, 18.5, 0.5], sc([MAN.armX, MAN.armY + liftL, 0], s), 'torso', { ...X, ...(restL ? { rest: restL } : {}) }));
-  P.push(part('armR', manArmM({ pal, ...arm, ...armR, side: 'R' }), [0.5, 18.5, 0.5], sc([-MAN.armX, MAN.armY + liftR, 0], s), 'torso', { ...X, ...(restR ? { rest: restR } : {}) }));
+  // (round 12) an arm with no baked bend is split at the elbow like the
+  // archer's (splitArm: the upper arm and the forearm overlap two rows at a
+  // rounded elbow, channels foreL / foreR), so a work or fighting pose can
+  // bend it instead of swinging a stiff stick from the shoulder; gear held in
+  // that hand is re-parented to the forearm by rig()
+  for (const [sd, o, lift, rest] of [['L', armL, liftL, restL], ['R', armR, liftR, restR]]) {
+    const a = manArmM({ pal, ...arm, ...o, side: sd });
+    const sx = sd === 'L' ? MAN.armX : -MAN.armX, R = rest ? { rest } : {};
+    if ({ ...arm, ...o }.bend) { P.push(part(`arm${sd}`, a, [0.5, 18.5, 0.5], sc([sx, MAN.armY + lift, 0], s), 'torso', { ...X, ...R })); continue; }
+    const [up, lo] = splitArm(a, pal);
+    P.push(part(`arm${sd}`, up, [0.5, 18.5, 0.5], sc([sx, MAN.armY + lift, 0], s), 'torso', { ...X, ...R }));
+    P.push(part(`fore${sd}`, lo, [0.5, 9.5, 0.5], sc(FORE_J, s), `arm${sd}`, { ...X, forearm: true }));
+  }
   return P;
 }
 
@@ -865,18 +921,23 @@ const KILT_LINEN_SH = 0xd6c8a8;
 // bent arm (channels foreL / foreR) stays one closed limb; the forearm turns
 // about the elbow's middle (pivot y 9.5)
 const FORE_FIST = [0, -4.25, 0];
+const FORE_J = [0, -4.5, 0];            // the elbow (arm joint -> forearm joint), rig voxels
+function splitArm(a, pal) {
+  const up = new VoxelModel(), lo = new VoxelModel();
+  for (const [k, v] of a.vox) {
+    const y = ((k >> 10) & 1023) - 512;
+    if (y >= 9) up.vox.set(k, v);
+    if (y <= 10) lo.vox.set(k, { ...v });
+  }
+  // the elbow knob behind the joint: closes the back of the bend
+  for (const y of [9, 10]) if (!lo.has(0, y, -2)) lo.set(0, y, -2, pal.M);
+  return [up, lo];
+}
 function archerArms(o = {}, pal = PAL_SKIN) {
-  const X = { scale: BODY_SCALE, jitter: 0.015 };
+  const X = { scale: BODY_SCALE, jitter: 0.015, ao: false };
   const out = [];
   for (const side of ['L', 'R']) {
-    const a = manArmM({ pal, ...o, side }), up = new VoxelModel(), lo = new VoxelModel();
-    for (const [k, v] of a.vox) {
-      const y = ((k >> 10) & 1023) - 512;
-      if (y >= 9) up.vox.set(k, v);
-      if (y <= 10) lo.vox.set(k, { ...v });
-    }
-    // the elbow knob behind the joint: closes the back of the bend
-    for (const y of [9, 10]) for (const x of [-1, 0, 1]) if (!lo.has(x, y, -2) && Math.abs(x) < 1) lo.set(x, y, -2, pal.M);
+    const [up, lo] = splitArm(manArmM({ pal, ...o, side }), pal);
     const sx = side === 'L' ? MAN.armX : -MAN.armX;
     out.push(part(`arm${side}`, up, [0.5, 18.5, 0.5], [sx, MAN.armY, 0], 'torso', X));
     out.push(part(`fore${side}`, lo, [0.5, 9.5, 0.5], [0, -4.5, 0], `arm${side}`, X));
@@ -907,19 +968,32 @@ function recurveBowM() {
 
 // ---- rigs --------------------------------------------------------------------
 const RIGS = {};
-function rig(type, meta, parts) { RIGS[type] = { ...meta, parts }; }
+function rig(type, meta, parts) {
+  // (round 12) gear held in a hand whose arm is split at the elbow (manParts:
+  // a part foreL / foreR flagged forearm) hangs from the forearm instead, at
+  // the same place while the elbow is straight
+  for (const p of parts) {
+    if (p.name.startsWith('fore') || (p.parent !== 'armL' && p.parent !== 'armR')) continue;
+    const f = parts.find((q) => q.forearm && q.parent === p.parent);
+    if (!f) continue;
+    p.parent = f.name;
+    p.joint = p.joint.map((v, i) => v - f.joint[i]);
+  }
+  RIGS[type] = { ...meta, parts };
+}
 // scale a sub-rig's internal joints (a rider at another rig voxel size)
 const sc = (j, s) => j.map((v) => v * s);
 
-// Laborer (unit_11): bare chest, a white linen kilt with a team sash, a white khat.
+// Laborer (unit_11): bare chest, Retold's team-coloured wrap kilt flaring
+// from a pale linen sash knotted at the front, close-cropped black hair.
 {
   const t = manTorso();
-  eKilt(t, { color: 0xf4eee0, side: LINEN_SH, hem: 0xd8ceb4, len: 6 });
-  eBelt(t, TEAM, TEAM);
-  t.box(1, -6, 3, 1, 7, 1, TEAM).set(1, -7, 3, TEAM_TRIM);                   // the sash's end down the front
+  eKilt(t, { len: 6, hem: null });
+  eBelt(t, LINEN, LINEN_SH);
+  t.box(0, -5, 3, 1, 6, 1, LINEN).set(0, -6, 3, LINEN_SH);                   // the sash's end down the front
   const showTool = () => ({ conditional: true, portrait: false });
   rig('laborer', { voxel: 0.07, anim: 'human', style: 'villager', stance: true }, [
-    ...manParts({ torso: t, head: 'laborer', arm: { band: TEAM }, leg: { sandal: null, kilt: 0xf4eee0 } }),
+    ...manParts({ torso: t, head: 'laborer', leg: { sandal: null, kilt: TEAM } }),
     part('toolAxe', axeToolM(), [0, 0, 0], HAND_E, 'armR', showTool()),
     part('toolPick', pickToolM(), [0, 0, 0], HAND_E, 'armR', showTool()),
     part('toolSickle', sickleToolM(), [0, 0, 0], HAND_E, 'armR', showTool()),
@@ -1271,7 +1345,7 @@ function riderLegsM({ y = 11, x0 = -2, x1 = 7, skin = SKIN, kiltC = TEAM, len = 
   const standLegs = new VoxelModel();
   for (const x of [-2, 1]) standLegs.box(x, 0, -1, 2, 14, 2, SKIN_FRONT).box(x, 0, -1, 2, 1, 3, SANDAL).box(x, 10, -1, 2, 4, 2, KILT_LINEN);
   const rider = riderMan({ torso: t, torsoJoint: [0, 14.5, -1], torsoParent: 'chariot', head: 'charioteer', headScale: 1.0 })
-    .filter((p) => p.name !== 'armL' && p.name !== 'armR');
+    .filter((p) => !/^(arm|fore)[LR]$/.test(p.name));
   rig('chariot_archer', { voxel: 0.07, anim: 'centaur', style: 'chariot', pose: 'chariot', graze: false }, [
     part('body', horseBody(C), [3, 0, 10.5], [0, 10, 12], null, { coat: true }),
     part('barding', stripedBlanket({ z0: 7, z1: 14, low: 5, top: 9, colors: [TEAM, TEAM_TRIM, OCHRE, RED] }), [3, 0, 10.5], [0, 0, 0], 'body'),
@@ -2150,8 +2224,11 @@ for (const [type, R] of Object.entries(RIGS)) {
     // sienna by unit_outline.gdshader for every mesh with a width factor, so
     // the line between an arm and a torso stops flattening the figure into a
     // paper cut-out)
-    const ol = p.name === 'head' ? 0.24 : (p.name === 'weapon' || p.name === 'shield' || p.name.startsWith('tool')) ? 0.3 : 0.36;
-    g.add(`${type}/${p.name}`, buildVoxelGeometry(p.model, { size: R.voxel * (p.scale || 1), pivot: p.pivot, jitter: p.jitter ?? 0.05 }), { outline: ol });
+    // (round 12) one width for every part of every Egyptian unit (bodies,
+    // heads, robes, gear), drawn in each surface's own shade
+    // (unit_outline.gdshader), so no unit or part gets a heavier line
+    const ol = 0.3;
+    g.add(`${type}/${p.name}`, buildVoxelGeometry(p.model, { size: R.voxel * (p.scale || 1), pivot: p.pivot, jitter: p.jitter ?? 0.05, ao: p.ao ?? true }), { outline: ol });
   }
 }
 g.extra.unitTypes = Object.keys(RIGS);

@@ -595,6 +595,11 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 		}
 		if (archer && pose != P_SLING) { set(CH_armL, -0.25 + S(p) * 0.3, 0, 0.08); set(CH_weapon, 0.2); }
 		if (beast) { set(CH_armL, S(p) * 0.4, 0, 0.15); set(CH_armR, -S(p) * 0.4 - 0.2, 0, -0.15); set(CH_weapon, 0.6); }
+		// (round 12, Egyptian men) the elbows soft on the walk, the forward
+		// swinging forearm bending more, so the arms are not stiff sticks
+		if (rig.stance > 0 && !beast) {
+			set(CH_foreL, -0.2 - std::max(0.0, -S(p)) * 0.35); set(CH_foreR, -0.2 - std::max(0.0, S(p)) * 0.35);
+		}
 	} else if (st == aov::A_GATHER || st == aov::A_BUILD) {
 		const int res = U.econ_res_type[row];
 		if (st == aov::A_BUILD) {
@@ -622,6 +627,53 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 			set(CH_armR, -0.6 - k * lift, 0, -0.05);
 			set(CH_armL, -0.7 - k * (lift - 0.2), 0, 0.2);
 			bob = -0.5 + k * 0.3;
+		}
+		if (rig.stance > 0 && !beast) {
+			// (round 12, Egyptian men: rig "stance", arms split at the elbow)
+			// work poses that carry weight: the hips dropped onto bent knees
+			// (each leg solved so its foot or knee meets the ground: thigh 7 +
+			// shin 7 rig voxels), the elbows bent, the shoulders driving into
+			// every blow; the Greek villagers keep the poses above
+			if (st == aov::A_BUILD) {
+				// kneeling at the foundation on the rear knee, the front foot
+				// planted; the mallet cocked behind the ear on a bent elbow and
+				// driven down, the body following it
+				const double p = t * 9;
+				const double s = std::max(0.0, S(p));
+				set(CH_legL, -1.45, 0, 0.06); set(CH_shinL, 1.05);
+				set(CH_legR, 0.15, 0, -0.06); set(CH_shinR, 1.75);
+				set(CH_torso, 0.42 - s * 0.14, -0.12);
+				set(CH_head, -0.3 + s * 0.08);
+				set(CH_armR, -0.95 - s * 1.35, 0, -0.12); set(CH_foreR, -0.3 - s * 1.0);
+				set(CH_armL, -0.85, 0.25, 0.12); set(CH_foreL, -0.75);
+				bob = -6.7 - (1 - s) * 0.25;
+			} else if (res == aov::RES_FOOD) {
+				// squatting at the bush, both knees deep, reaching in and
+				// pulling back with bent arms
+				const double p = t * 4;
+				set(CH_legL, -1.15, 0, 0.1); set(CH_shinL, 1.85);
+				set(CH_legR, -0.6, 0, -0.1); set(CH_shinR, 1.6);
+				set(CH_torso, 0.55 + S(p) * 0.06); set(CH_head, -0.35);
+				set(CH_armR, -1.25 + S(p) * 0.35, 0, -0.15); set(CH_foreR, -0.45 - S(p) * 0.35);
+				set(CH_armL, -1.2 - S(p + 1.5) * 0.3, 0, 0.12); set(CH_foreL, -0.5);
+				bob = -5.8;
+			} else {
+				// chopping / mining in a lunge: the front knee bent over the
+				// foot, the back leg braced; at the top of the swing the body
+				// rises a little and the tool is cocked behind the head on bent
+				// elbows, at the blow the hips drop and the shoulders follow the
+				// tool down into the trunk or the rock
+				const double cyc = std::fmod(t * 0.9, 1.0);
+				const double k = cyc < 0.7 ? smooth(cyc / 0.7) : 1 - smooth((cyc - 0.7) / 0.12);
+				const double tor = 0.55 - k * 0.5;
+				set(CH_legL, -0.75 - (1 - k) * 0.1, 0, 0.08); set(CH_shinL, 1.0 + (1 - k) * 0.15);
+				set(CH_legR, 0.4 + (1 - k) * 0.08, 0, -0.08); set(CH_shinR, 0.25 + (1 - k) * 0.1);
+				set(CH_torso, tor, -0.15);
+				set(CH_head, -0.2 - tor * 0.4);
+				set(CH_armR, ease(-1.45, -2.95, k) , 0, -0.06); set(CH_foreR, ease(-0.15, -0.95, k));
+				set(CH_armL, ease(-1.3, -2.8, k), 0, 0.16); set(CH_foreL, ease(-0.25, -0.9, k));
+				bob = -2.1 - (1 - k) * 0.7;
+			}
 		}
 	} else if (st == aov::A_WORSHIP) {
 		const double s = S(t * 2);
@@ -869,8 +921,15 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 	}
 	if (!beast && (st == aov::A_IDLE || attacking) && type != aov::U_VILLAGER) {
 		const double w = 0.13 + uhash(id, 62) * 0.1;
-		add(CH_legL, 0, 0, w); add(CH_legR, 0, 0, -w); add(CH_shinL, 0, 0, -w * 0.6); add(CH_shinR, 0, 0, w * 0.6);
-		bob -= w * 2;
+		if (rig.stance > 0) {
+			// (round 12, Egyptian men) feet a little apart under the hips, the
+			// shins straight under the knees: no knock-kneed, pigeon-toed A
+			add(CH_legL, 0, 0, w * 0.35); add(CH_legR, 0, 0, -w * 0.35); add(CH_shinL, 0, 0, -w * 0.3); add(CH_shinR, 0, 0, w * 0.3);
+			bob -= w * 0.5;
+		} else {
+			add(CH_legL, 0, 0, w); add(CH_legR, 0, 0, -w); add(CH_shinL, 0, 0, -w * 0.6); add(CH_shinR, 0, 0, w * 0.6);
+			bob -= w * 2;
+		}
 	}
 	if (st == aov::A_IDLE && !beast) {
 		const double g = smooth((S(t * (0.3 + uhash(id, 42) * 0.25) + uhash(id, 43) * 6.28) - 0.55) * 3);

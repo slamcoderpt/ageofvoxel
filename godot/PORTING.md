@@ -1280,8 +1280,8 @@ same channel names, plus:
   rider, mummy, sphinx) has a domed crown striped front-to-back on top (so the
   top reads as cloth, not a flat lid), a gold brow band, side wings flaring
   out and down to the shoulders and two lappets laid forward over the
-  shoulders and down the chest in front of the collar; the khat (laborer) a
-  bag at the nape; the priest a headcloth to the shoulders and a sun disc; the
+  shoulders and down the chest in front of the collar; the laborer close-cropped
+  black hair (round 12; was a khat); the priest a headcloth to the shoulders and a sun disc; the
   pharaoh's khepresh swells up and back; the spearman close-cropped black
   hair (a hairline on the face plane, the team band a row up so it shades
   neither brow nor eyes) and a side lock. The men's face plane (z = 5) is
@@ -1347,6 +1347,49 @@ same channel names, plus:
   side on a bent arm with the right forearm bent across to the string at
   rest, and to shoot the bow arm goes straight out and the right elbow draws
   back to shoulder height with the arrow along the forearm.
+- **One flesh mass, work poses with weight, one line** (round 12, the
+  Laborer first; every man): the limbs are round tapering sections
+  (`limbRows`: each row a filled ellipse on the half-voxel grid, an octagon
+  at 5 wide) instead of 3 x 3 sticks: a 5-wide deltoid / biceps tapering to
+  a 3-wide elbow, forearm and fist (`ARM_ROWS`), a 5-wide thigh (the two
+  thighs meet under the pelvis) tapering to a 5-wide rounded knee that is
+  the same section as the shin's top, so the knee rows overlap with no step
+  (`THIGH_ROWS` / `SHIN_ROWS`, pivot `LEG_PIVOT` [0.5, 14, 0.5]), a calf
+  bulging back, a 3-wide straight foot (toes forward). Four flat skin tones
+  (`PAL_SKIN` H / L / M / D, a mid brown 0x8e5634 front that grades to
+  Retold's labourer brown, no salmon; the heads' SKIN / SKIN_FACE a step
+  browner to match):
+  H the lit shoulder tops, L fronts, M sides and back, D the inner faces
+  (under the arms, the flanks under the armpits, the inner thighs and calves,
+  a side-tone row under the pectorals only, not a full dark seam); the calf
+  bulges back 5-6 half voxels; a palette with no H lightens L (`palH`).
+  Thighs and shins are built per side (the inner face differs). Every arm
+  without a baked bend is split at the elbow (`splitArm`, as the archer's:
+  parts armL / foreL, armR / foreR, the forearm joint `FORE_J`), and
+  `rig()` re-parents gear held in that hand (weapons, shields, tools) to the
+  forearm at the same place, so a straight elbow looks as before. The men's
+  bodies are meshed with no corner AO (`ao: false` on the part, passed to
+  buildVoxelGeometry): on the round sections it drew dark grooves down every
+  limb. The kilt (`eKilt`) flares as a short trapezoid (10 -> 12 -> 14 wide,
+  deeper towards the hem) with the row under the belt a tone down (the
+  belt's shadow) and the fold line. The Laborer (unit_11) now wears Retold's
+  team wrap kilt under a linen sash and close-cropped black hair (no white
+  khat). unit_view.cpp, for rigs with `stance` (Egyptian men; the Greek
+  villager poses are unchanged): work poses solved so a foot or knee meets
+  the ground (thigh 7 + shin 7 rig voxels): building kneels on the rear knee
+  with the mallet cocked behind the ear on a bent elbow and driven down
+  (bob -6.7), gathering food squats, chopping and mining lunge (front knee
+  bent over the foot, the back leg braced) with the tool cocked behind the
+  head on bent elbows and the hips dropping and the shoulders following it
+  into the blow; the walk bends the elbows; the idle stands feet under the
+  hips (no knock-kneed splay). One outline for every Egyptian unit: a single
+  width factor 0.3 for every part (bodies, heads, robes, gear), and
+  `unit_outline.gdshader` draws each mesh's line in its own surface colour
+  taken down (`eg_line_k` 0.24 of the linear albedo, team voxels in their
+  dye x0.22, plus a little sienna): deep brown round skin, warm grey round
+  white linen, so the priest's robe and face get the same thin clean line
+  as a bare worker. `unit.gdshader`: a softer rim (0.18) on the Egyptian
+  figures' own colours, which flared the lit edge of every limb pink.
 - **Palette**: the grade's exposure and warm chroma limiter (grade_effect.gd)
   take about half the chroma of any warm colour: a deep gold (0xd2a400) reads
   olive-khaki, an orange gold (0xffb000) peach like the skin. The gold is a

@@ -92,7 +92,9 @@ void fragment() {
 	// rim light: warm on skin, bronze and cloth, the unit's own dye on team parts
 	// (white on red reads pink), so outlines lift off the ground in shade
 	vec3 rim_col = mix(c * vec3(1.0, 0.93, 0.8), team_sat * 1.2, v_team);
-	em += rim_col * rim * 0.4 * (1.0 - v_dead);
+	// (round 12) a softer rim on the Egyptian figures' own colours: at 0.4 the
+	// lit edge of every brown limb flared salmon-pink
+	em += rim_col * rim * mix(0.4, mix(0.18, 0.4, v_team), v_eg) * (1.0 - v_dead);
 	// hit flash: the man struck flares white-hot to orange, off every team
 	// colour (the old team-tinted flash made blue soldiers look lit up)
 	float hit_k = min(v_flash * 20.0, 1.0);
