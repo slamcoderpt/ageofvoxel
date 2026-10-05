@@ -940,20 +940,25 @@ func _class_groups(units: Array) -> Array:
 	var set := {}
 	for u in units:
 		set[str(u)] = true
-	if set.size() >= 9:
+	if set.size() >= maxi(9, _defs.size()):
 		return ["All Units"]
 	var out := []
 	var human := ["hoplite", "toxotes", "hippikon"]
+	# (sim/civ) the Egyptian human soldiers and heroes share the Greek classes
+	var eg_human := ["spearman", "axeman", "slinger", "chariot_archer", "camel_rider", "war_elephant", "mercenary", "mercenary_cavalry"]
 	var myth := ["minotaur", "cyclops", "centaur", "medusa"]
 	if human.all(func(k): return set.has(k)):
 		out.append("Human Soldier")
 		for k in human: set.erase(k)
+		if eg_human.all(func(k): return set.has(k)):
+			for k in eg_human: set.erase(k)
 	if myth.all(func(k): return set.has(k)):
 		out.append("Myth Unit")
 		for k in myth: set.erase(k)
 	if set.has("hero"):
 		out.append("Hero")
 		set.erase("hero")
+		for k in ["priest", "pharaoh"]: set.erase(k)
 	for u in units:
 		if set.has(str(u)):
 			out.append(str(_defs[u].name) if _defs.has(u) else str(u).capitalize())
