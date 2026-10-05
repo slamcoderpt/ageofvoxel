@@ -148,6 +148,7 @@ AovUnitView::Rig AovUnitView::parse_rig(const Dictionary &R, int t) {
 	rig.gait = (float)(double)R.get("gait", 1.0);
 	rig.stride = (float)(double)R.get("stride", 1.0);
 	rig.hover = (float)(double)R.get("hover", 0.0);
+	rig.graze = (bool)R.get("graze", true);
 	rig.voxel = (float)(double)R.get("voxel", 0.07);
 	const Array parts = R.get("parts", Array());
 	for (int64_t i = 0; i < parts.size(); i++) {
@@ -427,7 +428,7 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 		} else {
 			set(CH_neck, 0.05 + S(t * 0.8) * 0.04);
 			if (st == aov::A_IDLE) {
-				const double g = smooth((S(t * 0.19 + id) - 0.7) * 5);
+				const double g = rig.graze ? smooth((S(t * 0.19 + id) - 0.7) * 5) : 0.0;
 				add(CH_neck, g * 0.75);
 				set(CH_legFL, -0.05); set(CH_legBR, 0.08); set(CH_cannonBR, 0.35);
 			}

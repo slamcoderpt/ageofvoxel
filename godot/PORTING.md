@@ -1018,7 +1018,10 @@ same channel names, plus:
   overarm; arms down at rest), `serpent` (medusa family without arms: the
   hood rears and strikes), `chariot`, `staff`; `gait` / `stride` (four-legged
   walk frequency / amplitude x the horse's: elephant 0.55 / 0.6, camel 0.75,
-  crocodile 0.7 / 0.55); `hover` (flyers, rig voxels); per part `vary: [k, n]`
+  crocodile 0.7 / 0.55); `hover` (flyers, rig voxels); `graze: false` (horse /
+  centaur kinds: no head-down grazing dip at idle, for harnessed and ridden
+  mounts: the chariot horse, the camel; Rig::graze in unit_view.cpp, default
+  true so the Greek horses are unchanged); per part `vary: [k, n]`
   (shown for the units whose id hashes to k of n, rule `R_VARY`).
 - **New kinds / channels**: `flyer` (Phoenix, Roc: hover with a bob, wings
   `wingL` / `wingR` beating, faster on the move, a dive with the talons
@@ -1039,10 +1042,19 @@ same channel names, plus:
   corselet and apron over a long team skirt, striped crook), `chariot_archer`
   (white horse in a striped blanket and team collar, two-wheeled silver car
   with a team front, an archer in silver scale and a helmet; anim `centaur`
-  = horse legs + archer arms), `camel_rider` (tan dromedary with a hump, white
-  cloth with a team border and zigzag hem, team scarf, rider in a tall team
-  cap with a khopesh), `mercenary_cavalry` (dark barded horse, Nubian
-  rider), `war_elephant` (0.1: grey elephant, cow-hide cloth, team pad, a
+  = horse legs + archer arms; the horse's neck is arched high with the head
+  out in front of the chest, the belly tucked up so daylight shows between
+  the fore and hind legs), `camel_rider` (0.09, the rider at 0.065 / 0.09
+  so the camel dominates: a sandy-brown hide distinct from the rider's
+  bronze skin, a lighter belly and legs, a darker muzzle; one high hump under
+  a domed white cloth with a broad team border and an ochre zigzag hem; a
+  long S-curved neck that dips from the chest and rises above the rider's
+  knees to a small head with ears and a narrow muzzle, a team scarf at the
+  throat; long thin legs with knobby knees / hocks and broad pads; the
+  rider's bare legs astride the cloth, a team tunic, a team-crowned linen
+  nemes with lappets, a silver hooked sword held forward from the fist),
+  `mercenary_cavalry` (dark barded horse, Nubian rider; shares the horse
+  neck and belly of the chariot horse), `war_elephant` (0.1: grey elephant, cow-hide cloth, team pad, a
   wooden howdah, a silver and gold forehead plate with a team lozenge,
   trunk, tusks, ears; a mahout at 0.7 x), `catapult` (0.09), `siege_tower`
   (0.1, team hides, a ladder).

@@ -296,12 +296,20 @@ function headE(style) {
     m.box(-1, 3, -1, 7, 3, 7, SILVER).box(0, 6, 0, 5, 1, 5, SILVER).carve(0, 3, 5, 5, 1, 1);
     m.box(2, 3, -1, 1, 5, 7, TEAM).carve(2, 3, 5, 1, 1, 1);
     m.box(-1, 0, 2, 1, 3, 3, SILVER).box(5, 0, 2, 1, 3, 3, SILVER).box(-1, -1, -1, 7, 4, 2, SILVER_DK);
-  } else if (style === 'cap') {
-    // the camel rider's tall flat-topped cap in team with a gold band
-    m.box(-1, 3, -1, 7, 2, 7, GOLD).carve(0, 3, 5, 5, 1, 1);
-    m.box(-1, 5, -1, 7, 4, 7, TEAM).box(-1, 9, -1, 7, 1, 7, TEAM_TRIM);
-    tbox(m, -1, 5, -1, 7, 4, 1, TEAM_SHADE);
-    m.box(-1, 0, -1, 7, 3, 2, HAIR);
+  } else if (style === 'camel') {
+    // a striped linen-and-team nemes: a rounded crown, a gold brow band and
+    // wide lappets flaring out beside the face to the shoulders
+    const S = stripes(LINEN, TEAM);
+    for (let y = 3; y <= 6; y++) for (let z = -1; z <= 5; z++) for (let x = -1; x <= 5; x++) {
+      const r = y === 3 ? 9 : y === 4 ? 8 : y === 5 ? 5.5 : 2.6;
+      if ((x - 2) * (x - 2) + (z - 2) * (z - 2) > r + 0.1) continue;
+      if (z === 5 && y < 4) continue;
+      m.set(x, y, z, y === 3 ? GOLD : y >= 5 ? TEAM : LINEN);   // a team crown over a linen stripe
+    }
+    m.carve(0, 3, 5, 5, 1, 1).box(0, 3, 5, 5, 1, 1, GOLD);
+    m.box(-1, -1, -1, 7, 4, 2, S);
+    for (const [x, o] of [[-1, -1], [5, 1]]) { m.box(x, -1, 1, 1, 4, 3, S); m.box(x + o, -4, 2, 1, 4, 2, S); m.box(x, -4, 2, 1, 3, 2, S); }
+    m.box(1, -3, -2, 3, 3, 1, S);
   } else if (style === 'priest') {
     // white headcloth over the shoulders, a gold sun disc on the brow
     m.box(-1, 3, -1, 7, 3, 7, LINEN).box(0, 6, 0, 5, 1, 5, LINEN).carve(0, 3, 5, 5, 1, 1);
@@ -386,6 +394,19 @@ function khopeshM(col = BRONZE) {
   const arc = [[7, 0], [8, 1], [9, 2], [9, 3], [9, 4], [8, 5], [7, 5], [6, 6]];
   for (const [y, z] of arc) { m.set(0, y, z, col); m.set(0, y - 1, z, col); }
   m.set(0, 5, 6, 0xf6f0d0);
+  return m;
+}
+// the camel rider's long khopesh-sword: a gold hilt, a bright blade leaning out from
+// the body (-x, the rider's right) and hooked forward at the tip
+function camelSwordM() {
+  const m = new VoxelModel();
+  m.box(0, -2, 0, 1, 3, 1, LEATHER).set(0, -3, 0, GOLD(0, 0, 0)).box(-1, 1, -1, 3, 1, 3, GOLD);
+  // the blade runs forward and a little up and out from the fist, hooked at the tip
+  for (let i = 0; i <= 8; i++) {
+    const x = -Math.round(i * 0.3), y = 2 + Math.round(i * 0.45), z = 1 + i;
+    m.set(x, y, z, SILVER_DK).set(x, y + 1, z, SILVER(x, y + 1, z));
+  }
+  for (const [y, z] of [[8, 10], [8, 11], [7, 11], [6, 11], [6, 12]]) m.set(-2, y, z, z >= 11 ? 0xf4f6f8 : SILVER(0, y, z));
   return m;
 }
 function longBladeM(col = GOLD, len = 12) {
@@ -623,26 +644,29 @@ function horseBody(C) {
   m.ellipsoid(3, 4, 17.5, 3.1, 4.4, 3.8, C);
   m.ellipsoid(3, 7.5, 2.5, 2.4, 1.5, 3, C);
   m.box(1, 1, 1, 5, 4, 4, C).box(1, 0, 16, 5, 4, 4, C);
-  for (let z = 8; z < 14; z++) m.carve(0, -2, z, 7, 2 + (z > 9 && z < 12 ? 1 : 0), 1);
+  // a tucked-up belly between the fore and hind legs (daylight under it)
+  for (let z = 7; z < 15; z++) m.carve(0, -2, z, 7, 3 + (z > 8 && z < 13 ? 1 : 0), 1);
   return m;
 }
 function horseNeck(C, MANE, { bridle = TEAM, collar: col = null } = {}) {
   const m = new VoxelModel();
-  const pts = [[0, 1.5, 3.2], [4, 2.6, 2.8], [8, 4.4, 2.3], [11.5, 6.4, 1.9]];
+  // an arched neck carried high (the crest up to y 13), the head out in
+  // front of the chest at ~40 degrees, clear of the forelegs
+  const pts = [[0, 1.5, 3.2], [4, 2.4, 2.8], [8.5, 3.6, 2.3], [12.5, 5.2, 1.9]];
   for (let i = 0; i < pts.length - 1; i++) capsuleYZ(m, 0, 3, pts[i][0], pts[i][1], pts[i][2], pts[i + 1][0], pts[i + 1][1], pts[i + 1][2], C);
-  capsuleYZ(m, 0, 3, 12, 7, 2.2, 7.5, 12.5, 1.5, C);
-  capsuleYZ(m, 0, 3, 11, 8, 1.6, 9, 9.5, 1.6, C);
-  capsuleYZ(m, 0, 3, 7.5, 12.5, 1.5, 7.2, 13.2, 1.2, 0x6f675f);
-  m.set(0, 7, 13, DARK).set(2, 7, 13, DARK).set(-1, 11, 8, DARK).set(3, 11, 8, DARK);
-  m.set(0, 14, 6, C).set(0, 15, 6, C).set(2, 14, 6, C).set(2, 15, 6, C);
-  for (let y = 1; y <= 13; y++) {
+  capsuleYZ(m, 0, 3, 13, 6, 2.2, 10, 11.5, 1.5, C);
+  capsuleYZ(m, 0, 3, 12, 7, 1.6, 10.5, 8.8, 1.6, C);
+  capsuleYZ(m, 0, 3, 10, 11.5, 1.5, 9.6, 12.4, 1.2, 0x6f675f);
+  m.set(0, 9, 12, DARK).set(2, 9, 12, DARK).set(-1, 12, 7, DARK).set(3, 12, 7, DARK);
+  m.set(0, 15, 5, C).set(0, 16, 5, C).set(2, 15, 5, C).set(2, 16, 5, C);
+  for (let y = 1; y <= 14; y++) {
     let z = -8;
     while (z < 12 && !m.has(1, y, z)) z++;
     if (z >= 12) continue;
     m.set(1, y, z - 1, MANE).set(1, y, z, MANE);
   }
-  m.line(-1, 12, 7, -1, 8, 11, bridle).line(3, 12, 7, 3, 8, 11, bridle).box(0, 13, 7, 3, 1, 1, bridle).box(-1, 8, 12, 5, 1, 1, bridle);
-  m.set(-1, 9, 10, GOLD(1, 1, 1)).set(3, 9, 10, GOLD(2, 1, 1));
+  m.line(-1, 13, 6, -1, 10, 10, bridle).line(3, 13, 6, 3, 10, 10, bridle).box(0, 14, 6, 3, 1, 1, bridle).box(-1, 10, 11, 5, 1, 1, bridle);
+  m.set(-1, 11, 9, GOLD(1, 1, 1)).set(3, 11, 9, GOLD(2, 1, 1));
   if (col) for (let y = 1; y <= 4; y++) for (let z = -2; z <= 8; z++) for (let x = -1; x <= 3; x++) {
     if (!m.has(x, y, z)) continue;
     if (!m.has(x + 1, y, z) || !m.has(x - 1, y, z) || !m.has(x, y, z + 1) || !m.has(x, y, z - 1)) m.set(x, y, z, y === 4 ? GOLD : col);
@@ -726,9 +750,9 @@ function riderTorso(build) { const m = build(); m.carve(-2, -6, -3, 12, 5, 10); 
   const t = riderTorso(() => { const m = torsoBody(SKIN); scaleArmor(m); collar(m, [GOLD, TEAM, GOLD]); kilt(m, { len: 4 }); m.box(0, 0, -1, 8, 1, 6, LEATHER_DK); return m; });
   const standLegs = new VoxelModel();
   for (const x of [-2, 1]) standLegs.box(x, 0, -1, 2, 10, 2, SKIN).box(x, 9, -1, 2, 2, 2, TEAM).box(x, 0, -1, 2, 1, 3, SANDAL);
-  rig('chariot_archer', { voxel: 0.07, anim: 'centaur', style: 'chariot', pose: 'chariot' }, [
+  rig('chariot_archer', { voxel: 0.07, anim: 'centaur', style: 'chariot', pose: 'chariot', graze: false }, [
     part('body', horseBody(C), [3, 0, 10.5], [0, 10, 12], null, { coat: true }),
-    part('barding', stripedBlanket({ z0: 6, z1: 15, low: 4, top: 9 }), [3, 0, 10.5], [0, 0, 0], 'body'),
+    part('barding', stripedBlanket({ z0: 7, z1: 14, low: 5, top: 9 }), [3, 0, 10.5], [0, 0, 0], 'body'),
     part('neck', horseNeck(C, MANE, { collar: TEAM }), [1.5, 0, 2], [0, 5.5, 8], 'body', { coat: true }),
     part('tail', horseTail(MANE), [1, 0, 0], [0, 7, -10], 'body', { coat: true }),
     ...horseLegs(C, {}),
@@ -744,59 +768,111 @@ function riderTorso(build) { const m = build(); m.carve(-2, -6, -3, 12, 5, 10); 
   ]);
 }
 
-// Camel Rider: a tan dromedary, a white saddle cloth with a team border and
-// a zigzag hem, a team neck scarf; the rider in a team tunic and a tall cap.
+// Camel Rider (rig voxel 0.09, the rider at 0.065 / 0.09):
+// a dromedary in its own sandy-brown hide (a lighter belly and legs, a dark
+// muzzle), one high hump under a domed white saddle cloth with a broad team
+// border and a zigzag hem, a long S-curved neck that dips from the chest and
+// rises high above the rider's knees to a small head with a narrow muzzle,
+// long thin legs with knobby knees and broad pads, a team scarf at the throat.
+// The rider: bronze skin over the white cloth, a team tunic and kilt, a gold
+// collar, a striped linen-and-team nemes, and a long hooked khopesh-sword
+// held out from his side.
 {
-  const C = pick3(15, 0xc89c68, 0xbb8f5c, 0xd4aa76, 0.5, 0.85);
-  const CD = 0x9a7048;
+  const HIDE = pick3(15, 0x9a7048, 0x8c6440, 0xa67a50, 0.5, 0.85);
+  const BELLY = pick3(17, 0xc9a67a, 0xbf9c70, 0xd2b084, 0.5, 0.85);
+  const MUZZLE = 0x7a5636, KNEE = 0x6e4e34, PAD = 0x3e2c20;
+  const HC = (x, y, z) => (y <= 2 ? BELLY(x, y, z) : HIDE(x, y, z));
   const body = new VoxelModel();
-  body.ellipsoid(3, 4.5, 10, 3.2, 4.2, 9, C);
-  body.ellipsoid(3, 4.5, 3.5, 3.2, 4.3, 3.6, C);
-  body.ellipsoid(3, 4, 16.5, 3, 4.4, 3.6, C);
-  body.ellipsoid(3, 9.5, 10.5, 2.9, 3.4, 4.6, C);   // the hump
-  for (let z = 7; z < 14; z++) body.carve(0, -2, z, 7, 2 + (z > 8 && z < 12 ? 1 : 0), 1);
+  body.ellipsoid(4, 4.5, 10, 3.8, 3.9, 7.5, HC);      // the barrel
+  body.ellipsoid(4, 4, 15.5, 3.5, 4.4, 3.2, HC);      // the deep chest (brisket)
+  body.ellipsoid(4, 4.8, 4, 3.5, 3.6, 3.4, HC);       // the narrow rump
+  body.ellipsoid(4, 9.5, 10.5, 2.9, 4.4, 4.2, HIDE);  // the single high hump
+  for (let z = 7; z < 13; z++) body.carve(0, -2, z, 9, 2 + (z > 8 && z < 11 ? 1 : 0), 1);   // the belly line
+  // the saddle cloth: a white dome over the hump and back, a broad team border
+  // falling down the flanks, a zigzag hem (ochre / dark leather), team ends
   const cloth = new VoxelModel();
-  for (let z = 5; z <= 16; z++) for (let x = -1; x <= 7; x++) {
+  const Z0 = 5, Z1 = 16;
+  for (let z = Z0; z <= Z1; z++) for (let x = 0; x <= 8; x++) {
     let top = -1;
-    for (let y = 16; y >= 0; y--) if (body.has(Math.min(6, Math.max(0, x)), y, z)) { top = y; break; }
+    for (let y = 16; y >= 0; y--) if (body.has(x, y, z)) { top = y; break; }
     if (top < 0) continue;
-    if (x >= 0 && x <= 6) cloth.set(x, top + 1, z, z === 5 || z === 16 ? TEAM : LINEN(x, top, z));
+    const end = z === Z0 || z === Z1;
+    cloth.set(x, top + 1, z, end ? TEAM : LINEN(x, top, z));
+    if (end) cloth.set(x, top + 2, z, TEAM_TRIM);
   }
-  for (let z = 5; z <= 16; z++) for (let y = 3; y <= 9; y++) {
-    const c = y <= 4 ? ((z + y) % 2 ? OCHRE : LEATHER_DK) : y <= 6 ? TEAM : LINEN(0, y, z);
-    cloth.set(-1, y, z, c).set(7, y, z, c);
+  for (let z = Z0; z <= Z1; z++) for (let y = 3; y <= 11; y++) for (const s of [-1, 1]) {
+    let xb = s < 0 ? 0 : 8;
+    while (xb >= 0 && xb <= 8 && !body.has(xb, y, z)) xb -= s;
+    if (xb < 0 || xb > 8) continue;
+    const x = xb + s;
+    if (cloth.has(x, y, z)) continue;
+    const c = y >= 8 ? LINEN(x, y, z) : y >= 6 ? (y === 6 ? TEAM_SHADE : TEAM) : y === 5 ? ((z & 1) ? OCHRE : LEATHER_DK) : ((z & 1) ? null : OCHRE);
+    if (c === TEAM_SHADE) tset(cloth, x, y, z, TEAM_SHADE); else if (c) cloth.set(x, y, z, c);
   }
+  // the rider's legs astride the hump: thighs over the cloth, bare shins
+  // hanging forward of the team border, sandal-less feet
+  for (const s of [-1, 1]) {
+    const hx = 4 + s * 3.2;
+    tube(cloth, [hx, 13.2, 10], [4 + s * 5.4, 10.8, 12.2], 1.1, 1.0, SKIN);
+    tube(cloth, [4 + s * 5.4, 10.8, 12.2], [4 + s * 5.8, 4.4, 12.6], 1.0, 0.85, SKIN);
+    tube(cloth, [hx, 13.4, 10], [4 + s * 4.6, 12.4, 11.8], 1.25, 1.1, TEAM);    // the kilt over the thigh
+    const fx = Math.round(4 + s * 5.9);
+    cloth.box(s < 0 ? fx - 1 : fx, 3, 12, 2, 1, 3, SKIN_SH);
+  }
+  // the neck: an S-curve dipping forward from the chest, then rising high
   const neck = new VoxelModel();
-  capsuleYZ(neck, 0, 3, 0, 1, 2.6, 2, 7, 2.0, C);
-  capsuleYZ(neck, 0, 3, 2, 7, 2.0, 9, 10, 1.6, C);
-  capsuleYZ(neck, 0, 3, 9, 10, 1.6, 13, 10.5, 1.7, C);
-  capsuleYZ(neck, 0, 3, 13, 10, 2.0, 12.5, 15.5, 1.4, C);   // the head, held level
-  capsuleYZ(neck, 0, 3, 12.2, 15.5, 1.4, 11.8, 16.5, 1.1, CD);
-  neck.set(-1, 14, 11, DARK).set(3, 14, 11, DARK).set(0, 15, 10, C).set(2, 15, 10, C);
-  neck.box(-1, 3, 3, 5, 3, 4, TEAM).box(-1, 1, 6, 5, 3, 2, TEAM).box(-1, -1, 7, 1, 3, 1, TEAM);   // the team scarf
-  neck.line(-1, 13, 13, -1, 12, 16, LEATHER_DK).line(3, 13, 13, 3, 12, 16, LEATHER_DK);
-  const up = (hind) => new VoxelModel().box(0, 0, 0, 2, 8, hind ? 3 : 2, C).box(0, 6, 0, 2, 2, 3, C);
-  const low = () => new VoxelModel().box(0, 2, 0, 2, 7, 2, C).box(0, 6, 0, 2, 1, 2, CD).box(-0, 0, -1, 2, 2, 4, CD);
+  const NP = [[1, 0, 2.6], [-0.3, 3.6, 2.1], [2.2, 7.0, 1.8], [8, 9.0, 1.6], [14, 9.0, 1.6]];
+  for (let i = 0; i < NP.length - 1; i++) capsuleYZ(neck, 0, 3, NP[i][0], NP[i][1], NP[i][2], NP[i + 1][0], NP[i + 1][1], NP[i + 1][2], HIDE);
+  for (let y = -2; y <= 10; y++) for (let z = 0; z <= 12; z++) if (neck.has(1, y, z) && !neck.has(1, y - 1, z) && y < 6) neck.set(1, y, z, BELLY(1, y, z));
+  // the small head held level, the narrow muzzle and the drooping lip
+  capsuleYZ(neck, 0, 3, 14.7, 8.4, 1.9, 14.5, 11.8, 1.5, HIDE);
+  capsuleYZ(neck, 0, 3, 14.3, 11.8, 1.25, 13.6, 14.8, 1.0, MUZZLE);
+  neck.set(1, 12, 14, MUZZLE).set(1, 12, 13, MUZZLE);
+  neck.set(0, 16, 8, HIDE).set(0, 17, 8, KNEE).set(2, 16, 8, HIDE).set(2, 17, 8, KNEE);   // small ears
+  for (const x of [0, 2]) if (neck.has(x, 15, 10)) neck.set(x, 15, 10, DARK);
+  neck.set(1, 13, 15, DARK);
+  // halter and the team scarf at the throat with a hanging end
+  for (let y = 11; y <= 17; y++) for (let x = 0; x <= 2; x++) { if (neck.has(x, y, 12)) neck.set(x, y, 12, LEATHER_DK); if (neck.has(x, y, 9) && y >= 15) neck.set(x, y, 9, LEATHER_DK); }
+  neck.set(1, 12, 15, 0x3a2a1e);
+  for (let y = -1; y <= 3; y++) for (let z = 0; z <= 5; z++) for (let x = -1; x <= 3; x++) {
+    if (!neck.has(x, y, z) || (neck.has(x + 1, y, z) && neck.has(x - 1, y, z) && neck.has(x, y + 1, z) && neck.has(x, y, z + 1) && neck.has(x, y, z - 1))) continue;
+    if (y >= 0) neck.set(x, y, z, TEAM);
+  }
+  neck.box(-1, 1, 4, 1, 2, 2, TEAM).box(-1, -3, 4, 1, 4, 1, TEAM).set(-1, -4, 4, TEAM_TRIM);
+  // long thin legs: a thick forearm / thigh, a knobby knee, a slim cannon, a broad pad
+  const up = (hind) => {
+    const m = new VoxelModel().box(0, 1, 0, 2, 7, 2, HIDE).box(0, 5, hind ? -1 : 0, 2, 3, 3, HIDE);
+    m.box(0, 0, hind ? -1 : 0, 2, 2, 3, KNEE);     // the knee (front) / hock (hind) knob
+    return m;
+  };
+  const low = () => new VoxelModel().box(0, 2, 0, 2, 7, 2, BELLY).box(0, 1, 0, 2, 1, 2, KNEE).box(0, 0, -1, 2, 1, 4, PAD);
   const coat = { coat: true };
-  const t = riderTorso(() => { const m = torsoBody(SKIN); m.box(0, 1, -1, 8, 7, 6, TEAM); tbox(m, 0, 1, -1, 1, 7, 6, TEAM_SHADE); tbox(m, 7, 1, -1, 1, 7, 6, TEAM_SHADE); m.box(1, 2, 4, 6, 4, 1, LEATHER); collar(m, [GOLD, TEAM_TRIM, GOLD]); kilt(m, { len: 4 }); m.box(0, 0, -1, 8, 1, 6, GOLD_DK); return m; });
-  rig('camel_rider', { voxel: 0.07, anim: 'horse', style: 'camel', gait: 0.75, stride: 0.9 }, [
-    part('body', body, [3, 0, 10.5], [0, 15, 0.5], null, coat),
-    part('barding', cloth, [3, 0, 10.5], [0, 0, 0], 'body'),
-    part('riderLegs', riderLegsM({ y: 12, x0: -3, x1: 8, z: 8, len: 7, sandal: false }), [3, 0, 10.5], [0, 0, 0], 'body'),
-    part('neck', neck, [1.5, 0, 2], [0, 4.5, 7.5], 'body', coat),
-    part('tail', new VoxelModel().box(0, -6, -1, 1, 6, 1, C).box(0, -8, -1, 1, 2, 1, HAIR), [0.5, 0, 0], [0, 7, -9.5], 'body', coat),
-    part('legFL', up(false), [1, 8, 1], [2, 1, 6.5], 'body', coat),
+  const R = 0.065 / 0.09;   // the rider a touch under the foot soldiers' size: the camel dominates
+  const t = riderTorso(() => {
+    const m = torsoBody(SKIN);
+    m.box(0, 1, -1, 8, 7, 6, TEAM); tbox(m, 0, 1, -1, 1, 7, 6, TEAM_SHADE); tbox(m, 7, 1, -1, 1, 7, 6, TEAM_SHADE);
+    m.box(1, 2, 4, 6, 4, 1, LEATHER).box(1, 2, -2, 6, 4, 1, LEATHER);    // the leather corslet
+    collar(m, [GOLD, TEAM_TRIM, GOLD]); kilt(m, { len: 4 }); m.box(0, 0, -1, 8, 1, 6, GOLD_DK);
+    return m;
+  });
+  rig('camel_rider', { voxel: 0.09, anim: 'horse', style: 'camel', gait: 0.75, stride: 0.9, graze: false }, [
+    part('body', body, [4, 0, 10], [0, 14, 0.5], null, coat),
+    part('barding', cloth, [4, 0, 10], [0, 0, 0], 'body'),
+    part('neck', neck, [1.5, 0, 1], [0, 5.5, 7.6], 'body', coat),
+    part('tail', new VoxelModel().box(0, -6, -1, 1, 6, 1, HIDE).box(0, -9, -1, 1, 3, 1, HAIR), [0.5, 0, 0], [0, 7, -9], 'body', coat),
+    part('legFL', up(false), [1, 8, 1], [2.5, 2, 5.5], 'body', coat),
     part('cannonFL', low(), [1, 9, 1], [0, -7, 0], 'legFL', coat),
-    part('legFR', up(false), [1, 8, 1], [-2, 1, 6.5], 'body', coat),
+    part('legFR', up(false), [1, 8, 1], [-2.5, 2, 5.5], 'body', coat),
     part('cannonFR', low(), [1, 9, 1], [0, -7, 0], 'legFR', coat),
-    part('legBL', up(true), [1, 8, 1.5], [2, 1, -6.5], 'body', coat),
+    part('legBL', up(true), [1, 8, 1], [2.5, 2, -5.5], 'body', coat),
     part('cannonBL', low(), [1, 9, 1], [0, -7, 0], 'legBL', coat),
-    part('legBR', up(true), [1, 8, 1.5], [-2, 1, -6.5], 'body', coat),
+    part('legBR', up(true), [1, 8, 1], [-2.5, 2, -5.5], 'body', coat),
     part('cannonBR', low(), [1, 9, 1], [0, -7, 0], 'legBR', coat),
-    part('torso', t, [4, 0, 2], [0, 13, 0.5], 'body'),
-    head('cap'),
-    ...arms({ upper: TEAM, bracer: GOLD }),
-    part('weapon', khopeshM(BRONZE), [0, 0, 0], HAND, 'armR'),
+    part('torso', t, [4, 0, 2], [0, 14.6, 0], 'body', { scale: R }),
+    part('head', headE('camel'), [2.5, 0, 2.5], sc([0, 10, 0.2], R), 'torso', { scale: 0.8 * R }),
+    part('armL', armM({ side: 'L', upper: TEAM, bracer: GOLD }), [1, 7, 1], sc([5.5, 8, 0], R), 'torso', { scale: R }),
+    part('armR', armM({ side: 'R', upper: TEAM, bracer: GOLD }), [1, 7, 1], sc([-5.5, 8, 0], R), 'torso', { scale: R }),
+    part('weapon', camelSwordM(), [0, 0, 0], sc(HAND, R), 'armR', { scale: R }),
   ]);
 }
 

@@ -59,6 +59,7 @@ public:
 		int pose = 0; // a variant of the kind (rig "pose": spear, slash, sling, serpent, chariot, staff)
 		float gait = 1, stride = 1; // four-legged walk frequency / amplitude (x the horse's)
 		float hover = 0;            // flyers: height above the ground (rig voxels)
+		bool graze = true;          // four-legged idle: dips the head to graze now and then
 		float voxel = 0.07f;
 		bool has_shield = false, has_armR = false;
 		std::vector<Part> parts;
