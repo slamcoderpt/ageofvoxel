@@ -33,6 +33,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "aov_sim.h"
@@ -50,11 +51,14 @@ public:
 		Vector3 joint;     // world units (joint * voxel)
 		bool coat = false;
 		int rule = 0;      // show rule (see unit_view.cpp)
-		int rule_v = 0;
+		int rule_v = 0, rule_n = 0; // (R_VARY: shown when the unit's id hashes to rule_v of rule_n)
 		bool weapon = false; // anim channel 'weapon' (dropped by the dead)
 	};
 	struct Rig {
-		int kind = 0; // K_HUMAN, K_ARCHER, K_BEAST, K_HORSE, K_CENTAUR, K_MEDUSA
+		int kind = 0; // K_HUMAN, K_ARCHER, K_BEAST, K_HORSE, K_CENTAUR, K_MEDUSA, K_FLYER, K_SIEGE
+		int pose = 0; // a variant of the kind (rig "pose": spear, slash, sling, serpent, chariot, staff)
+		float gait = 1, stride = 1; // four-legged walk frequency / amplitude (x the horse's)
+		float hover = 0;            // flyers: height above the ground (rig voxels)
 		float voxel = 0.07f;
 		bool has_shield = false, has_armR = false;
 		std::vector<Part> parts;
@@ -106,7 +110,9 @@ private:
 	void stamp(const HitRec &h);
 	void scan(double now, bool particles);
 
-	void pose_unit(int row, float out[][3], float &bob, float &fwd);
+	std::unordered_map<int32_t, int> rig_override_; // unit id -> rig index (render-only stand-ins)
+	static Rig parse_rig(const Dictionary &R, int type);
+	void pose_unit(int row, int ri, float out[][3], float &bob, float &fwd);
 	void emit_fx(const HitRec &h, double now);
 	static PackedFloat32Array pack(const Buf &b);
 
@@ -128,6 +134,13 @@ public:
 	// result also has parts_lod, part_counts_lod, unit_count (posed) and
 	// lod_count.
 	Dictionary update(double dt, double alpha, int64_t local_player, const Array &frustum, const Vector3 &lod_origin, double lod_dist);
+	// Render-only rigs (game/units: the Egyptian myth units before the sim has
+	// their types): add_rig appends a rig (same dictionary as setup's) after
+	// the sim types and returns its index; its part buffers follow the existing
+	// ones in parts / parts_lod. set_rig_override draws (and poses) that unit
+	// with the rig instead of its type's; rig < 0 clears it.
+	int64_t add_rig(const Dictionary &rig);
+	void set_rig_override(int64_t unit_id, int64_t rig);
 	// Unit LOD mesh (unit_lod.cpp): the coarser voxel twin of one exported
 	// unit part (Mesh.surface_get_arrays(0)), factor^3 voxels per cell; the
 	// same vertex format. shadow_only: whole cells, greedy-merged faces, for

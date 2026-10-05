@@ -14,20 +14,24 @@ using namespace godot;
 namespace {
 
 constexpr double PI = 3.14159265358979323846;
-enum Kind { K_HUMAN, K_ARCHER, K_BEAST, K_HORSE, K_CENTAUR, K_MEDUSA };
+enum Kind { K_HUMAN, K_ARCHER, K_BEAST, K_HORSE, K_CENTAUR, K_MEDUSA, K_FLYER, K_SIEGE };
+// rig "pose" (scripts/export-egypt-units.mjs): a variant of the kind's motion
+enum Pose { P_NONE, P_SPEAR, P_SLASH, P_SLING, P_SERPENT, P_CHARIOT, P_STAFF };
 
 // pose channels (anim names of src/units/models.js)
 enum Ch {
 	CH_legL, CH_shinL, CH_legR, CH_shinR, CH_torso, CH_head, CH_armL, CH_armR, CH_weapon, CH_shield, CH_arrow,
 	CH_foreL, CH_foreR, CH_body, CH_neck, CH_tail, CH_legFL, CH_cannonFL, CH_legFR, CH_cannonFR, CH_legBL,
-	CH_cannonBL, CH_legBR, CH_cannonBR, CH_tailA, CH_tailB, CH_tailC, CH_coil, CH_COUNT
+	CH_cannonBL, CH_legBR, CH_cannonBR, CH_tailA, CH_tailB, CH_tailC, CH_coil,
+	CH_wheel, CH_wingL, CH_wingR, // (Godot-only: chariots / siege, wings)
+	CH_COUNT
 };
 const char *CH_NAMES[CH_COUNT] = { "legL", "shinL", "legR", "shinR", "torso", "head", "armL", "armR", "weapon", "shield",
 	"arrow", "foreL", "foreR", "body", "neck", "tail", "legFL", "cannonFL", "legFR", "cannonFR", "legBL", "cannonBL",
-	"legBR", "cannonBR", "tailA", "tailB", "tailC", "coil" };
+	"legBR", "cannonBR", "tailA", "tailB", "tailC", "coil", "wheel", "wingL", "wingR" };
 
 // show(u) rules of the conditional parts (src/units/models.js)
-enum Rule { R_ALWAYS, R_HAMMER, R_TOOL, R_CARRY, R_ARROW, R_HELM, R_HAT, R_CLOAK, R_KIT, R_PENNANT, R_SHIELD };
+enum Rule { R_ALWAYS, R_HAMMER, R_TOOL, R_CARRY, R_ARROW, R_HELM, R_HAT, R_CLOAK, R_KIT, R_PENNANT, R_SHIELD, R_VARY };
 
 const double CORPSE_TIME = 26, FADE_START = 22.5;
 const double JITTER = 0.18, PRESS_RATE = 3, STAGGER = 0.5, STUCK_TIME = 9;
@@ -128,56 +132,85 @@ PackedFloat32Array AovUnitView::pack(const Buf &b) {
 void AovUnitView::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("setup", "sim", "rigs"), &AovUnitView::setup);
 	ClassDB::bind_method(D_METHOD("update", "dt", "alpha", "local_player", "frustum", "lod_origin", "lod_dist"), &AovUnitView::update, DEFVAL(Array()), DEFVAL(Vector3()), DEFVAL(0.0));
+	ClassDB::bind_method(D_METHOD("add_rig", "rig"), &AovUnitView::add_rig);
+	ClassDB::bind_method(D_METHOD("set_rig_override", "unit_id", "rig"), &AovUnitView::set_rig_override);
 	ClassDB::bind_static_method("AovUnitView", D_METHOD("lod_mesh", "arrays", "factor", "shadow_only"), &AovUnitView::lod_mesh, DEFVAL(2), DEFVAL(false));
+}
+
+AovUnitView::Rig AovUnitView::parse_rig(const Dictionary &R, int t) {
+	Rig rig;
+	const String kind = R.get("anim", "human");
+	rig.kind = kind == "archer" ? K_ARCHER : kind == "beast" ? K_BEAST : kind == "horse" ? K_HORSE : kind == "centaur" ? K_CENTAUR : kind == "medusa" ? K_MEDUSA
+		: kind == "flyer" ? K_FLYER : kind == "siege" ? K_SIEGE : K_HUMAN;
+	const String pose = R.get("pose", "");
+	rig.pose = pose == "spear" ? P_SPEAR : pose == "slash" ? P_SLASH : pose == "sling" ? P_SLING : pose == "serpent" ? P_SERPENT
+		: pose == "chariot" ? P_CHARIOT : pose == "staff" ? P_STAFF : P_NONE;
+	rig.gait = (float)(double)R.get("gait", 1.0);
+	rig.stride = (float)(double)R.get("stride", 1.0);
+	rig.hover = (float)(double)R.get("hover", 0.0);
+	rig.voxel = (float)(double)R.get("voxel", 0.07);
+	const Array parts = R.get("parts", Array());
+	for (int64_t i = 0; i < parts.size(); i++) {
+		const Dictionary P = parts[i];
+		Part p;
+		p.name = String(P.get("name", "")).utf8().get_data();
+		const std::string anim = String(P.get("anim", "")).utf8().get_data();
+		for (int c = 0; c < CH_COUNT; c++)
+			if (anim == CH_NAMES[c]) p.channel = c;
+		p.weapon = anim == "weapon";
+		if (p.channel == CH_shield) rig.has_shield = true;
+		if (p.channel == CH_armR) rig.has_armR = true;
+		p.parent = (int)(int64_t)P.get("parentIdx", -1);
+		const Array j = P.get("joint", Array());
+		if (j.size() >= 3) p.joint = Vector3((real_t)(double)j[0], (real_t)(double)j[1], (real_t)(double)j[2]) * rig.voxel;
+		p.coat = (bool)P.get("coat", false);
+		const bool cond = (bool)P.get("conditional", false);
+		const std::string &n = p.name;
+		const Array vary = P.get("vary", Array());
+		if (vary.size() >= 2) { p.rule = R_VARY; p.rule_v = (int)(int64_t)vary[0]; p.rule_n = std::max(1, (int)(int64_t)vary[1]); }
+		else if (cond) {
+			if (n == "toolHammer") p.rule = R_HAMMER;
+			else if (n == "toolAxe") { p.rule = R_TOOL; p.rule_v = aov::RES_WOOD; }
+			else if (n == "toolPick") { p.rule = R_TOOL; p.rule_v = aov::RES_GOLD; }
+			else if (n == "toolSickle") { p.rule = R_TOOL; p.rule_v = aov::RES_FOOD; }
+			else if (n == "carryWood") { p.rule = R_CARRY; p.rule_v = aov::RES_WOOD; }
+			else if (n == "carryGold") { p.rule = R_CARRY; p.rule_v = aov::RES_GOLD; }
+			else if (n == "carryFood") { p.rule = R_CARRY; p.rule_v = aov::RES_FOOD; }
+			else if (n == "arrow") p.rule = R_ARROW;
+			else if (n.rfind("head", 0) == 0) { p.rule = (String(R.get("style", "")) == "hoplite" || t == aov::U_HOPLITE) ? R_HELM : R_HAT; p.rule_v = n.size() > 4 ? n[4] - '0' : 0; }
+			else if (n == "cloakLong") { p.rule = R_CLOAK; p.rule_v = 1; }
+			else if (n == "cloakShort") { p.rule = R_CLOAK; p.rule_v = 2; }
+			else if (n == "weapon") { p.rule = R_KIT; p.rule_v = 0; }
+			else if (n == "sword" || n == "thureos") { p.rule = R_KIT; p.rule_v = 1; }
+			else if (n == "pennant") p.rule = R_PENNANT;
+			else if (n.rfind("shield", 0) == 0) { p.rule = R_SHIELD; p.rule_v = n.size() > 6 ? n[6] - '0' : 0; }
+		}
+		rig.parts.push_back(p);
+	}
+	return rig;
+}
+
+int64_t AovUnitView::add_rig(const Dictionary &R) {
+	Rig rig = parse_rig(R, -1);
+	rig.first = (int)part_bufs_.size();
+	part_bufs_.resize(part_bufs_.size() + rig.parts.size());
+	rigs_.push_back(rig);
+	return (int64_t)rigs_.size() - 1;
+}
+
+void AovUnitView::set_rig_override(int64_t unit_id, int64_t rig) {
+	if (rig < 0 || rig >= (int64_t)rigs_.size()) rig_override_.erase((int32_t)unit_id);
+	else rig_override_[(int32_t)unit_id] = (int)rig;
 }
 
 void AovUnitView::setup(const Ref<AovSim> &sim, const Array &rigs) {
 	sim_ref_ = sim;
 	rigs_.clear();
+	rig_override_.clear();
 	int first = 0;
 	for (int64_t t = 0; t < rigs.size(); t++) {
-		Rig rig;
-		const Dictionary R = rigs[t];
-		const String kind = R.get("anim", "human");
-		rig.kind = kind == "archer" ? K_ARCHER : kind == "beast" ? K_BEAST : kind == "horse" ? K_HORSE : kind == "centaur" ? K_CENTAUR : kind == "medusa" ? K_MEDUSA : K_HUMAN;
-		rig.voxel = (float)(double)R.get("voxel", 0.07);
+		Rig rig = parse_rig(rigs[t], (int)t);
 		rig.first = first;
-		const Array parts = R.get("parts", Array());
-		for (int64_t i = 0; i < parts.size(); i++) {
-			const Dictionary P = parts[i];
-			Part p;
-			p.name = String(P.get("name", "")).utf8().get_data();
-			const std::string anim = String(P.get("anim", "")).utf8().get_data();
-			for (int c = 0; c < CH_COUNT; c++)
-				if (anim == CH_NAMES[c]) p.channel = c;
-			p.weapon = anim == "weapon";
-			if (p.channel == CH_shield) rig.has_shield = true;
-			if (p.channel == CH_armR) rig.has_armR = true;
-			p.parent = (int)(int64_t)P.get("parentIdx", -1);
-			const Array j = P.get("joint", Array());
-			if (j.size() >= 3) p.joint = Vector3((real_t)(double)j[0], (real_t)(double)j[1], (real_t)(double)j[2]) * rig.voxel;
-			p.coat = (bool)P.get("coat", false);
-			const bool cond = (bool)P.get("conditional", false);
-			const std::string &n = p.name;
-			if (cond) {
-				if (n == "toolHammer") p.rule = R_HAMMER;
-				else if (n == "toolAxe") { p.rule = R_TOOL; p.rule_v = aov::RES_WOOD; }
-				else if (n == "toolPick") { p.rule = R_TOOL; p.rule_v = aov::RES_GOLD; }
-				else if (n == "toolSickle") { p.rule = R_TOOL; p.rule_v = aov::RES_FOOD; }
-				else if (n == "carryWood") { p.rule = R_CARRY; p.rule_v = aov::RES_WOOD; }
-				else if (n == "carryGold") { p.rule = R_CARRY; p.rule_v = aov::RES_GOLD; }
-				else if (n == "carryFood") { p.rule = R_CARRY; p.rule_v = aov::RES_FOOD; }
-				else if (n == "arrow") p.rule = R_ARROW;
-				else if (n.rfind("head", 0) == 0) { p.rule = (String(R.get("style", "")) == "hoplite" || t == aov::U_HOPLITE) ? R_HELM : R_HAT; p.rule_v = n.size() > 4 ? n[4] - '0' : 0; }
-				else if (n == "cloakLong") { p.rule = R_CLOAK; p.rule_v = 1; }
-				else if (n == "cloakShort") { p.rule = R_CLOAK; p.rule_v = 2; }
-				else if (n == "weapon") { p.rule = R_KIT; p.rule_v = 0; }
-				else if (n == "sword" || n == "thureos") { p.rule = R_KIT; p.rule_v = 1; }
-				else if (n == "pennant") p.rule = R_PENNANT;
-				else if (n.rfind("shield", 0) == 0) { p.rule = R_SHIELD; p.rule_v = n.size() > 6 ? n[6] - '0' : 0; }
-			}
-			rig.parts.push_back(p);
-		}
 		first += (int)rig.parts.size();
 		rigs_.push_back(rig);
 	}
@@ -303,14 +336,15 @@ void AovUnitView::setup(const Ref<AovSim> &sim, const Array &rigs) {
 
 // ---- src/units/anim.js pose() ---------------------------------------------------
 
-void AovUnitView::pose_unit(int row, float out[][3], float &bob_out, float &fwd_out) {
+void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, float &fwd_out) {
 	const aov::Sim &SM = sim_ref_->sim();
 	const aov::UnitStore &U = SM.entities.units;
 	const int32_t id = U.id[row];
 	const int type = U.type[row];
 	const aov::UnitDef &def = aov::unit_def(type);
-	const Rig &rig = rigs_[type];
+	const Rig &rig = rigs_[ri];
 	const int kind = rig.kind;
+	const int pose = rig.pose;
 	const bool dead = U.dead[row];
 	const int st = dead ? aov::A_DIE : U.anim_state[row];
 	const double phase = std::fmod(id * 0.618034, 1.0) * PI * 2;
@@ -333,6 +367,20 @@ void AovUnitView::pose_unit(int row, float out[][3], float &bob_out, float &fwd_
 	const double extend = a_ < 0.45 ? ext0 : 0, wind = a_ < 0.45 ? 0 : wind0;
 
 	auto archer_upper = [&](int vv) -> bool {
+		if (pose == P_SLING) {
+			// (Egyptian slinger) whirl the sling over the head, then a long
+			// overarm release towards the target; the free arm points at it
+			if (attacking) {
+				const double spin = t * 15;
+				set(CH_armL, -1.35, -0.2, 0.1);
+				set(CH_torso, 0.05 + extend * 0.25, 0.35 - extend * 0.6, 0);
+				set(CH_head, 0, -0.3 + extend * 0.4);
+				if (a_ < 0.45) { set(CH_armR, -2.9 + 1.9 * extend, 0.1, -0.2); set(CH_weapon, 0.3 + 1.6 * extend); }
+				else { set(CH_armR, -2.75, 0.2, -0.35); set(CH_weapon, 1.3 + S(spin) * 0.9, 0, C(spin) * 0.9); }
+				return true;
+			}
+			return false;
+		}
 		if (attacking) {
 			const double span = std::max(0.35, cd * (0.75 + uhash(id, 57) * 0.25) - 0.45);
 			const double draw = a_ < 0.45 ? 0 : smooth((a_ - 0.45) / span);
@@ -359,11 +407,12 @@ void AovUnitView::pose_unit(int row, float out[][3], float &bob_out, float &fwd_
 		double bob = 0;
 		const bool moving = st == aov::A_WALK;
 		if (moving) {
-			const double p = t * 12;
+			const double p = t * 12 * rig.gait, A = rig.stride;
+			set(CH_wheel, std::fmod(t * 7 * rig.gait, PI * 2));
 			auto leg = [&](int up, int cannon, double ph, bool hind) {
 				const double s = S(p + ph), c = C(p + ph);
-				set(up, (hind ? 0.1 : -0.05) - s * (hind ? 0.55 : 0.75));
-				set(cannon, hind ? std::max(0.0, c) * 1.1 + 0.1 : std::max(0.0, c) * 1.5 + 0.05);
+				set(up, (hind ? 0.1 : -0.05) - s * (hind ? 0.55 : 0.75) * A);
+				set(cannon, (hind ? std::max(0.0, c) * 1.1 + 0.1 : std::max(0.0, c) * 1.5 + 0.05) * A);
 			};
 			leg(CH_legBL, CH_cannonBL, 0, true);
 			leg(CH_legBR, CH_cannonBR, 0.5, true);
@@ -372,8 +421,8 @@ void AovUnitView::pose_unit(int row, float out[][3], float &bob_out, float &fwd_
 			set(CH_body, S(p + 1.2) * 0.07);
 			set(CH_neck, 0.05 - S(p + 1.2) * 0.14);
 			set(CH_tail, -0.7 + S(p * 0.5) * 0.1, S(p) * 0.15);
-			bob = 1.2 + S(p + 2.8) * 1.3;
-			set(CH_torso, 0.12 - S(p + 1.2) * 0.1);
+			bob = (1.2 + S(p + 2.8) * 1.3) * A;
+			set(CH_torso, 0.12 - S(p + 1.2) * 0.1 * A);
 			set(CH_head, -0.05);
 		} else {
 			set(CH_neck, 0.05 + S(t * 0.8) * 0.04);
@@ -430,8 +479,17 @@ void AovUnitView::pose_unit(int row, float out[][3], float &bob_out, float &fwd_
 			const double k = smooth(die_t / 0.6);
 			set(CH_torso, 0.9 * k, 0, 0.2 * k); set(CH_head, 0.4 * k); set(CH_armL, -0.6 * k, 0, 0.5 * k); set(CH_armR, -0.4 * k, 0, -0.6 * k);
 			bob = -6 * k;
+		} else if (pose == P_SERPENT) {
+			// (wadjet) the hood sways and rears, then strikes forward to spit
+			set(CH_torso, 0.05 - (attacking ? 0.35 * wind - 0.55 * extend : 0), S(t * 1.9) * 0.15);
 		} else if (!archer_upper(v % 2)) {
 			set(CH_torso, 0.05, S(t * 2.5) * 0.12); set(CH_armL, -0.4, 0, 0.1); set(CH_weapon, 0.3); set(CH_armR, -0.3, 0, -0.1);
+		}
+		{
+			// wings (wadjet): a slow beat at rest, faster on the move, spread wide to strike
+			const double f = moving ? 7 : 2.4, fl = S(t * f) * (moving ? 0.45 : 0.18);
+			const double up = st == aov::A_DIE ? -0.6 * smooth(die_t / 0.6) : 0.55 + fl + (attacking ? 0.35 * wind : 0);
+			set(CH_wingL, 0.1, 0, up); set(CH_wingR, 0.1, 0, -up);
 		}
 		if (attacking) set(CH_arrow, 1.55 - out[CH_armR][0], 0, 0);
 		add(CH_torso, -0.35 * rec);
@@ -440,9 +498,46 @@ void AovUnitView::pose_unit(int row, float out[][3], float &bob_out, float &fwd_
 		return;
 	}
 
+	if (kind == K_FLYER) {
+		// (phoenix, roc) hover at rig.hover, wings beating (faster on the move),
+		// a dive with the talons forward to strike, a fall when killed
+		const bool moving = st == aov::A_WALK;
+		const double f = moving ? 8 : 5;
+		const double fl = S(t * f);
+		double bob = rig.hover + S(t * f * 0.5 + 1) * 1.2;
+		set(CH_wingL, 0, 0, 0.12 + fl * 0.6); set(CH_wingR, 0, 0, -0.12 - fl * 0.6);
+		set(CH_body, moving ? 0.12 : 0.02 + S(t * 0.7) * 0.04, 0, S(t * 0.5) * 0.06);
+		set(CH_tail, -0.1 + S(t * f * 0.5) * 0.08, S(t * 0.9) * 0.15);
+		set(CH_legL, 0.7); set(CH_legR, 0.7);
+		if (attacking) {
+			set(CH_body, 0.15 + 0.45 * extend - 0.2 * wind);
+			set(CH_legL, 0.7 - 1.6 * extend); set(CH_legR, 0.7 - 1.6 * extend);
+			set(CH_wingL, 0, 0, 0.5 * wind + fl * 0.3); set(CH_wingR, 0, 0, -0.5 * wind - fl * 0.3);
+			bob -= 5 * extend;
+			fwd_out = (float)(0.3 * extend);
+		} else if (st == aov::A_DIE) {
+			const double k = smooth(die_t / 0.9);
+			bob = rig.hover * (1 - k);
+			set(CH_wingL, 0, 0, -0.5 * k + fl * (1 - k) * 0.6); set(CH_wingR, 0, 0, 0.5 * k - fl * (1 - k) * 0.6);
+			set(CH_body, 0.4 * k, 0, 0.6 * k);
+		}
+		bob_out = (float)bob;
+		return;
+	}
+	if (kind == K_SIEGE) {
+		// (catapult, siege tower) wheels roll on the move; the catapult's arm
+		// ("weapon") lies cocked back and throws on each attack
+		if (st == aov::A_WALK) set(CH_wheel, std::fmod(t * 4, PI * 2));
+		set(CH_weapon, attacking ? -1.25 + 1.65 * extend : -1.25);
+		bob_out = 0;
+		return;
+	}
+
 	const bool beast = kind == K_BEAST;
 	const bool archer = kind == K_ARCHER;
-	const bool hoplite = type == aov::U_HOPLITE || type == aov::U_HERO;
+	// (the Egyptian spearmen / axemen / mercenaries fight with the hoplite's
+	// stances: rig pose spear | slash)
+	const bool hoplite = type == aov::U_HOPLITE || type == aov::U_HERO || pose == P_SPEAR || pose == P_SLASH;
 	const bool hero = type == aov::U_HERO;
 	double bob = 0, fwd = 0;
 
@@ -460,7 +555,7 @@ void AovUnitView::pose_unit(int row, float out[][3], float &bob_out, float &fwd_
 			set(CH_armR, -0.15 - S(p) * 0.2, 0, -0.08);
 			set(CH_weapon, 0.15 + S(p) * 0.2);
 		}
-		if (archer) { set(CH_armL, -0.25 + S(p) * 0.3, 0, 0.08); set(CH_weapon, 0.2); }
+		if (archer && pose != P_SLING) { set(CH_armL, -0.25 + S(p) * 0.3, 0, 0.08); set(CH_weapon, 0.2); }
 		if (beast) { set(CH_armL, S(p) * 0.4, 0, 0.15); set(CH_armR, -S(p) * 0.4 - 0.2, 0, -0.15); set(CH_weapon, 0.6); }
 	} else if (st == aov::A_GATHER || st == aov::A_BUILD) {
 		const int res = U.econ_res_type[row];
@@ -521,7 +616,7 @@ void AovUnitView::pose_unit(int row, float out[][3], float &bob_out, float &fwd_
 			set(CH_legL, -0.45); set(CH_shinL, 0.3); set(CH_legR, 0.35); set(CH_shinR, 0.25);
 			bob = -1.5 * down;
 			fwd = 0.35 * down - 0.12 * up;
-		} else if (hoplite && !hero && gear_of(id, type, U.kit[row]).kit == 1) {
+		} else if (hoplite && !hero && (pose == P_SLASH || gear_of(id, type, U.kit[row]).kit == 1)) {
 			const double arm = ease(ease(-1.5, -2.85, wind), -1.15, extend);
 			const double tot = ease(ease(1.3, -0.55, wind), 2.1, extend);
 			set(CH_armR, arm, 0.1 - 0.2 * wind + 0.35 * extend, -0.3 - 0.25 * wind + 0.3 * extend);
@@ -663,7 +758,7 @@ void AovUnitView::pose_unit(int row, float out[][3], float &bob_out, float &fwd_
 				bob = -1.2;
 			}
 		}
-		if (archer) archer_upper(v % 2);
+		if (archer && pose != P_SLING) archer_upper(v % 2);
 		if (beast) {
 			set(CH_torso, 0.1 + b * 0.03);
 			set(CH_armR, -0.25, 0, -0.15); set(CH_armL, b * 0.05, 0, 0.18); set(CH_weapon, 0.4);
@@ -1068,9 +1163,14 @@ Dictionary AovUnitView::update(double dt, double alpha, int64_t local_player, co
 		if (U.removed[i]) continue;
 		const int type = U.type[i];
 		if (type >= (int)rigs_.size()) continue;
-		const Rig &rig = rigs_[type];
-		if (rig.parts.empty()) continue;
 		const int32_t id = U.id[i];
+		int ri = type;
+		if (!rig_override_.empty()) {
+			const auto ov = rig_override_.find(id);
+			if (ov != rig_override_.end()) ri = ov->second;
+		}
+		const Rig &rig = rigs_[ri];
+		if (rig.parts.empty()) continue;
 		const bool dead = U.dead[i];
 		const int owner = U.owner[i];
 		if (owner != local_player_ && !SM.fog.is_visible(U.x[i], U.z[i])) continue;
@@ -1110,7 +1210,7 @@ Dictionary AovUnitView::update(double dt, double alpha, int64_t local_player, co
 		while (dr > PI) dr -= PI * 2;
 		while (dr < -PI) dr += PI * 2;
 		float bob = 0, fwd = 0;
-		pose_unit(i, rot3, bob, fwd);
+		pose_unit(i, ri, rot3, bob, fwd);
 		const double rot = U.prev_rot[i] + dr * alpha + (dead ? 0 : yaw_[id]);
 		const double push = dead ? 0 : press_[id] + fwd;
 		const double jl = (uhash(id, 5) - 0.5) * 2 * JITTER * (big ? 0.3 : 1);
@@ -1155,7 +1255,7 @@ Dictionary AovUnitView::update(double dt, double alpha, int64_t local_player, co
 				const double k = std::min(1.0, die_t / 0.8);
 				const double f = k * k * (3 - 2 * k);
 				root = root * xl(0, f * 0.3, 0) * rot_z(side * f * PI / 2 * 0.92);
-			} else if (rig.kind == K_BEAST) {
+			} else if (rig.kind == K_BEAST || rig.kind == K_FLYER || rig.kind == K_SIEGE) {
 				const double k = std::min(1.0, std::max(0.0, (die_t - 0.22) / 0.5));
 				const double f = k * k * (3 - 2 * k);
 				const double bounce = die_t > 0.72 && die_t < 0.92 ? std::sin((die_t - 0.72) / 0.2 * PI) * 0.05 : 0;
@@ -1215,6 +1315,7 @@ Dictionary AovUnitView::update(double dt, double alpha, int64_t local_player, co
 				case R_KIT: show = gear.kit == p.rule_v; break;
 				case R_PENNANT: show = gear.kit == 0 && gear.pennant == 1; break;
 				case R_SHIELD: show = gear.kit == 0 && gear.shield == p.rule_v; break;
+				case R_VARY: show = (int)std::floor(uhash(id, 26) * p.rule_n) == p.rule_v; break;
 				default: break;
 			}
 			if (dead && p.weapon && die_t > 0.5 && rig.kind != K_ARCHER) show = false;

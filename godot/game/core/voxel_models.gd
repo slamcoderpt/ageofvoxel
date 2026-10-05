@@ -72,15 +72,27 @@ static func info(g: String, model_name: String) -> Dictionary:
 ## Unit rig metadata: {voxel, anim, style, parts: [{name, anim, joint:[x,y,z] (voxels),
 ## parent, parentIdx, coat, portrait, conditional, mesh}]}. World offset of a
 ## joint = joint * voxel, relative to the parent's joint (or the feet).
+## Types units.json has no rig for are looked up in the Godot-only
+## "egypt_units" group (scripts/export-egypt-units.mjs: the Egyptian units and
+## myth units), whose meshes mesh("units", ...) also finds.
 static func rig(unit_type: String) -> Dictionary:
 	var e := group("units")
-	return e.man.rigs.get(unit_type, {}) if e else {}
+	if e and e.man.rigs.has(unit_type):
+		return e.man.rigs[unit_type]
+	var x := group(EXTRA_UNITS) if FileAccess.file_exists(DIR + EXTRA_UNITS + ".json") else {}
+	return x.man.rigs.get(unit_type, {}) if x else {}
+
+const EXTRA_UNITS := "egypt_units"
 
 static func mesh(g: String, model_name: String) -> ArrayMesh:
 	var key := g + "/" + model_name
 	if _meshes.has(key):
 		return _meshes[key]
 	var e := group(g)
+	if g == "units" and e and not e.man.models.has(model_name) and FileAccess.file_exists(DIR + EXTRA_UNITS + ".json"):
+		var m2 := mesh(EXTRA_UNITS, model_name)
+		_meshes[key] = m2
+		return m2
 	if e.is_empty() or not e.man.models.has(model_name):
 		push_error("VoxelModels: no model %s" % key)
 		return null

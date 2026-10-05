@@ -25,7 +25,13 @@ extends Node3D
 ##
 ## Public API: `view` (the AovUnitView, shared with game/combat) and `last`
 ## (this frame's AovUnitView.update() result: combat draws arrows, bars,
-## sparks, dust and debris from it).
+## sparks, dust and debris from it), `draw_as(unit_id, type)` (draw and pose
+## one unit with another rig, e.g. an Egyptian myth unit the sim has no type
+## for yet, on a stand-in sim unit; see egypt_units_scene.gd).
+##
+## The Egyptian units and myth units (Godot-only) are the "egypt_units" model
+## group (scripts/export-egypt-units.mjs); VoxelModels.rig() finds them by the
+## sim's type key like the Greek ones.
 
 const STRIDE := 20
 
@@ -136,6 +142,7 @@ func setup(g: Node) -> void:
 	var size := float(game.sim.get_map_size())
 	_aabb = AABB(Vector3(-16, -40, -16), Vector3(size + 32, 160, size + 32))
 	var mat := ShaderMaterial.new()
+	_mat = mat
 	mat.shader = load("res://game/units/unit.gdshader")
 	var outline := ShaderMaterial.new()
 	outline.shader = load("res://game/units/unit_outline.gdshader")
@@ -156,16 +163,7 @@ func setup(g: Node) -> void:
 		rigs.append(rig)
 		if rig.is_empty():
 			continue
-		for p in rig.parts:
-			var pm := VoxelModels.mesh("units", str(p.mesh))
-			_mms.append(_add_mm("%s_%s" % [t, p.name], pm, mat, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF))
-			# near units cast their coarse voxel silhouette (a box per part is far
-			# fatter than a shield or an arm and smears the crowd's shadows)
-			_shadow_mms.append(_add_mm("%s_%s_shadow" % [t, p.name], VoxelModels.coarse(pm, 2, true), shadow_mat, GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY))
-			# far units: the coarse voxel twin (small rigs only: big ones are few and their voxels already large)
-			var lm: Mesh = VoxelModels.coarse(pm) if float(rig.voxel) < 0.1 else pm
-			_lod_mms.append(_add_mm("%s_%s_lod" % [t, p.name], lm, mat, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF))
-			_shadow_lod_mms.append(_add_mm("%s_%s_lod_shadow" % [t, p.name], box_mesh(pm), shadow_mat, GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY))
+		_add_rig_mms(t, rig)
 	# contact shadows
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(1, 1)
@@ -181,6 +179,45 @@ func setup(g: Node) -> void:
 	add_child(smi)
 	view = ClassDB.instantiate("AovUnitView")
 	view.setup(game.sim, rigs)
+	AovScenes.set_setup("egypt_units", preload("res://game/units/egypt_units_scene.gd").scene_setup)
+
+var _mat: ShaderMaterial
+var _extra_rigs := {}   # type name -> AovUnitView rig index (draw_as)
+
+## The MultiMeshes of one rig's parts, appended in AovUnitView part order.
+func _add_rig_mms(t: String, rig: Dictionary) -> void:
+	for p in rig.parts:
+		var pm := VoxelModels.mesh("units", str(p.mesh))
+		_mms.append(_add_mm("%s_%s" % [t, p.name], pm, _mat, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF))
+		# near units cast their coarse voxel silhouette (a box per part is far
+		# fatter than a shield or an arm and smears the crowd's shadows)
+		_shadow_mms.append(_add_mm("%s_%s_shadow" % [t, p.name], VoxelModels.coarse(pm, 2, true), _shadow_mat, GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY))
+		# far units: the coarse voxel twin (small rigs only: big ones are few and their voxels already large)
+		var lm: Mesh = VoxelModels.coarse(pm) if float(rig.voxel) < 0.1 else pm
+		_lod_mms.append(_add_mm("%s_%s_lod" % [t, p.name], lm, _mat, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF))
+		_shadow_lod_mms.append(_add_mm("%s_%s_lod_shadow" % [t, p.name], box_mesh(pm), _shadow_mat, GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY))
+
+## Draw (and pose) unit `unit_id` with the rig of `type_name` (a sim type or
+## any rig in units.json / egypt_units.json) instead of its own type's.
+## Render-only: the sim still runs the unit as its own type. False if there
+## is no such rig (or the library predates AovUnitView.add_rig).
+func draw_as(unit_id: int, type_name: String) -> bool:
+	if view == null or not view.has_method("add_rig"):
+		return false
+	var ri := int(_extra_rigs.get(type_name, -1))
+	if ri < 0:
+		var k := _types.find(type_name)
+		var rig := VoxelModels.rig(type_name)
+		if rig.is_empty():
+			return false
+		if k >= 0 and not VoxelModels.rig(_types[k]).is_empty():
+			ri = k
+		else:
+			ri = int(view.add_rig(rig))
+			_add_rig_mms(type_name, rig)
+		_extra_rigs[type_name] = ri
+	view.set_rig_override(unit_id, ri)
+	return true
 
 func frame(dt: float, alpha: float) -> void:
 	_ground_t += dt

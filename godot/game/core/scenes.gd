@@ -72,6 +72,11 @@ static var SCENES := {
 	# frames one building like reference/egypt/building_02..21.
 	"egypt_town": {"preset": "battle", "seed": 1, "hud": false, "reveal_all": true, "fast_forward": 0.0,
 		"camera": {"distance": 64.0, "pitch": 50.0, "yaw": 30.0}},
+	# Godot-only: the Egyptian units and myth units (game/units/egypt_units_scene.gd,
+	# models by scripts/export-egypt-units.mjs): a lineup, eu_group=foot | mounted |
+	# myth | battle | eco, eu_focus=<type> frames four of one type like reference/egypt/unit_05.
+	"egypt_units": {"preset": "battle", "seed": 1, "hud": false, "reveal_all": true, "fast_forward": 0.0,
+		"camera": {"distance": 30.0, "pitch": 46.0, "yaw": 28.0}},
 	# Godot-only: the research panel (game/ui/ui.gd _techui_setup): a selected
 	# Armory with its tech buttons, the research queue and a tech tooltip open
 	# (techui_sel=market | temple, techui_tip=<slot>).

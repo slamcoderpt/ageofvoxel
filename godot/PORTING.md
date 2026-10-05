@@ -189,7 +189,8 @@ godot --path godot -- --scene=town [--seed=N] [--mapsize=N] [--units=N] [--playe
   see "Walls and gates: the look"), `aifort` (two AIs play a match in the
   setup: their own walls, gates, towers and breaches, see "Enemy AI:
   fortifications"), `techbuildings` (the Greek Armory and Market, see
-  "Armory and Market: the look"), `egypt_town` (every Egyptian building in a town, see
+  "Armory and Market: the look"), `egypt_units` (every Egyptian unit and myth unit, see
+  "Egyptian units and myth units: the look"), `egypt_town` (every Egyptian building in a town, see
   "Egyptian buildings: the look"), `techui` (a selected Armory's tech
   buttons, research queue and a tooltip, see "Research panel, tooltips,
   market trade") and `menu` (the main menu,
@@ -996,6 +997,93 @@ node scripts/godot-shoot.mjs --scene egypt_town --out shots/godot/egypt_town.png
 node scripts/export-egypt.mjs          # re-export godot/assets/models/egypt*.{json,bin.gz}
 ```
 
+## Egyptian units and myth units: the look (game/units)
+
+Every Egyptian unit of Age of Mythology: Retold (`reference/egypt/unit_01..13`,
+`myth_01..14`, EGYPT.md sections 3 and 5) as a voxel part rig in the Greek
+units' format: the Godot-only model group `egypt_units` (rigs + meshes),
+written by `node scripts/export-egypt-units.mjs` (~2 s, deterministic; re-run
+it after changing the script, never hand-edit `assets/models/egypt_units*`).
+`VoxelModels.rig(type)` falls back to that group when `units.json` has no rig
+of the name, and `VoxelModels.mesh("units", name)` to its meshes, so
+`units.gd`, portraits, hero art and the model gallery draw them by the sim's
+type key with no stand-in. Posed by `AovUnitView` (`native/src/unit_view.cpp`)
+with the Greek units' code (idle, walk, gather, build, attack, hit, die), the
+same channel names, plus:
+
+- **Rig fields** (export-egypt-units.mjs head): `pose` = a variant of the anim
+  family: `spear` / `slash` (Spearman, Mercenary / Axeman, Mummy, Minion: the
+  hoplite's thrust variants and battle-line guards / the swordsman's overhead
+  slash), `sling` (archer family: the sling whirls over the head and is let go
+  overarm; arms down at rest), `serpent` (medusa family without arms: the
+  hood rears and strikes), `chariot`, `staff`; `gait` / `stride` (four-legged
+  walk frequency / amplitude x the horse's: elephant 0.55 / 0.6, camel 0.75,
+  crocodile 0.7 / 0.55); `hover` (flyers, rig voxels); per part `vary: [k, n]`
+  (shown for the units whose id hashes to k of n, rule `R_VARY`).
+- **New kinds / channels**: `flyer` (Phoenix, Roc: hover with a bob, wings
+  `wingL` / `wingR` beating, faster on the move, a dive with the talons
+  forward to strike, a fall when killed), `siege` (Catapult, Siege Tower:
+  wheels roll on the move, the catapult arm `weapon` lies cocked and throws on
+  each attack); the `wheel` channel also turns the chariot's wheels; the
+  medusa family beats `wingL` / `wingR` (Wadjet). Dead flyers and siege
+  topple like beasts.
+- **Units** (rig voxel): `laborer` (0.07, bare chest, white kilt, team sash
+  and khat, the villager's tools / loads by name: `toolAxe`, `carryWood` ...),
+  `spearman` (bare chest under a crossed harness, shaved head with a side
+  lock, team kilt and armbands, long spear, round-topped team shield),
+  `axeman` (gold scale collar, black and gold nemes, the gold epsilon axe, a
+  gold shield with team bands), `slinger` (leopard-skin vest, short team
+  kilt, sling, pouch), `mercenary` (a Nubian spearman, round team shield),
+  `priest` (white robe and headcloth, gold sun disc and sash, ankh staff),
+  `pharaoh` (0.08: the team blue crown with gold discs and uraeus, gold
+  corselet and apron over a long team skirt, striped crook), `chariot_archer`
+  (white horse in a striped blanket and team collar, two-wheeled silver car
+  with a team front, an archer in silver scale and a helmet; anim `centaur`
+  = horse legs + archer arms), `camel_rider` (tan dromedary with a hump, white
+  cloth with a team border and zigzag hem, team scarf, rider in a tall team
+  cap with a khopesh), `mercenary_cavalry` (dark barded horse, Nubian
+  rider), `war_elephant` (0.1: grey elephant, cow-hide cloth, team pad, a
+  wooden howdah, a silver and gold forehead plate with a team lozenge,
+  trunk, tusks, ears; a mahout at 0.7 x), `catapult` (0.09), `siege_tower`
+  (0.1, team hides, a ladder).
+- **Myth units** (no sim type yet: drawn on stand-in sim units, below):
+  `anubite` (beast, jackal head under a team headcloth, linen straps, two
+  sickle blades), `avenger` (beast, falcon head and feather mantle, team and
+  gold collar, two gold blades), `son_of_osiris` (beast, a gold falcon god
+  with a sun disc), `mummy`, `minion` (human), `sphinx` (four-legged: lion
+  body, a man's head in a team and white nemes), `petsuchos` (jewelled
+  crocodile, horned sun-disc crown, team tail tip), `scarab` (six legs on the
+  four leg channels, iridescent shell with team blotches, mandibles),
+  `scorpion_man` (a man on a team and white scorpion: eight legs, pincers on
+  the `neck` channel, a tail arching over the back), `wadjet` (serpent:
+  coil, hood, team wings with red bars), `phoenix`, `roc` (flyers; the roc
+  carries a basket).
+- **`units.gd draw_as(unit_id, type)`**: draws and poses one sim unit with
+  another rig (AovUnitView `add_rig(rig)` appends a render-only rig and its
+  part buffers, `set_rig_override(id, rig)`); the sim still runs it as its
+  own type. When the sim gains a type of the same key (anubite ...), its rig
+  is found by name and nothing else is needed. Known look gaps: very bright
+  saturated orange / yellow on large upward faces (the Phoenix's wings)
+  washes out under the grade, so the Phoenix is a golden bird with team
+  flame tips rather than a glowing one.
+
+Capture scene `egypt_units` (`game/units/egypt_units_scene.gd`): on the flat
+start of a battle map, desert ground with a paved square, player 1 Egyptian.
+
+```
+node scripts/godot-shoot.mjs --scene egypt_units --out shots/godot/egypt_units.png   # lineup: men / cavalry and siege / myth units
+     [--params "eu_group=foot"]       # a block of foot soldiers (unit_02)
+     [--params "eu_group=mounted"]    # chariots, camels, an elephant (unit_01 / unit_13)
+     [--params "eu_group=myth"]       # the myth units, two rows
+     [--params "eu_group=battle"]     # an Egyptian army against Greeks, 5 s into the fight
+     [--params "eu_group=eco"]        # Laborers gathering wood / gold and building, Priests, the Pharaoh
+     [--params "eu_focus=anubite"]    # four of one type from four sides, framed close (the wiki "views")
+     [--params "eu_state=walk"]       # with a lineup / focus: idle | walk | attack | die
+     [--params "eu_t=3"]              # seconds of sim after the setup
+     [--params "eu_yaw=28"]           # camera yaw (the rows face it)
+node scripts/export-egypt-units.mjs   # re-export godot/assets/models/egypt_units.{json,bin.gz}
+```
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower
@@ -1626,7 +1714,8 @@ techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
   Granary, Houses, the five Monuments, an Obelisk, Temple, Barracks, Migdol,
   his army in ranks with two Priests healing wounded Spearmen; a Greek player
   2. `node scripts/godot-shoot.mjs --scene egypt --out shots/godot/egypt-scene.png`.
-- **Renderer**: until a type has its model, `units.gd` draws an Egyptian unit
+- **Renderer**: every Egyptian unit has its own rig now ("Egyptian units and
+  myth units: the look"); a type without one falls back as before: `units.gd` draws an Egyptian unit
   with its Greek stand-in's rig (`get_unit_def(t).stand_in`) and
   `buildings.gd` an Egyptian building with its stand-in model or a sandstone
   placeholder block (Monuments, Obelisk). `get_buildings()` has `empower`
