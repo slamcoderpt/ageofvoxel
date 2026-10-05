@@ -91,7 +91,8 @@ static func scene_setup(game: Node) -> Dictionary:
 		# egt_row=house/0/a2,house/1/a2,granary/0/a1
 		var x := -6
 		for k in row_keys.split(","):
-			var t := k.split("/")[0]
+			var parts := k.split("/")
+			var t := parts[1] if parts[0] == "s" and parts.size() > 1 else parts[0]   # s/<type>/sK: a stage
 			var T: Dictionary = EgyptBuildingsRef.types().get(t, {"w": 3, "h": 3})
 			lots.append([t, x, 0, {"key": k}])
 			x += int(T.w) + 1

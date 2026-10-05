@@ -1024,8 +1024,11 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   yard's jars; three-slit window groups high on all four faces, framed
   doors, a red-striped cloth awning on poles (`AWN_H`); no roof vents, canopies or stairs;
   Archaic look `a1` mud brick with a mud gorge and thatch under poles, `a2`
-  sandstone with plaster roofs and an ochre band), `granary` 3x3 (a hut with a roof hatch and a ladder, two ribbed
-  domed silos, a grain bin, sacks), `lumber_camp` / `mining_camp` 3x3
+  sandstone with plaster roofs and an ochre band), `granary` 3x3 (after building_05: a coursed sandstone store at the
+  back left with a deep cavetto cornice, a framed roof hatch, a door and slit
+  in front and a ladder up to the roof; two domed brick silos in a row along
+  its east side, a ladder from the roof up to each silo's mouth; a crate of
+  grain and a barrel), `lumber_camp` / `mining_camp` 3x3
   (battered blocks, striped awnings over a log pile / gold ore bins and a
   trough), `farm` 4x4 (a mud border, an irrigation channel and a shaduf; the
   crops are the economy piece's), `temple` 5x6 (a two-tier platform with a
@@ -1057,6 +1060,18 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   0 jars and a basket, 1 crates and sacks, 2 a mud-brick wall run with a gap,
   3 a hand cart, 4 a pen corner, 5 a reed sunshade stall, 6 a woodpile,
   7 a shaded well).
+- **Silos** (`silo()`, the Granary's and the Town Center's): masonry, not
+  smooth capsules. A round dark stone plinth; a drum of plastered mud brick
+  in courses of 1.5 voxels (bricks in a running bond, darker head joints, a
+  recessed bed joint under every course so the rows read), its tone a dirty
+  plaster that lightens upward, stained in patches, the two bottom courses
+  worn dark; squared timber posts standing proud of it, each on a dark foot
+  block and capped over the timber band that rings the drum's top; a
+  corbelled beehive dome of stepped courses (riser + lit tread each); and a
+  loading mouth with a rolled plaster lip round a dark recessed throat with
+  a heap of grain in it. Smooth parts (`ringWall`, `ringTread`, `post`,
+  `beam`, `ladder`: oriented timbers) over a voxel core, so the AO and the
+  construction stages (the drum's courses rising) still work.
 - **Keys**: `<type>/<variant>/a<age>` finished (the highest listed age look
   <= the owner's age), `<type>/s<k>` in `egypt_stages` (k = floor(progress
   * 8) rounded down to 0, 2, 4, 6: 0 = the staked lot with team pennants and
@@ -1098,7 +1113,7 @@ node scripts/godot-shoot.mjs --scene egypt_town --out shots/godot/egypt_town.png
      [--params "egt_god=isis"]         # ra | isis | set (temple statue, Monument to the Gods)
      [--params "egt_age=1"]            # the owner's age (1: Archaic houses)
      [--params "egt_states=1"]         # a row of construction stages and variants
-     [--params "egt_row=house/0/a2,house/1/a2,house/2/a2"]   # a framed row of model keys (look reviews)
+     [--params "egt_row=house/0/a2,house/1/a2,house/2/a2"]   # a framed row of model keys (look reviews; s/<type>/s<k> for a stage)
      [--params "egt_yaw=208"]          # the framing camera's yaw for egt_focus / egt_row (default 28)
      [--params "egt_static=1"]         # render-only even where the sim has the types
      [--params "egt_details=1"]        # keep the map's pebbles and tufts

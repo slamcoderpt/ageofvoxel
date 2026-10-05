@@ -579,36 +579,168 @@ function frustum(m, cx, cz, y0, y1, r0, r1, color, { segs = 24, bands = 1 } = {}
     }
   }
 }
-// a domed clay silo (the granary's, the TC's): a smooth bellied body of lime-
-// washed clay with dark wooden ribs, a dome with a rim band and a small capped
-// neck. A voxel core inside keeps it solid for the AO, the construction cut
-// and the stages (which show the core rising).
-const SILO_T = [0xe2c896, 0xdcc08c, 0xe8d0a0];
-const SILO_RIB = 0x8a6844;
+// a domed granary silo (the granary's, the TC's; building_05), built in the
+// scene's masonry language: a round dark stone plinth; a drum of plastered
+// mud brick laid in courses (each course a row of bricks in a running bond,
+// head joints a shade darker, the bed joints recessed so every course throws
+// a line), its tone a dirty plaster that lightens upward, stained in patches
+// and worn dark over the bottom courses; squared timber posts standing proud
+// round it, each footed on the plinth in a dark block and capped over the
+// timber band that rings the drum's top; a corbelled beehive dome of stepped
+// courses (a riser and a lit tread per course, the plaster cleaner toward the
+// top); and the loading mouth: a raised plaster lip round a dark recessed
+// opening with a heap of grain inside. A voxel core keeps it solid for the
+// AO and the construction stages. Returns { cx, cz, top, lip, rm, R } for
+// ladders.
+const SILO_BRICK = [0xeac396, 0xe0b889, 0xefcb9e, 0xdbb082, 0xe6c090];
+const SILO_DOME = [0xe0c798, 0xd7bc8b, 0xe5cfa3];
+const SILO_WOOD = [0x6e4e30, 0x634528, 0x765536];
+const SILO_CAP = 0x46301c;
+// a ring of quads round (cx, cz): radius r0 at y0 to r1 at y1, `col(s)`
+function ringWall(m, cx, cz, y0, y1, r0, r1, segs, col, { inward = false, sh = [0.92, 1] } = {}) {
+  const sl = (r0 - r1) / Math.max(1e-6, y1 - y0);
+  for (let s = 0; s < segs; s++) {
+    const b0 = (s / segs) * Math.PI * 2, b1 = ((s + 1) / segs) * Math.PI * 2;
+    const p = (b, y, r) => [cx + Math.cos(b) * r, y, cz + Math.sin(b) * r];
+    const n = (b) => { const v = [Math.cos(b), sl, Math.sin(b)]; const l = Math.hypot(...v); return v.map((q) => (inward ? -q : q) / l).map((q, i) => (inward && i === 1 ? -q : q)); };
+    poly(m, [p(b0, y0, r0), p(b1, y0, r0), p(b1, y1, r1), p(b0, y1, r1)], col(s), { normals: [n(b0), n(b1), n(b1), n(b0)], shade: [sh[0], sh[0], sh[1], sh[1]] });
+  }
+}
+// a flat ring (r0 < r1) at height y facing up
+function ringTread(m, cx, cz, y, r0, r1, segs, col) {
+  for (let s = 0; s < segs; s++) {
+    const b0 = (s / segs) * Math.PI * 2, b1 = ((s + 1) / segs) * Math.PI * 2;
+    const p = (b, r) => [cx + Math.cos(b) * r, y, cz + Math.sin(b) * r];
+    if (r0 <= 1e-3) poly(m, [p(b0, r1), p(b1, r1), [cx, y, cz]], col(s), { out: [0, 1, 0] });
+    else poly(m, [p(b0, r0), p(b1, r0), p(b1, r1), p(b0, r1)], col(s), { out: [0, 1, 0] });
+  }
+}
+// an upright squared timber at angle a, its centre at radius rc, y0..y1
+function post(m, cx, cz, a, rc, y0, y1, w, d, c) {
+  const ca = Math.cos(a), sa = Math.sin(a);
+  const P = (u, v, y) => [cx + ca * (rc + v) - sa * u, y, cz + sa * (rc + v) + ca * u];
+  const hw = w / 2, hd = d / 2;
+  const q = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]];
+  for (let i = 0; i < 4; i++) {
+    const [u0, v0] = q[i], [u1, v1] = q[(i + 1) % 4];
+    const mu = (u0 + u1) / 2, mv = (v0 + v1) / 2;
+    const out = [ca * mv - sa * mu, 0, sa * mv + ca * mu];
+    const f = i === 2 ? 1 : i === 0 ? 0.7 : 0.85;
+    poly(m, [P(u0, v0, y0), P(u1, v1, y0), P(u1, v1, y1), P(u0, v0, y1)], shade(c, f), { out });
+  }
+  poly(m, [P(-hw, -hd, y1), P(hw, -hd, y1), P(hw, hd, y1), P(-hw, hd, y1)], shade(c, 1.08), { out: [0, 1, 0] });
+}
+// a squared timber from point a to point b (voxel space), w thick
+function beam(m, a, b, w, c) {
+  const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const L = Math.hypot(...d); if (L < 1e-6) return;
+  const D = d.map((q) => q / L);
+  let u = [D[2], 0, -D[0]]; let lu = Math.hypot(...u);
+  if (lu < 1e-6) { u = [1, 0, 0]; lu = 1; }
+  u = u.map((q) => q / lu);
+  const v = [D[1] * u[2] - D[2] * u[1], D[2] * u[0] - D[0] * u[2], D[0] * u[1] - D[1] * u[0]];
+  const h = w / 2;
+  const P = (o, su, sv) => [o[0] + (u[0] * su + v[0] * sv) * h, o[1] + (u[1] * su + v[1] * sv) * h, o[2] + (u[2] * su + v[2] * sv) * h];
+  const q = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  for (let i = 0; i < 4; i++) {
+    const [s0, t0] = q[i], [s1, t1] = q[(i + 1) % 4];
+    const mu = (s0 + s1) / 2, mv = (t0 + t1) / 2;
+    const out = [u[0] * mu + v[0] * mv, u[1] * mu + v[1] * mv, u[2] * mu + v[2] * mv];
+    const f = out[1] > 0.3 ? 1.08 : out[1] < -0.3 ? 0.7 : 0.9;
+    poly(m, [P(a, s0, t0), P(a, s1, t1), P(b, s1, t1), P(b, s0, t0)], shade(c, f), { out });
+  }
+  for (const [o, sg] of [[a, -1], [b, 1]]) poly(m, [P(o, -1, -1), P(o, 1, -1), P(o, 1, 1), P(o, -1, 1)], shade(c, 0.85), { out: D.map((q) => q * sg) });
+}
+// a ladder from foot f to head g (voxel space), its rails `span` apart across
+// the horizontal perpendicular, a rung every `step` along it
+function ladder(m, f, g, { span = 1.6, step = 1.3, c = 0x8a6a48 } = {}) {
+  const d = [g[0] - f[0], g[2] - f[2]]; const l = Math.hypot(...d) || 1;
+  const px = (-d[1] / l) * span / 2, pz = (d[0] / l) * span / 2;
+  for (const sg of [-1, 1]) beam(m, [f[0] + px * sg, f[1], f[2] + pz * sg], [g[0] + px * sg, g[1], g[2] + pz * sg], 0.42, c);
+  const L = Math.hypot(g[0] - f[0], g[1] - f[1], g[2] - f[2]);
+  for (let t = step; t < L - 0.3; t += step) {
+    const k = t / L, o = [f[0] + (g[0] - f[0]) * k, f[1] + (g[1] - f[1]) * k, f[2] + (g[2] - f[2]) * k];
+    beam(m, [o[0] - px * 1.1, o[1], o[2] - pz * 1.1], [o[0] + px * 1.1, o[1], o[2] + pz * 1.1], 0.3, shade(c, 0.9));
+  }
+}
 function silo(m, cx, cz, y, R, H, { ribs = 8, dome = 0.7 } = {}) {
-  lathe(m, cx, cz, y, y + H, () => R * 0.8, CLAY);
-  const segs = ribs * 4;
-  const col = (s, k) => (s % 4 === 0 ? SILO_RIB : SILO_T[(k + (s >> 2)) % SILO_T.length]);
-  const prof = [0.86, 0.95, 1.0, 1.0, 0.97, 0.92];
-  for (let i = 0; i + 1 < prof.length; i++) {
-    frustum(m, cx, cz, y + (H * i) / (prof.length - 1), y + (H * (i + 1)) / (prof.length - 1), R * prof[i], R * prof[i + 1], (s) => col(s, i), { segs });
+  const segs = Math.max(36, Math.round(R * 9));
+  const yP = y + 1.4;                     // the plinth's top
+  const yH = y + H;                       // the drum's top (the band's foot)
+  // the voxel core (solid for the AO and the stages)
+  lathe(m, cx, cz, y, Math.floor(yH), () => R * 0.8, CLAY);
+  // the plinth: a round dark stone step a voxel out, its tread lit
+  const plin = (s) => shade(PLINTH(s, 1, 7), 0.95 + 0.06 * hash3(s >> 1, 2, 3, 62));
+  ringWall(m, cx, cz, y - 0.2, yP, R + 1.05, R + 0.95, segs, plin);
+  ringTread(m, cx, cz, yP, R - 0.2, R + 0.95, segs, (s) => shade(plin(s), 1.12));
+  // the drum: courses of plastered brick
+  const course = 1.5, joint = 0.16;
+  const nC = Math.max(3, Math.round((yH - yP) / course));
+  const ch = (yH - yP) / nC;
+  const belly = (t) => R * (0.97 + 0.05 * Math.sin(Math.PI * Math.min(1, t * 1.15)));
+  const per = 4;                          // segments per brick
+  for (let k = 0; k < nC; k++) {
+    const ya = yP + k * ch, yb = ya + ch;
+    const t0 = k / nC, t1 = (k + 1) / nC;
+    const ra = belly(t0), rb = belly(t1);
+    const tone = (s) => {
+      const blk = Math.floor((s + (k & 1) * 2) / per);
+      let c = pick(hash3(blk, k, 7, 58), SILO_BRICK);
+      c = shade(c, 0.9 + 0.12 * t1);                                         // lighter upward
+      if (hash3(Math.floor(s / 7), Math.floor(k / 2), 1, 59) < 0.2) c = shade(c, 0.9);   // stains
+      if (k < 2) c = shade(c, k === 0 ? 0.76 : 0.86);                        // the worn foot
+      if ((s + (k & 1) * 2) % per === 0) c = shade(c, 0.86);                 // head joint
+      return c;
+    };
+    // the recessed bed joint, then the brick face
+    ringWall(m, cx, cz, ya, ya + joint, ra - 0.1, ra - 0.1, segs, (s) => shade(tone(s), 0.72), { sh: [1, 1] });
+    ringTread(m, cx, cz, ya + joint, ra - 0.1, ra, segs, (s) => shade(tone(s), 0.82));
+    ringWall(m, cx, cz, ya + joint, yb, ra, rb, segs, tone, { sh: [0.94, 1] });
   }
-  // the band at the dome's foot
-  frustum(m, cx, cz, y + H, y + H + 0.7, R * 0.95, R * 0.95, () => SILO_RIB, { segs });
-  // the dome: rings of quads up to the neck
-  const Rd = R * 0.93, Hd = R * dome;
-  const rings = 6, neck = Math.max(1.2, R * 0.26);
-  for (let i = 0; i < rings; i++) {
-    const a0 = (i / rings) * Math.PI / 2, a1 = ((i + 1) / rings) * Math.PI / 2;
-    const r0 = Math.max(neck, Math.cos(a0) * Rd), r1 = Math.max(neck, Math.cos(a1) * Rd);
-    const y0 = y + H + 0.7 + Math.sin(a0) * Hd, y1 = y + H + 0.7 + Math.sin(a1) * Hd;
-    if (r0 <= neck + 1e-6) break;
-    frustum(m, cx, cz, y0, y1, r0, r1, (s) => (s % 4 === 0 ? SILO_RIB : SILO_T[(i + 1 + (s >> 2)) % SILO_T.length]), { segs });
+  // the timber band round the drum's top
+  const Rt = belly(1);
+  ringWall(m, cx, cz, yH, yH + 1.3, Rt + 0.55, Rt + 0.55, segs, (s) => pick(hash3(s >> 2, 4, 1, 63), SILO_WOOD), { sh: [0.8, 1.05] });
+  ringTread(m, cx, cz, yH, Rt - 0.1, Rt + 0.55, segs, () => SILO_CAP);
+  ringTread(m, cx, cz, yH + 1.3, Rt - 0.4, Rt + 0.55, segs, (s) => shade(SILO_WOOD[s % 3], 1.15));
+  // the posts, footed on the plinth, capped over the band
+  for (let i = 0; i < ribs; i++) {
+    const a = ((i + 0.5) / ribs) * Math.PI * 2;
+    const c = SILO_WOOD[i % SILO_WOOD.length];
+    post(m, cx, cz, a, R + 0.45, yP, yH + 1.3, 0.7, 0.65, c);
+    post(m, cx, cz, a, R + 0.55, yP, yP + 0.7, 1.25, 1.0, SILO_CAP);        // the foot block
+    post(m, cx, cz, a, Rt + 0.55, yH + 1.3, yH + 1.9, 1.1, 0.9, SILO_CAP);   // the end cap
   }
-  const ny = y + H + 0.7 + Hd;
-  frustum(m, cx, cz, ny - 0.3, ny + 0.9, neck + 0.5, neck + 0.4, () => 0xcfb084, { segs: 16 });
-  S.cylinder(m, cx, ny + 0.9, cz, neck + 0.6, 0.5, 0x9a7a52, { segs: 16, cap: true });
-  lathe(m, cx, cz, y + H, Math.floor(ny), (yy) => Math.max(0, Rd * 0.85 * Math.sqrt(Math.max(0, 1 - ((yy - y - H) / Hd) ** 2)) - 0.6), CLAY);
+  // the corbelled dome: stepped courses from the band to the mouth
+  const rm = Math.max(1.6, R * 0.4), ri = rm - 0.5;
+  const nD = Math.max(5, Math.round(R * dome * 2));
+  const Hd = R * dome * 1.1;
+  let yy = yH + 1.3, rPrev = Rt - 0.4;
+  for (let j = 0; j < nD; j++) {
+    const t = (j + 1) / nD;
+    const r = rm + 0.35 + (Rt - 0.75 - rm) * Math.pow(Math.max(0, 1 - t * t), 0.6);
+    const h = Hd / nD;
+    const toneD = (s) => {
+      const blk = Math.floor((s + (j & 1) * 2) / per);
+      let c = shade(SILO_DOME[(j + (hash3(blk, j, 3, 64) < 0.5 ? 0 : 1)) % SILO_DOME.length], 0.9 + 0.12 * t);
+      if (hash3(Math.floor(s / 6), j, 2, 65) < 0.18) c = shade(c, 0.92);
+      if ((s + (j & 1) * 2) % per === 0) c = shade(c, 0.9);
+      return c;
+    };
+    if (j > 0) ringTread(m, cx, cz, yy, r, rPrev, segs, (s) => shade(toneD(s), 1.1));
+    ringWall(m, cx, cz, yy, yy + h, r, r, segs, toneD, { sh: [0.84, 1] });
+    yy += h; rPrev = r;
+  }
+  const top = yy;
+  // the mouth: the lip, its rolled top, the dark throat and the grain inside
+  ringTread(m, cx, cz, top, rm + 0.25, rPrev, segs, (s) => shade(SILO_DOME[s % 3], 1.06));
+  ringWall(m, cx, cz, top, top + 0.45, rm + 0.25, rm + 0.1, segs, () => 0xd9c49a, { sh: [0.85, 1] });
+  ringWall(m, cx, cz, top + 0.45, top + 0.8, rm + 0.3, rm + 0.3, segs, () => 0xcbb285, { sh: [0.85, 1] });
+  ringTread(m, cx, cz, top + 0.45, rm + 0.1, rm + 0.3, segs, () => 0xb89f74);
+  ringTread(m, cx, cz, top + 0.8, ri, rm + 0.3, segs, () => 0xf0e3c6);
+  ringWall(m, cx, cz, top - 0.6, top + 0.8, ri, ri, segs, () => 0x3a2c1e, { inward: true, sh: [0.45, 0.75] });
+  ringWall(m, cx, cz, top - 0.1, top + 0.5, ri * 0.98, ri * 0.4, segs, (s) => GRAIN(s, 0, 1), { sh: [0.8, 1.05] });
+  ringTread(m, cx, cz, top + 0.5, 0, ri * 0.4, segs, (s) => GRAIN(s, 1, 2));
+  return { cx, cz, top, lip: top + 0.8, rm, R };
 }
 // a log: a cylinder of bark along x or z, end grain at both ends
 function log(m, x0, y, z0, len, along = 'z', r = 1) {
@@ -1258,26 +1390,32 @@ function house(v, age) {
   return m;
 }
 
-// Granary (3 x 3; building_05): a low battered store with a roof hatch and a
-// ladder, two big domed clay silos with wooden ribs (the silhouette), a
-// threshing floor with a grain heap, sacks and a winnowing basket.
+// Granary (3 x 3; building_05): the flat-roofed store at the back left in
+// coursed sandstone with a deep cavetto cornice, a roof hatch and a ladder up
+// its front, the door beside it; two big domed brick silos in a row along its
+// east side (the silhouette), plank gangways from the store's roof up to their
+// loading mouths, a crate of grain and a barrel in front.
 function granary() {
   const m = lot(24, 24);
-  const t = block(m, 2, 2, 14, 12, 1, 9, { wall: WASH, roofC: MUDROOF, rimC: LIME, gorge: [0x8a5e38, 0x946640], torus: false, lipOut: 2, batter: 5, band: null });
+  const t = block(m, 1, 2, 11, 21, 1, 11, { wall: SAND, roofC: MUDROOF, rimC: LIME, gorge: [0x8a5e38, 0x946640], torus: false, lipOut: 2, batter: 6, band: null });
   const T = m.lastTop;
-  for (let x = T.c0 + 3; x < T.c0 + 7; x++) for (let z = T.d0 + 3; z < T.d0 + 6; z++) m.set(x, t - 1, z, DARK);   // the roof hatch
-  for (let x = T.c0 + 2; x < T.c0 + 8; x++) for (const z of [T.d0 + 2, T.d0 + 6]) m.set(x, t, z, 0x8a6a48);
-  for (let z = T.d0 + 2; z < T.d0 + 7; z++) for (const x of [T.c0 + 2, T.c0 + 7]) m.set(x, t, z, 0x8a6a48);
-  // the ladder leaning on the front
-  for (let y = 1; y < t + 1; y++) { const z = 13 + Math.floor((t - y) / 4); m.set(3, y, z, POLE); m.set(6, y, z, POLE); if (y % 3 === 0) { m.set(4, y, z, POLE); m.set(5, y, z, POLE); } }
-  silo(m, 18.5, 8.5, 1, 5.4, 14, { dome: 0.85 });
-  silo(m, 10.5, 18.5, 1, 4.8, 12, { dome: 0.85 });
-  door(m, '-x', 4, 3, 1, 6);
-  // the threshing floor and its grain heap
-  patch(m, 15, 15, 24, 24, WORN, { seed: 3 });
-  lathe(m, 20, 20, 1, 4, (y) => 3.4 - (y - 1) * 1.1, GRAIN);
-  m.line(16, 1, 22, 18, 5, 19, POLE);
-  sack(m, 15, 1, 15);
+  // the roof hatch with a timber frame
+  for (let x = T.c0 + 3; x < T.c0 + 6; x++) for (let z = T.d0 + 9; z < T.d0 + 13; z++) m.set(x, t - 1, z, DARK);
+  for (let x = T.c0 + 2; x < T.c0 + 7; x++) for (const z of [T.d0 + 8, T.d0 + 13]) m.set(x, t, z, 0x8a6a48);
+  for (let z = T.d0 + 8; z < T.d0 + 14; z++) for (const x of [T.c0 + 2, T.c0 + 6]) m.set(x, t, z, 0x8a6a48);
+  // the door and a slit window on the front
+  door(m, '+z', 3, 2, 1, 5);
+  slit(m, '+z', 4, 9, 2, 1);
+  // the silos
+  const A = silo(m, 17.5, 6.5, 1, 4.8, 14, { dome: 0.85 });
+  const B = silo(m, 17.5, 17.5, 1, 4.6, 12, { dome: 0.85 });
+  // a ladder from the store's roof up to each silo's loading mouth
+  for (const S0 of [A, B]) ladder(m, [T.c1 - 2.2, t, S0.cz], [S0.cx - S0.rm - 0.7, S0.lip + 0.6, S0.cz]);
+  // the ladder leaning on the front up to the roof
+  ladder(m, [8.5, 0.6, 23.6], [8.5, t + 0.8, 21.4]);
+  // a crate of grain and a barrel by the door
+  goodsBox(m, 10, 1, 21, 3, 3, 'grain', 2, 0x8a6236);
+  barrel(m, 1.5, 1, 22.5, 4, 1.4);
   return m;
 }
 
