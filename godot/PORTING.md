@@ -2029,7 +2029,9 @@ techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
 - **Mapping Retold onto this sim** (`civ.h` head, `egypt_unit(t).mapping`
   per unit): hp and damage as Retold; speed x0.65 (the Laborer: the
   villager's 2.7 / 4.0 ratio); range and LOS x0.6 (`DIST_SCALE`); reload
-  x1.15; armor: Egyptian units have a hack (`UnitDef.armor`) and a pierce
+  x1.15 for every Egyptian unit, the Laborer included (Retold ROF 1 -> 1.15 s,
+  6 hack every 1.15 s = 5.2 hack/s; the Greek villager keeps the browser's
+  1.5 s), asserted per unit by egypt_check `units.reload`; armor: Egyptian units have a hack (`UnitDef.armor`) and a pierce
   armor (`EgyptUnit.pierce_armor`) = Retold's x0.75 (the hoplite's 0.30 is
   Retold's 40 % hack), read by `Techs::unit_armor` (arrows pierce, blows
   hack); the Laborer too (25 / 35 % -> hack 0.1875, pierce 0.2625; the Greek

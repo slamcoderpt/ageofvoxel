@@ -56,7 +56,7 @@ const EgyptUnit *egypt_unit(int type) {
 	// pierce armor, crush vs buildings, x vs buildings, decay, limit, heal, stand-in, Retold, mapping
 	static const EgyptUnit T[U_TYPE_COUNT - U_LABORER] = {
 		{ 0.2625, 0, 0, 0, LABORER_CAP, 0, "villager",
-			"Laborer: 50 f, 1 pop, 17 s, 55 hp, 6 hack; 12 pierce vs animals (range 12, ROF 2), x4 vs towers, armor 25/35/99, speed 3.8, LOS 14; carries 15 food / 10 wood / 10 gold; gathers 10 % slower, builds 25 % slower, never worships; cap 100",
+			"Laborer: 50 f, 1 pop, 17 s, 55 hp, 6 hack, ROF 1 (reload 1.15 s, the villager 1.5); 12 pierce vs animals (range 12, ROF 2), x4 vs towers, armor 25/35/99, speed 3.8, LOS 14; carries 15 food / 10 wood / 10 gold; gathers 10 % slower, builds 25 % slower, never worships; cap 100",
 			"hp, damage as Retold; train 17 x 10/15 (the Greek villager here trains in 10 s for Retold's 15); speed x the villager's 2.7/4.0; LOS x0.6; armor x0.75 as the soldiers (hack 0.1875 / pierce 0.2625); the anti-animal bow vs Animals of Set: 12 per 2.3 s at 7.2 (wild deer / boar: this sim's hunting spear, as the villager's); gather = the villager's x0.9; carry 15 food / 10 wood / 10 gold as Retold (the villager's 10 of each; the +5 / +15 carry techs are not in this game); build work rate 0.75; pop 1 as Retold (the villager's 1)" },
 		{ 0.075, 0, 0, 0, 0, 0, "hoplite",
 			"Spearman: 50 f + 25 g, 2 pop, 12.5 s, 85 hp, 6 hack, x2 vs cavalry, armor 40/10/99, speed 5.0, LOS 16",

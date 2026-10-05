@@ -523,6 +523,45 @@ func _case_units() -> void:
 	var ok: bool = stats.pharaoh.hp == 145 and _near(stats.pharaoh.damage, 17.4) and _near(stats.pharaoh.range, 12.0) and stats.priest.hp == 116
 	ok = ok and stats.spearman.hp == 85 and _near(stats.slinger.range, 10.2) and _near(stats.camel_rider.pierce, 0.3)
 	_check("units.stats", ok, stats)
+	# reload = Retold ROF x1.15 for every Egyptian unit (EGYPT.md 3.1 / 1.5 / 1.6),
+	# the Laborer too (ROF 1 -> 1.15, the Greek villager keeps 1.5)
+	var rof := {"laborer": 1.0, "spearman": 1.0, "axeman": 1.0, "slinger": 1.0, "chariot_archer": 1.5,
+		"camel_rider": 1.0, "war_elephant": 1.4, "siege_tower": 1.0, "catapult": 4.0, "mercenary": 1.0,
+		"mercenary_cavalry": 1.0, "priest": 0.8, "pharaoh": 1.0}
+	var rok := true
+	var rel := {}
+	for t in rof:
+		rel[t] = [rof[t], stats[t].reload, _r(rof[t] * 1.15, 2)]
+		rok = rok and _near(stats[t].reload, rof[t] * 1.15, 0.006)
+	var vid := _u(sim, "villager", 1, 4.0, 4.0)
+	sim.tick(1)
+	var vr: float = sim.get_unit_stats(vid).reload
+	sim.kill_unit(vid, 0)
+	rel["villager (Greek)"] = vr
+	rok = rok and _near(vr, 1.5) and _near(stats.laborer.damage / stats.laborer.reload, 6.0 / 1.15)
+	_check("units.reload", rok, rel)
+	# measured: blows of a Laborer and of a Greek villager on a Greek house over 23 s
+	var blows := {}
+	for w in [["laborer", 1, "zeus"], ["villager", 2, "ra"]]:
+		var sb := _fresh("ra", "zeus", seed_arg, 3)
+		var hb := _b(sb, "house", 2 if w[0] == "laborer" else 1, 2, -2)
+		var wu := _u(sb, w[0], w[1], -2.0, 0.0)
+		sb.tick(1)
+		sb.take_events()
+		sb.order(wu, {"type": "attack", "target": hb})
+		var times := []
+		var dealt := 0.0
+		for k in int(30.0 * FPS):
+			sb.tick(1)
+			for e in sb.take_events():
+				if e.type == "unit:damaged" and int(e.other) == wu and int(e.id) == hb:
+					times.append(k / float(FPS))
+					dealt += float(e.amount)
+		var n := times.size()
+		var iv: float = (times[n - 1] - times[0]) / float(n - 1) if n > 1 else -1.0
+		blows[w[0]] = {"blows": n, "interval_s": _r(iv, 3), "hp_per_s_vs_house": _r(dealt / (times[n - 1] - times[0] + iv), 3) if n > 1 else 0.0}
+	var bok: bool = _near(blows.laborer.interval_s, 1.15, 0.04) and _near(blows.villager.interval_s, 1.5, 0.04)
+	_check("units.reload_measured", bok, blows)
 	# bonuses on a first blow (damage after armor): Spearman x2 vs cavalry, Axeman x4 vs
 	# infantry, Slinger x2.25 vs archers, Chariot x1.5 vs infantry, Camel x2 vs cavalry,
 	# Priest x5 vs myth; War Elephant x4 and Catapult crush vs buildings

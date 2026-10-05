@@ -77,7 +77,7 @@ inline const UnitDef *unit_defs() {
 		// (Retold hoplite / toxotes 2 -> 1, hippikon 3 -> 2): 2 -> 1, 3 -> 2, 5 -> 3
 		// bonus: villager, infantry, archer, cavalry, myth, hero, siege
 		{ "laborer", "Laborer", CLS_VILLAGER, 55, 2.565, 0.32, 8.4, 1, Cost(50, 0, 0, 0), 11.33, "Q", true, true, false, false, 0,
-			true, { 6, 0.5, 1.5, 0, false }, 0.1875, { 0 }, { 0.675, 0.54, 0.495 }, 10 },
+			true, { 6, 0.5, 1.15, 0, false }, 0.1875, { 0 }, { 0.675, 0.54, 0.495 }, 10 }, // reload: Retold ROF 1 x1.15 (the villager 1.5)
 		{ "spearman", "Spearman", CLS_INFANTRY, 85, 3.25, 0.42, 9.6, 1, Cost(50, 0, 25, 0), 12.5, "Q", false, false, false, false, 1,
 			true, { 6, 0.6, 1.15, 0, false }, 0.30, { 0, 0, 0, 2.0, 0, 0, 0 }, { 0 }, 0 },
 		{ "axeman", "Axeman", CLS_INFANTRY, 85, 2.795, 0.42, 9.6, 1, Cost(40, 0, 30, 0), 11.5, "W", false, false, false, false, 1,

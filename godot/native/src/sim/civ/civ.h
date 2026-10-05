@@ -29,7 +29,8 @@
 //   damage as AoM, distances x0.6, speeds x~0.65): hp and damage as Retold,
 //   speed x0.65 (a worker: x the Greek villager's ratio, 2.7 / 4.0), range and
 //   LOS x0.6 (DIST_SCALE), reload x1.15 (the browser's soldiers reload ~15 %
-//   slower than Retold's), armor: this sim's one value per unit becomes, for
+//   slower than Retold's; every Egyptian unit, the Laborer too: ROF 1 ->
+//   1.15 s, while the Greek villager keeps the browser's 1.5 s), armor: this sim's one value per unit becomes, for
 //   Egyptian units, a hack and a pierce armor = Retold's x0.75 (a hoplite's
 //   0.30 is Retold's ~40 % hack), crush (siege) vs units = Retold's 99 % crush
 //   armor; Egyptian buildings with no Greek counterpart: Retold hp x1.25
