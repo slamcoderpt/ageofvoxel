@@ -109,8 +109,15 @@ const DARK = 0x140e0a;
 const EYE_WHITE = 0xf0e8dc;
 const LINEN = pick3(6, 0xf2ecdc, 0xe8e0cb, 0xf8f4e8, 0.55, 0.85);
 const LINEN_SH = 0xcfc5ab;
-const GOLD = pick3(31, 0xd2a400, 0xc09400, 0xe0b414, 0.45, 0.8);   // deep: the exposure and the tone map's highlight roll-off wash a bright gold to cream
+// a light yellow with no blue: the grade's warm-chroma limit turns a deep gold
+// olive-khaki and an orange gold peach; this stays the most gold-looking
+const GOLD = pick3(31, 0xe8c400, 0xd8b400, 0xf2d020, 0.45, 0.8);
 const GOLD_DK = 0x6a4206;
+// the Pharaoh's gold: brighter and a step towards orange, so large gold faces
+// read as gold rather than olive under the grade
+const PH_GOLD = pick3(32, 0xf0c800, 0xe4bc00, 0xf8d420, 0.45, 0.8);
+const PH_GOLD_L = 0xffe040;
+const SKIN_PH = pick3(33, 0x8e5232, 0x864c2e, 0x965836);   // a clear tan (the face block reads at RTS zoom)
 const BRONZE = pick3(2, 0xd29c44, 0xbb8636, 0xe8be62, 0.45, 0.8);
 const SILVER = pick3(5, 0xd8dde2, 0xc4cad0, 0xeef1f4);
 const SILVER_DK = 0x8c939a;
@@ -212,6 +219,26 @@ function torsoBody(skin, shade = SKIN_SH) {
   m.box(3, 8, 1, 2, 2, 2, skin);                  // neck
   m.set(3, 5, 3, shade).set(4, 5, 3, shade);      // pec line
   m.set(3, 3, 3, shade).set(4, 2, 3, shade);      // abdomen
+  return m;
+}
+// A figure, not a crate: after a torso's dress is painted on, narrow the waist
+// (y 0..2 and the belt) to 6 voxels under the 8-voxel chest, square the
+// shoulders out to 10 (the top two chest rows copied one voxel out on each
+// side, so the arms hang from under them clear of the ribs) and flare the
+// kilt's hem to 10 (an A-line). Colours are copied from the neighbouring
+// voxel, so collars, vests and team dye carry over.
+function copyVox(m, from, to) {
+  const v = m.get(...from); if (!v) return;
+  m.set(...to, v.team ? TEAM : v.c); const n = m.get(...to); n.c = v.c; n.glow = v.glow;
+}
+function shapeTorso(m, { waist = true, shoulders = true, flare = true, hemRows = 1 } = {}) {
+  if (waist) for (let y = 0; y <= 2; y++) for (let z = -3; z <= 6; z++) for (const x of [-1, 0, 7, 8]) m.remove(x, y, z);
+  if (shoulders) for (let y = 6; y <= 7; y++) for (let z = 0; z <= 3; z++) { copyVox(m, [0, y, z], [-1, y, z]); copyVox(m, [7, y, z], [8, y, z]); }
+  if (flare) {
+    let lo = 0;
+    for (let y = -1; y >= -14; y--) for (let z = -2; z <= 5; z++) if (m.has(0, y, z) || m.has(7, y, z)) lo = Math.min(lo, y);
+    for (let y = lo; y < lo + hemRows && y < 0; y++) for (let z = -2; z <= 5; z++) { copyVox(m, [0, y, z], [-1, y, z]); copyVox(m, [7, y, z], [8, y, z]); }
+  }
   return m;
 }
 // kilt (shendyt) from the belt down to mid-thigh, in the army's colour with
@@ -341,7 +368,14 @@ function nemesN(m, a = GOLD, b = TEAM, { uraeus = false, lappets = true, chest =
 function headE(style) {
   const m = new VoxelModel();
   const dark = style === 'merc' || style === 'mercCav';
-  faceN(m, dark ? SKIN_DK : SKIN, dark ? SKIN_DK_SH : SKIN_SH, { nose: dark ? 0x6e4632 : 0xa86a3e });
+  if (style === 'pharaoh') {
+    // a clear tan face block: no brow line, two dark kohl eyes, the nose ridge
+    // (a step lighter than his arms: the face turns from the sun and must still read tan)
+    const FACE = pick3(34, 0xc89060, 0xc08858, 0xd0986a);
+    faceN(m, FACE, 0xa87046, { eyes: [DARK, DARK], brow: null, nose: 0xc08858 });
+    m.set(1, 4, 5, DARK).set(2, 4, 5, DARK).set(4, 4, 5, DARK).set(5, 4, 5, DARK);
+    m.set(2, 3, 5, FACE(2, 3, 5)).set(4, 3, 5, FACE(4, 3, 5)).set(3, 1, 5, 0x7a3a24);
+  } else faceN(m, dark ? SKIN_DK : SKIN, dark ? SKIN_DK_SH : SKIN_SH, { nose: dark ? 0x6e4632 : 0xa86a3e });
   if (style === 'laborer') {
     // a white linen khat bound with a team band, gathered into a bag at the nape
     capN(m, LINEN, { y0: 5, front: 6, top: 8 });
@@ -393,13 +427,14 @@ function headE(style) {
         if (z >= 5 && y < 6) continue;
         const ex = x === -1 + nar || x === 7 - nar, ez = z === -1 - back || z === 6 - Math.floor(back / 2);
         if (ex && ez) continue;
-        if ((x + y * 2 + z) % 5 === 0 && y > 6) m.set(x, y, z, GOLD); else m.set(x, y, z, TEAM);
+        if ((x + y * 2 + z) % 5 === 0 && y > 6) m.set(x, y, z, PH_GOLD); else m.set(x, y, z, TEAM);
       }
     }
-    m.box(-1, 6, 6, 9, 1, 1, GOLD).carve(-1, 6, 6, 1, 1, 1).carve(7, 6, 6, 1, 1, 1);
-    m.set(3, 7, 7, GOLD).set(3, 8, 7, GOLD).set(3, 9, 7, 0xff5a2a);   // uraeus
+    m.box(-1, 6, 6, 9, 1, 1, PH_GOLD).carve(-1, 6, 6, 1, 1, 1).carve(7, 6, 6, 1, 1, 1);
+    m.set(3, 7, 7, PH_GOLD_L).set(3, 8, 7, PH_GOLD_L).set(3, 9, 7, PH_GOLD_L);   // uraeus
     m.box(-1, 1, -1, 9, 4, 1, TEAM).box(-1, 1, 0, 1, 4, 3, TEAM).box(7, 1, 0, 1, 4, 3, TEAM);
-    m.box(3, -3, 5, 1, 3, 1, GOLD).set(3, -3, 6, GOLD);                // beard
+    // the braided false beard: dark, banded gold, standing out under the chin
+    m.box(2, -3, 5, 3, 3, 2, HAIR).box(2, -2, 6, 3, 1, 1, PH_GOLD_L).set(3, -4, 5, PH_GOLD_L);
   } else if (style === 'merc') {
     capN(m, HAIR, { y0: 5, front: 6, top: 8 });
     for (let x = -1; x <= 7; x += 2) m.set(x, 9, 2, HAIR);
@@ -445,10 +480,11 @@ function armM({ skin = SKIN, shade = SKIN_SH, upper = null, bracer = null, band:
   m.set(side === 'L' ? 0 : 1, 1, 2, shade);
   return m;
 }
+const ARM_X = 5.8;   // the arms hang from under the squared shoulders, clear of the ribs
 function arms(o = {}, y = 8) {
   return [
-    part('armL', armM({ ...o, side: 'L' }), [1, 7, 1], [5.5, y, 0], 'torso'),
-    part('armR', armM({ ...o, side: 'R' }), [1, 7, 1], [-5.5, y, 0], 'torso'),
+    part('armL', armM({ ...o, side: 'L' }), [1, 7, 1], [ARM_X, y, 0], 'torso'),
+    part('armR', armM({ ...o, side: 'R' }), [1, 7, 1], [-ARM_X, y, 0], 'torso'),
   ];
 }
 
@@ -558,9 +594,9 @@ function ankhStaffM() {
 // the pharaoh's crook, striped gold and team
 function crookM() {
   const m = new VoxelModel();
-  const S = (x, y, z) => ((y >> 1) & 1 ? GOLD(x, y, z) : TEAM);
-  for (let y = -4; y <= 13; y++) m.set(0, y, 0, S(0, y, 0));
-  for (const [y, z] of [[14, 0], [15, 1], [15, 2], [14, 3], [13, 3], [12, 3]]) m.set(0, y, z, S(0, y, z));
+  const S = (x, y, z) => ((y >> 1) & 1 ? PH_GOLD(x, y, z) : TEAM);
+  for (let y = -3; y <= 10; y++) m.set(0, y, 0, S(0, y, 0)).set(1, y, 0, S(1, y, 0));
+  for (const [y, z] of [[11, 0], [12, 1], [12, 2], [11, 3], [10, 3], [9, 3]]) m.set(0, y, z, S(0, y, z)).set(1, y, z, S(1, y, z));
   return m;
 }
 // tools (built along +z like the Greek villager's)
@@ -600,6 +636,7 @@ const sc = (j, s) => j.map((v) => v * s);
   t.box(0, 0, -1, 8, 1, 6, TEAM).box(5, -3, 4, 1, 3, 1, TEAM);    // team sash and its end
   t.box(1, 8, 0, 6, 1, 4, SKIN).box(3, 8, 1, 2, 2, 2, SKIN);
   const showTool = (n) => ({ conditional: true, portrait: false });
+  shapeTorso(t);
   rig('laborer', { voxel: 0.07, anim: 'human', style: 'villager' }, [
     ...legsE({ sandal: false }), part('torso', t, [4, 0, 2], [0, 12, 0]), head('laborer'),
     ...arms({ bracer: null, band: TEAM }),
@@ -619,6 +656,7 @@ const sc = (j, s) => j.map((v) => v * s);
   const t = torsoBody(SKIN);
   kilt(t, { len: 4, apron: LINEN, belt: LEATHER_DK });
   harness(t);
+  shapeTorso(t);
   rig('spearman', { voxel: 0.07, anim: 'human', style: 'spear', pose: 'spear' }, [
     ...legsE({ band: TEAM }), part('torso', t, [4, 0, 2], [0, 12, 0]), head('spear'),
     ...arms({ bracer: TEAM, band: TEAM }),
@@ -634,6 +672,7 @@ const sc = (j, s) => j.map((v) => v * s);
   kilt(t, { len: 4, apron: GOLD, belt: GOLD });
   collar(t, [GOLD, GOLD, GOLD_DK, GOLD]);
   for (let x = 0; x < 8; x++) for (let y = 5; y <= 8; y++) if ((x + y) % 2) { if (t.has(x, y, 4)) t.set(x, y, 4, 0xe8c020); }
+  shapeTorso(t);
   rig('axeman', { voxel: 0.07, anim: 'human', style: 'axe', pose: 'slash' }, [
     ...legsE({}), part('torso', t, [4, 0, 2], [0, 12, 0]), head('axe'),
     ...arms({ upper: TEAM, band: GOLD, bracer: GOLD }),
@@ -650,6 +689,7 @@ const sc = (j, s) => j.map((v) => v * s);
   t.box(0, 1, -1, 8, 7, 6, LEO).box(1, 8, 0, 6, 1, 4, LEO).box(2, 4, 4, 4, 4, 1, SKIN);    // open at the chest
   t.box(3, 8, 1, 2, 2, 2, SKIN);
   collar(t, [GOLD], SKIN);
+  shapeTorso(t);
   rig('slinger', { voxel: 0.07, anim: 'archer', style: 'sling', pose: 'sling' }, [
     ...legsE({}), part('torso', t, [4, 0, 2], [0, 12, 0]), head('sling'),
     ...arms({ bracer: TEAM }),
@@ -671,6 +711,7 @@ const sc = (j, s) => j.map((v) => v * s);
     sh.set(x, y, 0, LEATHER_DK);
   }
   sh.box(0, -1, -1, 1, 3, 1, LEATHER);
+  shapeTorso(t, { flare: false });
   rig('mercenary', { voxel: 0.07, anim: 'human', style: 'spear', pose: 'spear' }, [
     ...legsE({ skin: SKIN_DK, sandal: false, band: TEAM, foot: SKIN_DK }), part('torso', t, [4, 0, 2], [0, 12, 0]), head('merc'),
     ...arms({ skin: SKIN_DK, shade: SKIN_DK_SH, band: TEAM, bracer: TEAM }),
@@ -686,11 +727,13 @@ const sc = (j, s) => j.map((v) => v * s);
   for (let x = 1; x <= 6; x++) t.set(x, 8, 4, x % 2 ? 0x2a3a6a : LINEN(x, 8, 4));   // a dark zigzag collar edge
   t.box(0, 0, -1, 8, 2, 6, GOLD);                                                 // gold sash
   // the robe hangs to the ankles round the legs (bell skirt)
+  // an A-line: from the 6-voxel sash out to 12 at the feet
   for (let i = 1; i <= 10; i++) {
-    const y = -i, w = i < 3 ? 8 : 10, d = i < 3 ? 6 : 7;
-    t.box(4 - w / 2, y, 2 - Math.floor(d / 2) + 0, w, 1, d, i === 10 ? GOLD : LINEN);
+    const y = -i, w = 2 * Math.round((6 + (i - 1) * 6 / 9) / 2), d = 2 * Math.round((6 + (i - 1) * 2 / 9) / 2);
+    t.box(4 - w / 2, y, 2 - d / 2, w, 1, d, i === 10 ? GOLD : LINEN);
+    t.set(3, y, 2 + d / 2, GOLD).set(4, y, 2 + d / 2, GOLD);   // the sash's long end down the front
   }
-  t.box(3, -10, 5, 2, 10, 1, GOLD);   // the sash's long end down the front
+  shapeTorso(t, { flare: false });
   rig('priest', { voxel: 0.07, anim: 'human', style: 'priest', pose: 'staff' }, [
     ...legsE({ sandal: false }), part('torso', t, [4, 0, 2], [0, 12, 0]), head('priest'),
     ...arms({ sleeve: LINEN, bracer: GOLD }),
@@ -698,28 +741,53 @@ const sc = (j, s) => j.map((v) => v * s);
   ]);
 }
 
-// Pharaoh: the blue (team) crown, a gold collar and a gold robe over a team
-// skirt to the feet, the striped crook. A head taller than his men.
+// Pharaoh (unit_04): a figure, not a crate. A narrow waist under a gold sash,
+// a chest widening to squared gold shoulder pads that stand out past the
+// torso, a gold collar ring round a short neck, an A-line team skirt flaring
+// to the feet with a gold apron down the front and a gold hem. The face is
+// a clear tan block with dark eyes and a braided beard under the tall team
+// crown. The crook arm is lifted up and out (part "rest") so the striped
+// crook breaks the silhouette above the crown; the other fist is held clear
+// of the body. Light yellow gold (PH_GOLD): the deep GOLD of the
+// soldiers reads olive on large faces under the grade.
 {
-  const t = torsoBody(SKIN);
-  t.box(0, 1, -1, 8, 6, 6, GOLD).box(2, 3, 4, 4, 4, 1, SKIN);                       // gold corselet, open V
-  collar(t, [TEAM, GOLD, TEAM, GOLD]);
-  for (let i = 1; i <= 11; i++) {
-    const y = -i, w = i < 3 ? 8 : 10, d = i < 3 ? 6 : 7;
-    const x0 = 4 - w / 2, z0 = 2 - Math.floor(d / 2);
+  const t = new VoxelModel();
+  // torso x 0..7 (centre 4), z 0..3 (centre 2), front z = 3; hips y = 0
+  t.box(2, 0, 0, 4, 2, 4, PH_GOLD);                                                 // the waist in a gold sash
+  t.box(1, 2, 0, 6, 1, 4, TEAM);                                                    // the ribs widen
+  t.box(0, 3, 0, 8, 3, 4, TEAM);                                                    // chest (team under-robe)
+  for (let y = 2; y <= 5; y++) for (let x = 0; x < 8; x++) if (t.has(x, y, 3)) t.set(x, y, 3, PH_GOLD);   // the gold corselet over the chest
+  t.box(3, 2, 3, 2, 4, 1, TEAM).set(2, 5, 3, TEAM).set(5, 5, 3, TEAM);               // the team V of the corselet
+  t.box(-1, 6, 0, 10, 2, 4, PH_GOLD);                                               // squared shoulder pads past the torso
+  for (let x = 0; x <= 7; x++) { tset(t, x, 6, 3, TEAM_SHADE); tset(t, x, 6, 0, TEAM_SHADE); }   // a team row of the broad collar
+  t.box(2, 8, 0, 4, 1, 4, PH_GOLD_L);                                               // the gold collar ring round the neck
+  t.box(3, 8, 1, 2, 2, 2, SKIN_PH);                                                 // the neck shows above the ring
+  t.set(-1, 7, 0, GOLD_DK).set(8, 7, 0, GOLD_DK).set(-1, 7, 3, GOLD_DK).set(8, 7, 3, GOLD_DK);   // the pads' squared corners
+  // the A-line skirt: a shell from the sash flaring to the feet
+  const LEN = 11;
+  for (let i = 1; i <= LEN; i++) {
+    const y = -i;
+    const w = 2 * Math.round((5 + (i - 1) * 6 / (LEN - 1)) / 2), d = 2 * Math.round((4 + (i - 1) * 4 / (LEN - 1)) / 2);
+    const x0 = 4 - w / 2, z0 = 2 - d / 2;
+    const aw = Math.max(0.6, 2.4 - i * 0.12) + (i > 7 ? (i - 7) * 0.2 : 0);
     for (let x = x0; x < x0 + w; x++) for (let z = z0; z < z0 + d; z++) {
       const outer = x === x0 || x === x0 + w - 1 || z === z0 || z === z0 + d - 1;
       if (!outer) continue;
-      t.set(x, y, z, i === 11 ? GOLD : TEAM);
-      if (i < 11 && (x + z) % 3 === 0) tset(t, x, y, z, TEAM_SHADE);
+      const front = z === z0 + d - 1, cx = Math.abs(x + 0.5 - 4);
+      if (i === LEN - 1) t.set(x, y, z, PH_GOLD);                                                  // a gold hem band
+      else if (front && cx <= aw && i <= 9) t.set(x, y, z, cx > aw - 1 && i % 2 ? PH_GOLD_L : PH_GOLD);   // the pleated gold apron
+      else { t.set(x, y, z, TEAM); if ((x + z) % 3 === 0 || i === LEN) tset(t, x, y, z, TEAM_SHADE); }   // pleated team linen
     }
   }
-  t.box(2, -8, 5, 4, 8, 1, GOLD).box(3, -9, 5, 2, 1, 1, GOLD);                      // gold apron
-  t.box(0, 0, -1, 8, 1, 6, GOLD_DK);
+  t.box(3, -1, 4, 2, 1, 1, PH_GOLD_L);                                             // the sash knot
+  const armP = armM({ skin: SKIN_PH, shade: SKIN_SH, bracer: TEAM, band: PH_GOLD_L });
+  const armPL = armM({ skin: SKIN_PH, shade: SKIN_SH, bracer: TEAM, band: PH_GOLD_L, side: 'L' });
   rig('pharaoh', { voxel: 0.08, anim: 'human', style: 'pharaoh', pose: 'staff' }, [
-    ...legsE({ sandal: true }), part('torso', t, [4, 0, 2], [0, 12, 0]), head('pharaoh'),
-    ...arms({ bracer: TEAM, band: GOLD }),
-    part('weapon', crookM(), [0, 0, 0], GRIP, 'armR'),
+    ...legsE({ sandal: true, skin: SKIN_PH }), part('torso', t, [4, 0, 2], [0, 12, 0]), headPart('pharaoh', [0, 10, 0.2], 'torso', 1.2),
+    part('armL', armPL, [1, 7, 1], [6.2, 8, 0], 'torso', { rest: [-0.35, 0, 0.42] }),
+    part('armR', armP, [1, 7, 1], [-6.2, 8, 0], 'torso', { rest: [-0.25, 0, -2.25] }),
+    // the crook stands up and out of the raised fist (counter-turned in the hand)
+    part('weapon', crookM(), [0, 0, 0], [0, -6, 0.6], 'armR', { rest: [0, 0, 2.75] }),
   ]);
 }
 
@@ -901,6 +969,7 @@ function riderTorso(build) { const m = build(); m.carve(-2, -6, -3, 12, 5, 10); 
     bow.set(0, y, z, Math.abs(y) < 2 ? LEATHER : Math.abs(y) >= 8 ? GOLD(0, y, 0) : WOOD_DK);
   }
   for (let y = -8; y <= 8; y++) bow.set(0, y, 0, 0xe8e0cc);
+  shapeTorso(t, { flare: false });
   rig('chariot_archer', { voxel: 0.07, anim: 'centaur', style: 'chariot', pose: 'chariot', graze: false }, [
     part('body', horseBody(C), [3, 0, 10.5], [0, 10, 12], null, { coat: true }),
     part('barding', stripedBlanket({ z0: 7, z1: 14, low: 5, top: 9, colors: [TEAM, TEAM_TRIM, OCHRE, RED] }), [3, 0, 10.5], [0, 0, 0], 'body'),
@@ -1309,6 +1378,7 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
   }
   for (let i = 1; i <= 6; i++) { t.set(0, -i, 1, 0x8a7e60).set(7, -i, 2, 0x8a7e60); }
   t.box(0, 0, -1, 8, 1, 6, TEAM);
+  shapeTorso(t);
   rig('mummy', { voxel: 0.08, anim: 'human', style: 'mummy', pose: 'slash' }, [
     ...legsE({ skin: WRAP, sandal: false, wrap: WRAP, foot: 0x6a6050 }), part('torso', t, [4, 0, 2], [0, 12, 0]),
     head('mummy', [0, 10, 0.6]),
@@ -1324,6 +1394,7 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
   t.set(2, 6, 3, 0x5e5e58).set(5, 6, 3, 0x5e5e58).set(2, 4, 3, 0x5e5e58).set(5, 4, 3, 0x5e5e58);   // ribs
   t.box(1, -1, 0, 6, 1, 4, TEAM).box(2, -4, 4, 4, 3, 1, TEAM).box(2, -3, -1, 4, 2, 1, TEAM).box(0, 0, -1, 8, 1, 6, 0x4a4038);
   t.box(0, 8, -1, 8, 1, 6, TEAM).box(1, 4, -2, 6, 5, 1, TEAM);
+  shapeTorso(t, { flare: false });
   rig('minion', { voxel: 0.072, anim: 'human', style: 'minion', pose: 'slash' }, [
     ...legsE({ skin: GR, sandal: false, foot: 0x5e5e58 }), part('torso', t, [4, 0, 2], [0, 12, 0]),
     head('minion', [0, 10, 0.6]),

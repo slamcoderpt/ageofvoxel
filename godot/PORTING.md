@@ -1162,8 +1162,29 @@ same channel names, plus:
   `extra.a` = a per-mesh width factor (0 = 1, the Greeks'): Egyptian bodies
   0.75, gear 0.6, the half-size heads 0.5, so a line never swallows a face.
 - **Palette**: the grade's exposure and warm chroma limiter (grade_effect.gd)
-  wash bright golds and light skin to cream, so the gold is a deep yellow
-  (0xd2a400 ..) and the skin a darker bronze (0x94572f ..).
+  take about half the chroma of any warm colour: a deep gold (0xd2a400) reads
+  olive-khaki, an orange gold (0xffb000) peach like the skin. The gold is a
+  light yellow with no blue (`GOLD` 0xe8c400 .., the Pharaoh's `PH_GOLD`
+  0xf0c800 ..), the most gold-looking choice next to the team blue, and the
+  skin a darker bronze (0x94572f ..), so gold and skin stay apart by hue and
+  value.
+- **Figure shape** (`shapeTorso`): after a man's dress is painted on, the
+  waist and belt are cut to 6 voxels under the 8-voxel chest, the top two
+  chest rows are copied one voxel out on each side (squared shoulders, 10
+  wide) and a kilt's hem flares to 10 (an A-line); the arms hang at x 5.8
+  from under the shoulders, clear of the ribs. Used by the Laborer,
+  Spearman, Axeman, Slinger, Mercenary, Priest, the charioteer, Mummy and
+  Minion. The Pharaoh (unit_04) is built by hand: a gold-sashed 4-voxel
+  waist, a team chest under a gold corselet with a team V, squared gold
+  shoulder pads standing out past the torso, a light gold collar ring round
+  a visible 1-voxel neck, an A-line team skirt (5 to 12 wide) with a pleated
+  gold apron and a gold hem band, a tan face block (lighter than his arms)
+  with dark kohl eyes and a dark braided beard banded in gold, his head at
+  1.2x. His crook arm is raised up and out by a part `rest` ([-0.25, 0,
+  -2.25]) and the 2-voxel-thick striped crook counter-turned in the fist
+  ([0, 0, 2.75]) so it stands above the crown, clear of the body; the other
+  fist is held forward and out ([-0.35, 0, 0.42]). The rests compose with
+  the human idle / walk / attack channels (unit_view.cpp: `b * rest`).
 - **New kinds / channels**: `flyer` (Phoenix, Roc: hover with a bob, wings
   `wingL` / `wingR` beating, faster on the move, a dive with the talons
   forward to strike, a fall when killed), `siege` (Catapult, Siege Tower:
@@ -1180,7 +1201,8 @@ same channel names, plus:
   kilt, sling, pouch), `mercenary` (a Nubian spearman, round team shield),
   `priest` (white robe and headcloth, gold sun disc and sash, ankh staff),
   `pharaoh` (0.08: the team blue crown with gold discs and uraeus, gold
-  corselet and apron over a long team skirt, striped crook), `chariot_archer`
+  corselet, shoulder pads and apron over an A-line team skirt, the striped
+  crook raised overhead), `chariot_archer`
   (white horse in a striped blanket and team collar, hitched to an Egyptian
   chariot: a D-shaped car open at the back (an 11-voxel front, sides sweeping
   down to the back), its breastwork in the army's colour inside gold rims and
