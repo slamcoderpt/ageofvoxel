@@ -99,9 +99,16 @@ class Group {
 
 // ---- palette -----------------------------------------------------------------
 const pick3 = (seed, a, b, c, pa = 0.5, pb = 0.85) => (x, y, z) => { const h = hash3(x, y, z, seed); return h < pa ? a : h < pb ? b : c; };
-// sun-bronzed Egyptian skin, a step darker and browner than the Greeks'
-const SKIN = pick3(3, 0x94572f, 0x8a4f2a, 0x9e6036);
-const SKIN_SH = 0x6a3a1e;
+// sun-bronzed Egyptian skin: a warm light terracotta tan, two to three value
+// steps above the leather and the hafts (LEATHER, WOOD), so a bare arm never
+// melts into a strap, a shaft or a shield back; the face plane a step lighter
+// again (SKIN_FACE) so the dark eyes, brow and hairline read on it
+const SKIN = pick3(3, 0xc46e38, 0xba6632, 0xcc7840);
+const SKIN_SH = 0x8e4a24;
+const SKIN_FACE = pick3(35, 0xeca062, 0xe4985a, 0xf2a86a);
+// bare chests and limbs, seen in shade from the camera: a redder light tone,
+// so the sand-coloured bounce light leaves them warm terracotta, not olive
+const SKIN_FRONT = pick3(36, 0xffa070, 0xf89868, 0xffa878);
 const SKIN_DK = pick3(4, 0x5c3824, 0x4f2f1e, 0x684230);   // the Nubian mercenaries
 const SKIN_DK_SH = 0x3a2216;
 const HAIR = 0x1c1410;
@@ -121,11 +128,16 @@ const SKIN_PH = pick3(33, 0x8e5232, 0x864c2e, 0x965836);   // a clear tan (the f
 const BRONZE = pick3(2, 0xd29c44, 0xbb8636, 0xe8be62, 0.45, 0.8);
 const SILVER = pick3(5, 0xd8dde2, 0xc4cad0, 0xeef1f4);
 const SILVER_DK = 0x8c939a;
-const LEATHER = 0x6e4526;
-const LEATHER_DK = 0x452a16;
-const SANDAL = 0x6a4524;
-const WOOD = pick3(9, 0x8a5e36, 0x7d5431, 0x96683c);
-const WOOD_DK = 0x553820;
+// leather and wood sit well below the skin (dark walnut hafts, black-brown straps)
+const LEATHER = 0x54301a;
+const LEATHER_DK = 0x301a0c;
+const SANDAL = 0x4a2a14;
+const WOOD = pick3(9, 0x5c3a20, 0x52331c, 0x664226);
+const WOOD_DK = 0x382010;
+// spear and arrow points: dark iron-grey blades with a bright honed edge
+const BLADE = 0x6a737c;
+const BLADE_EDGE = 0xb4bec8;
+const BLADE_DK = 0x4c525a;
 const BLACK = 0x1e1a18;
 const TEAM_TRIM = 0xf4eedc;
 const TEAM_SHADE = 0xb4b4b4;   // team voxels a value step darker (the tint multiplies)
@@ -187,12 +199,17 @@ const GRIP = [-0.6, -6, 0.8];
 const SHIELD_AT = [2.4, -4, 3.5];
 
 // ---- human body (the Greek rig's proportions: 0.07 voxels, ~24 tall) ---------
+// bare limbs are seen side-on from the RTS camera, their lit tops tiny: they
+// take the lighter face tone so legs and arms read as skin next to the hafts
+const limb = (skin) => (skin === SKIN ? SKIN_FRONT : skin);
 function thighM(skin, kilt = null) {
+  skin = limb(skin);
   const m = new VoxelModel().box(0, 0, 0, 2, 6, 2, skin);
   if (kilt) m.box(0, 4, 0, 2, 2, 2, kilt);
   return m;
 }
 function shinM(skin, { sandal = true, band: bnd = null, wrap = null, foot = null } = {}) {
+  skin = limb(skin);
   const m = new VoxelModel().box(0, 1, 0, 2, 5, 2, skin);
   if (wrap) for (let y = 1; y <= 5; y++) m.box(0, y, 0, 2, 1, 2, y % 2 ? wrap : LINEN_SH);
   if (bnd) m.box(0, 4, 0, 2, 1, 2, bnd);
@@ -217,8 +234,13 @@ function torsoBody(skin, shade = SKIN_SH) {
   m.box(0, 3, 0, 8, 5, 4, skin);
   m.box(1, 8, 1, 6, 1, 2, skin);
   m.box(3, 8, 1, 2, 2, 2, skin);                  // neck
-  m.set(3, 5, 3, shade).set(4, 5, 3, shade);      // pec line
-  m.set(3, 3, 3, shade).set(4, 2, 3, shade);      // abdomen
+  // the bare chest and belly (front plane) a step lighter: it faces the low
+  // RTS camera and turns from the sun, and must still read as skin, not mud
+  if (skin === SKIN) for (let y = 0; y <= 7; y++) for (let x = 0; x < 8; x++) if (m.has(x, y, 3)) m.set(x, y, 3, SKIN_FRONT);
+  else {
+    m.set(3, 5, 3, shade).set(4, 5, 3, shade);    // pec line
+    m.set(3, 3, 3, shade).set(4, 2, 3, shade);    // abdomen
+  }
   return m;
 }
 // A figure, not a crate: after a torso's dress is painted on, narrow the waist
@@ -297,14 +319,14 @@ const HEAD_SCALE = 0.5;
 const HEAD_PIVOT = [3.5, 0, 3];
 const HEAD_TILT = [-0.22, 0, 0];   // chin up: the face turns to the camera above
 const LIP = 0x6a2c1c;
-function faceN(m, skin = SKIN, shade = SKIN_SH, { eyes = null, brow = HAIR, nose = null } = {}) {
+function faceN(m, skin = SKIN, shade = SKIN_SH, { eyes = null, brow = HAIR, nose = null, face = null } = {}) {
   for (let y = 0; y <= 7; y++) for (let x = 0; x <= 6; x++) for (let z = 0; z <= 5; z++) {
     const ex = x === 0 || x === 6, ez = z === 0 || z === 5;
     if (ex && ez) continue;                              // rounded vertical edges
     if (y === 7 && (ex || ez)) continue;                 // rounded crown
     if (y === 0 && (ex || z === 0)) continue;            // the jaw narrows to the chin
     if (y === 1 && ex && z >= 4) continue;
-    m.set(x, y, z, ex || z === 0 ? shade : skin);
+    m.set(x, y, z, ex || z === 0 ? shade : z === 5 && face ? face : skin);
   }
   // the face (z = 5, x 1..5)
   const E = eyes || [EYE_WHITE, DARK];
@@ -375,7 +397,13 @@ function headE(style) {
     faceN(m, FACE, 0xa87046, { eyes: [DARK, DARK], brow: null, nose: 0xc08858 });
     m.set(1, 4, 5, DARK).set(2, 4, 5, DARK).set(4, 4, 5, DARK).set(5, 4, 5, DARK);
     m.set(2, 3, 5, FACE(2, 3, 5)).set(4, 3, 5, FACE(4, 3, 5)).set(3, 1, 5, 0x7a3a24);
-  } else faceN(m, dark ? SKIN_DK : SKIN, dark ? SKIN_DK_SH : SKIN_SH, { nose: dark ? 0x6e4632 : 0xa86a3e });
+  } else if (dark) faceN(m, SKIN_DK, SKIN_DK_SH, { nose: 0x6e4632, face: 0x6c4632 });
+  else {
+    // the light face plane: two dark kohl eyes (a voxel of the body each), a
+    // brow line a value step down above them, the nose standing out lighter
+    faceN(m, SKIN, SKIN_SH, { eyes: [0xecd6bc, DARK], brow: 0x8a4422, nose: 0xeaa874, face: SKIN_FACE });
+    m.set(2, 3, 5, SKIN_FACE(2, 3, 5)).set(4, 3, 5, SKIN_FACE(4, 3, 5));
+  }
   if (style === 'laborer') {
     // a white linen khat bound with a team band, gathered into a bag at the nape
     capN(m, LINEN, { y0: 5, front: 6, top: 8 });
@@ -384,9 +412,12 @@ function headE(style) {
     m.box(1, 1, -2, 5, 5, 1, LINEN).box(2, -1, -2, 3, 2, 1, LINEN_SH);
     m.box(-1, 3, 0, 1, 3, 3, LINEN).box(7, 3, 0, 1, 3, 3, LINEN);
   } else if (style === 'spear') {
-    // shaved head with a team headband and one long braided side lock
-    for (let x = 1; x <= 5; x++) for (let z = 1; z <= 4; z++) m.set(x, 8, z, SKIN_SH);
-    ringN(m, 6, TEAM);
+    // close-cropped black hair (a clear hairline over the light face), a team
+    // headband and one long braided side lock
+    // (the band sits a row up, so it casts no shadow on the brow and eyes)
+    capN(m, HAIR, { y0: 5, front: 7, top: 8 });
+    for (let x = 0; x <= 6; x++) m.set(x, 6, 5, HAIR);
+    ringN(m, 7, TEAM);
     m.box(-2, 1, 1, 1, 5, 2, HAIR).box(-2, -3, 1, 1, 4, 1, HAIR).set(-2, -4, 1, GOLD(0, 0, 0));
   } else if (style === 'axe') {
     nemesN(m, GOLD, BLACK);
@@ -472,6 +503,7 @@ function head(style, joint = [0, 10, 0.2], parent = 'torso', extra = {}) {
 }
 // Arm: x 0..1, y 0..6 (the hand at the bottom), pivot at the shoulder.
 function armM({ skin = SKIN, shade = SKIN_SH, upper = null, bracer = null, band: bnd = null, side = 'L', sleeve = null } = {}) {
+  skin = limb(skin);
   const m = new VoxelModel();
   m.box(0, 0, 0, 2, 2, 2, skin).box(0, 2, 0, 2, 3, 2, skin).box(0, 5, 0, 2, 2, 2, upper || skin);
   if (sleeve) m.box(0, 4, 0, 2, 3, 2, sleeve);
@@ -489,14 +521,22 @@ function arms(o = {}, y = 8) {
 }
 
 // ---- hand-held gear (along +y, the grip at the origin) -------------------------
-function spearM(len = 26, head = BRONZE) {
+// the spear: a dark walnut shaft and a leaf-shaped iron-grey point, four
+// voxels long over a dark socket: one wide at the base, three wide across
+// the leaf's belly with bright honed edges, narrowing to a bright tip; a thin
+// midrib front to back so the point reads edge-on too
+function spearM(len = 26) {
   const m = new VoxelModel();
-  m.box(0, -9, 0, 1, len, 1, (x, y, z) => (y % 6 === 0 ? WOOD_DK : WOOD(x, y, z)));
   const t = len - 9;
-  m.box(0, t, 0, 1, 6, 1, head).set(0, t + 6, 0, GOLD_DK);
-  m.box(-1, t + 1, 0, 3, 3, 1, head).box(0, t + 1, -1, 1, 3, 3, head);
+  m.box(0, -9, 0, 1, t + 9, 1, (x, y, z) => (y % 6 === 0 ? WOOD_DK : WOOD(x, y, z)));
+  m.set(0, t, 0, BLADE_DK);                                         // the socket
+  m.set(0, t + 1, 0, BLADE).set(-1, t + 1, 0, BLADE_DK).set(1, t + 1, 0, BLADE_DK);
+  m.set(0, t + 2, 0, BLADE).set(-1, t + 2, 0, BLADE_EDGE).set(1, t + 2, 0, BLADE_EDGE);
+  m.set(0, t + 3, 0, BLADE).set(-1, t + 3, 0, BLADE_EDGE).set(1, t + 3, 0, BLADE_EDGE);
+  m.set(0, t + 4, 0, BLADE_EDGE).set(0, t + 5, 0, BLADE_EDGE);
+  m.set(0, t + 2, 1, BLADE_DK).set(0, t + 2, -1, BLADE_DK).set(0, t + 3, 1, BLADE).set(0, t + 3, -1, BLADE);
   m.set(0, t - 1, 0, TEAM).set(0, t - 2, 0, TEAM);   // a team tassel under the blade
-  m.box(0, -11, 0, 1, 2, 1, head);
+  m.box(0, -11, 0, 1, 2, 1, BLADE_DK);               // the butt spike
   return m;
 }
 // the epsilon axe: a long haft and a gold crescent blade held at two tangs
@@ -506,7 +546,8 @@ function epsilonAxeM() {
   for (let y = 9; y <= 16; y++) {
     const d = Math.abs(y - 12.5);
     const z1 = 5 - Math.round(d * d * 0.18);
-    for (let z = 1; z <= z1; z++) m.set(0, y, z, z === z1 ? 0xe0a838 : GOLD(0, y, z));
+    // (an orange-leaning gold: the plain GOLD turns olive in shade on a blade this big)
+    for (let z = 1; z <= z1; z++) m.set(0, y, z, z === z1 ? 0xffd468 : (hash3(0, y, z, 83) < 0.5 ? 0xf2a428 : 0xe89a20));
   }
   m.carve(0, 11, 1, 1, 3, 2);           // the open eye between the tangs (the epsilon)
   m.set(0, 16, 0, GOLD_DK).set(0, 9, 0, GOLD_DK);
@@ -554,7 +595,7 @@ function egShieldM({ face = TEAM, rim = GOLD, boss = GOLD, bands = false, w = 3,
     if (!edge && bands && (y === 0 || y === -3 || y === 3)) c = rim;
     if (!edge && Math.abs(x) <= 0 && Math.abs(y - 1) <= 1) c = boss;
     m.set(x, y, 1, c);
-    m.set(x, y, 0, edge ? GOLD_DK : (x === 0 ? LEATHER_DK : WOOD));
+    m.set(x, y, 0, edge ? GOLD_DK : (x === 0 ? LEATHER_DK : (hash3(x, y, 0, 81) < 0.3 ? 0x3a2a1e : 0xa08868)));   // a cowhide back
   }
   m.box(0, -1, -1, 1, 3, 1, LEATHER);
   return m;
@@ -571,7 +612,7 @@ function bowM() {
 }
 function arrowM() {
   const m = new VoxelModel();
-  m.box(0, 0, -2, 1, 1, 14, WOOD).set(0, 0, 12, BRONZE(0, 0, 0)).set(0, 0, 13, BRONZE(0, 0, 1));
+  m.box(0, 0, -2, 1, 1, 14, WOOD).set(0, 0, 12, BLADE).set(0, 0, 13, BLADE_EDGE);
   m.box(0, 0, -3, 1, 1, 3, 0xf4f0e8).set(0, 1, -2, TEAM).set(0, -1, -2, TEAM);
   return m;
 }
@@ -655,13 +696,18 @@ const sc = (j, s) => j.map((v) => v * s);
 {
   const t = torsoBody(SKIN);
   kilt(t, { len: 4, apron: LINEN, belt: LEATHER_DK });
-  harness(t);
+  // a white scale collar over the shoulders with a team row (unit_01), the
+  // chest bare below it: no dark straps blotting the torso
+  // (sitting a row low so the neck and the chin stay clear above it)
+  for (const [y, c] of [[7, LINEN], [6, TEAM], [5, LINEN_SH]]) t.box(0, y, -1, 8, 1, 6, c);
+  t.box(1, 8, 0, 6, 1, 4, LINEN).box(3, 8, 1, 2, 2, 2, SKIN);
+  for (let x = 0; x < 8; x++) if (x & 1) t.set(x, 7, 4, LINEN_SH);
   shapeTorso(t);
   rig('spearman', { voxel: 0.07, anim: 'human', style: 'spear', pose: 'spear' }, [
     ...legsE({ band: TEAM }), part('torso', t, [4, 0, 2], [0, 12, 0]), head('spear'),
     ...arms({ bracer: TEAM, band: TEAM }),
     part('weapon', spearM(28), [0, 0, 0], GRIP, 'armR'),
-    part('shield', egShieldM({ face: TEAM, rim: BRONZE, boss: BRONZE }), [0, 0, 0], SHIELD_AT, 'armL'),
+    part('shield', egShieldM({ face: TEAM, rim: SILVER, boss: SILVER }), [0, 0, 0], SHIELD_AT, 'armL'),
   ]);
 }
 
@@ -669,8 +715,11 @@ const sc = (j, s) => j.map((v) => v * s);
 // epsilon axe and a gold and team shield.
 {
   const t = torsoBody(SKIN);
+  // a team tunic under the gold scale collar (unit_02), so the gold never
+  // sits on bare skin of the same value
+  for (let x = 0; x < 8; x++) for (let y = 0; y <= 7; y++) for (let z = 0; z < 4; z++) if (t.has(x, y, z)) tset(t, x, y, z, (x + y) % 3 ? 0xffffff : TEAM_SHADE);
   kilt(t, { len: 4, apron: GOLD, belt: GOLD });
-  collar(t, [GOLD, GOLD, GOLD_DK, GOLD]);
+  collar(t, [GOLD, TEAM, GOLD, GOLD_DK]);
   for (let x = 0; x < 8; x++) for (let y = 5; y <= 8; y++) if ((x + y) % 2) { if (t.has(x, y, 4)) t.set(x, y, 4, 0xe8c020); }
   shapeTorso(t);
   rig('axeman', { voxel: 0.07, anim: 'human', style: 'axe', pose: 'slash' }, [
@@ -715,7 +764,7 @@ const sc = (j, s) => j.map((v) => v * s);
   rig('mercenary', { voxel: 0.07, anim: 'human', style: 'spear', pose: 'spear' }, [
     ...legsE({ skin: SKIN_DK, sandal: false, band: TEAM, foot: SKIN_DK }), part('torso', t, [4, 0, 2], [0, 12, 0]), head('merc'),
     ...arms({ skin: SKIN_DK, shade: SKIN_DK_SH, band: TEAM, bracer: TEAM }),
-    part('weapon', spearM(24, SILVER), [0, 0, 0], GRIP, 'armR'),
+    part('weapon', spearM(24), [0, 0, 0], GRIP, 'armR'),
     part('shield', sh, [0, 0, 0], SHIELD_AT, 'armL'),
   ]);
 }
@@ -1841,7 +1890,9 @@ for (const [type, R] of Object.entries(RIGS)) {
   for (const p of parts) {
     // thinner lines on the small-voxel heads and the hand-held gear, so a line
     // never swallows a face or a haft
-    const ol = p.name === 'head' ? 0.5 : (p.name === 'weapon' || p.name === 'shield' || p.name.startsWith('tool')) ? 0.6 : 0.75;
+    // (thin enough that two soldiers side by side keep their own outlines and
+    // a line never fills the gap between a torso and an arm)
+    const ol = p.name === 'head' ? 0.35 : (p.name === 'weapon' || p.name === 'shield' || p.name.startsWith('tool')) ? 0.45 : 0.55;
     g.add(`${type}/${p.name}`, buildVoxelGeometry(p.model, { size: R.voxel * (p.scale || 1), pivot: p.pivot, jitter: 0.05 }), { outline: ol });
   }
 }

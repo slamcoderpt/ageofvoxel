@@ -31,7 +31,10 @@ const STAND_IN := {"anubite": "minotaur", "avenger": "minotaur", "mummy": "medus
 ## lineup spacing (world units) by size
 const GAP := {"war_elephant": 4.2, "siege_tower": 3.4, "catapult": 3.4, "chariot_archer": 3.6, "camel_rider": 2.8, "mercenary_cavalry": 2.6,
 	"sphinx": 3.6, "petsuchos": 3.8, "scarab": 3.2, "scorpion_man": 3.4, "wadjet": 3.6, "phoenix": 3.6, "roc": 4.6, "son_of_osiris": 2.4,
-	"avenger": 2.2, "anubite": 2.0}
+	"avenger": 2.2, "anubite": 2.0,
+	# men with long hafts stand a spear's length apart, so in a focus view no
+	# man's spear or shield crosses his neighbour's body
+	"spearman": 2.6, "mercenary": 2.6, "axeman": 2.3, "priest": 2.2, "pharaoh": 2.3, "slinger": 2.0, "laborer": 1.9}
 
 static func scene_setup(game: Node) -> Dictionary:
 	var sim = game.sim
@@ -78,10 +81,12 @@ static func scene_setup(game: Node) -> Dictionary:
 		cam_dist = 4.0 + float(GAP.get(one, 1.0)) * 1.5
 		cam_pitch = 40.0
 	elif focus_type != "":
-		# four of one type from four sides (Retold's wiki "views")
+		# four of one type from four sides (Retold's wiki "views"), each turned
+		# three-quarters so the side and back views still show a face edge and
+		# the body, not just a haft
 		var size := float(GAP.get(focus_type, 1.6))
 		for k in 4:
-			var ang: float = yaw + float([0.0, PI * 0.5, PI, -PI * 0.6][k])
+			var ang: float = yaw + float([0.0, PI * 0.38, PI * 0.82, -PI * 0.4][k])
 			var p: Vector2 = at.call(float([-1.0, 1.0, 0.0, 0.0][k]) * size * 0.9, float([0.0, 0.0, -1.0, 1.0][k]) * size * 0.75)
 			spawn.call(focus_type, 1, p, ang)
 		cam_dist = 5.5 + size * 3.2
@@ -92,8 +97,10 @@ static func scene_setup(game: Node) -> Dictionary:
 		for r in rows.size():
 			var row: Array = rows[r]
 			for k in row.size():
-				spawn.call(row[k], 1, at.call((k - (row.size() - 1) * 0.5) * 1.25 + (r % 2) * 0.4, 2.4 - r * 1.6), yaw)
-		cam_dist = 14.0
+				# a man's width plus his haft and shield apart, rows staggered, so
+				# each soldier stands on his own ground
+				spawn.call(row[k], 1, at.call((k - (row.size() - 1) * 0.5) * 2.0 + (r % 2) * 0.7, 3.6 - r * 2.3), yaw)
+		cam_dist = 18.0
 		cam_pitch = 42.0
 	elif group == "mounted":
 		var row1 := ["chariot_archer", "war_elephant", "chariot_archer"]

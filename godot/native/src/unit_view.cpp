@@ -726,7 +726,13 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 		set(CH_head, S(t * 0.9) * 0.04, S(t * 0.53) * 0.3 * clamp01(S(t * 0.21) * 3));
 		set(CH_armL, b * 0.03, 0, 0.07); set(CH_armR, -b * 0.03, 0, -0.07);
 		set(CH_legL, -0.04, 0, 0.03); set(CH_legR, 0.04, 0, -0.03);
-		if (hoplite && v == 1) {
+		// (the Egyptian spear / slash rigs stand at ease: the haft upright and
+		// held out from the body, the shield low at the side, so in a crowd no
+		// man's levelled spear or raised shield covers his neighbour)
+		const bool eg_ease = pose == P_SPEAR || pose == P_SLASH;
+		if (hoplite && eg_ease) {
+			set(CH_armL, -0.25, 0.15, 0.16); set(CH_armR, -0.22 - b * 0.02, 0, -0.32); set(CH_weapon, 0.12, 0, 0.3);
+		} else if (hoplite && v == 1) {
 			set(CH_armL, -1.1, 0.45, 0.15); set(CH_armR, -2.2 + b * 0.04, 0.1, -0.12); set(CH_weapon, 1.57 + 0.2 + 2.2);
 			set(CH_torso, 0.12 + b * 0.02, -0.2); set(CH_legL, -0.45); set(CH_shinL, 0.35); set(CH_legR, 0.3); set(CH_shinR, 0.3);
 			bob = -1.1;

@@ -1160,8 +1160,30 @@ same channel names, plus:
   out and down to the shoulders and two lappets laid forward over the
   shoulders and down the chest in front of the collar; the khat (laborer) a
   bag at the nape; the priest a headcloth to the shoulders and a sun disc; the
-  pharaoh's khepresh swells up and back; the spearman a shaved crown, team
-  band and side lock.
+  pharaoh's khepresh swells up and back; the spearman close-cropped black
+  hair (a hairline on the face plane, the team band a row up so it shades
+  neither brow nor eyes) and a side lock. The men's face plane (z = 5) is
+  `SKIN_FACE`, a step lighter than the skull, with 1-voxel dark pupils inside
+  pale eye corners, a brow line a value step down above them and a lighter
+  nose ridge.
+- **Value separation** (round 6): skin, leather, wood and metal sit 2-3
+  value steps apart: `SKIN` a warm terracotta tan (0xc46e38 ..), bare chests
+  (torso front plane) and limbs `SKIN_FRONT` (0xffa070 ..: they face the
+  camera in shade, and the sand bounce light turns a yellower tan olive),
+  `LEATHER` / `WOOD` dark walnut (0x54301a / 0x5c3a20 ..), shield backs a
+  pale spotted cowhide. Spear points (`spearM`) are leaf-shaped iron-grey
+  blades (`BLADE` / `BLADE_EDGE` / `BLADE_DK`): a dark socket, 3 wide across
+  the belly with bright honed edges, narrowing to a bright tip, a midrib
+  front to back; arrowheads the same grey. The Spearman wears a white scale
+  collar with a team row (unit_01) set a row low so the neck shows, no dark
+  straps; the Axeman a team tunic under his gold collar; the epsilon axe
+  blade an orange-leaning gold (plain GOLD goes olive in shade).
+- **Idle at ease** (unit_view.cpp, `eg_ease`): rigs with pose `spear` /
+  `slash` (Spearman, Mercenary, Axeman, Mummy, Minion) skip the hoplite's
+  idle variants (spear levelled overhead, shield raised) and stand with the
+  haft upright held out from the body and the shield low at the side, so in
+  a group no man's spear or shield covers a neighbour. Greek rigs have no
+  `pose` and keep their idles; combat-line guards are unchanged.
 - **Collision offsets**: long hafts (spear, epsilon axe, ankh staff, crook)
   are gripped at `GRIP` [-0.6, -6, 0.8] (outside and in front of the fist,
   not its centre) and shields strapped at `SHIELD_AT` [2.4, -4, 3.5] on the
@@ -1175,14 +1197,14 @@ same channel names, plus:
   the hull stays closed; `export-models.mjs` writes it for the Greek `units`
   group (only units.bin.gz changes), `export-egypt-units.mjs` for its own.
   `extra.a` = a per-mesh width factor (0 = 1, the Greeks'): Egyptian bodies
-  0.75, gear 0.6, the half-size heads 0.5, so a line never swallows a face.
+  0.55, gear 0.45, the half-size heads 0.35, so a line never swallows a face
+  and two men side by side keep their own outlines.
 - **Palette**: the grade's exposure and warm chroma limiter (grade_effect.gd)
   take about half the chroma of any warm colour: a deep gold (0xd2a400) reads
   olive-khaki, an orange gold (0xffb000) peach like the skin. The gold is a
   light yellow with no blue (`GOLD` 0xe8c400 .., the Pharaoh's `PH_GOLD`
-  0xf0c800 ..), the most gold-looking choice next to the team blue, and the
-  skin a darker bronze (0x94572f ..), so gold and skin stay apart by hue and
-  value.
+  0xf0c800 ..), the most gold-looking choice next to the team blue; the skin
+  is a warm terracotta (see Value separation), apart from the gold by hue.
 - **Figure shape** (`shapeTorso`): after a man's dress is painted on, the
   waist and belt are cut to 6 voxels under the 8-voxel chest, the top two
   chest rows are copied one voxel out on each side (squared shoulders, 10
@@ -1284,7 +1306,7 @@ node scripts/godot-shoot.mjs --scene egypt_units --out shots/godot/egypt_units.p
      [--params "eu_group=myth"]       # the myth units, two rows
      [--params "eu_group=battle"]     # an Egyptian army against Greeks, 5 s into the fight
      [--params "eu_group=eco"]        # Laborers gathering wood / gold and building, Priests, the Pharaoh
-     [--params "eu_focus=anubite"]    # four of one type from four sides, framed close (the wiki "views")
+     [--params "eu_focus=anubite"]    # four of one type from four sides (three-quarter turns), framed close; men with hafts stand GAP 2-2.6 apart
      [--params "eu_state=walk"]       # with a lineup / focus: idle | walk | attack | die
      [--params "eu_t=3"]              # seconds of sim after the setup
      [--params "eu_yaw=28"]           # camera yaw (the rows face it)
