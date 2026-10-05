@@ -1006,7 +1006,38 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   frames, slits and team voxels carry through), with holes at recesses
   (doors) and gaps where something stands against the wall (porches,
   lintels, beams, adjoining blocks). Finished models only (construction
-  stages keep the stepped voxels).
+  stages keep the stepped voxels). A cut 1-4 voxels into a battered face
+  (a slit, a flagpole niche, a relief panel, a window group, a door whose
+  leaf sits deeper) is drawn as the same sloping plane that many voxels
+  deeper with reveal quads round it (sides 0.6 / 0.42 of the wall's value,
+  sill 0.86, soffit 0.45), so a slot follows the batter as one clean sloping
+  recess instead of a stepped bite showing the stairs behind it; only a
+  cut with nothing within 4 voxels behind it stays a hole.
+- **Pylon towers** (`pylon()`, the Siege Works' two towers): a battered
+  block (one clean voxel step every `b` = 9 rows under the skin) whose
+  skin record carries `cav` and `roll`: `skin()` adds a **torus roll** (a
+  270-degree round moulding, `ROLL_L`) up every corner on the hip line and a
+  half-round one along every face's top row, and a **curved cavetto**: one
+  smooth concave fluted sheet (4 rows, darkening into its throat) flaring
+  from the wall's top 2 voxels up and `lipOut` = 3 voxels out to the lip's
+  outer edge (the voxel gorge rows block() lays are cut away under it); the
+  pale lip has a one-voxel parapet on its edge, a shadow row, then the team
+  line on the recessed deck. `recessPanel(face, u0, yTop, rows, pal)` sinks
+  a relief panel one voxel into a face (a dark incised frame, a pale
+  dressed ground, palette figures: `PANEL_GOD` a lioness-headed goddess with
+  a sceptre, `PANEL_ANKH`, `PANEL_GLYPH`); `frame: null` for plain slots
+  (the flagpole niches).
+- **Siege Works** (building_11): the two towers stand apart (the front one
+  stepped forward and to the side, a 2-voxel gap, so no skin seam), both
+  with a low lotus frieze, relief panels on all four faces and a stair
+  hatch on the deck; the front tower has two tall flagpole niches cut
+  through the frieze either side of a projecting limestone gate block with
+  its own cornice, a 12-voxel framed doorway under a lintel and a winged
+  sun, its path clear of props (the siege-tower ladder frame is gone). The
+  colonnade's square pillars (green / ochre feet, a red ring, a lapis neck)
+  carry an architrave with the painted frieze on its edge, a gorge row one
+  voxel out, a lip two out and a parapet; the canvas awning runs from the
+  back tower's front down onto that parapet on two posts.
 - **Two team strengths**: `TEAM` voxels (roof lines, lapis bands, plinth
   panels) are weathered to a dark warm grey and tinted at 0.62, so the
   owner's colour is a thin dark lapis / maroon line, never the loudest thing;
@@ -1127,8 +1158,8 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   0 jars and a basket, 1 crates and sacks, 2 a mud-brick wall run with a gap,
   3 a hand cart, 4 a pen corner, 5 a reed sunshade stall, 6 a woodpile,
   7 a shaded well).
-- **Canvas awnings** (`clothAwning()`: houses, camps, the Town Center; the
-  Market, Armory and Siege Works keep the voxel `awning()` with team
+- **Canvas awnings** (`clothAwning()`: houses, camps, the Town Center, the
+  Siege Works; the Market and Armory keep the voxel `awning()` with team
   stripes): a smooth two-sided sheet drawn by `clothSkin()` (half-voxel
   quads in `m.skin`, like the battered walls), not voxel slats. It runs from
   a timber batten on the wall, sloping `drop` voxels to the front, bellied
