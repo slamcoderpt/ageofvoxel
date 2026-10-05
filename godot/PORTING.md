@@ -1065,7 +1065,18 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   voxels deep with a thin gold rim; in egypt_town the processional way's
   obelisks stand two tiles out from the temple's front corners), `eg_barracks`
   5x5 (thick battered ranges round a drill yard, a raised gatehouse with a
-  latticed door, team banners on poles, a rack of spears and shields),
+  latticed door (no painted sun over it: it read as a face); the yard's
+  front is a pylon gateway, no loose spear racks: two battered ochre
+  pylons (batter 7, h 21, a red band under the gorge) each with two
+  vertical flagpole niches cut a voxel into the face along the batter (a
+  team banner's pole stands in the outer one) and an incised relief of a
+  king smiting (dark sand, white crown, red kilt) between them; between the
+  pylons a limestone gate block a step lower, its cavetto cornice the lintel
+  bridging them, a lapis band, a winged sun disc (lapis / turquoise wings,
+  a red disc) over the door, and heavy cedar double doors one voxel inside
+  proud jambs and a lintel (vertical planks, a dark meeting seam, two
+  2-row bronze straps with rivets); barrels, a crate, a dummy and an
+  archery butt in the yard),
   `migdol` 7x7 (a tall battered limestone keep with a tiled roof, four taller
   corner turrets whose team rim runs only along their two outer sides, slit
   windows in threes, a projecting gate front with a deep gate and a gilt
@@ -1154,6 +1165,8 @@ node scripts/godot-shoot.mjs --scene egypt_town --out shots/godot/egypt_town.png
      [--params "egt_states=1"]         # a row of construction stages and variants
      [--params "egt_row=house/0/a2,house/1/a2,house/2/a2"]   # a framed row of model keys (look reviews; s/<type>/s<k> for a stage)
      [--params "egt_yaw=208"]          # the framing camera's yaw for egt_focus / egt_row (default 28)
+     [--params "egt_pitch=30"]         # the framing camera's pitch for egt_focus / egt_row (default 44)
+     [--params "egt_dist=13"]          # the framing camera's distance (default 5 + 2 x tiles for a focus, by the row's span for a row)
      [--params "egt_static=1"]         # render-only even where the sim has the types
      [--params "egt_details=1"]        # keep the map's pebbles and tufts
 node scripts/export-egypt.mjs          # re-export godot/assets/models/egypt*.{json,bin.gz}

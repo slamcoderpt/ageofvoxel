@@ -14,6 +14,8 @@ extends RefCounted
 ##     [--params "egt_states=1"]          # a row of construction stages (s0 s2 s4 s6) and looks instead
 ##     [--params "egt_row=house/0/a2,house/1/a2"]  # a framed row of the given model keys instead
 ##     [--params "egt_yaw=208"]           # the framing camera's yaw (degrees, default 28: the front)
+##     [--params "egt_pitch=30"]          # the framing camera's pitch (degrees, default 44)
+##     [--params "egt_dist=20"]           # the framing camera's distance (tiles)
 ##     [--params "egt_static=1"]          # render-only even when the sim has the types
 ##     [--params "egt_sand=0"]            # keep the map's ground (no sand)
 ##     [--params "egt_details=1"]         # keep the map's ground details (pebbles, tufts)
@@ -166,14 +168,14 @@ static func scene_setup(game: Node) -> Dictionary:
 		var x1 := float(cx + int(lots[-1][1]) + int(EgyptBuildingsRef.types().get(lots[-1][0], {"w": 3}).w))
 		var span := x1 - x0
 		focus = Vector2((x0 + x1) * 0.5, cz + 1.5)
-		game.args["cam"] = "%f,%f,%f,%f,%f" % [focus.x, focus.y, maxf(8.0, 2.0 + span * 0.7), 44.0, float(game.args.get("egt_yaw", 28.0))]
+		game.args["cam"] = "%f,%f,%f,%f,%f" % [focus.x, focus.y, float(game.args.get("egt_dist", maxf(8.0, 2.0 + span * 0.7))), float(game.args.get("egt_pitch", 44.0)), float(game.args.get("egt_yaw", 28.0))]
 	ctx["focus"] = focus
 	if focus_size == 0.0 and not states and not game.args.has("cam"):
 		# the whole settlement, like reference/egypt/building_01
 		game.args["cam"] = "%f,%f,%f,%f,%f" % [cx - 1.0, cz + 0.5, 44.0, 50.0, 30.0]
 	if focus_size > 0.0 and not game.args.has("cam"):
 		# frame one building like Retold's building views (high, close)
-		game.args["cam"] = "%f,%f,%f,%f,%f" % [focus.x, focus.y, maxf(14.0, 5.0 + focus_size * 2.0), 44.0, float(game.args.get("egt_yaw", 28.0))]
+		game.args["cam"] = "%f,%f,%f,%f,%f" % [focus.x, focus.y, float(game.args.get("egt_dist", maxf(14.0, 5.0 + focus_size * 2.0))), float(game.args.get("egt_pitch", 44.0)), float(game.args.get("egt_yaw", 28.0))]
 	print("egypt_town: %d buildings (%s), age %d, god %s, focus %s, sand %s" % [lots.size(), "sim" if use_sim else "render-only", age, god, focus_type if focus_type != "" else "town", sim.has_method("paint_ground")])
 	return ctx
 

@@ -1858,21 +1858,57 @@ function barracks() {
   block(m, 2, 13, 12, 36, 1, 11, { wall: OCHRE_W, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 5, band: null });
   block(m, 30, 13, 38, 28, 1, 9, { wall: OCHRE_W, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 5, band: null });
   // the raised gatehouse in the middle of the back range
-  const tg = block(m, 14, 6, 27, 17, 1, 16, { wall: LIME, roofC: ROOFTILE, rimC: LIME, gorge: [0xd2c4a4, 0xdccfb2], lipOut: 2, batter: 5, band: 'red', frieze: 1 });
+  const tg = block(m, 14, 6, 27, 17, 1, 16, { wall: LIME, roofC: ROOFTILE, rimC: LIME, gorge: [0xd2c4a4, 0xdccfb2], lipOut: 2, batter: 5, band: 'lapis', frieze: 1 });
   block(m, 17, 8, 24, 14, tg - 1, 4, { batter: 0, band: null });
-  door(m, '+z', 18, 5, 1, 9, { lattice: true, sun: true, deep: 3 });
-  // corner piers at the yard entrance with the banners
-  block(m, 8, 33, 15, 40, 1, 12, { wall: OCHRE_W, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 5, band: null });
-  block(m, 30, 27, 37, 34, 1, 12, { wall: OCHRE_W, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 5, band: null });
-  banner(m, 15, 1, 38, 30);
-  banner(m, 37, 1, 31, 30, '+x');
-  banner(m, 27, 1, 17, 32);
-  banner(m, 12, 1, 15, 28);
-  slit(m, '+x', 20, 6, 3, 1); slit(m, '+x', 25, 6, 3, 1); slit(m, '+z', 5, 6, 3, 1); slit(m, '+z', 34, 6, 3, 1);
-  // two weapon racks in the yard, a practice dummy, an archery butt
-  rack(m, 18, 29, 8); rack(m, 21, 23, 7);
-  dummy(m, 15, 26);
-  lathe(m, 27.5, 21.5, 1, 6, () => 2.2, (x, y, z) => (y === 3 ? RED : THATCH(x, y, z)));
+  door(m, '+z', 18, 5, 1, 9, { lattice: true, sun: false, deep: 3 });
+  // the yard's front: a pylon gateway (two battered pylons, a gate block
+  // between them under a lintel with a cavetto cornice and a gilt winged sun,
+  // heavy cedar double doors with bronze straps set in the doorway)
+  const PY = { wall: OCHRE_W, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 7, band: 'red' };
+  for (const [x0, x1] of [[5, 16], [25, 36]]) {
+    block(m, x0, 28, x1, 38, 1, 21, PY);
+    // two vertical flagpole niches cut into the front face (a shadowed slot
+    // following the batter), the team banner's pole standing in the outer one
+    for (const u of [x0 + 2, x1 - 3]) {
+      for (let y = 2; y < 17; y++) {
+        const q = outer(m, '+z', u, y, lim(m));
+        if (!q) continue;
+        m.remove(q[0], q[1], q[2]);
+        m.set(q[0], q[1], q[2] - 1, y === 2 ? 0x6e5236 : 0x86643e);
+      }
+      if (u === (x0 < 20 ? x0 + 2 : x1 - 3)) banner(m, u, 1, 38, 31);
+    }
+    // an incised relief between the niches: a striding figure with a raised
+    // arm (a king smiting) cut in a darker sand, a white crown and a red kilt
+    const mid = Math.floor((x0 + x1) / 2) - 2;
+    paint(m, '+z', mid, 16, ['.L...', '.LL.D', '.DD.D', 'DDDDD', '.DD..', '.DD..', '.RR..', '.RRR.', '.D.D.', 'D...D', 'D...D'],
+      { L: 0xe9dfc6, D: 0x74482a, R: RED_M });
+  }
+  // link walls from the pylons back to the ranges
+  block(m, 30, 27, 38, 32, 1, 9, { wall: OCHRE_W, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 5, band: null });
+  // the gate block: limestone, its own cornice (the lintel's cavetto) a step
+  // below the pylons' tops
+  block(m, 15, 32, 26, 38, 1, 18, { wall: LIME, roofC: ROOFTILE, rimC: LIME, gorge: [0xd2c4a4, 0xdccfb2], lipOut: 2, batter: 0, band: 'lapis' });
+  door(m, '+z', 17, 7, 1, 9, { deep: 1, frame: LIME, sun: false });
+  // the cedar leaves: vertical planks, a dark meeting seam, bronze straps
+  // with rivets every third course
+  const CEDAR = [0x9c5a32, 0x8a4c2a];
+  for (let x = 17; x < 24; x++) for (let y = 1; y < 10; y++) {
+    const q = outer(m, '+z', x, y, lim(m));
+    if (!q) continue;
+    let c = CEDAR[x & 1];
+    if (x === 20) c = REVEAL2;
+    else if (y === 2 || y === 3 || y === 6 || y === 7) c = (x === 18 || x === 22) && (y === 3 || y === 7) ? 0x8f6a2c : 0xe0b452;
+    m.set(q[0], q[1], q[2], c);
+  }
+  // the winged sun disc on the lintel face, spanning the gate
+  paint(m, '+z', 15, 15, ['GLLLRRRLLLG', 'TTLLRRRLLTT', '.TTTGGGTTT.', '...TTGTT...'], { G: GILT, L: LAPIS, T: TURQ, R: RED });
+  // in the yard: barrels and a shield stand by the walls, a practice dummy,
+  // an archery butt
+  barrel(m, 14.5, 1, 20.5, 5, 1.7); barrel(m, 14.5, 1, 24.5, 5, 1.7);
+  crate(m, 26, 1, 18, 3, 3, 3);
+  dummy(m, 18, 26);
+  lathe(m, 27.5, 23.5, 1, 6, () => 2.2, (x, y, z) => (y === 3 ? RED : THATCH(x, y, z)));
   return m;
 }
 
