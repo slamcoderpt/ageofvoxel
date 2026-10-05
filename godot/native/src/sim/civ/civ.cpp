@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstring>
 
 #include "../core/jsmath.h"
 #include "../sim.h"
@@ -92,8 +93,20 @@ const EgyptUnit *egypt_unit(int type) {
 		{ 0.225, 0, 0, 0, 1, 10, "hero",
 			"Pharaoh: free, 0 pop, 100 hp (110 / 125 / 145), 3 attack (13.2 / 15 / 17.4), range 3 (12 / 18 / 20), x2.5 vs myth, armor 15/30/99, heals 10 hp/s, empowers, respawns at the TC after 90 s",
 			"per age as the Priest; empower in sim/civ (O_EMPOWER)" },
+		{ 0, 0, 0, 0, 0, 0, "anubite",
+			"Baboon of Set: 3 favor, 1 pop, 20 hp, 3 hack, speed 3.3; Set's starting scout (Archaic Animal of Set)",
+			"hp, damage as Retold; speed x0.65; class infantry (this sim has no animal class); LOS 12 (20 m x0.6: EGYPT.md gives none); armor 0; Set's start only (the Pharaoh's summons are not in this game)" },
 	};
 	return is_egypt_unit(type) ? &T[type - U_LABORER] : nullptr;
+}
+
+std::string unit_plural(int type) {
+	const std::string n = unit_def(type).name;
+	if (type == U_BABOON) return "Baboons of Set";
+	if (type == U_MERCENARY_CAVALRY) return n; // (a collective)
+	if (n.size() > 1 && n.back() == 'y' && !std::strchr("aeiou", n[n.size() - 2])) return n.substr(0, n.size() - 1) + "ies";
+	if (n.size() && (n.back() == 's' || n.back() == 'x')) return n + "es";
+	return n + "s";
 }
 
 const HeroAge *hero_age(int type) {
@@ -206,7 +219,11 @@ void Civs::init(Sim *s) {
 		favor_made[i] = 0;
 		had_pharaoh[i] = false;
 		drop_bonus[i] = 0;
+		isis_healed[i] = 0;
+		devotee_saved[i] = 0;
+		shield_refused[i] = 0;
 	}
+	mandjet_by.clear();
 	s->commands.register_handler(O_EMPOWER, [this](int r, const Order &o) {
 		if (!rules() || !can_empower(r)) return false;
 		Entities &E = sim->entities;
@@ -351,7 +368,7 @@ int Civs::train_check(int b, int utype, std::string *why) const {
 	if (c != CIV_EGYPT) return 0;
 	if (utype == U_PRIEST && B.type[b] == B_TOWN_CENTER && !has_built(owner, B_TEMPLE)) return no(2, "Requires a Temple");
 	const EgyptUnit *eu = egypt_unit(utype);
-	if (eu && eu->limit > 0 && count_type(owner, utype) >= eu->limit) return no(2, std::string("Limit of ") + std::to_string(eu->limit) + " " + unit_def(utype).name + (eu->limit > 1 ? "s" : ""));
+	if (eu && eu->limit > 0 && count_type(owner, utype) >= eu->limit) return no(2, std::string("Limit of ") + std::to_string(eu->limit) + " " + (eu->limit > 1 ? unit_plural(utype) : std::string(unit_def(utype).name)));
 	return 0;
 }
 
@@ -365,6 +382,10 @@ CivStart Civs::egypt_start(int owner, const Start &st, int villagers) {
 	out.workers = sim->spawn_block(U_LABORER, owner, std::max(1, villagers - 2), fx, fz, 0, 1.1);
 	const std::vector<int32_t> ph = sim->spawn_block(U_PHARAOH, owner, 1, fx - 2.6, fz + 0.4, 1, 1.1);
 	const std::vector<int32_t> pr = sim->spawn_block(U_PRIEST, owner, 1, fx + 2.6, fz + 0.4, 1, 1.1);
+	if (god_is(owner, "set")) { // (Retold: Set also starts with a Baboon of Set, the scout animal)
+		const std::vector<int32_t> bb = sim->spawn_block(U_BABOON, owner, 1, fx + 4.4, fz + 0.4, 1, 1.1);
+		out.baboon = bb.empty() ? 0 : bb[0];
+	}
 	out.pharaoh = ph.empty() ? 0 : ph[0];
 	out.priest = pr.empty() ? 0 : pr[0];
 	return out;
@@ -441,9 +462,111 @@ double Civs::monument_favor_rate(int owner) const {
 	double rate = 0;
 	for (int b = 0; b < B.size(); b++) {
 		if (B.removed[b] || B.dead[b] || !B.built[b] || B.owner[b] != owner || !is_monument(B.type[b])) continue;
-		rate += MONUMENT_FAVOR_MIN[monument_index(B.type[b])] / 60 * (1 + EMPOWER_FAVOR * B.civ_empower[b]);
+		rate += MONUMENT_FAVOR_MIN[monument_index(B.type[b])] / 60 * (1 + empower_favor(owner) * B.civ_empower[b]);
 	}
 	return rate;
+}
+
+double Civs::empower_favor(int owner) const { return god_is(owner, "isis") ? ISIS_EMPOWER_FAVOR : EMPOWER_FAVOR; }
+
+// ---- the major gods' Monument auras ------------------------------------------------------------
+
+double Civs::rect_dist(int b, double x, double z) const {
+	const BuildingStore &B = sim->entities.buildings;
+	const double x0 = B.tx[b], z0 = B.tz[b], x1 = x0 + B.w[b], z1 = z0 + B.h[b];
+	const double dx = x < x0 ? x0 - x : x > x1 ? x - x1 : 0;
+	const double dz = z < z0 ? z0 - z : z > z1 ? z - z1 : 0;
+	return jsm::hypot(dx, dz);
+}
+
+double Civs::shield_radius(int b) const {
+	const BuildingStore &B = sim->entities.buildings;
+	if (b < 0 || b >= B.size() || B.removed[b] || B.dead[b] || !B.built[b] || !is_monument(B.type[b])) return 0;
+	const int o = B.owner[b];
+	if (civ(o) != CIV_EGYPT || !god_is(o, "isis")) return 0;
+	return B.civ_empower[b] > 0 ? SHIELD_RANGE_EMPOWERED : SHIELD_RANGE;
+}
+
+bool Civs::shield_allows(int caster, double x, double z, std::string *why, int32_t *by) const {
+	if (why) why->clear();
+	if (by) *by = 0;
+	if (!rules()) return true;
+	const BuildingStore &B = sim->entities.buildings;
+	for (int b = 0; b < B.size(); b++) {
+		const double r = shield_radius(b);
+		if (r <= 0 || !sim->is_enemy(B.owner[b], caster)) continue;
+		if (rect_dist(b, x, z) <= r) {
+			if (why) *why = "Blocked by a Divine Shield";
+			if (by) *by = B.id[b];
+			return false;
+		}
+	}
+	return true;
+}
+
+// footprint to footprint: a Monument's centre to the building's rect, less the Monument's half size
+static double mon_dist(const Civs &C, const BuildingStore &B, int m, int b) {
+	return std::max(0.0, C.rect_dist(b, B.x[m], B.z[m]) - 0.5 * std::min(B.w[m], B.h[m]));
+}
+
+int32_t Civs::devotee_monument(int b) const {
+	const BuildingStore &B = sim->entities.buildings;
+	if (!rules() || b < 0 || b >= B.size() || B.removed[b]) return 0;
+	const int o = B.owner[b];
+	if ((B.type[b] != B_EG_BARRACKS && B.type[b] != B_MIGDOL) || civ(o) != CIV_EGYPT || !god_is(o, "set")) return 0;
+	int32_t best = 0;
+	double bd = 1e9;
+	for (int m = 0; m < B.size(); m++) {
+		if (B.removed[m] || B.dead[m] || !B.built[m] || B.owner[m] != o || !is_monument(B.type[m])) continue;
+		const double d = mon_dist(*this, B, m, b);
+		if (d <= DEVOTEES_RANGE && d < bd) {
+			bd = d;
+			best = B.id[m];
+		}
+	}
+	return best;
+}
+
+double Civs::train_cost_mult(int b, int) const { return devotee_monument(b) ? DEVOTEES_COST : 1; }
+
+void Civs::auras(double dt) {
+	Entities &E = sim->entities;
+	UnitStore &U = E.units;
+	BuildingStore &B = E.buildings;
+	mandjet_by.assign(B.size(), 0);
+	// 1. Ra's Mandjet: a Monument the Pharaoh himself empowers (full strength) lends
+	// 60 % to every other own building (Monuments too, not Farms) in 18 tiles; no
+	// stacking (the strongest empowerment wins), no chaining
+	std::vector<int> src;
+	for (int b = 0; b < B.size(); b++)
+		if (!B.removed[b] && !B.dead[b] && B.built[b] && is_monument(B.type[b]) && B.civ_empower[b] >= 1 &&
+				civ(B.owner[b]) == CIV_EGYPT && god_is(B.owner[b], "ra"))
+			src.push_back(b);
+	for (int m : src) {
+		const int o = B.owner[m];
+		for (int b = 0; b < B.size(); b++) {
+			if (b == m || B.removed[b] || B.dead[b] || B.owner[b] != o || building_def(B.type[b]).farm) continue;
+			if (mon_dist(*this, B, m, b) > MANDJET_RANGE || B.civ_empower[b] >= MANDJET_STRENGTH) continue;
+			B.civ_empower[b] = MANDJET_STRENGTH;
+			mandjet_by[b] = B.id[m];
+		}
+	}
+	// 2. Isis: an empowered Monument heals her units and her allies' in 30 tiles at
+	// 1 hp/s (half if busy, not siege); several Monuments stack
+	for (int m = 0; m < B.size(); m++) {
+		if (shield_radius(m) != SHIELD_RANGE_EMPOWERED) continue;
+		const int o = B.owner[m];
+		const double half = 0.5 * std::max(B.w[m], B.h[m]);
+		sim->movement.hash.for_each_near(B.x[m], B.z[m], SHIELD_RANGE_EMPOWERED + half + 2, [&](int r) {
+			if (r >= U.size() || U.removed[r] || U.dead[r] || !sim->is_ally(o, U.owner[r])) return;
+			if (U.hp[r] >= U.max_hp[r] || unit_def(U.type[r]).cls == CLS_SIEGE) return;
+			if (std::max(0.0, rect_dist(m, U.x[r], U.z[r]) - U.radius[r]) > SHIELD_RANGE_EMPOWERED) return;
+			const bool busy = U.moving[r] || U.order_type[r] != O_IDLE;
+			const double before = U.hp[r];
+			U.hp[r] = std::min(U.max_hp[r], U.hp[r] + ISIS_MONUMENT_HEAL * (busy ? 0.5 : 1) * dt);
+			isis_healed[o] += U.hp[r] - before;
+		});
+	}
 }
 
 // ---- tick ------------------------------------------------------------------------------------
@@ -483,6 +606,7 @@ void Civs::update(double dt) {
 		U.anim_want[r] = A_WORSHIP;
 		B.civ_empower[b] = std::max(B.civ_empower[b], empower_strength(r)); // (several empowerers do not stack, Retold)
 	}
+	auras(dt); // (Ra's Mandjet adds to the empowerment; Isis' Monuments heal)
 	// Obelisk LOS
 	for (int b = 0; b < B.size(); b++)
 		if (!B.removed[b] && B.type[b] == B_OBELISK) B.sight[b] = building_def(B_OBELISK).sight * (1 + EMPOWER_LOS * B.civ_empower[b]);

@@ -63,6 +63,14 @@ bool GodPowers::cast(int owner, int id, double x, double z) {
 	if (!can_cast(owner, id).ok) return false;
 	Sim &S = *sim;
 	if (!S.map().clamp_to_map(x, z)) return false; // bounds: off-map target -> the edge tile, NaN refused (nothing paid)
+	if (S.godot_rules) { // (Godot-only, sim/civ: Isis' Divine Shield; refused, nothing paid)
+		int32_t by = 0;
+		if (!S.civs.shield_allows(owner, x, z, nullptr, &by)) {
+			const int m = S.entities.building_slot(by);
+			if (m >= 0) S.civs.shield_refused[S.entities.buildings.owner[m]]++;
+			return false;
+		}
+	}
 	const PowerDef &def = power_def(id);
 	S.players[owner].pay(def.cost);
 	cooldowns[owner][id] = S.time + def.cooldown;

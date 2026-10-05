@@ -94,7 +94,11 @@ MatchResult Sim::setup_match(const MatchConfig &cfg) {
 		const AIParams par = ai_params(d);
 		p.gather_mult = par.gather_mult;
 		for (int k = 0; k < 4; k++) p.res[k] = stock[k] + (k < 3 ? par.bonus_res : 0);
-		if (p.civ == CIV_EGYPT) p.res[RES_FAVOR] = 0; // (sim/civ: Retold's Egyptians start without favor: no worship, Monuments)
+		// (sim/civ: Retold's Egyptians start smaller, 200 f / 100 w / 50 g and no favor: the
+		// setup's stockpile x EGYPT_START_RES, "deathmatch" keeps its 10000s but the favor)
+		if (p.civ == CIV_EGYPT)
+			for (int k = 0; k < 4; k++)
+				if (k == RES_FAVOR || cfg.resources != "deathmatch") p.res[k] = stock[k] * EGYPT_START_RES[k] + (k < 3 ? par.bonus_res : 0);
 		if (mp.human && !local_player) local_player = id;
 	}
 	if (!local_player) local_player = ids[0];

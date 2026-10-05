@@ -215,7 +215,7 @@ void spark_color(double T, float &r, float &g, float &b) {
 
 double unit_height(int type) {
 	static const double H[aov::U_TYPE_COUNT] = { 2.0, 2.25, 2.05, 2.75, 3.4, 3.7, 5.0, 2.9, 2.6,
-		2.0, 2.25, 2.25, 2.05, 2.75, 2.9, 4.2, 5.0, 2.6, 2.25, 2.75, 2.0, 2.3 }; // (the Egyptian types: sim/civ)
+		2.0, 2.25, 2.25, 2.05, 2.75, 2.9, 4.2, 5.0, 2.6, 2.25, 2.75, 2.0, 2.3, 1.4 }; // (the Egyptian types: sim/civ)
 	return type >= 0 && type < aov::U_TYPE_COUNT ? H[type] : 1.8;
 }
 

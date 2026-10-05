@@ -15,7 +15,7 @@ enum UnitClass : uint8_t { CLS_VILLAGER, CLS_INFANTRY, CLS_ARCHER, CLS_CAVALRY, 
 enum UnitType : uint8_t { U_VILLAGER, U_HOPLITE, U_TOXOTES, U_HIPPIKON, U_MINOTAUR, U_HERO, U_CYCLOPS, U_CENTAUR, U_MEDUSA,
 	// Egyptian (Godot-only, sim/civ)
 	U_LABORER, U_SPEARMAN, U_AXEMAN, U_SLINGER, U_CHARIOT_ARCHER, U_CAMEL_RIDER, U_WAR_ELEPHANT, U_SIEGE_TOWER, U_CATAPULT,
-	U_MERCENARY, U_MERCENARY_CAVALRY, U_PRIEST, U_PHARAOH,
+	U_MERCENARY, U_MERCENARY_CAVALRY, U_PRIEST, U_PHARAOH, U_BABOON,
 	U_TYPE_COUNT };
 constexpr int U_GREEK_COUNT = U_LABORER; // the browser's types (Greek); the rest are Egyptian
 inline bool is_egypt_unit(int t) { return t >= U_LABORER && t < U_TYPE_COUNT; }
@@ -95,6 +95,9 @@ inline const UnitDef *unit_defs() {
 			true, { 0.5, 3.0, 0.92, 0, true }, 0.075, { 0, 0, 0, 0, 5.0, 0, 0 }, { 0 }, 0 },
 		{ "pharaoh", "Pharaoh", CLS_HERO, 100, 2.6, 0.4, 10.8, 0, Cost(), 0, "", false, false, false, true, 0,
 			true, { 3, 1.8, 1.15, 0, true }, 0.1125, { 0, 0, 0, 0, 2.5, 0, 0 }, { 0 }, 0 },
+		// Set's starting scout (an Animal of Set: this sim has no animal class, infantry)
+		{ "baboon_of_set", "Baboon of Set", CLS_INFANTRY, 20, 2.145, 0.3, 12, 1, Cost(0, 0, 0, 3), 0, "", false, false, false, false, 0,
+			true, { 3, 0.6, 1.15, 0, false }, 0, { 0 }, { 0 }, 0 },
 	};
 	// clang-format on
 	return D;

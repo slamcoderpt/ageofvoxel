@@ -366,6 +366,7 @@ void Combat::damage(int32_t tid, double amount, const Hitter &a, uint8_t kind) {
 		} else if (sim->godot_rules && rules_armored(B.type[t])) dmg *= sim->techs.building_armor_mult(a, kind, B.type[t]); // (Godot-only: Retold's Armory / Market / Temple armor, sim/techs; the Egyptian buildings', sim/civ)
 		else dmg *= (ad && ad->cls == CLS_MYTH) || a.myth_class ? 1.2 : 0.35;
 		if (eu && eu->vs_buildings > 0) dmg *= eu->vs_buildings; // (War Elephant x4)
+		if (eu && U.type[a.row] == U_LABORER && B.type[t] == B_TOWER) dmg *= LABORER_VS_TOWER; // (sim/civ: Retold's Laborer x4 vs towers)
 	}
 	if (sim->godot_rules) {
 		// Godot-only: a building's arrows (Town Center, towers) never hurt a

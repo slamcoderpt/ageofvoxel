@@ -6,7 +6,8 @@ extends SceneTree
 ##   defs         the two civs, their build menus and units; every Egyptian unit's and
 ##                building's numbers (Retold, mapped) printed and spot-checked
 ##   match        the god picks the civ (zeus -> Greek, ra / isis / set -> Egyptian);
-##                Egyptian start: Town Center, 3 Laborers, the Pharaoh, a Priest, no favor
+##                Egyptian start: Town Center, 3 Laborers, the Pharaoh, a Priest (Set: a Baboon),
+##                Retold's 200 f / 100 w / 50 g and no favor (Greek 300 / 300 / 200 / 20)
 ##   economy      5 minutes, the same woods / mine / farms for a Greek and an Egyptian:
 ##                wood, gold and food per worker (Laborers x0.9), each civ's drop sites
 ##                (Granary food only, Lumber Camp wood, Mining Camp gold), favor from 3
@@ -21,6 +22,11 @@ extends SceneTree
 ##                hp, his Priests empower at 60 %), Isis (TC +5 pop, techs -10 %, Obelisk 5 gold,
 ##                built 40 % faster), Set (Barracks units +5 % speed, Barracks / Siege Works /
 ##                Migdol -25 % gold)
+##   auras        the major gods' Monument auras (EGYPT.md 1.4, 4): Ra's Mandjet (a Pharaoh-
+##                empowered Monument empowers his buildings in 18 tiles at 60 %: train speed,
+##                favor), Isis' Divine Shield (no enemy god power in 15 / 30 tiles, 1 hp/s
+##                healing in 30 tiles, favor +100 % empowered: 9 / min vs Ra's 5.4), Set's
+##                Devotees (Barracks / Migdol near a Monument train at -10 %, refunds alike)
 ##   locks        civ locks (builds, trains, techs both ways), Monument order and limit, the
 ##                TC's Priests need a Temple, Laborer cap, Mercenary limit, Mythic needs a
 ##                Migdol, a Laborer cannot build an Obelisk, a Priest only that
@@ -178,7 +184,7 @@ func _build_time(sim: Object, b: int, max_s := 200.0) -> float:
 
 func _run() -> void:
 	var t0 := Time.get_ticks_msec()
-	for c in ["defs", "match", "economy", "units", "pharaoh", "priest", "gods", "locks", "determinism", "rules_off"]:
+	for c in ["defs", "match", "economy", "units", "pharaoh", "priest", "gods", "auras", "locks", "determinism", "rules_off"]:
 		if _want(c):
 			call("_case_" + c)
 	result["ms"] = Time.get_ticks_msec() - t0
@@ -209,7 +215,9 @@ func _case_defs() -> void:
 	var ok: bool = float(sp.hp) == 85 and float(sp.cost.food) == 50 and float(sp.cost.gold) == 25 and _near(float(sp.hack_armor), 0.30) and _near(float(sp.pierce_armor), 0.075)
 	ok = ok and float(ax.attack.damage) == 5 and float(lab.hp) == 55 and float(lab.cost.food) == 50 and str(lab["class"]) == "villager"
 	ok = ok and float(sim.get_unit_def("war_elephant").hp) == 450 and int(sim.get_unit_def("pharaoh").pop) == 0 and float(sim.get_unit_def("priest").cost.gold) == 100
-	_check("defs.units", ok and units.size() == 13, units)
+	var bb: Dictionary = sim.get_unit_def("baboon_of_set")
+	ok = ok and float(bb.hp) == 20 and float(bb.attack.damage) == 3 and float(bb.cost.favor) == 3 and int(bb.pop) == 1 and str(bb.civ) == "egyptian"
+	_check("defs.units", ok and units.size() == 14, units)
 	# every Egyptian building's numbers (for an Egyptian owner)
 	var blds := {}
 	for t in e.build_menu:
@@ -245,15 +253,17 @@ func _case_match() -> void:
 		var p: Dictionary = sim.get_player(i + 1)
 		civs.append(str(p.civ))
 		var st := {}
-		for t in ["villager", "laborer", "pharaoh", "priest"]:
+		for t in ["villager", "laborer", "pharaoh", "priest", "baboon_of_set"]:
 			st[t] = _units_of(sim, i + 1, t).size()
 		st["favor"] = float(p.favor)
+		st["stock"] = [float(p.food), float(p.wood), float(p.gold)]
 		st["tc"] = _buildings_of(sim, i + 1, "town_center").size()
 		starts[str(p.god)] = st
 	var ok: bool = bool(r.ok) and civs == ["greek", "egyptian", "egyptian", "egyptian"]
-	ok = ok and starts.Zeus.villager == 5 and starts.Zeus.laborer == 0 and starts.Zeus.favor == 20
+	ok = ok and starts.Zeus.villager == 5 and starts.Zeus.laborer == 0 and starts.Zeus.favor == 20 and starts.Zeus.stock == [300.0, 300.0, 200.0]
 	for g in ["Ra", "Isis", "Set"]:
 		ok = ok and starts[g].laborer == 3 and starts[g].pharaoh == 1 and starts[g].priest == 1 and starts[g].villager == 0 and starts[g].favor == 0 and starts[g].tc == 1
+		ok = ok and starts[g].stock == [200.0, 100.0, 50.0] and starts[g].baboon_of_set == (1 if g == "Set" else 0)
 	_check("match.civ_from_god", ok, {"civs": civs, "starts": starts})
 	# a match can also name the civ (scenes / tools)
 	var sim2: Object = ClassDB.instantiate("AovSim")
@@ -438,6 +448,22 @@ func _case_units() -> void:
 		hits["%s -> %s" % [c[0], c[1]]] = _r(d, 3)
 		want["%s -> %s" % [c[0], c[1]]] = _r(c[2], 3)
 		ok = ok and _near(d, c[2], 0.01)
+	# a Laborer's blow on a tower: x4 (Retold), against the villager's (3 vs 6 damage)
+	var s4 := _fresh("ra", "zeus", seed_arg, 3)
+	var tw := _b(s4, "tower", 2, 2, -2)
+	var vl := _u(s4, "villager", 2, -2.0, 0.0)
+	var lb := _u(s4, "laborer", 1, -2.0, 1.0)
+	s4.tick(1)
+	var lb_hit := _first_hit(s4, lb, tw)
+	var s5 := _fresh("zeus", "zeus", seed_arg, 3)
+	var tw5 := _b(s5, "tower", 2, 2, -2)
+	var vl5 := _u(s5, "villager", 1, -2.0, 0.0)
+	s5.tick(1)
+	var vl_hit := _first_hit(s5, vl5, tw5)
+	hits["laborer -> tower"] = _r(lb_hit, 3)
+	hits["villager -> tower"] = _r(vl_hit, 3)
+	want["laborer -> tower"] = _r(vl_hit * 2.0 * 4.0, 3)
+	ok = ok and vl_hit > 0 and _near(lb_hit, vl_hit * 2.0 * 4.0, 0.01)
 	_check("units.bonus_hits", ok, {"measured": hits, "want": want})
 	# counters at equal cost (900 resources each side)
 	var fights := {}
@@ -699,6 +725,234 @@ func _case_gods() -> void:
 	ok = ok and r["isis pop_cap (one TC)"] == 20 and r["ra pop_cap (one TC)"] == 15
 	_check("gods.passives", ok, r)
 
+# auras ------------------------------------------------------------------------------------
+
+## Ticks until `owner` has an empowered building (max 60 s).
+func _wait_empowered(sim: Object, owner: int, n := 1) -> void:
+	for i in 60 * FPS:
+		sim.tick(1)
+		var k := 0
+		for e in sim.get_civ_state(owner).empowered:
+			if float(e.strength) >= 1.0:
+				k += 1
+		if k >= n:
+			return
+
+## Seconds to train 3 `type` at building b (-1: not within 200 s).
+func _train3(sim: Object, b: int, type: String) -> float:
+	for i in 3:
+		sim.train(b, type)
+	sim.take_events()
+	var n := 0
+	for t in 200 * FPS:
+		sim.tick(1)
+		for e in sim.take_events():
+			if e.type == "unit:trained" and int(e.owner) == 2:
+				n += 1
+		if n >= 3:
+			return (t + 1) / float(FPS)
+	return -1.0
+
+## hp/s a unit gains over `seconds`
+func _hp_rate(sim: Object, id: int, seconds: float) -> float:
+	var h0 := float(sim.get_unit(id).hp)
+	_step(sim, seconds)
+	return (float(sim.get_unit(id).hp) - h0) / seconds
+
+## Destroys `owner`'s buildings and units (a test's far side free of arrows).
+func _disarm(sim: Object, owner: int) -> void:
+	var B: Dictionary = sim.get_buildings()
+	for i in B.count:
+		if int(B.owner[i]) == owner:
+			sim.damage(int(B.ids[i]), 1e7, 0)
+	var U: Dictionary = sim.get_units()
+	for i in U.ids.size():
+		if int(U.owner[i]) == owner:
+			sim.kill_unit(int(U.ids[i]), 0)
+	sim.tick(1)
+
+func _case_auras() -> void:
+	# --- favor of an empowered Monument to Villagers: Ra / Set +20 % (5.4 / min), Isis +100 % (9)
+	var fav := {}
+	var ok := true
+	for g in ["ra", "isis", "set"]:
+		var sim := _fresh("zeus", g, seed_arg, 1)
+		sim.set_player_resources(2, {"favor": 0})
+		var m := _b(sim, "monument_villagers", 2, 0, -4)
+		var ph: Array = [_u(sim, "pharaoh", 2, -3.0, 3.0)]
+		sim.tick(1)
+		var plain := float(sim.get_civ_state(2).favor_per_min)
+		sim.order_empower(PackedInt32Array(ph), m)
+		_wait_empowered(sim, 2)
+		var f0 := float(_res(sim, 2).favor)
+		_step(sim, 30.0)
+		var f1 := float(_res(sim, 2).favor)
+		var st: Dictionary = sim.get_civ_state(2)
+		fav[g] = {"plain /min": _r(plain), "empowered /min": _r(float(st.favor_per_min)), "measured over 30 s, /min": _r((f1 - f0) * 2.0), "empower_favor": st.empower_favor}
+		var want := 9.0 if g == "isis" else 5.4
+		ok = ok and _near(plain, 4.5) and _near(float(st.favor_per_min), want) and _near((f1 - f0) * 2.0, want, 0.02)
+	_check("auras.monument_favor", ok, fav)
+
+	# --- Ra's Mandjet: the Pharaoh on Monument 1 lends 60 % to Monument 2, a Barracks in
+	# 18 tiles (not the one 26 tiles off, not a Farm); Ra's Priest on it lends nothing
+	var r := {}
+	var sim := _fresh("zeus", "ra", seed_arg, 3)
+	sim.set_player_resources(2, {"favor": 0})
+	var m1 := _b(sim, "monument_villagers", 2, -16, -4)
+	var m2 := _b(sim, "monument_soldiers", 2, -16, 4)
+	var bk := _b(sim, "eg_barracks", 2, -7, -4)
+	var far := _b(sim, "eg_barracks", 2, 12, -4)
+	var farm := _b(sim, "farm", 2, -11, 9)
+	_disarm(sim, 1)   # (the Greek Town Center's arrows reach the west side of the area)
+	for i in 4:   # (room for 9 spearmen; out of the Monument's reach)
+		_b(sim, "house", 2, 10 + (i % 2) * 4, 8 + (i / 2) * 4)
+	var ph: Array = [_u(sim, "pharaoh", 2, -18.0, -6.0)]
+	sim.tick(1)
+	var t_plain := _train3(sim, far, "spearman")
+	sim.order_empower(PackedInt32Array(ph), m1)
+	_wait_empowered(sim, 2)
+	sim.tick(1)
+	var st: Dictionary = sim.get_civ_state(2)
+	var lent := {}
+	for e in st.mandjet:
+		lent[int(e.id)] = int(e.by)
+	var emp := {}
+	for e in st.empowered:
+		emp[int(e.id)] = _r(float(e.strength), 2)
+	r["empowered {id: strength}"] = emp
+	r["mandjet {id: by}"] = lent
+	r["ids [m1, m2, barracks, far barracks, farm]"] = [m1, m2, bk, far, farm]
+	ok = emp.get(m1, 0.0) == 1.0 and emp.get(m2, 0.0) == 0.6 and emp.get(bk, 0.0) == 0.6 and not emp.has(far) and not emp.has(farm)
+	ok = ok and lent.get(m2, 0) == m1 and lent.get(bk, 0) == m1 and lent.size() == 2
+	r["favor /min (4.5 x1.2 + 6 x1.12 = 12.12)"] = _r(float(st.favor_per_min))
+	ok = ok and _near(float(st.favor_per_min), 4.5 * 1.2 + 6.0 * (1 + 0.2 * 0.6))
+	var t_near := _train3(sim, bk, "spearman")
+	var t_far := _train3(sim, far, "spearman")
+	r["3 spearmen s [far barracks before, Mandjet barracks, far barracks]"] = [t_plain, t_near, t_far]
+	r["want Mandjet (x1/1.45)"] = _r(t_plain / 1.45, 2)
+	ok = ok and _near(t_near, t_plain / 1.45, 0.1) and _near(t_far, t_plain, 0.05)
+	# Ra's Priest on the Monument (60 %): no Mandjet; an Isis Pharaoh's Monument: none either
+	sim.order(ph[0], {"type": "move", "x": C.x + 0.0, "z": C.y + 16.0})
+	var pr: Array = [_u(sim, "priest", 2, -18.0, -6.0)]
+	sim.tick(1)
+	sim.order_empower(PackedInt32Array(pr), m1)
+	for i in 20 * FPS:
+		sim.tick(1)
+		if not sim.get_civ_state(2).empowered.is_empty():
+			break
+	_step(sim, 1.0)
+	r["priest-empowered: mandjet"] = sim.get_civ_state(2).mandjet.size()
+	r["priest-empowered: empowered"] = sim.get_civ_state(2).empowered.size()
+	ok = ok and r["priest-empowered: mandjet"] == 0 and r["priest-empowered: empowered"] == 1
+	var si := _fresh("zeus", "isis", seed_arg, 3)
+	var im := _b(si, "monument_villagers", 2, -16, -4)
+	_b(si, "eg_barracks", 2, -7, -4)
+	var iph: Array = [_u(si, "pharaoh", 2, -18.0, -6.0)]
+	si.tick(1)
+	si.order_empower(PackedInt32Array(iph), im)
+	_wait_empowered(si, 2)
+	si.tick(1)
+	r["isis: mandjet"] = si.get_civ_state(2).mandjet.size()
+	ok = ok and r["isis: mandjet"] == 0
+	_check("auras.mandjet", ok, r)
+
+	# --- Isis' Divine Shield: no enemy god power within 15 tiles of a Monument, 30 when
+	# empowered; refused casts cost nothing; her own (and allies') powers are not blocked
+	r = {}
+	sim = _fresh("zeus", "isis", seed_arg, 3)
+	var sm := _b(sim, "monument_villagers", 2, -18, 0)   # footprint x -18..-16
+	sim.tick(1)
+	var edge := C.x - 16.0   # its east edge
+	var z := C.y + 1.0
+	var fv := func() -> float: return float(_res(sim, 1).favor)
+	var f_a: float = fv.call()
+	r["bolt at 10 tiles"] = sim.cast_power(1, "bolt", edge + 10.0, z)
+	r["shield_check 10"] = sim.shield_check(1, edge + 10.0, z)
+	var f_b: float = fv.call()
+	r["shield_check 20 (unempowered)"] = sim.shield_check(1, edge + 20.0, z)
+	r["isis' own at 5"] = sim.shield_check(2, edge + 5.0, z)
+	r["bolt at 20"] = sim.cast_power(1, "bolt", edge + 20.0, z)
+	var f_c: float = fv.call()
+	ok = not bool(r["bolt at 10 tiles"]) and f_a == f_b and not bool(r["shield_check 10"].ok) and int(r["shield_check 10"].by) == sm
+	ok = ok and bool(r["shield_check 20 (unempowered)"].ok) and bool(r["isis' own at 5"].ok) and bool(r["bolt at 20"]) and f_c < f_b
+	var sph: Array = [_u(sim, "pharaoh", 2, -20.0, 2.0)]
+	sim.tick(1)
+	sim.order_empower(PackedInt32Array(sph), sm)
+	_wait_empowered(sim, 2)
+	sim.tick(1)
+	r["shield_check 20 (empowered)"] = sim.shield_check(1, edge + 20.0, z)
+	r["shield_check 29"] = sim.shield_check(1, edge + 29.0, z)
+	r["shield_check 31"] = sim.shield_check(1, edge + 31.0, z)
+	var f_d: float = fv.call()
+	r["lightning_storm at 20 (empowered)"] = sim.cast_power(1, "lightning_storm", edge + 20.0, z)
+	r["favor [before, after the refused casts, after bolt, after the refused storm]"] = [f_a, f_b, f_c, fv.call()]
+	r["shields"] = sim.get_civ_state(2).shields
+	r["refused"] = sim.get_civ_state(2).shield_refused
+	ok = ok and not bool(r["shield_check 20 (empowered)"].ok) and not bool(r["shield_check 29"].ok) and bool(r["shield_check 31"].ok)
+	ok = ok and not bool(r["lightning_storm at 20 (empowered)"]) and fv.call() == f_d and int(r.refused) == 2
+	_check("auras.divine_shield", ok, r)
+
+	# --- Isis: an empowered Monument heals in 30 tiles at 1 hp/s, half if busy, stacking
+	r = {}
+	sim = _fresh("zeus", "isis", seed_arg, 3)
+	var h1 := _b(sim, "monument_villagers", 2, -18, -2)
+	var h2 := _b(sim, "monument_soldiers", 2, -18, 4)
+	var sp := _u(sim, "spearman", 2, 0.0, 0.0)       # ~16 tiles off
+	var sfar := _u(sim, "spearman", 2, 16.0, 0.0)    # ~32 tiles off
+	var hph: Array = [_u(sim, "pharaoh", 2, -20.0, -4.0)]
+	var hph2: Array = [_u(sim, "pharaoh", 2, -20.0, 6.0)]
+	sim.tick(1)
+	sim.damage(sp, 60.0, 0)
+	sim.damage(sfar, 60.0, 0)
+	r["unempowered hp/s"] = _r(_hp_rate(sim, sp, 3.0))
+	sim.order_empower(PackedInt32Array(hph), h1)
+	_wait_empowered(sim, 2)
+	r["one empowered hp/s"] = _r(_hp_rate(sim, sp, 4.0))
+	sim.order_empower(PackedInt32Array(hph2), h2)
+	_wait_empowered(sim, 2, 2)
+	r["two empowered hp/s"] = _r(_hp_rate(sim, sp, 4.0))
+	r["32 tiles off hp/s"] = _r(_hp_rate(sim, sfar, 2.0))
+	sim.order(sp, {"type": "move", "x": C.x + 0.0, "z": C.y + 14.0})
+	sim.tick(2)
+	r["two, walking (busy) hp/s"] = _r(_hp_rate(sim, sp, 2.0))
+	r["isis_healed"] = _r(float(sim.get_civ_state(2).isis_healed), 2)
+	ok = r["unempowered hp/s"] == 0.0 and _near(r["one empowered hp/s"], 1.0, 0.02) and _near(r["two empowered hp/s"], 2.0, 0.02)
+	ok = ok and r["32 tiles off hp/s"] == 0.0 and _near(r["two, walking (busy) hp/s"], 1.0, 0.05)
+	_check("auras.isis_heal", ok, r)
+
+	# --- Set's Devotees: a Barracks / Migdol in 18 tiles of a Monument trains at -10 %
+	# (the refund of a cancelled one is what he paid); a far Barracks and Ra's pay in full
+	r = {}
+	ok = true
+	for g in ["set", "ra"]:
+		sim = _fresh("zeus", g, seed_arg, 3)
+		_b(sim, "monument_villagers", 2, -16, -4)
+		var dbk := _b(sim, "eg_barracks", 2, -8, -4)
+		var dfar := _b(sim, "eg_barracks", 2, 12, -4)
+		var dmg := _b(sim, "migdol", 2, -8, 6)
+		sim.tick(1)
+		var paid := func(b: int, t: String) -> Array:
+			var a: Dictionary = _res(sim, 2)
+			sim.train(b, t)
+			var c: Dictionary = _res(sim, 2)
+			return [_r(a.food - c.food, 2), _r(a.wood - c.wood, 2), _r(a.gold - c.gold, 2)]
+		var row := {}
+		row["spearman near [f, w, g]"] = paid.call(dbk, "spearman")
+		row["spearman far"] = paid.call(dfar, "spearman")
+		row["camel rider at the migdol"] = paid.call(dmg, "camel_rider")
+		var before: Dictionary = _res(sim, 2)
+		sim.cancel_train(dbk, 0)
+		var after: Dictionary = _res(sim, 2)
+		row["refund near [f, g]"] = [_r(after.food - before.food, 2), _r(after.gold - before.gold, 2)]
+		row["get_trains cost near"] = sim.get_trains(dbk)[0].cost
+		row["devotees"] = sim.get_civ_state(2).devotees.size()
+		r[g] = row
+		var k := 0.9 if g == "set" else 1.0
+		ok = ok and row["spearman near [f, w, g]"] == [_r(50 * k, 2), 0.0, _r(25 * k, 2)] and row["spearman far"] == [50.0, 0.0, 25.0]
+		ok = ok and row["camel rider at the migdol"] == [_r(50 * k, 2), 0.0, _r(70 * k, 2)] and row["refund near [f, g]"] == [_r(50 * k, 2), _r(25 * k, 2)]
+		ok = ok and _near(float(row["get_trains cost near"].food), 50 * k) and row.devotees == (2 if g == "set" else 0)
+	_check("auras.devotees", ok, r)
+
 # locks ------------------------------------------------------------------------------------
 
 func _case_locks() -> void:
@@ -793,7 +1047,7 @@ func _case_locks() -> void:
 			q += 1
 	r["laborers trainable at 98"] = q
 	r["laborer cap reason"] = sim.train(etc2, "laborer").reason
-	ok = ok and n == 1 and q == 2
+	ok = ok and n == 1 and q == 2 and r["mercenary limit reason"] == "Limit of 12 Mercenaries"
 	# Mythic Age: the Egyptians need a Migdol
 	var s2 := _fresh("zeus", "ra", seed_arg, 2)
 	s2.set_player_resources(2, {"food": 5000, "gold": 5000})

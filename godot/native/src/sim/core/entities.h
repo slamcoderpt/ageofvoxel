@@ -28,6 +28,7 @@ struct TrainItem {
 	uint8_t type = 0;
 	double t = 0, total = 0;
 	bool free = false; // the Town Center's free villager (Economy::rescue): nothing to refund
+	double cost_mult = 1; // (Godot-only, sim/civ: Set's Devotees paid x0.9; the refund is the same share)
 };
 using TrainQueue = std::vector<TrainItem>;
 

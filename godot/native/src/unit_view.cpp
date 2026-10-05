@@ -38,7 +38,7 @@ const double JITTER = 0.18, PRESS_RATE = 3, STAGGER = 0.5, STUCK_TIME = 9;
 const double COATS[6][3] = { { 1, 1, 1 }, { 1.08, 1.08, 1.07 }, { 0.97, 0.9, 0.78 }, { 0.86, 0.86, 0.88 }, { 1.04, 1.02, 0.98 }, { 0.92, 0.9, 0.86 } };
 // Units.heightOf (health bar height), by type index
 const double HEIGHT_OF[aov::U_TYPE_COUNT] = { 2.0, 2.25, 2.05, 2.75, 3.4, 3.7, 5.0, 2.9, 2.6,
-	2.0, 2.25, 2.25, 2.05, 2.75, 2.9, 4.2, 5.0, 2.6, 2.25, 2.75, 2.0, 2.3 }; // (the Egyptian types: sim/civ)
+	2.0, 2.25, 2.25, 2.05, 2.75, 2.9, 4.2, 5.0, 2.6, 2.25, 2.75, 2.0, 2.3, 1.4 }; // (the Egyptian types: sim/civ)
 
 inline double clamp01(double v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
 inline double smooth(double v) { v = clamp01(v); return v * v * (3 - 2 * v); }

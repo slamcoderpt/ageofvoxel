@@ -16,6 +16,7 @@ void AovSim::_bind_civ_methods() {
 	ClassDB::bind_method(D_METHOD("order_empower", "ids", "building"), &AovSim::order_empower);
 	ClassDB::bind_method(D_METHOD("get_civ_state", "owner"), &AovSim::get_civ_state);
 	ClassDB::bind_method(D_METHOD("get_civ_fx"), &AovSim::get_civ_fx);
+	ClassDB::bind_method(D_METHOD("shield_check", "caster", "x", "z"), &AovSim::shield_check);
 }
 
 static Dictionary civ_cost_dict(const aov::Cost &c) {
@@ -153,6 +154,12 @@ Array AovSim::get_trains(int64_t building) const {
 		std::string why;
 		const int k = sim_.civs.train_check(b, *u, &why);
 		e["type"] = aov::unit_def(*u).key;
+		// the cost he pays here (Set's Devotees: x0.9 near a Monument)
+		const double cm = sim_.godot_rules ? sim_.civs.train_cost_mult(b, *u) : 1;
+		aov::Cost c = aov::unit_def(*u).cost;
+		for (int r = 0; r < aov::RES_COUNT; r++) c.v[r] *= cm;
+		e["cost"] = civ_cost_dict(c);
+		if (cm != 1) e["devotees"] = sim_.civs.devotee_monument(b);
 		e["ok"] = k == 0;
 		e["reason"] = String(why.c_str());
 		out.push_back(e);
@@ -204,6 +211,44 @@ Dictionary AovSim::get_civ_state(int64_t owner) const {
 		if (!U.removed[r] && !U.dead[r] && U.owner[r] == o && U.type[r] == aov::U_PHARAOH) ph = U.id[r];
 	d["pharaoh"] = ph;
 	d["respawn_in"] = C.respawn_at[o] >= 0 ? C.respawn_at[o] - sim_.time : -1.0;
+	// the major god's Monument auras (EGYPT.md 4)
+	d["god"] = String(sim_.players[o].god.c_str()).to_lower();
+	d["empower_favor"] = C.empower_favor(o);
+	Array mandjet, shields, devotees;
+	for (int b = 0; b < B.size(); b++) {
+		if (B.removed[b] || B.dead[b] || B.owner[b] != o) continue;
+		if (b < (int)C.mandjet_by.size() && C.mandjet_by[b]) {
+			Dictionary m;
+			m["id"] = B.id[b];
+			m["type"] = aov::building_def(B.type[b]).key;
+			m["by"] = C.mandjet_by[b];
+			mandjet.push_back(m);
+		}
+		const double sr = C.shield_radius(b);
+		if (sr > 0) {
+			Dictionary m;
+			m["id"] = B.id[b];
+			m["x"] = B.x[b];
+			m["z"] = B.z[b];
+			m["radius"] = sr;
+			m["heals"] = sr == aov::SHIELD_RANGE_EMPOWERED ? aov::ISIS_MONUMENT_HEAL : 0.0;
+			shields.push_back(m);
+		}
+		if (const int32_t dm = C.devotee_monument(b)) {
+			Dictionary m;
+			m["id"] = B.id[b];
+			m["type"] = aov::building_def(B.type[b]).key;
+			m["by"] = dm;
+			m["cost_mult"] = aov::DEVOTEES_COST;
+			devotees.push_back(m);
+		}
+	}
+	d["mandjet"] = mandjet;
+	d["shields"] = shields;
+	d["devotees"] = devotees;
+	d["isis_healed"] = C.isis_healed[o];
+	d["devotee_saved"] = C.devotee_saved[o];
+	d["shield_refused"] = C.shield_refused[o];
 	d["laborers"] = C.count_type(o, aov::U_LABORER);
 	d["laborer_cap"] = aov::LABORER_CAP;
 	d["home_tc"] = C.home_tc[o];
@@ -230,8 +275,26 @@ Dictionary AovSim::get_civ_fx() const {
 			}
 		}
 	}
+	PackedInt32Array mandjet;
+	const aov::BuildingStore &B = sim_.entities.buildings;
+	for (int b = 0; b < B.size() && b < (int)sim_.civs.mandjet_by.size(); b++)
+		if (!B.removed[b] && !B.dead[b] && sim_.civs.mandjet_by[b]) {
+			mandjet.push_back(sim_.civs.mandjet_by[b]);
+			mandjet.push_back(B.id[b]);
+		}
 	d["heals"] = heals;
 	d["empowers"] = emp_ids;
 	d["empower_strength"] = emp_k;
+	d["mandjet"] = mandjet;
+	return d;
+}
+
+Dictionary AovSim::shield_check(int64_t caster, double x, double z) const {
+	Dictionary d;
+	std::string why;
+	int32_t by = 0;
+	d["ok"] = sim_.civs.shield_allows((int)caster, x, z, &why, &by);
+	d["reason"] = String(why.c_str());
+	d["by"] = by;
 	return d;
 }

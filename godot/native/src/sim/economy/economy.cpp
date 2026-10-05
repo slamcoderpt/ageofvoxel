@@ -254,8 +254,16 @@ Result Economy::train(int b, int type) {
 	if (B.queue[b].size() >= 10) return { false, "Queue full" };
 	recount();
 	if (p.pop + def.pop > p.pop_cap) return { false, "Need more houses" };
-	if (!p.pay(def.cost)) return { false, "Not enough resources" };
+	// (Godot-only, sim/civ: Set's Devotees, -10 % near a Monument)
+	const double cm = rules ? sim->civs.train_cost_mult(b, type) : 1;
+	Cost cost = def.cost;
+	if (cm != 1)
+		for (int k = 0; k < RES_COUNT; k++) cost.v[k] *= cm;
+	if (!p.pay(cost)) return { false, "Not enough resources" };
+	if (cm != 1)
+		for (int k = 0; k < RES_COUNT; k++) sim->civs.devotee_saved[B.owner[b]] += def.cost.v[k] - cost.v[k];
 	B.queue[b].push_back({ (uint8_t)type, 0, def.train_time });
+	B.queue[b].back().cost_mult = cm;
 	p.pop += def.pop;
 	Event e;
 	e.type = EV_RESOURCES_CHANGED;
@@ -268,7 +276,13 @@ void Economy::cancel_train(int b, int i) {
 	BuildingStore &B = sim->entities.buildings;
 	if (b < 0 || B.removed[b] || i < 0 || i >= (int)B.queue[b].size()) return;
 	const int type = B.queue[b][i].type;
-	if (!B.queue[b][i].free) sim->players[B.owner[b]].refund(unit_def(type).cost);
+	if (!B.queue[b][i].free) {
+		Cost c = unit_def(type).cost;
+		const double cm = B.queue[b][i].cost_mult; // (sim/civ: what Set's Devotees let him pay)
+		if (cm != 1)
+			for (int k = 0; k < RES_COUNT; k++) c.v[k] *= cm;
+		sim->players[B.owner[b]].refund(c);
+	}
 	B.queue[b].erase(B.queue[b].begin() + i);
 }
 

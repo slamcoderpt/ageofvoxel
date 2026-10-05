@@ -220,7 +220,8 @@ public:
 	Array get_trains(int64_t building) const;                 // [{type, ok, reason}] for its owner
 	void order_empower(const PackedInt32Array &ids, int64_t building); // Pharaoh / Ra's Priests
 	Dictionary get_civ_state(int64_t owner) const;            // monuments, favor rate, empowered, Pharaoh, Laborers
-	Dictionary get_civ_fx() const;                            // heals [healer, target]*, empowers [unit, building, strength]*
+	Dictionary get_civ_fx() const;                            // heals [healer, target]*, empowers [unit, building, strength]*, mandjet [monument, building]*
+	Dictionary shield_check(int64_t caster, double x, double z) const; // {ok, reason, by}: Isis' Divine Shield at a god power's target
 
 	// --- events: [{type: "entity:added", id, kind, other, owner, a, x, z, amount}], cleared on read
 	Array take_events();
