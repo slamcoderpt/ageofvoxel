@@ -151,6 +151,7 @@ const PROD = {
   orange: (x, y, z) => pick(hash3(x, y, z, 45), [0xe58a2a, 0xd87a20, 0xf09a3a]),
   fish: (x, y, z) => pick(hash3(x, y, z, 46), [0xa9b4bc, 0x97a3ac, 0xbcc6cc]),
   grain: GRAIN,
+  gold: (x, y, z) => GOLDORE(x, y, z),
 };
 const FIRE = [0xc8400c, 0xe06010, 0xf08a20, 0xffb040];
 const FG = { glow: 0.45 };
@@ -539,7 +540,7 @@ function awning(m, face, f, a0, a1, yTop, depth, drop, colors, { sw = 2, posts =
 const CANVAS = [0xe6d9bd, 0xe1d3b5, 0xeadfc6];
 const CANVAS_T = [0xb7735a, 0xae6c53, 0xbb7860];
 const CANVAS_HEM = 0x9a5a44;
-function clothAwning(m, face, f, a0, a1, yTop, depth, drop, { posts = null, sw = 2, sag = 1, belly = 0.6, ground = 1, stripes = [CANVAS, CANVAS_T], hem = CANVAS_HEM } = {}) {
+function clothAwning(m, face, f, a0, a1, yTop, depth, drop, { posts = null, sw = 2, sag = 1, belly = 0.6, ground = 1, stripes = [CANVAS, CANVAS_T], hem = CANVAS_HEM, post = POLE } = {}) {
   const P = posts || [a0, a1 - 1];
   const C = { face, f, a0, a1, yTop, depth, drop, P, sw, sag, belly, stripes };
   // the sheet's height at (a, d): a along the wall, d out from the wall face
@@ -569,7 +570,7 @@ function clothAwning(m, face, f, a0, a1, yTop, depth, drop, { posts = null, sw =
   // the front posts, each poking a voxel through the cloth
   for (const a of P) {
     const ye = Math.ceil(C.y(a + 0.5, depth));
-    for (let y = ground; y <= ye; y++) put(a, y, depth, POLE);
+    for (let y = ground; y <= ye; y++) put(a, y, depth, post);
   }
   // the batten the cloth is nailed to along the wall
   for (let a = a0; a < a1; a++) put(a, yTop, 1, DARKWOOD);
@@ -1527,7 +1528,7 @@ const CAMP_FRIEZE = [(x, y, z) => ((x + z) % 5 === 0 ? shade(LAPIS, 0.8) : LAPIS
 // east face to a row of posts (sagging between them, a scalloped hem) over
 // the camp's stock: a stack of big logs showing their pale ring ends, a
 // saw-pit in front with a log on trestles and a pit saw through it, crates,
-// a barrel, a sheerlegs hoist behind.
+// a barrel, a spare log behind (no tall frame: the block is the silhouette).
 function lumberCamp() {
   const m = lot(24, 24);
   block(m, 2, 3, 13, 15, 1, 13, { wall: WASH, roofC: MUDROOF, rimC: LIME, gorge: [0xc9ab7c, 0xd6ba8c], torus: false, lipOut: 2, batter: 5, band: null, flare: true });
@@ -1560,50 +1561,73 @@ function lumberCamp() {
   for (const x of [17, 18]) for (let y = 1; y < 8; y++) m.set(x, y, 20, (y === 1 || x === 18) ? 0x4e4a45 : 0x77726a);
   for (let z = 19; z < 22; z++) m.set(17, 8, z, POLE);
   for (const [x, z] of [[17, 23], [19, 23], [13, 21], [23, 20]]) if (!m.has(x, 0, z)) m.set(x, 0, z, 0xd9c08a);
-  // the camp's tall element: a timber sheerlegs (an A-frame hoist) behind
-  // the stack with a log slung from its head
-  for (const x of [13, 22]) m.line(x, 1, 1, 17, 22, 1, POLE);
-  m.box(16, 22, 0, 3, 1, 3, DARKWOOD);
-  for (let y = 13; y < 22; y++) m.set(17, y, 1, 0xcdb98a);
-  log(m, 14, 11, 1, 7, 'x', 1);
+  // no tall frame (Retold's camp has none): a spare log on chocks behind
+  // the stack, under the block's height
+  log(m, 13, 2, 1, 10, 'x', 1);
+  for (const x of [14, 21]) m.set(x, 1, 1, DARKWOOD);
   return m;
 }
 
-// Mining Camp (3 x 3; building_07): a battered block, a cloth on poles over
-// bins of gold ore, a sledge of quarried stone, a trough, baskets of ore,
-// a rack of picks.
+// Mining Camp (3 x 3; building_07): a flat-roofed battered block under a
+// flared cavetto with a team rim, pale limestone corner piers, a painted
+// frieze of lapis / red / ochre panels between pale fillets under the
+// cornice and a turquoise dado over the base course, a framed door (proud
+// jambs, lintel, a small cornice, the gilt winged sun) on the front; two
+// canvas awnings on light palm-log posts, the west one over a timber bin of
+// gold ore built against the wall, the east one over a stone water trough on
+// a footing course against the wall; crates, barrels and lumps of gold ore
+// in front. No tall frame: the block is the silhouette, as in Retold.
+const MINE_PAT = (x, y, z) => { const u = (x + z) % 7; return u === 0 || u === 4 ? FRIEZE_SEP : u < 4 ? (u === 2 ? OCHRE_M : LAPIS) : RED_M; };
+const MINE_FRIEZE = [FRIEZE_SEP, MINE_PAT, MINE_PAT, FRIEZE_SEP, (x, y, z) => ((x + z) % 5 === 0 ? shade(RED_M, 0.82) : RED_M)];
+const PALMPOST = (x, y, z) => ((y & 1) ? 0xb08a5c : 0xa07c50);
+function oreLump(m, x, z, s = 0) {
+  const R = [0x8c7a5a, 0x7d6c50, 0x96845f];
+  m.box(x, 1, z, 2, 1, 2, (xx, yy, zz) => (hash3(xx, yy, zz, 90 + s) < 0.45 ? GOLDORE(xx, yy, zz) : pick(hash3(xx, yy, zz, 91), R)));
+  m.set(x + (s & 1), 2, z + ((s >> 1) & 1), GOLDORE);
+}
 function miningCamp() {
   const m = lot(24, 24);
-  block(m, 8, 3, 18, 14, 1, 12, { wall: WASH, roofC: MUDROOF, rimC: LIME, gorge: [0xc9ab7c, 0xd6ba8c], torus: false, lipOut: 2, batter: 5, band: null, flare: true });
-  // the painted frieze under the flared cornice (as the Lumber Camp's)
-  bands(m, 0, 0, 22, 18, 12, CAMP_FRIEZE);
-  door(m, '+z', 11, 4, 1, 7);
-  const yTop = 9, f = 8 + Math.floor((yTop - 1) / 5);
-  clothAwning(m, '-x', f, 5, 15, yTop, f - 1, 3, { sw: 2, sag: 1 });
-  // ore bins under the awning
-  for (let x = 1; x < 7; x++) for (let z = 7; z < 15; z++) for (let y = 1; y < 4; y++) {
-    const rim = x === 1 || x === 6 || z === 7 || z === 14;
-    if (rim) m.set(x, y, z, PLANK(x, y, z)); else if (y === 3) m.set(x, y, z, GOLDORE);
+  block(m, 5, 3, 17, 13, 1, 12, { wall: WASH, roofC: MUDROOF, rimC: LIME, gorge: [0xc9ab7c, 0xd6ba8c], torus: true, lipOut: 2, batter: 6, band: null, flare: true });
+  // the painted frieze under the cornice (rows 11..8), the dado over the base
+  bands(m, 0, 0, 24, 24, 11, MINE_FRIEZE);
+  bands(m, 0, 0, 24, 24, 3, [(x, y, z) => ((x + z) % 4 === 0 ? FRIEZE_SEP : TURQ)]);
+  door(m, '+z', 11, 4, 1, 5, { deep: 3 });
+  slit(m, '-z', 13, 6, 3, 1); slit(m, '-z', 9, 6, 3, 1); slit(m, '-x', 8, 6, 3, 1);
+  // the front-left awning over the ore bin, the east one over the trough,
+  // on light palm-log posts
+  const yTop = 10, inset = Math.floor((yTop - 1) / 6);
+  clothAwning(m, '+z', 12 - inset, 1, 10, yTop, 5, 3, { sw: 2, sag: 0.9, post: PALMPOST });
+  clothAwning(m, '+x', 16 - inset, 4, 12, yTop, 6, 4, { sw: 2, sag: 0.8, post: PALMPOST });
+  // the ore bin against the front wall: a dark timber sill, plank sides with
+  // corner posts, heaped gold ore
+  for (let x = 2; x < 9; x++) for (let z = 13; z < 19; z++) {
+    m.set(x, 1, z, DARKWOOD);
+    const rim = x === 2 || x === 8 || z === 13 || z === 18, corner = (x === 2 || x === 8) && (z === 13 || z === 18);
+    for (let y = 2; y < 5; y++) {
+      if (corner) m.set(x, y, z, DARKWOOD);
+      else if (rim) m.set(x, y, z, y === 4 ? shade(PLANK(x, y, z), 1.08) : PLANK(x, y, z));
+      else if (y === 4) m.set(x, y, z, GOLDORE);
+      else m.set(x, y, z, 0x5a4630);
+    }
+    if (!rim && hash3(x, 5, z, 5) < 0.65) m.set(x, 5, z, GOLDORE);
   }
-  for (let x = 2; x < 6; x++) for (let z = 8; z < 14; z++) if (hash3(x, 4, z, 5) < 0.5) m.set(x, 4, z, GOLDORE);
-  // a stone trough on the east
-  for (let x = 19; x < 23; x++) for (let z = 6; z < 13; z++) for (let y = 1; y < 3; y++) {
-    const rim = x === 19 || x === 22 || z === 6 || z === 12;
-    m.set(x, y, z, rim || y === 1 ? LIME(x, y, z) : WATER);
+  for (let x = 4; x < 7; x++) for (let z = 15; z < 18; z++) if (hash3(x, 6, z, 8) < 0.6) m.set(x, 6, z, GOLDORE);
+  // the water trough against the east wall: a darker footing course a voxel
+  // proud, sandstone sides, a limestone coping, the water a voxel down
+  for (let x = 17; x < 22; x++) for (let z = 4; z < 12; z++) m.set(x, 1, z, SAND_D);
+  for (let x = 17; x < 21; x++) for (let z = 5; z < 11; z++) {
+    const rim = x === 17 || x === 20 || z === 5 || z === 10;
+    m.set(x, 2, z, rim ? SAND(x, 2, z) : WATER);
+    if (rim) m.set(x, 3, z, LIME(x, 3, z));
   }
-  // a sledge with two quarried blocks
-  for (const z of [18, 21]) for (let x = 13; x < 22; x++) m.set(x, 1, z, x === 13 ? DARKWOOD : POLE);
-  m.box(14, 2, 17, 4, 3, 5, LIME); m.box(18, 2, 17, 3, 2, 5, SAND);
-  // the camp's tall element: a timber headframe over the ore bins, a pulley
-  // wheel at its head and a bucket of ore on the rope
-  for (const z of [6, 15]) m.box(3, 1, z, 1, 22, 1, POLE);
-  for (let z = 6; z < 16; z++) m.set(3, 22, z, DARKWOOD);
-  m.line(3, 14, 6, 3, 21, 10, POLE); m.line(3, 14, 15, 3, 21, 11, POLE);
-  wheel(m, 4, 19, 10, 2, 'z');
-  for (let y = 14; y < 21; y++) m.set(4, y, 10, 0xcdb98a);
-  m.box(3, 11, 9, 3, 3, 3, PLANK); m.box(4, 14, 10, 1, 1, 1, GOLDORE);
-  // a rack of picks against the block
-  for (let i = 0; i < 3; i++) { m.line(9 + i * 2, 1, 15, 9 + i * 2, 6, 14, 0x7a5230); m.set(8 + i * 2, 6, 14, STEEL); m.set(10 + i * 2, 6, 14, STEEL); }
+  barrel(m, 22, 1, 6.5, 5, 1.9);
+  // crates right of the door, one stacked, a barrel, a crate of ore
+  crate(m, 17, 1, 14, 3, 3, 3, 0xb08850);
+  crate(m, 17, 4, 14, 3, 2, 3, 0xa27c48);
+  barrel(m, 21.5, 1, 15.5, 5, 1.9);
+  goodsBox(m, 16, 1, 18, 4, 4, 'gold', 2, 0x8a6236);
+  // lumps of gold ore on the ground in front of the bin
+  oreLump(m, 3, 20, 0); oreLump(m, 9, 19, 1); oreLump(m, 6, 21, 2); oreLump(m, 11, 21, 3);
   return m;
 }
 

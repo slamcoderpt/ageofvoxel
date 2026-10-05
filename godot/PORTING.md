@@ -946,9 +946,10 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   and a voxel wider each side, a second shadowed course over it.
 - **A tall element per function** (read at a glance): the Town Center's
   painted pylon gate and Ra statue, the house's **red-striped cloth
-  awning** on poles over its jars (and an upper room or a walled yard), the Granary's tall domed silos, the Lumber Camp's timber
-  sheerlegs with a slung log, the Mining Camp's headframe with a pulley and
-  an ore bucket, the Temple's papyrus colonnade and gilt-tipped obelisk
+  awning** on poles over its jars (and an upper room or a walled yard), the Granary's tall domed silos, the camps' canvas work-yard
+  awnings over their stock (no tall timber frame: Retold's camps have none,
+  the battered block under its flared cornice is the silhouette, every prop
+  below its height), the Temple's papyrus colonnade and gilt-tipped obelisk
   pair at the ramp foot, the Barracks' tall banner masts, the Market's
   **columned portico** standing above its hall, the Armory's tall chimney
   furnace, the Migdol's keep and turrets.
@@ -1035,7 +1036,16 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   big logs (`bigLog`: 3x3 section, pale sapwood ring caps round a dark
   heart, ends to the open side), crates, a barrel and a saw-pit in front (a
   dark pit in a timber kerb, a log on bearers, the pit saw through it); the
-  Mining Camp's over gold ore bins, a trough, a sledge of blocks), `farm` 4x4 (a mud border, an irrigation channel and a shaduf; the
+  Mining Camp after building_07: a 12x10 block under a flared cavetto with
+  the team rim, limestone corner piers, a painted frieze under the cornice
+  (`MINE_FRIEZE`: pale fillets round a band of lapis / ochre / red panels,
+  a red rule), a turquoise dado over the dark base course, a framed door
+  (proud jambs, lintel, small cornice); two canvas awnings on pale palm-log
+  posts (`clothAwning(..., { post })`), the front-left one over a timber ore
+  bin built against the wall (a dark sill, corner posts, heaped gold), the
+  east one over a stone water trough on a footing course against the wall;
+  crates, barrels, a crate of ore and lumps of ore (`oreLump`) in front, so
+  every prop touches the block or the ground apron, none floats), `farm` 4x4 (a mud border, an irrigation channel and a shaduf; the
   crops are the economy piece's), `temple` 5x6 (a two-tier platform with a
   ramp, a kiosk of painted papyrus columns with screen walls, a naos and
   white drapes, the **major god's statue**: variants `ra` falcon with the
