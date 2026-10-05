@@ -61,6 +61,7 @@ public:
 		float gait = 1, stride = 1; // four-legged walk frequency / amplitude (x the horse's)
 		float hover = 0;            // flyers: height above the ground (rig voxels)
 		bool graze = true;          // four-legged idle: dips the head to graze now and then
+		bool upright = false;       // (the Egyptian Priest) the staff stays upright in the hand: the weapon counters the arm's and torso's pitch / roll
 		float stance = 0;           // (Egyptian men) idle in a relaxed stride (x this; robes less), not stiffly upright
 		float voxel = 0.07f;
 		bool has_shield = false, has_armR = false;

@@ -1248,8 +1248,12 @@ same channel names, plus:
   the hull stays closed; `export-models.mjs` writes it for the Greek `units`
   group (only units.bin.gz changes), `export-egypt-units.mjs` for its own.
   `extra.a` = a per-mesh width factor (0 = 1, the Greeks'): Egyptian bodies
-  0.55, gear 0.45, the half-size heads 0.35, so a line never swallows a face
-  and two men side by side keep their own outlines.
+  0.36, gear 0.3, the half-size heads 0.24 (round 10, about 1-2 px at RTS
+  zoom), so a line never swallows a face and two men side by side keep their
+  own outlines. A mesh with a width factor is drawn in `eg_line_color`, a
+  dark sienna (0.29, 0.14, 0.06), not the Greeks' near-black, so the line
+  round each arm, kilt and head reads as shade and the figure no longer looks
+  like a paper cut-out; Greek meshes (factor 0) are unchanged.
 - **Palette**: the grade's exposure and warm chroma limiter (grade_effect.gd)
   take about half the chroma of any warm colour: a deep gold (0xd2a400) reads
   olive-khaki, an orange gold (0xffb000) peach like the skin. The gold is a
@@ -1312,7 +1316,22 @@ same channel names, plus:
   scale 0.5 so the cords are thin) hangs from the fist along -y: a team
   finger loop, two dark cords to a leather cradle round a grey stone, 12 rig
   voxels long), `mercenary` (a Nubian spearman, round team shield),
-  `priest` (white robe and headcloth, gold sun disc and sash, ankh staff),
+  `priest` (unit_09: white robe and headcloth, gold sun disc and sash; round
+  10: the robe gathered to an 8-wide waist under the sash and flaring over
+  the hips to the hem, robed legs with bare feet; not a T-pose: the staff
+  arm's shoulder raised half a voxel (`manParts` `liftR`), both forearms bent
+  at the elbow (`manArmM` `bend`, `bendArm` turns the forearm voxels forward
+  about the elbow; `armFist(a)` gives the bent fist for the held part), the
+  free fist at the waist; the ankh staff (`ankhStaffM`, authored at half the
+  rig voxel, part scale 0.5) a dark banded shaft to above the head under one
+  clear ankh in a deep gold (0x8c6c00 .., light 0xb89400, dark rim 0x483000:
+  lighter golds wash to cream / peach on a small sunlit emblem, no glow): a
+  12-wide crossbar with flared ends under a teardrop loop 8 wide and 14 tall
+  whose 4 x 9 eye is cut through, so the ground shows in the hole; rig field
+  `upright` (Rig::upright, unit_view.cpp) gives the weapon the unit's own
+  orientation instead of the arm's, so the staff stands upright through the
+  walk swing, the raised arm and the attack; the Son of Osiris carries the
+  same staff with a glow),
   `pharaoh` (0.08: the team blue crown with gold discs and uraeus, gold
   corselet, shoulder pads and apron over an A-line team skirt, the striped
   crook raised overhead), `chariot_archer`

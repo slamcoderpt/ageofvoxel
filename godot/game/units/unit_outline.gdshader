@@ -7,7 +7,11 @@ render_mode cull_front, unshaded, shadows_disabled, ambient_light_disabled;
 
 uniform float width = 0.045;
 uniform vec3 line_color : source_color = vec3(0.078, 0.051, 0.031);
+// the line of meshes with a width factor (the Egyptian units): a dark sienna,
+// so a thin line round an arm or a kilt reads as shade, not a black cut-out edge
+uniform vec3 eg_line_color : source_color = vec3(0.29, 0.14, 0.06);
 varying float v_fade;
+varying float v_eg;
 
 // CUSTOM1.b (Egyptian unit meshes, export-egypt-units.mjs): a per-corner push
 // direction, every copy of a corner moved alike so the hull stays closed (no
@@ -21,6 +25,7 @@ void vertex() {
 		dir = vec3(mod(code, 3.0), mod(floor(code / 3.0), 3.0), floor(code / 9.0)) - 1.0;
 	}
 	float k = CUSTOM1.a > 0.002 ? CUSTOM1.a : 1.0;
+	v_eg = CUSTOM1.a > 0.002 ? 1.0 : 0.0;
 	VERTEX += dir * width * k;
 	v_fade = COLOR.a;
 }
@@ -33,5 +38,5 @@ float bayer4(vec2 fc) {
 
 void fragment() {
 	if (v_fade < 0.999 && bayer4(FRAGCOORD.xy) > v_fade) discard;
-	ALBEDO = line_color;
+	ALBEDO = v_eg > 0.5 ? eg_line_color : line_color;
 }

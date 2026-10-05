@@ -530,7 +530,7 @@ function eStraps(m, color, stud) {
 // forearm, elbow and upper arm up to a deltoid cap that bulges outwards;
 // pivot [0.5, 18.5, 0.5] at the shoulder joint. Two flat tones: the front
 // and the cap's top light, the rest the side tone.
-function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, sleeve = null, fist = null } = {}) {
+function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, sleeve = null, fist = null, bend = 0 } = {}) {
   const m = new VoxelModel();
   const out = side === 'L' ? 1 : -1;
   for (let y = 0; y <= 18; y++) for (let x = -1; x <= 1; x++) for (let z = -1; z <= 1; z++) {
@@ -551,8 +551,31 @@ function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, 
     const c = sleeve || (y === 17 || z === 1 ? pal.L : pal.M);
     if (c === TEAM) tset(m, 2 * out, y, z, z === 1 ? 0xffffff : TEAM_SHADE); else m.set(2 * out, y, z, c);
   }
+  return bendArm(m, bend);
+}
+// bend an arm (manArmM, half voxels) at the elbow: the forearm (y <= 9) turns
+// forward (+z) by a radians about the elbow (y 9.5, z 0.5), so the arm hangs
+// from the shoulder and the forearm comes forward instead of the whole arm
+// hanging straight; armFist(a) = the bent fist in rig voxels from the shoulder
+// joint (for a part attached to the hand)
+const ELBOW_Y = 9.5;
+function bendArm(m, a) {
+  if (!a) return m;
+  const ca = Math.cos(a), sa = Math.sin(a), fore = [];
+  for (const [k, v] of m.vox) {
+    const x = ((k >> 20) & 1023) - 512, y = ((k >> 10) & 1023) - 512, z = (k & 1023) - 512;
+    if (y <= 9) fore.push([x, y, z, v]);
+  }
+  for (const [x, y, z] of fore) m.remove(x, y, z);
+  for (const [x, y, z, v] of fore) for (const oy of [0.2, 0.5, 0.8]) for (const oz of [0.2, 0.5, 0.8]) {
+    const dy = y + oy - ELBOW_Y, dz = z + oz - 0.5;
+    const ny = Math.floor(ELBOW_Y + dy * ca + dz * sa), nz = Math.floor(0.5 + dz * ca - dy * sa);
+    if (ny > 9 && m.has(x, ny, nz)) continue;
+    m.set(x, ny, nz, 0); Object.assign(m.get(x, ny, nz), v);
+  }
   return m;
 }
+const armFist = (a) => [0, (ELBOW_Y - 8 * Math.cos(a) - 18.5) * BODY_SCALE, 8 * Math.sin(a) * BODY_SCALE];
 // Thigh / shin (half voxels): x -2..1, z -2..1, y 0..13 (pivot [0, 14, 0] at
 // the hip / knee); the shin narrows to a 2 x 2 ankle over a sandalled foot.
 function manThighM({ pal = PAL_SKIN, kilt = null } = {}) {
@@ -628,7 +651,7 @@ function eSash(m, color, x0 = -5, x1 = 4, y0 = 13, y1 = 3) {
 }
 // the parts of a standing Egyptian man; s scales a rider (joints and voxels)
 function manParts({ torso, head: hs, headScale = 0.9, headZ = MAN.headZ, pal = PAL_SKIN, arm = {}, armL = {}, armR = {}, leg = {}, s = 1,
-  legs = true, torsoJoint = null, torsoParent = null, restL = null, restR = null } = {}) {
+  legs = true, torsoJoint = null, torsoParent = null, restL = null, restR = null, liftL = 0, liftR = 0 } = {}) {
   const S = BODY_SCALE * s, X = { scale: S, jitter: 0.015 };   // flat tones: almost no per-voxel jitter
   const P = [];
   if (legs) {
@@ -642,8 +665,8 @@ function manParts({ torso, head: hs, headScale = 0.9, headZ = MAN.headZ, pal = P
   }
   P.push(part('torso', torso, [0, 0, 0], torsoJoint || sc([0, MAN.hip, 0], s), torsoParent, X));
   P.push(headPart(hs, sc([0, MAN.headY, headZ], s), 'torso', headScale * s));
-  P.push(part('armL', manArmM({ pal, ...arm, ...armL, side: 'L' }), [0.5, 18.5, 0.5], sc([MAN.armX, MAN.armY, 0], s), 'torso', { ...X, ...(restL ? { rest: restL } : {}) }));
-  P.push(part('armR', manArmM({ pal, ...arm, ...armR, side: 'R' }), [0.5, 18.5, 0.5], sc([-MAN.armX, MAN.armY, 0], s), 'torso', { ...X, ...(restR ? { rest: restR } : {}) }));
+  P.push(part('armL', manArmM({ pal, ...arm, ...armL, side: 'L' }), [0.5, 18.5, 0.5], sc([MAN.armX, MAN.armY + liftL, 0], s), 'torso', { ...X, ...(restL ? { rest: restL } : {}) }));
+  P.push(part('armR', manArmM({ pal, ...arm, ...armR, side: 'R' }), [0.5, 18.5, 0.5], sc([-MAN.armX, MAN.armY + liftR, 0], s), 'torso', { ...X, ...(restR ? { rest: restR } : {}) }));
   return P;
 }
 
@@ -756,15 +779,40 @@ function slingM() {
   m.box(-2, -22, -1, 4, 2, 3, 0x8e8a82).box(-1, -21, 0, 2, 1, 1, 0xa8a49a);   // the grey stone
   return m;
 }
-// the priest's staff, topped by a gold ankh
-function ankhStaffM() {
+// the priest's staff (round 10, unit_09), authored at half the rig voxel
+// (part scale 0.5, pivot [1, 0, 1]: a 2 x 2 shaft centred on the fist):
+// a dark shaft from the ground to above the head, topped by one clear ankh
+// in a deep orange gold (the grade turns the light GOLD cream on a small
+// emblem): a 12-wide crossbar with flared ends over a teardrop loop 8 wide
+// and 14 tall whose 4-wide, 9-tall eye is cut right through, so the ground
+// shows in the hole; a darker rim on the loop's outer edge keeps the shape
+// against a white robe, no glow (glow washes it to cream)
+const ANKH_G = pick3(84, 0x8c6c00, 0x846400, 0x947400);
+const ANKH_L = 0xb89400, ANKH_D = 0x483000;
+function ankhStaffM({ glow = 0 } = {}) {
   const m = new VoxelModel();
-  m.box(0, -10, 0, 1, 25, 1, (x, y, z) => (y % 7 === 0 ? GOLD(x, y, z) : WOOD_DK));
-  const G = (x, y, z) => GOLD(x, y, z);
-  m.box(-3, 15, 0, 7, 1, 1, G).box(0, 14, 0, 1, 2, 1, G);
-  for (const [x, y] of [[-1, 16], [1, 16], [-2, 17], [2, 17], [-2, 18], [2, 18], [-1, 19], [1, 19], [0, 19]]) m.set(x, y, 0, G, { glow: 0.25 });
+  const o = glow ? { glow } : undefined;
+  for (let y = -29; y <= 26; y++) for (let x = 0; x <= 1; x++) for (let z = 0; z <= 1; z++)
+    m.set(x, y, z, y >= 22 || (y + 40) % 14 === 0 || y <= -27 ? ANKH_G(x, y, z) : (x + z) % 2 ? WOOD_DK : 0x2a160a, o);
+  // the crossbar, the arms flaring at the ends
+  for (let x = -5; x <= 6; x++) {
+    const e = x <= -4 || x >= 5;
+    for (let y = e ? 26 : 27; y <= (e ? 30 : 29); y++) for (let z = 0; z <= 1; z++)
+      m.set(x, y, z, x === -5 || x === 6 ? ANKH_D : y === (e ? 30 : 29) ? ANKH_L : ANKH_G(x, y, z), o);
+  }
+  // the loop: [outer half-width, eye half-width] per row from the crossbar up
+  const ROWS = [[1, 0], [2, 0], [3, 0], [3, 1], [4, 2], [4, 2], [4, 2], [4, 2], [4, 2], [4, 2], [4, 2], [3, 1], [3, 0], [2, 0]];
+  ROWS.forEach(([hw, eh], i) => {
+    const y = 30 + i;
+    for (let x = 1 - hw; x < 1 + hw; x++) {
+      if (eh && x >= 1 - eh && x < 1 + eh) continue;     // the eye, cut through
+      const rim = x === 1 - hw || x === hw;
+      for (let z = 0; z <= 1; z++) m.set(x, y, z, rim && hw >= 3 ? ANKH_D : i >= 11 ? ANKH_L : ANKH_G(x, y, z), o);
+    }
+  });
   return m;
 }
+const ANKH_PIVOT = [1, 0, 1];
 // the pharaoh's crook, striped gold and team
 function crookM() {
   const m = new VoxelModel();
@@ -908,18 +956,31 @@ const sc = (j, s) => j.map((v) => v * s);
   const LEN = 23;
   for (let i = 0; i <= LEN; i++) {
     const y = 1 - i;
-    const w = 2 * Math.round((10 + i * 5 / LEN) / 2), z0 = -3 - Math.round(i * 1.5 / LEN), z1 = 2 + Math.round(i * 1.5 / LEN);
+    // (round 10) the robe gathers to the 8-wide waist under the sash and
+    // flares over the hips to 16 at the hem: a waist, not a slab
+    const w = i < 2 ? 8 : 2 * Math.round(Math.min(10 + (i - 2) * 0.5, 10 + (i - 2) * 6 / (LEN - 2)) / 2), z0 = -3 - Math.round(i * 1.5 / LEN), z1 = 2 + Math.round(i * 1.5 / LEN);
     for (let x = -w / 2; x < w / 2; x++) for (let z = z0; z <= z1; z++) {
       const ex = x === -w / 2 || x === w / 2 - 1;
       if (ex && (z === z0 || z === z1)) continue;
       t.set(x, y, z, i >= LEN - 1 ? GOLD : (ex || z === z0 ? RB_SH : RB));
     }
+    if (i < 2) for (const x of [-5, 4]) for (let z = -3; z <= 2; z++) t.remove(x, y, z);
     for (let x = 0; x <= 1; x++) t.set(x, y, z1 + 1, GOLD);               // the sash's long end down the front
   }
   eBelt(t, GOLD, GOLD);
-  rig('priest', { voxel: 0.07, anim: 'human', style: 'priest', pose: 'staff', stance: 0.3 }, [
-    ...manParts({ torso: t, head: 'priest', arm: { sleeve: RB, bracer: GOLD }, leg: { sandal: null } }),
-    part('weapon', ankhStaffM(), [0, 0, 0], GRIP_E, 'armR'),
+  // (round 10) not a T-pose: the staff arm's shoulder raised half a voxel and
+  // its forearm bent forward to hold the staff out in front of the hip, the
+  // free arm bent at the elbow with the fist at the waist
+  // the legs are robed (linen to the ankle, bare feet), so a striding leg
+  // that swings out of the rigid robe reads as cloth, not a bare plank
+  const BR = 0.95, BL = 1.35;
+  const fistR = armFist(BR);
+  rig('priest', { voxel: 0.07, anim: 'human', style: 'priest', pose: 'staff', stance: 0.3, upright: true }, [
+    ...manParts({ torso: t, head: 'priest', arm: { sleeve: RB, bracer: GOLD }, armL: { bend: BL }, armR: { bend: BR }, leg: { sandal: null, pal: { L: RB, M: RB_SH, D: RB_SH }, foot: PAL_SKIN.M },
+      liftR: 0.5, restL: [0, -0.75, 0.1], restR: [0, -0.35, -0.2] }),
+    // the staff stands upright in the bent fist whatever the arm does (rig
+    // "upright": unit_view.cpp gives the weapon the unit's orientation)
+    part('weapon', ankhStaffM(), ANKH_PIVOT, [fistR[0] - 0.4, fistR[1], fistR[2] + 0.2], 'armR', { scale: 0.5 }),
   ]);
 }
 
@@ -1613,7 +1674,7 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
   headM.ellipsoid(2.5, 8, 2.5, 2, 2.4, 2, 0xffe060, { glow: 0.9 });   // the sun disc
   rig('son_of_osiris', { voxel: 0.1, anim: 'beast', style: 'beast' }, [
     ...beastManParts({ torso: body, head: headM, headScale: 0.62, arm: { band: GOLD, bracer: GOLD }, leg: { kilt: TEAM }, shin: shinO }),
-    part('weapon', ankhStaffM(), [0, 0, 0], BEAST_FIST, 'foreR'),
+    part('weapon', ankhStaffM({ glow: 0.15 }), ANKH_PIVOT, BEAST_FIST, 'foreR', { scale: 0.5 }),
   ]);
 }
 
@@ -2024,7 +2085,11 @@ for (const [type, R] of Object.entries(RIGS)) {
     // never swallows a face or a haft
     // (thin enough that two soldiers side by side keep their own outlines and
     // a line never fills the gap between a torso and an arm)
-    const ol = p.name === 'head' ? 0.35 : (p.name === 'weapon' || p.name === 'shield' || p.name.startsWith('tool')) ? 0.45 : 0.55;
+    // (round 10: thinner again, about 1-2 px at RTS zoom, and drawn in dark
+    // sienna by unit_outline.gdshader for every mesh with a width factor, so
+    // the line between an arm and a torso stops flattening the figure into a
+    // paper cut-out)
+    const ol = p.name === 'head' ? 0.24 : (p.name === 'weapon' || p.name === 'shield' || p.name.startsWith('tool')) ? 0.3 : 0.36;
     g.add(`${type}/${p.name}`, buildVoxelGeometry(p.model, { size: R.voxel * (p.scale || 1), pivot: p.pivot, jitter: p.jitter ?? 0.05 }), { outline: ol });
   }
 }

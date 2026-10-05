@@ -149,6 +149,7 @@ AovUnitView::Rig AovUnitView::parse_rig(const Dictionary &R, int t) {
 	rig.stride = (float)(double)R.get("stride", 1.0);
 	rig.hover = (float)(double)R.get("hover", 0.0);
 	rig.graze = (bool)R.get("graze", true);
+	rig.upright = (bool)R.get("upright", false);
 	{ const Variant sv = R.get("stance", 0.0); rig.stance = sv.get_type() == Variant::BOOL ? ((bool)sv ? 1.0f : 0.0f) : (float)(double)sv; }
 	rig.voxel = (float)(double)R.get("voxel", 0.07);
 	const Array parts = R.get("parts", Array());
@@ -1331,6 +1332,10 @@ Dictionary AovUnitView::update(double dt, double alpha, int64_t local_player, co
 			const Transform3D &parent = p.parent >= 0 ? world[p.parent] : root;
 			Basis b;
 			if (p.channel >= 0) b = euler(rot3[p.channel][0], rot3[p.channel][1], rot3[p.channel][2]);
+			// (rig "upright": the Priest) the ankh staff stands upright in the
+			// fist whatever the arm does (walk swing, raised arm): the weapon
+			// takes the unit's own orientation, not the arm's
+			if (rig.upright && p.weapon && !dead) b = parent.basis.inverse() * root.basis;
 			if (p.has_rest) b = b * p.rest;
 			world[pi] = parent * Transform3D(b, p.joint);
 			bool show = true;
