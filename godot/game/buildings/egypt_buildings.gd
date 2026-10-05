@@ -47,6 +47,7 @@ var _players := {}         # owner -> {civ, god, age} (refreshed each frame)
 
 static var _types := {}    # the manifest's types (loaded once)
 static var _stage_keys: Array = [0, 2, 4, 6]
+static var _shader: Shader = null
 
 func setup(g: Node, team_colors: Array) -> void:
 	game = g
@@ -125,8 +126,18 @@ static func fit_scale(type_name: String, w: float, h: float) -> float:
 func _material(owner: int) -> ShaderMaterial:
 	if not _mats.has(owner):
 		var c: int = _colors[owner] if owner < _colors.size() else 0xffffff
-		_mats[owner] = BuildingAO.material(Color.hex((c << 8) | 0xff))
+		_mats[owner] = material(Color.hex((c << 8) | 0xff))
 	return _mats[owner]
+
+## building_ao.gd's material on egypt_building.gdshader (warm shade: the
+## scene's cool shade light re-coloured to umber, a sand bounce at the foot).
+static func material(color: Color) -> ShaderMaterial:
+	if _shader == null:
+		_shader = load("res://game/buildings/egypt_building.gdshader")
+	var m := ShaderMaterial.new()
+	m.shader = _shader
+	m.set_shader_parameter("team_color", color)
+	return m
 
 func _player(owner: int) -> Dictionary:
 	if not _players.has(owner):

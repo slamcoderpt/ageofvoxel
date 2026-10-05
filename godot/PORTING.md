@@ -30,7 +30,7 @@ their main file) or ask their owner. Shared code is in `game/core/` and
 | core (foundation; skirmish builder: camera, fog pass, playtest) | `game/main.gd`, `game/core/` (args, scenes, camera, model loader, voxel shader, bench, sim_debug, simcheck, `fog_view.gd` + `fog_of_war.gdshader` (fog-of-war shading, one full-screen pass), `playtest.gd` (scripted skirmish playthrough), `menu_playtest.gd` (the screen flow through real input: menu -> setup -> loading -> match -> Esc menu -> menu, see "Screen flow"), `match_rules.gd` + `match_check.gd` (match settings -> the sim, see "Match rules")) | `core/` (constants, rng, jsmath, bounds, game_map, entities, players, events, spatial_hash, pathfinding, movement, commands, profile, fog, victory), `match/` (the match setup: seats, teams, difficulty, stockpiles), `fortify/` (walls, gates, towers, their stages: Godot-only, see "Walls, gates, towers"), `techs/` (research queues, the Armory / Market / Temple techs, market trade, tribute: Godot-only, see "Research, Armory, Market, Temple techs"), `sim.{h,cpp}` | `src/core/` |
 | terrain | `game/terrain/terrain.gd` + `terrain.gdshader` (chunks, paving cobbles / pale stone of MaterialPatches patchGround), `water.gdshader` (Water.js), `props.gdshader` (voxel.gdshader + MultiMesh instance tint, used by trees / gold / berries / ground details); mesher in `native/src/terrain_mesher.cpp` (TerrainMesh.js full port, water depth bake, GroundDetails.js scatter) | map edits live in `core/game_map`; resource nodes `Sim::spawn_resource` | `src/terrain/` |
 | lighting | `game/lighting/lighting.gd` (sun + PCSS soft shadows, hemisphere = ambient colour + two unshadowed up/down lights, fill, depth haze following the camera, SSAO, MSAA, `--quality=high\|medium\|low`, `--post=high\|low\|off`), `grade_effect.gd` (CompositorEffect compute pass on the HDR buffer: exposure 2.1 + PBR Neutral + the PostFX.js grade; Godot's tonemap is LINEAR; Compatibility/web falls back to AgX), `sky.gdshader`. MaterialPatches.js canopy / foliage terms not ported yet | none | `src/lighting/` |
-| buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `walls.gd` (Greek walls, pillars and gates with swinging leaves, construction and damage states; models by `../scripts/export-walls.mjs`, see "Walls and gates: the look"), `towers.gd` + `tower_scene.gd` (Greek towers, a model per upgrade stage, construction / damage / upgrade states, the `towers` capture scene; models by `../scripts/export-towers.mjs`, see "Towers: the look"), `tech_buildings.gd` + `techbuildings_scene.gd` (the Greek Armory and Market, a model per age look plus construction stages, the `techbuildings` capture scene; models by `../scripts/export-techbuildings.mjs`, see "Armory and Market: the look"), `egypt_buildings.gd` + `egypt_town_scene.gd` (every Egyptian building, construction stages, the `egypt_town` capture scene; models by `../scripts/export-egypt.mjs`, see "Egyptian buildings: the look"), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
+| buildings | `game/buildings/buildings.gd` (models, construction stages, house yaw, fog visibility), `walls.gd` (Greek walls, pillars and gates with swinging leaves, construction and damage states; models by `../scripts/export-walls.mjs`, see "Walls and gates: the look"), `towers.gd` + `tower_scene.gd` (Greek towers, a model per upgrade stage, construction / damage / upgrade states, the `towers` capture scene; models by `../scripts/export-towers.mjs`, see "Towers: the look"), `tech_buildings.gd` + `techbuildings_scene.gd` (the Greek Armory and Market, a model per age look plus construction stages, the `techbuildings` capture scene; models by `../scripts/export-techbuildings.mjs`, see "Armory and Market: the look"), `egypt_buildings.gd` + `egypt_town_scene.gd` + `egypt_building.gdshader` (every Egyptian building, construction stages, the `egypt_town` capture scene, warm shade; models by `../scripts/export-egypt.mjs`, see "Egyptian buildings: the look"), `town_props.gd` (props.js: town dressing, one MultiMesh per prop kind), `building_ao.gd` + `building.gdshader` (every building / prop mesh gets a wide-radius AO baked once per model by `AovBuildingAO.bake` in `native/src/building_ao.cpp` (render side, stands in for the browser's GTAO: column gaps, porticoes, eaves, wall-to-ground contact), stored in CUSTOM1.b and multiplied into the albedo; pale albedo pulled down, glow lowered; without the class, e.g. an old web .wasm, meshes come out without it) | `buildings/` (defs, spawn + ground dressing, placement, construction, destroy, town.js: ported) | `src/buildings/` |
 | units | `game/units/units.gd` (rigs posed by the full anim.js port, conditional parts, crowd yaw / press / jitter, deaths and corpses, contact shadows), `unit.gdshader` (team lift + rim, hit flash, corpse drain, dithered fade) + `unit_outline.gdshader` (inverted hull, next pass; per-corner push directions in CUSTOM1.b keep the hull closed, see "Egyptian units and myth units: the look"); posing in C++: `native/src/unit_view.cpp` (`AovUnitView`) | `units/` (defs, spawn, anim state, spread: ported) | `src/units/` |
 | combat (incl. enemy AI) | `game/combat/combat.gd` (arrows + streaks + stuck arrows, health bars, hit sparks / flash, dust, chips, ground scars, dropped gear; shaders in `game/combat/`), `tower_fire.gd` + `tower_flash / tower_puff.gdshader` (tower arrows: loose flash, heavier arrow, tracer, strike; see "Towers: the look"), all instance data from `AovUnitView` (via `pieces.units.last`) | `combat/` (combat.cpp: attack order, targeting, damage, projectiles, death, Town Center arrows, phalanx lines; enemy_ai.cpp: ported, plus god powers and a wave log, Godot-only; enemy_ai_fort.cpp: the AI's walls, towers and breaches, Godot-only) | `src/combat/` |
 | economy | `game/economy/economy.gd` (EconomyView: animals, spears, boats, shoals, crops, stockpiles, loads, decor; Godot-only activity fx: axe / pick chips and dust, sickle chaff, stooks on cut rows, hoof dust, shoal ripples, fish splashes, net ripples, boat wakes; crops sway, `econ_voxel.gdshader`, `fx_chip / fx_puff / fx_ring.gdshader`), buffers built in C++ by `AovEconView` (`native/src/econ_view.{h,cpp}`, render side, reads the sim, never writes it) | `economy/` (gathering, farms, hunting, fishing, worship, training, age: ported) | `src/economy/` |
@@ -917,6 +917,23 @@ a few smooth parts (the silos), pivoted at the footprint centre, the front to
 Armory, Sentry Tower), warm sandstone ashlar (pylons, plinths), pale limestone cornices
 and copings, dark plaster / mud roof decks, mud brick and palm thatch
 (Archaic houses), painted friezes (blue / red / ochre), gilt, dark basalt.
+- **Warm shade** (`game/buildings/egypt_building.gdshader`, the Egyptian
+  buildings' material, `EgyptBuildings.material(colour)`; Greek buildings keep
+  `building.gdshader`): the scene's shade light is cool (the hemisphere's sky
+  half, the blue fill, the blue-grey ambient) and turned shaded sandstone
+  slate / ice blue. This shader lights the sun as usual (Lambert, its cast
+  shadows) but re-colours every cool light and the ambient
+  (`ambient_light_disabled`, re-added as emission) to a warm umber of the
+  same luminance (`shade_color`, `shade_warm`), lifted by `shade_gain` 1.25
+  so a face in shade sits at ~65 % of the lit value (measured on the
+  Barracks' pylon: lit (166, 123, 77), shaded side (114, 80, 46)), and adds a
+  warm bounce off the sand (`bounce` 0.10, fading out `bounce_h` 1.1 tiles
+  up, on faces turned sideways or down). Team voxels keep the cool light so
+  the owner's line stays lapis / maroon, not brown. No specular (roughness
+  0.93 had none to speak of).
+- **Roof decks** (`PLASTER`): one smooth trowelled surface, a faint tone
+  drift over large irregular patches and a few stains, no tile grid or 2x2
+  checker (that read as an empty grid of tiles).
 - **Three values per lot** (so a town never reads as one tan mass): the
   walls are the lightest (whitewash / limestone), the **roof deck** two
   steps darker (`PLASTER` a warm grey-brown deck, `ROOFTILE` a darker tile,
@@ -1071,12 +1088,22 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   vertical flagpole niches cut a voxel into the face along the batter (a
   team banner's pole stands in the outer one) and an incised relief of a
   king smiting (dark sand, white crown, red kilt) between them; between the
-  pylons a limestone gate block a step lower, its cavetto cornice the lintel
+  pylons a limestone gate block a step lower (the slot the pylons' batter
+  opens beside it is closed: their inner faces stand flush against it up to
+  its cornice, so no dark wedge of stepped voxels shows), its cavetto cornice the lintel
   bridging them, a lapis band, a winged sun disc (lapis / turquoise wings,
   a red disc) over the door, and heavy cedar double doors one voxel inside
   proud jambs and a lintel (vertical planks, a dark meeting seam, two
   2-row bronze straps with rivets); barrels, a crate, a dummy and an
-  archery butt in the yard),
+  archery butt in the yard; the ranges and pylons in `OCHRE_P`, calm
+  horizontal ochre courses with low joint contrast, so a battered pylon face
+  reads as one tapering stone surface; the relief sits in a dressed panel
+  (smooth pale sandstone in a dark incised frame); the roof decks dressed
+  (`barracksRoofs`): a raised clerestory strip with dark light slots between
+  piers down the back range's spine either side of the gatehouse, a
+  stairwell hut with a dark doorway to the yard on the west range, a striped
+  sunshade on four poles over grain, a sack and a crate on the east range,
+  sacks and crates by the clerestory),
   `migdol` 7x7 (a tall battered limestone keep with a tiled roof, four taller
   corner turrets whose team rim runs only along their two outer sides, slit
   windows in threes, a projecting gate front with a deep gate and a gilt

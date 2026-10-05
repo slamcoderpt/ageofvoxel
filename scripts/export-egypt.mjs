@@ -91,7 +91,15 @@ const LIME_S = 0xd9c9a8;      // the shadowed lip under a cornice
 // the roof deck: a packed-mud / plaster deck two value steps darker than the
 // whitewashed walls and the pale lip that frames it, so from the RTS camera
 // every roof reads as a dark inset inside a bright frame (never one tan mass)
-const PLASTER = (x, y, z) => { const c = pick(hash3(x >> 1, y, z >> 1, 13), [0xa99880, 0xa39279, 0xae9d85, 0x9d8c74]); return (x % 5 === 0 || z % 5 === 0) ? shade(c, 0.9) : c; };
+// a plaster roof deck: one smooth trowelled surface (no tile grid, no
+// checker of 2x2 patches): a faint tone drift over large irregular patches,
+// a few darker stains, single-voxel speckle at +-1 %
+const PLASTER = (x, y, z) => {
+  const big = hash3((x + ((z >> 3) & 1) * 3) >> 3, y, (z + ((x >> 3) & 1) * 2) >> 3, 13);
+  let c = pick(big, [0xa79680, 0xa49380, 0xa99882]);
+  if (hash3(x >> 1, y, z >> 1, 17) < 0.06) c = shade(c, 0.94);
+  return shade(c, 0.99 + 0.02 * hash3(x, y, z, 18));
+};
 const ROOFTILE = (x, y, z) => { const c = pick(hash3(x >> 2, y, z >> 2, 14), [0xbcb19c, 0xb4a993, 0xc2b7a2]); return (x % 4 === 0 || z % 4 === 0) ? shade(c, 0.86) : c; };
 // whitewashed plaster walls (Retold's houses and camps: a pale cream wash
 // over the brick, faint courses showing through), the lightest value on a lot
@@ -382,6 +390,10 @@ const FRIEZE = [FRIEZE_SEP, RED_M, RED_M, FRIEZE_SEP, LAPIS, LAPIS, FRIEZE_SEP, 
 // value steps, so the parts of a compound read apart: a pale limestone for the
 // chief block, a warm ochre sandstone for enclosure walls, a dark mud brick
 // for the lesser buildings, a cool grey flagstone for courtyards
+// the Barracks' ochre sandstone: the same warm ochre in calm horizontal
+// courses (low joint contrast, one tone family), so a battered pylon face
+// reads as one tapering stone surface, not blotches
+const OCHRE_P = coursed([0xcf9856, 0xc8914f, 0xd49e5e], { course: 3, len: 8, bed: 0.91, head: 0.94, seed: 27 });
 const OCHRE_W = masonry([0xcd9450, 0xc38a48, 0xd49c58], [0xbd8444, 0xc8904c, 0xb47c3e], { len: 8, course: 3, bed: 0.82, head: 0.88, grime: 3, seed: 21 });
 const MUDB = masonry([0xa47448, 0x9a6b40, 0xad7c4f], [0x93653c, 0x9f7046, 0xa8784c], { len: 4, course: 2, bed: 0.84, head: 0.9, grime: 2, seed: 23 });
 const MUDROOF = (x, y, z) => { const c = pick(hash3(x >> 1, y, z >> 1, 24), [0xb99468, 0xb08b60, 0xc09c70]); return (x % 5 === 0 || z % 5 === 0) ? shade(c, 0.93) : c; };
@@ -1854,9 +1866,11 @@ function barracks() {
   const m = lot(W, W, EARTH);
   patch(m, 11, 15, 33, 38, EARTH, { seed: 5 });
   // back range, west range, a lower east range
-  block(m, 2, 2, 38, 14, 1, 12, { wall: OCHRE_W, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 5, band: null });
-  block(m, 2, 13, 12, 36, 1, 11, { wall: OCHRE_W, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 5, band: null });
-  block(m, 30, 13, 38, 28, 1, 9, { wall: OCHRE_W, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 5, band: null });
+  const RNG = { wall: OCHRE_P, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 5, band: null };
+  const tb = block(m, 2, 2, 38, 14, 1, 12, RNG);
+  const tw = block(m, 2, 13, 12, 36, 1, 11, RNG);
+  const te = block(m, 30, 13, 38, 28, 1, 9, RNG);
+  barracksRoofs(m, tb, tw, te);
   // the raised gatehouse in the middle of the back range
   const tg = block(m, 14, 6, 27, 17, 1, 16, { wall: LIME, roofC: ROOFTILE, rimC: LIME, gorge: [0xd2c4a4, 0xdccfb2], lipOut: 2, batter: 5, band: 'lapis', frieze: 1 });
   block(m, 17, 8, 24, 14, tg - 1, 4, { batter: 0, band: null });
@@ -1864,7 +1878,7 @@ function barracks() {
   // the yard's front: a pylon gateway (two battered pylons, a gate block
   // between them under a lintel with a cavetto cornice and a gilt winged sun,
   // heavy cedar double doors with bronze straps set in the doorway)
-  const PY = { wall: OCHRE_W, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 7, band: 'red' };
+  const PY = { wall: OCHRE_P, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 7, band: 'red' };
   for (const [x0, x1] of [[5, 16], [25, 36]]) {
     block(m, x0, 28, x1, 38, 1, 21, PY);
     // two vertical flagpole niches cut into the front face (a shadowed slot
@@ -1881,14 +1895,27 @@ function barracks() {
     // an incised relief between the niches: a striding figure with a raised
     // arm (a king smiting) cut in a darker sand, a white crown and a red kilt
     const mid = Math.floor((x0 + x1) / 2) - 2;
-    paint(m, '+z', mid, 16, ['.L...', '.LL.D', '.DD.D', 'DDDDD', '.DD..', '.DD..', '.RR..', '.RRR.', '.D.D.', 'D...D', 'D...D'],
-      { L: 0xe9dfc6, D: 0x74482a, R: RED_M });
+    // a dressed panel (smooth pale sandstone inside a dark incised frame) so
+    // the figure reads as a carved relief, not a stain in the masonry
+    const fig = ['.L...', '.LL.D', '.DD.D', 'DDDDD', '.DD..', '.DD..', '.RR..', '.RRR.', '.D.D.', 'D...D', 'D...D'];
+    const panel = ['FFFFFFF'];
+    for (const r of fig) panel.push('F' + r.replace(/\./g, 'P') + 'F');
+    panel.push('FFFFFFF');
+    paint(m, '+z', mid - 1, 17, panel, { L: 0xf1e8d2, D: 0x7a4a2a, R: RED_M, P: 0xddb37c, F: 0x9a6a3a });
   }
   // link walls from the pylons back to the ranges
-  block(m, 30, 27, 38, 32, 1, 9, { wall: OCHRE_W, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 5, band: null });
+  block(m, 30, 27, 38, 32, 1, 9, { wall: OCHRE_P, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, lipOut: 2, batter: 5, band: null });
   // the gate block: limestone, its own cornice (the lintel's cavetto) a step
   // below the pylons' tops
   block(m, 15, 32, 26, 38, 1, 18, { wall: LIME, roofC: ROOFTILE, rimC: LIME, gorge: [0xd2c4a4, 0xdccfb2], lipOut: 2, batter: 0, band: 'lapis' });
+  // close the slot the pylons' batter opens beside the gate block (their
+  // inner faces stand flush against it up to its cornice), so no dark wedge
+  // of stepped voxels shows between a pylon and the gate
+  for (let y = 1; y < 20; y++) for (const x of [13, 14, 26, 27]) for (let z = 30; z < 38; z++) {
+    const ins = Math.floor((y - 1) / 7);
+    if (z > 37 - ins || m.get(x, y, z)) continue;
+    if ((x < 20 ? m.get(x - 1, y, z) || m.get(x + 1, y, z) : m.get(x + 1, y, z) || m.get(x - 1, y, z))) m.set(x, y, z, OCHRE_P(x, y, z));
+  }
   door(m, '+z', 17, 7, 1, 9, { deep: 1, frame: LIME, sun: false });
   // the cedar leaves: vertical planks, a dark meeting seam, bronze straps
   // with rivets every third course
@@ -1910,6 +1937,39 @@ function barracks() {
   dummy(m, 18, 26);
   lathe(m, 27.5, 23.5, 1, 6, () => 2.2, (x, y, z) => (y === 3 ? RED : THATCH(x, y, z)));
   return m;
+}
+
+// The Barracks' roof decks are not empty tile grids: a raised clerestory
+// strip on the back range either side of the gatehouse (a pale-lipped
+// ochre clerestory with dark light slots between piers), a stairwell hut with
+// a dark doorway on the west range, a striped sunshade on poles over jars
+// and a basket on the east range, storage jars by the clerestory.
+function barracksRoofs(m, tb, tw, te) {
+  const CL = { wall: OCHRE_P, rimC: LIME, gorge: [0xb98a52, 0xc4965c], torus: false, band: null, plinth: false, socle: 0, rim: false, cornice: false };
+  // the clerestory: a long narrow raised strip down the back range's spine,
+  // dark light slots between piers along both long faces
+  for (const [x0, x1] of [[4, 14], [27, 37]]) {
+    block(m, x0, 6, x1, 10, tb, 3, CL);
+    for (let x = x0 + 1; x < x1 - 1; x += 2) for (let y = tb; y < tb + 2; y++) {
+      m.set(x, y, 9, REVEAL); m.set(x, y, 6, REVEAL);
+    }
+  }
+  sack(m, 6, tb, 11); goodsBox(m, 31, tb, 11, 3, 2, 'grain', 2);
+  // the stairwell hut on the west range, its dark doorway to the yard
+  block(m, 4, 19, 9, 24, tw, 5, CL);
+  for (let z = 20; z < 22; z++) for (let y = tw; y < tw + 4; y++) { m.set(8, y, z, REVEAL); m.set(7, y, z, REVEAL2); }
+  for (let z = 19; z < 23; z++) m.set(9, tw + 4, z, LIME(9, tw + 4, z));
+  crate(m, 6, tw, 28, 3, 3, 3); sack(m, 5, tw, 32);
+  // a striped sunshade on four poles over the east range's deck, goods under it
+  const sy = te + 5;
+  for (const [px, pz] of [[31, 16], [36, 16], [31, 25], [36, 25]]) for (let y = te; y < sy + (pz === 16 ? 1 : 0); y++) m.set(px, y, pz, POLE(px, y, pz));
+  for (let x = 30; x < 38; x++) for (let z = 15; z < 27; z++) {
+    const y = sy + (z < 21 ? 1 : 0);
+    const st = (x >> 1) & 1 ? CANVAS_T : CANVAS;
+    m.set(x, y, z, st[(x + z) % st.length]);
+  }
+  for (let x = 30; x < 38; x++) if (x & 1) m.set(x, sy - 1, 26, CANVAS_HEM);
+  goodsBox(m, 32, te, 18, 3, 3, 'grain', 2); sack(m, 32, te, 22); crate(m, 34, te, 22, 2, 2, 2);
 }
 
 // Migdol Stronghold (6 x 6; building_10): a tall battered square limestone
