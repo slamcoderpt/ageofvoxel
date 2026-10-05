@@ -944,7 +944,7 @@ Dictionary AovSim::get_building_def(const String &type, int64_t owner) const {
 	d["h"] = b.h;
 	// (Godot-only, sim/techs: Retold's Temple cost / hp, its myth units)
 	d["hp"] = sim_.godot_rules ? aov::rules_building_hp(t) : b.hp;
-	d["cost"] = cost_dict(sim_.godot_rules ? aov::civ_building_cost(civ, t) : b.cost);
+	d["cost"] = cost_dict(sim_.godot_rules ? (owner > 0 ? sim_.civs.cost((int)owner, t) : aov::civ_building_cost(civ, t)) : b.cost);
 	d["build_time"] = b.build_time;
 	d["pop"] = b.pop;
 	d["sight"] = b.sight;
@@ -1292,12 +1292,20 @@ static Dictionary tech_entry(const aov::Sim &S, int owner, int t) {
 	return e;
 }
 
+// (sim/civ) a building's tech list holds its owner's civ's techs only (a Greek
+// Temple never lists Hands of the Pharaoh, an Egyptian one no Greek god tech)
+static bool civ_tech_of(const aov::Sim &s, int t, int owner) {
+	const int c = aov::tech_civ(t);
+	return c < 0 || c == s.civs.civ(owner);
+}
+#define civ_tech(t, owner) civ_tech_of(sim_, (t), (owner))
+
 Array AovSim::get_owner_techs(int64_t owner, const String &building_type) const {
 	Array out;
 	const int bt = aov::building_type_of(building_type.utf8().get_data());
 	if (bt < 0 || owner <= 0 || owner >= aov::MAX_PLAYERS) return out;
 	for (int t = 0; t < aov::T_COUNT; t++)
-		if (sim_.techs.researches_at(bt, t)) out.push_back(tech_entry(sim_, (int)owner, t));
+		if (sim_.techs.researches_at(bt, t) && civ_tech(t, (int)owner)) out.push_back(tech_entry(sim_, (int)owner, t));
 	return out;
 }
 
@@ -1333,7 +1341,7 @@ Array AovSim::get_techs(int64_t building) const {
 		return out;
 	}
 	for (int t = 0; t < aov::T_COUNT; t++)
-		if (sim_.techs.researches_at(type, t)) out.push_back(tech_entry(sim_, owner, t));
+		if (sim_.techs.researches_at(type, t) && civ_tech(t, owner)) out.push_back(tech_entry(sim_, owner, t));
 	return out;
 }
 

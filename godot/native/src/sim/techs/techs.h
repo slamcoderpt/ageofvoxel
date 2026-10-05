@@ -151,6 +151,9 @@ struct TechDef {
 const TechDef &tech_def(int t);
 int tech_of(const char *key); // -1 if unknown
 int tech_home_building(int home); // B_ARMORY / B_MARKET / B_TEMPLE
+// (sim/civ) the civ whose tech it is: the Greek god techs and Temple techs CIV_GREEK,
+// Hands of the Pharaoh CIV_EGYPT, the generic Armory / Market lines -1 (both)
+int tech_civ(int t);
 
 constexpr int TECH_EVENT_BASE = 100; // tech:researched a = TECH_EVENT_BASE + TechId (fort stages: 1..6)
 constexpr int TECH_QUEUE_MAX = 5;

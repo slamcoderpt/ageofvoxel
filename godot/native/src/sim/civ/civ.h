@@ -114,6 +114,9 @@ constexpr double RA_PRIEST_EMPOWER = 0.6;
 constexpr double PHARAOH_RESPAWN = 90;
 constexpr double HEAL_RANGE = 10 * 0.6;  // Retold 10 x DIST_SCALE
 constexpr double ISIS_OBELISK_BUILD = 1.4;
+// major gods' passive bonuses (EGYPT.md 4)
+constexpr double RA_BERRIES = 1.30, RA_CAMEL_HP = 1.15, SET_INFANTRY_SPEED = 1.05, SET_MILITARY_GOLD = 0.75, ISIS_TECH_COST = 0.90;
+constexpr int ISIS_TC_POP = 5;
 constexpr double FAVOR_CAP = 200;        // the Greek favor cap of this sim
 constexpr double SIEGE_CRUSH_ARMOR = 0.05; // a browser building's crush armor vs siege (Retold buildings: 5-10 %)
 
@@ -135,6 +138,13 @@ public:
 
 	int civ(int owner) const;
 	bool rules() const;
+	bool god_is(int owner, const char *god) const; // the owner's major god (lower case)
+	// the owner's cost of a building (civ_building_cost plus the major god: Set's
+	// Barracks / Siege Works / Migdol -25 % gold, Isis' Obelisk 5 gold)
+	Cost cost(int owner, int btype) const;
+	int pop_bonus(int owner, int btype) const;      // Isis: a Town Center +5
+	double gather_bonus(int urow, int res_type_node) const; // Ra: Laborers on berries +30 %
+	double tech_cost_mult(int owner) const;         // Isis: techs -10 % food / wood / gold
 	// may `owner` place `btype` here and now (civ, age, Monument order / limit); reason when not
 	bool can_build(int owner, int btype, std::string *why = nullptr) const;
 	// may building row b train utype for its owner? 0 yes, 1 not on its civ's list for that

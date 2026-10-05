@@ -225,12 +225,49 @@ void Civs::init(Sim *s) {
 		if (e.a == U_PHARAOH) had_pharaoh[o] = true;
 		if (sim->players[o].age > 0) hero_age_stats(r, 0, sim->players[o].age);
 	});
+	// major gods' unit bonuses at spawn: Ra's Migdol units +15 % hp, Set's Barracks units +5 % speed
+	s->events.on(EV_ENTITY_ADDED, [this](const Event &e) {
+		if (!rules() || e.kind != K_UNIT || !is_egypt_unit(e.a)) return;
+		const int r = sim->entities.unit_slot(e.id);
+		if (r < 0) return;
+		UnitStore &U = sim->entities.units;
+		const int t = e.a, o = e.owner;
+		if ((t == U_CHARIOT_ARCHER || t == U_CAMEL_RIDER || t == U_WAR_ELEPHANT) && god_is(o, "ra")) {
+			U.max_hp[r] *= RA_CAMEL_HP;
+			U.hp[r] *= RA_CAMEL_HP;
+		}
+		if ((t == U_SPEARMAN || t == U_AXEMAN || t == U_SLINGER) && god_is(o, "set")) U.speed[r] *= SET_INFANTRY_SPEED;
+	});
 	s->events.on(EV_AGE_ADVANCED, [this](const Event &e) {
 		if (rules()) on_age(e.owner);
 	});
 }
 
 bool Civs::rules() const { return sim->godot_rules; }
+
+bool Civs::god_is(int owner, const char *god) const {
+	return owner > 0 && owner < MAX_PLAYERS && sim->players[owner].exists && lower_str(sim->players[owner].god) == god;
+}
+
+Cost Civs::cost(int owner, int btype) const {
+	const int c = civ(owner);
+	Cost k = civ_building_cost(c, btype);
+	if (c != CIV_EGYPT) return k;
+	if (god_is(owner, "set") && (btype == B_EG_BARRACKS || btype == B_SIEGE_WORKS || btype == B_MIGDOL)) k.v[RES_GOLD] *= SET_MILITARY_GOLD;
+	if (god_is(owner, "isis") && btype == B_OBELISK) k.v[RES_GOLD] = 5;
+	return k;
+}
+
+int Civs::pop_bonus(int owner, int btype) const {
+	return btype == B_TOWN_CENTER && civ(owner) == CIV_EGYPT && god_is(owner, "isis") ? ISIS_TC_POP : 0;
+}
+
+double Civs::gather_bonus(int u, int node_type) const {
+	const UnitStore &U = sim->entities.units;
+	return U.type[u] == U_LABORER && node_type == R_BERRY && god_is(U.owner[u], "ra") ? RA_BERRIES : 1;
+}
+
+double Civs::tech_cost_mult(int owner) const { return civ(owner) == CIV_EGYPT && god_is(owner, "isis") ? ISIS_TECH_COST : 1; }
 
 int Civs::civ(int owner) const {
 	return owner > 0 && owner < MAX_PLAYERS && sim->players[owner].exists ? sim->players[owner].civ : CIV_GREEK;

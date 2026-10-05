@@ -284,7 +284,7 @@ int32_t Buildings::place(int type, int owner, int tx, int tz, const std::vector<
 	const BuildingDef &def = building_def(type);
 	Player &p = sim->players[owner];
 	// (Godot-only: Retold's Temple, sim/techs; each civ's costs, sim/civ)
-	const Cost cost = sim->godot_rules ? civ_building_cost(p.civ, type) : def.cost;
+	const Cost cost = sim->godot_rules ? sim->civs.cost(owner, type) : def.cost;
 	if (!can_place(type, tx, tz) || !p.can_afford(cost)) return 0;
 	if (sim->godot_rules && p.age < def.min_age) return 0; // (Godot-only: the fortifications' ages)
 	if (sim->godot_rules && !sim->civs.can_build(owner, type)) return 0; // (Godot-only, sim/civ: civ, Monument order)

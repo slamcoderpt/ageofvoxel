@@ -1432,6 +1432,145 @@ x1.25; a click on the Market: its rates on the card and the buttons' prices;
 a click on Buy Food (+100 food for the shown price, the price and the label
 move) and S (sells 100 food, the price falls).
 
+## Civilizations, the Egyptians (native/src/sim/civ)
+
+Godot-only, behind `Sim::godot_rules` (check-sim 16/16 bit-exact: with the
+rules off every player is Greek, no Egyptian type spawns, places or trains).
+The reference is `reference/egypt/EGYPT.md` (Retold's numbers). Owner: the
+civ piece (`sim/civ/civ.{h,cpp}`, its hooks in economy / buildings / combat /
+techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
+
+- **A civilization per player**: `Player::civ` (0 Greek, 1 Egyptian), set by
+  `setup_match` from the major god (`zeus / hades / poseidon` -> Greek,
+  `ra / isis / set` -> Egyptian, any case) or a player's `civ` key
+  ("greek" / "egyptian") in the match config; `set_player_civ(owner, civ)`
+  for scenes / checks. A Greek and an Egyptian play the same match, each with
+  his own types (`unit_civ`, `building_civ`): the Greek ones (the browser's
+  plus Armory, Market, walls, towers) and the Egyptian ones (units from
+  `U_LABORER`, buildings from `B_GRANARY`). Town Center, House, Farm,
+  Temple, Armory, Market, walls, gates and towers are both civs' (an
+  Egyptian one costs gold and never wood: `civ_building_cost`); Storehouse
+  and Military Academy are Greek only. A player places only his civ's
+  buildings (`Civs::can_build`: civ, age, Monument order), his buildings
+  train only his civ's lists (`civ_trains`), builders build only their civ's
+  (`unit_can_build`: villager Greek / shared, Laborer Egyptian / shared but the
+  Obelisk, Priest the Obelisk alone), techs: the Greek god techs and the
+  Greek Temple techs are Greek only, Hands of the Pharaoh Egyptian only, the
+  generic Armory and Market lines both (they apply to the Egyptian human
+  soldiers and heroes: `M_EG_HUMAN`, `M_HERO`; Ballistics / Burning Pitch to
+  Slingers and Chariot Archers). Unit masks are 32 bits now (`UnitMask`).
+- **Start** (Retold): Town Center, `villagers - 2` Laborers (3 of the
+  default 5), the Pharaoh, a Priest; the setup's stockpile but no favor.
+- **Economy**: Laborers gather x0.9 (their rates are the villager's x0.9,
+  farms `FARM_RATE` x0.9), build at 0.75 (a site's rate is (1 / time) x
+  n^0.75 x the builders' mean work rate: a House is 15 s for a villager, 20 s
+  for a Laborer, Retold's x4/3), never worship (the order is refused), a cap
+  of 100 (living + queued). Drop sites: Granary (food), Lumber Camp (wood),
+  Mining Camp (gold), all free; the Town Center takes everything. Favor only
+  from the five Monuments (one each, in order: a later one needs every
+  earlier one standing, a foundation will do), 4.5 / 6 / 7.5 / 9 / 12 per
+  minute (39 with all five), capped at 200 like the Greeks'. The Mythic Age
+  needs a Migdol Stronghold (and the Heroic an Armory or a Market, as the
+  Greeks). The free worker of `Economy::rescue` is a Laborer.
+- **The Pharaoh** (one, free, 0 pop, not trainable; respawns at his home
+  Town Center, else any, 90 s after he fell): `O_EMPOWER` (order type
+  "empower", `order_empower(ids, building)`, a right-click on an own
+  building but a Farm) walks him to the building; standing within 2 tiles of
+  it he empowers it (`B.civ_empower`, 1; Ra's Priests 0.6; several do not
+  stack): construction and repair +75 %, training +75 % (not Laborers),
+  research +75 % (age-ups are the player's, not empowered), +20 % on each
+  drop at it, Monument favor +20 %, x0.75 reload of a shooting building
+  (Town Center, Migdol, tower), Obelisk LOS +75 %. He and the Priests heal
+  the most hurt ally within 6 tiles (Retold 10 x 0.6) while idle: 10 / 7.5
+  hp/s, half on a busy target; a healing Priest does not auto-attack. Both
+  grow with the age (hp, damage, range, LOS: `hero_age`, applied on
+  `age:advanced` and at spawn). Isis' Priests build Obelisks 40 % faster.
+- **Major gods' passives** (EGYPT.md 4, `Civs::cost / pop_bonus /
+  gather_bonus / tech_cost_mult` and the spawn handler): Ra: Laborers +30 %
+  on berries, Chariot Archer / Camel Rider / War Elephant +15 % hp, his
+  Priests empower (60 %); Isis: a Town Center +5 pop (20), techs -10 % food /
+  wood / gold (not favor, not age-ups), Obelisks 5 gold and built 40 %
+  faster by her Priests; Set: Spearman / Axeman / Slinger +5 % speed,
+  Barracks / Siege Works / Migdol -25 % gold. Not yet: the Monument auras
+  (Mandjet, Divine Shield, Devotees), Set's animals and conversions, the god
+  powers (Rain, Prosperity, Vision) and the unique techs. The setup screen's
+  pantheon picker (game/menu/setup) still lists the Egyptians as "not in the
+  game yet": a match config with `god: "ra" | "isis" | "set"` (main.gd's
+  `match` arg, `start_match`) plays them already.
+- **Mapping Retold onto this sim** (`civ.h` head, `egypt_unit(t).mapping`
+  per unit): hp and damage as Retold; speed x0.65 (the Laborer: the
+  villager's 2.7 / 4.0 ratio); range and LOS x0.6 (`DIST_SCALE`); reload
+  x1.15; armor: Egyptian units have a hack (`UnitDef.armor`) and a pierce
+  armor (`EgyptUnit.pierce_armor`) = Retold's x0.75 (the hoplite's 0.30 is
+  Retold's 40 % hack), read by `Techs::unit_armor` (arrows pierce, blows
+  hack); the Laborer keeps the villager's 0; train time as Retold (the
+  Laborer 17 x 10 / 15, as the villager's 10 s for Retold's 15). Bonuses are
+  the class multipliers (Spearman x2 cavalry, Axeman x4 infantry, Slinger
+  x2.25 archers, Chariot Archer x1.5 infantry, Camel Rider x2 cavalry and
+  x1.25 archers, War Elephant x1.5 archers and x4 vs buildings, Priest x5 /
+  Pharaoh x2.5 myth). Siege: a Catapult stone is 42 vs units (40 pierce + 200
+  crush x the 1 % human crush vulnerability; no area, no minimum range here)
+  and 200 crush vs buildings, a Siege Tower 9 vs units and 59.1 crush per hit
+  vs buildings (Retold's 180 / 3.5 s at a 1.15 s reload), crush less the
+  building's crush armor (5 %), not the browser's flat x0.35. Buildings: the
+  shared types keep the Greek building's hp, footprint and base build time;
+  the Egyptian ones take Retold hp x1.25 (the TC / Temple / Academy ratio),
+  footprints of the models (drop sites 3x3, Monuments 2x2 / 3x3, Barracks
+  5x5, Migdol 6x6, Siege Works 5x5, Obelisk 1x1), Retold armor (40 / 90 / 5,
+  Migdol 50 / 90 / 5, Monuments and Obelisk 5 / 90 / 5), LOS x0.6. The Migdol
+  shoots one arrow of 10.35 every 1.6 s at 12 tiles (3 x 11.5 against the
+  TC's 2 x 10 in Retold, on this sim's TC arrow of 6). Mercenaries lose 2.5 /
+  4 hp/s (limits 12 / 8). Not in this game (yet): ships and the Dock,
+  Caravans, the Lighthouse, the Wonder, the per-line Medium / Heavy / Champion
+  upgrades and Levy / Conscript techs, relics, Set's animals, the Egyptian
+  minor gods, their god powers and myth units.
+- **Renderer**: until a type has its model, `units.gd` draws an Egyptian unit
+  with its Greek stand-in's rig (`get_unit_def(t).stand_in`) and
+  `buildings.gd` an Egyptian building with its stand-in model or a sandstone
+  placeholder block (Monuments, Obelisk). `get_buildings()` has `empower`
+  (0..1) and `civ` (the owner's) per building; `get_civ_fx()` the heal and
+  empower pairs for beams.
+
+API (all Godot-only): `civ_names()`, `get_civ(civ)` ({key, name, gods,
+build_menu, units, buildings, worker}), `set_player_civ(owner, civ)`,
+`get_build_menu(owner)`, `can_build(owner, type)` ({ok, reason}),
+`get_trains(building)` ([{type, ok, reason}]), `order_empower(ids,
+building)`, `get_civ_state(owner)` ({civ, monuments, empowered,
+favor_per_min, favor_made, drop_bonus, pharaoh, respawn_in, laborers,
+laborer_cap, home_tc}), `get_civ_fx()` ({heals: [healer, target]*,
+empowers: [unit, building]*, empower_strength}), `get_building_def(type,
+owner = 0)` (owner > 0: his civ's cost and trains; plus civ, stand_in,
+armor, by_civ {greek|egyptian: {cost, trains, build_time for one builder}},
+monument / favor_per_min), `get_unit_def(type)` (plus civ, hack_armor,
+pierce_armor, stand_in, retold, mapping, limit, heal, decay, by_age),
+`get_player(id)` (plus civ, civ_id); `get_techs(building)` /
+`get_owner_techs(owner, type)` list only the owner's civ's techs (`tech_civ`).
+
+```
+godot --headless --path godot -s res://game/core/egypt_check.gd [-- --only=defs,match,economy,units,pharaoh,priest,gods,locks,determinism,rules_off]   # ~10 s
+```
+
+`egypt_check.gd` ("EGYPT PASS|FAIL <case>", `EGYPT_RESULT {json}`, exit =
+failures): the civs and every Egyptian unit's / building's numbers; the god
+picks the civ and the Egyptian start; a 5-minute Greek vs Egyptian economy
+on the same woods / mine / farms (today: Egyptian / Greek wood 0.94, gold
+0.88, food 0.90; favor 3 worshippers 76 vs the five Monuments 195), drop
+sites, no worship; each unit's live stats, its bonus on a first blow, and
+its counters fought at equal cost (900 resources: Spearmen beat hippikons,
+Axemen hoplites and Spearmen, Slingers toxotes, Camel Riders hippikons and
+Chariot Archers, hippikons Slingers, War Elephants toxotes; reported: this
+sim's archers do not kite, so Chariot Archers lose a straight fight to
+infantry as the Greek toxotes does); the Pharaoh's empower measured
+(wood x1.20, 3 Spearmen 37.6 -> 21.5 s and Laborers unchanged, a House 20 ->
+11.46 s for a Laborer (15 s for a villager), Copper Weapons 30 -> 17.2 s,
+Monument 4.5 -> 5.4 favor / min), his respawn at the TC at 90 s and his
+stats by age; healing 7.5 / 10 / 3.75 hp/s; the civ locks both ways,
+Monument order, the TC's Priests, Mercenary and Laborer limits, a Migdol
+for Mythic, builders; the major gods' passives (Ra's berries 0.877 vs 0.675
+food/s, camel 155.25 hp, Set's Spearman 3.41 speed and 56.25-gold Barracks,
+Isis' 20-pop TC, 90 / 90 Copper Weapons and 5-gold Obelisk); a mixed Greek + Egyptian match twice, bit-equal;
+rules off refuses.
+
 ## Conventions
 
 - **World units**: 1 tile = 1 world unit, terrain voxel `VOXEL = 0.5` (2x2

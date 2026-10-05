@@ -216,6 +216,12 @@ int tech_of(const char *key) {
 	return -1;
 }
 
+int tech_civ(int t) {
+	if (t == T_HANDS_OF_THE_PHARAOH) return CIV_EGYPT;
+	const TechDef &d = tech_def(t);
+	return d.god || d.home == TH_TEMPLE ? CIV_GREEK : -1;
+}
+
 int tech_home_building(int home) { return home == TH_ARMORY ? B_ARMORY : home == TH_MARKET ? B_MARKET : B_TEMPLE; }
 
 // ---- setup ------------------------------------------------------------------
@@ -283,8 +289,8 @@ int Techs::state(int owner, int t, std::string *reason) const {
 	if (!sim->godot_rules) { why("Not in this game"); return TS_UNAVAILABLE; }
 	if (d.missing) { why(std::string("No ") + d.missing + " in this game"); return TS_UNAVAILABLE; }
 	const Player &p = sim->players[owner];
-	{ // (sim/civ) a civ's techs: the Greek god techs and Temple techs are the Greeks', Hands of the Pharaoh the Egyptians'
-		const int tc = t == T_HANDS_OF_THE_PHARAOH ? CIV_EGYPT : (d.god || d.home == TH_TEMPLE) ? CIV_GREEK : -1;
+	{ // (sim/civ) a civ's techs
+		const int tc = tech_civ(t);
 		if (tc >= 0 && tc != p.civ) { why(std::string("Not a technology of the ") + civ_name(p.civ)); return TS_UNAVAILABLE; }
 	}
 	if (d.god) {
@@ -314,6 +320,9 @@ Cost Techs::cost_for(int owner, int t) const {
 	Cost c = d.cost;
 	if (d.home == TH_ARMORY && owner > 0 && owner < MAX_PLAYERS && mods[owner].armory_discount)
 		for (int k = 0; k < RES_FAVOR; k++) c.v[k] *= 0.25; // (favor unchanged)
+	const double im = sim->civs.tech_cost_mult(owner); // (sim/civ: Isis -10 %, favor unchanged)
+	if (im != 1)
+		for (int k = 0; k < RES_FAVOR; k++) c.v[k] *= im;
 	return c;
 }
 

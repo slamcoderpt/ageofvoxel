@@ -201,7 +201,8 @@ func _case_defs() -> void:
 		per[str(d.building)] += 1
 		if str(d.missing) != "":
 			missing.append(k)
-	_check("defs.count", names.size() == 47 and per.armory == 21 and per.market == 3 and per.temple == 23, {"n": names.size(), "per": per})
+	# (+1 Temple tech of the Egyptians, sim/civ: Hands of the Pharaoh; egypt_check.gd checks it)
+	_check("defs.count", names.size() == 48 and per.armory == 21 and per.market == 3 and per.temple == 24, {"n": names.size(), "per": per})
 	# spot checks against reference/techs/TECHS.md
 	var want := {
 		"copper_weapons": [{"food": 100.0, "gold": 100.0}, 30.0, 1, ""],

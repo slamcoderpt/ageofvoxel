@@ -399,7 +399,7 @@ Dictionary AovEconView::update(double alpha, bool paused, int64_t local_player, 
 	// ---- villagers: oversized loads while walking, work effects while gathering
 	const int rows = (int)U.id.size();
 	for (int i = 0; i < rows; i++) {
-		if (U.removed[i] || U.dead[i] || U.type[i] != aov::U_VILLAGER) continue;
+		if (U.removed[i] || U.dead[i] || (U.type[i] != aov::U_VILLAGER && U.type[i] != aov::U_LABORER)) continue; // (sim/civ: the Laborer too)
 		const int st = U.anim_state[i];
 		if (st != aov::A_WALK && st != aov::A_GATHER) continue;
 		const double x = U.prev_x[i] + (U.x[i] - U.prev_x[i]) * alpha, z = U.prev_z[i] + (U.z[i] - U.prev_z[i]) * alpha;

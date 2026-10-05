@@ -397,7 +397,7 @@ void Economy::recount() {
 		if (B.removed[b]) continue;
 		Player &p = sim->players[B.owner[b]];
 		const BuildingDef &d = building_def(B.type[b]);
-		if (B.built[b] && d.pop) p.pop_cap += d.pop;
+		if (B.built[b] && d.pop) p.pop_cap += sim->godot_rules ? d.pop + sim->civs.pop_bonus(B.owner[b], B.type[b]) : d.pop; // (sim/civ: Isis' TC +5)
 		for (const TrainItem &q : B.queue[b]) p.pop += unit_def(q.type).pop;
 	}
 	for (auto &p : sim->players) p.pop_cap = std::min(POP_MAX, p.pop_cap);
@@ -585,7 +585,10 @@ void Economy::update_gatherer(int r, double dt) {
 			if (sim->godot_rules && U.type[r] == U_LABORER) base *= LABORER_GATHER; // (Godot-only, sim/civ: Laborers farm 10 % slower)
 		}
 		else if (animal) base = ud.gather_rate[RES_FOOD] * 1.35;
-		else base = rt <= RES_GOLD ? ud.gather_rate[rt] : NAN;
+		else {
+			base = rt <= RES_GOLD ? ud.gather_rate[rt] : NAN;
+			if (sim->godot_rules && U.type[r] == U_LABORER && tk == K_RESOURCE) base *= sim->civs.gather_bonus(r, R.type[t]); // (sim/civ: Ra's berries)
+		}
 		double rate = base * dt;
 		const double gm = sim->players[U.owner[r]].gather_mult; // (Godot-only: Titan AI; 1 = exact)
 		if (gm != 1) rate *= gm;

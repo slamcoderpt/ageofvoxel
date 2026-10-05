@@ -28,6 +28,7 @@ var _mats := {}       # owner -> ShaderMaterial
 var _names: PackedStringArray
 var _props: Node3D = null
 var _sig := -1          # buildings signature (ids + built), props re-layout on change
+var _model_of := {}     # type -> the model type drawn (sim/civ: an Egyptian type with no model yet -> its Greek stand-in; "" = a placeholder block)
 var _fog_version := -1
 var walls: Node3D = null   # walls.gd: walls and gates (sim types "*wall*" / "*gate*", or walls.set_static())
 var towers: Node3D = null  # towers.gd: the sim's "tower" rows, one model per upgrade stage
@@ -97,11 +98,14 @@ func frame(dt: float, _alpha: float) -> void:
 		seen[id] = true
 		sig = (sig * 31 + id * 2 + built[i]) & 0x3fffffff
 		var type := _names[types[i]]
+		var mtype := _model_type(type)
 		var v := maxi(0, variant[i])
-		var key := "%s/%d" % [type, v]
+		if mtype != type:
+			v = 0
+		var key := "%s/%d" % [mtype, v]
 		var group := "buildings"
 		if not built[i]:
-			key = "%s/%d/%d" % [type, v, mini(STAGES - 1, floori(progress[i] * STAGES))]
+			key = "%s/%d/%d" % [mtype, v, mini(STAGES - 1, floori(progress[i] * STAGES))]
 			group = "construction"
 		if egypt.owns(type, civs[i] if i < civs.size() else 0, owners[i]):
 			continue   # egypt_buildings.gd
@@ -112,7 +116,10 @@ func frame(dt: float, _alpha: float) -> void:
 		if TechBuildings.handles(type):
 			continue   # tech_buildings.gd
 		var e: Dictionary = _nodes.get(id, {})
-		if e.is_empty() and VoxelModels.info(group, key).is_empty():
+		if mtype == "":
+			key = "block/%d" % built[i]   # (sim/civ) a placeholder block: no model, no stand-in
+			group = "placeholder"
+		elif e.is_empty() and VoxelModels.info(group, key).is_empty():
 			continue   # a type with no exported model (yet)
 		if e.is_empty():
 			var mi := MeshInstance3D.new()
@@ -132,7 +139,8 @@ func frame(dt: float, _alpha: float) -> void:
 			e.mi.visible = owners[i] == 1 or game.sim.is_explored(e.mi.position.x, e.mi.position.z)
 		if e.key != group + "/" + key:
 			e.key = group + "/" + key
-			e.mi.mesh = BuildingAO.mesh(group, key)
+			e.mi.mesh = _placeholder(rect[i * 4 + 2], rect[i * 4 + 3], type, built[i] != 0) if group == "placeholder" else BuildingAO.mesh(group, key)
+			e.mi.material_override = null if group == "placeholder" else _material(owners[i])
 	for id in _nodes.keys():
 		if not seen.has(id):
 			_nodes[id].mi.queue_free()
@@ -147,6 +155,57 @@ func frame(dt: float, _alpha: float) -> void:
 		_props.rebuild(_prop_buildings(B))
 	else:
 		_props.update_fog()
+
+## (sim/civ) The model type drawn for a sim type: its own when exported, else
+## the stand-in its def names (an Egyptian type before its model exists), else
+## "" (a placeholder block). Kept per type.
+func _model_type(type: String) -> String:
+	if _model_of.has(type):
+		return _model_of[type]
+	var m := type
+	if VoxelModels.info("buildings", type + "/0").is_empty():
+		m = str(game.sim.get_building_def(type).get("stand_in", ""))
+		if m != "" and VoxelModels.info("buildings", m + "/0").is_empty():
+			m = ""
+	_model_of[type] = m
+	return m
+
+## (sim/civ) A sandstone block on the footprint (Monuments: a stepped plinth
+## and a dark statue block, the Obelisk a tall gilt-tipped needle): reads as
+## "an Egyptian building with no model yet", never as a Greek one.
+func _placeholder(w: int, h: int, type: String, done: bool) -> Mesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var sand := Color(0.83, 0.72, 0.52)
+	var dark := Color(0.2, 0.18, 0.16)
+	var gold := Color(0.85, 0.68, 0.25)
+	var boxes := []
+	if type == "obelisk":
+		boxes = [[Vector3(0.7, 0.3, 0.7), 0.0, sand], [Vector3(0.36, 3.2, 0.36), 0.3, sand], [Vector3(0.22, 0.4, 0.22), 3.5, gold]]
+	elif type.begins_with("monument"):
+		boxes = [[Vector3(w * 0.9, 0.35, h * 0.9), 0.0, sand], [Vector3(w * 0.6, 0.3, h * 0.6), 0.35, gold], [Vector3(w * 0.35, 1.2 + w * 0.4, h * 0.35), 0.65, dark]]
+	else:
+		boxes = [[Vector3(w * 0.9, 1.6, h * 0.9), 0.0, sand]]
+	var k := 1.0 if done else 0.35
+	for b in boxes:
+		var size: Vector3 = b[0]
+		var c: Color = b[2]
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(size.x, size.y * k, size.z)
+		var arr := mesh.get_mesh_arrays()
+		var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		var norms: PackedVector3Array = arr[Mesh.ARRAY_NORMAL]
+		var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX]
+		for j in idx:
+			st.set_color(c)
+			st.set_normal(norms[j])
+			st.add_vertex(verts[j] + Vector3(0, float(b[1]) * k + size.y * k * 0.5, 0))
+	var out := st.commit()
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.roughness = 0.9
+	out.surface_set_material(0, mat)
+	return out
 
 ## The building list the prop layout needs, with the temple's temenos rect
 ## (town.js sets bld_temenos when it laid the two-step platform out; the sim
