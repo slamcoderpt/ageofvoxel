@@ -154,7 +154,7 @@ void EnemyAI::research(int tc, const std::vector<int> &vills, const std::vector<
 		return;
 	}
 	if (par.armory_at <= 0 || p.age < 1 || saving) return;
-	choose_gods();
+	if (!egypt()) choose_gods(); // (Greek minor gods; an Egyptian has none to take yet)
 	int armory = -1, market = -1, temple = -1, academy = -1;
 	bool armory_any = false, market_any = false;
 	for (int b : buildings) {
@@ -166,7 +166,7 @@ void EnemyAI::research(int tc, const std::vector<int> &vills, const std::vector<
 			market_any = true;
 			if (market < 0 && B.built[b]) market = b;
 		} else if (t == B_TEMPLE && temple < 0 && B.built[b]) temple = b;
-		else if (t == B_BARRACKS && academy < 0 && B.built[b]) academy = b;
+		else if ((t == B_BARRACKS || t == B_EG_BARRACKS) && academy < 0 && B.built[b]) academy = b; // (sim/civ: an Egyptian's Barracks)
 	}
 	// no saving with a small army or foes in the town: the men first
 	int men = 0;
@@ -210,7 +210,7 @@ void EnemyAI::research(int tc, const std::vector<int> &vills, const std::vector<
 		if (academy < 0 || (!heroic_due && ((int)vills.size() < par.armory_at || since_classical < par.armory_delay))) return;
 		const bool fort_done = !(par.walls && ring_state_ != 3) && fort.towers >= par.towers_max;
 		if (!heroic_due && par.fort_first && !fort_done && since_classical < par.armory_delay + par.fort_cap) return; // (the fortifications first)
-		const Cost &c = building_def(B_ARMORY).cost;
+		const Cost c = build_cost(B_ARMORY); // (sim/civ: an Egyptian's is free)
 		if (!p.can_afford(c)) save_for(1000 + B_ARMORY, c);
 		else if (try_build(B_ARMORY, pick_builder(vills), tc)) techs.armories++;
 		return;
@@ -236,8 +236,11 @@ void EnemyAI::research(int tc, const std::vector<int> &vills, const std::vector<
 		}
 	}
 	// 2. the Market
-	if (!market_any && par.market_age <= 3 && p.age >= par.market_age && armory >= 0 && S.time - armory_up_at_ >= par.market_delay) {
-		const Cost &c = building_def(B_MARKET).cost;
+	// (sim/civ: an Egyptian's Market is free and turns its idle wood into the gold
+	// everything of its costs: it builds one in the Classical Age, every difficulty but Easy)
+	const int market_age = egypt() && par.market_age <= 3 ? 1 : par.market_age;
+	if (!market_any && market_age <= 3 && p.age >= market_age && armory >= 0 && S.time - armory_up_at_ >= par.market_delay) {
+		const Cost c = build_cost(B_MARKET);
 		if (!p.can_afford(c)) save_for(1000 + B_MARKET, c);
 		else if (try_build(B_MARKET, pick_builder(vills), tc)) techs.markets++;
 	}
@@ -333,8 +336,11 @@ void EnemyAI::trade(int market, int32_t tc_id, const Cost *goal) {
 			if (p.res[r] < want(r) && buy(r, want(RES_GOLD) + TRADE_KEEP)) return;
 	}
 	// a food / wood glut, gold short: sell it; a gold glut, food / wood short: buy
-	for (int r : TRADED)
-		if (p.res[r] > par.trade_glut && p.res[RES_GOLD] < par.trade_glut * 0.5 && sell(r)) return;
+	for (int r : TRADED) {
+		// (an Egyptian: wood is for its Slingers and Chariot Archers alone: beyond 400 it goes for gold)
+		const double glut = egypt() && r == RES_WOOD ? 400 : par.trade_glut;
+		if (p.res[r] > glut && p.res[RES_GOLD] < par.trade_glut * 0.5 && sell(r)) return;
+	}
 	if (p.res[RES_GOLD] > par.trade_glut) {
 		const int r = p.res[RES_FOOD] <= p.res[RES_WOOD] ? RES_FOOD : RES_WOOD;
 		if (p.res[r] < TRADE_LOW) buy(r, par.trade_glut * 0.5);

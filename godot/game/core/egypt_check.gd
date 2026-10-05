@@ -203,7 +203,7 @@ func _build_time(sim: Object, b: int, max_s := 200.0) -> float:
 
 func _run() -> void:
 	var t0 := Time.get_ticks_msec()
-	for c in ["defs", "match", "economy", "carry", "units", "pop", "limits", "pharaoh", "priest", "gods", "auras", "set", "civcosts", "locks", "determinism", "rules_off"]:
+	for c in ["defs", "match", "economy", "carry", "units", "pop", "limits", "pharaoh", "priest", "gods", "auras", "set", "civcosts", "ages", "locks", "ai", "determinism", "rules_off"]:
 		if _want(c):
 			call("_case_" + c)
 	result["ms"] = Time.get_ticks_msec() - t0
@@ -1764,6 +1764,126 @@ func _case_civcosts() -> void:
 	ok = ok and _near(r["toxotes arrow on a laborer"], 7 * (1 - 0.2625), 0.01) and r["drop sites LOS"] == [5.4, 5.4, 5.4]
 	ok = ok and r["barracks / siege works LOS"] == [5.4, 5.4]
 	_check("civcosts.laborer_armor_los", ok, r)
+
+# ages: what each civ may build in which age; the age-ups ---------------------------------
+
+## EGYPT.md 2: the Egyptian Sentry Tower and Stone Wall / Gate are Classical (this
+## sim's Greeks build both in the Archaic Age): can_build, place_building and the
+## build menu's min_age refuse them in the Archaic Age, nothing paid; from the
+## Classical Age the tower goes up for 200 gold in Retold's 80 s. The age-ups are
+## the same for both civs (EGYPT.md 1.8), this sim's Greek ones.
+func _case_ages() -> void:
+	var r := {}
+	var sim := _fresh("zeus", "ra", seed_arg, 0)
+	var lb := _u(sim, "laborer", 2, 6.0, 0.0)
+	var vl := _u(sim, "villager", 1, -6.0, 0.0)
+	sim.tick(1)
+	var row := {}
+	for t in ["tower", "wall", "gate", "house", "farm", "granary"]:
+		row[t] = [sim.can_build(2, t).get("reason", "") if not bool(sim.can_build(2, t).ok) else "ok", int(sim.get_building_def(t, 2).min_age)]
+	r["egyptian archaic [can_build, min_age]"] = row
+	r["greek archaic tower / wall"] = [sim.can_build(1, "tower").ok, sim.can_build(1, "wall").ok, int(sim.get_building_def("tower", 1).min_age)]
+	var g0: float = _res(sim, 2).gold
+	var placed := int(sim.place_building("tower", 2, C.x + 8, C.y - 8, PackedInt32Array([lb])))
+	r["egyptian archaic place tower"] = placed
+	r["gold paid"] = _r(g0 - _res(sim, 2).gold)
+	var pw: Dictionary = sim.plan_wall(2, Vector2i(C.x + 2, C.y + 12), Vector2i(C.x + 10, C.y + 12))
+	r["egyptian archaic plan_wall"] = pw.reason
+	var ok: bool = row.tower == ["Requires Classical Age", 1] and row.wall == ["Requires Classical Age", 1] and row.gate == ["Requires Classical Age", 1]
+	ok = ok and row.house[0] == "ok" and row.farm[0] == "ok" and row.granary[0] == "ok"
+	ok = ok and r["greek archaic tower / wall"] == [true, true, 0] and placed == 0 and _near(r["gold paid"], 0.0) and str(pw.reason) == "Requires Classical Age"
+	var gt := int(sim.place_building("tower", 1, C.x - 10, C.y - 8, PackedInt32Array([vl])))
+	r["greek archaic place tower"] = gt
+	ok = ok and gt > 0
+	# Classical: allowed, 200 gold, Retold's 80 s for one Laborer
+	sim.set_player_age(2, 1)
+	r["egyptian classical can_build tower / wall"] = [sim.can_build(2, "tower").ok, sim.can_build(2, "wall").ok]
+	g0 = _res(sim, 2).gold
+	var w0: float = _res(sim, 2).wood
+	var t2 := int(sim.place_building("tower", 2, C.x + 8, C.y - 8, PackedInt32Array([lb])))
+	r["egyptian classical tower paid [w, g]"] = [_r(w0 - _res(sim, 2).wood), _r(g0 - _res(sim, 2).gold)]
+	var bt := _build_time(sim, t2, 120.0) if t2 > 0 else -1.0
+	r["egyptian classical tower build s"] = _r(bt, 1)
+	ok = ok and r["egyptian classical can_build tower / wall"] == [true, true] and t2 > 0 and r["egyptian classical tower paid [w, g]"] == [0.0, 200.0] and _near(bt, 80.0, 3.0)
+	_check("ages.tower_walls", ok, r)
+
+	# the age-ups: the same for both civs (EGYPT.md 1.8 "the same as the Greeks'"):
+	# this sim's (the browser's) Classical 400 f with no Temple, Heroic 800 f + 500 g
+	# with an Armory or a Market, Mythic 1000 f + 1000 g (Retold 1200 + 1200), the
+	# Egyptians' Mythic needing a Migdol Stronghold
+	r = {}
+	ok = true
+	for g in ["zeus", "ra"]:
+		var costs := []
+		var reasons := []
+		for age in [0, 1, 2]:
+			var s2 := _fresh(g, "zeus", seed_arg, age)
+			costs.append(s2.next_age_cost(1))
+			var a: Dictionary = s2.advance_age(1)
+			reasons.append("ok" if bool(a.ok) else str(a.reason))
+		r[g] = {"next age costs (from Archaic, Classical, Heroic)": costs, "advance with no Temple / Armory / Migdol": reasons}
+		ok = ok and reasons[0] == "ok" and reasons[1] == "Requires an Armory or a Market"
+		ok = ok and reasons[2] == ("Requires a Migdol Stronghold" if g == "ra" else "ok")
+	ok = ok and JSON.stringify(r.zeus["next age costs (from Archaic, Classical, Heroic)"]) == JSON.stringify(r.ra["next age costs (from Archaic, Classical, Heroic)"])
+	_check("ages.age_ups", ok, r)
+
+# the enemy AI on an Egyptian seat ------------------------------------------------------------
+
+## A sim-only hard-AI match, zeus vs ra (the critic's seed 5), 12 minutes: the
+## Egyptian AI trains Laborers, puts up its drop sites, a Monument (favor), its
+## Barracks, reaches the Classical Age, trains Egyptian soldiers, sends its Pharaoh
+## to empower, never a Greek type; the same match twice gives the same units hash.
+func _ai_match(minutes: int) -> Dictionary:
+	var sim: Object = ClassDB.instantiate("AovSim")
+	sim.set_godot_rules(true)
+	var ps := [{"id": 1, "name": "P1", "human": false, "team": 1, "god": "zeus", "ai": "hard"}, {"id": 2, "name": "P2", "human": false, "team": 2, "god": "ra", "ai": "hard"}]
+	sim.start_match({"seed": 5, "map_size": 160, "preset": "skirmish", "resources": "standard", "players": ps})
+	sim.set_record_events(true)
+	var names: PackedStringArray = sim.unit_type_names()
+	var trained := {}
+	var built := {}
+	var empowered := 0
+	var max_labs := 0
+	for k in minutes * 6:
+		sim.tick(10 * FPS)
+		for e in sim.take_events():
+			if int(e.get("owner", 0)) != 2:
+				continue
+			if e.type == "unit:trained" or e.type == "unit:spawned":
+				var t := str(e.get("a", ""))
+				if t.is_valid_int() and int(t) < names.size():
+					t = names[int(t)]
+				trained[t] = int(trained.get(t, 0)) + 1
+			elif e.type == "building:completed":
+				var bt := str(e.get("a", ""))
+				if bt.is_valid_int():
+					bt = sim.building_type_names()[int(bt)]
+				built[bt] = int(built.get(bt, 0)) + 1
+		max_labs = maxi(max_labs, _units_of(sim, 2, "laborer").size())
+		for ph in _units_of(sim, 2, "pharaoh"):
+			if str(sim.get_unit(ph).get("order", "")) == "empower":
+				empowered += 1
+	var p: Dictionary = sim.get_player(2)
+	var ai: Dictionary = sim.get_ai(2)
+	return {"hash": sim.units_hash(), "age": int(p.age), "pop": int(p.pop), "max laborers": max_labs, "trained": trained, "built": built,
+		"pharaoh empowering (samples)": empowered, "favor made": _r(float(sim.get_civ_state(2).get("favor_made", 0.0)), 1),
+		"villagers / storehouses": [_units_of(sim, 2, "villager").size(), _buildings_of(sim, 2, "storehouse").size() + _buildings_of(sim, 2, "barracks").size()],
+		"town centers": _buildings_of(sim, 2, "town_center").size(), "waves": ai.get("waves", []).size(), "classical at": _r(float(ai.techs.classical_at), 0),
+		"greek pop": int(sim.get_player(1).pop)}
+
+func _case_ai() -> void:
+	var a := _ai_match(12)
+	var b := _ai_match(12)
+	var soldiers := 0
+	for t in ["spearman", "axeman", "slinger"]:
+		soldiers += int(a.trained.get(t, 0))
+	var ok: bool = int(a["max laborers"]) >= 20 and int(a.age) >= 1 and a["town centers"] >= 1 and soldiers >= 5
+	for t in ["granary", "lumber_camp", "mining_camp", "monument_villagers", "eg_barracks", "house"]:
+		ok = ok and int(a.built.get(t, 0)) >= 1
+	ok = ok and a["villagers / storehouses"] == [0, 0] and int(a["pharaoh empowering (samples)"]) > 0 and float(a["favor made"]) > 0 and int(a.pop) >= 10
+	ok = ok and a.hash == b.hash
+	a["soldiers trained"] = soldiers
+	_check("ai.egyptian_seat", ok, {"run": a, "same hash twice": a.hash == b.hash})
 
 # determinism ------------------------------------------------------------------------------
 

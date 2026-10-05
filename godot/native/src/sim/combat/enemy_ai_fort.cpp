@@ -127,13 +127,13 @@ void EnemyAI::fortify(int tc, const std::vector<int> &vills, const std::vector<i
 			towers++;
 			rising += !B.built[b];
 		}
-		academy = academy || (B.type[b] == B_BARRACKS && B.built[b]);
+		academy = academy || ((B.type[b] == B_BARRACKS || B.type[b] == B_EG_BARRACKS) && B.built[b]); // (sim/civ: an Egyptian's Barracks)
 	}
 	const int nv = (int)vills.size();
 	// towers, one at a time, once the army has its academy
 	want_gold_ = tower_wait_ = false;
 	if (towers < par.towers_max && !rising && academy && nv >= par.tower_at && (!saving || par.army_while_saving)) {
-		const Cost &c = building_def(B_TOWER).cost;
+		const Cost c = build_cost(B_TOWER); // (sim/civ: an Egyptian's 200 gold)
 		want_gold_ = p.res[RES_GOLD] < c.v[RES_GOLD] + 20;
 		if (p.res[RES_WOOD] >= c.v[RES_WOOD] + 60 && p.res[RES_GOLD] >= c.v[RES_GOLD] + 20) {
 			if (!build_tower(tc, vills, false)) tower_fail_++;
@@ -256,7 +256,8 @@ bool EnemyAI::tower_spot(int tc, int k, int &otx, int &otz) const {
 bool EnemyAI::build_tower(int tc, const std::vector<int> &vills, bool instant) {
 	Sim &S = *sim;
 	Player &p = S.players[owner];
-	const Cost &c = building_def(B_TOWER).cost;
+	const Cost c = build_cost(B_TOWER);
+	if (egypt() && !S.civs.can_build(owner, B_TOWER)) return false; // (sim/civ: an Egyptian's towers are Classical)
 	const int builder = instant ? -1 : pick_builder(vills);
 	if ((!instant && builder < 0) || !p.can_afford(c)) return false;
 	int tx = 0, tz = 0;
@@ -520,7 +521,7 @@ void EnemyAI::ring_gates(bool instant) {
 	Sim &S = *sim;
 	BuildingStore &B = S.entities.buildings;
 	Player &p = S.players[owner];
-	const Cost &gc = building_def(B_GATE).cost;
+	const Cost gc = build_cost(B_GATE); // (sim/civ: an Egyptian's in gold)
 	bool all = true;
 	for (AIGateGap &g : gaps_) {
 		if (g.state >= 2) continue;

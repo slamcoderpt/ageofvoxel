@@ -967,7 +967,7 @@ Dictionary AovSim::get_building_def(const String &type, int64_t owner) const {
 	d["walkable"] = b.walkable;
 	d["worship"] = b.worship;
 	d["hotkey"] = b.hotkey;
-	d["min_age"] = b.min_age;
+	d["min_age"] = sim_.godot_rules ? aov::civ_building_min_age(civ, t) : b.min_age; // (sim/civ: the Egyptians' Classical towers / walls)
 	d["variants"] = b.variants;
 	civ_building_def(t, civ, d); // (Godot-only, sim/civ)
 	return d;

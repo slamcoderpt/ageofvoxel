@@ -30,6 +30,7 @@ static const int STORE_MAX = 4;            // ... storehouses at most
 static const double FOOD_GLUT = 1500;      // Godot-only: food beyond this (wood / gold short): fewer farmers
 static const double STRAY_DIST = 30;      // idle soldiers this far from our Town Center rejoin the attack
 static const int OVERDUE_MIN = 6;         // men an overdue wave needs at least
+static const double EG_FIRST_WAVE = 300;  // Godot-only, an Egyptian seat: s past its Classical Age before its first wave
 
 const char *ai_difficulty_name(int d) {
 	static const char *n[] = { "easy", "moderate", "hard", "titan" };
@@ -193,8 +194,12 @@ void EnemyAI::update(double dt) {
 	BuildingStore &B = E.buildings;
 	Player &p = S.players[owner];
 	std::vector<int> vills, army, buildings;
+	// (Godot-only, sim/civ: an Egyptian seat plays its own civ: Laborers, drop
+	// sites, Monuments for favor, its Barracks and Migdol, the Pharaoh empowering)
+	const bool eg = egypt();
 	for (int r = 0; r < U.size(); r++) {
 		if (U.removed[r] || U.owner[r] != owner || U.dead[r]) continue;
+		if (eg && U.type[r] == U_PHARAOH) continue; // (he empowers: egypt_pharaoh)
 		(unit_def(U.type[r]).gatherer ? vills : army).push_back(r);
 	}
 	for (int b = 0; b < B.size(); b++)
@@ -223,8 +228,9 @@ void EnemyAI::update(double dt) {
 	const bool saving = S.godot_rules ? escrow_item_ >= 2000 && escrow_item_ < 2004
 			: p.age < 1 && !p.advancing && has_age_cost && nv >= 16 && S.time >= 300 && S.time < 540 && !p.can_afford(age_cost);
 	// 1. villagers
-	if ((S.godot_rules ? escrow_item_ < 0 || nv < (p.age == 0 ? par.archaic_villagers : saving ? 12 : 30) || escrow_allows(unit_def(U_VILLAGER).cost) : !saving) && nv < (S.godot_rules ? par.villagers_rules : par.max_villagers) && (int)B.queue[tc].size() < par.villager_queue)
-		S.economy.train(tc, U_VILLAGER);
+	const int worker = eg ? U_LABORER : U_VILLAGER;
+	if ((S.godot_rules ? escrow_item_ < 0 || nv < (p.age == 0 ? par.archaic_villagers : saving ? 12 : 30) || escrow_allows(unit_def(worker).cost) : !saving) && nv < (S.godot_rules ? par.villagers_rules : par.max_villagers) && (int)B.queue[tc].size() < par.villager_queue)
+		S.economy.train(tc, worker);
 	int counts[3] = { 0, 0, 0 };
 	std::vector<int> by_type[3];
 	for (int v : vills)
@@ -247,6 +253,15 @@ void EnemyAI::update(double dt) {
 		sh[RES_WOOD] = std::min(sh[RES_WOOD], 1 - sh[RES_FOOD] - sh[RES_GOLD]);
 		sh[RES_FOOD] = 1 - sh[RES_WOOD] - sh[RES_GOLD];
 	}
+	// (Godot-only, sim/civ: gold is an Egyptian's wood: its Farms, Town Centers,
+	// Temple, Barracks, Migdol, towers and most soldiers cost gold; wood only its
+	// Slingers and Chariot Archers: a few hands in the woods)
+	if (eg) {
+		const double f = par.food_share > 0 ? par.food_share : 0.5;
+		sh[RES_WOOD] = p.res[RES_WOOD] > 300 ? 0.04 : 0.12;
+		sh[RES_GOLD] = p.res[RES_GOLD] > 1200 ? 0.15 : 1 - f - sh[RES_WOOD];
+		sh[RES_FOOD] = 1 - sh[RES_WOOD] - sh[RES_GOLD];
+	}
 	// (Godot-only: what it saves for lacks gold: more hands on gold, for
 	// every difficulty; enemy_ai_techs.cpp)
 	if (S.godot_rules && tech_gold_ && sh[RES_GOLD] < 0.3) {
@@ -264,7 +279,7 @@ void EnemyAI::update(double dt) {
 	// (Godot-only: from the Classical Age farms, houses and towers all want
 	// wood while it saves food and gold for the next age: a fifth of the
 	// hands in the woods at least while it is short)
-	if (S.godot_rules && p.age >= 1 && p.res[RES_WOOD] < 150 && sh[RES_WOOD] < 0.2) {
+	if (S.godot_rules && !eg && p.age >= 1 && p.res[RES_WOOD] < 150 && sh[RES_WOOD] < 0.2) {
 		const double take = 0.2 - sh[RES_WOOD];
 		sh[RES_WOOD] = 0.2;
 		if (sh[RES_FOOD] - take >= 0.3) sh[RES_FOOD] -= take;
@@ -325,17 +340,28 @@ void EnemyAI::update(double dt) {
 	if (p.pop_cap - p.pop < par.house_margin && p.pop_cap < 300 && !building(B_HOUSE)) try_build(B_HOUSE, pick_builder(vills), tc);
 	// 3. military
 	int academy = -1, temple_any = -1, temple = -1, academy2 = -1;
+	// (an Egyptian: the Barracks from the Classical Age, a Migdol Stronghold, its
+	// second military building, from the Heroic Age: the Mythic Age needs one)
+	const int ACAD = eg ? B_EG_BARRACKS : B_BARRACKS, ACAD2 = eg ? B_MIGDOL : B_BARRACKS;
 	for (int b : buildings) {
-		if (academy >= 0 && academy2 < 0 && B.type[b] == B_BARRACKS) academy2 = b;
-		if (academy < 0 && B.type[b] == B_BARRACKS) academy = b;
+		if (eg ? academy2 < 0 && B.type[b] == ACAD2 : academy >= 0 && academy2 < 0 && B.type[b] == ACAD2) academy2 = b;
+		if (academy < 0 && B.type[b] == ACAD) academy = b;
 		if (temple_any < 0 && B.type[b] == B_TEMPLE) temple_any = b;
 		if (temple < 0 && B.type[b] == B_TEMPLE && B.built[b]) temple = b;
 	}
-	if (academy < 0 && nv >= par.academy_at) try_build(B_BARRACKS, pick_builder(vills), tc);
-	if (temple_any < 0 && nv >= par.temple_at) try_build(B_TEMPLE, pick_builder(vills), tc);
-	if (par.academy2_at > 0 && academy >= 0 && academy2 < 0 && temple_any >= 0 && nv >= par.academy2_at && !building(B_BARRACKS))
+	if (academy < 0 && nv >= par.academy_at && (!eg || p.age >= 1)) try_build(ACAD, pick_builder(vills), tc);
+	if (temple_any < 0 && nv >= par.temple_at && (!eg || p.age >= 1)) try_build(B_TEMPLE, pick_builder(vills), tc); // (an Egyptian's gold goes to Laborers' Farms first)
+	if (eg) {
+		// (the Migdol: every difficulty that goes past the Heroic Age, or the Mythic Age never comes)
+		if (academy >= 0 && academy2 < 0 && p.age >= 2 && !building(B_MIGDOL)) try_build(B_MIGDOL, pick_builder(vills), tc);
+	} else if (par.academy2_at > 0 && academy >= 0 && academy2 < 0 && temple_any >= 0 && nv >= par.academy2_at && !building(B_BARRACKS))
 		try_build(B_BARRACKS, pick_builder(vills), tc);
 	static const int PICK[4] = { U_HOPLITE, U_TOXOTES, U_HOPLITE, U_HIPPIKON };
+	// (Egyptian: the Barracks' Spearmen (vs cavalry), Slingers (vs infantry), Axemen
+	// (vs infantry, heroes); the Migdol's Camel Riders, Chariot Archers, War Elephants)
+	static const int EPICK[4] = { U_SPEARMAN, U_SLINGER, U_AXEMAN, U_SPEARMAN };
+	static const int EPICK2[4] = { U_CAMEL_RIDER, U_CHARIOT_ARCHER, U_CAMEL_RIDER, U_WAR_ELEPHANT };
+	const int *pick_a = eg ? EPICK : PICK, *pick_b = eg ? EPICK2 : PICK;
 	// (Godot-only: with an army at home, the wood for the next stretch of wall / the next tower comes first)
 	int home = 0; // (soldiers by the Town Center: a wave out does not count)
 	if (S.godot_rules)
@@ -346,16 +372,40 @@ void EnemyAI::update(double dt) {
 	// for: an AI saving for its next age with one spearman at home was
 	// overrun by the first wave and lost half its villagers)
 	const bool guard_short = (int)army.size() < par.guard;
-	const int pick1 = PICK[(int64_t)std::floor(S.time / 7) % 4], pick2 = PICK[((int64_t)std::floor(S.time / 7) + 1) % 4];
+	const int pick1 = pick_a[(int64_t)std::floor(S.time / 7) % 4], pick2 = pick_b[((int64_t)std::floor(S.time / 7) + 1) % 4];
 	if (academy >= 0 && B.built[academy] && (int)B.queue[academy].size() < par.army_queue && (!saving || par.army_while_saving) && !walls_first &&
 			(!S.godot_rules || guard_short || escrow_allows(unit_def(pick1).cost)))
 		S.economy.train(academy, pick1);
 	if (academy2 >= 0 && B.built[academy2] && (int)B.queue[academy2].size() < par.army_queue && (!saving || par.army_while_saving) && !walls_first &&
 			(!S.godot_rules || guard_short || escrow_allows(unit_def(pick2).cost)))
 		S.economy.train(academy2, pick2);
-	if (temple >= 0 && p.age >= 1 && B.queue[temple].size() < 1 && (!S.godot_rules || escrow_allows(unit_def(U_MINOTAUR).cost))) S.economy.train(temple, U_MINOTAUR);
-	// worshippers
-	if (temple >= 0) {
+	if (eg) {
+		// (an Egyptian Temple trains Priests: two from the Heroic Age, healers that go with the waves)
+		if (temple >= 0 && p.age >= 2 && B.queue[temple].empty() && S.civs.count_type(owner, U_PRIEST) < 2 && escrow_allows(unit_def(U_PRIEST).cost) &&
+				p.res[RES_GOLD] >= unit_def(U_PRIEST).cost.v[RES_GOLD] + 100)
+			S.economy.train(temple, U_PRIEST);
+		// (foes at its town, its camps out by the woods and mines: the men at home go
+		// at them; at the Town Center with no soldier at all (none before the
+		// Classical Age), Mercenaries, the Egyptians' stopgap, Retold)
+		int threat = -1;
+		for (int b : buildings)
+			if (!is_wall_piece(B.type[b]) && S.combat.find_enemy_near(B.x[b], B.z[b], owner, 14) >= 0) { threat = b; break; }
+		if (threat >= 0) {
+			// (a few, at the Town Center itself, no soldier left, gold to spare: they
+			// decay, and its Farms and Barracks want the gold more)
+			if (army.empty() && threat == tc && S.civs.count_type(owner, U_MERCENARY) < 3 && p.res[RES_GOLD] >= 200 && B.queue[tc].size() < 3)
+				S.economy.train(tc, U_MERCENARY);
+			std::vector<int> def;
+			for (int u : army)
+				if ((U.order_type[u] == O_IDLE || (U.order_type[u] == O_ATTACK && (U.order_b[u] & ATK_AUTO))) && jsm::hypot(U.x[u] - B.x[threat], U.z[u] - B.z[threat]) < 45)
+					def.push_back(u);
+			if (!def.empty()) S.commands.move(def, B.x[threat], B.z[threat], O_ATTACK_MOVE);
+		}
+		egypt_monuments(tc, vills, buildings);
+		egypt_pharaoh(tc, buildings);
+	} else if (temple >= 0 && p.age >= 1 && B.queue[temple].size() < 1 && (!S.godot_rules || escrow_allows(unit_def(U_MINOTAUR).cost))) S.economy.train(temple, U_MINOTAUR);
+	// worshippers (an Egyptian's Laborers never worship: favor from its Monuments)
+	if (temple >= 0 && !eg) {
 		int worshipping = 0;
 		for (int v : vills) worshipping += U.order_type[v] == O_WORSHIP;
 		// Godot-only: never more than a quarter of the villagers at prayer (a
@@ -387,7 +437,10 @@ void EnemyAI::update(double dt) {
 		S.economy.advance_age(owner);
 
 	// Godot-only: a storehouse by a wood line / mine far from every drop-off
-	if (S.godot_rules) storehouses(tc, vills, buildings);
+	if (S.godot_rules) {
+		if (eg) egypt_camps(tc, vills, buildings);
+		else storehouses(tc, vills, buildings);
+	}
 	// Godot-only: a foundation nobody builds any more gets a villager
 	if (S.godot_rules) finish_sites(vills, buildings);
 	// Godot-only: the Armory, the Market, their techs and the Temple's, the
@@ -406,7 +459,12 @@ void EnemyAI::update(double dt) {
 	// Godot-only: a wave overdue by a whole interval (the army cannot grow to
 	// wave_size: a starved economy, a population cap) goes with what there is
 	const bool overdue = S.godot_rules && S.time >= next_wave_at + 120 / aggression && (int)idle_army.size() >= OVERDUE_MIN;
-	if (S.time >= next_wave_at && ((int)idle_army.size() >= wave_size || overdue)) {
+	// (an Egyptian has no soldiers before its Barracks, in the Classical Age: its
+	// first wave waits five minutes past it, and its waves are a third bigger:
+	// its men cost less and are 1 pop, the Greek town has its towers by then)
+	const bool eg_early = eg && (techs.age_at[1] < 0 || S.time < techs.age_at[1] + EG_FIRST_WAVE);
+	const int need_men = eg ? wave_size + wave_size / 3 : wave_size;
+	if (S.time >= next_wave_at && !eg_early && ((int)idle_army.size() >= need_men || overdue)) {
 		// (Godot-only: a weak wave keeps clear of enemy towers, see enemy_ai_fort.cpp)
 		const int t = S.godot_rules ? pick_target(tc, (int)idle_army.size(), overdue) : find_target(tc);
 		if (t >= 0) {
@@ -599,7 +657,7 @@ bool EnemyAI::assign(int v, int res, int tc, const std::vector<int> &buildings) 
 			if (kv.first == fid) first = kv.second;
 		if (first < 0) farm_tries_.push_back({ fid, first = S.time });
 		if (S.time - first > 90) {
-			S.players[owner].refund(building_def(B_FARM).cost);
+			S.players[owner].refund(egypt() ? build_cost(B_FARM) : building_def(B_FARM).cost);
 			S.buildings.destroy(fid);
 			farm_tries_.erase(std::remove_if(farm_tries_.begin(), farm_tries_.end(), [&](const std::pair<int32_t, double> &kv) { return kv.first == fid; }), farm_tries_.end());
 			return false;
@@ -727,8 +785,9 @@ int EnemyAI::find_target(int tc) const {
 bool EnemyAI::try_build(int type, int builder, int tc) {
 	Sim &S = *sim;
 	Player &p = S.players[owner];
-	const Cost cost = S.godot_rules ? rules_building_cost(type) : building_def(type).cost; // (Godot-only: Retold's Temple, sim/techs)
+	const Cost cost = egypt() ? build_cost(type) : S.godot_rules ? rules_building_cost(type) : building_def(type).cost; // (Godot-only: Retold's Temple, sim/techs; an Egyptian's own costs, sim/civ)
 	if (builder < 0 || !p.can_afford(cost)) return false;
+	if (egypt() && !S.civs.can_build(owner, type)) return false; // (sim/civ: its civ's types, ages, limits)
 	// (Godot-only: what it saves for stays in the bank: no farm or storehouse
 	// out of the Armory's wood; houses and the saved-for building itself go on)
 	if (S.godot_rules && type != B_HOUSE && escrow_item_ != 1000 + type && !escrow_allows(cost)) return false;
@@ -767,6 +826,132 @@ bool EnemyAI::gap_ok(int tx, int tz, int w, int h) const {
 		for (int x = tx - 1; x <= tx + w; x++)
 			if (!map.is_walkable(x, z)) return false;
 	return true;
+}
+
+// ---- an Egyptian seat (Godot-only, sim/civ) ---------------------------------------
+
+bool EnemyAI::egypt() const { return sim->godot_rules && sim->civs.civ(owner) == CIV_EGYPT; }
+
+Cost EnemyAI::build_cost(int type) const { return egypt() ? sim->civs.cost(owner, type) : building_def(type).cost; } // (a Greek: the def's, as before)
+
+static const double EG_CAMP_FAR = 9;  // a node worked this far from every drop site of its kind gets a camp
+static const int EG_CAMP_MAX = 4;     // camps of each kind at most
+
+// Laborers drop food only at a Granary, wood at a Lumber Camp, gold at a
+// Mining Camp (or the Town Center): a free camp goes up by every food / wood /
+// gold node worked away from one, as Retold's AI does (one rising at a time).
+void EnemyAI::egypt_camps(int, const std::vector<int> &vills, const std::vector<int> &buildings) {
+	Sim &S = *sim;
+	Entities &E = S.entities;
+	const UnitStore &U = E.units;
+	const BuildingStore &B = E.buildings;
+	const ResourceStore &R = E.resources;
+	store_t_ -= par.think;
+	if (store_t_ > 0) return;
+	store_t_ = STORE_EVERY;
+	static const int CAMP[3] = { B_GRANARY, B_LUMBER_CAMP, B_MINING_CAMP };
+	int have[3] = { 0, 0, 0 };
+	for (int b : buildings)
+		for (int k = 0; k < 3; k++)
+			if (B.type[b] == CAMP[k]) {
+				if (!B.built[b]) return; // (one going up)
+				have[k]++;
+			}
+	Player &p = S.players[owner];
+	for (int res = RES_FOOD; res <= RES_GOLD; res++) {
+		const int type = CAMP[res];
+		const Cost c = build_cost(type);
+		if (have[res] >= EG_CAMP_MAX || !p.can_afford(c) || !S.civs.can_build(owner, type)) continue;
+		int first = -1, rs = -1;
+		for (int v : vills) {
+			if (U.order_type[v] != O_GATHER || U.econ_res_type[v] != res) continue;
+			const int s = E.resource_slot(U.order_target[v]);
+			if (s < 0) continue; // (a farm: by the Town Center)
+			const int32_t d = S.economy.nearest_dropoff(owner, R.x[s], R.z[s], res);
+			const int ds = d ? E.building_slot(d) : -1;
+			if (ds >= 0 && jsm::hypot(B.x[ds] - R.x[s], B.z[ds] - R.z[s]) < EG_CAMP_FAR) continue;
+			first = v;
+			rs = s;
+			break;
+		}
+		if (first < 0) continue;
+		const BuildingDef &def = building_def(type);
+		const double rx = R.x[rs], rz = R.z[rs];
+		for (int r = 2; r <= 8; r++)
+			for (int i = 0; i < 16; i++) {
+				const double a = PI * 2 * i / 16;
+				const int tx = (int)std::floor(rx + jsm::cos(a) * r) - def.w / 2, tz = (int)std::floor(rz + jsm::sin(a) * r) - def.h / 2;
+				if (!S.buildings.can_place(type, tx, tz) || !gap_ok(tx, tz, def.w, def.h) || reserved(tx, tz, def.w, def.h)) continue;
+				p.pay(c);
+				const int b = S.buildings.spawn(type, owner, tx, tz, false);
+				if (b < 0) return;
+				S.commands.order(first, Order::with_target(O_BUILD, B.id[b]));
+				fort.storehouses++;
+				return;
+			}
+	}
+}
+
+// Favor: the five Monuments, in order, one rising at a time: the first once a
+// few Laborers work, then one more per age (all five in the Mythic Age), each
+// with something left over for the army and the next age.
+void EnemyAI::egypt_monuments(int tc, const std::vector<int> &vills, const std::vector<int> &buildings) {
+	Sim &S = *sim;
+	const BuildingStore &B = S.entities.buildings;
+	monument_t_ -= par.think;
+	if (monument_t_ > 0) return;
+	monument_t_ = 5;
+	int have = 0;
+	for (int b : buildings)
+		if (is_monument(B.type[b])) {
+			if (!B.built[b]) return;
+			have++;
+		}
+	const Player &p = S.players[owner];
+	const int allowed = p.age >= 3 ? MONUMENT_COUNT : p.age + 1;
+	if (have >= allowed || (int)vills.size() < 8) return;
+	const int type = B_MONUMENT_VILLAGERS + have;
+	const Cost c = build_cost(type);
+	for (int k = 0; k < RES_COUNT; k++)
+		if (c.has[k] && p.res[k] < c.v[k] + 75) return;
+	try_build(type, pick_builder(vills), tc);
+}
+
+// The Pharaoh empowers (O_EMPOWER): a rising Town Center / Temple / Barracks /
+// Migdol / Armory / Market / Monument first (+75 % build), else a military
+// building training (+75 %), else one researching, else the Granary (+20 % food
+// dropped), else the Town Center. He fights back what attacks him.
+void EnemyAI::egypt_pharaoh(int tc, const std::vector<int> &buildings) {
+	Sim &S = *sim;
+	const UnitStore &U = S.entities.units;
+	const BuildingStore &B = S.entities.buildings;
+	int ph = -1;
+	for (int r = 0; r < U.size() && ph < 0; r++)
+		if (!U.removed[r] && !U.dead[r] && U.owner[r] == owner && U.type[r] == U_PHARAOH) ph = r;
+	if (ph < 0) return;
+	if (U.order_type[ph] == O_ATTACK && S.combat.find_enemy_near(U.x[ph], U.z[ph], owner, 10) >= 0) return;
+	auto pick = [&](auto pred) {
+		int best = -1;
+		double bd = INFINITY;
+		for (int b : buildings) {
+			if (!pred(b)) continue;
+			const double d = jsm::hypot(B.x[b] - B.x[tc], B.z[b] - B.z[tc]);
+			if (d < bd) { bd = d; best = b; }
+		}
+		return best;
+	};
+	auto big = [&](int t) {
+		return t == B_TOWN_CENTER || t == B_TEMPLE || t == B_EG_BARRACKS || t == B_MIGDOL || t == B_ARMORY || t == B_MARKET || is_monument(t);
+	};
+	int t = pick([&](int b) { return !B.built[b] && big(B.type[b]) && jsm::hypot(B.x[b] - B.x[tc], B.z[b] - B.z[tc]) < 30; });
+	if (t < 0) t = pick([&](int b) { return B.built[b] && (B.type[b] == B_EG_BARRACKS || B.type[b] == B_MIGDOL) && !B.queue[b].empty(); });
+	if (t < 0) t = pick([&](int b) { return B.built[b] && !B.tech_queue[b].empty(); });
+	if (t < 0) t = pick([&](int b) { return B.built[b] && B.type[b] == B_GRANARY; });
+	if (t < 0) t = tc;
+	const int32_t id = B.id[t];
+	if (U.order_type[ph] == O_EMPOWER && U.order_target[ph] == id) return;
+	S.commands.order(ph, Order::with_target(O_EMPOWER, id));
+	pharaoh_on_ = id;
 }
 
 } // namespace aov

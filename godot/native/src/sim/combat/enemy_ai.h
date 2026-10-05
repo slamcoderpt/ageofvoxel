@@ -190,6 +190,14 @@ private:
 	void use_powers(const std::vector<int> &army, const std::vector<int> &buildings);
 	std::vector<uint8_t> reach_; // scratch: cells in reach of our army / base
 	void storehouses(int tc, const std::vector<int> &vills, const std::vector<int> &buildings); // Godot-only
+	// Godot-only, an Egyptian seat (sim/civ): drop sites by the nodes worked, the Monuments, the Pharaoh's empower
+	bool egypt() const;
+	Cost build_cost(int type) const; // what a building costs this owner (civ, god)
+	void egypt_camps(int tc, const std::vector<int> &vills, const std::vector<int> &buildings);
+	void egypt_monuments(int tc, const std::vector<int> &vills, const std::vector<int> &buildings);
+	void egypt_pharaoh(int tc, const std::vector<int> &buildings);
+	int32_t pharaoh_on_ = 0;    // the building the Pharaoh was last sent to empower
+	double monument_t_ = 0;     // s until the next Monument check
 	void finish_sites(const std::vector<int> &vills, const std::vector<int> &buildings); // Godot-only
 	double site_t_ = 0;         // s until the next abandoned-foundation check
 	double store_t_ = 0;        // s until the next storehouse check

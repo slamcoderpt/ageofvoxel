@@ -2140,6 +2140,56 @@ techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
   upgrades and Levy / Conscript techs, relics, the Egyptian minor gods,
   their god powers and myth units (other pieces'); the wild animals other than
   deer and boar (this sim has only those two to convert).
+- **Ages per civ** (`civ_building_min_age`, `EGYPT_TOWER_AGE`,
+  `EGYPT_WALL_AGE`): EGYPT.md 2 puts the Egyptian Sentry Tower and the Stone
+  Wall / Gate in the Classical Age, so an Egyptian cannot build a tower, a
+  wall, a pillar or a gate in the Archaic Age: `can_build` says "Requires
+  Classical Age", `place_building` returns 0 and takes nothing, `plan_wall`
+  refuses as before, and `get_building_def(type, owner)`'s `min_age` (and
+  `by_civ.egyptian.min_age`) is 1, so the build menu greys them out. From the
+  Classical Age his tower is 200 g and 80 s for one Laborer. The Greeks keep
+  this sim's Archaic towers and walls. The enemy AI's towers go through the
+  same gate (`EnemyAI::build_tower`).
+- **Age-ups**: EGYPT.md 1.8 gives the Egyptians "the same age-up costs and
+  requirements as the Greeks'", so they take this sim's Greek age-ups, which
+  are the browser's and not Retold's: the Classical Age is 400 f with no
+  Temple needed (Retold: a Temple), the Heroic 800 f + 500 g with an Armory
+  or a Market (as Retold), the Mythic 1000 f + 1000 g (Retold 1200 + 1200)
+  with, for an Egyptian, a Migdol Stronghold (Retold's fortress prerequisite;
+  the Greeks here need none). Times 60 / 75 / 120 s for both. Moving either
+  civ to Retold's Temple and Mythic price would change how the Greeks play
+  today, so both civs keep the browser's. `egypt_check` `ages.age_ups`
+  measures both civs' `next_age_cost` and `advance_age` refusals.
+- **The enemy AI on an Egyptian seat** (`combat/enemy_ai*.cpp`, behind
+  `EnemyAI::egypt()`; a Greek seat plays exactly as before): it trains
+  Laborers at the Town Center; puts up a free Granary / Lumber Camp / Mining
+  Camp by each food / wood / gold node worked 9 tiles or more from a drop
+  site of its kind (`egypt_camps`, up to 4 each, one rising at a time); its
+  workers go 50-55 % on food, ~40 % on gold and ~12 % on wood (gold is an
+  Egyptian's wood: Farms, Temple, Barracks, Migdol, towers and most
+  soldiers cost gold); builds the Monuments in order for its favor (the
+  first once 8 Laborers work, then one more per age, all five in the Mythic
+  Age; `egypt_monuments`) and never sends anyone to worship; builds its
+  Barracks and Temple from the Classical Age and a Migdol in the Heroic Age
+  (its Mythic Age needs one); trains Spearmen / Slingers / Axemen at the
+  Barracks and Camel Riders / Chariot Archers / War Elephants at the Migdol,
+  two Priests from the Heroic Age; sends the Pharaoh to empower a rising
+  big building, else a training Barracks / Migdol, else a building
+  researching, else a Granary, else the Town Center (`egypt_pharaoh`; he is
+  kept out of the waves); with foes at its buildings sends its idle men
+  there and, with no soldier at the Town Center, hires up to 3 Mercenaries;
+  launches its first wave 5 min past its Classical Age, its waves a third
+  bigger than a Greek's; builds a free Market in the Classical Age and sells
+  wood beyond 400 for gold; all its costs, ages and limits are its civ's
+  (`EnemyAI::build_cost`, `Civs::can_build`). Measured (sim-only, hard vs
+  hard, 45 min): zeus vs ra seed 5 the Egyptian is still up at 45 min
+  (before: no Laborer trained, nothing built, wiped out by minute 7);
+  over seeds 3-17 it lasts 20-45 min against the Greek AI but does not beat
+  it yet; Egyptian vs Egyptian (isis vs set) runs 45 min with 40-80 pop a
+  side. `egypt_check` `ai.egyptian_seat`: in 12 minutes of the seed-5 match
+  it trains 38 Laborers, builds every drop site, two Monuments, Barracks,
+  Temple, Armory, Market, a tower and walls, reaches the Classical Age,
+  trains 22 soldiers, the Pharaoh empowers, no Greek type; twice the same hash.
 - **Scene `egypt`** (`sim/civ/egypt_scene.cpp`, entry in
   `game/core/scenes.gd`): player 1 Egyptian (Ra, Mythic) at the first start,
   Laborers at a Lumber Camp (empowered by the Pharaoh), a Mining Camp and a
@@ -2169,7 +2219,7 @@ laborer_cap, home_tc}), `get_civ_fx()` ({heals: [healer, target]*,
 empowers: [unit, building]*, empower_strength}), `get_building_def(type,
 owner = 0)` (owner > 0: his civ's cost and trains; plus civ, stand_in,
 armor, by_civ {greek|egyptian: {cost, trains, build_time for one builder}},
-monument / favor_per_min), `get_unit_def(type)` (plus civ, hack_armor,
+monument / favor_per_min; by_civ also has min_age and limit), `get_unit_def(type)` (plus civ, hack_armor,
 pierce_armor, stand_in, retold, mapping, limit, heal, decay, by_age),
 `get_player(id)` (plus civ, civ_id); `get_civ_state` also gives `god`,
 `empower_favor`, `mandjet` ([{id, type, by}]), `shields` ([{id, x, z,

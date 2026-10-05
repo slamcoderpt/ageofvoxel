@@ -110,6 +110,7 @@ void AovSim::civ_building_def(int t, int civ, Dictionary &d) const {
 		for (const int *u = aov::civ_trains(c, t); *u >= 0; u++) tr.push_back(aov::unit_def(*u).key);
 		e["trains"] = tr;
 		if (const int lim = aov::civ_building_limit(c, t)) e["limit"] = lim;
+		e["min_age"] = aov::civ_building_min_age(c, t); // (the Egyptians' Classical towers and walls)
 		// one builder's time: a Laborer works at 0.75 (the Obelisk: a Priest, 1)
 		const double bt = aov::civ_build_time(c, t) > 0 ? aov::civ_build_time(c, t) : aov::building_def(t).build_time; // (Retold's Egyptian base times)
 		e["base_build_time"] = bt;

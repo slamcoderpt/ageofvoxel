@@ -199,6 +199,14 @@ Cost civ_wall_piece_cost(int civ, int type, int tiles) {
 	return Cost(0, 0, tiles >= WALL_SEGMENT_MAX ? 15 : tiles >= 2 ? 9 : 6, 0);
 }
 
+int civ_building_min_age(int civ, int btype) {
+	const int a = building_def(btype).min_age;
+	if (civ != CIV_EGYPT) return a;
+	if (btype == B_TOWER) return std::max(a, EGYPT_TOWER_AGE);
+	if (is_wall_piece(btype) || btype == B_GATE) return std::max(a, EGYPT_WALL_AGE);
+	return a;
+}
+
 double civ_build_time(int civ, int btype) {
 	if (civ != CIV_EGYPT) return 0;
 	switch (btype) { // Retold's base times (a Laborer: x4/3: 200 / 13.33 / 80 s)
@@ -518,7 +526,8 @@ bool Civs::can_build(int owner, int btype, std::string *why) const {
 	if (!civ_has_building(c, btype)) return no(std::string("The ") + civ_name(c) + " cannot build a " + building_def(btype).name);
 	if (!rules()) return true;
 	const int age = owner > 0 && owner < MAX_PLAYERS ? sim->players[owner].age : 0;
-	if (age < building_def(btype).min_age) return no(std::string("Requires ") + AGES[building_def(btype).min_age] + " Age");
+	const int min_age = civ_building_min_age(c, btype); // (the Egyptians' Classical towers and walls)
+	if (age < min_age) return no(std::string("Requires ") + AGES[min_age] + " Age");
 	const int lim = civ_building_limit(c, btype);
 	if (lim > 1) { // (the Monuments' one each: below, with their order)
 		const BuildingStore &B = sim->entities.buildings;

@@ -49,6 +49,11 @@
 //   as the myth units, whose pop this sim does not halve). Ranged units stand and
 //   shoot (no kiting) whatever the civ: at equal cost infantry that reaches them
 //   wins (toxotes vs hoplites, Slingers or Chariot Archers vs Spearmen / Axemen).
+//   Ages (civ_building_min_age, EGYPT.md 2): an Egyptian's Sentry Tower and walls /
+//   gates are Classical (the Greeks build both in the Archaic Age here); the age-ups
+//   are the same for both civs (EGYPT.md 1.8), so the Egyptians take this sim's Greek
+//   ones: Classical 400 f with no Temple, Heroic 800 f + 500 g with an Armory or a
+//   Market, Mythic 1000 f + 1000 g (Retold 1200 + 1200) with, for them, a Migdol.
 //   Building limits (civ_building_limit, Retold): one of each Monument, 15 Migdols.
 //   The shared types' Retold limits (House 16, Sentry Tower 30, one TC in the
 //   Archaic Age) are not applied: this sim's Greeks have none and keep playing as today.
@@ -209,6 +214,11 @@ double civ_fort_tech_time(int civ, int tech);
 // (long, WALL_SEGMENT_MAX) 15 g. has = false: not Egyptian (the per-tile price)
 constexpr int EGYPT_WALL_AGE = 1;
 Cost civ_wall_piece_cost(int civ, int type, int tiles);
+// the age a civ may build a type from (rules on): the def's min_age, but for an Egyptian
+// the Sentry Tower and the walls / gates come in the Classical Age (EGYPT.md 2: Sentry
+// Tower Classical, Stone Wall / Gate Classical; this sim's Greeks build both Archaic)
+constexpr int EGYPT_TOWER_AGE = 1;
+int civ_building_min_age(int civ, int btype);
 // Egyptian base build times of the shared types where Retold differs from this sim's Greek
 // one (Town Center 150, Farm 10, Sentry Tower 60); 0 = the def's
 double civ_build_time(int civ, int btype);
