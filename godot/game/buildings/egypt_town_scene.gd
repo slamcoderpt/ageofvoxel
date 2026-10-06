@@ -29,7 +29,8 @@ extends RefCounted
 const LAYOUT := [
 	["town_center", -3, -3, {}],
 	["temple", -2, -15, {}],
-	["obelisk", -4, -6, {}], ["obelisk", 3, -6, {}], ["obelisk", -5, 4, {}], ["obelisk", 5, 4, {}],
+	# one pair of obelisks flanking the temple's entrance (not in the streets)
+	["obelisk", -3, -9, {}], ["obelisk", 3, -9, {}],
 	# the west quarter: two rows of houses on their lanes, a lane's width apart
 	# so every house stands on its own plinth line
 	["house", -19, -8, {"variant": 1}], ["house", -15, -8, {"variant": 0}], ["house", -11, -8, {"variant": 2}],
@@ -116,6 +117,7 @@ static func scene_setup(game: Node) -> Dictionary:
 	var focus_type := str(game.args.get("egt_focus", ""))
 	var focus := Vector2(cx + 0.5, cz + 2.0)
 	var focus_size := 0.0
+	var house_k := 0
 	for l in lots:
 		var type: String = l[0]
 		var T: Dictionary = EgyptBuildingsRef.types().get(type, {})
@@ -133,6 +135,11 @@ static func scene_setup(game: Node) -> Dictionary:
 		if use_sim and names.has(type) and not ex.has("key"):
 			var id: int = sim.spawn_building(type, 1, tx, tz, true)
 			if id > 0:
+				if type == "house":
+					# the town shows all six house plans in turn (in a match
+					# the sim's variant and the lot pick one)
+					view.model_override[id] = "house/%d/a%d" % [house_k % 6, 2 if age >= 2 else 1]
+					house_k += 1
 				continue
 		var e := {"type": type, "owner": 1, "x": center.x, "z": center.y, "age": age, "god": god, "variant": int(ex.get("variant", 0))}
 		if ex.has("key"):

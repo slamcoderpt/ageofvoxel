@@ -1418,6 +1418,50 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   (`outStair()`). The sim has three house variants: `egypt_buildings.gd`
   draws plan `variant + 3 x ((x * 7 + z * 13) mod 2)` of the lot's tile, so
   a row of houses mixes all six.
+- **Houses, round 24** (a town of near-identical tan battered blocks that
+  dissolved into the sand): `house(v)` rebuilt on `hbox()` (a house block
+  with vertical walls, no batter: the battered pylon look stays with the
+  temples, camps and barracks). Every house block has a dark mud-brick dado
+  (`MUDB`, 3 rows), walls in a lime whitewash (`HWHITE`, a touch cool in
+  the albedo) or a warm ochre plaster (`HOCHRE`), a painted band of two clean
+  stripes (red over green on white houses, blue over red on ochre ones, a
+  pale fillet between), a shadowed row under a strong three-row cavetto (two
+  rows of painted leaves flaring one and two voxels out: blue on white
+  houses, green / red on ochre ones, then a pale limestone lip); white roofs
+  (`HROOF_W`) or dark mud roofs with reed-mat patches (`HROOF_M`), no
+  outline on the deck; wooden-grille windows; the owner's colour on the door
+  lintels and on striped team / linen roof shades (`clothShade()`). Six
+  functions, six silhouettes: 0 a courtyard house (two-storey back block with
+  a parapeted roof terrace under a striped shade, a one-storey wing, a walled
+  paved court with a painted gate, a palm and jars); 1 a potter's workshop
+  (an ochre hall open at the front behind a portico of three painted papyrus
+  columns `hcolumn()`, a bench of drying pots, a wheel, a beehive kiln with a
+  glowing stoke hole, a woodpile); 2 a terrace house (tall white block, an
+  upper room with a wind-catcher, a parapeted terrace with a striped shade,
+  balcony beams); 3 a loggia house (ochre, an open roof pavilion on four
+  painted columns over a rug, a palm-trunk awning); 4 a wide low white house
+  with a jar stack on its roof and a palm awning over a woodpile; 5 a tall
+  white block with a wind-catcher beside a low ochre block whose terrace is
+  reached by an outside mud-brick stair. Archaic: the same plans in mud
+  brick under thatch with mud cornices. The lot hash in `egypt_buildings.gd`
+  is now `((x * 92837111) ^ (z * 689287499)) >> 4 & 1` (the old `x * 7 + z
+  * 13` parity gave a whole row the same half); `egypt_town` overrides its
+  houses to cycle all six plans (`model_override`). The grade's sandstone
+  pass creams any pale neutral, so the houses separate from the sand by
+  value and paint (white roofs above the ground's value, ochre walls, dark
+  dados and mud roofs below it), not by a pure white.
+- **Roof outlines removed** (round 24): `block()`'s `rim` now defaults to
+  `false` (no owner's-colour line round a roof deck on the Town Center,
+  Granary, Barracks, camps, Migdol towers); the Barracks, pylon, Market
+  portico and Siege Works deck lines are gone too (the Siege Works' team
+  line moved to its colonnade architrave, a vertical face). The Granary's
+  store is ochre sandstone with a lapis band and a blue / red cavetto and a
+  team banner on its roof. The Market's three stalls have flat blue-and-linen
+  canopies on thin posts at chest height (`clothAwning()`, a voxel of sag, a
+  hem) instead of the stepped voxel awnings, a blue painted cavetto on the
+  hall, an ochre pier, a team banner on the portico. In `egypt_town` the
+  obelisks are one pair flanking the temple's entrance (no more obelisks in
+  the street grid).
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8
@@ -1426,8 +1470,8 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   warm chroma limiter still takes half of any gold's chroma, so the golds
   read by value against the dark basalt, not by saturation.
 - **Canvas awnings** (`clothAwning()`: houses, camps, the Town Center, the
-  Siege Works; the Market and Armory keep the voxel `awning()` with team
-  stripes): a smooth two-sided sheet drawn by `clothSkin()` (half-voxel
+  Siege Works, the Market since round 24; the Armory keeps the voxel
+  `awning()` with team stripes): a smooth two-sided sheet drawn by `clothSkin()` (half-voxel
   quads in `m.skin`, like the battered walls), not voxel slats. It runs from
   a timber batten on the wall, sloping `drop` voxels to the front, bellied
   along its run and sagging (`sag`, ~1 voxel) in the middle of every span

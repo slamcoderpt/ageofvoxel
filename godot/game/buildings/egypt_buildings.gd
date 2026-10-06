@@ -174,7 +174,7 @@ func from_buildings(B: Dictionary, names: PackedStringArray) -> void:
 		if type == "house":
 			# six house plans from the sim's three variants: the lot picks the half
 			var rr: PackedInt32Array = B.rect
-			vv += 3 * posmod(rr[i * 4] * 7 + rr[i * 4 + 1] * 13, 2)
+			vv += 3 * ((((rr[i * 4] * 92837111) ^ (rr[i * 4 + 1] * 689287499)) >> 4) & 1)
 		var key := model_key(type, vv, B.built[i] != 0, float(B.progress[i]), int(P.age), str(P.god))
 		if model_override.has(id):
 			key = str(model_override[id])
