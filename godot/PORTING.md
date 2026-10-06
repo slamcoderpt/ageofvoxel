@@ -1342,7 +1342,10 @@ same channel names, plus:
   hoplite's thrust variants and battle-line guards / the swordsman's overhead
   slash), `sling` (archer family: the sling whirls over the head and is let go
   overarm; arms down at rest), `serpent` (medusa family without arms: the
-  hood rears and strikes), `chariot`, `staff`; `gait` / `stride` (four-legged
+  hood rears and strikes), `chariot`, `staff`, `mount` (horse family, round
+  14: the Camel Rider's and Mercenary Cavalry's riders keep their elbows in
+  with both forearms bent forward, the left fist at the reins, the weapon
+  carried forward; Greek rigs never set it); `gait` / `stride` (four-legged
   walk frequency / amplitude x the horse's: elephant 0.55 / 0.6, camel 0.75,
   crocodile 0.7 / 0.55); `hover` (flyers, rig voxels); `graze: false` (horse /
   centaur kinds: no head-down grazing dip at idle, for harnessed and ridden
@@ -1676,6 +1679,22 @@ node scripts/godot-shoot.mjs --scene egypt_units --out shots/godot/egypt_units.p
                                       # (eu_one=chariot_archer&eu_turn=30&eu_zoom=0.62 + these: the archer close)
 node scripts/export-egypt-units.mjs   # re-export godot/assets/models/egypt_units.{json,bin.gz}
 ```
+
+Mounts (round 14): the camel's saddle cloth is a narrow drape over the hump
+(z 6..15 at the hem, only the seat z 8..13 on top, so the hump's tan fore and
+aft slopes, the rump, shoulders and lower flanks stay bare), one voxel proud of
+the hide, ending at mid-barrel well above the elbows: a white linen field, two
+team rows, one gold trim row, a red / ochre fringe flaring a voxel further with
+tassels on every other column. The rider's legs (`riderLegs`, half voxels) run
+from the seat forward over the hump front to a knee and hang down the flank,
+the feet below the fringe; a narrow team scarf over a gold edge at the throat.
+The chariot horse's blanket is Retold's deep red with ochre / cream stripes, an
+ochre two-stripe spine and a dark leather / ochre fringe, the bridle dark
+leather, so the white head and neck break from the cloth in value; the
+Mercenary Cavalry's cloth is narrow too (z 8..13, team / cream stripes, a
+silver row, two-tone fringe) over the rider's linen-kilted legs. `stripedBlanket`
+takes `spine` and `hem: [a, b]` for that. Close views:
+`--params "eu_one=camel_rider&eu_turn=90&eu_zoom=1.2&eu_ax=-0.6&eu_az=-1.3&eu_pitch=18"`.
 
 ## Walls, gates, towers: placement (game/ui)
 

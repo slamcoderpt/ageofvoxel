@@ -16,7 +16,7 @@ namespace {
 constexpr double PI = 3.14159265358979323846;
 enum Kind { K_HUMAN, K_ARCHER, K_BEAST, K_HORSE, K_CENTAUR, K_MEDUSA, K_FLYER, K_SIEGE };
 // rig "pose" (scripts/export-egypt-units.mjs): a variant of the kind's motion
-enum Pose { P_NONE, P_SPEAR, P_SLASH, P_SLING, P_SERPENT, P_CHARIOT, P_STAFF };
+enum Pose { P_NONE, P_SPEAR, P_SLASH, P_SLING, P_SERPENT, P_CHARIOT, P_STAFF, P_MOUNT };
 
 // pose channels (anim names of src/units/models.js)
 enum Ch {
@@ -146,7 +146,7 @@ AovUnitView::Rig AovUnitView::parse_rig(const Dictionary &R, int t) {
 		: kind == "flyer" ? K_FLYER : kind == "siege" ? K_SIEGE : K_HUMAN;
 	const String pose = R.get("pose", "");
 	rig.pose = pose == "spear" ? P_SPEAR : pose == "slash" ? P_SLASH : pose == "sling" ? P_SLING : pose == "serpent" ? P_SERPENT
-		: pose == "chariot" ? P_CHARIOT : pose == "staff" ? P_STAFF : P_NONE;
+		: pose == "chariot" ? P_CHARIOT : pose == "staff" ? P_STAFF : pose == "mount" ? P_MOUNT : P_NONE;
 	rig.gait = (float)(double)R.get("gait", 1.0);
 	rig.stride = (float)(double)R.get("stride", 1.0);
 	rig.hover = (float)(double)R.get("hover", 0.0);
@@ -492,6 +492,14 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 			set(CH_weapon, moving ? 0.9 : 0.25);
 		}
 		if (st != aov::A_DIE) { set(CH_armL, -0.75, 0.2, 0.25); set(CH_shield, 0.1, 1.1, 0); }
+		if (pose == P_MOUNT && st != aov::A_DIE) {
+			// (Egyptian riders, "mount") elbows in at the sides, both forearms
+			// bent forward: the left fist on the reins before the lap, the right
+			// carrying the weapon forward (raised and swung through when attacking)
+			set(CH_armL, -0.12, 0.1, 0.05); set(CH_foreL, -0.85);
+			if (!attacking) { set(CH_armR, moving ? -0.4 : -0.3, 0, -0.06); set(CH_foreR, -1.0); set(CH_weapon, moving ? 0.5 : 0.2); }
+			else set(CH_foreR, -0.35 - 0.4 * wind);
+		}
 		fwd_out = attacking ? (float)(0.25 * extend) : 0;
 		return bob;
 	};
