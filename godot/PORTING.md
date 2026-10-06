@@ -1199,6 +1199,38 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   construction stages leave it out. `--preview <type>[:variant]
   --preview-out f.json` dumps one model's voxels (insets included) without
   exporting, for a quick offline look.
+- **Statue anatomy and material, round 17** (`cleanStatue()`,
+  `polishStatue()`): the standing figures (`stride`, `stand`) are taller (kn
+  +6: the head about a seventh of the figure) and in the canonical pose: the
+  left leg (+x; the figure faces +z) a full foot forward and leaning (7 half
+  voxels at the foot, 0 at the hip), the right upright; each leg a long foot
+  with instep and toes, a narrow ankle (gold anklet proud), a shin with the
+  calf bulging back, a knee cap, a fuller thigh. The torso tapers from square
+  shoulders (half-width 8) through the chest (7, pectorals a voxel proud with
+  a shadow under them) to the waist (5, a navel); `side` arms hang free with a
+  rounded deltoid, a narrower wrist and a clenched fist holding a gold cloth
+  roll. The shendyt is gold with one-voxel diagonal pleat lines, a plain
+  apron (`CG_L` framed `CG_D`), a belt with a lapis buckle. Nemes, wigs and
+  the broad collar are in one-voxel bands, gold and lapis alternating (the
+  lappets 2 wide and 1 deep; the collar five rings and a bead row); a gold wig
+  (`wig: 'gold'`) alternates gold / dark gold and carries vulture wings.
+  `o.pillar = [x0, x1, top]` draws a back pillar (granite, a gold top line, a
+  gold / lapis column down its back) the figure is cut against; `crown:
+  'hedjet'` a round-sectioned gold white crown to a knob; `pose: 'dress'` a
+  queen in a gold sheath dress over bare granite shins (kn +4); `arms:
+  'embrace'` her near hand on the king's forearm. Monument to Pharaohs
+  (building_16) is now the striding king (nemes, hedjet, fists at his sides)
+  and the queen with one shared back pillar; the Monument to Priests'
+  figure stands against a pillar too. `polishStatue()` then gives every
+  statue voxel two or three value steps of its material from its exposure:
+  a highlight on sky-facing edges and vertical corners, a darker step in
+  recesses (every open face looking into a concave corner) and on faces
+  turned down, front faces shaded across the form like a polished cylinder
+  (lit third highlighted, the far side darker), sunlit gold tops a step down
+  so they stay gold, a faint two-tone grain on the granite. The Armory's two
+  blocks are battered (4 / 5 rows a step) under a flared two-row cavetto and
+  a pale lip, so the block behind the Monuments is no plain box. Look at
+  `--params "egt_row=monument_pharaohs/0/a1&egt_pitch=30&egt_lift=2.6&egt_dist=9&egt_yaw=20"`.
 - **Statue bodies, round 16** (`cleanStatue()`): golds deepened (`CG`
   0x9c6800, `CG_L` 0xb88400, `CG_D` 0x664200: brighter yellows wash to cream /
   tan under the scene's grade and haze) and every lapis inlay (nemes stripes,

@@ -2843,14 +2843,30 @@ function toClean(o) {
 function cleanStatue(m, cx, y0, cz, o = {}) {
   const { pose = 'stride', head = 'nemes', arms = 'side', kiltFront = TEAMB } = o;
   const kilt = o.kilt ?? GRAN;
-  const set = (x, y, z, c) => { m.set(cx + x, y0 + y, cz + z, c); const v = m.get(cx + x, y0 + y, cz + z); if (v) v.clean = 1; };
+  const touched = [];
+  const set = (x, y, z, c) => {
+    m.set(cx + x, y0 + y, cz + z, c);
+    const v = m.get(cx + x, y0 + y, cz + z);
+    if (v) { v.clean = 1; touched.push([cx + x, y0 + y, cz + z]); }
+  };
   const B = (xa, xb, ya, yb, za, zb, c) => {
     for (let x = xa; x < xb; x++) for (let y = ya; y < yb; y++) for (let z = za; z < zb; z++) set(x, y, z, typeof c === 'function' ? c(x, y, z) : c);
   };
   const S = (hw, ya, yb, za, zb, c) => B(-hw, hw, ya, yb, za, zb, c);
   const M = (xa, xb, ya, yb, za, zb, c) => { B(xa, xb, ya, yb, za, zb, c); B(-xb, -xa, ya, yb, za, zb, c); };   // mirrored pair
-  const kn = pose === 'kneel' ? -16 : 0;
-  const stripe = (x, y) => ((((y - kn) % 3) + 3) % 3 === 0 ? LAPIS_S : CG);
+  // the back pillar (o.pillar = [x0, x1, top]): a granite slab behind the
+  // figure(s) from the base to the shoulders, a gold top line, an inscribed
+  // gold column down its back; the figure is cut against it
+  if (o.pillar) {
+    const [pa, pb, pt] = o.pillar;
+    B(pa, pb, 0, pt, -8, -3, (x, y, z) => (y === pt - 1 ? CG_L : z === -8 && Math.abs(x - Math.round((pa + pb) / 2) + 0.5) < 2 && y > 3 && y < pt - 3 ? ((y % 3) ? CG : LAPIS_S) : GRAN));
+  }
+  // kn lifts the torso and head: down for the kneeling figure, up for the
+  // standing ones, whose legs and kilt are drawn longer (a head about a
+  // seventh of the figure, not a mannequin's quarter)
+  const kn = pose === 'kneel' ? -16 : pose === 'stride' || pose === 'stand' ? 6 : pose === 'dress' ? 4 : 0;
+  // one-voxel bands, gold and lapis alternating (a gold wig: gold / dark gold)
+  const stripe = o.wig === 'gold' ? (x, y) => ((y - kn) & 1 ? CG_D : CG) : (x, y) => ((y - kn) & 1 ? LAPIS_S : CG);
 
   // ---- the lower body
   if (pose === 'mummy') {
@@ -2865,74 +2881,129 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
       return g[j - 1][x + 2] === 'g' ? GRAN_D : CG;
     });
   } else if (pose === 'dress') {
-    // a sheath dress from the bust to the ankles: one tapering granite
-    // column (feet showing under the hem), a gold hem line
-    M(1, 5, 0, 2, -2, 5, GRAN);
-    for (let y = 2; y < 26; y++) S(5 + Math.floor((y - 2) / 9), y, y + 1, -3, 3, y === 3 ? CG : GRAN);
+    // a queen's sheath dress (building_16): bare granite feet and shins, a
+    // gold dress clinging from the ankles to under the bust (hips swelling,
+    // a waist, a gold hem), the shins together
+    M(1, 4, 0, 1, -2, 5, GRAN);                                // the feet
+    M(1, 4, 1, 2, -2, 3, GRAN);                                // insteps
+    for (let x = 1; x < 4; x += 2) { set(x, 0, 4, GRAN_D); set(-1 - x, 0, 4, GRAN_D); }   // toes
+    M(1, 4, 2, 9, -2, 2, GRAN);                                // the shins
+    M(1, 4, 4, 10, -3, -2, GRAN);                              // calves
+    if (o.anklets !== 0) M(1, 4, 2, 3, -2, 2, CG_L);           // anklets
+    for (let y = 9; y < 30 + kn; y++) {
+      const hw = y < 14 ? 4 : y < 20 ? 5 : y < 29 ? 6 : 5, zb = y < 20 ? -3 : -4, zf = y < 14 ? 2 : 3;
+      B(-hw, hw, y, y + 1, zb, zf + 1, () => (y === 9 ? CG_L : y === 10 ? CG_D : CG));
+    }
   } else if (pose === 'kneel') {
     M(1, 6, 0, 3, -7, 3, GRAN);                                // shins folded back
     M(1, 6, 3, 7, -4, 8, GRAN);                                // thighs forward to the knees
     S(7, 5, 9, -4, 4, (x) => (((x + 64) >> 1) & 1 ? GRAN_D : kilt));   // the pleated kilt over the lap
     S(7, 9, 10, -4, 5, CG_L);                                  // the belt
   } else {
-    // the legs: a shin narrowing to a gold ankle cuff (proud of the shin), a
-    // knee cap a voxel forward, the calf a voxel back, a fuller thigh
-    const f = pose === 'stride' ? 3 : 0;
+    // the legs in the canonical stride (building_15 / _16): the left leg
+    // (+x: the figure faces +z) set a full foot forward and leaning, the
+    // right one upright; each a long foot with an instep and toes, a narrow
+    // ankle, a shin with the calf bulging back, a knee cap, a fuller thigh
+    const f = pose === 'stride' ? 7 : 0;
     for (const sx of [-1, 1]) {
-      const xa = sx < 0 ? -6 : 1, xb = xa + 5;                 // the thigh's span
-      const sa = sx < 0 ? -5 : 1, sb = sa + 4;                 // the shin's (the inner edge kept straight)
-      const lean = (y) => (sx < 0 ? Math.round(f * (19 - y) / 19) : 0);
-      B(sa, sb, 0, 2, -3 + lean(0), 5 + lean(0), GRAN);       // the foot
-      B(sa, sb, 0, 1, 4 + lean(0), 5 + lean(0), GRAN_D);      // the toes' line
-      if (o.anklets) B(sa - (sx < 0 ? 1 : 0), sb + (sx > 0 ? 1 : 0), 2, 4, -3 + lean(2), 3 + lean(2), CG);   // the cuff, proud
-      for (let y = o.anklets ? 4 : 2; y < 10; y++) B(sa, sb, y, y + 1, -2 + lean(y), 2 + lean(y), GRAN);   // the shin
-      B(sa, sb, 5, 9, -3 + lean(7), -2 + lean(7), GRAN);       // the calf
-      B(sa, sb, 9, 12, 2 + lean(10), 3 + lean(10), GRAN_D);    // the knee cap
-      for (let y = 9; y < 18; y++) B(xa, xb, y, y + 1, -2 + lean(y), 2 + lean(y), GRAN);   // the thigh
+      const fw = sx > 0 ? f : 0;
+      const L = (y) => Math.round(fw * Math.max(0, 23 - y) / 23);
+      const X = (a, b, y, ya, yb, za, zb, c) => (sx > 0 ? B(a, b, ya, yb, za + L(y), zb + L(y), c) : B(-b, -a, ya, yb, za + L(y), zb + L(y), c));
+      X(1, 5, 0, 0, 1, -3, 6, GRAN);                           // the foot
+      X(1, 5, 0, 1, 2, -3, 3, GRAN);                           // the instep
+      for (let x = 1; x < 5; x += 2) X(x, x + 1, 0, 0, 1, 5, 6, GRAN_D);   // toes
+      X(2, 4, 2, 2, 4, -2, 1, GRAN);                           // the ankle
+      if (o.anklets) X(1, 5, 3, 3, 4, -3, 2, CG_L);           // an anklet, proud
+      for (let y = 4; y < 13; y++) X(1, 4, y, y, y + 1, -2, 2, GRAN);           // the shin
+      for (let y = 6; y < 11; y++) X(1, 4, y, y, y + 1, -3, -2, GRAN);          // the calf
+      for (let y = 13; y < 15; y++) X(1, 5, y, y, y + 1, -2, 2, GRAN);          // the knee
+      X(2, 4, 14, 13, 15, 2, 3, GRAN);                         // the knee cap
+      for (let y = 15; y < 23; y++) X(1, 6, y, y, y + 1, -3, 3, GRAN);          // the thigh
     }
-    // the shendyt: a stepped trapezoid flaring from the waist to the hem in
-    // alternating light / dark pleat columns, a dark hem line, the belt over it
-    const KL = kilt === GRAN ? GRAN : CG_L, KD = kilt === GRAN ? GRAN_D : CG_D;
-    for (let y = 16; y < 25; y++) {
-      const hw = y >= 23 ? 6 : y >= 20 ? 7 : 8, zf = y >= 23 ? 4 : y >= 19 ? 5 : 6;
-      B(-hw, hw, y, y + 1, -4, zf, (x) => (y === 16 ? KD : ((x + 64) >> 1) & 1 ? KD : KL));
+    // the shendyt (a gold kilt): a trapezoid flaring from the waist to the
+    // hem, its diagonal pleats in one-voxel lines, a dark hem line; the front
+    // apron a voxel proud, tapering, banded light / dark gold with a thin
+    // lapis edge, the belt and its buckle over it
+    const gk = kilt !== GRAN, KL = gk ? CG : GRAN, KD = gk ? CG_D : GRAN_D;
+    for (let y = 21; y < 31; y++) {
+      const hw = y >= 27 ? 6 : 7, zf = 5;
+      B(-hw, hw, y, y + 1, -4, zf, (x) => (y === 21 ? KD : ((x - (y >> 1) + 64) % 4 === 0 ? KD : KL)));
     }
-    // the apron: a tapered lapis panel hanging from the belt, a voxel proud,
-    // framed in gold, a dark gold fold down its centre (kiltFront: null for none)
-    if (kiltFront !== null) for (let y = 16; y < 25; y++) {
-      const hw = y >= 22 ? 2 : y >= 19 ? 3 : 4, zf = y >= 23 ? 4 : y >= 19 ? 5 : 6;
-      B(-hw, hw, y, y + 1, zf, zf + 1, (x) => (y === 16 || x === -hw || x === hw - 1 ? CG_L : (x === -1 || x === 0) && y > 17 ? CG_D : LAPIS_S));
+    if (kiltFront !== null) for (let y = 21; y < 31; y++) {
+      const hw = y >= 27 ? 2 : 3, zf = 5;
+      B(-hw, hw, y, y + 1, zf, zf + 1, (x) => (x === -hw || x === hw - 1 || y === 21 ? CG_D : CG_L));
     }
-    S(7, 25, 26, -4, 5, CG_L);                                 // the belt
-    B(-2, 2, 25, 26, 5, 6, CG_D);                              // its knot
+    S(6, 31, 32, -4, 5, CG_L);                                 // the belt
+    B(-2, 2, 31, 32, 5, 6, (x) => (x === -2 || x === 1 ? CG_L : LAPIS_S));   // the buckle
   }
-  // ---- the torso: waist, chest, shoulders
-  if (pose !== 'mummy') {
-    S(6, 26 + kn, 29 + kn, -3, 3, GRAN);
-    S(7, 29 + kn, 33 + kn, -3, 4, GRAN);
+  // ---- the torso
+  const male = pose === 'stride' || pose === 'stand';
+  if (male) {
+    // tapering from the shoulders to a waist: the waist, the ribs, the chest
+    // with the pectorals a voxel proud and a shadow line under them, square
+    // shoulders with the deltoids rounded over the arm
+    S(5, 26 + kn, 28 + kn, -3, 3, GRAN);
+    S(6, 28 + kn, 30 + kn, -3, 4, GRAN);
+    S(7, 30 + kn, 34 + kn, -3, 4, GRAN);
+    S(8, 34 + kn, 35 + kn, -3, 4, GRAN);
+    S(7, 35 + kn, 36 + kn, -3, 3, GRAN);
+    B(-6, -1, 30 + kn, 32 + kn, 4, 5, GRAN); B(1, 6, 30 + kn, 32 + kn, 4, 5, GRAN);   // pectorals
+    B(-1, 1, 27 + kn, 28 + kn, 2, 3, GRAN_D);                            // the navel
+  } else if (pose === 'dress') {
+    S(6, 30 + kn, 34 + kn, -3, 4, GRAN);
+    S(7, 34 + kn, 35 + kn, -3, 4, GRAN);
+    S(6, 35 + kn, 36 + kn, -3, 3, GRAN);
+    B(-5, -1, 29 + kn, 31 + kn, 4, 5, CG); B(1, 5, 29 + kn, 31 + kn, 4, 5, CG);    // the bust under the dress
+    S(5, 31 + kn, 32 + kn, -3, 4, CG_L);                                 // the dress's top edge
+  } else {
+    if (pose !== 'mummy') {
+      S(6, 26 + kn, 29 + kn, -3, 3, GRAN);
+      S(7, 29 + kn, 33 + kn, -3, 4, GRAN);
+    }
+    S(9, 33 + kn, 35 + kn, -3, 4, GRAN);
+    S(8, 35 + kn, 36 + kn, -3, 4, GRAN);
   }
-  S(9, 33 + kn, 35 + kn, -3, 4, GRAN);
-  S(8, 35 + kn, 36 + kn, -3, 4, GRAN);
-  // ---- the broad collar: three continuous one-voxel rings on the chest
-  for (let y = 29 + kn; y < 36 + kn; y++) for (let x = -8; x < 8; x++) {
-    const d = Math.hypot(x + 0.5, (36 + kn - y) * 1.2);
-    const c = d < 3.4 ? null : d < 4.5 ? CG_L : d < 5.6 ? LAPIS_S : d < 6.7 ? CG_L : null;
-    if (c) set(x, y, 4, c);
+  // ---- the broad collar: one-voxel rings, gold and lapis alternating, a
+  // bead row at the rim
+  for (let y = 30 + kn; y < 36 + kn; y++) for (let x = -8; x < 8; x++) {
+    const d = Math.hypot(x + 0.5, (36.3 + kn - y) * 1.25);
+    const r = [2.4, 3.3, 4.2, 5.1, 6.0, 6.8];
+    const c = d < r[0] || d >= r[5] ? null : d < r[1] ? CG_L : d < r[2] ? LAPIS_S : d < r[3] ? CG : d < r[4] ? LAPIS_S : ((x + 64) & 1 ? CG_L : CG_D);
+    if (c) set(x, y, male || pose === 'dress' ? 4 : 4, c);
   }
   // ---- arms
   if (arms === 'side') {
-    // arms hanging free of the body (a voxel of air between the arm and the
-    // chest / kilt): upper arm, the forearm a voxel forward from the elbow, a
-    // fist with a dark finger line, gold armlets and two-row cuffs
-    M(9, 12, 27, 35, -2, 2, GRAN);                             // the upper arms
-    M(9, 12, 21, 27, -1, 3, GRAN);                             // the forearms
-    M(9, 12, 17, 21, -1, 3, GRAN);                             // the fists
-    M(9, 12, 18, 19, 2, 3, GRAN_D);
-    M(9, 12, 31, 32, -2, 2, CG_L);                             // armlets
-    M(9, 12, 21, 23, -1, 3, CG_L);                             // cuffs
+    // hanging free of the body (air between the arm and the waist / kilt):
+    // a rounded deltoid, the upper arm, a narrower elbow, the forearm, a
+    // clenched fist holding a gold cloth roll (its end showing in front, the
+    // knuckles in a dark line), a gold armlet and bracelet
+    const xa = male ? 8 : 7, w = male ? 3 : 2;
+    M(xa, xa + w, 33 + kn, 35 + kn, -2, 3, GRAN);                        // the deltoid
+    M(xa, xa + w - 1, 35 + kn, 36 + kn, -2, 2, GRAN);
+    M(xa, xa + w, 27 + kn, 33 + kn, -2, 2, GRAN);                        // the upper arm
+    M(xa, xa + w, 21 + kn, 27 + kn, -1, 2, GRAN);                        // the forearm
+    M(xa, xa + w, 20 + kn, 21 + kn, -1, 1, GRAN);                        // the wrist
+    if (male) {
+      M(xa, xa + w, 16 + kn, 20 + kn, -2, 2, GRAN);                      // the fist
+      M(xa, xa + w, 17 + kn, 18 + kn, 1, 2, GRAN_D);                     // the knuckles' line
+      M(xa + 1, xa + 2, 16 + kn, 18 + kn, 2, 3, CG_L);                   // the roll's end
+    } else M(xa, xa + w, 15 + kn, 20 + kn, -1, 1, GRAN);                 // the open hand
+    M(xa, xa + w, 30 + kn, 31 + kn, -2, 2, CG_L);                        // armlets
+    M(xa, xa + w, 21 + kn, 22 + kn, -1, 2, CG_L);                        // bracelets
+  } else if (arms === 'embrace') {
+    // the queen: the far arm hanging, the near one (-x) reaching across to
+    // the king's arm, the hand resting on it in front
+    B(7, 9, 33 + kn, 35 + kn, -2, 3, GRAN); B(7, 9, 21 + kn, 33 + kn, -2, 2, GRAN); B(7, 9, 15 + kn, 21 + kn, -1, 1, GRAN);
+    B(7, 9, 30 + kn, 31 + kn, -2, 2, CG_L); B(7, 9, 21 + kn, 22 + kn, -1, 2, CG_L);
+    B(-9, -7, 33 + kn, 35 + kn, -2, 3, GRAN);                            // the near shoulder
+    B(-9, -7, 28 + kn, 33 + kn, -1, 3, GRAN);                            // the upper arm, angled forward
+    B(-10, -8, 26 + kn, 29 + kn, 1, 4, GRAN);                            // the elbow
+    B(-12, -9, 25 + kn, 27 + kn, 2, 4, GRAN);                            // the forearm across
+    B(-10, -9, 25 + kn, 27 + kn, 2, 4, CG_L);                            // the bracelet
+    B(-13, -11, 24 + kn, 27 + kn, 2, 4, GRAN);                           // the hand on his arm
   } else if (arms === 'crossed') {
     // forearms crossed on the chest as two plain blocks, the fists forward
-    if (pose !== 'mummy') M(9, 12, 28, 35, -2, 2, GRAN);       // upper arms
+    if (pose !== 'mummy') M(9, 12, 28 + kn, 35 + kn, -2, 2, GRAN);   // upper arms
     B(-5, 9, 27 + kn, 30 + kn, 4, 6, GRAN);
     B(-9, 5, 30 + kn, 33 + kn, 4, 6, GRAN);
     B(-8, -5, 27 + kn, 31 + kn, 4, 7, GRAN);                   // fists
@@ -2944,13 +3015,13 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     // under each as one flat panel: lapis coverts under the arm, a gold
     // line, then long primaries in gold / lapis stripes two voxels wide,
     // the lower edge sweeping down toward the hand
-    M(9, 19, 31, 34, -1, 2, GRAN);
-    M(15, 16, 31, 34, -1, 2, CG);                              // bracelets
+    M(9, 19, 31 + kn, 34 + kn, -1, 2, GRAN);
+    M(15, 16, 31 + kn, 34 + kn, -1, 2, CG);                              // bracelets
     for (let x = 9; x < 19; x++) {
       const bot = 21 - Math.floor((x - 9) * 0.9);
       for (let y = bot; y < 31; y++) {
         const c = y >= 28 ? ST_LAPIS : y === 27 ? CG_L : (Math.floor((x - 9) / 2) & 1 ? ST_LAPIS : CG);
-        set(x, y, 0, c); set(-1 - x, y, 0, c);
+        set(x, y + kn, 0, c); set(-1 - x, y + kn, 0, c);
       }
     }
   } else if (arms === 'pots') {
@@ -2995,9 +3066,20 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     const Y = kn;
     B(-5, 5, 37 + Y, 47 + Y, -4, -2, stripe);
     B(-5, -4, 38 + Y, 47 + Y, -4, 2, stripe); B(4, 5, 38 + Y, 47 + Y, -4, 2, stripe);
-    M(4, 7, 30 + Y, 42 + Y, 1, 4, stripe);
-    M(4, 7, 30 + Y, 31 + Y, 1, 4, CG);
-    if (head === 'wig') S(5, 46 + Y, 47 + Y, -4, 4, CG);       // a gold fillet
+    M(4, 6, 31 + Y, 42 + Y, 2, 4, stripe);
+    M(4, 6, 31 + Y, 32 + Y, 2, 4, CG_L);
+    if (head === 'wig') {
+      // the crown of the wig domed over the head, a gold fillet
+      S(5, 46 + Y, 47 + Y, -4, 4, CG_L);
+      S(4, 47 + Y, 48 + Y, -4, 3, stripe);
+      S(3, 48 + Y, 49 + Y, -3, 2, stripe);
+      S(2, 49 + Y, 50 + Y, -2, 1, stripe);
+      if (o.wig === 'gold') {
+        // the vulture headdress: wings down over the wig's sides, a vulture head at the brow
+        M(4, 6, 40 + Y, 47 + Y, -3, 3, (x, y) => ((y & 1) ? CG : CG_D));
+        B(-1, 1, 45 + Y, 48 + Y, 4, 5, CG_L);
+      }
+    }
   }
   if (head === 'falcon') {
     // Horus / Ra: a gold falcon's head as one block, a dark hooked beak, dark
@@ -3047,6 +3129,15 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     S(4, 48 + Y, 49 + Y, -3, 3, (x) => ((x & 1) ? ST_LAPIS : CG));
     B(-1, 1, 46 + Y, 48 + Y, 4, 5, CG);
   }
+  if (o.crown === 'hedjet') {
+    // the king's tall white crown cast in gold (building_16), rising out of
+    // the nemes to a round knob
+    // (round sections: a radius tapering from the brow to the knob)
+    for (let y = 49; y < 62; y++) {
+      const r = y < 59 ? 3.6 - (y - 49) * 0.15 : y === 59 ? 1.2 : 1.9;
+      for (let x = -4; x < 4; x++) for (let z = -4; z < 4; z++) if (Math.hypot(x + 0.5, z + 0.5) <= r) set(x, y + kn, z, CG);
+    }
+  }
   if (head === 'nemes') {
     const Y = kn;
     B(-5, 5, 46 + Y, 47 + Y, -4, 5, CG);                       // the brow band
@@ -3058,10 +3149,11 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     B(-2, 2, 31 + Y, 37 + Y, -4, -2, stripe);                  // the tail
     for (let y = 36; y < 46; y++) {                            // the wings flaring to the shoulders
       const w = 5 + Math.floor((46 - y) / 3);
-      M(5, w, y + Y, y + Y + 1, -3, 2, stripe);
+      M(5, w, y + Y, y + Y + 1, -3, 1, stripe);
     }
-    M(4, 7, 30 + Y, 41 + Y, 2, 5, stripe);                     // the lappets down the chest
-    M(4, 7, 30 + Y, 31 + Y, 2, 5, CG);
+    M(4, 6, 32 + Y, 41 + Y, 4, 5, stripe);                     // the lappets down the chest, thin
+    M(4, 6, 41 + Y, 42 + Y, 3, 5, stripe);
+    M(4, 6, 32 + Y, 33 + Y, 4, 5, CG_L);
     B(-1, 1, 47 + Y, 49 + Y, 5, 6, CG);                        // the uraeus
   } else if (head === 'double') {
     // the red crown (deshret) with its tall back plate, the white crown
@@ -3080,6 +3172,67 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     B(1, 2, 52 + Y, 53 + Y, 4, 5, CG);
     B(-1, 1, 47 + Y, 49 + Y, 5, 6, CG);                        // the uraeus
   }
+  polishStatue(m, touched);
+}
+// The statues' material ramp (round 17): every statue voxel takes one of
+// two or three value steps of its material from its exposure, so the black
+// granite reads as polished stone and the gold as metal: a highlight on
+// edges turned to the sky (an open top and an open side) and on vertical
+// corners, a darker step in recesses (every open face looking into a
+// concave corner: between the arms and the body, under the pectorals, the
+// belt and the kilt's hem, between the legs, against the back pillar) and
+// on faces turned down, and a faint grain of two granite tones. Line colours
+// (GRAN_D, CG_D, kohl, ivory) stay as drawn.
+const GRAN_R = 0x1b1f26, GRAN_G = 0x30363f, GRAN_G2 = 0x262b33, GRAN_H = 0x4b5563;
+const CG_H = 0xd8a414, LAPIS_R = 0x263f6a, LAPIS_H = 0x4c6ca6;
+const STATUE_RAMP = new Map([
+  [GRAN, [GRAN_R, GRAN, GRAN_H]], [GRAN_F, [GRAN, GRAN_F, GRAN_H]],
+  [CG, [CG_D, CG, CG_L]], [CG_L, [CG, CG_L, CG_H]], [LAPIS_S, [LAPIS_R, LAPIS_S, LAPIS_H]],
+]);
+const DIRS6 = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+function polishStatue(m, pts) {
+  const seen = new Set(), out = [];
+  for (const [x, y, z] of pts) {
+    const k = `${x},${y},${z}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const v = m.get(x, y, z);
+    if (!v || v.team) continue;
+    const ramp = STATUE_RAMP.get(v.c);
+    if (!ramp) continue;
+    const open = DIRS6.filter(([a, b, c]) => !m.has(x + a, y + b, z + c));
+    if (!open.length) continue;
+    const ox = open.some((d) => d[0]), oz = open.some((d) => d[2]), up = open.some((d) => d[1] > 0), dn = open.some((d) => d[1] < 0);
+    // a face is in a recess when the cell before it has solid on two or more of its four sides
+    const concave = open.every(([a, b, c]) => {
+      let n = 0;
+      for (const [p, q, r] of DIRS6) {
+        if ((p && a) || (q && b) || (r && c)) continue;
+        if (m.has(x + a + p, y + b + q, z + c + r)) n++;
+      }
+      return n >= 2;
+    });
+    let i = 1;
+    if (concave) i = 0;
+    else if (up && (ox || oz)) i = 2;
+    else if (ox && oz && !dn) i = 2;
+    else if (dn && !up && !ox && !oz) i = 0;
+    else if (up && v.c === CG_L) i = 0;                          // sunlit gold tops a step down, so they stay gold, not cream
+    else if (!m.has(x, y, z + 1)) {
+      // a front face: shaded across the form like a polished cylinder (the
+      // sun from -x): a highlight stripe on the lit third, the far side a step
+      // darker as it turns away
+      let x0 = x, x1 = x;
+      while (m.has(x0 - 1, y, z) && x - x0 < 12) x0--;
+      while (m.has(x1 + 1, y, z) && x1 - x < 12) x1++;
+      const n = x1 - x0 + 1, t = (x - x0) / Math.max(1, n - 1);
+      if (n >= 4) { if (t >= 0.78) i = 0; else if (t > 0.12 && t < 0.42) i = 2; }
+    }
+    let c = ramp[i];
+    if (i === 1 && v.c === GRAN) { const h = hash3(x, y, z, 77); c = h < 0.18 ? GRAN_G : h < 0.3 ? GRAN_G2 : GRAN; }
+    out.push([v, c]);
+  }
+  for (const [v, c] of out) v.c = c;
 }
 function monument(kind, god = 'ra') {
   if (kind <= 3) {
@@ -3090,7 +3243,7 @@ function monument(kind, god = 'ra') {
       null,
       { pose: 'kneel', arms: 'pots', head: 'nemes', kiltFront: null },
       { pose: 'mummy', arms: 'crossed', head: 'double' },
-      { pose: 'stride', arms: 'side', head: 'nemes', kilt: CG, anklets: 1 },
+      { pose: 'stride', arms: 'side', head: 'nemes', kilt: CG, anklets: 1, pillar: [-6, 6, 38] },
     ][kind];
     cleanStatue(m, 16, pd, kind === 1 ? 17 : 15, o);
     return m;
@@ -3099,8 +3252,11 @@ function monument(kind, god = 'ra') {
     const m = lot(48, 48, EARTH);
     const py = monPlinth(m, 5, 6, 43, 42, 1, 14, { faces: { '+z': 'cart2', '-z': 'cart2' }, seed: 4 });
     const pd = monDie(m, 9, 11, 39, 37, py, 3);
-    cleanStatue(m, 15, pd, 24, { pose: 'stand', head: 'nemes', arms: 'crossed', kilt: CG });
-    cleanStatue(m, 33, pd, 24, { pose: 'dress', head: 'wig', crown: 'modius', arms: 'side', kiltFront: null });
+    // building_16: the king striding, fists at his sides, in the nemes and a
+    // gold white crown; the queen in a gold sheath dress and vulture wig, her
+    // near hand on his arm; one back pillar joining them
+    cleanStatue(m, 15, pd, 24, { pose: 'stride', head: 'nemes', crown: 'hedjet', arms: 'side', kilt: CG, anklets: 1, pillar: [-6, 25, 38] });
+    cleanStatue(m, 34, pd, 24, { pose: 'dress', head: 'wig', wig: 'gold', arms: 'embrace', kiltFront: null });
     return m;
   }
   const m = lot(64, 64, EARTH);
@@ -3131,8 +3287,10 @@ function monument(kind, god = 'ra') {
 function armory() {
   const m = lot(32, 32);
   patch(m, 17, 3, 31, 23, EARTH, { seed: 4 });
-  block(m, 2, 4, 19, 16, 1, 13, { wall: WASH, roofC: MUDROOF, rimC: LIME, gorge: [0x8a5e38, 0x946640], torus: false, lipOut: 2, batter: 6, band: 'lapis', frieze: 1 });
-  block(m, 27, 4, 31, 22, 1, 10, { wall: MUDB, roofC: MUDROOF, rimC: LIME, gorge: [0x8a5e38, 0x946640], torus: false, lipOut: 2, batter: 0, band: null });
+  // both blocks battered under a flared two-row cavetto and a pale lip (round 17:
+  // no plain boxes behind the Monuments)
+  block(m, 2, 4, 19, 16, 1, 13, { wall: WASH, roofC: MUDROOF, rimC: LIME, gorge: [0xb08458, 0xc49a6c], torus: true, lipOut: 2, flare: true, batter: 4, band: 'lapis', frieze: 1 });
+  block(m, 27, 4, 31, 22, 1, 10, { wall: MUDB, roofC: MUDROOF, rimC: LIME, gorge: [0xb08458, 0xc49a6c], torus: true, lipOut: 2, flare: true, batter: 5, band: 'ochre' });
   door(m, '+z', 8, 4, 1, 8);
   slit(m, '+z', 4, 7, 3, 1); slit(m, '+z', 15, 7, 3, 1);
   // the forge frame: posts and beams, the dark striped awning over it
