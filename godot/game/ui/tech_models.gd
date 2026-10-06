@@ -663,7 +663,8 @@ static func _custom(name: String, root: Node3D) -> bool:
 		"t_monstrous_rage": _m_monstrous_rage(root)
 		"t_pious_sacrifice": _m_pious_sacrifice(root)
 		_:
-			return false
+			# the Egyptian techs ("e_<key>"): their own models
+			return name.begins_with("e_") and load("res://game/ui/egypt_tech_models.gd").build_into(name, root)
 	return true
 
 ## Weapons line: swords (not spears: the god techs own the spear, the pike and

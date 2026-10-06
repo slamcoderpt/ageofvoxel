@@ -608,6 +608,25 @@ func _temple_step(lots: Array) -> void:
 		await _frames(4)
 	_check("hovering the Sphinx: its tooltip names Bast", str(ui.tooltip.get("title", "")) == "Train Sphinx"
 		and str(ui.tooltip.get("lines", [])).contains("Bast"), "%s %s" % [ui.tooltip.get("title", ""), ui.tooltip.get("lines", [])])
+	# the Temple's tech buttons: each Egyptian tech its own rendered 3D icon
+	# (egypt_tech_models.gd), not the generic scroll; and every one of the 36
+	var TI = load("res://game/ui/tech_icons.gd")
+	var tsv := []
+	for c in ui.commands:
+		if c != null and str(c.get("action", "")) == "research":
+			tsv.append(str(c.svg))
+	var tok := tsv.size() >= 2
+	for nm in tsv:
+		tok = tok and str(nm).begins_with("e_") and TI.rendered(str(nm)) and tsv.count(nm) == 1
+	_check("the Temple's techs: each its own rendered icon (no scroll)", tok, str(tsv))
+	var all_icons := {}
+	var unrendered := []
+	for k in TI.EGYPT_GOD:
+		var nm2: String = TI.icon_for(str(k))
+		all_icons[nm2] = true
+		if not TI.rendered(nm2) or not TI.BACKDROPS.has(nm2):
+			unrendered.append(nm2)
+	_check("all 36 Egyptian techs: 36 distinct rendered icons with their own backdrops", all_icons.size() == 36 and unrendered.is_empty(), str(unrendered))
 	await _shot("temple")
 	# harness: the favor a Sphinx costs (an Egyptian's favor comes from Monuments)
 	pr = sim.get_player(ME)

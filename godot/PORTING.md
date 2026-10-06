@@ -2880,6 +2880,44 @@ Owner: the ui piece. Reference: `reference/egypt/ui_01..05.jpg`.
     / Pharaoh; refusals from `last_cast_reason`;
   - the medallion tooltip lists the minor gods chosen; the info panel's
     watermark is the major god's emblem.
+  - **Egyptian tech icons**: every one of the 36 Egyptian techs
+    (`techs.cpp`, Hands of the Pharaoh .. Tusks of Apedemak) is its own
+    rendered 3D model, as the Greek ones: `TechIcons.icon_for(key)` gives
+    `"e_<key>"` for a key in `TechIcons.EGYPT_GOD` (tech -> its god), and
+    `TechModels.build` hands `e_` names to `game/ui/egypt_tech_models.gd`
+    (`build_into`, one `_m_<key>` per tech, built from tech_models.gd's
+    parts in the Egyptian palette: gold, lapis, turquoise, linen, granite,
+    sandstone, Nile mud). Retold's subjects where it has one (ui_05:
+    Crocodilopolis the crocodile under Sobek's sun disc, Sun-dried Mud-brick
+    a brick stack, Dark Water a dark pool, Solar Barque the barque with the
+    sun): Hands of the Pharaoh an ankh and crook, Skin of the Rhino a horn on
+    grey hide, Flood of the Nile a wave over wheat, Clairvoyance the wedjat,
+    Criosphinx a ram head, Hieracosphinx a falcon head, Sacred Cats a Bastet
+    cat, Adze of Wepwawet an adze, Scalloped Axe the epsilon axe, Leather
+    Frame Shield a cowhide shield, Electrum Bullets bullets and a sling,
+    Shaduf the well sweep, Feet of the Jackal Anubis' head, Serpent Spear a
+    spear with an asp, Necropolis a step pyramid, Bone Bow a recurve bow,
+    Slings of the Sun a sling with a sun stone, Crimson Linen folded red
+    linen, Force of the West Wind a boulder in wind, Funeral Rites a canopic
+    jar and gold, Spirit of Maat Maat's feather on a scale pan, Nebty the
+    cobra and vulture wings, Funeral Barge a barge with a sarcophagus, New
+    Kingdom the double crown, Desert Wind dunes, Atef Crown the atef, Axe of
+    Vengeance a glowing crescent axe, Greatest of Fifty a khopesh and
+    standard, Spear of Horus a gold spear with falcon wings, Valley of the
+    Kings a gold funerary mask, Book of Thoth a glowing papyrus under the
+    moon, Tusks of Apedemak gold-banded tusks. Each has its own painted
+    backdrop (`BACKDROPS["e_<key>"]`), plate (`PLATE_OF`), and joins
+    `tile_names()` / the prewarm, so techs_playtest's "every tech icon is a
+    rendered 3D model" and "its own backdrop" checks cover them; headless,
+    the fallback is the god's hieroglyph in gold (`_egypt_fallback`).
+  - hp on the selection card: `ceil(hp)` against `round(max_hp)`, clamped
+    (an Egyptian's max hp is fractional: a Classical Pharaoh 110, not
+    "111/110"); a tooltip's title too long for the panel steps its size
+    down (narrow: 278 px, wide: 360 px) instead of running past the border
+    ("ADVANCE TO THE HEROIC AGE: SOBEK"); an Egyptian-only building's
+    tooltip gives this sim's hp and Retold's (`EGYPT_ONLY_BUILDINGS`: the
+    sim maps Retold's building hp x1.25, sim/civ civ.h, so a Granary is
+    "500 hp (Retold 400)", an Obelisk "63 hp (Retold 50)").
 - **Capture scene `egyptui`** (`ui.gd _egyptui_setup`, entry in
   `scenes.gd`): the `egypt` scene's Ra town back in the Classical Age with
   Bast chosen (Rain and Eclipse in the hub), a purse leaving some buttons
@@ -2904,8 +2942,9 @@ Owner: the ui piece. Reference: `reference/egypt/ui_01..05.jpg`.
   on it, Q trains a Spearman; a Temple (S + click) built, a click on it:
   its grid holds the Priest and Bast's Sphinx and none of the other nine
   myth units, every one of them refused by `get_trains` with its reason
-  (the minor god / the age), the Sphinx's tooltip names Bast, its key trains
-  a Sphinx; a click on the Pharaoh, Q, a click on the
+  (the minor god / the age), the Sphinx's tooltip names Bast, the Temple's
+  tech buttons each their own rendered `e_` icon and all 36 Egyptian techs
+  36 distinct rendered icons with backdrops, its key trains a Sphinx; a click on the Pharaoh, Q, a click on the
   Barracks: empowered at 1; a click on Rain: favor paid, recharge running.
   Harness only: the AI off, the sim stepped fast, 60 favor before the cast
   and before the Sphinx (+400 wood / gold there).

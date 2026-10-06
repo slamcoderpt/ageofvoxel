@@ -110,7 +110,7 @@ const GODS := {
 	"poseidon": {"name": "Poseidon", "title": "God of the Sea", "culture": "Greeks", "available": false},
 	"ra": {"name": "Ra", "title": "God of the Sun", "culture": "Egyptians", "available": true,
 		"powers": ["rain"], "focus": "Focus: Migdol Stronghold units and empowerment.",
-		"lines": ["Mandjet: a Monument the Pharaoh empowers empowers every building within 30 m at 60 %.",
+		"lines": ["Mandjet: when the Pharaoh empowers a Monument, every building within 30 m is empowered at 60 %.",
 			"Priests can empower (at 60 % of a Pharaoh).",
 			"Laborers gather berries 30 % faster; Camel Riders, Chariot Archers and War Elephants +15 % hp."]},
 	"isis": {"name": "Isis", "title": "Goddess of Magic and Healing", "culture": "Egyptians", "available": true,

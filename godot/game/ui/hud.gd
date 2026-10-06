@@ -827,7 +827,9 @@ func _draw_info() -> void:
 			if info.has("hp"):
 				var hy := oy + 18 + 6
 				S.draw_icon(self, "heart", Rect2(x0, hy + 1, 18, 18))
-				var hs := "%d/%d" % [int(ceil(info.hp)), int(info.max_hp)]
+				# (an Egyptian's max hp is fractional, 100 x 1.1: both rounded the same way)
+				var mhp := int(round(float(info.max_hp)))
+				var hs := "%d/%d" % [mini(int(ceil(float(info.hp) - 0.01)), mhp), mhp]
 				S.text(self, bold, Vector2(x0 + 24, hy + 16), hs, 16, S.INK)
 				var bx := x0 + 24 + S.text_width(bold, hs, 16) + 12
 				var bar := Rect2(bx, hy + 5.5, 170, 9)
@@ -1163,9 +1165,13 @@ func _draw_tooltip() -> void:
 		else:
 			lines.append(str(l))
 	var w := 0.0
-	var tw := S.text_width(title, str(t.get("title", "")), 14, 0.5)
-	if t.get("sub", "") != "":
-		tw += 5 + S.text_width(sans, t.sub, 14)
+	# a long name ("ADVANCE TO THE HEROIC AGE: SOBEK") steps its size down to
+	# fit the panel's widest instead of running past its edge
+	var subw := 0.0 if t.get("sub", "") == "" else 5 + S.text_width(sans, t.sub, 14)
+	var tsz := 14
+	while tsz > 9 and S.text_width(title, str(t.get("title", "")), tsz, 0.5) + subw > 278.0:
+		tsz -= 1
+	var tw := S.text_width(title, str(t.get("title", "")), tsz, 0.5) + subw
 	w = tw
 	for l in lines:
 		w = maxf(w, S.text_width(sans, str(l), 14))
@@ -1191,9 +1197,9 @@ func _draw_tooltip() -> void:
 	S.vgrad(self, r, [[0.0, Color(12 / 255.0, 40 / 255.0, 48 / 255.0, 0.97)], [1.0, Color(4 / 255.0, 17 / 255.0, 22 / 255.0, 0.97)]])
 	draw_rect(r, S.BRONZE_HI, false, 1.0)
 	var cy := r.position.y + 8 + 14
-	S.text(self, title, Vector2(r.position.x + 11, cy), str(t.get("title", "")), 14, S.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.8, 0.5)
+	S.text(self, title, Vector2(r.position.x + 11, cy), str(t.get("title", "")), tsz, S.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.8, 0.5)
 	if t.get("sub", "") != "":
-		S.text(self, sans, Vector2(r.position.x + 11 + S.text_width(title, str(t.title), 14, 0.5) + 5, cy), t.sub, 14, S.MUTED)
+		S.text(self, sans, Vector2(r.position.x + 11 + S.text_width(title, str(t.title), tsz, 0.5) + 5, cy), t.sub, 14, S.MUTED)
 	# the state and its reason open the tooltip, right under the name (as a tech's)
 	if t.has("status"):
 		cy += 18
@@ -1291,7 +1297,11 @@ func _draw_wide_tooltip(t: Dictionary) -> void:
 		rows.append([str(l), sans, 12, S.MUTED, 16.0])
 	var head := str(t.get("title", ""))
 	var hk := str(t.get("hotkey", ""))
-	var w := S.text_width(title, head, 15, 0.5) + (6.0 + S.text_width(sans, "(%s)" % hk, 14) if hk != "" else 0.0)
+	var hkw := (6.0 + S.text_width(sans, "(%s)" % hk, 14)) if hk != "" else 0.0
+	var hsz := 15   # a long name steps down to fit (never past the panel's edge)
+	while hsz > 10 and S.text_width(title, head, hsz, 0.5) + hkw > maxw + 10:
+		hsz -= 1
+	var w := S.text_width(title, head, hsz, 0.5) + hkw
 	var cost: Dictionary = t.get("cost", {})
 	var gain: Dictionary = t.get("gain", {})
 	var cw := S.text_width(sans, "Cost:", 14) + 6
@@ -1322,9 +1332,9 @@ func _draw_wide_tooltip(t: Dictionary) -> void:
 	draw_rect(r, S.BRONZE_HI, false, 1.0)
 	var lx := r.position.x + 11
 	var cy := r.position.y + 8 + 15
-	S.text(self, title, Vector2(lx, cy), head, 15, S.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.8, 0.5)
+	S.text(self, title, Vector2(lx, cy), head, hsz, S.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.8, 0.5)
 	if hk != "":
-		S.text(self, sans, Vector2(lx + S.text_width(title, head, 15, 0.5) + 6, cy), "(%s)" % hk, 14, S.MUTED)
+		S.text(self, sans, Vector2(lx + S.text_width(title, head, hsz, 0.5) + 6, cy), "(%s)" % hk, 14, S.MUTED)
 	if not cost.is_empty() or t.has("time"):
 		cy += 22
 		S.text(self, sans, Vector2(lx, cy), "Cost:", 14, S.INK, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)

@@ -986,6 +986,10 @@ func egypt() -> bool:
 	return civ == "egyptian"
 
 ## A building's def with my civ's cost, trains, min age and hotkey (cached per match).
+## The Egyptian buildings with no Greek counterpart (sim/civ: Retold's hp x1.25).
+const EGYPT_ONLY_BUILDINGS := ["granary", "lumber_camp", "mining_camp", "obelisk", "eg_barracks", "migdol", "siege_works",
+	"monument_villagers", "monument_soldiers", "monument_priests", "monument_pharaohs", "monument_gods"]
+
 func _bdef(t: String) -> Dictionary:
 	if not _mbdefs.has(t):
 		var d: Dictionary = sim.get_building_def(t, me)
@@ -1049,7 +1053,12 @@ func _egypt_build_cmd(t: String, key: String, slot: int) -> Dictionary:
 		lines = ["+%s favor / min (Monument %d of 5, in order)." % [_num(float(d.get("favor_per_min", 0.0))), int(d.get("monument", 1))],
 			"Empowered: more favor (%s: +%d %%)." % [str(cs.get("god", "ra")).capitalize(), int(round(float(cs.get("empower_favor", 0.2)) * 100))]]
 	var bt := float(d.get("build_time_one", 0.0))
-	lines.append("%d hp · %s Age%s" % [int(d.get("hp", 0)), AGES[clampi(int(d.get("min_age", 0)), 0, 3)], " · %d s for one builder" % int(round(bt)) if bt > 0.0 else ""])
+	var hp_s := "%d hp" % int(round(float(d.get("hp", 0))))
+	if real in EGYPT_ONLY_BUILDINGS:
+		# this sim's buildings are Retold's hp x1.25 (sim/civ civ.h: the Town
+		# Center's 3000 / 2400); the Egyptian-only ones say Retold's number too
+		hp_s += " (Retold %d)" % int(round(float(d.get("hp", 0)) / 1.25))
+	lines.append("%s · %s Age%s" % [hp_s, AGES[clampi(int(d.get("min_age", 0)), 0, 3)], " · %d s for one builder" % int(round(bt)) if bt > 0.0 else ""])
 	c["lines"] = lines
 	if real == "wall":
 		c.title = "Build Wall"

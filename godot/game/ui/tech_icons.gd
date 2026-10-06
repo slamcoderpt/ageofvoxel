@@ -142,12 +142,54 @@ const BY_TECH := {
 	"pious_sacrifice": "t_pious_sacrifice",
 }
 
+## Egyptian tech -> its god (the headless SVG fallback draws the god's sign)
+const EGYPT_GOD := {
+	"hands_of_the_pharaoh": "ra",
+	"skin_of_the_rhino": "ra",
+	"flood_of_the_nile": "isis",
+	"clairvoyance": "set",
+	"criosphinx": "bast",
+	"hieracosphinx": "bast",
+	"sacred_cats": "bast",
+	"adze_of_wepwawet": "bast",
+	"scalloped_axe": "ptah",
+	"leather_frame_shield": "ptah",
+	"electrum_bullets": "ptah",
+	"shaduf": "ptah",
+	"feet_of_the_jackal": "anubis",
+	"serpent_spear": "anubis",
+	"necropolis": "anubis",
+	"sun_dried_mud_brick": "sobek",
+	"crocodilopolis": "sobek",
+	"dark_water": "sobek",
+	"solar_barque": "sobek",
+	"bone_bow": "sekhmet",
+	"slings_of_the_sun": "sekhmet",
+	"crimson_linen": "sekhmet",
+	"force_of_the_west_wind": "sekhmet",
+	"funeral_rites": "nephthys",
+	"spirit_of_maat": "nephthys",
+	"nebty": "nephthys",
+	"funeral_barge": "nephthys",
+	"new_kingdom": "osiris",
+	"desert_wind": "osiris",
+	"atef_crown": "osiris",
+	"axe_of_vengeance": "horus",
+	"greatest_of_fifty": "horus",
+	"spear_of_horus": "horus",
+	"valley_of_the_kings": "thoth",
+	"book_of_thoth": "thoth",
+	"tusks_of_apedemak": "thoth",
+}
+
 ## The icon of a tech: its line in its tier's metal for the Armory's generic
 ## lines ("copper_weapons" -> "t_weapons_copper"), else its own glyph.
 static func icon_for(tech: String) -> String:
 	var parts := tech.split("_")
 	if parts.size() == 2 and TIERS.has(parts[0]) and TEMPLATES.has(parts[1]):
 		return "t_%s_%s" % [parts[1], parts[0]]
+	if EGYPT_GOD.has(tech):
+		return "e_" + tech   # an Egyptian tech: its own model (egypt_tech_models.gd)
 	return BY_TECH.get(tech, "t_scroll")
 
 ## The SVG of an icon name ("" when it is not one of these).
@@ -156,6 +198,8 @@ static func svg(name: String) -> String:
 		return SVG[name]
 	if GODS.has(name):
 		return GODS[name]
+	if name.begins_with("e_") and EGYPT_GOD.has(name.substr(2)):
+		return _egypt_fallback(name.substr(2))
 	var parts := name.split("_")
 	if parts.size() == 3 and parts[0] == "t" and TEMPLATES.has(parts[1]) and TIERS.has(parts[2]):
 		var c: Array = TIERS[parts[2]]
@@ -164,6 +208,15 @@ static func svg(name: String) -> String:
 		t = t.replace("$W", str(WEAPON_BLADES[parts[2]]) if parts[1] == "weapons" else "")
 		return t.replace("$A", c[0]).replace("$B", c[1]).replace("$C", c[2]).replace("$D", c[3])
 	return ""
+
+## The headless fallback of an Egyptian tech's picture (no renderer: the
+## model is not drawn): its god's hieroglyph (egypt_icons.gd) in gold on a dark
+## outline; with a renderer every Egyptian tech is its own 3D model.
+static func _egypt_fallback(tech: String) -> String:
+	var god := str(EGYPT_GOD.get(tech, ""))
+	var EI = load("res://game/ui/egypt_icons.gd")
+	var src := str(EI.SVG.get("mg_" + god, EI.SVG.get(god, EI.SVG["empower"])))
+	return src.replace("currentColor", "#f2c14e")
 
 ## The tier of an Armory line's tech (1 copper, 2 bronze, 3 iron), else 0.
 static func tier_of(tech: String) -> int:
@@ -205,6 +258,42 @@ const PLATE_OF := {
 	"t_oracle": "sky", "t_temple_of_healing": "verdant", "t_golden_apples": "verdant", "t_dionysia": "violet",
 	"t_face_of_the_gorgon": "verdant", "t_pious_sacrifice": "ember",
 	"t_tax_collectors": "treasury", "t_ambassadors": "treasury", "t_coinage": "treasury", "t_scroll": "sky",
+	"e_hands_of_the_pharaoh": "amber",
+	"e_skin_of_the_rhino": "amber",
+	"e_flood_of_the_nile": "sea",
+	"e_clairvoyance": "dusk",
+	"e_criosphinx": "amber",
+	"e_hieracosphinx": "amber",
+	"e_sacred_cats": "amber",
+	"e_adze_of_wepwawet": "amber",
+	"e_scalloped_axe": "bronze",
+	"e_leather_frame_shield": "bronze",
+	"e_electrum_bullets": "bronze",
+	"e_shaduf": "bronze",
+	"e_feet_of_the_jackal": "violet",
+	"e_serpent_spear": "violet",
+	"e_necropolis": "violet",
+	"e_sun_dried_mud_brick": "verdant",
+	"e_crocodilopolis": "verdant",
+	"e_dark_water": "verdant",
+	"e_solar_barque": "verdant",
+	"e_bone_bow": "ember",
+	"e_slings_of_the_sun": "ember",
+	"e_crimson_linen": "ember",
+	"e_force_of_the_west_wind": "ember",
+	"e_funeral_rites": "sky",
+	"e_spirit_of_maat": "sky",
+	"e_nebty": "sky",
+	"e_funeral_barge": "sky",
+	"e_new_kingdom": "verdant",
+	"e_desert_wind": "verdant",
+	"e_atef_crown": "verdant",
+	"e_axe_of_vengeance": "sky",
+	"e_greatest_of_fifty": "sky",
+	"e_spear_of_horus": "sky",
+	"e_valley_of_the_kings": "treasury",
+	"e_book_of_thoth": "treasury",
+	"e_tusks_of_apedemak": "treasury",
 }
 
 ## Every icon's own painted backdrop (not one vignette per family): a sky
@@ -252,6 +341,43 @@ const BACKDROPS := {
 	"t_ambassadors": ["#1c3e4c", "#04100c", "#ffd890", 0.5, 0.66, 0.55, "horizon", "#ffe0a0", 0.9, 30],
 	"t_coinage": ["#103e34", "#021008", "#ffe08a", 0.5, 0.4, 0.55, "rays", "#ffe8a0", 0.5, 31],
 	"t_scroll": ["#1c3a6e", "#040a18", "#d4ecff", 0.5, 0.3, 0.6, "mist", "#c0d8ff", 0.6, 32],
+	# the Egyptian techs (EgyptTechModels): sand, the Nile, lapis night, tomb stone
+	"e_hands_of_the_pharaoh": ["#3a2c10", "#0c0804", "#ffe08a", 0.5, 0.35, 0.6, "rays", "#ffe6a0", 0.6, 40],
+	"e_skin_of_the_rhino": ["#4a4234", "#12100c", "#f0d8a0", 0.3, 0.2, 0.7, "dust", "#e8d4a8", 0.6, 41],
+	"e_flood_of_the_nile": ["#1e5a7a", "#04141e", "#c8f0ff", 0.6, 0.2, 0.65, "waves", "#a0e4ff", 0.7, 42],
+	"e_clairvoyance": ["#14244e", "#03060e", "#90c0ff", 0.5, 0.45, 0.55, "stars", "#e0ecff", 0.9, 43],
+	"e_criosphinx": ["#5a4626", "#16100a", "#ffd890", 0.7, 0.15, 0.7, "dust", "#ffe8b0", 0.7, 44],
+	"e_hieracosphinx": ["#2c4a6e", "#0a1220", "#ffe0a0", 0.25, 0.15, 0.7, "clouds", "#b8c8e0", 0.6, 45],
+	"e_sacred_cats": ["#3e3020", "#0e0a06", "#b8f070", 0.5, 0.3, 0.55, "bokeh", "#e8d080", 0.6, 46],
+	"e_adze_of_wepwawet": ["#3e5a22", "#0c1406", "#f0e8a0", 0.7, 0.2, 0.7, "bokeh", "#d8f098", 0.55, 47],
+	"e_scalloped_axe": ["#4a3a2a", "#100c08", "#ffc070", 0.3, 0.85, 0.7, "embers", "#ffd08a", 0.7, 48],
+	"e_leather_frame_shield": ["#5a4a30", "#141008", "#ffe4b0", 0.75, 0.15, 0.75, "blocks", "#8a7450", 0.6, 49],
+	"e_electrum_bullets": ["#2e3a46", "#080c10", "#fff2c0", 0.6, 0.3, 0.55, "streaks", "#d0d8e0", 0.5, 50],
+	"e_shaduf": ["#5e7a8a", "#123040", "#fff0c0", 0.8, 0.12, 0.7, "horizon", "#ffe0a0", 0.8, 51],
+	"e_feet_of_the_jackal": ["#3a2a46", "#0a060e", "#ffcc70", 0.7, 0.3, 0.55, "mist", "#c0a0d8", 0.7, 52],
+	"e_serpent_spear": ["#203a1e", "#040a04", "#a8f070", 0.6, 0.2, 0.6, "drips", "#90e060", 0.6, 53],
+	"e_necropolis": ["#463058", "#100818", "#ffb860", 0.5, 0.75, 0.6, "horizon", "#ffc880", 1.0, 54],
+	"e_sun_dried_mud_brick": ["#6a4a2a", "#1a1008", "#ffd890", 0.25, 0.1, 0.75, "rays", "#ffe0a0", 0.45, 55],
+	"e_crocodilopolis": ["#1e4a3a", "#04100c", "#ffd060", 0.4, 0.2, 0.6, "waves", "#80d0b0", 0.55, 56],
+	"e_dark_water": ["#0c2a4a", "#02060e", "#60d0ff", 0.5, 0.6, 0.55, "waves", "#4090c0", 0.6, 57],
+	"e_solar_barque": ["#a85a20", "#2a0e04", "#ffe090", 0.62, 0.35, 0.6, "horizon", "#ffd080", 0.9, 58],
+	"e_bone_bow": ["#4e3a2a", "#100a06", "#ffd8a0", 0.75, 0.2, 0.65, "dust", "#f0d8b0", 0.6, 59],
+	"e_slings_of_the_sun": ["#6a3a12", "#1a0a02", "#ffd060", 0.6, 0.3, 0.6, "rays", "#ffd890", 0.7, 60],
+	"e_crimson_linen": ["#3c2a1e", "#0e0806", "#ffc8a0", 0.5, 0.2, 0.6, "bokeh", "#ffb890", 0.5, 61],
+	"e_force_of_the_west_wind": ["#3a5a80", "#0a1626", "#e0f0ff", 0.2, 0.3, 0.7, "clouds", "#c0d4f0", 0.75, 62],
+	"e_funeral_rites": ["#2a2a40", "#08080e", "#ffd890", 0.5, 0.2, 0.6, "blocks", "#5a5068", 0.6, 63],
+	"e_spirit_of_maat": ["#1c3a5a", "#040a14", "#fff4d0", 0.5, 0.25, 0.6, "rays", "#e8f0ff", 0.5, 64],
+	"e_nebty": ["#14305a", "#030814", "#ffd070", 0.5, 0.3, 0.6, "stars", "#ffe8b0", 0.8, 65],
+	"e_funeral_barge": ["#1c1a36", "#04040c", "#a0c0ff", 0.25, 0.25, 0.55, "mist", "#8090c0", 0.75, 66],
+	"e_new_kingdom": ["#3a4a2a", "#0c1006", "#ffe8a0", 0.5, 0.15, 0.65, "rays", "#fff0b0", 0.5, 67],
+	"e_desert_wind": ["#8a5a2a", "#2a1406", "#ffd080", 0.75, 0.25, 0.6, "dust", "#ffe0a0", 0.8, 68],
+	"e_atef_crown": ["#1e4a30", "#04100a", "#e8ffd0", 0.5, 0.2, 0.6, "mist", "#b0f0c0", 0.6, 69],
+	"e_axe_of_vengeance": ["#2a1a2a", "#080408", "#ff9050", 0.5, 0.95, 0.7, "smoke", "#6a4060", 0.8, 70],
+	"e_greatest_of_fifty": ["#4a5a6a", "#101418", "#ffe0a0", 0.8, 0.1, 0.7, "dust", "#e0e4e8", 0.55, 71],
+	"e_spear_of_horus": ["#2a4a8a", "#060e22", "#ffe8a0", 0.6, 0.15, 0.6, "clouds", "#c0d0f0", 0.6, 72],
+	"e_valley_of_the_kings": ["#4a3a1a", "#120c04", "#ffd070", 0.5, 0.3, 0.6, "blocks", "#7a6440", 0.6, 73],
+	"e_book_of_thoth": ["#16362e", "#020a08", "#90ffd0", 0.5, 0.3, 0.55, "stars", "#c0fff0", 0.75, 74],
+	"e_tusks_of_apedemak": ["#5a4a2e", "#14100a", "#ffe8c0", 0.7, 0.2, 0.65, "bokeh", "#f0e0b0", 0.55, 75],
 }
 
 ## Per icon framing: [fit, dx, dy] (fit: the share of the tile the picture's
@@ -527,6 +653,8 @@ static func prewarm_step() -> bool:
 		for k in SVG:
 			if PLATE_OF.has(k):
 				names.append(k)
+		for k in EGYPT_GOD:
+			names.append("e_" + str(k))
 		# the sizes they are drawn at, 1:1 (a rescaled tile goes soft):
 		# the command grid's 48 px, the queue's 34 px, the card's 22 px
 		for nm in names:
@@ -570,6 +698,8 @@ static func tile_names() -> Array:
 	for k in SVG:
 		if PLATE_OF.has(k):
 			names.append(k)
+	for k in EGYPT_GOD:
+		names.append("e_" + str(k))
 	return names
 
 ## True when an icon's picture comes from its 3D model.
