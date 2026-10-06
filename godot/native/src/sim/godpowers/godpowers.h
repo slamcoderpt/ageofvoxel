@@ -75,7 +75,7 @@ constexpr double MINION_LIFE = 60;
 constexpr double TORNADO_HACK = 25, TORNADO_CRUSH = 100, TORNADO_EVERY = 0.5, TORNADO_FULL = 5 * 0.6, TORNADO_SLOW = 0.65,
 	TORNADO_SLOW_TIME = 6, TORNADO_SPEED = 2.5, TORNADO_SPIRAL = 1.2, TORNADO_OWN = 0.1, TORNADO_FARM = 0.1, TORNADO_LOS = 20 * 0.6;
 constexpr int THOTH_METEORS = 12;            // Thoth's Meteor: 12 meteors in a 25 m circle,
-constexpr double THOTH_FIRST = 3, THOTH_REST = 6, THOTH_STEP = 1.0, THOTH_AREA = 8 * 0.6, THOTH_CRUSH = 580, THOTH_DIVINE = 40, THOTH_OWN = 0.1;
+constexpr double THOTH_FIRST = 3, THOTH_REST = 6, THOTH_STEP = 1.2, THOTH_AREA = 8 * 0.6, THOTH_CRUSH = 580, THOTH_DIVINE = 40, THOTH_OWN = 0.1;
 constexpr double SON_HEAL = 15;               // the Son of Osiris heals allies 15 hp/s (civ.cpp EgyptUnit.heal)
 constexpr double THOTH_CRATER_LIFE = 90;      // (visual only) how long its glowing craters stay drawn
 constexpr int TREE_FLAT = 100;                // a tree flattened by a Tornado / Thoth's Meteor: variant + 100 (the wood stays)

@@ -1114,7 +1114,7 @@ func _case_meteor() -> void:
 	r["first blast on the house"] = _r(house_hit)
 	r["blast on a hoplite"] = _r(hop_hit)
 	# house (Greek, 5 % crush): 580 x 0.95 + 40 = 591; hoplite (99 %): 5.8 + 40 = 45.8
-	var ok: bool = r["cast"] and landed.size() == 12 and _near(landed[0], 3.0, 0.1) and _near(landed[1], 6.0, 0.1) and _near(landed[11], 16.0, 0.1)
+	var ok: bool = r["cast"] and landed.size() == 12 and _near(landed[0], 3.0, 0.1) and _near(landed[1], 6.0, 0.1) and _near(landed[2], 7.2, 0.1) and _near(landed[11], 18.0, 0.1)
 	ok = ok and _near(house_hit, 591.0, 0.01) and _near(hop_hit, 45.8, 0.01)
 	_check("meteor.thoth", ok, r)
 

@@ -310,49 +310,103 @@ func _capture() -> void:
 		return
 	var code := 0
 	if args.has("out"):
-		var img := get_viewport().get_texture().get_image()
+		var img := _read_frame()
 		# Guard against a frame read back with a wrong row pitch (a critic once got a
 		# 1420-wide capture that was all diagonal scanline smear): in a sheared image
 		# neighbouring rows no longer match, so the vertical gradient dwarfs the
 		# horizontal one (a real frame ~0.8-1.2, a 4 px pitch error ~2.3). Re-read
-		# the next frames; give up loudly rather than save garbage.
+		# the next frames; if it stays sheared, exit 3 WITHOUT writing --out (so a
+		# good PNG already there is kept). capture_verdict() holds the rules.
 		var shear := shear_ratio(img)
 		var tries := 0
-		while shear > 1.6 and tries < 6:
+		while shear > SHEAR_MAX and tries < 6:
 			tries += 1
 			printerr("AOV_CAPTURE_RETRY sheared frame (v/h %.2f), reading the next one" % shear)
 			await RenderingServer.frame_post_draw
-			img = get_viewport().get_texture().get_image()
+			img = _read_frame()
 			shear = shear_ratio(img)
 		var out := str(args.out)
 		if not out.is_absolute_path():
 			out = OS.get_environment("AOV_CWD").path_join(out) if OS.get_environment("AOV_CWD") != "" else ProjectSettings.globalize_path("res://").path_join(out)
-		DirAccess.make_dir_recursive_absolute(out.get_base_dir())
-		# written beside the target and renamed into place, so two captures aimed at the same
-		# path (agents sharing shots/godot/<scene>.png) never interleave into a torn file
-		var tmp := "%s.%d.tmp.png" % [out.get_basename(), OS.get_process_id()]
-		var err := img.save_png(tmp)
-		if err == OK:
-			err = DirAccess.rename_absolute(tmp, out)
-		if err != OK:
-			DirAccess.remove_absolute(tmp)
 		var st := image_stats(img)
-		print("AOV_CAPTURE %s" % JSON.stringify({"out": out, "width": img.get_width(), "height": img.get_height(),
+		var want_w := int(args.width) if args.has("width") else -1
+		var want_h := int(args.height) if args.has("height") else -1
+		var v := capture_verdict(shear, st.mean, st.std, img.get_width(), img.get_height(), want_w, want_h)
+		var err := OK
+		if v.save:
+			DirAccess.make_dir_recursive_absolute(out.get_base_dir())
+			# written beside the target and renamed into place, so two captures aimed at the same
+			# path (agents sharing shots/godot/<scene>.png) never interleave into a torn file
+			var tmp := "%s.%d.tmp.png" % [out.get_basename(), OS.get_process_id()]
+			err = img.save_png(tmp)
+			if err == OK:
+				err = DirAccess.rename_absolute(tmp, out)
+			if err != OK:
+				DirAccess.remove_absolute(tmp)
+		print("AOV_CAPTURE %s" % JSON.stringify({"out": out, "saved": v.save and err == OK, "width": img.get_width(), "height": img.get_height(),
 			"mean": snappedf(st.mean, 0.01), "std": snappedf(st.std, 0.01), "shear": snappedf(shear, 0.01), "tick": sim.get_tick(), "errors": errors}))
+		for w in v.warnings:
+			printerr("AOV_CAPTURE_WARN ", w)
+		for e in v.errors:
+			push_error(e)
+		code = v.code
 		if err != OK:
 			push_error("save_png failed: %s" % error_string(err))
 			code = 2
-		elif shear > 1.6:
-			push_error("capture looks sheared (row pitch?): vertical / horizontal gradient %.2f" % shear)
-			code = 3
-		if args.has("width") and (img.get_width() != int(args.width) or img.get_height() != int(args.height)):
-			printerr("AOV_CAPTURE_WARN capture is %dx%d, asked for %sx%s" % [img.get_width(), img.get_height(), args.width, args.height])
-		elif st.mean < 8.0 or st.std < 4.0:
-			push_error("capture looks blank (mean %.1f, std %.1f)" % [st.mean, st.std])
-			code = 3
 	if not errors.is_empty():
 		code = max(code, 1)
 	get_tree().quit(code)
+
+const SHEAR_MAX := 1.6
+
+## The viewport frame; --capture_fake=shear,blank,crop (any mix) swaps in a
+## row-pitch-sheared, black or 3/4-size copy so game/core/capture_guard_check.gd can drive the guard end to end.
+func _read_frame() -> Image:
+	var img := get_viewport().get_texture().get_image()
+	var fake := str(args.get("capture_fake", "")).split(",", false)
+	if fake.has("crop"):
+		img = img.get_region(Rect2i(0, 0, img.get_width() * 3 / 4, img.get_height() * 3 / 4))
+	if fake.has("shear"):
+		img = fake_shear(img, 4)
+	if fake.has("blank"):
+		img.fill(Color.BLACK)
+	return img
+
+## What _capture does with a frame, as data (pure, so it is checked headless):
+## save = write the PNG to --out; code = exit code (0 ok, 3 sheared or blank).
+## A sheared frame is never written, so it cannot replace a good PNG already at
+## --out. A blank frame is still written (to show what went wrong) but exits 3.
+## A size mismatch with --width/--height is only a warning, independent of both.
+static func capture_verdict(shear: float, mean: float, std: float, w: int, h: int, want_w: int, want_h: int) -> Dictionary:
+	var v := {"save": true, "code": 0, "errors": [], "warnings": []}
+	if want_w > 0 and want_h > 0 and (w != want_w or h != want_h):
+		v.warnings.append("capture is %dx%d, asked for %dx%d" % [w, h, want_w, want_h])
+	if shear > SHEAR_MAX:
+		v.save = false
+		v.code = 3
+		v.errors.append("capture looks sheared (row pitch?): vertical / horizontal gradient %.2f; not saved" % shear)
+	if mean < 8.0 or std < 4.0:
+		v.code = 3
+		v.errors.append("capture looks blank (mean %.1f, std %.1f)" % [mean, std])
+	return v
+
+## The image re-read as if each row were `extra` pixels longer than it is (what
+## a wrong row pitch does): the diagonal scanline smear the shear guard catches.
+static func fake_shear(img: Image, extra: int) -> Image:
+	var s := img.duplicate() as Image
+	s.convert(Image.FORMAT_RGB8)
+	var w := s.get_width()
+	var h := s.get_height()
+	var d := s.get_data()
+	var n := d.size()
+	var o := PackedByteArray()
+	o.resize(n)
+	var row := w * 3
+	for y in h:
+		var src := (y * (w + extra) * 3) % n
+		for x in row:
+			o[y * row + x] = d[(src + x) % n]
+	return Image.create_from_data(w, h, false, Image.FORMAT_RGB8, o)
 
 ## Luminance mean / std over a 160x90 downscale (same check as shoot.mjs).
 static func image_stats(img: Image) -> Dictionary:

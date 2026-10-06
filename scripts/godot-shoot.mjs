@@ -47,7 +47,9 @@ if (args.seed) user.push(`--seed=${args.seed}`);
 for (const [k, v] of new URLSearchParams(args.params || '')) user.push(`--${k}=${v}`);
 
 fs.mkdirSync(path.dirname(out), { recursive: true });
-try { fs.unlinkSync(out); } catch {}
+// the old PNG is not deleted first: godot writes the new one atomically (temp + rename) and
+// only when the frame passes the shear guard, so a failed run leaves the last good shot in place
+const before = fs.existsSync(out) ? fs.statSync(out).mtimeMs : -1;
 const cmd = ['-a', '-s', `-screen 0 ${args.width}x${args.height}x24`, args.godot, '--path', GODOT_DIR,
   '--rendering-driver', 'vulkan', '--audio-driver', 'Dummy', '--resolution', `${args.width}x${args.height}`, '--', ...user];
 const t0 = Date.now();
@@ -81,7 +83,8 @@ if (code !== 0) errors.push(`godot exited with code ${code}`);
 if (!cap) errors.push('no AOV_CAPTURE line (capture did not happen)');
 else if (cap.mean < 8 || cap.std < 4) errors.push(`image looks blank (mean ${cap.mean}, std ${cap.std})`);
 else if (cap.shear > 1.6) errors.push(`image looks sheared (vertical/horizontal gradient ${cap.shear}: a row-pitch error)`);
-if (!fs.existsSync(out)) errors.push(`no PNG written at ${out}`);
+if (!fs.existsSync(out) || fs.statSync(out).mtimeMs === before || (cap && cap.saved === false))
+  errors.push(`no PNG written at ${out}${fs.existsSync(out) ? ' (the previous one is left untouched)' : ''}`);
 const secs = ((Date.now() - t0) / 1000).toFixed(1);
 if (cap) console.log(`[godot-shoot] ${args.scene} -> ${out} in ${secs}s  (mean ${cap.mean.toFixed(1)}, std ${cap.std.toFixed(1)}${cap.shear != null ? `, shear ${cap.shear}` : ''}, tick ${cap.tick})`);
 if (errors.length && args.verbose !== 'true') console.error(lines.filter((l) => l.trim()).slice(-25).join('\n'));

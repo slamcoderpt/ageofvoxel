@@ -184,13 +184,31 @@ godot --path godot -- --scene=town [--seed=N] [--mapsize=N] [--units=N] [--playe
   The frame is also checked for a row-pitch shear (`main.gd shear_ratio`: mean
   vertical / mean horizontal luminance step over every 3rd pixel, ~0.8-1.1 on a
   real frame, ~2.3 when rows are read back 4 px off): above 1.6 the next frames
-  are read again (up to 6), then the capture fails with exit 3; `AOV_CAPTURE`
-  carries `shear` and godot-shoot.mjs prints it. The PNG is written to
-  `<out>.<pid>.tmp.png` and renamed into place, so two captures aimed at the
-  same path (agents sharing `shots/godot/<scene>.png`) never leave a torn file.
+  are read again (up to 6); if it stays sheared NOTHING is written to `--out`
+  (a good PNG already there is kept byte for byte) and the run exits 3;
+  `AOV_CAPTURE` carries `shear` and `saved`, and godot-shoot.mjs prints the
+  ratio. A clean frame is written to `<out>.<pid>.tmp.png` and renamed into
+  place, so two captures aimed at the same path (agents sharing
+  `shots/godot/<scene>.png`) never leave a torn file. The rules are one pure
+  function, `main.gd capture_verdict()`: sheared = not saved, exit 3; blank =
+  saved (to show what went wrong), exit 3; a frame whose size differs from
+  `--width/--height` only prints `AOV_CAPTURE_WARN` and never masks the blank
+  or shear verdicts; a save / rename error exits 2. godot-shoot.mjs no longer
+  deletes the old PNG first: it reports "no PNG written (the previous one is
+  left untouched)" when the run did not save one. `--capture_fake=shear,blank,crop`
+  (any mix) swaps the frame for a 4 px row-pitch-sheared, black or 3/4-size
+  copy, for testing. Check: `godot --headless --path godot -s
+  res://game/core/capture_guard_check.gd [-- --no-e2e]` (15 cases, ~1.5 min:
+  the verdict table, the shear metric on a real-looking and a sheared image,
+  then real xvfb captures of `town` to one path: clean = exit 0 + written,
+  sheared = exit 3 with the good PNG unchanged and no temp file, cropped =
+  one warning + exit 0, blank and cropped = exit 3).
   (Gods round 13: a critic's 1420x798 egypt_powers frame came back as diagonal
   scanline smear; every power captured clean at 1420x798 here, shear 0.79-1.03,
-  so the guard and the atomic write are the fix for a cause not reproduced.)
+  so the guard and the atomic write are the fix for a cause not reproduced.
+  Round 14 fixed the round-13 guard, which still saved the sheared frame and had
+  hung the blank check off the size warning so a blank frame of the wrong size
+  exited 0.)
 - `--quit`: same without saving. A watchdog quits (exit 4) after `--timeout`
   seconds (default 600) so a script error never hangs a capture.
 - Scenes: `skirmish town battle godpower coast economy hud stress` (same
@@ -3283,7 +3301,7 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   | Ancestors (Nephthys) | 100, 180, +5; 13 Minions over 13 s in 16 m, dead 60 s after | 9.6 tiles (Atef Crown 120 s) |
   | Son of Osiris (Osiris) | 350, 240, +50; own or ally's Pharaoh -> demigod, chain lightning, heals 15 hp/s; a new Pharaoh later | 609 hp, 50.75 divine per bolt (his own target's hit too: no armor, combat.cpp, x3 vs myth) jumping to 3 more within 4.8 tiles; heals allies 15 hp/s (the Pharaoh's 10 raised, civ.cpp EgyptUnit.heal); an ally's Pharaoh becomes the ally's demigod; the Pharaoh respawns after 90 s; cannot be healed, immune to the aimed powers (below) |
   | Tornado (Horus) | 350, 240, +5; 20 s spiralling out, 25 hack + 100 crush every 0.5 s, full 5 m falling to 15 m, x0.1 Farms, slow 35 % 6 s | Archimedean spiral at 2.5 tiles/s; crush armor 99 % (myth 80 %, siege 85 %); flings units within 3 tiles; own x0.1; flattens the trees within 3 tiles; blocks other powers within 15 m of the funnel |
-  | Meteor (Thoth) | 350, 240, +5; 12 meteors, first at 3 s, then from 6 s on the densest targets, 580 crush + 40 divine in 8 m, knockback | one a second, 4.8 tiles; flattens the trees in each blast; blocks other powers in its 25 m circle; its own fire and glowing craters (sim `Meteor::kind` 1, `Scorch::kind` / `Fire::kind` 1, the craters kept `THOTH_CRATER_LIFE` 90 s; drawn by `thoth_fx`, below) |
+  | Meteor (Thoth) | 350, 240, +5; 12 meteors, first at 3 s, then from 6 s on the densest targets, the last at 18 s, 580 crush + 40 divine in 8 m, knockback | one every 1.2 s (6, 7.2 .. 18 s), 4.8 tiles; flattens the trees in each blast; blocks other powers in its 25 m circle; its own fire and glowing craters (sim `Meteor::kind` 1, `Scorch::kind` / `Fire::kind` 1, the craters kept `THOTH_CRATER_LIFE` 90 s; drawn by `thoth_fx`, below) |
   Their damage is exact (`DK_DIVINE` in combat: no bonus / armor / building factor; the caller
   computes Retold's armor). Counters for checks: `get_power_stats`.
   **Local blocks**: a live Tornado (within its 15 m of the funnel) or Thoth's Meteor (inside

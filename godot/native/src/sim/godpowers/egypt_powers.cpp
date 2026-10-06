@@ -811,7 +811,8 @@ void GodPowers::update_egypt(double dt) {
 	if (!slowed.empty())
 		slowed.erase(std::remove_if(slowed.begin(), slowed.end(), [&](const std::pair<int32_t, double> &p) { return p.second < now; }), slowed.end());
 
-	// Thoth's Meteor: the first on the centre after 3 s, then one a second on the densest targets
+	// Thoth's Meteor: the first on the centre after 3 s, then the other 11 from 6 s every 1.2 s on the
+	// densest targets, the last landing at 18 s (Retold: 18 s, "the other 11 follow after 3 more seconds")
 	for (ThothCast &t : thoth) {
 		if (t.done) continue;
 		while (t.launched < THOTH_METEORS) {
