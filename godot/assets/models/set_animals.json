@@ -1,0 +1,3507 @@
+{
+ "format": 2,
+ "group": "set_animals",
+ "bin": "set_animals.bin.gz",
+ "bytes": 1810624,
+ "rigs": {
+  "gazelle_of_set": {
+   "voxel": 0.06,
+   "anim": "horse",
+   "style": "gazelle",
+   "gait": 1.4,
+   "stride": 0.9,
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "body",
+     "anim": "body",
+     "joint": [
+      0,
+      10,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "gazelle_of_set/body"
+    },
+    {
+     "name": "neck",
+     "anim": "neck",
+     "joint": [
+      0,
+      4,
+      5.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "gazelle_of_set/neck"
+    },
+    {
+     "name": "head",
+     "anim": "head",
+     "joint": [
+      0,
+      6,
+      3
+     ],
+     "parent": "neck",
+     "parentIdx": 1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "gazelle_of_set/head",
+     "rest": [
+      0.1,
+      0,
+      0
+     ]
+    },
+    {
+     "name": "tail",
+     "anim": "tail",
+     "joint": [
+      0,
+      4.5,
+      -6
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "gazelle_of_set/tail"
+    },
+    {
+     "name": "legFL",
+     "anim": "legFL",
+     "joint": [
+      1.4,
+      2,
+      3.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "gazelle_of_set/legFL"
+    },
+    {
+     "name": "cannonFL",
+     "anim": "cannonFL",
+     "joint": [
+      0,
+      -5,
+      0
+     ],
+     "parent": "legFL",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "gazelle_of_set/cannonFL"
+    },
+    {
+     "name": "legFR",
+     "anim": "legFR",
+     "joint": [
+      -1.4,
+      2,
+      3.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "gazelle_of_set/legFR"
+    },
+    {
+     "name": "cannonFR",
+     "anim": "cannonFR",
+     "joint": [
+      0,
+      -5,
+      0
+     ],
+     "parent": "legFR",
+     "parentIdx": 6,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "gazelle_of_set/cannonFR"
+    },
+    {
+     "name": "legBL",
+     "anim": "legBL",
+     "joint": [
+      1.4,
+      2,
+      -3.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "gazelle_of_set/legBL"
+    },
+    {
+     "name": "cannonBL",
+     "anim": "cannonBL",
+     "joint": [
+      0,
+      -5,
+      0
+     ],
+     "parent": "legBL",
+     "parentIdx": 8,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "gazelle_of_set/cannonBL"
+    },
+    {
+     "name": "legBR",
+     "anim": "legBR",
+     "joint": [
+      -1.4,
+      2,
+      -3.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "gazelle_of_set/legBR"
+    },
+    {
+     "name": "cannonBR",
+     "anim": "cannonBR",
+     "joint": [
+      0,
+      -5,
+      0
+     ],
+     "parent": "legBR",
+     "parentIdx": 10,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "gazelle_of_set/cannonBR"
+    }
+   ]
+  },
+  "hyena_of_set": {
+   "voxel": 0.06,
+   "anim": "horse",
+   "style": "hyena",
+   "gait": 1.3,
+   "stride": 0.8,
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "body",
+     "anim": "body",
+     "joint": [
+      0,
+      8,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hyena_of_set/body"
+    },
+    {
+     "name": "neck",
+     "anim": "neck",
+     "joint": [
+      0,
+      5,
+      5.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hyena_of_set/neck"
+    },
+    {
+     "name": "head",
+     "anim": "head",
+     "joint": [
+      0,
+      2.5,
+      3
+     ],
+     "parent": "neck",
+     "parentIdx": 1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hyena_of_set/head",
+     "rest": [
+      0.2,
+      0,
+      0
+     ]
+    },
+    {
+     "name": "tail",
+     "anim": "tail",
+     "joint": [
+      0,
+      3.5,
+      -6
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hyena_of_set/tail"
+    },
+    {
+     "name": "legFL",
+     "anim": "legFL",
+     "joint": [
+      1.6,
+      4,
+      3.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hyena_of_set/legFL"
+    },
+    {
+     "name": "cannonFL",
+     "anim": "cannonFL",
+     "joint": [
+      0,
+      -5,
+      0
+     ],
+     "parent": "legFL",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hyena_of_set/cannonFL"
+    },
+    {
+     "name": "legFR",
+     "anim": "legFR",
+     "joint": [
+      -1.6,
+      4,
+      3.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hyena_of_set/legFR"
+    },
+    {
+     "name": "cannonFR",
+     "anim": "cannonFR",
+     "joint": [
+      0,
+      -5,
+      0
+     ],
+     "parent": "legFR",
+     "parentIdx": 6,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hyena_of_set/cannonFR"
+    },
+    {
+     "name": "legBL",
+     "anim": "legBL",
+     "joint": [
+      1.6,
+      2,
+      -3.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hyena_of_set/legBL"
+    },
+    {
+     "name": "cannonBL",
+     "anim": "cannonBL",
+     "joint": [
+      0,
+      -3,
+      0
+     ],
+     "parent": "legBL",
+     "parentIdx": 8,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hyena_of_set/cannonBL"
+    },
+    {
+     "name": "legBR",
+     "anim": "legBR",
+     "joint": [
+      -1.6,
+      2,
+      -3.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hyena_of_set/legBR"
+    },
+    {
+     "name": "cannonBR",
+     "anim": "cannonBR",
+     "joint": [
+      0,
+      -3,
+      0
+     ],
+     "parent": "legBR",
+     "parentIdx": 10,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hyena_of_set/cannonBR"
+    }
+   ]
+  },
+  "giraffe_of_set": {
+   "voxel": 0.07,
+   "anim": "horse",
+   "style": "giraffe",
+   "gait": 0.8,
+   "stride": 0.75,
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "body",
+     "anim": "body",
+     "joint": [
+      0,
+      15,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "giraffe_of_set/body"
+    },
+    {
+     "name": "neck",
+     "anim": "neck",
+     "joint": [
+      0,
+      5.5,
+      5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "giraffe_of_set/neck"
+    },
+    {
+     "name": "head",
+     "anim": "head",
+     "joint": [
+      0,
+      17,
+      6
+     ],
+     "parent": "neck",
+     "parentIdx": 1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "giraffe_of_set/head",
+     "rest": [
+      0.15,
+      0,
+      0
+     ]
+    },
+    {
+     "name": "tail",
+     "anim": "tail",
+     "joint": [
+      0,
+      5,
+      -5.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "giraffe_of_set/tail"
+    },
+    {
+     "name": "legFL",
+     "anim": "legFL",
+     "joint": [
+      1.6,
+      3,
+      3.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "giraffe_of_set/legFL"
+    },
+    {
+     "name": "cannonFL",
+     "anim": "cannonFL",
+     "joint": [
+      0,
+      -7,
+      0
+     ],
+     "parent": "legFL",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "giraffe_of_set/cannonFL"
+    },
+    {
+     "name": "legFR",
+     "anim": "legFR",
+     "joint": [
+      -1.6,
+      3,
+      3.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "giraffe_of_set/legFR"
+    },
+    {
+     "name": "cannonFR",
+     "anim": "cannonFR",
+     "joint": [
+      0,
+      -7,
+      0
+     ],
+     "parent": "legFR",
+     "parentIdx": 6,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "giraffe_of_set/cannonFR"
+    },
+    {
+     "name": "legBL",
+     "anim": "legBL",
+     "joint": [
+      1.6,
+      2,
+      -3.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "giraffe_of_set/legBL"
+    },
+    {
+     "name": "cannonBL",
+     "anim": "cannonBL",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "legBL",
+     "parentIdx": 8,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "giraffe_of_set/cannonBL"
+    },
+    {
+     "name": "legBR",
+     "anim": "legBR",
+     "joint": [
+      -1.6,
+      2,
+      -3.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "giraffe_of_set/legBR"
+    },
+    {
+     "name": "cannonBR",
+     "anim": "cannonBR",
+     "joint": [
+      0,
+      -6,
+      0
+     ],
+     "parent": "legBR",
+     "parentIdx": 10,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "giraffe_of_set/cannonBR"
+    }
+   ]
+  },
+  "crocodile_of_set": {
+   "voxel": 0.08,
+   "anim": "horse",
+   "style": "croc",
+   "gait": 0.7,
+   "stride": 0.55,
+   "graze": false,
+   "sprawl": true,
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "body",
+     "anim": "body",
+     "joint": [
+      0,
+      1,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "crocodile_of_set/body"
+    },
+    {
+     "name": "neck",
+     "anim": "neck",
+     "joint": [
+      0,
+      1,
+      8.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "crocodile_of_set/neck"
+    },
+    {
+     "name": "tail",
+     "anim": "tailA",
+     "joint": [
+      0,
+      1.8,
+      -8
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "crocodile_of_set/tail"
+    },
+    {
+     "name": "tail2",
+     "anim": "tailB",
+     "joint": [
+      0,
+      -1,
+      -7
+     ],
+     "parent": "tail",
+     "parentIdx": 2,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "crocodile_of_set/tail2"
+    },
+    {
+     "name": "tail3",
+     "anim": "tailC",
+     "joint": [
+      0,
+      -0.7999999999999998,
+      -7
+     ],
+     "parent": "tail2",
+     "parentIdx": 3,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "crocodile_of_set/tail3"
+    },
+    {
+     "name": "legFL",
+     "anim": "legFL",
+     "joint": [
+      2.8,
+      1.5,
+      5.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "crocodile_of_set/legFL"
+    },
+    {
+     "name": "cannonFL",
+     "anim": "cannonFL",
+     "joint": [
+      2.5,
+      0,
+      0
+     ],
+     "parent": "legFL",
+     "parentIdx": 5,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "crocodile_of_set/cannonFL"
+    },
+    {
+     "name": "legFR",
+     "anim": "legFR",
+     "joint": [
+      -2.8,
+      1.5,
+      5.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "crocodile_of_set/legFR"
+    },
+    {
+     "name": "cannonFR",
+     "anim": "cannonFR",
+     "joint": [
+      -2.5,
+      0,
+      0
+     ],
+     "parent": "legFR",
+     "parentIdx": 7,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "crocodile_of_set/cannonFR"
+    },
+    {
+     "name": "legBL",
+     "anim": "legBL",
+     "joint": [
+      2.8,
+      1.5,
+      -5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "crocodile_of_set/legBL"
+    },
+    {
+     "name": "cannonBL",
+     "anim": "cannonBL",
+     "joint": [
+      2.5,
+      0,
+      0
+     ],
+     "parent": "legBL",
+     "parentIdx": 9,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "crocodile_of_set/cannonBL"
+    },
+    {
+     "name": "legBR",
+     "anim": "legBR",
+     "joint": [
+      -2.8,
+      1.5,
+      -5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "crocodile_of_set/legBR"
+    },
+    {
+     "name": "cannonBR",
+     "anim": "cannonBR",
+     "joint": [
+      -2.5,
+      0,
+      0
+     ],
+     "parent": "legBR",
+     "parentIdx": 11,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "crocodile_of_set/cannonBR"
+    }
+   ]
+  },
+  "hippo_of_set": {
+   "voxel": 0.09,
+   "anim": "horse",
+   "style": "hippo",
+   "gait": 0.8,
+   "stride": 0.45,
+   "graze": false,
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "body",
+     "anim": "body",
+     "joint": [
+      0,
+      2.5,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippo_of_set/body"
+    },
+    {
+     "name": "neck",
+     "anim": "neck",
+     "joint": [
+      0,
+      4.5,
+      6
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippo_of_set/neck"
+    },
+    {
+     "name": "tail",
+     "anim": "tail",
+     "joint": [
+      0,
+      5,
+      -6.8
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippo_of_set/tail"
+    },
+    {
+     "name": "legFL",
+     "anim": "legFL",
+     "joint": [
+      2.4,
+      3.5,
+      3.8
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippo_of_set/legFL"
+    },
+    {
+     "name": "cannonFL",
+     "anim": "cannonFL",
+     "joint": [
+      0,
+      -2,
+      0
+     ],
+     "parent": "legFL",
+     "parentIdx": 3,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippo_of_set/cannonFL"
+    },
+    {
+     "name": "legFR",
+     "anim": "legFR",
+     "joint": [
+      -2.4,
+      3.5,
+      3.8
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippo_of_set/legFR"
+    },
+    {
+     "name": "cannonFR",
+     "anim": "cannonFR",
+     "joint": [
+      0,
+      -2,
+      0
+     ],
+     "parent": "legFR",
+     "parentIdx": 5,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippo_of_set/cannonFR"
+    },
+    {
+     "name": "legBL",
+     "anim": "legBL",
+     "joint": [
+      2.4,
+      3.5,
+      -3.8
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippo_of_set/legBL"
+    },
+    {
+     "name": "cannonBL",
+     "anim": "cannonBL",
+     "joint": [
+      0,
+      -2,
+      0
+     ],
+     "parent": "legBL",
+     "parentIdx": 7,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippo_of_set/cannonBL"
+    },
+    {
+     "name": "legBR",
+     "anim": "legBR",
+     "joint": [
+      -2.4,
+      3.5,
+      -3.8
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippo_of_set/legBR"
+    },
+    {
+     "name": "cannonBR",
+     "anim": "cannonBR",
+     "joint": [
+      0,
+      -2,
+      0
+     ],
+     "parent": "legBR",
+     "parentIdx": 9,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "hippo_of_set/cannonBR"
+    }
+   ]
+  },
+  "rhino_of_set": {
+   "voxel": 0.09,
+   "anim": "horse",
+   "style": "rhino",
+   "gait": 0.85,
+   "stride": 0.55,
+   "graze": false,
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "body",
+     "anim": "body",
+     "joint": [
+      0,
+      5,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "rhino_of_set/body"
+    },
+    {
+     "name": "neck",
+     "anim": "neck",
+     "joint": [
+      0,
+      3.5,
+      6.4
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "rhino_of_set/neck",
+     "rest": [
+      0.2,
+      0,
+      0
+     ]
+    },
+    {
+     "name": "tail",
+     "anim": "tail",
+     "joint": [
+      0,
+      4.5,
+      -6.8
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "rhino_of_set/tail"
+    },
+    {
+     "name": "legFL",
+     "anim": "legFL",
+     "joint": [
+      2,
+      3,
+      3.8
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "rhino_of_set/legFL"
+    },
+    {
+     "name": "cannonFL",
+     "anim": "cannonFL",
+     "joint": [
+      0,
+      -3,
+      0
+     ],
+     "parent": "legFL",
+     "parentIdx": 3,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "rhino_of_set/cannonFL"
+    },
+    {
+     "name": "legFR",
+     "anim": "legFR",
+     "joint": [
+      -2,
+      3,
+      3.8
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "rhino_of_set/legFR"
+    },
+    {
+     "name": "cannonFR",
+     "anim": "cannonFR",
+     "joint": [
+      0,
+      -3,
+      0
+     ],
+     "parent": "legFR",
+     "parentIdx": 5,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "rhino_of_set/cannonFR"
+    },
+    {
+     "name": "legBL",
+     "anim": "legBL",
+     "joint": [
+      2,
+      3,
+      -3.8
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "rhino_of_set/legBL"
+    },
+    {
+     "name": "cannonBL",
+     "anim": "cannonBL",
+     "joint": [
+      0,
+      -3,
+      0
+     ],
+     "parent": "legBL",
+     "parentIdx": 7,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "rhino_of_set/cannonBL"
+    },
+    {
+     "name": "legBR",
+     "anim": "legBR",
+     "joint": [
+      -2,
+      3,
+      -3.8
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "rhino_of_set/legBR"
+    },
+    {
+     "name": "cannonBR",
+     "anim": "cannonBR",
+     "joint": [
+      0,
+      -3,
+      0
+     ],
+     "parent": "legBR",
+     "parentIdx": 9,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "rhino_of_set/cannonBR"
+    }
+   ]
+  },
+  "elephant_of_set": {
+   "voxel": 0.1,
+   "anim": "horse",
+   "style": "elephant",
+   "gait": 0.55,
+   "stride": 0.6,
+   "graze": false,
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "body",
+     "anim": "body",
+     "joint": [
+      0,
+      8,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "elephant_of_set/body"
+    },
+    {
+     "name": "neck",
+     "anim": "neck",
+     "joint": [
+      0,
+      7,
+      7.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "elephant_of_set/neck"
+    },
+    {
+     "name": "tail",
+     "anim": "tail",
+     "joint": [
+      0,
+      8,
+      -7.2
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "elephant_of_set/tail"
+    },
+    {
+     "name": "legFL",
+     "anim": "legFL",
+     "joint": [
+      2.6,
+      4,
+      4.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "elephant_of_set/legFL"
+    },
+    {
+     "name": "cannonFL",
+     "anim": "cannonFL",
+     "joint": [
+      0,
+      -5,
+      0
+     ],
+     "parent": "legFL",
+     "parentIdx": 3,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "elephant_of_set/cannonFL"
+    },
+    {
+     "name": "legFR",
+     "anim": "legFR",
+     "joint": [
+      -2.6,
+      4,
+      4.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "elephant_of_set/legFR"
+    },
+    {
+     "name": "cannonFR",
+     "anim": "cannonFR",
+     "joint": [
+      0,
+      -5,
+      0
+     ],
+     "parent": "legFR",
+     "parentIdx": 5,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "elephant_of_set/cannonFR"
+    },
+    {
+     "name": "legBL",
+     "anim": "legBL",
+     "joint": [
+      2.6,
+      4,
+      -4.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "elephant_of_set/legBL"
+    },
+    {
+     "name": "cannonBL",
+     "anim": "cannonBL",
+     "joint": [
+      0,
+      -5,
+      0
+     ],
+     "parent": "legBL",
+     "parentIdx": 7,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "elephant_of_set/cannonBL"
+    },
+    {
+     "name": "legBR",
+     "anim": "legBR",
+     "joint": [
+      -2.6,
+      4,
+      -4.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "elephant_of_set/legBR"
+    },
+    {
+     "name": "cannonBR",
+     "anim": "cannonBR",
+     "joint": [
+      0,
+      -5,
+      0
+     ],
+     "parent": "legBR",
+     "parentIdx": 9,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "elephant_of_set/cannonBR"
+    }
+   ]
+  },
+  "deer_of_set": {
+   "voxel": 0.065,
+   "anim": "horse",
+   "style": "deer",
+   "gait": 1.3,
+   "stride": 0.85,
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "body",
+     "anim": "body",
+     "joint": [
+      0,
+      10,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "deer_of_set/body"
+    },
+    {
+     "name": "neck",
+     "anim": "neck",
+     "joint": [
+      0,
+      4,
+      5.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "deer_of_set/neck"
+    },
+    {
+     "name": "head",
+     "anim": "head",
+     "joint": [
+      0,
+      5.5,
+      3
+     ],
+     "parent": "neck",
+     "parentIdx": 1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "deer_of_set/head",
+     "rest": [
+      0.1,
+      0,
+      0
+     ]
+    },
+    {
+     "name": "tail",
+     "anim": "tail",
+     "joint": [
+      0,
+      4.5,
+      -5.8
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "deer_of_set/tail"
+    },
+    {
+     "name": "legFL",
+     "anim": "legFL",
+     "joint": [
+      1.4,
+      2,
+      3.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "deer_of_set/legFL"
+    },
+    {
+     "name": "cannonFL",
+     "anim": "cannonFL",
+     "joint": [
+      0,
+      -5,
+      0
+     ],
+     "parent": "legFL",
+     "parentIdx": 4,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "deer_of_set/cannonFL"
+    },
+    {
+     "name": "legFR",
+     "anim": "legFR",
+     "joint": [
+      -1.4,
+      2,
+      3.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "deer_of_set/legFR"
+    },
+    {
+     "name": "cannonFR",
+     "anim": "cannonFR",
+     "joint": [
+      0,
+      -5,
+      0
+     ],
+     "parent": "legFR",
+     "parentIdx": 6,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "deer_of_set/cannonFR"
+    },
+    {
+     "name": "legBL",
+     "anim": "legBL",
+     "joint": [
+      1.4,
+      2,
+      -3.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "deer_of_set/legBL"
+    },
+    {
+     "name": "cannonBL",
+     "anim": "cannonBL",
+     "joint": [
+      0,
+      -5,
+      0
+     ],
+     "parent": "legBL",
+     "parentIdx": 8,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "deer_of_set/cannonBL"
+    },
+    {
+     "name": "legBR",
+     "anim": "legBR",
+     "joint": [
+      -1.4,
+      2,
+      -3.5
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "deer_of_set/legBR"
+    },
+    {
+     "name": "cannonBR",
+     "anim": "cannonBR",
+     "joint": [
+      0,
+      -5,
+      0
+     ],
+     "parent": "legBR",
+     "parentIdx": 10,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "deer_of_set/cannonBR"
+    }
+   ]
+  },
+  "boar_of_set": {
+   "voxel": 0.08,
+   "anim": "horse",
+   "style": "boar",
+   "gait": 1.2,
+   "stride": 0.6,
+   "graze": false,
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "body",
+     "anim": "body",
+     "joint": [
+      0,
+      4,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "boar_of_set/body"
+    },
+    {
+     "name": "neck",
+     "anim": "neck",
+     "joint": [
+      0,
+      3.5,
+      5.2
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "boar_of_set/neck",
+     "rest": [
+      0.15,
+      0,
+      0
+     ]
+    },
+    {
+     "name": "tail",
+     "anim": "tail",
+     "joint": [
+      0,
+      4.5,
+      -5.6
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "boar_of_set/tail"
+    },
+    {
+     "name": "legFL",
+     "anim": "legFL",
+     "joint": [
+      1.8,
+      2.5,
+      3
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "boar_of_set/legFL"
+    },
+    {
+     "name": "cannonFL",
+     "anim": "cannonFL",
+     "joint": [
+      0,
+      -2,
+      0
+     ],
+     "parent": "legFL",
+     "parentIdx": 3,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "boar_of_set/cannonFL"
+    },
+    {
+     "name": "legFR",
+     "anim": "legFR",
+     "joint": [
+      -1.8,
+      2.5,
+      3
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "boar_of_set/legFR"
+    },
+    {
+     "name": "cannonFR",
+     "anim": "cannonFR",
+     "joint": [
+      0,
+      -2,
+      0
+     ],
+     "parent": "legFR",
+     "parentIdx": 5,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "boar_of_set/cannonFR"
+    },
+    {
+     "name": "legBL",
+     "anim": "legBL",
+     "joint": [
+      1.8,
+      2.5,
+      -3
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "boar_of_set/legBL"
+    },
+    {
+     "name": "cannonBL",
+     "anim": "cannonBL",
+     "joint": [
+      0,
+      -2,
+      0
+     ],
+     "parent": "legBL",
+     "parentIdx": 7,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "boar_of_set/cannonBL"
+    },
+    {
+     "name": "legBR",
+     "anim": "legBR",
+     "joint": [
+      -1.8,
+      2.5,
+      -3
+     ],
+     "parent": "body",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "boar_of_set/legBR"
+    },
+    {
+     "name": "cannonBR",
+     "anim": "cannonBR",
+     "joint": [
+      0,
+      -2,
+      0
+     ],
+     "parent": "legBR",
+     "parentIdx": 9,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "boar_of_set/cannonBR"
+    }
+   ]
+  }
+ },
+ "unitTypes": [
+  "gazelle_of_set",
+  "hyena_of_set",
+  "giraffe_of_set",
+  "crocodile_of_set",
+  "hippo_of_set",
+  "rhino_of_set",
+  "elephant_of_set",
+  "deer_of_set",
+  "boar_of_set"
+ ],
+ "models": {
+  "gazelle_of_set/body": {
+   "vertices": 1000,
+   "indices": 1500,
+   "aabb": [
+    -0.12,
+    0.06,
+    -0.3,
+    0.18,
+    0.42,
+    0.36
+   ],
+   "position": 0,
+   "normal": 12000,
+   "color": 24000,
+   "extra": 28000,
+   "index": 32000
+  },
+  "gazelle_of_set/neck": {
+   "vertices": 528,
+   "indices": 792,
+   "aabb": [
+    -0.06,
+    -0.06,
+    -0.06,
+    0.12,
+    0.48,
+    0.3
+   ],
+   "position": 38000,
+   "normal": 44336,
+   "color": 50672,
+   "extra": 52784,
+   "index": 54896
+  },
+  "gazelle_of_set/head": {
+   "vertices": 720,
+   "indices": 1080,
+   "aabb": [
+    -0.18,
+    0,
+    -0.12,
+    0.24,
+    0.54,
+    0.3
+   ],
+   "position": 58064,
+   "normal": 66704,
+   "color": 75344,
+   "extra": 78224,
+   "index": 81104
+  },
+  "gazelle_of_set/tail": {
+   "vertices": 72,
+   "indices": 108,
+   "aabb": [
+    0,
+    -0.18,
+    0,
+    0.06,
+    0.06,
+    0.06
+   ],
+   "position": 85424,
+   "normal": 86288,
+   "color": 87152,
+   "extra": 87440,
+   "index": 87728
+  },
+  "gazelle_of_set/legFL": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.06,
+    -0.36,
+    -0.06,
+    0.06,
+    0,
+    0.06
+   ],
+   "position": 88160,
+   "normal": 90848,
+   "color": 93536,
+   "extra": 94432,
+   "index": 95328
+  },
+  "gazelle_of_set/cannonFL": {
+   "vertices": 176,
+   "indices": 264,
+   "aabb": [
+    -0.06,
+    -0.54,
+    -0.06,
+    0.06,
+    0,
+    0
+   ],
+   "position": 96672,
+   "normal": 98784,
+   "color": 100896,
+   "extra": 101600,
+   "index": 102304
+  },
+  "gazelle_of_set/legFR": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.06,
+    -0.36,
+    -0.06,
+    0.06,
+    0,
+    0.06
+   ],
+   "position": 103360,
+   "normal": 106048,
+   "color": 108736,
+   "extra": 109632,
+   "index": 110528
+  },
+  "gazelle_of_set/cannonFR": {
+   "vertices": 176,
+   "indices": 264,
+   "aabb": [
+    -0.06,
+    -0.54,
+    -0.06,
+    0.06,
+    0,
+    0
+   ],
+   "position": 111872,
+   "normal": 113984,
+   "color": 116096,
+   "extra": 116800,
+   "index": 117504
+  },
+  "gazelle_of_set/legBL": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.06,
+    -0.36,
+    -0.06,
+    0.06,
+    0,
+    0.06
+   ],
+   "position": 118560,
+   "normal": 121248,
+   "color": 123936,
+   "extra": 124832,
+   "index": 125728
+  },
+  "gazelle_of_set/cannonBL": {
+   "vertices": 176,
+   "indices": 264,
+   "aabb": [
+    -0.06,
+    -0.54,
+    -0.06,
+    0.06,
+    0,
+    0
+   ],
+   "position": 127072,
+   "normal": 129184,
+   "color": 131296,
+   "extra": 132000,
+   "index": 132704
+  },
+  "gazelle_of_set/legBR": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.06,
+    -0.36,
+    -0.06,
+    0.06,
+    0,
+    0.06
+   ],
+   "position": 133760,
+   "normal": 136448,
+   "color": 139136,
+   "extra": 140032,
+   "index": 140928
+  },
+  "gazelle_of_set/cannonBR": {
+   "vertices": 176,
+   "indices": 264,
+   "aabb": [
+    -0.06,
+    -0.54,
+    -0.06,
+    0.06,
+    0,
+    0
+   ],
+   "position": 142272,
+   "normal": 144384,
+   "color": 146496,
+   "extra": 147200,
+   "index": 147904
+  },
+  "hyena_of_set/body": {
+   "vertices": 1408,
+   "indices": 2112,
+   "aabb": [
+    -0.12,
+    0,
+    -0.36,
+    0.18,
+    0.48,
+    0.42
+   ],
+   "position": 148960,
+   "normal": 165856,
+   "color": 182752,
+   "extra": 188384,
+   "index": 194016
+  },
+  "hyena_of_set/neck": {
+   "vertices": 608,
+   "indices": 912,
+   "aabb": [
+    -0.12,
+    -0.12,
+    -0.12,
+    0.18,
+    0.3,
+    0.3
+   ],
+   "position": 202464,
+   "normal": 209760,
+   "color": 217056,
+   "extra": 219488,
+   "index": 221920
+  },
+  "hyena_of_set/head": {
+   "vertices": 736,
+   "indices": 1104,
+   "aabb": [
+    -0.18,
+    -0.12,
+    -0.06,
+    0.24,
+    0.3,
+    0.42
+   ],
+   "position": 225568,
+   "normal": 234400,
+   "color": 243232,
+   "extra": 246176,
+   "index": 249120
+  },
+  "hyena_of_set/tail": {
+   "vertices": 88,
+   "indices": 132,
+   "aabb": [
+    0,
+    -0.3,
+    0,
+    0.06,
+    0,
+    0.06
+   ],
+   "position": 253536,
+   "normal": 254592,
+   "color": 255648,
+   "extra": 256000,
+   "index": 256352
+  },
+  "hyena_of_set/legFL": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.06,
+    -0.36,
+    -0.06,
+    0.06,
+    0,
+    0.06
+   ],
+   "position": 256880,
+   "normal": 259568,
+   "color": 262256,
+   "extra": 263152,
+   "index": 264048
+  },
+  "hyena_of_set/cannonFL": {
+   "vertices": 280,
+   "indices": 420,
+   "aabb": [
+    -0.06,
+    -0.42,
+    -0.06,
+    0.06,
+    0,
+    0.12
+   ],
+   "position": 265392,
+   "normal": 268752,
+   "color": 272112,
+   "extra": 273232,
+   "index": 274352
+  },
+  "hyena_of_set/legFR": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.06,
+    -0.36,
+    -0.06,
+    0.06,
+    0,
+    0.06
+   ],
+   "position": 276032,
+   "normal": 278720,
+   "color": 281408,
+   "extra": 282304,
+   "index": 283200
+  },
+  "hyena_of_set/cannonFR": {
+   "vertices": 280,
+   "indices": 420,
+   "aabb": [
+    -0.06,
+    -0.42,
+    -0.06,
+    0.06,
+    0,
+    0.12
+   ],
+   "position": 284544,
+   "normal": 287904,
+   "color": 291264,
+   "extra": 292384,
+   "index": 293504
+  },
+  "hyena_of_set/legBL": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.06,
+    -0.24,
+    -0.06,
+    0.06,
+    0.12,
+    0.06
+   ],
+   "position": 295184,
+   "normal": 297872,
+   "color": 300560,
+   "extra": 301456,
+   "index": 302352
+  },
+  "hyena_of_set/cannonBL": {
+   "vertices": 280,
+   "indices": 420,
+   "aabb": [
+    -0.06,
+    -0.42,
+    -0.06,
+    0.06,
+    0,
+    0.12
+   ],
+   "position": 303696,
+   "normal": 307056,
+   "color": 310416,
+   "extra": 311536,
+   "index": 312656
+  },
+  "hyena_of_set/legBR": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.06,
+    -0.24,
+    -0.06,
+    0.06,
+    0.12,
+    0.06
+   ],
+   "position": 314336,
+   "normal": 317024,
+   "color": 319712,
+   "extra": 320608,
+   "index": 321504
+  },
+  "hyena_of_set/cannonBR": {
+   "vertices": 280,
+   "indices": 420,
+   "aabb": [
+    -0.06,
+    -0.42,
+    -0.06,
+    0.06,
+    0,
+    0.12
+   ],
+   "position": 322848,
+   "normal": 326208,
+   "color": 329568,
+   "extra": 330688,
+   "index": 331808
+  },
+  "giraffe_of_set/body": {
+   "vertices": 1272,
+   "indices": 1908,
+   "aabb": [
+    -0.14,
+    0,
+    -0.35,
+    0.21,
+    0.56,
+    0.49
+   ],
+   "position": 333488,
+   "normal": 348752,
+   "color": 364016,
+   "extra": 369104,
+   "index": 374192
+  },
+  "giraffe_of_set/neck": {
+   "vertices": 1192,
+   "indices": 1788,
+   "aabb": [
+    -0.07,
+    -0.07,
+    -0.07,
+    0.14,
+    1.33,
+    0.56
+   ],
+   "position": 381824,
+   "normal": 396128,
+   "color": 410432,
+   "extra": 415200,
+   "index": 419968
+  },
+  "giraffe_of_set/head": {
+   "vertices": 600,
+   "indices": 900,
+   "aabb": [
+    -0.21,
+    -0.07,
+    -0.07,
+    0.28,
+    0.35,
+    0.49
+   ],
+   "position": 427120,
+   "normal": 434320,
+   "color": 441520,
+   "extra": 443920,
+   "index": 446320
+  },
+  "giraffe_of_set/tail": {
+   "vertices": 152,
+   "indices": 228,
+   "aabb": [
+    0,
+    -0.56,
+    0,
+    0.14,
+    0,
+    0.07
+   ],
+   "position": 449920,
+   "normal": 451744,
+   "color": 453568,
+   "extra": 454176,
+   "index": 454784
+  },
+  "giraffe_of_set/legFL": {
+   "vertices": 288,
+   "indices": 432,
+   "aabb": [
+    -0.07,
+    -0.56,
+    -0.07,
+    0.07,
+    0,
+    0.07
+   ],
+   "position": 455696,
+   "normal": 459152,
+   "color": 462608,
+   "extra": 463760,
+   "index": 464912
+  },
+  "giraffe_of_set/cannonFL": {
+   "vertices": 384,
+   "indices": 576,
+   "aabb": [
+    -0.07,
+    -0.77,
+    -0.07,
+    0.07,
+    0,
+    0.07
+   ],
+   "position": 466640,
+   "normal": 471248,
+   "color": 475856,
+   "extra": 477392,
+   "index": 478928
+  },
+  "giraffe_of_set/legFR": {
+   "vertices": 288,
+   "indices": 432,
+   "aabb": [
+    -0.07,
+    -0.56,
+    -0.07,
+    0.07,
+    0,
+    0.07
+   ],
+   "position": 481232,
+   "normal": 484688,
+   "color": 488144,
+   "extra": 489296,
+   "index": 490448
+  },
+  "giraffe_of_set/cannonFR": {
+   "vertices": 384,
+   "indices": 576,
+   "aabb": [
+    -0.07,
+    -0.77,
+    -0.07,
+    0.07,
+    0,
+    0.07
+   ],
+   "position": 492176,
+   "normal": 496784,
+   "color": 501392,
+   "extra": 502928,
+   "index": 504464
+  },
+  "giraffe_of_set/legBL": {
+   "vertices": 288,
+   "indices": 432,
+   "aabb": [
+    -0.07,
+    -0.49,
+    -0.07,
+    0.07,
+    0.07,
+    0.07
+   ],
+   "position": 506768,
+   "normal": 510224,
+   "color": 513680,
+   "extra": 514832,
+   "index": 515984
+  },
+  "giraffe_of_set/cannonBL": {
+   "vertices": 384,
+   "indices": 576,
+   "aabb": [
+    -0.07,
+    -0.77,
+    -0.07,
+    0.07,
+    0,
+    0.07
+   ],
+   "position": 517712,
+   "normal": 522320,
+   "color": 526928,
+   "extra": 528464,
+   "index": 530000
+  },
+  "giraffe_of_set/legBR": {
+   "vertices": 288,
+   "indices": 432,
+   "aabb": [
+    -0.07,
+    -0.49,
+    -0.07,
+    0.07,
+    0.07,
+    0.07
+   ],
+   "position": 532304,
+   "normal": 535760,
+   "color": 539216,
+   "extra": 540368,
+   "index": 541520
+  },
+  "giraffe_of_set/cannonBR": {
+   "vertices": 384,
+   "indices": 576,
+   "aabb": [
+    -0.07,
+    -0.77,
+    -0.07,
+    0.07,
+    0,
+    0.07
+   ],
+   "position": 543248,
+   "normal": 547856,
+   "color": 552464,
+   "extra": 554000,
+   "index": 555536
+  },
+  "crocodile_of_set/body": {
+   "vertices": 1944,
+   "indices": 2916,
+   "aabb": [
+    -0.24,
+    0,
+    -0.64,
+    0.32,
+    0.4,
+    0.72
+   ],
+   "position": 557840,
+   "normal": 581168,
+   "color": 604496,
+   "extra": 612272,
+   "index": 620048
+  },
+  "crocodile_of_set/neck": {
+   "vertices": 992,
+   "indices": 1488,
+   "aabb": [
+    -0.16,
+    -0.16,
+    0,
+    0.24,
+    0.24,
+    0.96
+   ],
+   "position": 631712,
+   "normal": 643616,
+   "color": 655520,
+   "extra": 659488,
+   "index": 663456
+  },
+  "crocodile_of_set/tail": {
+   "vertices": 608,
+   "indices": 912,
+   "aabb": [
+    -0.16,
+    -0.16,
+    -0.48,
+    0.24,
+    0.32,
+    0.08
+   ],
+   "position": 669408,
+   "normal": 676704,
+   "color": 684000,
+   "extra": 686432,
+   "index": 688864
+  },
+  "crocodile_of_set/tail2": {
+   "vertices": 448,
+   "indices": 672,
+   "aabb": [
+    -0.08,
+    -0.08,
+    -0.48,
+    0.16,
+    0.24,
+    0.08
+   ],
+   "position": 692512,
+   "normal": 697888,
+   "color": 703264,
+   "extra": 705056,
+   "index": 706848
+  },
+  "crocodile_of_set/tail3": {
+   "vertices": 336,
+   "indices": 504,
+   "aabb": [
+    -0.08,
+    -0.08,
+    -0.48,
+    0.16,
+    0.24,
+    0.08
+   ],
+   "position": 709536,
+   "normal": 713568,
+   "color": 717600,
+   "extra": 718944,
+   "index": 720288
+  },
+  "crocodile_of_set/legFL": {
+   "vertices": 128,
+   "indices": 192,
+   "aabb": [
+    0,
+    -0.08,
+    -0.08,
+    0.24,
+    0.08,
+    0.08
+   ],
+   "position": 722304,
+   "normal": 723840,
+   "color": 725376,
+   "extra": 725888,
+   "index": 726400
+  },
+  "crocodile_of_set/cannonFL": {
+   "vertices": 216,
+   "indices": 324,
+   "aabb": [
+    -0.04,
+    -0.16,
+    -0.16,
+    0.28,
+    0.08,
+    0.16
+   ],
+   "position": 727168,
+   "normal": 729760,
+   "color": 732352,
+   "extra": 733216,
+   "index": 734080
+  },
+  "crocodile_of_set/legFR": {
+   "vertices": 128,
+   "indices": 192,
+   "aabb": [
+    -0.24,
+    -0.08,
+    -0.08,
+    0,
+    0.08,
+    0.08
+   ],
+   "position": 735376,
+   "normal": 736912,
+   "color": 738448,
+   "extra": 738960,
+   "index": 739472
+  },
+  "crocodile_of_set/cannonFR": {
+   "vertices": 216,
+   "indices": 324,
+   "aabb": [
+    -0.28,
+    -0.16,
+    -0.16,
+    0.04,
+    0.08,
+    0.16
+   ],
+   "position": 740240,
+   "normal": 742832,
+   "color": 745424,
+   "extra": 746288,
+   "index": 747152
+  },
+  "crocodile_of_set/legBL": {
+   "vertices": 128,
+   "indices": 192,
+   "aabb": [
+    0,
+    -0.08,
+    -0.08,
+    0.24,
+    0.08,
+    0.08
+   ],
+   "position": 748448,
+   "normal": 749984,
+   "color": 751520,
+   "extra": 752032,
+   "index": 752544
+  },
+  "crocodile_of_set/cannonBL": {
+   "vertices": 216,
+   "indices": 324,
+   "aabb": [
+    -0.04,
+    -0.16,
+    -0.16,
+    0.28,
+    0.08,
+    0.16
+   ],
+   "position": 753312,
+   "normal": 755904,
+   "color": 758496,
+   "extra": 759360,
+   "index": 760224
+  },
+  "crocodile_of_set/legBR": {
+   "vertices": 128,
+   "indices": 192,
+   "aabb": [
+    -0.24,
+    -0.08,
+    -0.08,
+    0,
+    0.08,
+    0.08
+   ],
+   "position": 761520,
+   "normal": 763056,
+   "color": 764592,
+   "extra": 765104,
+   "index": 765616
+  },
+  "crocodile_of_set/cannonBR": {
+   "vertices": 216,
+   "indices": 324,
+   "aabb": [
+    -0.28,
+    -0.16,
+    -0.16,
+    0.04,
+    0.08,
+    0.16
+   ],
+   "position": 766384,
+   "normal": 768976,
+   "color": 771568,
+   "extra": 772432,
+   "index": 773296
+  },
+  "hippo_of_set/body": {
+   "vertices": 1776,
+   "indices": 2664,
+   "aabb": [
+    -0.36,
+    0.09,
+    -0.54,
+    0.45,
+    0.72,
+    0.63
+   ],
+   "position": 774592,
+   "normal": 795904,
+   "color": 817216,
+   "extra": 824320,
+   "index": 831424
+  },
+  "hippo_of_set/neck": {
+   "vertices": 1288,
+   "indices": 1932,
+   "aabb": [
+    -0.27,
+    -0.27,
+    0,
+    0.36,
+    0.45,
+    0.81
+   ],
+   "position": 842080,
+   "normal": 857536,
+   "color": 872992,
+   "extra": 878144,
+   "index": 883296
+  },
+  "hippo_of_set/tail": {
+   "vertices": 56,
+   "indices": 84,
+   "aabb": [
+    0,
+    -0.27,
+    0,
+    0.09,
+    0,
+    0.09
+   ],
+   "position": 891024,
+   "normal": 891696,
+   "color": 892368,
+   "extra": 892592,
+   "index": 892816
+  },
+  "hippo_of_set/legFL": {
+   "vertices": 216,
+   "indices": 324,
+   "aabb": [
+    -0.135,
+    -0.27,
+    -0.135,
+    0.135,
+    0,
+    0.135
+   ],
+   "position": 893152,
+   "normal": 895744,
+   "color": 898336,
+   "extra": 899200,
+   "index": 900064
+  },
+  "hippo_of_set/cannonFL": {
+   "vertices": 280,
+   "indices": 420,
+   "aabb": [
+    -0.135,
+    -0.36,
+    -0.135,
+    0.135,
+    0,
+    0.225
+   ],
+   "position": 901360,
+   "normal": 904720,
+   "color": 908080,
+   "extra": 909200,
+   "index": 910320
+  },
+  "hippo_of_set/legFR": {
+   "vertices": 216,
+   "indices": 324,
+   "aabb": [
+    -0.135,
+    -0.27,
+    -0.135,
+    0.135,
+    0,
+    0.135
+   ],
+   "position": 912000,
+   "normal": 914592,
+   "color": 917184,
+   "extra": 918048,
+   "index": 918912
+  },
+  "hippo_of_set/cannonFR": {
+   "vertices": 280,
+   "indices": 420,
+   "aabb": [
+    -0.135,
+    -0.36,
+    -0.135,
+    0.135,
+    0,
+    0.225
+   ],
+   "position": 920208,
+   "normal": 923568,
+   "color": 926928,
+   "extra": 928048,
+   "index": 929168
+  },
+  "hippo_of_set/legBL": {
+   "vertices": 216,
+   "indices": 324,
+   "aabb": [
+    -0.135,
+    -0.27,
+    -0.135,
+    0.135,
+    0,
+    0.135
+   ],
+   "position": 930848,
+   "normal": 933440,
+   "color": 936032,
+   "extra": 936896,
+   "index": 937760
+  },
+  "hippo_of_set/cannonBL": {
+   "vertices": 280,
+   "indices": 420,
+   "aabb": [
+    -0.135,
+    -0.36,
+    -0.135,
+    0.135,
+    0,
+    0.225
+   ],
+   "position": 939056,
+   "normal": 942416,
+   "color": 945776,
+   "extra": 946896,
+   "index": 948016
+  },
+  "hippo_of_set/legBR": {
+   "vertices": 216,
+   "indices": 324,
+   "aabb": [
+    -0.135,
+    -0.27,
+    -0.135,
+    0.135,
+    0,
+    0.135
+   ],
+   "position": 949696,
+   "normal": 952288,
+   "color": 954880,
+   "extra": 955744,
+   "index": 956608
+  },
+  "hippo_of_set/cannonBR": {
+   "vertices": 280,
+   "indices": 420,
+   "aabb": [
+    -0.135,
+    -0.36,
+    -0.135,
+    0.135,
+    0,
+    0.225
+   ],
+   "position": 957904,
+   "normal": 961264,
+   "color": 964624,
+   "extra": 965744,
+   "index": 966864
+  },
+  "rhino_of_set/body": {
+   "vertices": 1568,
+   "indices": 2352,
+   "aabb": [
+    -0.27,
+    0.09,
+    -0.54,
+    0.36,
+    0.72,
+    0.63
+   ],
+   "position": 968544,
+   "normal": 987360,
+   "color": 1006176,
+   "extra": 1012448,
+   "index": 1018720
+  },
+  "rhino_of_set/neck": {
+   "vertices": 1016,
+   "indices": 1524,
+   "aabb": [
+    -0.18,
+    -0.18,
+    0,
+    0.27,
+    0.63,
+    0.72
+   ],
+   "position": 1028128,
+   "normal": 1040320,
+   "color": 1052512,
+   "extra": 1056576,
+   "index": 1060640
+  },
+  "rhino_of_set/tail": {
+   "vertices": 72,
+   "indices": 108,
+   "aabb": [
+    0,
+    -0.36,
+    0,
+    0.09,
+    0,
+    0.09
+   ],
+   "position": 1066736,
+   "normal": 1067600,
+   "color": 1068464,
+   "extra": 1068752,
+   "index": 1069040
+  },
+  "rhino_of_set/legFL": {
+   "vertices": 264,
+   "indices": 396,
+   "aabb": [
+    -0.135,
+    -0.36,
+    -0.135,
+    0.135,
+    0,
+    0.135
+   ],
+   "position": 1069472,
+   "normal": 1072640,
+   "color": 1075808,
+   "extra": 1076864,
+   "index": 1077920
+  },
+  "rhino_of_set/cannonFL": {
+   "vertices": 312,
+   "indices": 468,
+   "aabb": [
+    -0.135,
+    -0.45,
+    -0.135,
+    0.135,
+    0,
+    0.135
+   ],
+   "position": 1079504,
+   "normal": 1083248,
+   "color": 1086992,
+   "extra": 1088240,
+   "index": 1089488
+  },
+  "rhino_of_set/legFR": {
+   "vertices": 264,
+   "indices": 396,
+   "aabb": [
+    -0.135,
+    -0.36,
+    -0.135,
+    0.135,
+    0,
+    0.135
+   ],
+   "position": 1091360,
+   "normal": 1094528,
+   "color": 1097696,
+   "extra": 1098752,
+   "index": 1099808
+  },
+  "rhino_of_set/cannonFR": {
+   "vertices": 312,
+   "indices": 468,
+   "aabb": [
+    -0.135,
+    -0.45,
+    -0.135,
+    0.135,
+    0,
+    0.135
+   ],
+   "position": 1101392,
+   "normal": 1105136,
+   "color": 1108880,
+   "extra": 1110128,
+   "index": 1111376
+  },
+  "rhino_of_set/legBL": {
+   "vertices": 264,
+   "indices": 396,
+   "aabb": [
+    -0.135,
+    -0.36,
+    -0.135,
+    0.135,
+    0,
+    0.135
+   ],
+   "position": 1113248,
+   "normal": 1116416,
+   "color": 1119584,
+   "extra": 1120640,
+   "index": 1121696
+  },
+  "rhino_of_set/cannonBL": {
+   "vertices": 312,
+   "indices": 468,
+   "aabb": [
+    -0.135,
+    -0.45,
+    -0.135,
+    0.135,
+    0,
+    0.135
+   ],
+   "position": 1123280,
+   "normal": 1127024,
+   "color": 1130768,
+   "extra": 1132016,
+   "index": 1133264
+  },
+  "rhino_of_set/legBR": {
+   "vertices": 264,
+   "indices": 396,
+   "aabb": [
+    -0.135,
+    -0.36,
+    -0.135,
+    0.135,
+    0,
+    0.135
+   ],
+   "position": 1135136,
+   "normal": 1138304,
+   "color": 1141472,
+   "extra": 1142528,
+   "index": 1143584
+  },
+  "rhino_of_set/cannonBR": {
+   "vertices": 312,
+   "indices": 468,
+   "aabb": [
+    -0.135,
+    -0.45,
+    -0.135,
+    0.135,
+    0,
+    0.135
+   ],
+   "position": 1145168,
+   "normal": 1148912,
+   "color": 1152656,
+   "extra": 1153904,
+   "index": 1155152
+  },
+  "elephant_of_set/body": {
+   "vertices": 2480,
+   "indices": 3720,
+   "aabb": [
+    -0.4,
+    0,
+    -0.7,
+    0.5,
+    1.1,
+    0.8
+   ],
+   "position": 1157024,
+   "normal": 1186784,
+   "color": 1216544,
+   "extra": 1226464,
+   "index": 1236384
+  },
+  "elephant_of_set/neck": {
+   "vertices": 2872,
+   "indices": 4308,
+   "aabb": [
+    -0.5,
+    -0.9,
+    -0.4,
+    0.6,
+    0.5,
+    1
+   ],
+   "position": 1251264,
+   "normal": 1285728,
+   "color": 1320192,
+   "extra": 1331680,
+   "index": 1343168
+  },
+  "elephant_of_set/tail": {
+   "vertices": 120,
+   "indices": 180,
+   "aabb": [
+    0,
+    -0.7,
+    0,
+    0.1,
+    0,
+    0.1
+   ],
+   "position": 1360400,
+   "normal": 1361840,
+   "color": 1363280,
+   "extra": 1363760,
+   "index": 1364240
+  },
+  "elephant_of_set/legFL": {
+   "vertices": 512,
+   "indices": 768,
+   "aabb": [
+    -0.2,
+    -0.6,
+    -0.2,
+    0.2,
+    0,
+    0.2
+   ],
+   "position": 1364960,
+   "normal": 1371104,
+   "color": 1377248,
+   "extra": 1379296,
+   "index": 1381344
+  },
+  "elephant_of_set/cannonFL": {
+   "vertices": 608,
+   "indices": 912,
+   "aabb": [
+    -0.2,
+    -0.7,
+    -0.2,
+    0.2,
+    0,
+    0.3
+   ],
+   "position": 1384416,
+   "normal": 1391712,
+   "color": 1399008,
+   "extra": 1401440,
+   "index": 1403872
+  },
+  "elephant_of_set/legFR": {
+   "vertices": 512,
+   "indices": 768,
+   "aabb": [
+    -0.2,
+    -0.6,
+    -0.2,
+    0.2,
+    0,
+    0.2
+   ],
+   "position": 1407520,
+   "normal": 1413664,
+   "color": 1419808,
+   "extra": 1421856,
+   "index": 1423904
+  },
+  "elephant_of_set/cannonFR": {
+   "vertices": 608,
+   "indices": 912,
+   "aabb": [
+    -0.2,
+    -0.7,
+    -0.2,
+    0.2,
+    0,
+    0.3
+   ],
+   "position": 1426976,
+   "normal": 1434272,
+   "color": 1441568,
+   "extra": 1444000,
+   "index": 1446432
+  },
+  "elephant_of_set/legBL": {
+   "vertices": 512,
+   "indices": 768,
+   "aabb": [
+    -0.2,
+    -0.6,
+    -0.2,
+    0.2,
+    0,
+    0.2
+   ],
+   "position": 1450080,
+   "normal": 1456224,
+   "color": 1462368,
+   "extra": 1464416,
+   "index": 1466464
+  },
+  "elephant_of_set/cannonBL": {
+   "vertices": 608,
+   "indices": 912,
+   "aabb": [
+    -0.2,
+    -0.7,
+    -0.2,
+    0.2,
+    0,
+    0.3
+   ],
+   "position": 1469536,
+   "normal": 1476832,
+   "color": 1484128,
+   "extra": 1486560,
+   "index": 1488992
+  },
+  "elephant_of_set/legBR": {
+   "vertices": 512,
+   "indices": 768,
+   "aabb": [
+    -0.2,
+    -0.6,
+    -0.2,
+    0.2,
+    0,
+    0.2
+   ],
+   "position": 1492640,
+   "normal": 1498784,
+   "color": 1504928,
+   "extra": 1506976,
+   "index": 1509024
+  },
+  "elephant_of_set/cannonBR": {
+   "vertices": 608,
+   "indices": 912,
+   "aabb": [
+    -0.2,
+    -0.7,
+    -0.2,
+    0.2,
+    0,
+    0.3
+   ],
+   "position": 1512096,
+   "normal": 1519392,
+   "color": 1526688,
+   "extra": 1529120,
+   "index": 1531552
+  },
+  "deer_of_set/body": {
+   "vertices": 1016,
+   "indices": 1524,
+   "aabb": [
+    -0.13,
+    0.065,
+    -0.325,
+    0.195,
+    0.455,
+    0.39
+   ],
+   "position": 1535200,
+   "normal": 1547392,
+   "color": 1559584,
+   "extra": 1563648,
+   "index": 1567712
+  },
+  "deer_of_set/neck": {
+   "vertices": 528,
+   "indices": 792,
+   "aabb": [
+    -0.065,
+    -0.065,
+    -0.065,
+    0.13,
+    0.455,
+    0.325
+   ],
+   "position": 1573808,
+   "normal": 1580144,
+   "color": 1586480,
+   "extra": 1588592,
+   "index": 1590704
+  },
+  "deer_of_set/head": {
+   "vertices": 792,
+   "indices": 1188,
+   "aabb": [
+    -0.26,
+    0,
+    -0.13,
+    0.325,
+    0.65,
+    0.325
+   ],
+   "position": 1593872,
+   "normal": 1603376,
+   "color": 1612880,
+   "extra": 1616048,
+   "index": 1619216
+  },
+  "deer_of_set/tail": {
+   "vertices": 56,
+   "indices": 84,
+   "aabb": [
+    0,
+    -0.13,
+    0,
+    0.065,
+    0.065,
+    0.065
+   ],
+   "position": 1623968,
+   "normal": 1624640,
+   "color": 1625312,
+   "extra": 1625536,
+   "index": 1625760
+  },
+  "deer_of_set/legFL": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.065,
+    -0.39,
+    -0.065,
+    0.065,
+    0,
+    0.065
+   ],
+   "position": 1626096,
+   "normal": 1628784,
+   "color": 1631472,
+   "extra": 1632368,
+   "index": 1633264
+  },
+  "deer_of_set/cannonFL": {
+   "vertices": 176,
+   "indices": 264,
+   "aabb": [
+    -0.065,
+    -0.585,
+    -0.065,
+    0.065,
+    0,
+    0
+   ],
+   "position": 1634608,
+   "normal": 1636720,
+   "color": 1638832,
+   "extra": 1639536,
+   "index": 1640240
+  },
+  "deer_of_set/legFR": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.065,
+    -0.39,
+    -0.065,
+    0.065,
+    0,
+    0.065
+   ],
+   "position": 1641296,
+   "normal": 1643984,
+   "color": 1646672,
+   "extra": 1647568,
+   "index": 1648464
+  },
+  "deer_of_set/cannonFR": {
+   "vertices": 176,
+   "indices": 264,
+   "aabb": [
+    -0.065,
+    -0.585,
+    -0.065,
+    0.065,
+    0,
+    0
+   ],
+   "position": 1649808,
+   "normal": 1651920,
+   "color": 1654032,
+   "extra": 1654736,
+   "index": 1655440
+  },
+  "deer_of_set/legBL": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.065,
+    -0.39,
+    -0.065,
+    0.065,
+    0,
+    0.065
+   ],
+   "position": 1656496,
+   "normal": 1659184,
+   "color": 1661872,
+   "extra": 1662768,
+   "index": 1663664
+  },
+  "deer_of_set/cannonBL": {
+   "vertices": 176,
+   "indices": 264,
+   "aabb": [
+    -0.065,
+    -0.585,
+    -0.065,
+    0.065,
+    0,
+    0
+   ],
+   "position": 1665008,
+   "normal": 1667120,
+   "color": 1669232,
+   "extra": 1669936,
+   "index": 1670640
+  },
+  "deer_of_set/legBR": {
+   "vertices": 224,
+   "indices": 336,
+   "aabb": [
+    -0.065,
+    -0.39,
+    -0.065,
+    0.065,
+    0,
+    0.065
+   ],
+   "position": 1671696,
+   "normal": 1674384,
+   "color": 1677072,
+   "extra": 1677968,
+   "index": 1678864
+  },
+  "deer_of_set/cannonBR": {
+   "vertices": 176,
+   "indices": 264,
+   "aabb": [
+    -0.065,
+    -0.585,
+    -0.065,
+    0.065,
+    0,
+    0
+   ],
+   "position": 1680208,
+   "normal": 1682320,
+   "color": 1684432,
+   "extra": 1685136,
+   "index": 1685840
+  },
+  "boar_of_set/body": {
+   "vertices": 1336,
+   "indices": 2004,
+   "aabb": [
+    -0.24,
+    0,
+    -0.4,
+    0.32,
+    0.64,
+    0.48
+   ],
+   "position": 1686896,
+   "normal": 1702928,
+   "color": 1718960,
+   "extra": 1724304,
+   "index": 1729648
+  },
+  "boar_of_set/neck": {
+   "vertices": 696,
+   "indices": 1044,
+   "aabb": [
+    -0.16,
+    -0.16,
+    0,
+    0.24,
+    0.4,
+    0.56
+   ],
+   "position": 1737664,
+   "normal": 1746016,
+   "color": 1754368,
+   "extra": 1757152,
+   "index": 1759936
+  },
+  "boar_of_set/tail": {
+   "vertices": 72,
+   "indices": 108,
+   "aabb": [
+    0,
+    -0.32,
+    0,
+    0.08,
+    0,
+    0.08
+   ],
+   "position": 1764112,
+   "normal": 1764976,
+   "color": 1765840,
+   "extra": 1766128,
+   "index": 1766416
+  },
+  "boar_of_set/legFL": {
+   "vertices": 128,
+   "indices": 192,
+   "aabb": [
+    -0.08,
+    -0.24,
+    -0.08,
+    0.08,
+    0,
+    0.08
+   ],
+   "position": 1766848,
+   "normal": 1768384,
+   "color": 1769920,
+   "extra": 1770432,
+   "index": 1770944
+  },
+  "boar_of_set/cannonFL": {
+   "vertices": 160,
+   "indices": 240,
+   "aabb": [
+    -0.08,
+    -0.32,
+    -0.08,
+    0.08,
+    0,
+    0.08
+   ],
+   "position": 1771712,
+   "normal": 1773632,
+   "color": 1775552,
+   "extra": 1776192,
+   "index": 1776832
+  },
+  "boar_of_set/legFR": {
+   "vertices": 128,
+   "indices": 192,
+   "aabb": [
+    -0.08,
+    -0.24,
+    -0.08,
+    0.08,
+    0,
+    0.08
+   ],
+   "position": 1777792,
+   "normal": 1779328,
+   "color": 1780864,
+   "extra": 1781376,
+   "index": 1781888
+  },
+  "boar_of_set/cannonFR": {
+   "vertices": 160,
+   "indices": 240,
+   "aabb": [
+    -0.08,
+    -0.32,
+    -0.08,
+    0.08,
+    0,
+    0.08
+   ],
+   "position": 1782656,
+   "normal": 1784576,
+   "color": 1786496,
+   "extra": 1787136,
+   "index": 1787776
+  },
+  "boar_of_set/legBL": {
+   "vertices": 128,
+   "indices": 192,
+   "aabb": [
+    -0.08,
+    -0.24,
+    -0.08,
+    0.08,
+    0,
+    0.08
+   ],
+   "position": 1788736,
+   "normal": 1790272,
+   "color": 1791808,
+   "extra": 1792320,
+   "index": 1792832
+  },
+  "boar_of_set/cannonBL": {
+   "vertices": 160,
+   "indices": 240,
+   "aabb": [
+    -0.08,
+    -0.32,
+    -0.08,
+    0.08,
+    0,
+    0.08
+   ],
+   "position": 1793600,
+   "normal": 1795520,
+   "color": 1797440,
+   "extra": 1798080,
+   "index": 1798720
+  },
+  "boar_of_set/legBR": {
+   "vertices": 128,
+   "indices": 192,
+   "aabb": [
+    -0.08,
+    -0.24,
+    -0.08,
+    0.08,
+    0,
+    0.08
+   ],
+   "position": 1799680,
+   "normal": 1801216,
+   "color": 1802752,
+   "extra": 1803264,
+   "index": 1803776
+  },
+  "boar_of_set/cannonBR": {
+   "vertices": 160,
+   "indices": 240,
+   "aabb": [
+    -0.08,
+    -0.32,
+    -0.08,
+    0.08,
+    0,
+    0.08
+   ],
+   "position": 1804544,
+   "normal": 1806464,
+   "color": 1808384,
+   "extra": 1809024,
+   "index": 1809664
+  }
+ }
+}

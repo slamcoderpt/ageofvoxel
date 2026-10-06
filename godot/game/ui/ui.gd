@@ -481,9 +481,13 @@ static func _techui_setup(g: Node) -> Dictionary:
 ##   node scripts/godot-shoot.mjs --scene egyptui --width 1920 --height 1080
 ##     [--params "egyptui_sel=pharaoh"]   # laborer (default) | pharaoh | tc (= god) | temple | priest
 ##                                        # | pantheon (Select Pantheon on Ra; &god=isis|set|zeus)
+##                                        # | set_pharaoh (Set's Pharaoh in the Mythic Age: Empower and
+##                                        #   the eight Animals of Set, the Elephant's tooltip)
 ##     [--params "egyptui_tip=5"]         # the command slot whose tooltip is open (-1: none)
 static func _egyptui_setup(g: Node) -> Dictionary:
 	var sim2: Object = g.sim
+	if str(g.args.get("egyptui_sel", "")) == "set_pharaoh":
+		return _egyptui_set_pharaoh(g)
 	var ctx: Dictionary = sim2.setup_scene("egypt", g.scene_opts())
 	sim2.set_player_age(1, 1)
 	if sim2.has_method("set_minor_god"):
@@ -539,6 +543,25 @@ static func _egyptui_setup(g: Node) -> Dictionary:
 		ctx["select"] = [sel]
 	ctx["tip_slot"] = int(g.args.get("egyptui_tip", tip))
 	print("egyptui: selected %s %d, tooltip slot %d" % [pick, sel, int(ctx.tip_slot)])
+	return ctx
+
+## egyptui_sel=set_pharaoh: the "egypt_set" scene's town of Set put in the
+## Mythic Age (every summon open), his Pharaoh selected with the summon grid:
+## Empower (Q), the eight Animals of Set (S D F G J K L N), Attack-Move (A),
+## Stop (X); the tooltip on the Elephant of Set (slot 12) unless egyptui_tip.
+static func _egyptui_set_pharaoh(g: Node) -> Dictionary:
+	var sim2: Object = g.sim
+	var ctx: Dictionary = sim2.setup_scene("egypt_set", g.scene_opts())
+	sim2.set_player_age(1, 3)
+	sim2.set_player_resources(1, {"food": 1200.0, "wood": 600.0, "gold": 1000.0, "favor": 120.0})
+	var sel := int(sim2.get_civ_state(1).get("pharaoh", 0))
+	if sel > 0:
+		var e: Dictionary = sim2.get_unit(sel)
+		if not e.is_empty():
+			ctx["focus"] = Vector2(float(e.x), float(e.z) + 3.0)
+		ctx["select"] = [sel]
+	ctx["tip_slot"] = int(g.args.get("egyptui_tip", 12))
+	print("egyptui: selected Set's pharaoh %d, tooltip slot %d" % [sel, int(ctx.tip_slot)])
 	return ctx
 
 func _refresh_all() -> void:
@@ -1102,22 +1125,41 @@ func _egypt_unit_commands(us: Array, list: Array) -> void:
 	var empowerers := phar.size() + (priests.size() if god == "ra" else 0)
 	if empowerers > 0:
 		var strength := "a Pharaoh's full strength" if not phar.is_empty() else "60 % (Ra's Priests)"
-		list.append({"key": "W" if phar.is_empty() else "Q", "slot": 1 if phar.is_empty() else 0, "svg": "empower", "title": "Empower",
+		# Q with the Pharaoh alone; W when Priests are selected too (their Obelisk holds Q)
+		var on_w := phar.is_empty() or not priests.is_empty()
+		list.append({"key": "W" if on_w else "Q", "slot": 1 if on_w else 0, "svg": "empower", "title": "Empower",
 			"lines": ["Click one of your buildings to empower it", "(%s):" % strength, "work +75 %, drop-offs +20 %, Monument favor up.",
 				"Right-clicking a building does the same."], "enabled": true, "action": "empower"})
 	if phar.size() == 1 and god == "set":
 		var menu: Array = sim.get_summon_menu(int(phar[0].id))
-		var keys := ["A", "S", "D", "F", "G", "Y", "U", "I"]
+		# letters no other button of his grid or the HUD takes (Q Empower, A Attack-Move,
+		# X Stop, H home, Z / C / V / B the god powers, E / R / T a Roc's)
+		var keys := SUMMON_KEYS
 		for j in mini(menu.size(), keys.size()):
 			var m: Dictionary = menu[j]
 			var c := {"key": keys[j], "slot": 5 + j, "tex": _portraits.unit(str(m.type), me), "title": "Summon %s" % str(m.name), "cost": m.cost,
-				"time": float(m.time), "lines": ["An Animal of Set appears beside the Pharaoh (%d pop);" % int(m.pop), "its carcass feeds your Laborers."],
+				"time": float(m.time), "lines": _summon_lines(m),
 				"enabled": bool(m.ok), "action": "summon", "arg": [int(phar[0].id), str(m.type)]}
 			if not bool(m.ok) and not str(m.reason).begins_with("Not enough"):
 				c["warn"] = str(m.reason)
 				if int(m.age) > int(player.get("age", 0)):
 					c["age_req"] = int(m.age)
 			list.append(c)
+
+const SUMMON_KEYS := ["S", "D", "F", "G", "J", "K", "L", "N"]
+
+## An Animal of Set's summon tooltip: what it is (EGYPT.md 3.2) and its stats
+## in this sim (hp, attack at my age: Archaic x0.1, armor, speed, pop, the
+## food its carcass leaves).
+func _summon_lines(m: Dictionary) -> Array:
+	var d: Dictionary = sim.get_unit_def(str(m.type))
+	# (the Archaic x0.1 only while it can be had in the Archaic: a Hyena is summoned Classical or later)
+	var dmg := float(d.get("attack", {}).get("damage", 0.0)) * (0.1 if maxi(int(player.get("age", 0)), int(m.age)) == 0 else 1.0)
+	return ["An Animal of Set appears beside the Pharaoh;", "its carcass feeds your Laborers.",
+		"%d hp · %s hack attack · speed %s" % [int(round(float(d.get("hp", 0)))), _num(dmg), _num(float(d.get("speed", 0.0)))],
+		"Armor %d %% hack, %d %% pierce · %d pop · %s food" % [int(round(float(d.get("hack_armor", 0.0)) * 100)), int(round(float(d.get("pierce_armor", 0.0)) * 100)),
+			int(m.pop), _num(float(d.get("food", 0.0)))],
+		"Summoned in %s s · %s Age" % [_num(float(m.time)), AGES[clampi(int(m.age), 0, 3)]]]
 
 ## The Roc (gods piece, sim/godpowers egypt_myth.cpp; EGYPT.md 5.2: a flying transport for
 ## 20, it lands 2 s to load or unload): with a Roc selected, Board (E) sends the other

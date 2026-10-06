@@ -27,7 +27,10 @@ extends SceneTree
 ## on it shows Spearman / Axeman / Slinger, Q trains a Spearman; a click on
 ## the Pharaoh shows Empower (Q), Q + a click on the Barracks empowers it
 ## (get_civ_state: the Barracks empowered at 1); a click on the Rain button
-## casts Rain (favor paid, its cooldown running, Rain active in the sim).
+## casts Rain (favor paid, its cooldown running, Rain active in the sim);
+## then Esc -> Quit to Main Menu, Skirmish again, Set picked, Play: a click on
+## Set's Pharaoh shows the eight Animals of Set, each with its own rendered
+## icon and stats, every key distinct (A Attack-Move); S summons a Baboon.
 ## Harness shortcuts (not player input): the enemy AI is off once the match
 ## runs, the sim is stepped fast while frames render between, 60 favor is
 ## granted before the cast (an Egyptian starts with none; a Monument makes
@@ -555,7 +558,118 @@ func _run() -> void:
 		"favor %.0f -> %.0f, cooldown %.0f s, '%s'" % [f0, f1, cd, ui.msg_text])
 	await _shot("rain")
 	report_egypt(eg)
+	# 11. a second match as Set: his Pharaoh's summon grid
+	await _set_match()
 	_finish()
+
+## 11. Esc -> Quit to Main Menu -> Skirmish -> Set in Select Pantheon -> Play; a
+## click on Set's Pharaoh: the eight Animals of Set each with its own rendered
+## icon (a voxel rig, no blank square), stats in the tooltip, every key of the
+## grid distinct (A stays Attack-Move); S summons a Baboon, A starts Attack-Move.
+func _set_match() -> void:
+	var m := _main()
+	var gm: Node = m.get("game_menu") if m else null
+	if gm == null:
+		_check("Set: back to the main menu", false, "no game menu")
+		return
+	await _key(KEY_ESCAPE)
+	await _frames(4)
+	var ok_quit := await _click_control(gm.buttons.quit)
+	var ok := ok_quit and await _await_scene("menu", m, 600)
+	_check("Set: Esc, Quit to Main Menu", ok)
+	if not ok:
+		return
+	await _frames(45)
+	ok = _main().pieces.has("menu") and await _click_control(_main().pieces.menu._tiles.get("skirmish"))
+	await _frames(6)
+	screen = _find_screen(root)
+	if not ok or screen == null:
+		_check("Set: Skirmish opens the setup screen", false)
+		return
+	var s: Dictionary = screen.settings
+	await _click_zone(0, "god", 0)
+	await _click_zone(1, "god_pick", "set")
+	await _click_zone(1, "god_confirm")
+	_check("Set: a click on Set in Select Pantheon, Confirm", screen._modal == "" and str(s.players[0].god) == "set", str(s.players[0].god))
+	var old := _main()
+	await _click_zone(0, "play")
+	ok = await _await_scene("skirmish", old)
+	if not ok:
+		_check("Set: Play starts the match", false)
+		return
+	_bind()
+	var p: Dictionary = sim.get_player(ME)
+	_check("Set: the sim has you Egyptian with Set", str(p.get("civ", "")) == "egyptian" and str(p.get("god", "")).to_lower() == "set", "%s / %s" % [p.get("civ", ""), p.get("god", "")])
+	sim.set_ai_enabled(false)   # harness
+	for i in 2:
+		await _button(root.get_visible_rect().get_center(), MOUSE_BUTTON_WHEEL_DOWN, true)
+	await _frames(20)
+	var ph := _units("pharaoh")
+	if ph.is_empty():
+		_check("Set: a click selects the Pharaoh", false, "no Pharaoh")
+		return
+	var phid: int = ph[0].id
+	await _look(float(ph[0].x), float(ph[0].z) + 2.0)
+	var psel := await _select_unit(phid)
+	await _frames(8)
+	_check("Set: a click selects the Pharaoh", psel)
+	var sums := []
+	for c in ui.commands:
+		if c != null and str(c.get("action", "")) == "summon":
+			sums.append(c)
+	var types := sums.map(func(c): return str(c.arg[1]))
+	_check("Set: his grid has the eight Animals of Set", types == ["baboon_of_set", "gazelle_of_set", "hyena_of_set", "giraffe_of_set",
+		"crocodile_of_set", "hippo_of_set", "rhino_of_set", "elephant_of_set"], str(types))
+	# every summon icon: a rig, a rendered picture (not a blank square), all different
+	await _frames(4)
+	var bad := []
+	var seen := {}
+	for c in sums:
+		var t := str(c.arg[1])
+		var img: Image = (c.tex as Texture2D).get_image() if c.get("tex") != null else null
+		var cover := 0
+		if img != null:
+			for y in range(0, img.get_height(), 4):
+				for x in range(0, img.get_width(), 4):
+					if img.get_pixel(x, y).a > 0.5:
+						cover += 1
+		var hsh: int = hash(img.get_data()) if img != null else 0
+		if VoxelModels.rig(t).is_empty() or img == null or cover < 20 or seen.has(hsh):
+			bad.append("%s (cover %d)" % [t, cover])
+		seen[hsh] = t
+	_check("Set: each summon has its own rendered icon (8 distinct voxel portraits)", bad.is_empty() and sums.size() == 8, str(bad))
+	var keys_seen := {}
+	var dup := []
+	for c in ui.commands:
+		if c == null:
+			continue
+		if keys_seen.has(c.key):
+			dup.append("%s: %s / %s" % [c.key, keys_seen[c.key], c.title])
+		keys_seen[c.key] = c.title
+	var am := _cmd_find(func(c): return str(c.get("action", "")) == "attack_move")
+	_check("Set: every key of the grid is its own (A is Attack-Move, no summon on A)", dup.is_empty() and str(am.get("key", "")) == "A"
+		and sums.all(func(c): return str(c.key) != "A"), "%s, keys %s" % [str(dup), str(sums.map(func(c): return c.key))])
+	var hp = _cmd_where(func(c): return str(c.get("action", "")) == "summon" and str(c.arg[1]) == "hyena_of_set")
+	if hp != null:
+		await _move(hp + Vector2(3, 2))
+		await _frames(4)
+	var tl := " ".join(PackedStringArray(Array(ui.tooltip.get("lines", [])).map(func(l): return str(l))))
+	_check("Set: hovering the Hyena: its stats and its age (Classical, greyed)", str(ui.tooltip.get("title", "")) == "Summon Hyena of Set"
+		and tl.contains("45 hp") and tl.contains("pop") and tl.contains("food"), "'%s' %s" % [ui.tooltip.get("title", ""), tl])
+	await _shot("set_pharaoh")
+	# S: a Baboon of Set (harness: 10 favor; a Set player starts with none)
+	var pr: Dictionary = sim.get_player(ME)
+	sim.set_player_resources(ME, {"food": float(pr.food), "wood": float(pr.wood), "gold": float(pr.gold), "favor": 10.0})
+	await _frames(6)
+	var b0 := _units("baboon_of_set").size()
+	var bk := str(sums[0].key) if not sums.is_empty() else "S"
+	await _key(OS.find_keycode_from_string(bk))
+	var tb := await _step_until(30.0, func(): return _units("baboon_of_set").size() > b0)
+	_check("Set: %s summons a Baboon of Set beside the Pharaoh" % bk, tb >= 0.0, "%d -> %d, '%s'" % [b0, _units("baboon_of_set").size(), ui.msg_text])
+	await _key(KEY_A)
+	await _frames(2)
+	_check("Set: A starts Attack-Move", str(ui._mode.get("kind", "")) == "attack_move", str(ui._mode))
+	await _key(KEY_ESCAPE)
 
 ## The Temple (8b): placed with its key, built, clicked; its train buttons
 ## read against the sim's own gates.

@@ -2956,8 +2956,30 @@ Owner: the ui piece. Reference: `reference/egypt/ui_01..05.jpg`.
   - the Pharaoh's **Empower** (Q; Ra's Priests' on W): a cursor mode, a
     click on one of your buildings calls `order_empower` (right-click does
     the same through `smart`); the card says "Empowering", a building's card
-    "Empowered · n%"; Set's Pharaoh adds his summons (A S D F G Y U I, the
-    animals' portraits, `summon_animal`);
+    "Empowered · n%"; Set's Pharaoh adds his summons (`summon_animal`) on
+    S D F G J K L N (`ui.gd SUMMON_KEYS`: letters nothing else in his grid or
+    the HUD takes: Q Empower, A Attack-Move, X Stop, H home, Z C V B the god
+    powers, E R T a Roc's; until ui round 5 the Baboon sat on A and the key
+    dispatcher, first match wins, never reached Attack-Move); with Priests
+    selected too, Empower moves to W (their Obelisk holds Q). Each summon's
+    icon is the animal's voxel portrait and its tooltip gives its stats
+    (`_summon_lines`: hp, hack attack at the age it can be had (Archaic x0.1), speed,
+    hack / pierce armor, pop, the carcass' food, summon time, age);
+  - **Animals of Set models** (`scripts/export-set-animals.mjs`, group
+    `set_animals`, ~1 s, deterministic): voxel rigs for the Gazelle, Hyena,
+    Giraffe, Crocodile, Hippopotamus, Rhinoceros and Elephant of Set and the
+    Priests' converted Deer and Boar of Set (only the Baboon had one, in
+    egypt_units, so the others drew nothing in the world and a blank square
+    on their buttons): natural beasts as reference/egypt/unit_12.jpg (a
+    fawn gazelle with lyre horns and a dark flank stripe, a spotted hyena
+    with a dark mane and a sloping back, a reticulated giraffe, an olive
+    crocodile on the Petsuchos' sprawl rig, a grey-violet hippo with pink
+    cheeks, a horned slate rhino, a tusked bush elephant with big ears, a
+    red deer with antlers, a bristly boar), each with the team collar and
+    a gold-and-red amulet of Set, in the unit format of export-egypt-units
+    (horse anim channels), so AovUnitView poses them and portraits.gd
+    renders them; `VoxelModels.rig()` / `mesh("units", ..)` look in
+    `EXTRA_RIG_GROUPS` (egypt_units, egypt_gods, set_animals) in order;
   - favor: the resource strip's favor cell counts the Monuments standing and
     its tooltip gives their favor / min and the empower bonus; a Monument's
     card its favor / min;
@@ -3015,7 +3037,10 @@ Owner: the ui piece. Reference: `reference/egypt/ui_01..05.jpg`.
   `--params "egyptui_sel=pharaoh"` (Empower), `egyptui_sel=tc` (or `god`:
   the age-up's minor-god pick, Sobek / Sekhmet), `temple`, `priest`,
   `pantheon` (the setup screen's Select Pantheon over the match, on Ra;
-  `&god=isis|set|zeus` for another card: setup.gd reads `egyptui_sel`);
+  `&god=isis|set|zeus` for another card: setup.gd reads `egyptui_sel`),
+  `set_pharaoh` (`_egyptui_set_pharaoh`: the `egypt_set` town of Set put in
+  the Mythic Age, his Pharaoh selected: Empower, the eight Animals of Set,
+  Attack-Move, Stop; the Elephant of Set's tooltip, slot 12);
   `egyptui_tip=<slot>` (-1: no tooltip). Word wrap (setup.gd `_wrap`, hud.gd
   `_wrap`) keeps a number with its unit ("10 %", "30 m", "20 s") on one line.
 - **Verified together (ui round 4, one tree, lavapipe)**: egypt_playtest
@@ -3043,8 +3068,14 @@ Owner: the ui piece. Reference: `reference/egypt/ui_01..05.jpg`.
   tech buttons each their own rendered `e_` icon and all 36 Egyptian techs
   36 distinct rendered icons with backdrops, its key trains a Sphinx; a click on the Pharaoh, Q, a click on the
   Barracks: empowered at 1; a click on Rain: favor paid, recharge running.
+  Then a second match as Set (ui round 5): Esc, Quit to Main Menu,
+  Skirmish, Set in Select Pantheon, Play; a click on his Pharaoh: the eight
+  Animals of Set in order, each icon a voxel rig rendered (alpha coverage)
+  and all eight images distinct, every key of the grid its own and A
+  Attack-Move, the Hyena's tooltip with its stats; S summons a Baboon of
+  Set; A starts Attack-Move.
   Harness only: the AI off, the sim stepped fast, 60 favor before the cast
-  and before the Sphinx (+400 wood / gold there).
+  and before the Sphinx (+400 wood / gold there), 10 favor before the summon.
   "EGYPTPLAY ok|FAIL", "EGYPTPLAY_RESULT {json}", exit = failures.
 
 ## The Egyptian gods (native/src/sim/godpowers, sim/techs, game/godpowers)

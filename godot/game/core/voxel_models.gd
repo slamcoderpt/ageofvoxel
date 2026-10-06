@@ -79,29 +79,35 @@ static func rig(unit_type: String) -> Dictionary:
 	var e := group("units")
 	if e and e.man.rigs.has(unit_type):
 		return e.man.rigs[unit_type]
-	var x := group(EXTRA_UNITS) if FileAccess.file_exists(DIR + EXTRA_UNITS + ".json") else {}
-	if x and x.man.rigs.has(unit_type):
-		return x.man.rigs[unit_type]
-	# (then the Egyptian gods' own: scripts/export-egypt-gods.mjs, the Serpent and the Phoenix Egg)
-	var gx := group(EXTRA_GODS) if FileAccess.file_exists(DIR + EXTRA_GODS + ".json") else {}
-	return gx.man.rigs.get(unit_type, {}) if gx else {}
+	# (then egypt_units, the Egyptian gods' own: scripts/export-egypt-gods.mjs, the
+	# Serpent and the Phoenix Egg, and the Animals of Set: scripts/export-set-animals.mjs)
+	for xg in EXTRA_RIG_GROUPS:
+		var x := group(xg) if FileAccess.file_exists(DIR + xg + ".json") else {}
+		if x and x.man.rigs.has(unit_type):
+			return x.man.rigs[unit_type]
+	return {}
 
 const EXTRA_UNITS := "egypt_units"
 const EXTRA_GODS := "egypt_gods"
+const EXTRA_RIG_GROUPS := ["egypt_units", "egypt_gods", "set_animals"]
 
 static func mesh(g: String, model_name: String) -> ArrayMesh:
 	var key := g + "/" + model_name
 	if _meshes.has(key):
 		return _meshes[key]
 	var e := group(g)
-	if g == "units" and e and not e.man.models.has(model_name) and FileAccess.file_exists(DIR + EXTRA_UNITS + ".json"):
-		var xg := group(EXTRA_UNITS)
-		var src := EXTRA_UNITS
-		if xg and not xg.man.models.has(model_name) and FileAccess.file_exists(DIR + EXTRA_GODS + ".json"):
-			src = EXTRA_GODS
-		var m2 := mesh(src, model_name)
-		_meshes[key] = m2
-		return m2
+	if g == "units" and e and not e.man.models.has(model_name):
+		var src := ""
+		for xn in EXTRA_RIG_GROUPS:
+			if FileAccess.file_exists(DIR + xn + ".json"):
+				var xg := group(xn)
+				if xg and xg.man.models.has(model_name):
+					src = xn
+					break
+		if src != "":
+			var m2 := mesh(src, model_name)
+			_meshes[key] = m2
+			return m2
 	if e.is_empty() or not e.man.models.has(model_name):
 		push_error("VoxelModels: no model %s" % key)
 		return null
