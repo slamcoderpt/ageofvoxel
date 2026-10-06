@@ -6,6 +6,7 @@ extends RefCounted
 ## calls these from _draw() with its CanvasItem; hit testing is the screen's.
 
 const S := preload("res://game/ui/hud_style.gd")
+const EgyptIcons := preload("res://game/ui/egypt_icons.gd")
 
 const FIELD_H := 38.0
 const ITEM_H := 36.0
@@ -229,6 +230,7 @@ static func god_disc(ci: CanvasItem, c: Vector2, rad: float, god: String, hover 
 	match god:
 		"hades": stops = [[0.0, Color("#7a2a22")], [0.6, Color("#2a0e0c")], [1.0, Color("#0a0404")]]
 		"poseidon": stops = [[0.0, Color("#3aa4b8")], [0.6, Color("#0f4a5c")], [1.0, Color("#041c24")]]
+		"ra", "isis", "set": stops = EgyptIcons.GOD_STOPS[god].duplicate(true)
 		_: stops = [[0.0, Color("#f6e3a8")], [0.45, Color("#6d93b8")], [1.0, Color("#1a2c44")]]
 	if locked:
 		for s in stops:
@@ -236,13 +238,31 @@ static func god_disc(ci: CanvasItem, c: Vector2, rad: float, god: String, hover 
 			var l := cc.get_luminance()
 			s[1] = Color(l, l, l).lerp(cc, 0.2).darkened(0.35)
 	S.disc(ci, c, rad - 1.0, S.radial_tex(stops, Vector2(0.5, 0.35), 0.7, 64))
-	var em: String = {"zeus": "zeus", "hades": "bident", "poseidon": "trident"}.get(god, "zeus")
-	var px := rad * (1.7 if em == "zeus" else 1.25)
+	var em: String = {"zeus": "zeus", "hades": "bident", "poseidon": "trident", "ra": "ra", "isis": "isis", "set": "set"}.get(god, "zeus")
+	var px := rad * (1.7 if em in ["zeus", "ra", "isis", "set"] else 1.25)
 	var tint := "#fff6d8" if not locked else "#9a9a94"
 	draw_svg(ci, em, Rect2(c - Vector2(px, px) * 0.5, Vector2(px, px)), tint, Color.WHITE, true)
 	ci.draw_arc(c, rad - 1.5, PI * 1.15, PI * 1.85, 24, Color(1, 1, 1, 0.22), 2.0, true)
 	if locked:
 		ci.draw_circle(c, rad - 1.0, Color(0, 0, 0, 0.35), true, -1.0, true)
 		draw_svg(ci, "lock", Rect2(c + Vector2(rad * 0.25, rad * 0.2), Vector2(rad * 0.7, rad * 0.7)), "#d8c08a")
+
+## A minor god's disc (the Egyptians' age-up gods): lapis and gold, his
+## hieroglyph emblem (EgyptIcons "mg_<god>"); `locked` greys it.
+static func minor_disc(ci: CanvasItem, c: Vector2, rad: float, god: String, hover := false, locked := false) -> void:
+	ci.draw_circle(c + Vector2(0, 2), rad + 3, Color(0, 0, 0, 0.55), true, -1.0, true)
+	ci.draw_circle(c, rad + 2.5, DARK_RIM, true, -1.0, true)
+	ci.draw_circle(c, rad + 1.5, Color("#f3d893") if hover else Color("#b38a45"), true, -1.0, true)
+	ci.draw_circle(c, rad, Color.BLACK, true, -1.0, true)
+	var stops: Array = EgyptIcons.GOD_STOPS.minor.duplicate(true)
+	if locked:
+		for st in stops:
+			var cc: Color = st[1]
+			var l := cc.get_luminance()
+			st[1] = Color(l, l, l).lerp(cc, 0.2).darkened(0.35)
+	S.disc(ci, c, rad - 1.0, S.radial_tex(stops, Vector2(0.5, 0.3), 0.7, 64))
+	var px := rad * 1.45
+	draw_svg(ci, "mg_" + god, Rect2(c - Vector2(px, px) * 0.5, Vector2(px, px)), "#ffe9a8" if not locked else "#9a9a94", Color.WHITE, true)
+	ci.draw_arc(c, rad - 1.5, PI * 1.15, PI * 1.85, 24, Color(1, 1, 1, 0.22), 2.0, true)
 
 const DARK_RIM := Color("#040b0e")

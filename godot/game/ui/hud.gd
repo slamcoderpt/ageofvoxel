@@ -158,7 +158,10 @@ func _draw_resrow() -> void:
 			ix += 27 + 7
 			S.text(self, bold, Vector2(ix, cy + 7), str(int(st.get(k, 0))), 20, Color("#fbf3de"))
 			var tip: Dictionary = tips[k].duplicate()
-			tip["lines"] = tip.lines + ["%d villagers %s" % [int(st.get("n_" + k, 0)), "worshipping" if k == "favor" else "gathering"]]
+			if k == "favor" and st.has("favor_lines"):
+				tip["lines"] = st.favor_lines   # an Egyptian: the Monuments' favor
+			else:
+				tip["lines"] = tip.lines + ["%d %s %s" % [int(st.get("n_" + k, 0)), str(st.get("worker_word", "villagers")).to_lower(), "worshipping" if k == "favor" else "gathering"]]
 			zone(cell, "res", k, tip)
 		else:
 			S.draw_icon(self, "house", Rect2(ix, cy - 13.5, 27, 27))
@@ -221,7 +224,7 @@ func _draw_power(r: Rect2, p: Dictionary) -> void:
 			draw_rect(r.grow(1.0 + k * 2.0), Color(0.62, 0.82, 1.0, 0.35 - k * 0.1), false, 2.0)
 	var def: Dictionary = p.def
 	zone(r, "power", p.key, {"title": def.get("name", ""), "sub": "(%s)" % def.get("god", ""), "lines": [def.get("desc", "")],
-		"cost": {"favor": def.get("favor", 0)}, "hotkey": str(def.get("hotkey", "")), "warn": "" if ok else p.reason})
+		"cost": {"favor": p.get("cost", def.get("favor", 0))}, "hotkey": str(def.get("hotkey", "")), "warn": "" if ok else p.reason})
 
 func _conic_ring(c: Vector2, r0: float, r1: float, stops: Array, a0 := 0.0, a1 := TAU, n := 72) -> void:
 	for k in n:
@@ -270,6 +273,8 @@ func _draw_medal(st: Dictionary) -> void:
 	draw_string(f, pos, roman, HORIZONTAL_ALIGNMENT_LEFT, -1, 34, Color("#f6f1d2"))
 	var p: Dictionary = ui.player
 	var lines := ["Worshipping %s" % p.get("god", "Zeus")]
+	for mg in st.get("minor_gods", []):
+		lines.append("· %s" % str(mg))
 	if st.get("next_age", "") != "":
 		lines.append("Advance at the Town Center (A)")
 	zone(Rect2(c - Vector2(42, 42), Vector2(84, 84)), "medal", null, {"title": "%s Age" % p.get("age_name", "Archaic"), "lines": lines})
@@ -512,6 +517,8 @@ func _draw_commands() -> void:
 				_reveal(c.tex, pdst, rr.grow(-2), float(c.get("progress", 0.0)))
 			if st == "locked":
 				draw_rect(rr.grow(-2), Color(0.03, 0.05, 0.07, 0.22))
+		elif c.has("minor"):
+			_minor_tile(rr, str(c.minor), en or st == "researching" or st == "unaffordable")
 		else:
 			S.draw_icon(self, c.svg, Rect2(rr.get_center() - Vector2(16, 16), Vector2(32, 32)), true, mod)
 		_draw_cmd_state(c, rr, ir, st, hover)
@@ -532,6 +539,20 @@ func _draw_commands() -> void:
 			if c.has(k):
 				tip[k] = c[k]
 		zone(cr, "cmd", i, tip)
+
+## A minor god's age-up button (the Egyptians): a lapis disc under his gold
+## hieroglyph, dimmed when the button is locked.
+func _minor_tile(rr: Rect2, god: String, lit: bool) -> void:
+	var c := rr.get_center()
+	var stops := [[0.0, Color("#f8e6b0")], [0.45, Color("#2e5ea6")], [1.0, Color("#081836")]] if lit else \
+		[[0.0, Color("#8a8a86")], [0.45, Color("#3a3e48")], [1.0, Color("#101216")]]
+	draw_circle(c, 22.5, Color("#1a1206"), true, -1.0, true)
+	draw_circle(c, 21.5, Color("#d8b46c") if lit else Color("#6a6a6e"), true, -1.0, true)
+	S.disc(self, c, 20.0, S.radial_tex(stops, Vector2(0.5, 0.3), 0.7, 64))
+	var tex := S.icon("mg_" + god, 38, "#ffe9a8" if lit else "#a8a8a4")
+	if tex:
+		draw_texture_rect(tex, Rect2(c - Vector2(19, 20), Vector2(38, 38)), false, Color(0, 0, 0, 0.7))
+		draw_texture_rect(tex, Rect2(c - Vector2(19, 19), Vector2(38, 38)), false)
 
 ## The state layer of a command button (PORTING.md "Command button states").
 ## One language for every button (tech, train, build, trade), read from the
@@ -762,7 +783,8 @@ func _draw_info() -> void:
 	S.boss(self, Vector2(r.end.x + 2, r.position.y - 2), 7)
 	var info: Dictionary = ui.info
 	# the god's emblem, faint
-	var em := S.icon("zeus", 150, "#78d2dc")
+	var g0 := str(ui.player.get("god", "zeus")).to_lower()
+	var em := S.icon(g0 if g0 in ["ra", "isis", "set"] else "zeus", 150, "#78d2dc")
 	if em:
 		draw_texture_rect(em, Rect2(r.end.x - 3 - 8 - 150, r.end.y - 6 - 150, 150, 150), false, Color(1, 1, 1, 0.10))
 	var x0 := r.position.x + 16

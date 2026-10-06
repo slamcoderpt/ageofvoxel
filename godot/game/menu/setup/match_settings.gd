@@ -95,7 +95,11 @@ const DIFFICULTIES := [
 ## Player colours: 1..6 are the sim's PLAYER_COLORS for owners 1..6.
 const COLORS := [0x000000, 0x2f6bff, 0xe0282e, 0x2fb04a, 0xf2c21b, 0x8e44d8, 0xf07818, 0x2fc8d8, 0xe860b0]
 
-## Major gods. Only Zeus is in the game: the others are listed locked.
+## Major gods. Zeus (Greeks) and Ra, Isis, Set (Egyptians: the sim's civ per
+## player follows the god, PORTING.md "Civilizations"); Hades and Poseidon are
+## listed locked. "focus" / "lines": the card's text (Retold's, EGYPT.md 4);
+## "powers": the god powers he has from the start (the Egyptians' minor gods
+## add one per age: game/ui/egypt_icons.gd OFFERED / the sim's minor_gods_of).
 const GODS := {
 	"zeus": {"name": "Zeus", "title": "King of the Olympian Gods", "culture": "Greeks", "available": true,
 		"powers": ["lightning_storm", "bolt", "meteor"],
@@ -104,8 +108,41 @@ const GODS := {
 			"Three god powers, each with its own cooldown (listed on the right)."]},
 	"hades": {"name": "Hades", "title": "God of the Underworld", "culture": "Greeks", "available": false},
 	"poseidon": {"name": "Poseidon", "title": "God of the Sea", "culture": "Greeks", "available": false},
+	"ra": {"name": "Ra", "title": "God of the Sun", "culture": "Egyptians", "available": true,
+		"powers": ["rain"], "focus": "Focus: Migdol Stronghold units and empowerment.",
+		"lines": ["Mandjet: a Monument the Pharaoh empowers empowers every building within 30 m at 60 %.",
+			"Priests can empower (at 60 % of a Pharaoh).",
+			"Laborers gather berries 30 % faster; Camel Riders, Chariot Archers and War Elephants +15 % hp."]},
+	"isis": {"name": "Isis", "title": "Goddess of Magic and Healing", "culture": "Egyptians", "available": true,
+		"powers": ["prosperity"], "focus": "Focus: technology.",
+		"lines": ["Divine Shield: no enemy god power within 25 m of a Monument (50 m and healing when empowered).",
+			"Technologies cost 10 % less; Town Centers +5 population.",
+			"Obelisks cost 5 gold less and Priests build them 40 % faster."]},
+	"set": {"name": "Set", "title": "God of Storms and Trickery", "culture": "Egyptians", "available": true,
+		"powers": ["vision"], "focus": "Focus: Barracks units.",
+		"lines": ["Devotees: Barracks and Migdols near a Monument train 10 % cheaper.",
+			"The Pharaoh summons Animals of Set; Priests convert wild animals; starts with a Baboon.",
+			"Spearmen, Axemen and Slingers +5 % speed; Barracks, Siege Works and Migdols -25 % gold."]},
 }
-const GOD_ORDER := ["zeus", "hades", "poseidon"]
+const GOD_ORDER := ["zeus", "hades", "poseidon", "ra", "isis", "set"]
+## the pantheon picker's culture rows (Retold's Select Pantheon, reference/egypt/ui_04.jpg)
+const CULTURES := [["Greeks", ["zeus", "hades", "poseidon"]], ["Egyptians", ["ra", "isis", "set"]]]
+## god power names / one-line help for the cards (the sim's get_power_def has the full text)
+const POWERS := {
+	"lightning_storm": ["Lightning Storm", "A storm of bolts over a wide area"], "bolt": ["Bolt", "Strikes one unit dead"],
+	"meteor": ["Meteor", "A burning rock that levels buildings"],
+	"rain": ["Rain", "50 s: your Laborers farm 150 % faster"], "prosperity": ["Prosperity", "75 s: your Laborers mine gold 50 % faster"],
+	"vision": ["Vision", "Reveals a circle anywhere on the map for 20 s"],
+	"eclipse": ["Eclipse", "Myth units stronger and faster"], "shifting_sands": ["Shifting Sands", "Teleports your units"],
+	"plague_of_serpents": ["Plague of Serpents", "Fourteen serpents rise"], "locust_swarm": ["Locust Swarm", "Swarms devour farms"],
+	"citadel": ["Citadel", "A Town Center becomes a Citadel"], "ancestors": ["Ancestors", "Raises 13 Minions"],
+	"son_of_osiris": ["Son of Osiris", "The Pharaoh becomes a demigod"], "tornado": ["Tornado", "A wrecking whirlwind"],
+	"thoth_meteor": ["Meteor", "Twelve meteors fall"],
+}
+
+## The culture of a god key ("Greeks" / "Egyptians").
+static func culture_of(god: String) -> String:
+	return str(GODS.get(god.to_lower(), GODS.zeus).culture)
 
 const AI_NAMES := ["Pericles", "Leonidas", "Themistocles", "Miltiades", "Lysander", "Epaminondas"]
 

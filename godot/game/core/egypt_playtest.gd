@@ -1,0 +1,569 @@
+extends SceneTree
+## The Egyptians played from the menu through real input only (ui piece:
+## the setup's pantheon picker, the Egyptian HUD; PORTING.md "Egyptian HUD").
+## Every player action is an InputEvent fed to Input.parse_input_event: mouse
+## moves / presses on the drawn widgets of the main menu, the setup screen and
+## the HUD (their hit zones' centres), on units and buildings (screen points
+## projected from the sim) and on the ground, and keys; what happened is read
+## back from the sim.
+##
+##   VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 1280x720x24" \
+##     godot --path godot --rendering-driver vulkan --audio-driver Dummy --resolution 1280x720 \
+##     -s res://game/core/egypt_playtest.gd [-- --shots=/abs/dir]
+##
+## Launched with no scene argument (a player's launch: the main menu).
+## Steps: Skirmish -> the setup screen; the pantheon disc of your row opens
+## Select Pantheon; Ra (in the Egyptians' row) is picked and confirmed; the
+## starting resources set to High in their dropdown; Play -> the match loads
+## and the sim has you Egyptian (civ, god Ra, Laborers, the Pharaoh, no
+## villager); a click and shift-clicks select the Laborers (Ctrl+1); the
+## Laborers' build grid is the Egyptian one (Granary on W, House on Q,
+## Barracks greyed "Requires Classical Age", a Granary tooltip on hover);
+## the Granary button + a ground click and Q + a ground click lay a Granary
+## and a House the Laborers build; H selects the Town Center, whose age-up
+## shows Ra's two Classical minor gods (Bast on A, Ptah on S), a click on
+## Bast advances to the Classical Age with Bast (get_gods: minor 1 = bast,
+## Eclipse among the powers); D + a ground click lays a Barracks; a click
+## on it shows Spearman / Axeman / Slinger, Q trains a Spearman; a click on
+## the Pharaoh shows Empower (Q), Q + a click on the Barracks empowers it
+## (get_civ_state: the Barracks empowered at 1); a click on the Rain button
+## casts Rain (favor paid, its cooldown running, Rain active in the sim).
+## Harness shortcuts (not player input): the enemy AI is off once the match
+## runs, the sim is stepped fast while frames render between, 60 favor is
+## granted before the cast (an Egyptian starts with none; a Monument makes
+## 4.5 a minute).
+##
+## Prints "EGYPTPLAY ok|FAIL <step>" and "EGYPTPLAY_RESULT {json}"; exit =
+## failures (99 on a timeout). Needs a rendering display (hit zones are
+## registered while the HUD draws; headless windows are 64x64).
+
+const Loading := preload("res://game/menu/loading.gd")
+const ME := 1
+
+var fails: Array = []
+var passes := 0
+var clicks := 0
+var keys := 0
+var shots := ""
+var result := {}
+var screen: Control      # the setup screen
+var main: Node
+var ui: Node
+var sim: Object
+var cam: Camera3D
+
+func _initialize() -> void:
+	var dog := Timer.new()
+	dog.wait_time = 2400
+	dog.one_shot = true
+	dog.autostart = true
+	dog.timeout.connect(func() -> void:
+		printerr("EGYPTPLAY timeout")
+		print("EGYPTPLAY_RESULT %s" % JSON.stringify({"passed": passes, "failed": fails + ["timeout"], "steps": result}))
+		quit(99))
+	root.add_child.call_deferred(dog)
+	var a := AovArgs.parse()
+	shots = str(a.get("shots", ""))
+	change_scene_to_file("res://game/main.tscn")
+	_run.call_deferred()
+
+# ---- plumbing ---------------------------------------------------------------------------
+
+func _check(name: String, ok: bool, detail := "") -> void:
+	result[name] = ok
+	if ok:
+		passes += 1
+		print("EGYPTPLAY ok   %s %s" % [name, detail])
+	else:
+		fails.append(name)
+		print("EGYPTPLAY FAIL %s %s" % [name, detail])
+
+func _frames(n: int) -> void:
+	for i in n:
+		await process_frame
+
+func _shot(name: String) -> void:
+	if shots == "":
+		return
+	await RenderingServer.frame_post_draw
+	DirAccess.make_dir_recursive_absolute(shots)
+	root.get_texture().get_image().save_png(shots.path_join("egypt_play_%s.png" % name))
+
+func _move(p: Vector2, mask := 0) -> void:
+	var e := InputEventMouseMotion.new()
+	var last: Vector2 = root.get_mouse_position()
+	e.position = p
+	e.global_position = p
+	e.relative = p - last
+	e.button_mask = mask
+	Input.warp_mouse(p)
+	Input.parse_input_event(e)
+	await _frames(1)
+
+func _button(p: Vector2, button: int, pressed: bool, mods := {}) -> void:
+	var e := InputEventMouseButton.new()
+	e.position = p
+	e.global_position = p
+	e.button_index = button
+	e.pressed = pressed
+	e.factor = 1.0
+	e.shift_pressed = mods.get("shift", false)
+	e.ctrl_pressed = mods.get("ctrl", false)
+	Input.parse_input_event(e)
+	await _frames(1)
+
+func _click(p: Vector2, button := MOUSE_BUTTON_LEFT, mods := {}) -> void:
+	clicks += 1
+	await _move(p)
+	await _button(p, button, true, mods)
+	await _button(p, button, false, mods)
+	await _frames(2)
+
+func _key(k: Key, mods := {}) -> void:
+	keys += 1
+	var e := InputEventKey.new()
+	e.keycode = k
+	e.physical_keycode = k
+	e.pressed = true
+	e.ctrl_pressed = mods.get("ctrl", false)
+	Input.parse_input_event(e)
+	await _frames(1)
+	var r := e.duplicate() as InputEventKey
+	r.pressed = false
+	Input.parse_input_event(r)
+	await _frames(2)
+
+func _main() -> Node:
+	var m := current_scene
+	return m if m != null and "scene_def" in m else null
+
+func _scene_name() -> String:
+	var m := _main()
+	return str(m.scene_def.get("name", "")) if m else ""
+
+## wait until `scene` is built and on screen (no loading screen left)
+func _await_scene(scene: String, old, max_frames := 1200) -> bool:
+	for i in max_frames:
+		await process_frame
+		var l := root.get_node_or_null(Loading.NODE_NAME)
+		var m := _main()
+		if m != null and (old == null or not is_instance_valid(old) or m != old) and _scene_name() == scene and not bool(m.building) and m.sim != null and l == null:
+			return true
+	return false
+
+# ---- the setup screen (as game/core/menu_playtest.gd) -------------------------------------
+
+func _find_screen(n: Node) -> Control:
+	if n is Control and n.get_script() and str(n.get_script().resource_path).ends_with("menu/setup/setup.gd"):
+		return n
+	for c in n.get_children():
+		var r := _find_screen(c)
+		if r:
+			return r
+	return null
+
+func _zone_pos(layer: int, id: String, arg = null) -> Variant:
+	for z in screen._zones[layer]:
+		if z.id != id:
+			continue
+		if arg != null:
+			var a = z.arg
+			if typeof(a) == TYPE_DICTIONARY:
+				if a.id != arg[0] or int(a.row) != int(arg[1]):
+					continue
+			elif a != arg:
+				continue
+		return screen.get_global_transform_with_canvas() * (z.rect as Rect2).get_center()
+	return null
+
+func _click_zone(layer: int, id: String, arg = null) -> bool:
+	var p = _zone_pos(layer, id, arg)
+	if p == null:
+		return false
+	await _click(p)
+	return true
+
+## open dropdown (id, row) and click the item whose value is v
+func _pick(id: String, row: int, v) -> bool:
+	if not await _click_zone(0, "dd", [id, row]):
+		return false
+	if screen._open.is_empty():
+		return false
+	var idx := -1
+	for i in screen._open.items.size():
+		if screen._open.items[i].value == v:
+			idx = i
+	if idx < 0:
+		await _key(KEY_ESCAPE)
+		return false
+	return await _click_zone(1, "item", idx)
+
+# ---- the match --------------------------------------------------------------------------
+
+func _bind() -> void:
+	main = _main()
+	ui = main.pieces.get("ui")
+	sim = main.sim
+	cam = main.camera
+
+func _screen(x: float, z: float, lift := 0.0) -> Vector2:
+	cam.apply()
+	return cam.unproject_position(Vector3(x, sim.height_at(x, z) + lift, z))
+
+func _on_screen(p: Vector2) -> bool:
+	var r := root.get_visible_rect().grow(-40)
+	return r.has_point(p) and p.y > r.size.y * 0.14 and p.y < r.size.y * 0.72
+
+func _units(type_name := "") -> Array:
+	var u: Dictionary = sim.get_units()
+	var names: PackedStringArray = sim.unit_type_names()
+	var out := []
+	for i in int(u.count):
+		if int(u.owner[i]) == ME and not (u.flags[i] & 2) and (type_name == "" or names[u.type[i]] == type_name):
+			out.append({"id": int(u.ids[i]), "x": float(u.pos[i * 2]), "z": float(u.pos[i * 2 + 1])})
+	return out
+
+func _buildings(type_name: String) -> Array:
+	var B: Dictionary = sim.get_buildings()
+	var out := []
+	for i in int(B.count):
+		if int(B.owner[i]) == ME and B.type_names[B.type[i]] == type_name:
+			out.append({"id": int(B.ids[i]), "tx": int(B.rect[i * 4]), "tz": int(B.rect[i * 4 + 1]), "w": int(B.rect[i * 4 + 2]), "h": int(B.rect[i * 4 + 3])})
+	return out
+
+func _cmd_where(pred: Callable) -> Variant:
+	for z in ui._back.zones:
+		if z.id == "cmd":
+			var c = ui.commands[int(z.arg)]
+			if c != null and pred.call(c):
+				return ui._back.get_global_transform_with_canvas() * z.rect.get_center()
+	return null
+
+func _cmd_find(pred: Callable) -> Dictionary:
+	for c in ui.commands:
+		if c != null and pred.call(c):
+			return c
+	return {}
+
+func _build_cmd(t: String) -> Dictionary:
+	return _cmd_find(func(c): return str(c.get("action", "")) == "build" and str(c.get("arg", "")) == t)
+
+func _hud_zone(id: String, arg = null) -> Variant:
+	for layer in [ui._front, ui._back]:
+		for z in layer.zones:
+			if z.id == id and (arg == null or str(z.arg) == str(arg)):
+				return layer.get_global_transform_with_canvas() * z.rect.get_center()
+	return null
+
+## step the sim fast (frames render in between) until done() or the time is up
+func _step_until(seconds: float, done: Callable) -> float:
+	var t := 0.0
+	while t < seconds:
+		if done.call():
+			return t
+		sim.tick(30)
+		t += 1.0
+		if int(t) % 3 == 0:
+			await _frames(1)
+	return t if done.call() else -1.0
+
+func _look(x: float, z: float) -> void:
+	cam.target.x = x
+	cam.target.z = z
+	await _frames(6)
+
+## a free lot for `type` near the Town Center, on screen, away from `avoid`
+func _lot(type: String, avoid: Array) -> Dictionary:
+	var tc: Dictionary = _buildings("town_center")[0]
+	var d: Dictionary = sim.get_building_def(type)
+	var w := int(d.w)
+	var h := int(d.h)
+	var c := Vector2(tc.tx + tc.w * 0.5, tc.tz + tc.h * 0.5)
+	for r in range(6, 18):
+		for k in 24:
+			var a := TAU * k / 24.0
+			var t := Vector2i(int(round(c.x + cos(a) * r - w * 0.5)), int(round(c.y + sin(a) * r - h * 0.5)))
+			if not sim.can_place(type, t.x, t.y) or not sim.is_explored(t.x + 0.5, t.y + 0.5):
+				continue
+			var far := true
+			for o in avoid:
+				if absi(t.x - o.x) < 7 and absi(t.y - o.y) < 7:
+					far = false
+			if not far:
+				continue
+			var sp := _screen(t.x + w * 0.5, t.y + h * 0.5)
+			if _on_screen(sp) and sim.units_near(t.x + w * 0.5, t.y + h * 0.5, maxf(w, h)).is_empty():
+				return {"tile": t, "screen": sp}
+	return {}
+
+## the Laborers (group 1), the build command by `how` ("key" / "click"), a click on a lot
+func _place(type: String, how: String, avoid: Array) -> int:
+	await _key(KEY_1)
+	await _frames(3)
+	var before := _buildings(type).size()
+	var bc := _build_cmd(type)
+	if bc.is_empty():
+		_check("%s button in the Laborers' grid" % type, false)
+		return 0
+	if how == "key":
+		await _key(OS.find_keycode_from_string(str(bc.key)))
+	else:
+		await _click(_cmd_where(func(c): return str(c.get("action", "")) == "build" and str(c.get("arg", "")) == type))
+	await _frames(3)
+	var placing: bool = ui._mode.get("kind", "") == "place" and str(ui._mode.get("type", "")) == type
+	var lot := _lot(type, avoid)
+	if lot.is_empty() or not placing:
+		_check("place %s (%s)" % [type, how], false, "placing %s, lot %s, msg '%s'" % [placing, lot, ui.msg_text])
+		return 0
+	await _move(lot.screen)
+	await _frames(3)
+	await _click(lot.screen)
+	await _frames(4)
+	var id := 0
+	for b in _buildings(type):
+		if Vector2i(b.tx, b.tz) == lot.tile:
+			id = b.id
+	_check("place %s (%s %s + a ground click)" % [type, how, str(bc.key)], _buildings(type).size() == before + 1 and id > 0, "lot %s, id %d" % [lot.tile, id])
+	avoid.append(lot.tile)
+	return id
+
+## a real left click on a building, on a footprint spot no unit covers (retried)
+func _select_building(id: int) -> bool:
+	for attempt in 8:
+		if ui.selected.size() == 1 and int(ui.selected[0]) == id:
+			return true
+		var b: Dictionary = sim.get_building(id)
+		if b.is_empty():
+			return false
+		await _look(float(b.x), float(b.z) + 2.0)
+		var p = _building_point(id)
+		if p == null:
+			await _frames(4)
+			continue
+		await _click(p)
+		await _frames(4)
+	return ui.selected.size() == 1 and int(ui.selected[0]) == id
+
+## a screen point on building `id` that picks it (units win picks), or null
+func _building_point(id: int) -> Variant:
+	var b: Dictionary = sim.get_building(id)
+	var w := float(b.w)
+	var h := float(b.h)
+	var x0 := float(b.x) - w * 0.5
+	var z0 := float(b.z) - h * 0.5
+	var n := 6
+	for k in n * n:
+		var q := Vector2(x0 + (k % n + 0.5) / n * w, z0 + (k / n + 0.5) / n * h)
+		var sp := _screen(q.x, q.y, 0.6)
+		if _on_screen(sp) and ui.pick_entity(sp) == id:
+			return sp
+	return null
+
+## a real left click on a unit (it may walk: retried)
+func _select_unit(id: int, shift := false) -> bool:
+	for attempt in 8:
+		if ui.selected.has(id) and (shift or ui.selected.size() == 1):
+			return true
+		var u: Dictionary = sim.get_unit(id)
+		if u.is_empty():
+			return false
+		var sp := _screen(float(u.x), float(u.z), 0.9)
+		if not _on_screen(sp):
+			await _look(float(u.x), float(u.z) + 2.0)
+			sp = _screen(float(u.x), float(u.z), 0.9)
+		if ui.pick_entity(sp) != id:
+			sp = _screen(float(u.x), float(u.z), 0.4)
+		await _click(sp, MOUSE_BUTTON_LEFT, {"shift": shift})
+		await _frames(3)
+	return ui.selected.has(id)
+
+# ---- the playthrough ----------------------------------------------------------------------
+
+func _run() -> void:
+	# 1. the main menu -> Skirmish -> the setup screen
+	var ok := await _await_scene("menu", null, 400)
+	_check("plain launch opens the main menu", ok, _scene_name())
+	if not ok:
+		return _finish()
+	await _frames(45)
+	var m := _main()
+	ok = m.pieces.has("menu") and await _click_control(m.pieces.menu._tiles.get("skirmish"))
+	await _frames(6)
+	screen = _find_screen(root)
+	_check("Skirmish opens the setup screen", ok and screen != null and screen.is_visible_in_tree())
+	if screen == null:
+		return _finish()
+	var s: Dictionary = screen.settings
+
+	# 2. Select Pantheon: your row's god disc, Ra in the Egyptians' row, Confirm
+	await _click_zone(0, "god", 0)
+	_check("your pantheon disc opens Select Pantheon", screen._modal == "god")
+	var has_egypt := _zone_pos(1, "god_pick", "ra") != null and _zone_pos(1, "god_pick", "isis") != null and _zone_pos(1, "god_pick", "set") != null
+	_check("the picker offers Ra, Isis and Set", has_egypt)
+	await _click_zone(1, "god_pick", "ra")
+	_check("a click picks Ra (his card shows)", screen._god_pick == "ra")
+	await _shot("pantheon")
+	await _click_zone(1, "god_confirm")
+	_check("Confirm Ra: you play Ra", screen._modal == "" and str(s.players[0].god) == "ra", str(s.players[0].god))
+	_check("starting resources High", await _pick("resources", 0, "high") and str(s.resources) == "high", str(s.resources))
+
+	# 3. Play: the match as an Egyptian
+	var old := _main()
+	await _click_zone(0, "play")
+	ok = await _await_scene("skirmish", old)
+	_check("Play starts the match", ok)
+	if not ok:
+		return _finish()
+	_bind()
+	var p: Dictionary = sim.get_player(ME)
+	_check("the sim has you Egyptian with Ra", str(p.get("civ", "")) == "egyptian" and str(p.get("god", "")).to_lower() == "ra", "%s / %s" % [p.get("civ", ""), p.get("god", "")])
+	_check("Egyptian start: Laborers and the Pharaoh, no villager", _units("laborer").size() >= 3 and _units("pharaoh").size() == 1 and _units("villager").is_empty(),
+		"%d laborers" % _units("laborer").size())
+	sim.set_ai_enabled(false)   # harness
+	for i in 2:
+		await _button(root.get_visible_rect().get_center(), MOUSE_BUTTON_WHEEL_DOWN, true)
+	await _frames(20)
+	var tc: Dictionary = _buildings("town_center")[0]
+	await _look(tc.tx + tc.w * 0.5, tc.tz + tc.h * 0.5 + 2.0)
+
+	# 4. the Laborers: a click, shift-clicks, Ctrl+1
+	var labs := _units("laborer")
+	var sel_ok := true
+	for i in labs.size():
+		sel_ok = sel_ok and await _select_unit(labs[i].id, i > 0)
+	_check("click + shift-clicks select the Laborers", sel_ok and ui.selected.size() == labs.size(), "%d/%d" % [ui.selected.size(), labs.size()])
+	await _key(KEY_1, {"ctrl": true})
+	await _frames(6)
+
+	# 5. the Egyptian build grid, its hotkeys, states and a tooltip
+	var gc := _build_cmd("granary")
+	var hc := _build_cmd("house")
+	var bc := _build_cmd("eg_barracks")
+	_check("the Laborers' grid is Egyptian: Granary W, House Q, Barracks D, no Storehouse",
+		str(gc.get("key", "")) == "W" and str(hc.get("key", "")) == "Q" and str(bc.get("key", "")) == "D" and _build_cmd("storehouse").is_empty(),
+		"%s / %s / %s" % [gc.get("key", ""), hc.get("key", ""), bc.get("key", "")])
+	_check("the Barracks waits for the Classical Age (greyed, its reason)", not bool(bc.get("enabled", true)) and str(bc.get("state", "")) == "locked"
+		and str(bc.get("warn", "")).contains("Classical"), "'%s'" % bc.get("warn", ""))
+	var gp = _cmd_where(func(c): return str(c.get("arg", "")) == "granary")
+	if gp != null:
+		await _move(gp + Vector2(3, 2))
+		await _frames(4)
+	_check("hovering the Granary shows its tooltip", str(ui.tooltip.get("title", "")) == "Build Granary" and str(ui.tooltip.get("hotkey", "")) == "W"
+		and not Array(ui.tooltip.get("lines", [])).is_empty(), str(ui.tooltip.get("title", "")))
+	await _shot("build_grid")
+
+	# 6. a Granary (its button + a ground click) and a House (Q + a ground click), built by the Laborers
+	var lots := []
+	var ids := {}
+	for step in [["granary", "click"], ["house", "key"]]:
+		var id := await _place(step[0], step[1], lots)
+		ids[step[0]] = id
+		if id == 0:
+			continue
+		var t := await _step_until(300.0, func(): var b: Dictionary = sim.get_building(id); return not b.is_empty() and bool(b.built))
+		_check("the Laborers build the %s" % step[0], t >= 0.0, "in %.0f s" % t)
+
+	# 7. H: the Town Center; its age-up offers Ra's Classical gods; a click on Bast advances
+	await _look(tc.tx + tc.w * 0.5, tc.tz + tc.h * 0.5 + 2.0)
+	await _key(KEY_H)
+	await _frames(6)
+	var bast := _cmd_find(func(c): return str(c.get("action", "")) == "age_god" and str(c.get("arg", "")) == "bast")
+	var ptah := _cmd_find(func(c): return str(c.get("action", "")) == "age_god" and str(c.get("arg", "")) == "ptah")
+	_check("the Town Center's age-up: Bast (A) or Ptah (S)", str(bast.get("key", "")) == "A" and str(ptah.get("key", "")) == "S" and bool(bast.get("enabled", false)),
+		"%s / %s" % [bast.get("title", ""), ptah.get("title", "")])
+	var lb := _units("laborer").size()
+	var tl = _cmd_where(func(c): return str(c.get("action", "")) == "train" and str(c.get("arg", "")) == "laborer")
+	if tl != null:
+		await _click(tl)
+	await _frames(3)
+	await _shot("age_pick")
+	var bp = _cmd_where(func(c): return str(c.get("action", "")) == "age_god" and str(c.get("arg", "")) == "bast")
+	if bp != null:
+		await _click(bp)
+	await _frames(3)
+	_check("a click on Bast starts the advance", bool(sim.get_player(ME).get("advancing", false)), "'%s'" % ui.msg_text)
+	var aged := await _step_until(200.0, func(): return int(sim.get_player(ME).age) >= 1)
+	var gods: Dictionary = sim.get_gods(ME) if sim.has_method("get_gods") else {}
+	_check("the Classical Age with Bast", aged >= 0.0 and str(gods.get("minor", {}).get(1, "")) == "bast", "after %.0f s, %s" % [aged, gods.get("minor", {})])
+	_check("the Town Center trained a Laborer (its button)", _units("laborer").size() > lb, "%d -> %d" % [lb, _units("laborer").size()])
+	await _frames(12)   # (the HUD refreshes its power buttons 5 times a second)
+	var pk: Array = Array(sim.player_powers(ME)) if sim.has_method("player_powers") else []
+	_check("Bast's Eclipse joins Rain in the god powers", pk.has("rain") and pk.has("eclipse") and ui.powers.size() == pk.size(), str(pk))
+
+	# 8. a Barracks (D + a ground click), a click on it, Q trains a Spearman
+	var bar := await _place("eg_barracks", "key", lots)
+	if bar > 0:
+		var t := await _step_until(400.0, func(): var b: Dictionary = sim.get_building(bar); return not b.is_empty() and bool(b.built))
+		_check("the Laborers build the Barracks", t >= 0.0, "in %.0f s" % t)
+		var picked := await _select_building(bar)
+		await _frames(6)
+		var sc := _cmd_find(func(c): return str(c.get("action", "")) == "train" and str(c.get("arg", "")) == "spearman")
+		_check("the Barracks' grid: Spearman (Q), Axeman, Slinger", picked and str(sc.get("key", "")) == "Q"
+			and not _cmd_find(func(c): return str(c.get("arg", "")) == "axeman").is_empty() and not _cmd_find(func(c): return str(c.get("arg", "")) == "slinger").is_empty(),
+			"selected %s, Q = %s" % [picked, sc.get("title", "")])
+		var n0 := _units("spearman").size()
+		await _key(KEY_Q)
+		await _frames(3)
+		var tt := await _step_until(120.0, func(): return _units("spearman").size() > n0)
+		_check("Q trains a Spearman", tt >= 0.0, "in %.0f s" % tt)
+
+	# 9. the Pharaoh: a click on him, Empower (Q), a click on the Barracks
+	var ph := _units("pharaoh")
+	if ph.is_empty() or bar == 0:
+		_check("the Pharaoh empowers the Barracks", false, "no Pharaoh / Barracks")
+	else:
+		var phid: int = ph[0].id
+		var b0: Dictionary = sim.get_building(bar)
+		await _look(float(b0.x), float(b0.z) + 2.0)
+		var psel := await _select_unit(phid)
+		await _frames(6)
+		var ec := _cmd_find(func(c): return str(c.get("action", "")) == "empower")
+		_check("a click selects the Pharaoh: Empower on Q", psel and str(ec.get("key", "")) == "Q", "selected %s" % psel)
+		await _shot("pharaoh")
+		await _key(KEY_Q)
+		await _frames(2)
+		_check("Q: the empower cursor", str(ui._mode.get("kind", "")) == "empower")
+		var bpt = _building_point(bar)
+		if bpt != null:
+			await _click(bpt)
+		await _frames(3)
+		var te := await _step_until(120.0, func():
+			for e in sim.get_civ_state(ME).get("empowered", []):
+				if int(e.id) == bar and float(e.strength) >= 1.0:
+					return true
+			return false)
+		_check("the Pharaoh empowers the Barracks", te >= 0.0, "in %.0f s, '%s'" % [te, ui.msg_text])
+
+	# 10. a god power: a click on Rain (harness: 60 favor)
+	var pr: Dictionary = sim.get_player(ME)
+	sim.set_player_resources(ME, {"food": float(pr.food), "wood": float(pr.wood), "gold": float(pr.gold), "favor": 60.0})
+	await _frames(12)
+	var rp = _hud_zone("power", "rain")
+	var f0 := float(sim.get_player(ME).favor)
+	if rp != null:
+		await _click(rp)
+	await _frames(4)
+	var f1 := float(sim.get_player(ME).favor)
+	var cd := float(sim.power_cooldown(ME, "rain"))
+	var eg: Dictionary = sim.get_egypt_powers() if sim.has_method("get_egypt_powers") else {}
+	_check("a click on Rain casts it (favor paid, its recharge running)", rp != null and f0 - f1 >= 29.0 and cd > 0.0,
+		"favor %.0f -> %.0f, cooldown %.0f s, '%s'" % [f0, f1, cd, ui.msg_text])
+	await _shot("rain")
+	report_egypt(eg)
+	_finish()
+
+func report_egypt(eg: Dictionary) -> void:
+	result["egypt_powers"] = str(eg.keys()) if not eg.is_empty() else ""
+
+## Click a Control, after checking it is the one the GUI finds there.
+func _click_control(c: Control) -> bool:
+	if c == null or not c.is_visible_in_tree():
+		return false
+	var p := c.get_global_transform_with_canvas() * (c.size * 0.5)
+	await _click(p)
+	return true
+
+func _finish() -> void:
+	print("EGYPTPLAY clicks %d, keys %d" % [clicks, keys])
+	print("EGYPTPLAY_RESULT %s" % JSON.stringify({"passed": passes, "failed": fails, "steps": result}))
+	quit(fails.size())

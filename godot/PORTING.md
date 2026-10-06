@@ -557,7 +557,8 @@ back ({} for a run without one). main.gd honours seed, mapsize,
 timescale and fog, and hands the rest to the match rules (below). Which
 player counts a map takes is asked of the generator (`M.starts_for`: the
 starts `new_game` places): Aegean Hills, Marathon and Circle of Poleis take
-2-6, Ionian Coast 2. Only Zeus is playable: Hades and Poseidon
+2-6, Ionian Coast 2. Zeus, Ra, Isis and Set are playable (the god picks
+the civ: "Egyptian HUD, god pick" below): Hades and Poseidon
 are shown locked in the pantheon picker. The map preview is the real
 generator's output for the chosen preset / seed / size / player count
 (tiles coloured like the minimap, trees / gold / berries, Town Center
@@ -2226,9 +2227,9 @@ techs / fortify / match / commands, `native/src/aov_sim_civ.cpp`).
     paid (`TrainItem::cost_mult`).
   - Not yet: the god powers (Rain, Prosperity, Vision) and the unique techs
     (another piece's). The setup screen's
-  pantheon picker (game/menu/setup) still lists the Egyptians as "not in the
-  game yet": a match config with `god: "ra" | "isis" | "set"` (main.gd's
-  `match` arg, `start_match`) plays them already.
+  pantheon picker offers Ra, Isis and Set (see "Egyptian HUD, god pick");
+  a match config with `god: "ra" | "isis" | "set"` (main.gd's `match` arg,
+  `start_match`) plays them.
 - **Set's Animals of Set** (EGYPT.md 1.5, 1.6, 3.2, 4 Set; the numbers
   EGYPT.md leaves out from the Retold wiki's Animal of Set tables, as of
   update 19.12998): class `CLS_ANIMAL` ("animal"), Egyptian types from
@@ -2531,6 +2532,101 @@ Watch Tower 50 w + 100 g paid and refunded, Fortified / Citadel Wall 500 f +
 and a Set match with summons, a conversion, an age-up gift and an animal
 fight twice, bit-equal; rules off refuses (no Animal of Set spawns, no
 convert, no summon).
+
+## Egyptian HUD, god pick (game/ui, game/menu/setup)
+
+Owner: the ui piece. Reference: `reference/egypt/ui_01..05.jpg`.
+
+- **Select Pantheon** (`setup.gd _draw_god_modal`, `match_settings.gd`
+  `GODS` / `GOD_ORDER` / `CULTURES` / `POWERS`): the left column is grouped by
+  culture as Retold's (ui_04): GREEKS (Zeus; Hades, Poseidon locked) and
+  EGYPTIANS (Ra, Isis, Set, all available), Norse / Atlanteans "not in the
+  game yet". The centre card: name, title, the god's art (`_god_art`: his
+  colours, a dune horizon and gold-and-lapis obelisk bands for an Egyptian,
+  the emblem with its glow, as the Zeus card) and his focus + bonuses
+  (EGYPT.md 4). The right column: Zeus' three powers, or an Egyptian's
+  Archaic power (I) then the minor-god tree (II / III / IV medallions, the
+  two gods offered at each age with their hieroglyph discs, focus and god
+  power; `sim.minor_gods_of` when the extension has it, else
+  `EgyptIcons.OFFERED`). Any seat (AIs too) can be given any god; the row's
+  portrait is a Pharaoh / Spearman for an Egyptian, the profile chip says
+  the culture. `--god=ra|isis|set|zeus` / `--god2=` set your / the first
+  AI's god on the scene (captures):
+  `node scripts/godot-shoot.mjs --scene setup --params "players=3&open=god&god=ra"`.
+- **Icons** (`game/ui/egypt_icons.gd`, read by `hud_style.icon()` after
+  icons.gd and tech_icons.gd): the god emblems `ra` / `isis` / `set` (100-unit,
+  currentColor, the Zeus emblem's double ring), the minor gods' hieroglyphs
+  `mg_<god>` (Bast's cat, Ptah's djed, Anubis' jackal, Sobek's crocodile,
+  Sekhmet's lioness, Nephthys' glyph, Osiris' atef, Horus' wedjat, Thoth's
+  ibis), the god power icons (rain, prosperity, vision, eclipse,
+  shifting_sands, plague_of_serpents, locust_swarm, citadel, ancestors,
+  son_of_osiris, tornado; Thoth's meteor = "meteor"), `empower`, `monument`,
+  `summon`. `widgets.gd god_disc` / `minor_disc` draw the discs.
+- **The HUD for an Egyptian** (`ui.gd`, everything keyed on
+  `get_player(me).civ`; a Greek's HUD is unchanged):
+  - building defs per civ (`_bdef(t)` = `get_building_def(t, me)` with
+    `by_civ[civ]` cost / min age / one builder's time);
+  - the Laborers' build grid `EGYPT_GRID` (Retold's, ui_01): Q House, W
+    Granary, E Lumber Camp, R Mining Camp, T Farm / A Monument (the next one
+    in order), S Temple, D Barracks, F Armory, G Market / Y Migdol, U Siege
+    Works, I Sentry Tower, O Wall, P Town Center; portraits of the Egyptian
+    models (`portraits.gd` renders `EgyptBuildings.mesh_for` for an Egyptian
+    owner), refusals from `can_build` (age numeral, Monument order, limits),
+    Retold's help, hp, age and one builder's time in the tooltip. The keys
+    avoid Z C V B (god powers); X stops even without a Stop button. A
+    Priest's grid: the Obelisk (Q); Laborers never get the Obelisk, Priests
+    nothing else (`_run_command build` filters the builders). The placement
+    ghost is the Egyptian model, fitted to the footprint.
+  - train buttons from `get_trains(building)` (Devotees' cost, "Requires a
+    Temple", the minor god of a myth unit, the age), keys by slot; a Temple
+    hides the myth units of the gods not chosen once an age's god is picked;
+  - the Town Center's age-up is two buttons (A, S), one per minor god the
+    major god offers for the next age (lapis disc, gold hieroglyph; tooltip:
+    the god's focus, power and myth units); a click calls
+    `set_minor_god(me, age + 1, god)` then `advance_age` (the god is undone if
+    the advance is refused); while advancing the chosen god's button runs
+    blue with the progress, the other says "Advancing with ...";
+  - the Pharaoh's **Empower** (Q; Ra's Priests' on W): a cursor mode, a
+    click on one of your buildings calls `order_empower` (right-click does
+    the same through `smart`); the card says "Empowering", a building's card
+    "Empowered · n%"; Set's Pharaoh adds his summons (A S D F G Y U I, the
+    animals' portraits, `summon_animal`);
+  - favor: the resource strip's favor cell counts the Monuments standing and
+    its tooltip gives their favor / min and the empower bonus; a Monument's
+    card its favor / min;
+  - god powers: `player_powers(me)` (the Greeks' three; Ra / Isis / Set's
+    Archaic power, then one per minor god chosen), their ramped cost from
+    `get_power_info`; a "global" power (Rain, Prosperity, Eclipse) casts on
+    the click, "two_points" (Shifting Sands) takes two clicks
+    (`cast_power2`), "own_tc" / "own_pharaoh" aim at the clicked Town Center
+    / Pharaoh; refusals from `last_cast_reason`;
+  - the medallion tooltip lists the minor gods chosen; the info panel's
+    watermark is the major god's emblem.
+- **Capture scene `egyptui`** (`ui.gd _egyptui_setup`, entry in
+  `scenes.gd`): the `egypt` scene's Ra town back in the Classical Age with
+  Bast chosen (Rain and Eclipse in the hub), a purse leaving some buttons
+  short, a Laborer selected with the build grid and the Granary's tooltip
+  open: `node scripts/godot-shoot.mjs --scene egyptui --width 1920 --height 1080`;
+  `--params "egyptui_sel=pharaoh"` (Empower), `egyptui_sel=tc` (or `god`:
+  the age-up's minor-god pick, Sobek / Sekhmet), `temple`, `priest`;
+  `egyptui_tip=<slot>` (-1: no tooltip).
+- **Real-input playtest** (`game/core/egypt_playtest.gd`), launched with no
+  scene argument like a player:
+  ```
+  VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a -s "-screen 0 1280x720x24" \
+    godot --path godot --rendering-driver vulkan --audio-driver Dummy --resolution 1280x720 \
+    -s res://game/core/egypt_playtest.gd [-- --shots=/abs/dir]
+  ```
+  Menu -> Skirmish -> your god disc -> Ra -> Confirm -> resources High ->
+  Play; the sim has you Egyptian; click / shift-click the Laborers, Ctrl+1;
+  the Egyptian grid (keys, the Barracks' Classical lock, the Granary
+  tooltip); Granary (button + ground click) and House (Q + click) built; H,
+  the age-up offers Bast / Ptah, a Laborer trained, a click on Bast: the
+  Classical Age with Bast and Eclipse; Barracks (D + click) built, a click
+  on it, Q trains a Spearman; a click on the Pharaoh, Q, a click on the
+  Barracks: empowered at 1; a click on Rain: favor paid, recharge running.
+  Harness only: the AI off, the sim stepped fast, 60 favor before the cast.
+  "EGYPTPLAY ok|FAIL", "EGYPTPLAY_RESULT {json}", exit = failures.
 
 ## The Egyptian gods (native/src/sim/godpowers, sim/techs, game/godpowers)
 

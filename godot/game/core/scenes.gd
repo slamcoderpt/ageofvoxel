@@ -92,6 +92,11 @@ static var SCENES := {
 	# (techui_sel=market | temple, techui_tip=<slot>).
 	"techui": {"preset": "skirmish", "seed": 7, "hud": true, "reveal_all": true, "fast_forward": 0.0,
 		"camera": {"distance": 30.0, "pitch": 48.0, "yaw": 30.0, "focus_dz": 3.0}},
+	# Godot-only: the Egyptian HUD (game/ui/ui.gd _egyptui_setup): the egypt scene's
+	# Ra town in the Classical Age with a Laborer selected, the build grid and a
+	# tooltip open (egyptui_sel=pharaoh | tc | temple | priest, egyptui_tip=<slot>).
+	"egyptui": {"preset": "skirmish", "seed": 7, "hud": true, "reveal_all": true, "fast_forward": 2.0,
+		"camera": {"distance": 30.0, "pitch": 48.0, "yaw": 25.0}},
 	# Godot-only: the enemy AI's own fortifications (game/core/aifort_scene.gd):
 	# two AIs play aifort_t minutes in the setup (walls, gates, towers, breaches).
 	"aifort": {"preset": "skirmish", "seed": 2, "hud": false, "reveal_all": true, "fast_forward": 0.0,

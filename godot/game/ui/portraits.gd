@@ -27,9 +27,20 @@ func unit(type: String, owner: int) -> Texture2D:
 	return _cache[key]
 
 func building(type: String, owner: int) -> Texture2D:
-	if FORT.has(type):
+	var eg := _egypt_model(type, owner)
+	if FORT.has(type) and eg == "":
 		return fort(type, owner)
 	var key := "b:%s:%d" % [type, owner]
+	if not _cache.has(key) and eg != "":
+		# an Egyptian's building: its Egyptian model (egypt_buildings.gd), Classical look
+		var p: Dictionary = sim.get_player(owner) if sim else {}
+		var em := MeshInstance3D.new()
+		em.mesh = EgyptBuildings.mesh_for(eg, 1, str(p.get("god", "ra")).to_lower())
+		em.material_override = _material(owner)
+		var eroot := Node3D.new()
+		if em.mesh:
+			eroot.add_child(em)
+		_cache[key] = _render(eroot)
 	if not _cache.has(key):
 		var mi := MeshInstance3D.new()
 		# the Armory and the Market are the "techbuildings" models (Classical look)
@@ -39,6 +50,23 @@ func building(type: String, owner: int) -> Texture2D:
 		root.add_child(mi)
 		_cache[key] = _render(root)
 	return _cache[key]
+
+const EgyptBuildings := preload("res://game/buildings/egypt_buildings.gd")
+
+## The Egyptian model type a building portrait uses ("" = the Greek / shared
+## model): every type with an Egyptian model when its owner is Egyptian (the
+## tower: the Sentry Tower), the Egyptian-only types always.
+func _egypt_model(type: String, owner: int) -> String:
+	var egyptian := false
+	if sim:
+		egyptian = str(sim.get_player(owner).get("civ", "")) == "egyptian"
+	if type == "tower" or type == "wall" or type == "wall_pillar" or type == "gate":
+		return "sentry_tower" if egyptian and type == "tower" and EgyptBuildings.model_type("sentry_tower") != "" else ""
+	if EgyptBuildings.model_type(type) == "":
+		return ""
+	if egyptian or type in ["granary", "lumber_camp", "mining_camp", "obelisk", "eg_barracks", "migdol", "siege_works"] or type.begins_with("monument_"):
+		return type
+	return ""
 
 ## Fortification portraits (Godot-only models, groups "walls" / "towers"):
 ## a short run of wall between two pillars, a pillar, a closed gate between

@@ -43,10 +43,45 @@ const FORT_TYPES := {"wall": true, "wall_pillar": true, "gate": true, "tower": t
 const GHOST_OK := Color(0.49, 1.0, 0.6, 0.45)
 const GHOST_BAD := Color(1.0, 0.35, 0.29, 0.45)
 const GHOST_JOIN := Color(1.0, 0.86, 0.4, 0.6)
-const ORDER_NAMES := {1: "Moving", 2: "Gathering", 3: "Returning", 4: "Worshipping", 5: "Building", 6: "Attacking", 7: "Attack-moving"}
+const ORDER_NAMES := {1: "Moving", 2: "Gathering", 3: "Returning", 4: "Worshipping", 5: "Building", 6: "Attacking", 7: "Attack-moving", 8: "Empowering", 9: "Converting"}
 const AM_COLOR := Color("#ff7a30")   # attack-move: cursor ring and order marker
 const RES_NAMES := ["food", "wood", "gold"]
-const POWER_ICONS := {"lightning_storm": "storm", "bolt": "bolt", "meteor": "meteor"}
+const POWER_ICONS := {"lightning_storm": "storm", "bolt": "bolt", "meteor": "meteor", "thoth_meteor": "meteor"}
+const EgyptIcons := preload("res://game/ui/egypt_icons.gd")
+const EgyptBuildings := preload("res://game/buildings/egypt_buildings.gd")
+## The Egyptian Laborer's build grid (Retold's, reference/egypt/ui_01.jpg):
+## [building, hotkey] by slot, economy on the top row, the Monuments (one
+## button: the next one in order), Temple and the Classical buildings in the
+## middle, the late military, defences and Town Center below. The keys avoid
+## Z / C / V / B (the god powers) and X (stop: its key still works).
+const EGYPT_GRID := [["house", "Q"], ["granary", "W"], ["lumber_camp", "E"], ["mining_camp", "R"], ["farm", "T"],
+	["monument", "A"], ["temple", "S"], ["eg_barracks", "D"], ["armory", "F"], ["market", "G"],
+	["migdol", "Y"], ["siege_works", "U"], ["tower", "I"], ["wall", "O"], ["town_center", "P"]]
+const MONUMENTS := ["monument_villagers", "monument_soldiers", "monument_priests", "monument_pharaohs", "monument_gods"]
+## build-grid tooltip lines of the Egyptian buildings (Retold's help text, EGYPT.md 2)
+const EGYPT_LINES := {
+	"house": ["+10 population."],
+	"granary": ["Drop-off for food; Laborers carry 15 food.", "Researches the farming techs."],
+	"lumber_camp": ["Drop-off for wood."],
+	"mining_camp": ["Drop-off for gold."],
+	"farm": ["Laborers farm food here; infinite."],
+	"temple": ["Trains Priests and the myth units of your minor gods;", "researches god techs."],
+	"eg_barracks": ["Trains Spearmen, Axemen and Slingers."],
+	"migdol": ["Trains Chariot Archers, Camel Riders and War Elephants;", "shoots arrows. The Mythic Age needs one."],
+	"siege_works": ["Trains Siege Towers and Catapults."],
+	"town_center": ["Trains Laborers, Priests and Mercenaries;", "advances to the next age."],
+	"obelisk": ["Sees far: line of sight over a wide area.", "Built by Priests."],
+}
+const EGYPT_TRAIN_LINES := {
+	"laborer": "Gathers, builds, repairs; 15 food / 10 wood / 10 gold a trip.",
+	"priest": "Heals; Ra's Priests empower, Set's convert wild animals.",
+	"mercenary": "A hired spearman for the Town Center's defence; dies in time.",
+	"mercenary_cavalry": "A hired rider; dies in time.",
+	"spearman": "Fast infantry, x2 vs cavalry.", "axeman": "Heavy infantry, x4 vs infantry.",
+	"slinger": "Ranged infantry, x2.25 vs archers.", "chariot_archer": "Fast ranged cavalry, x1.5 vs infantry.",
+	"camel_rider": "Raider, x2 vs cavalry.", "war_elephant": "Slow, very tough, x4 vs buildings.",
+	"siege_tower": "Siege: breaks buildings and walls.", "catapult": "Siege: long-range stones vs buildings.",
+}
 const HEIGHT := {"villager": 2.0, "hoplite": 2.25, "toxotes": 2.05, "hippikon": 2.75, "minotaur": 3.4, "hero": 3.7, "cyclops": 5.0, "centaur": 2.9, "medusa": 2.6}
 
 var game: Node = null
@@ -90,6 +125,8 @@ var _names: PackedStringArray
 var _defs := {}                  # unit type key -> def
 var _bdefs := {}                 # building type key -> def
 var _pdefs := {}                 # power key -> def
+var _mbdefs := {}                # building type key -> def with my civ's cost / trains / min age (get_building_def(t, me))
+var civ := "greek"               # my civilization ("greek" | "egyptian", get_player(me).civ)
 var _stat_t := 0.0
 var _hud_t := 0.0
 var _msg_t := 0.0
@@ -139,6 +176,7 @@ func setup(g: Node) -> void:
 		_pdefs[n] = sim.get_power_def(n)
 	_tech_names = sim.tech_names() if sim.has_method("tech_names") else PackedStringArray()
 	AovScenes.set_setup("techui", _techui_setup)
+	AovScenes.set_setup("egyptui", _egyptui_setup)
 	hud_visible = AovArgs.flag(g.args, "hud", bool(g.scene_def.get("hud", false)))
 	_fog_on = AovArgs.flag(g.args, "fog", not bool(g.scene_def.get("reveal_all", false)))
 	# interactive play: formation moves share one path field (PORTING.md);
@@ -432,6 +470,66 @@ static func _techui_setup(g: Node) -> Dictionary:
 	print("techui: armory %d market %d temple %d, selected %d" % [armory, market, temple, sel])
 	return ctx
 
+## The "egyptui" capture scene (Godot-only): the "egypt" scene's Ra town
+## (sim/civ/egypt_scene.cpp) put back in the Classical Age with Bast chosen
+## (Rain and Eclipse in the god-power slots), a purse that leaves some
+## buttons short, and one unit or building selected with a command tooltip
+## open: a Laborer (the build grid, the Granary's tooltip), the Pharaoh (his
+## Empower command), the Town Center (the age-up's two minor gods, Sobek and
+## Sekhmet: the god pick), a Temple or a Priest.
+##   node scripts/godot-shoot.mjs --scene egyptui --width 1920 --height 1080
+##     [--params "egyptui_sel=pharaoh"]   # laborer (default) | pharaoh | tc (= god) | temple | priest
+##     [--params "egyptui_tip=5"]         # the command slot whose tooltip is open (-1: none)
+static func _egyptui_setup(g: Node) -> Dictionary:
+	var sim2: Object = g.sim
+	var ctx: Dictionary = sim2.setup_scene("egypt", g.scene_opts())
+	sim2.set_player_age(1, 1)
+	if sim2.has_method("set_minor_god"):
+		sim2.set_minor_god(1, 1, "bast")
+	sim2.set_player_resources(1, {"food": 820.0, "wood": 340.0, "gold": 610.0, "favor": 45.0})
+	var pick := str(g.args.get("egyptui_sel", "laborer"))
+	if pick == "god":
+		pick = "tc"
+	var cs: Dictionary = sim2.get_civ_state(1)
+	var sel := 0
+	var tip := 1
+	match pick:
+		"pharaoh":
+			sel = int(cs.get("pharaoh", 0))
+			tip = 0
+		"tc":
+			sel = int(cs.get("home_tc", 0))
+			tip = 4
+		"temple", "priest", "laborer":
+			if pick == "temple":
+				var B: Dictionary = sim2.get_buildings()
+				for i in int(B.count):
+					if int(B.owner[i]) == 1 and B.type_names[B.type[i]] == "temple":
+						sel = int(B.ids[i])
+				tip = 0
+			else:
+				var u: Dictionary = sim2.get_units()
+				var names: PackedStringArray = sim2.unit_type_names()
+				var f: Vector2 = ctx.get("focus", Vector2.ZERO)
+				var best := 1e9
+				for i in int(u.count):
+					if int(u.owner[i]) != 1 or names[u.type[i]] != pick:
+						continue
+					var dd := Vector2(u.pos[i * 2], u.pos[i * 2 + 1]).distance_to(f)
+					if dd < best:
+						best = dd
+						sel = int(u.ids[i])
+				tip = 1 if pick == "laborer" else 0
+	if sel > 0:
+		var k := int(sim2.entity_kind(sel))
+		var e: Dictionary = sim2.get_unit(sel) if k == 1 else sim2.get_building(sel)
+		if not e.is_empty():
+			ctx["focus"] = Vector2(float(e.x), float(e.z) + 3.0)
+		ctx["select"] = [sel]
+	ctx["tip_slot"] = int(g.args.get("egyptui_tip", tip))
+	print("egyptui: selected %s %d, tooltip slot %d" % [pick, sel, int(ctx.tip_slot)])
+	return ctx
+
 func _refresh_all() -> void:
 	_refresh_stats()
 	_refresh_hud(_selection_sig())
@@ -484,12 +582,13 @@ func _handle_events(events: Array) -> void:
 						batch.append(["%s trained." % _defs.get(u.type, {}).get("name", u.type), false])
 			"villager:free":
 				if int(e.owner) == me:
-					batch.append(["Your Town Center calls a new villager.", true])
+					batch.append(["Your Town Center calls a new %s." % ("Laborer" if egypt() else "villager"), true])
 			"age:advanced":
 				if int(e.owner) == me:
 					batch.append(["You reached the %s Age!" % AGES[clampi(int(e.a), 0, 3)], true])
 			"godpower:cast":
-				var pn: String = sim.power_names()[clampi(int(e.a), 0, 2)]
+				var pnames: PackedStringArray = sim.power_names()
+				var pn: String = pnames[clampi(int(e.a), 0, pnames.size() - 1)]
 				if int(e.owner) == me:
 					batch.append(["You use the %s God Power!" % _pdefs[pn].name, true])
 				elif sim.is_enemy(me, int(e.owner)):
@@ -738,15 +837,27 @@ func _refresh_hud(sig: String) -> void:
 	hud_state["adv"] = float(p.advance_t) / maxf(0.001, float(p.advance_total)) if bool(p.get("advancing", false)) else 0.0
 	var s := int(floor(float(sim.get_time())))
 	hud_state["clock"] = "%02d:%02d" % [s / 60, s % 60]
-	# god powers
+	var c2 := str(p.get("civ", "greek"))
+	if c2 != civ:
+		civ = c2
+		_mbdefs.clear()
+	# god powers: the ones my gods give (player_powers: the Greeks' three, an
+	# Egyptian's major god's and one per minor god chosen), with their ramped cost
 	powers = []
-	for k in sim.power_names():
-		var def: Dictionary = _pdefs[k]
+	var pkeys: Array = Array(sim.player_powers(me)) if sim.has_method("player_powers") else Array(sim.power_names())
+	for k in pkeys:
+		var def: Dictionary = _pdefs.get(k, {})
+		if def.is_empty():
+			continue
 		var cc: Dictionary = sim.can_cast(me, k)
+		var pinfo: Dictionary = sim.get_power_info(me, k) if sim.has_method("get_power_info") else {}
 		var left := float(sim.power_cooldown(me, k))
-		powers.append({"key": k, "def": def, "icon": POWER_ICONS.get(k, "bolt"), "can": bool(cc.ok), "reason": str(cc.reason),
+		powers.append({"key": k, "def": def, "icon": POWER_ICONS.get(k, k), "can": bool(cc.ok), "reason": str(cc.reason),
 			"cd": clampf(left / maxf(0.001, float(def.cooldown)), 0.0, 1.0), "cd_left": left,
+			"cost": float(pinfo.get("cost", def.get("favor", 0))), "target": str(pinfo.get("target", "point")),
 			"active": _mode.get("kind", "") == "power" and _mode.get("id", "") == k})
+	if egypt():
+		_egypt_hud_state()
 	if sig != _cmd_sig:
 		_cmd_sig = sig
 	_fort = sim.get_fortify(me)
@@ -791,12 +902,14 @@ func _commands_for() -> Array:
 	var us := sel.filter(func(e): return e.kind == "unit")
 	var age := int(player.get("age", 0))
 	if not us.is_empty():
-		var builders := us.filter(func(e): return bool(_defs[e.type].get("builder", false)))
+		var builders := [] if egypt() else us.filter(func(e): return bool(_defs[e.type].get("builder", false)))
+		if egypt():
+			_egypt_unit_commands(us, list)
 		if not builders.is_empty():
 			for t in BUILD_MENU:
 				if not _bdefs.has(t):
 					continue
-				var d: Dictionary = _bdefs[t]
+				var d: Dictionary = _bdef(t)
 				var ok_age := int(d.get("min_age", 0)) <= age
 				var c := {"key": str(d.hotkey), "tex": _portraits.building(t, me), "title": "Build %s" % d.name, "cost": d.cost,
 					"enabled": ok_age and _can_afford(d.cost), "action": "build", "arg": t,
@@ -826,7 +939,9 @@ func _commands_for() -> Array:
 		var b: Dictionary = sel[0]
 		if b.kind == "building" and bool(b.get("built", false)):
 			var bd: Dictionary = _bdefs[b.type]
-			for t in bd.get("trains", []):
+			if egypt():
+				_egypt_trains(b, list)
+			for t in ([] if egypt() else bd.get("trains", [])):
 				var d: Dictionary = _defs[t]
 				var ok := int(d.get("min_age", 0)) <= age
 				var tc := {"key": str(d.hotkey), "tex": _portraits.unit(t, me), "title": "Train %s" % d.name,
@@ -835,7 +950,9 @@ func _commands_for() -> Array:
 					tc["warn"] = "Requires the %s Age" % AGES[int(d.min_age)]
 					tc["age_req"] = int(d.min_age)
 				list.append(tc)
-			if bool(bd.get("age_up", false)) and age + 1 < AGES.size():
+			if bool(bd.get("age_up", false)) and age + 1 < AGES.size() and egypt():
+				_egypt_age_commands(list)
+			elif bool(bd.get("age_up", false)) and age + 1 < AGES.size():
 				var cost: Dictionary = sim.next_age_cost(me)
 				var adv := bool(player.get("advancing", false))
 				list.append({"key": "A", "svg": "age", "title": ("Advancing to the %s Age..." if adv else "Advance to the %s Age") % AGES[age + 1],
@@ -862,6 +979,204 @@ func _commands_for() -> Array:
 		if c != null:
 			_auto_state(c, sb)
 	return slots
+
+# ---- the Egyptians (PORTING.md "Egyptian HUD") -------------------------------------------------
+
+func egypt() -> bool:
+	return civ == "egyptian"
+
+## A building's def with my civ's cost, trains, min age and hotkey (cached per match).
+func _bdef(t: String) -> Dictionary:
+	if not _mbdefs.has(t):
+		var d: Dictionary = sim.get_building_def(t, me)
+		var by: Dictionary = d.get("by_civ", {}).get(civ, {})
+		if not by.is_empty():
+			d["cost"] = by.get("cost", d.get("cost", {}))
+			d["min_age"] = int(by.get("min_age", d.get("min_age", 0)))
+			d["build_time_one"] = float(by.get("build_time", 0.0))
+		_mbdefs[t] = d
+	return _mbdefs[t]
+
+## The next Monument in order (the first one not standing or laid), else the last.
+func _next_monument() -> String:
+	var have := {}
+	var B: Dictionary = sim.get_buildings()
+	var tn: PackedStringArray = B.type_names
+	for i in int(B.count):
+		if int(B.owner[i]) == me:
+			have[tn[B.type[i]]] = true
+	for m in MONUMENTS:
+		if not have.has(m):
+			return m
+	return MONUMENTS[MONUMENTS.size() - 1]
+
+## The HUD's Egyptian state: favor from the Monuments (the resource strip's
+## favor cell counts them), the worker word, the gods for the medallion.
+func _egypt_hud_state() -> void:
+	var cs: Dictionary = sim.get_civ_state(me)
+	var mons: Array = cs.get("monuments", [])
+	var built := mons.filter(func(m): return bool(m.built))
+	hud_state["worker_word"] = "Laborers"
+	hud_state["favor_lines"] = ["Made by your Monuments: %d of 5 standing" % built.size(),
+		"+%s favor / min now (empowered: +%d %%)" % [_num(float(cs.get("favor_per_min", 0.0))), int(round(float(cs.get("empower_favor", 0.2)) * 100))],
+		"Spent on god powers, myth units and techs"]
+	hud_state["n_favor"] = built.size()
+	var gods: Dictionary = sim.get_gods(me) if sim.has_method("get_gods") else {}
+	var picked := []
+	for a in [1, 2, 3]:
+		var g := str(gods.get("minor", {}).get(a, ""))
+		if g != "":
+			picked.append("%s (%s)" % [str(EgyptIcons.MINOR.get(g, {}).get("name", g.capitalize())), AGES[a]])
+	hud_state["minor_gods"] = picked
+
+## One Egyptian build button (EGYPT_GRID): his civ's cost, the reason it is
+## refused (can_build: the age, the Monument order, a limit), Retold's help.
+func _egypt_build_cmd(t: String, key: String, slot: int) -> Dictionary:
+	var real := _next_monument() if t == "monument" else t
+	var d: Dictionary = _bdef(real)
+	var age := int(player.get("age", 0))
+	var cb: Dictionary = sim.can_build(me, real)
+	var ok := bool(cb.ok)
+	var c := {"key": key, "slot": slot, "tex": _portraits.building(real, me), "title": "Build %s" % str(d.get("name", real)), "cost": d.get("cost", {}),
+		"enabled": ok and _can_afford(d.get("cost", {})), "action": "build", "arg": real}
+	if not ok:
+		c["warn"] = str(cb.reason) if str(cb.reason) != "" else "Cannot build that yet"
+		if int(d.get("min_age", 0)) > age:
+			c["age_req"] = int(d.min_age)
+	var lines: Array = (EGYPT_LINES.get(real, []) + BUILD_LINES.get(real, [])).duplicate()
+	if real.begins_with("monument_"):
+		var cs: Dictionary = sim.get_civ_state(me)
+		lines = ["+%s favor / min (Monument %d of 5, in order)." % [_num(float(d.get("favor_per_min", 0.0))), int(d.get("monument", 1))],
+			"Empowered: more favor (%s: +%d %%)." % [str(cs.get("god", "ra")).capitalize(), int(round(float(cs.get("empower_favor", 0.2)) * 100))]]
+	var bt := float(d.get("build_time_one", 0.0))
+	lines.append("%d hp · %s Age%s" % [int(d.get("hp", 0)), AGES[clampi(int(d.get("min_age", 0)), 0, 3)], " · %d s for one builder" % int(round(bt)) if bt > 0.0 else ""])
+	c["lines"] = lines
+	if real == "wall":
+		c.title = "Build Wall"
+		c.action = "wall"
+		c.lines = ["Click and drag on the ground to draw a line;", "it joins your walls it touches.",
+			"%s · %d hp per tile" % [str(_fort.get("wall_name", d.get("name", "Wall"))), int(_fort.get("wall_tile_hp", d.get("hp", 0)))],
+			"Cost per segment · %s Age" % AGES[clampi(int(d.get("min_age", 0)), 0, 3)]]
+	elif real == "tower":
+		var tw: Dictionary = _fort.get("tower", {})
+		c.title = "Build %s" % str(_fort.get("tower_name", d.get("name", "Tower")))
+		c.lines = ["Shoots arrows at enemies in range %s." % _num(tw.get("range", 10)),
+			"%d hp · %s Age" % [int(tw.get("hp", d.get("hp", 0))), AGES[clampi(int(d.get("min_age", 0)), 0, 3)]]]
+	return c
+
+## The Egyptian units' commands: the Laborers' build grid, a Priest's Obelisk,
+## the Pharaoh's (and Ra's Priests') Empower, Set's Pharaoh's summons.
+func _egypt_unit_commands(us: Array, list: Array) -> void:
+	var labs := us.filter(func(e): return str(e.type) == "laborer")
+	var priests := us.filter(func(e): return str(e.type) == "priest")
+	var phar := us.filter(func(e): return str(e.type) == "pharaoh")
+	var god := str(player.get("god", "")).to_lower()
+	if not labs.is_empty():
+		for i in EGYPT_GRID.size():
+			list.append(_egypt_build_cmd(str(EGYPT_GRID[i][0]), str(EGYPT_GRID[i][1]), i))
+		return
+	if not priests.is_empty():
+		list.append(_egypt_build_cmd("obelisk", "Q", 0))
+	var empowerers := phar.size() + (priests.size() if god == "ra" else 0)
+	if empowerers > 0:
+		var strength := "a Pharaoh's full strength" if not phar.is_empty() else "60 % (Ra's Priests)"
+		list.append({"key": "W" if phar.is_empty() else "Q", "slot": 1 if phar.is_empty() else 0, "svg": "empower", "title": "Empower",
+			"lines": ["Click one of your buildings: he walks to it and empowers it", "(%s): work +75 %%, drops +20 %%, Monument favor up." % strength,
+				"Right-click a building does the same."], "enabled": true, "action": "empower"})
+	if phar.size() == 1 and god == "set":
+		var menu: Array = sim.get_summon_menu(int(phar[0].id))
+		var keys := ["A", "S", "D", "F", "G", "Y", "U", "I"]
+		for j in mini(menu.size(), keys.size()):
+			var m: Dictionary = menu[j]
+			var c := {"key": keys[j], "slot": 5 + j, "tex": _portraits.unit(str(m.type), me), "title": "Summon %s" % str(m.name), "cost": m.cost,
+				"time": float(m.time), "lines": ["An Animal of Set appears beside the Pharaoh (%d pop);" % int(m.pop), "its carcass feeds your Laborers."],
+				"enabled": bool(m.ok), "action": "summon", "arg": [int(phar[0].id), str(m.type)]}
+			if not bool(m.ok) and not str(m.reason).begins_with("Not enough"):
+				c["warn"] = str(m.reason)
+				if int(m.age) > int(player.get("age", 0)):
+					c["age_req"] = int(m.age)
+			list.append(c)
+
+## An Egyptian building's train buttons (get_trains: his civ's list, Devotees' cost,
+## the locks: a Temple for Priests, the minor god for a myth unit, the age).
+func _egypt_trains(b: Dictionary, list: Array) -> void:
+	var trains: Array = sim.get_trains(int(b.id))
+	var age := int(player.get("age", 0))
+	var keys := ["Q", "W", "E", "R", "T", "A", "S", "D", "F", "G", "Y", "U", "I", "O", "P"]
+	var tc := str(b.type) == "town_center"
+	var j := 0
+	for tr in trains:
+		var t := str(tr.type)
+		var d: Dictionary = _defs.get(t, {})
+		if d.is_empty():
+			continue
+		# a myth unit of a minor god not chosen stays off the Temple's grid once his age's god is picked
+		var reason := str(tr.reason)
+		if reason.begins_with("Requires the minor god") and _minor_chosen_for(int(d.get("min_age", 1))):
+			continue
+		while tc and (j == 4 or j == 9):
+			j += 1   # (the Town Center's age-up buttons)
+		if j >= keys.size():
+			break
+		var c := {"key": keys[j], "slot": j, "tex": _portraits.unit(t, me), "title": "Train %s" % str(d.get("name", t)), "cost": tr.cost,
+			"enabled": bool(tr.ok) and _can_afford(tr.cost), "action": "train", "arg": t, "time": float(d.get("train_time", 0.0))}
+		var line := str(EGYPT_TRAIN_LINES.get(t, ""))
+		if line == "" and str(d.get("god", "")) != "":
+			line = "Myth unit of %s." % str(d.god).capitalize()
+		c["lines"] = [line] if line != "" else []
+		if tr.has("devotees"):
+			c.lines.append("Devotees: -10 % near your Monument.")
+		if not bool(tr.ok) and not reason.begins_with("Not enough") and reason != "Need more houses":
+			c["warn"] = reason
+			if int(d.get("min_age", 0)) > age:
+				c["age_req"] = int(d.min_age)
+		elif not bool(tr.ok):
+			c["deny"] = reason
+		list.append(c)
+		j += 1
+
+## Has the player chosen the minor god of `age` (1..3)?
+func _minor_chosen_for(age: int) -> bool:
+	if not sim.has_method("get_gods"):
+		return false
+	return str(sim.get_gods(me).get("minor", {}).get(clampi(age, 1, 3), "")) != ""
+
+## The Town Center's age-up for an Egyptian: one button per minor god his major
+## god offers for the next age (Retold: the god is chosen with the age-up);
+## while advancing, the chosen god's button shows the progress.
+func _egypt_age_commands(list: Array) -> void:
+	var age := int(player.get("age", 0))
+	var nxt := age + 1
+	var cost: Dictionary = sim.next_age_cost(me)
+	var adv := bool(player.get("advancing", false))
+	var god := str(player.get("god", "ra")).to_lower()
+	var offer := EgyptIcons.offered(sim, god, nxt)
+	var chosen := ""
+	if sim.has_method("get_gods"):
+		chosen = str(sim.get_gods(me).get("minor", {}).get(nxt, ""))
+	for k in mini(offer.size(), 2):
+		var g: String = offer[k]
+		var info: Dictionary = EgyptIcons.MINOR.get(g, {"name": g.capitalize(), "power": "", "focus": ""})
+		var pk := str(info.power)
+		var pname := str(_pdefs.get(pk, {}).get("name", pk.capitalize()))
+		var units := []
+		for t in _names:
+			if str(_defs[t].get("god", "")).to_lower() == g:
+				units.append(str(_defs[t].name))
+		var lines := ["%s: %s." % [str(info.name), str(info.focus)], "God power: %s" % pname]
+		if not units.is_empty():
+			lines.append("Myth unit%s: %s" % ["s" if units.size() > 1 else "", ", ".join(units)])
+		var c := {"key": ["A", "S"][k], "slot": [4, 9][k], "minor": g, "svg": "mg_" + g,
+			"title": ("Advancing to the %s Age (%s)..." if adv else "Advance to the %s Age: %s") % [AGES[nxt], str(info.name)],
+			"cost": cost, "lines": lines, "enabled": not adv and _can_afford(cost), "action": "age_god", "arg": g}
+		if adv:
+			c["enabled"] = false
+			if chosen == g:
+				c["progress"] = float(hud_state.get("adv", 0.0))
+				_set_state(c, "researching", "Advancing · %d%%" % int(floor(float(hud_state.get("adv", 0.0)) * 100)))
+			else:
+				c["warn"] = "Advancing with %s" % str(EgyptIcons.MINOR.get(chosen, {}).get("name", chosen.capitalize()))
+		list.append(c)
 
 # ---- research and trade commands (sim/techs; PORTING.md "Research panel, tooltips, market") ----
 
@@ -1267,7 +1582,7 @@ func _info_for() -> Dictionary:
 	if e.kind == "unit":
 		var ud: Dictionary = _defs[e.type]
 		_owner_fields(d, int(e.owner))
-		d["cls"] = str(ud.get("class", "")).capitalize()
+		d["cls"] = "Worker" if str(e.type) == "laborer" else str(ud.get("class", "")).capitalize()
 		d["hp"] = float(e.hp)
 		d["max_hp"] = float(e.max_hp)
 		d["tex"] = _portraits.unit(e.type, int(e.owner))
@@ -1309,6 +1624,11 @@ func _info_for() -> Dictionary:
 			_fort_info(e, d)
 		if not bool(e.built):
 			d.tasks.append("Under construction · %d%%" % int(floor(float(e.progress) * 100)))
+		var emp := _empower_of(int(e.id))
+		if emp > 0.0:
+			d.tasks.append("Empowered · %d%%" % int(round(emp * 100)))
+		if str(e.type).begins_with("monument_") and bool(e.built):
+			d.stats.append(["favor", "+" + _num(float(sim.get_building_def(str(e.type)).get("favor_per_min", 0.0)) * (1.0 + emp * float(sim.get_civ_state(int(e.owner)).get("empower_favor", 0.2)))), "favor / min"])
 		if bool(bd.get("age_up", false)) and bool(player.get("advancing", false)) and int(e.owner) == me:
 			d.tasks.append("Advancing · %d%%" % int(floor(float(hud_state.get("adv", 0)) * 100)))
 		for k in bd.get("dropoff", []):
@@ -1336,6 +1656,17 @@ func _info_for() -> Dictionary:
 			d["icon"] = rk
 			d.stats.append([rk, str(int(ceil(float(r.amount[i])))), rk])
 	return d
+
+## A building's empowerment (0..1: the Pharaoh 1, Ra's Priests 0.6, Mandjet 0.6), 0 for none.
+func _empower_of(id: int) -> float:
+	var B: Dictionary = sim.get_buildings()
+	if not B.has("empower"):
+		return 0.0
+	var ids: PackedInt32Array = B.ids
+	var i := ids.bsearch(id)
+	if i < int(B.count) and ids[i] == id:
+		return float(B.empower[i])
+	return 0.0
 
 ## The research part of a building's card: "Researching <tech> · n%", the
 ## queue (icon + progress, click to cancel: refunds what was paid), the techs
@@ -1761,8 +2092,17 @@ func _click_zone(id: String, arg) -> void:
 				message(p.reason)
 				return
 			_cancel_mode()  # (drops a building ghost still on the cursor)
-			_mode = {"kind": "power", "id": arg}
-			message("%s: choose a target" % p.def.name)
+			if str(p.get("target", "point")) == "global":
+				# a power over the whole map (Rain, Prosperity, Eclipse): cast at once
+				if sim.cast_power(me, str(arg), 0.0, 0.0):
+					message("%s!" % p.def.name)
+				else:
+					message(_cast_reason(str(arg)))
+				_hud_t = 0.0
+				return
+			_mode = {"kind": "power", "id": arg, "target": str(p.get("target", "point"))}
+			var hint := {"two_points": "choose where it starts", "own_tc": "click one of your Town Centers", "own_pharaoh": "click your Pharaoh"}
+			message("%s: %s" % [p.def.name, hint.get(str(p.get("target", "")), "choose a target")])
 			_hud_t = 0.0
 		"group":
 			_recall_group(str(arg), false, true)
@@ -1841,6 +2181,9 @@ func _run_command(c: Dictionary) -> void:
 			var builders := []
 			for e in sel:
 				if e.kind == "unit" and bool(_defs[e.type].get("builder", false)) and int(e.owner) == me:
+					# an Egyptian's Laborers build all but the Obelisk, his Priests only that
+					if egypt() and (str(e.type) == "priest") != (str(c.arg) == "obelisk"):
+						continue
 					builders.append(e.id)
 			_begin_place(str(c.arg), builders)
 		"wall":
@@ -1883,6 +2226,29 @@ func _run_command(c: Dictionary) -> void:
 		"age":
 			var r: Dictionary = sim.advance_age(me)
 			if not r.ok: message(r.reason)
+		"age_god":
+			# an Egyptian age-up: the minor god first, then the advance (undone if refused)
+			var nxt := int(player.get("age", 0)) + 1
+			var g: Dictionary = sim.set_minor_god(me, nxt, str(c.arg))
+			var r: Dictionary = sim.advance_age(me) if bool(g.ok) else g
+			if not bool(r.ok):
+				if bool(g.ok):
+					sim.set_minor_god(me, nxt, "")
+				message(str(r.reason))
+			else:
+				message("Advancing to the %s Age with %s" % [AGES[clampi(nxt, 0, 3)], str(EgyptIcons.MINOR.get(str(c.arg), {}).get("name", str(c.arg).capitalize()))])
+		"empower":
+			var ids := []
+			for e in sel:
+				if e.kind == "unit" and int(e.owner) == me and (str(e.type) == "pharaoh" or str(e.type) == "priest"):
+					ids.append(e.id)
+			_cancel_mode()
+			_mode = {"kind": "empower", "ids": ids}
+			Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND)
+			message("Empower: click one of your buildings (Esc cancels)")
+		"summon":
+			var r: Dictionary = sim.summon_animal(int(c.arg[0]), str(c.arg[1]))
+			if not bool(r.ok): message(str(r.reason))
 	_hud_t = 0.0
 	_stat_t = 0.0
 
@@ -1919,12 +2285,40 @@ func _unhandled_input(e: InputEvent) -> void:
 				return
 			if _mode.get("kind", "") == "power":
 				var g = pick_ground(e.position)
+				if g != null and str(_mode.get("target", "")) == "two_points" and _mode.get("from") == null:
+					# Shifting Sands: the first click picks the units' circle, the second where they go
+					_mode["from"] = g
+					message("%s: now choose where they go" % str(_pdefs[_mode.id].name))
+					return
 				if g != null:
-					var ok: bool = sim.cast_power(me, _mode.id, g.x, g.y)
+					var ok: bool
+					if _mode.get("from") != null:
+						ok = sim.cast_power2(me, _mode.id, _mode.from.x, _mode.from.y, g.x, g.y)
+					else:
+						var at: Vector2 = g
+						var tid := pick_entity(e.position)
+						if tid != 0 and str(_mode.get("target", "")).begins_with("own_"):
+							# aim at the Town Center / Pharaoh clicked, not the ground behind it
+							var k := int(sim.entity_kind(tid))
+							var ent: Dictionary = sim.get_unit(tid) if k == 1 else sim.get_building(tid) if k == 2 else {}
+							if not ent.is_empty():
+								at = Vector2(float(ent.x), float(ent.z))
+						ok = sim.cast_power(me, _mode.id, at.x, at.y)
 					if not ok:
-						message(str(sim.can_cast(me, _mode.id).reason))
+						message(_cast_reason(str(_mode.id)))
 				_mode = {}
 				_hud_t = 0.0
+				return
+			if _mode.get("kind", "") == "empower":
+				var tid := pick_entity(e.position)
+				if tid != 0 and int(sim.entity_kind(tid)) == 2 and _owner_of(tid) == me:
+					sim.order_empower(PackedInt32Array(_mode.ids), tid)
+					var tb: Dictionary = sim.get_building(tid)
+					_marker(float(tb.x), float(tb.z), Color("#ffd860"))
+					message("Empowering the %s" % str(_bdefs.get(str(tb.type), {}).get("name", "building")))
+					_cancel_mode()
+				else:
+					message("Empower: click one of your buildings")
 				return
 			_drag = {"start": e.position, "shift": e.shift_pressed, "active": false}
 		elif e.button_index == MOUSE_BUTTON_RIGHT:
@@ -2137,6 +2531,9 @@ func _key(e: InputEventKey) -> void:
 			else:
 				message(_deny_text(c))
 			return
+	if ch == "X" and not _own_units().is_empty():
+		# Stop when the grid has no room for its button (the Laborers' full build grid)
+		sim.order_idle(PackedInt32Array(_own_units()))
 
 func _recall_group(k: String, add: bool, center: bool) -> void:
 	var ids := _alive(groups.get(k, []))
@@ -2210,7 +2607,13 @@ func _begin_place(type: String, builders: Array) -> void:
 	_cancel_mode()
 	_mode = {"kind": "place", "type": type, "builders": builders}
 	_ghost = MeshInstance3D.new()
-	if type == "tower":
+	var eg_model := type if EgyptBuildings.model_type(type) != "" else ("sentry_tower" if type == "tower" and EgyptBuildings.model_type("sentry_tower") != "" else "")
+	if egypt() and eg_model != "":
+		# an Egyptian's building: its Egyptian model, fitted to the footprint
+		_ghost.mesh = EgyptBuildings.mesh_for(eg_model, int(player.get("age", 0)), str(player.get("god", "ra")).to_lower())
+		var bd0: Dictionary = _bdefs.get(type, {})
+		_ghost.scale = Vector3.ONE * EgyptBuildings.fit_scale(eg_model, float(bd0.get("w", 1)), float(bd0.get("h", 1)))
+	elif type == "tower":
 		_ghost.mesh = VoxelModels.mesh("towers", str(clampi(int(_fort.get("tower_level", 0)), 0, 3)))
 	elif type == "armory" or type == "market":
 		_ghost.mesh = VoxelModels.mesh("techbuildings", "%s/a1" % type)
@@ -2227,7 +2630,14 @@ func _begin_place(type: String, builders: Array) -> void:
 	add_child(_ghost)
 	_update_ghost()
 
+## Why a cast was refused (the sim's last reason, else can_cast's).
+func _cast_reason(k: String) -> String:
+	var why := str(sim.last_cast_reason()) if sim.has_method("last_cast_reason") else ""
+	return why if why != "" else str(sim.can_cast(me, k).reason)
+
 func _cancel_mode() -> void:
+	if _mode.get("kind", "") == "empower":
+		Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 	if _ghost:
 		_ghost.queue_free()
 		_ghost = null
@@ -2282,7 +2692,7 @@ func _update_ghost() -> void:
 	var tx := int(round(g.x - float(d.w) / 2.0))
 	var tz := int(round(g.y - float(d.h) / 2.0))
 	_ghost_tile = Vector2i(tx, tz)
-	_ghost_ok = sim.can_place(_mode.type, tx, tz) and _can_afford(d.cost) and (not _fog_on or sim.is_explored(tx, tz))
+	_ghost_ok = sim.can_place(_mode.type, tx, tz) and _can_afford(_bdef(_mode.type).get("cost", d.cost)) and (not _fog_on or sim.is_explored(tx, tz))
 	var x := tx + float(d.w) * 0.5
 	var z := tz + float(d.h) * 0.5
 	_ghost.position = Vector3(x, sim.height_at(x, z), z)

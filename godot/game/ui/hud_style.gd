@@ -6,6 +6,7 @@ extends RefCounted
 
 const Icons := preload("res://game/ui/icons.gd")
 const TechIcons := preload("res://game/ui/tech_icons.gd")
+const EgyptIcons := preload("res://game/ui/egypt_icons.gd")
 
 const GOLD := Color("#e9c878")
 const GOLD_HI := Color("#fff0c0")
@@ -70,11 +71,14 @@ static func icon(name: String, px: int, tint := "") -> Texture2D:
 	var svg: String = Icons.SVG.get(name, "")
 	if svg.is_empty():
 		svg = TechIcons.svg(name)   # the tech / market glyphs (Godot-only)
+	var evb := EgyptIcons.viewbox(name)   # the Egyptians' gods, powers, commands
+	if svg.is_empty() and evb > 0.0:
+		svg = EgyptIcons.SVG[name]
 	if svg.is_empty():
 		return null
 	if tint != "":
 		svg = svg.replace("currentColor", tint)
-	var vb := 100.0 if name == "zeus" else 120.0 if name == "wing" else 24.0
+	var vb := 100.0 if name == "zeus" else 120.0 if name == "wing" else evb if evb > 0.0 else 24.0
 	var img := Image.new()
 	var err := img.load_svg_from_string(svg, float(px) / vb)
 	if err != OK:

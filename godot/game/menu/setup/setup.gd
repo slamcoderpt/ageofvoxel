@@ -17,7 +17,7 @@ extends Control
 ## HUD style: panel.gdshader panels, hud_style.gd type and bronze,
 ## widgets.gd fields / lists / pills.
 ##
-## Scene: godot --path godot -- --scene=setup [--players=2..6] [--map=KEY]
+## Scene: godot --path godot -- --scene=setup [--players=2..6] [--map=KEY] [--god=ra|isis|set|zeus] [--god2=...]
 ##        [--seed=N] [--mapsize=N] [--open=team|color|difficulty|count|size|resources|speed|god|map]
 ## (captures: node scripts/godot-shoot.mjs --scene setup --params "players=5").
 
@@ -25,6 +25,7 @@ const S := preload("res://game/ui/hud_style.gd")
 const W := preload("res://game/menu/setup/widgets.gd")
 const M := preload("res://game/menu/setup/match_settings.gd")
 const MapPreview := preload("res://game/menu/setup/map_preview.gd")
+const EgyptIcons := preload("res://game/ui/egypt_icons.gd")
 const FLOW := "res://game/menu/flow.gd"   # the main menu's screen flow (loaded when there)
 
 ## portraits.gd with its owner -> colour lookup replaced by our colour index
@@ -118,6 +119,11 @@ func _ready() -> void:
 	_layout()
 	get_viewport().size_changed.connect(_layout)
 
+	# --god=ra|isis|set|zeus: your pantheon (captures), --god2=: the first AI's
+	for k in [["god", 0], ["god2", 1]]:
+		var gk := str(args.get(k[0], "")).to_lower()
+		if M.GODS.has(gk) and bool(M.GODS[gk].available) and int(k[1]) < _players().size():
+			_players()[int(k[1])].god = gk
 	match str(args.get("open", "")):
 		"team": _open_dropdown("team", 1)
 		"color": _open_dropdown("color", 1)
@@ -163,7 +169,7 @@ func chat_rect() -> Rect2: return Rect2(22, 1022, 700, 46)
 func leave_rect() -> Rect2: return Rect2(_css.x - 22 - 480, 1026, 210, 42)
 func play_rect() -> Rect2: return Rect2(_css.x - 22 - 250, 1026, 250, 42)
 func modal_rect() -> Rect2:
-	var sz := Vector2(1240, 780) if _modal == "god" else Vector2(1300, 600)
+	var sz := Vector2(1460, 840) if _modal == "god" else Vector2(1300, 600)
 	return Rect2(((_css - sz) * 0.5).round(), sz)
 
 const DARK_PANEL := {"bg_mode": 1, "bg0": Color(0.105, 0.125, 0.13, 0.96), "bg1": Color(0.062, 0.078, 0.084, 0.97),
@@ -572,7 +578,7 @@ func _draw_title(ci: CanvasItem) -> void:
 	W.draw_box(ci, chip, Color(0.02, 0.06, 0.07, 0.85), Color("#8c6a36"), 1.5, 3.0)
 	W.god_disc(ci, Vector2(chip.position.x + 26, chip.get_center().y), 18, str(_players()[0].god))
 	S.text(ci, S.font("bold"), Vector2(chip.position.x + 56, chip.get_center().y + 8), str(_players()[0].name), 22, S.INK)
-	S.text(ci, S.font("sans"), Vector2(chip.position.x, chip.get_center().y + 7), "Greeks", 17, S.MUTED, HORIZONTAL_ALIGNMENT_RIGHT, chip.size.x - 14)
+	S.text(ci, S.font("sans"), Vector2(chip.position.x, chip.get_center().y + 7), M.culture_of(str(_players()[0].god)), 17, S.MUTED, HORIZONTAL_ALIGNMENT_RIGHT, chip.size.x - 14)
 	W.frame_corners(ci, Rect2(8, 6, r.size.x - 16, r.size.y - 12), 30)
 
 func _draw_bar(ci: CanvasItem) -> void:
@@ -662,7 +668,8 @@ func _draw_row(ci: CanvasItem, t: Rect2, c: Dictionary, i: int, y: float) -> voi
 	var pr := Rect2(c.name, cy - 26, 52, 52)
 	ci.draw_rect(pr.grow(2), Color.BLACK)
 	S.radial_box(ci, pr, [[0.0, Color("#2a5462")], [0.7, Color("#0c2a33")], [1.0, Color("#041116")]], Vector2(0.5, 0.3))
-	var tex: Texture2D = _portraits.unit("hero" if human else "hoplite", int(p.color))
+	var egy := EgyptIcons.is_egypt_god(str(p.god))
+	var tex: Texture2D = _portraits.unit(("pharaoh" if human else "spearman") if egy else ("hero" if human else "hoplite"), int(p.color))
 	if tex:
 		# head and shoulders: the upper middle of the full-figure portrait
 		var n := float(tex.get_width())
@@ -820,78 +827,165 @@ func _draw_god_modal(ci: CanvasItem) -> void:
 	var cx := Rect2(r.end.x - 60, r.position.y + 24, 36, 36)
 	W.draw_svg(ci, "close", cx.grow(-6), "#f3d893" if _hover(cx, 1) else "#c9a258")
 	_zone(1, cx, "modal_close")
-	# left: gods by culture
+	# left: gods by culture (Retold's Select Pantheon, reference/egypt/ui_04.jpg)
 	var lx := r.position.x + 40
-	var ly := r.position.y + 100
-	var col_r := Rect2(lx - 10, ly, 360, r.size.y - 200)
+	var ly := r.position.y + 96
+	var col_r := Rect2(lx - 10, ly, 360, r.size.y - 196)
 	W.draw_box(ci, col_r, Color(0, 0, 0, 0.3), Color(0.55, 0.42, 0.22, 0.6), 1.0, 3.0)
-	S.text(ci, S.font("title"), Vector2(col_r.position.x, ly + 40), "GREEKS", 24, Color("#e9c878"), HORIZONTAL_ALIGNMENT_CENTER, col_r.size.x, 0.9, 2.0)
-	W.rule(ci, Vector2(col_r.position.x + 30, ly + 56), Vector2(col_r.end.x - 30, ly + 56))
-	for gi in M.GOD_ORDER.size():
-		var g: String = M.GOD_ORDER[gi]
-		var gd: Dictionary = M.GODS[g]
-		var card := Rect2(col_r.position.x + 20 + gi * 110, ly + 78, 100, 132)
-		var av := bool(gd.available)
-		var hov := _hover(card, 1) and av
-		var sel := _god_pick == g
-		W.draw_box(ci, card, Color(0.06, 0.16, 0.19, 0.9) if sel else Color(0.02, 0.05, 0.06, 0.8),
-			Color("#f3d893") if sel or hov else Color(0.55, 0.42, 0.22, 0.7), 2.0 if sel else 1.0, 3.0)
-		W.god_disc(ci, Vector2(card.get_center().x, card.position.y + 46), 33, g, hov, not av)
-		S.text(ci, S.font("title"), Vector2(card.position.x, card.end.y - 32), gd.name.to_upper(), 16, Color("#e9c878") if av else Color(0.55, 0.53, 0.5), HORIZONTAL_ALIGNMENT_CENTER, card.size.x, 0.8, 1.0)
-		S.text(ci, S.font("sans"), Vector2(card.position.x, card.end.y - 12), "Available" if av else "Locked", 14,
-			Color(0.6, 0.8, 0.6) if av else Color(0.55, 0.52, 0.48), HORIZONTAL_ALIGNMENT_CENTER, card.size.x, 0.6)
-		_zone(1, card, "god_pick", g)
-	var cultures := ["EGYPTIANS", "NORSE", "ATLANTEANS"]
-	for k in cultures.size():
-		var yy := ly + 260 + k * 74
-		S.text(ci, S.font("title"), Vector2(col_r.position.x, yy), cultures[k], 20, Color(0.55, 0.52, 0.47), HORIZONTAL_ALIGNMENT_CENTER, col_r.size.x, 0.8, 2.0)
-		S.text(ci, S.font("sans"), Vector2(col_r.position.x, yy + 26), "Not in the game yet", 16, Color(0.5, 0.49, 0.46), HORIZONTAL_ALIGNMENT_CENTER, col_r.size.x, 0.6)
+	var yy := ly
+	for cu in M.CULTURES:
+		S.text(ci, S.font("title"), Vector2(col_r.position.x, yy + 38), str(cu[0]).to_upper(), 24, Color("#e9c878"), HORIZONTAL_ALIGNMENT_CENTER, col_r.size.x, 0.9, 2.0)
+		W.rule(ci, Vector2(col_r.position.x + 30, yy + 54), Vector2(col_r.end.x - 30, yy + 54))
+		var gods: Array = cu[1]
+		for gi in gods.size():
+			var g: String = gods[gi]
+			var gd: Dictionary = M.GODS[g]
+			var card := Rect2(col_r.position.x + 20 + gi * 110, yy + 70, 100, 132)
+			var av := bool(gd.available)
+			var hov := _hover(card, 1) and av
+			var sel := _god_pick == g
+			W.draw_box(ci, card, Color(0.06, 0.16, 0.19, 0.9) if sel else Color(0.02, 0.05, 0.06, 0.8),
+				Color("#f3d893") if sel or hov else Color(0.55, 0.42, 0.22, 0.7), 2.0 if sel else 1.0, 3.0)
+			W.god_disc(ci, Vector2(card.get_center().x, card.position.y + 46), 33, g, hov, not av)
+			S.text(ci, S.font("title"), Vector2(card.position.x, card.end.y - 32), gd.name.to_upper(), 16, Color("#e9c878") if av else Color(0.55, 0.53, 0.5), HORIZONTAL_ALIGNMENT_CENTER, card.size.x, 0.8, 1.0)
+			S.text(ci, S.font("sans"), Vector2(card.position.x, card.end.y - 12), "Available" if av else "Locked", 14,
+				Color(0.6, 0.8, 0.6) if av else Color(0.55, 0.52, 0.48), HORIZONTAL_ALIGNMENT_CENTER, card.size.x, 0.6)
+			_zone(1, card, "god_pick", g)
+		yy += 222
+	for k in 2:
+		var ty := yy + 30 + k * 68
+		S.text(ci, S.font("title"), Vector2(col_r.position.x, ty), ["NORSE", "ATLANTEANS"][k], 20, Color(0.55, 0.52, 0.47), HORIZONTAL_ALIGNMENT_CENTER, col_r.size.x, 0.8, 2.0)
+		S.text(ci, S.font("sans"), Vector2(col_r.position.x, ty + 26), "Not in the game yet", 16, Color(0.5, 0.49, 0.46), HORIZONTAL_ALIGNMENT_CENTER, col_r.size.x, 0.6)
 	# centre: the god
-	var gd: Dictionary = M.GODS[_god_pick]
+	var g0 := _god_pick
+	var gd: Dictionary = M.GODS[g0]
+	var egy := EgyptIcons.is_egypt_god(g0)
 	var mx := r.position.x + 420
-	var mw := 420.0
+	var mw := 440.0
 	var plaque := Rect2(mx, ly, mw, 78)
 	W.draw_box(ci, plaque, Color(0.03, 0.07, 0.08, 0.95), Color("#c9a258"), 2.0, 4.0)
 	W.frame_corners(ci, plaque.grow(-4), 14)
 	S.text(ci, S.font("black"), Vector2(mx, ly + 38), gd.name.to_upper(), 30, Color("#fff0c0"), HORIZONTAL_ALIGNMENT_CENTER, mw, 0.9, 1.5)
 	S.text(ci, S.font("title"), Vector2(mx, ly + 64), gd.title.to_upper(), 15, Color("#d8c9a0"), HORIZONTAL_ALIGNMENT_CENTER, mw, 0.8, 1.0)
-	var art := Rect2(mx + 40, ly + 96, mw - 80, 250)
-	S.vgrad(ci, art.grow(4), S.METAL)
-	S.radial_box(ci, art, [[0.0, Color("#f8e8b8")], [0.35, Color("#7da0c4")], [0.75, Color("#253c5c")], [1.0, Color("#0c1626")]], Vector2(0.5, 0.35))
-	var em := S.icon_glow("zeus", 200, 6)
-	if em:
-		ci.draw_texture_rect(em, Rect2(art.get_center() - Vector2(em.get_width(), em.get_height()) * 0.5, Vector2(em.get_width(), em.get_height())), false, Color(1.0, 0.95, 0.7, 0.55))
-	W.draw_svg(ci, "zeus", Rect2(art.get_center() - Vector2(100, 100), Vector2(200, 200)), "#fff8e0")
-	var dr := Rect2(mx, art.end.y + 22, mw, 190)
+	var art := Rect2(mx + 40, ly + 96, mw - 80, 260)
+	_god_art(ci, art, g0)
+	var dr := Rect2(mx, art.end.y + 20, mw, r.end.y - 92 - (art.end.y + 20))
 	W.draw_box(ci, dr, Color(0.01, 0.03, 0.035, 0.85), Color(0.55, 0.42, 0.22, 0.8), 1.0, 3.0)
-	var lines: Array = gd.get("lines", [])
 	var ly2 := dr.position.y + 30
+	if str(gd.get("focus", "")) != "":
+		S.text(ci, S.font("bold"), Vector2(dr.position.x + 14, ly2), str(gd.focus), 17, S.GOLD)
+		ly2 += 28
+	var lines: Array = gd.get("lines", [])
 	for li in lines.size():
 		S.text(ci, S.font("bold"), Vector2(dr.position.x + 14, ly2), "•", 17, S.GOLD)
-		ly2 = _wrap(ci, str(lines[li]), Vector2(dr.position.x + 30, ly2), dr.size.x - 44, 17, S.INK) + 30
-	# right: god powers
+		ly2 = _wrap(ci, str(lines[li]), Vector2(dr.position.x + 30, ly2), dr.size.x - 44, 17, S.INK) + 28
+	# right: god powers (Zeus: his three; an Egyptian: his Archaic power, then the
+	# minor gods he picks from at each age-up with their powers, as ui_04's tree)
 	var rx := mx + mw + 36
 	var rw := r.end.x - 36 - rx
-	S.text(ci, S.font("title"), Vector2(rx, ly + 30), "GOD POWERS", 22, Color("#e9c878"), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.9, 2.0)
+	S.text(ci, S.font("title"), Vector2(rx, ly + 30), "GOD POWERS" if not egy else "GOD POWER AND MINOR GODS", 22, Color("#e9c878"), HORIZONTAL_ALIGNMENT_LEFT, -1, 0.9, 2.0)
 	W.rule(ci, Vector2(rx, ly + 46), Vector2(rx + rw, ly + 46), false)
-	var powers := [["storm", "Lightning Storm", "Z", "A storm of bolts over a wide area"], ["bolt", "Bolt", "C", "Strikes one unit dead"],
-		["meteor", "Meteor", "V", "A burning rock that levels buildings"]]
-	for pi in powers.size():
-		var py := ly + 70 + pi * 96
-		var ic := Rect2(rx, py, 72, 72)
-		S.cell(ci, ic, [[0.0, Color("#2a6a7a")], [0.7, Color("#0c2a33")], [1.0, Color("#041116")]], Vector2(0.5, 0.3), 2.0)
-		S.draw_icon(ci, powers[pi][0], ic.grow(-14))
-		S.text(ci, S.font("title7"), Vector2(rx + 88, py + 28), powers[pi][1], 21, S.INK)
-		_wrap(ci, powers[pi][3], Vector2(rx + 88, py + 54), rw - 92, 16, S.MUTED)
-		var kr := Rect2(rx + 88 + S.text_width(S.font("title7"), powers[pi][1], 21) + 10, py + 7, 28, 27)
-		W.draw_box(ci, kr, Color(0, 0, 0, 0.5), Color("#8c6a36"), 1.0, 3.0)
-		S.text(ci, S.font("bold"), Vector2(kr.position.x, kr.position.y + 21), powers[pi][2], 17, S.GOLD, HORIZONTAL_ALIGNMENT_CENTER, kr.size.x)
-	_wrap(ci, "Minor gods (one per age) are not in the game yet.", Vector2(rx, ly + 70 + 3 * 96 + 16), rw, 16, Color(0.6, 0.6, 0.56))
-	var cb := Rect2(r.get_center().x - 160, r.end.y - 72, 320, 44)
+	if not egy:
+		var keys := {"lightning_storm": "Z", "bolt": "C", "meteor": "V"}
+		var pw: Array = gd.get("powers", [])
+		for pi in pw.size():
+			var py := ly + 70 + pi * 96
+			_power_row(ci, Rect2(rx, py, rw, 80), str(pw[pi]), keys.get(pw[pi], ""))
+		_wrap(ci, "Minor gods (one per age) are not in the game yet.", Vector2(rx, ly + 70 + 3 * 96 + 16), rw, 16, Color(0.6, 0.6, 0.56))
+	else:
+		var py := ly + 64
+		_age_medal(ci, Vector2(rx + 30, py + 36), 0)
+		_power_row(ci, Rect2(rx + 74, py, rw - 74, 80), str(gd.powers[0]), "Z")
+		var sim_ref: Object = _sim_for_gods()
+		for age in [1, 2, 3]:
+			var ay: float = ly + 168 + (age - 1) * 152
+			ci.draw_line(Vector2(rx, ay - 10), Vector2(rx + rw, ay - 10), Color(0.55, 0.42, 0.22, 0.45), 1.0)
+			_age_medal(ci, Vector2(rx + 30, ay + 64), age)
+			var offer := EgyptIcons.offered(sim_ref, g0, age)
+			for k in offer.size():
+				var mg: String = offer[k]
+				var info: Dictionary = EgyptIcons.MINOR.get(mg, {"name": mg.capitalize(), "power": "", "focus": ""})
+				var gy: float = ay + k * 68
+				var gc2 := Vector2(rx + 98, gy + 30)
+				W.minor_disc(ci, gc2, 28, mg)
+				S.text(ci, S.font("title7"), Vector2(rx + 136, gy + 22), str(info.name), 21, S.INK)
+				S.text(ci, S.font("sans"), Vector2(rx + 136, gy + 46), str(info.focus), 15, S.MUTED, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)
+				var pk := str(info.power)
+				if pk != "":
+					var ic := Rect2(rx + rw - 172, gy + 6, 44, 44)
+					S.cell(ci, ic, [[0.0, Color("#4c77b0")], [0.82, Color("#152847")], [1.0, Color("#152847")]], Vector2(0.5, 0.38), 2.0)
+					S.draw_icon(ci, "meteor" if pk == "thoth_meteor" else pk, ic.grow(-7))
+					_wrap(ci, str(M.POWERS.get(pk, [pk.capitalize()])[0]), Vector2(ic.end.x + 8, gy + 34), 118, 15, Color("#d8e6f0"))
+	var cb := Rect2(r.get_center().x - 160, r.end.y - 68, 320, 44)
 	W.pill(ci, cb, "Confirm %s" % gd.name, "bronze", _hover(cb, 1))
 	_zone(1, cb, "god_confirm")
 	# clicks anywhere else in the modal are swallowed
 	_zones[1].push_front({"rect": Rect2(Vector2.ZERO, _css), "id": "none", "arg": null})
+
+## the god card's art: his colours and emblem over a sun / sea / desert glow
+func _god_art(ci: CanvasItem, art: Rect2, god: String) -> void:
+	S.vgrad(ci, art.grow(4), S.METAL)
+	var stops: Array
+	match god:
+		"ra": stops = [[0.0, Color("#fff6d0")], [0.3, Color("#f2b850")], [0.7, Color("#a8481a")], [1.0, Color("#2a0c04")]]
+		"isis": stops = [[0.0, Color("#eefcff")], [0.32, Color("#6cc8d8")], [0.72, Color("#1c5a86")], [1.0, Color("#071a30")]]
+		"set": stops = [[0.0, Color("#ffe2b8")], [0.3, Color("#d8783c")], [0.72, Color("#6a1a10")], [1.0, Color("#1a0604")]]
+		_: stops = [[0.0, Color("#f8e8b8")], [0.35, Color("#7da0c4")], [0.75, Color("#253c5c")], [1.0, Color("#0c1626")]]
+	S.radial_box(ci, art, stops, Vector2(0.5, 0.35))
+	if EgyptIcons.is_egypt_god(god):
+		# a horizon of dunes / the Nile under the emblem, and two gold obelisk bands
+		var hz := art.position.y + art.size.y * 0.78
+		var dune := PackedVector2Array([Vector2(art.position.x, art.end.y), Vector2(art.position.x, hz)])
+		for k in 9:
+			var x := art.position.x + art.size.x * k / 8.0
+			dune.append(Vector2(x, hz + sin(k * 1.7) * 6.0))
+		dune.append(Vector2(art.end.x, art.end.y))
+		var dc: Color = {"ra": Color(0.36, 0.14, 0.04, 0.75), "isis": Color(0.04, 0.16, 0.3, 0.75), "set": Color(0.3, 0.07, 0.03, 0.75)}[god]
+		ci.draw_colored_polygon(dune, dc)
+		for side in [0, 1]:
+			var bx := art.position.x + 18 if side == 0 else art.end.x - 30
+			ci.draw_rect(Rect2(bx, art.position.y + 14, 12, art.size.y - 28), Color(0, 0, 0, 0.25))
+			ci.draw_rect(Rect2(bx + 2, art.position.y + 16, 8, art.size.y - 32), Color("#d8a840"))
+			for k in 8:
+				ci.draw_rect(Rect2(bx + 2, art.position.y + 26 + k * (art.size.y - 52) / 8.0, 8, 3), Color("#2e5ea6"))
+	var em := S.icon_glow(god, 200, 6)
+	if em:
+		ci.draw_texture_rect(em, Rect2(art.get_center() - Vector2(em.get_width(), em.get_height()) * 0.5, Vector2(em.get_width(), em.get_height())), false, Color(1.0, 0.95, 0.7, 0.55))
+	W.draw_svg(ci, god, Rect2(art.get_center() - Vector2(100, 100), Vector2(200, 200)), "#fff8e0")
+
+## a god power row of the card: icon cell, name, hotkey chip, one line
+func _power_row(ci: CanvasItem, r: Rect2, key: String, hotkey: String) -> void:
+	var ic := Rect2(r.position, Vector2(72, 72))
+	S.cell(ci, ic, [[0.0, Color("#2a6a7a")], [0.7, Color("#0c2a33")], [1.0, Color("#041116")]], Vector2(0.5, 0.3), 2.0)
+	var icon: String = {"lightning_storm": "storm", "thoth_meteor": "meteor"}.get(key, key)
+	S.draw_icon(ci, icon, ic.grow(-14))
+	var nm: Array = M.POWERS.get(key, [key.capitalize(), ""])
+	S.text(ci, S.font("title7"), Vector2(r.position.x + 88, r.position.y + 28), str(nm[0]), 21, S.INK)
+	_wrap(ci, str(nm[1]), Vector2(r.position.x + 88, r.position.y + 54), r.size.x - 92, 16, S.MUTED)
+	if hotkey != "":
+		var kr := Rect2(r.position.x + 88 + S.text_width(S.font("title7"), str(nm[0]), 21) + 10, r.position.y + 7, 28, 27)
+		W.draw_box(ci, kr, Color(0, 0, 0, 0.5), Color("#8c6a36"), 1.0, 3.0)
+		S.text(ci, S.font("bold"), Vector2(kr.position.x, kr.position.y + 21), hotkey, 17, S.GOLD, HORIZONTAL_ALIGNMENT_CENTER, kr.size.x)
+
+## the age medallion of the minor-god tree (I bronze, II silver, III gold, IV green: Retold's)
+func _age_medal(ci: CanvasItem, c: Vector2, age: int) -> void:
+	var face: Array = [[[0.0, Color("#f0b884")], [0.6, Color("#a05a28")], [1.0, Color("#4a2410")]],
+		[[0.0, Color("#ffffff")], [0.6, Color("#a8b0b8")], [1.0, Color("#40464e")]],
+		[[0.0, Color("#fff4c0")], [0.6, Color("#d8a630")], [1.0, Color("#5a3c08")]],
+		[[0.0, Color("#b8f0c0")], [0.6, Color("#2e9a50")], [1.0, Color("#0a3818")]]][clampi(age, 0, 3)]
+	ci.draw_circle(c + Vector2(0, 2), 25, Color(0, 0, 0, 0.6), true, -1.0, true)
+	ci.draw_circle(c, 24, Color("#1a1206"), true, -1.0, true)
+	S.disc(ci, c, 22, S.radial_tex(face, Vector2(0.5, 0.3), 0.7, 64))
+	ci.draw_arc(c, 18, 0, TAU, 40, Color(0, 0, 0, 0.35), 1.5, true)
+	var rn: String = ["I", "II", "III", "IV"][clampi(age, 0, 3)]
+	S.text(ci, S.font("black"), Vector2(c.x - 30, c.y + 9), rn, 24, Color("#fff8e0"), HORIZONTAL_ALIGNMENT_CENTER, 60, 0.9)
+
+## a sim to ask which minor gods a major god offers (the screen has none of its own)
+static var _gods_sim: Object = null
+func _sim_for_gods() -> Object:
+	if _gods_sim == null and ClassDB.class_exists("AovSim"):
+		_gods_sim = ClassDB.instantiate("AovSim")
+	return _gods_sim
 
 # map chooser ---------------------------------------------------------------------------------------
 
