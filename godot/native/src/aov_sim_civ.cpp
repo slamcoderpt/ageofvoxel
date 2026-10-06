@@ -179,14 +179,38 @@ Array AovSim::get_trains(int64_t building) const {
 		Dictionary e;
 		std::string why;
 		const int k = sim_.civs.train_check(b, *u, &why);
+		// the same gates as Economy::train, in its order (the list, the age,
+		// the minor god, then the civ's own locks), so a button is only ok when
+		// sim.train would take it but for resources, houses and the queue
+		const char *gate = k ? "civ" : "";
+		if (k != 1 && sim_.godot_rules) {
+			const int owner = B.owner[b];
+			const int age = owner > 0 && owner < aov::MAX_PLAYERS ? sim_.players[owner].age : 0;
+			const int min_age = sim_.techs.min_age_for(owner, *u);
+			std::string gwhy;
+			if (min_age > age) {
+				why = std::string("Requires ") + aov::AGES[min_age] + " Age";
+				gate = "age";
+			} else if (!sim_.techs.god_allows_unit(owner, *u, &gwhy)) {
+				why = gwhy;
+				gate = "god";
+			}
+		}
+		if (!B.built[b] && !*gate) {
+			why = "Cannot train here";
+			gate = "built";
+		}
 		e["type"] = aov::unit_def(*u).key;
+		e["gate"] = String(gate);
+		e["min_age"] = sim_.techs.min_age_for(B.owner[b], *u);
+		if (const char *g = aov::myth_unit_god(*u)) e["god"] = String(g);
 		// the cost he pays here (Set's Devotees: x0.9 near a Monument)
 		const double cm = sim_.godot_rules ? sim_.civs.train_cost_mult(b, *u) : 1;
 		aov::Cost c = aov::unit_def(*u).cost;
 		for (int r = 0; r < aov::RES_COUNT; r++) c.v[r] *= cm;
 		e["cost"] = civ_cost_dict(c);
 		if (cm != 1) e["devotees"] = sim_.civs.devotee_monument(b);
-		e["ok"] = k == 0;
+		e["ok"] = !*gate;
 		e["reason"] = String(why.c_str());
 		out.push_back(e);
 	}

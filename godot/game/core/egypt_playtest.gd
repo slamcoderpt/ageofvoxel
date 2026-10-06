@@ -507,6 +507,11 @@ func _run() -> void:
 		var tt := await _step_until(120.0, func(): return _units("spearman").size() > n0)
 		_check("Q trains a Spearman", tt >= 0.0, "in %.0f s" % tt)
 
+	# 8b. a Temple: its grid holds the Priest and the myth units of the gods he
+	# chose (Bast: the Sphinx), none of another god's (Ptah's Wadjet, Anubis' Anubite,
+	# Thoth's Phoenix...); each button's state agrees with sim.train; its key trains it
+	await _temple_step(lots)
+
 	# 9. the Pharaoh: a click on him, Empower (Q), a click on the Barracks
 	var ph := _units("pharaoh")
 	if ph.is_empty() or bar == 0:
@@ -551,6 +556,70 @@ func _run() -> void:
 	await _shot("rain")
 	report_egypt(eg)
 	_finish()
+
+## The Temple (8b): placed with its key, built, clicked; its train buttons
+## read against the sim's own gates.
+func _temple_step(lots: Array) -> void:
+	# harness: the Temple's and the Sphinx's price (the Barracks and Spearman spent the purse)
+	var pr: Dictionary = sim.get_player(ME)
+	sim.set_player_resources(ME, {"food": float(pr.food) + 300.0, "wood": float(pr.wood) + 600.0, "gold": float(pr.gold) + 600.0, "favor": 60.0})
+	var tcmd := _build_cmd("temple")
+	await _key(KEY_1)
+	await _frames(6)
+	tcmd = _build_cmd("temple")
+	_check("the Temple on S in the Laborers' grid, enabled", str(tcmd.get("key", "")) == "S" and bool(tcmd.get("enabled", false)), "%s '%s'" % [tcmd.get("key", ""), tcmd.get("warn", "")])
+	var tid := await _place("temple", "key", lots)
+	if tid == 0:
+		return
+	var t := await _step_until(500.0, func(): var b: Dictionary = sim.get_building(tid); return not b.is_empty() and bool(b.built))
+	_check("the Laborers build the Temple", t >= 0.0, "in %.0f s" % t)
+	var picked := await _select_building(tid)
+	await _frames(6)
+	var shown := []
+	for c in ui.commands:
+		if c != null and str(c.get("action", "")) == "train":
+			shown.append(str(c.arg))
+	var myth := []
+	for tr in sim.get_trains(tid):
+		if str(tr.get("god", "")) != "":
+			myth.append(str(tr.type))
+	var others := []
+	for m in myth:
+		if m != "sphinx" and shown.has(m):
+			others.append(m)
+	_check("the Temple's grid: the Priest and Bast's Sphinx, no other god's myth unit", picked and shown.has("priest") and shown.has("sphinx") and others.is_empty() and myth.size() >= 10,
+		"shown %s, of %d myth units" % [shown, myth.size()])
+	# every button's state is the sim's: a held-back unit would be refused by sim.train
+	var agree := true
+	var bad := ""
+	for tr in sim.get_trains(tid):
+		if str(tr.get("god", "")) != "" and str(tr.type) != "sphinx":
+			if bool(tr.ok):
+				agree = false
+				bad += "%s ok; " % tr.type
+			elif not (str(tr.reason).begins_with("Requires the minor god") or str(tr.reason).begins_with("Requires ")):
+				agree = false
+				bad += "%s '%s'; " % [tr.type, tr.reason]
+	_check("get_trains holds back every myth unit of a god not chosen (its reason)", agree, bad)
+	var sc := _cmd_find(func(c): return str(c.get("action", "")) == "train" and str(c.get("arg", "")) == "sphinx")
+	var sp = _cmd_where(func(c): return str(c.get("action", "")) == "train" and str(c.get("arg", "")) == "sphinx")
+	if sp != null:
+		await _move(sp + Vector2(3, 2))
+		await _frames(4)
+	_check("hovering the Sphinx: its tooltip names Bast", str(ui.tooltip.get("title", "")) == "Train Sphinx"
+		and str(ui.tooltip.get("lines", [])).contains("Bast"), "%s %s" % [ui.tooltip.get("title", ""), ui.tooltip.get("lines", [])])
+	await _shot("temple")
+	# harness: the favor a Sphinx costs (an Egyptian's favor comes from Monuments)
+	pr = sim.get_player(ME)
+	sim.set_player_resources(ME, {"food": float(pr.food), "wood": float(pr.wood), "gold": maxf(float(pr.gold), 300.0), "favor": 60.0})
+	await _frames(12)
+	sc = _cmd_find(func(c): return str(c.get("action", "")) == "train" and str(c.get("arg", "")) == "sphinx")
+	var n0 := _units("sphinx").size()
+	if not sc.is_empty():
+		await _key(OS.find_keycode_from_string(str(sc.key)))
+	await _frames(3)
+	var tt := await _step_until(120.0, func(): return _units("sphinx").size() > n0)
+	_check("the Sphinx's key trains a Sphinx", bool(sc.get("enabled", false)) and tt >= 0.0, "key %s, in %.0f s, '%s'" % [sc.get("key", ""), tt, ui.msg_text])
 
 func report_egypt(eg: Dictionary) -> void:
 	result["egypt_powers"] = str(eg.keys()) if not eg.is_empty() else ""

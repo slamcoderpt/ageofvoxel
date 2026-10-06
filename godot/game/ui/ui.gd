@@ -1081,8 +1081,8 @@ func _egypt_unit_commands(us: Array, list: Array) -> void:
 	if empowerers > 0:
 		var strength := "a Pharaoh's full strength" if not phar.is_empty() else "60 % (Ra's Priests)"
 		list.append({"key": "W" if phar.is_empty() else "Q", "slot": 1 if phar.is_empty() else 0, "svg": "empower", "title": "Empower",
-			"lines": ["Click one of your buildings: he walks to it and empowers it", "(%s): work +75 %%, drops +20 %%, Monument favor up." % strength,
-				"Right-click a building does the same."], "enabled": true, "action": "empower"})
+			"lines": ["Click one of your buildings to empower it", "(%s):" % strength, "work +75 %, drop-offs +20 %, Monument favor up.",
+				"Right-clicking a building does the same."], "enabled": true, "action": "empower"})
 	if phar.size() == 1 and god == "set":
 		var menu: Array = sim.get_summon_menu(int(phar[0].id))
 		var keys := ["A", "S", "D", "F", "G", "Y", "U", "I"]
@@ -1110,9 +1110,11 @@ func _egypt_trains(b: Dictionary, list: Array) -> void:
 		var d: Dictionary = _defs.get(t, {})
 		if d.is_empty():
 			continue
-		# a myth unit of a minor god not chosen stays off the Temple's grid once his age's god is picked
+		# Retold: the Temple shows the myth units of the minor gods he has chosen,
+		# no other (a god not chosen, one his major god never offers, a later age's)
 		var reason := str(tr.reason)
-		if reason.begins_with("Requires the minor god") and _minor_chosen_for(int(d.get("min_age", 1))):
+		var gate := str(tr.get("gate", ""))
+		if str(tr.get("god", "")) != "" and (gate == "god" or (gate == "age" and not _god_chosen(str(tr.god)))):
 			continue
 		while tc and (j == 4 or j == 9):
 			j += 1   # (the Town Center's age-up buttons)
@@ -1128,12 +1130,23 @@ func _egypt_trains(b: Dictionary, list: Array) -> void:
 			c.lines.append("Devotees: -10 % near your Monument.")
 		if not bool(tr.ok) and not reason.begins_with("Not enough") and reason != "Need more houses":
 			c["warn"] = reason
-			if int(d.get("min_age", 0)) > age:
-				c["age_req"] = int(d.min_age)
+			var ma := int(tr.get("min_age", d.get("min_age", 0)))
+			if ma > age:
+				c["age_req"] = ma
 		elif not bool(tr.ok):
 			c["deny"] = reason
 		list.append(c)
 		j += 1
+
+## Is `god` one of the minor gods the player has chosen?
+func _god_chosen(god: String) -> bool:
+	if not sim.has_method("get_gods"):
+		return false
+	var minor: Dictionary = sim.get_gods(me).get("minor", {})
+	for k in minor:
+		if str(minor[k]) == god:
+			return true
+	return false
 
 ## Has the player chosen the minor god of `age` (1..3)?
 func _minor_chosen_for(age: int) -> bool:
@@ -1587,13 +1600,18 @@ func _info_for() -> Dictionary:
 		d["max_hp"] = float(e.max_hp)
 		d["tex"] = _portraits.unit(e.type, int(e.owner))
 		var atk: Dictionary = ud.get("attack", {})
-		if float(atk.get("damage", 0)) > 0:
-			d.stats.append(["sword", _num(atk.damage), "ranged" if str(atk.get("projectile", "")) != "" else "hack"])
+		# the live numbers (techs, the Pharaoh's / Priests' per-age values), the def's as a fallback
+		var live: Dictionary = sim.get_unit_stats(int(e.id)) if sim.has_method("get_unit_stats") else {}
+		var dmg := float(live.get("damage", atk.get("damage", 0)))
+		if float(atk.get("damage", 0)) > 0 or dmg > 0:
+			d.stats.append(["sword", _num(snappedf(dmg, 0.1)), "ranged" if str(atk.get("projectile", "")) != "" else "hack"])
 		d.stats.append(["shield", "%d%%" % int(round(float(ud.get("armor", 0)) * 100)), "armor"])
-		if float(ud.get("speed", 0)) > 0:
-			d.stats.append(["speed", "%.1f" % float(ud.speed), "speed"])
-		if float(ud.get("sight", 0)) > 0:
-			d.stats.append(["eye", _num(ud.sight), "LOS"])
+		var spd := float(live.get("speed", ud.get("speed", 0)))
+		if spd > 0:
+			d.stats.append(["speed", "%.1f" % spd, "speed"])
+		var los := float(live.get("sight", ud.get("sight", 0)))
+		if los > 0:
+			d.stats.append(["eye", _num(snappedf(los, 0.1)), "LOS"])
 		# carried goods and the current task, from the unit arrays
 		var u := units()
 		var ids: PackedInt32Array = u.ids

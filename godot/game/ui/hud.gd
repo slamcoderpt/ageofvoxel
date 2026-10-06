@@ -1152,8 +1152,16 @@ func _draw_tooltip() -> void:
 	var title := S.font("title")
 	var sans := S.font("sans")
 	var bold := S.font("bold")
-	var lines: Array = t.get("lines", [])
 	var cost: Dictionary = t.get("cost", {})
+	# the body lines wrapped to the panel's widest (278): no line runs past its edge
+	var lines: Array = []
+	for l in t.get("lines", []):
+		if S.text_width(sans, str(l), 14) > 278.0:
+			# (a number keeps its unit: "+20 %" never breaks before the %)
+			for wl in _wrap(sans, str(l).replace(" %", "\u00a0%"), 14, 278.0):
+				lines.append(str(wl).replace("\u00a0", " "))
+		else:
+			lines.append(str(l))
 	var w := 0.0
 	var tw := S.text_width(title, str(t.get("title", "")), 14, 0.5)
 	if t.get("sub", "") != "":
@@ -1172,7 +1180,7 @@ func _draw_tooltip() -> void:
 		w = maxf(w, 262.0)  # room for the Graphics row
 	var h := 8.0 + 18.0 + lines.size() * 18.0 + (20.0 if not cost.is_empty() else 0.0) + (18.0 if t.get("hotkey", "") != "" else 0.0) + (18.0 if t.get("warn", "") != "" or t.has("status") else 0.0) + (38.0 if menu else 0.0) + 8.0
 	var ar: Rect2 = t.anchor
-	var x := minf(W() - 290.0, ar.position.x)
+	var x := minf(W() - maxf(290.0, w + 30.0), ar.position.x)
 	var y := ar.position.y - h - 8.0
 	if y < 4.0:
 		y = ar.end.y + 8.0

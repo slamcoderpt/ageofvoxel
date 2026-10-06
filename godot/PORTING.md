@@ -2752,8 +2752,22 @@ Owner: the ui piece. Reference: `reference/egypt/ui_01..05.jpg`.
     nothing else (`_run_command build` filters the builders). The placement
     ghost is the Egyptian model, fitted to the footprint.
   - train buttons from `get_trains(building)` (Devotees' cost, "Requires a
-    Temple", the minor god of a myth unit, the age), keys by slot; a Temple
-    hides the myth units of the gods not chosen once an age's god is picked;
+    Temple", the minor god of a myth unit, the age), keys by slot.
+    `get_trains` runs `Economy::train`'s own gates in its order (the list,
+    `Techs::min_age_for`, `Techs::god_allows_unit`, then `Civs::train_check`'s
+    Temple / limit locks; an unbuilt building refuses), so an entry is `ok`
+    exactly when `sim.train` would take it but for resources, houses and the
+    queue; each entry also has `gate` ("" | civ | age | god | built),
+    `min_age` and, for a myth unit, `god`. Retold's Temple shows only the
+    myth units of the minor gods chosen: an entry gated by `god` (a god not
+    picked, or one the major god never offers) or by `age` for a god not yet
+    chosen is not drawn; a Ra player with Bast in the Classical Age sees the
+    Priest and the Sphinx only;
+  - the selection card's attack, speed and LOS come from `get_unit_stats`
+    (techs, the Pharaoh's / Priests' per-age values: a Classical Pharaoh
+    13.2 ranged, a Priest 2.2), the def's as a fallback; tooltip body lines
+    wider than the panel (278 px) wrap (`hud.gd _wrap`, a "+20 %" kept whole)
+    and the panel stays on screen;
   - the Town Center's age-up is two buttons (A, S), one per minor god the
     major god offers for the next age (lapis disc, gold hieroglyph; tooltip:
     the god's focus, power and myth units); a click calls
@@ -2797,9 +2811,14 @@ Owner: the ui piece. Reference: `reference/egypt/ui_01..05.jpg`.
   tooltip); Granary (button + ground click) and House (Q + click) built; H,
   the age-up offers Bast / Ptah, a Laborer trained, a click on Bast: the
   Classical Age with Bast and Eclipse; Barracks (D + click) built, a click
-  on it, Q trains a Spearman; a click on the Pharaoh, Q, a click on the
+  on it, Q trains a Spearman; a Temple (S + click) built, a click on it:
+  its grid holds the Priest and Bast's Sphinx and none of the other nine
+  myth units, every one of them refused by `get_trains` with its reason
+  (the minor god / the age), the Sphinx's tooltip names Bast, its key trains
+  a Sphinx; a click on the Pharaoh, Q, a click on the
   Barracks: empowered at 1; a click on Rain: favor paid, recharge running.
-  Harness only: the AI off, the sim stepped fast, 60 favor before the cast.
+  Harness only: the AI off, the sim stepped fast, 60 favor before the cast
+  and before the Sphinx (+400 wood / gold there).
   "EGYPTPLAY ok|FAIL", "EGYPTPLAY_RESULT {json}", exit = failures.
 
 ## The Egyptian gods (native/src/sim/godpowers, sim/techs, game/godpowers)
