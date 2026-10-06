@@ -441,6 +441,10 @@ double GodPowers::damage_mult(int r) const {
 	if (sim->entities.units.type[r] == U_SERPENT) return serpent_mult(sim->entities.units.owner[r]); // (Heroic / Mythic +20 %)
 	return eclipse_unit(*this, *sim, r) ? ECLIPSE_DAMAGE : 1;
 }
+bool GodPowers::power_immune(int r) const {
+	const int t = sim->entities.units.type[r];
+	return t == U_ROC || t == U_SON_OF_OSIRIS;
+}
 double GodPowers::vuln_mult(int r) const { return eclipse_unit(*this, *sim, r) ? ECLIPSE_VULN : 1; }
 // Retold's armor is a vulnerability (damage taken = 1 - armor); -10 % vulnerability multiplies it
 double GodPowers::armor_after(int r, double armor) const {
@@ -528,16 +532,31 @@ double GodPowers::building_hack_mult(int b, const Hitter &a, uint8_t kind) const
 	return v > 0 ? std::max(0.0, v - CITADEL_HACK) / v : 1;
 }
 
+// a volley's arrows after the first (combat fires the first): Retold's Egyptian Town Center
+// shoots 2 arrows a volley, the Citadel Center one more (an Egyptian one 3); each extra arrow
+// flies at another enemy in range when there is one, else at the same target
+int GodPowers::volley_arrows(int b) const {
+	const BuildingStore &B = sim->entities.buildings;
+	const int o = B.owner[b];
+	const bool egypt_tc = B.type[b] == B_TOWN_CENTER && o > 0 && o < MAX_PLAYERS && sim->players[o].civ == CIV_EGYPT;
+	return 1 + (egypt_tc ? 1 : 0) + (is_citadel(b) ? 1 : 0);
+}
+
 void GodPowers::extra_arrows(int b, int target, double damage) {
-	if (!is_citadel(b)) return;
-	// the third arrow: at another enemy in range if there is one, else the same
+	const int n = volley_arrows(b) - 1;
+	if (n <= 0) return;
 	Sim &S = *sim;
 	const BuildingStore &B = S.entities.buildings;
 	const UnitStore &U = S.entities.units;
 	const BuildingDef &d = building_def(B.type[b]);
-	const int e = S.combat.find_enemy_near(B.x[b], B.z[b], B.owner[b], d.attack_range + B.w[b] / 2.0,
-			[&](int o) { return o != target; });
-	S.combat.fire(B.id[b], U.id[e >= 0 ? e : target], damage * CITADEL_ATTACK, 4);
+	std::vector<int> shot{ target };
+	for (int i = 0; i < n; i++) {
+		const int e = S.combat.find_enemy_near(B.x[b], B.z[b], B.owner[b], d.attack_range + B.w[b] / 2.0,
+				[&](int o) { return std::find(shot.begin(), shot.end(), o) == shot.end(); });
+		const int t = e >= 0 ? e : target;
+		if (e >= 0) shot.push_back(e);
+		S.combat.fire(B.id[b], U.id[t], damage * building_attack_mult(b), 4);
+	}
 }
 
 bool GodPowers::is_uncontrolled(int32_t unit) const {
@@ -701,7 +720,7 @@ void GodPowers::update_egypt(double dt) {
 		const double dmg = SWARM_DPS * step * (S.players[w.owner].age >= 3 ? 1.2 : 1); // (Mythic +20 %)
 		std::vector<int32_t> hit;
 		S.movement.hash.for_each_near(x, z, w.radius + 1, [&](int r) {
-			if (r >= U.size() || U.removed[r] || U.dead[r] || U.type[r] == U_ROC) return;
+			if (r >= U.size() || U.removed[r] || U.dead[r] || power_immune(r)) return;
 			if (jsm::hypot(U.x[r] - x, U.z[r] - z) <= w.radius) hit.push_back(U.id[r]);
 		});
 		std::sort(hit.begin(), hit.end());
@@ -747,7 +766,7 @@ void GodPowers::update_egypt(double dt) {
 		auto fall = [&](double d) { return d <= TORNADO_FULL ? 1.0 : std::max(0.0, 1 - (d - TORNADO_FULL) / (R - TORNADO_FULL)); };
 		std::vector<int> rows;
 		S.movement.hash.for_each_near(nx, nz, R + 1, [&](int r) {
-			if (r >= U.size() || U.removed[r] || U.dead[r] || U.type[r] == U_ROC) return;
+			if (r >= U.size() || U.removed[r] || U.dead[r] || power_immune(r)) return;
 			if (jsm::hypot(U.x[r] - nx, U.z[r] - nz) <= R) rows.push_back(r);
 		});
 		std::sort(rows.begin(), rows.end());
@@ -867,7 +886,7 @@ void GodPowers::impact_thoth(const Meteor &m) {
 	scorches.push_back({ x, y, z, S.time, seed, m.radius * 2.2, true });
 	std::vector<int> rows;
 	S.movement.hash.for_each_near(x, z, m.radius + 1, [&](int r) {
-		if (r < U.size() && !U.removed[r] && !U.dead[r] && U.type[r] != U_ROC && jsm::hypot(U.x[r] - x, U.z[r] - z) <= m.radius) rows.push_back(r);
+		if (r < U.size() && !U.removed[r] && !U.dead[r] && !power_immune(r) && jsm::hypot(U.x[r] - x, U.z[r] - z) <= m.radius) rows.push_back(r);
 	});
 	std::sort(rows.begin(), rows.end());
 	for (int r : rows) {

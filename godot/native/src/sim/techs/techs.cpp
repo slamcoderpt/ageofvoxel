@@ -1233,7 +1233,7 @@ void Techs::update(double dt) {
 	}
 	if (!any_heal_) return;
 	auto heal = [&](int r, double amount) {
-		if (U.dead[r] || U.hp[r] >= U.max_hp[r]) return;
+		if (U.dead[r] || U.hp[r] >= U.max_hp[r] || U.type[r] == U_SON_OF_OSIRIS) return; // (Retold: the Son cannot be healed)
 		U.hp[r] = std::min(U.max_hp[r], U.hp[r] + amount);
 	};
 	// regeneration and the heroes' Hymn

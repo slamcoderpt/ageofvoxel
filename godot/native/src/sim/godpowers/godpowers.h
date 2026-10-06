@@ -66,7 +66,7 @@ constexpr double SANDS_MIN_DIST = 40 * 0.6;  // Shifting Sands: the destination 
 constexpr int SERPENTS = 14, SERPENT_WAVE = 2; // Plague of Serpents: 2 at once, then 2 every 3 s
 constexpr double SERPENT_EVERY = 3, SERPENT_GUARD = 6;
 constexpr int SWARMS = 5;                    // Locust Swarm: 5 swarms at 3 m/s for 20 s,
-constexpr double SWARM_SPEED = 3 * 0.65, SWARM_DPS = 3.5, SWARM_FARM = 6, SWARM_OWN = 0.1, SWARM_TICK = 0.25; // 3.5 divine/s in 6 m
+constexpr double SWARM_SPEED = 3 * 0.6, SWARM_DPS = 3.5, SWARM_FARM = 6, SWARM_OWN = 0.1, SWARM_TICK = 0.25; // 3.5 divine/s in 6 m
 constexpr double CITADEL_HP = 1200, CITADEL_ATTACK = 1.2, CITADEL_SIGHT = 1 * 0.6, CITADEL_WORK = 1.25, CITADEL_HACK = 0.10;
 constexpr int CITADEL_POP = 10;
 constexpr int MINIONS = 13;                  // Ancestors: 13 Minions over 13 s, dead 60 s after the cast
@@ -197,6 +197,10 @@ public:
 	double gather_mult(int urow, bool farm, int res, int node_type) const; // Rain, Prosperity
 	double damage_mult(int urow) const;   // Eclipse
 	double vuln_mult(int urow) const;     // Eclipse: x0.9 damage taken by the caster's myth units
+	// Retold's immunities (Godot-only, godot_rules): the Roc is immune to god powers, the Son of
+	// Osiris to targeted ones (every hostile power here is aimed: Bolt, Lightning Storm, Meteor,
+	// Locust Swarm, Tornado, Thoth's Meteor); near() / find_target() and the Egyptian loops skip them
+	bool power_immune(int urow) const;
 	double armor_after(int urow, double armor) const; // armor with the Eclipse's -10 % vulnerability
 	double building_hack_mult(int brow, const Hitter &a, uint8_t kind) const; // the Citadel: +10 % hack armor
 	// god powers blocked locally (a live Tornado, Thoth's Meteor): "" if (x, z) is free
@@ -216,6 +220,7 @@ public:
 	double age_mult(int owner) const;     // the Citadel (the owner's age-up)
 	int pop_bonus(int brow) const;        // the Citadel
 	double building_attack_mult(int brow) const;
+	int volley_arrows(int brow) const;    // arrows a volley (Egyptian TC 2, the Citadel +1)
 	void extra_arrows(int brow, int target_row, double damage);
 	bool is_citadel(int brow) const;
 	bool is_uncontrolled(int32_t unit) const;

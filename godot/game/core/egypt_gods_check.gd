@@ -46,6 +46,13 @@ extends SceneTree
 ##               (+20 % by age), Tusks of Apedemak's -1 pop
 ##   roc         the Roc boards units (they leave the world, their pop stays), flies, lands and
 ##               sets them down; a Roc that falls takes its riders
+##   immunity    Retold's immunities: a Zeus player's Bolt, Lightning Storm and Meteor and an
+##               Egyptian foe's Locust Swarm and Thoth's Meteor strike the spearmen beside a Son
+##               of Osiris and a Roc and never them (0 damage events, hp 609 / 700 kept)
+##   noheal      the Son of Osiris cannot be healed: a Priest beside him heals a spearman, the
+##               Son gains only his own 15 hp/s (+30 in 2 s)
+##   volleys     the Egyptian Town Center shoots 2 arrows a volley, the Greek one 1 (as before),
+##               a Citadel Center 3 at three different hoplites
 ##   ai          an Egyptian AI seat casts its gods' powers (Rain on its Farms, a Tornado / Plague
 ##               of Serpents / Ancestors on a cluster of foes)
 ##
@@ -204,7 +211,7 @@ func _run() -> void:
 	var t0 := Time.get_ticks_msec()
 	for c in ["defs", "gods", "passives", "model", "rain", "prosperity", "vision", "eclipse", "sands", "serpents", "locusts", "citadel",
 			"ancestors", "son", "tornado", "meteor", "myth", "techs", "bounds", "determinism",
-			"phantom", "blocks", "allies", "trees", "split", "roc", "ai"]:
+			"phantom", "blocks", "allies", "trees", "split", "roc", "immunity", "noheal", "volleys", "ai"]:
 		if _want(c):
 			call("_case_" + c)
 	result["ms"] = Time.get_ticks_msec() - t0
@@ -684,7 +691,7 @@ func _case_locusts() -> void:
 	r["farm hp lost"] = _r(farm_lost)
 	r["farm damage counted"] = _r(float(sim.get_power_stats(1).farm_damage))
 	# a hoplite under n swarms loses 3.5 n / s; the own man 0.35 n / s; the farm x6
-	var ok: bool = r["cast (heading +x)"] and r["swarms"] == 5 and r["swarms after 21 s"] == 0 and _near(r["swarm speed [tiles/s]"], 1.95, 0.01)
+	var ok: bool = r["cast (heading +x)"] and r["swarms"] == 5 and r["swarms after 21 s"] == 0 and _near(r["swarm speed [tiles/s]"], 1.8, 0.01)
 	# (damage lands every 0.25 s, i.e. every 8th tick: 3.5 x 8 / 30 per swarm a pulse; the own man x0.1)
 	ok = ok and lost_1s > 3.4 and _near(fposmod(lost_1s + 0.001, 3.5 * 8.0 / 30.0), 0.0, 0.01) and own_1s > 0 and _near(fposmod(own_1s + 0.0001, 0.35 * 8.0 / 30.0), 0.0, 0.001) and farm_lost > 20.9 * 2
 	_check("locusts.swarms", ok, r)
@@ -712,7 +719,7 @@ func _case_citadel() -> void:
 		sim.tick(1)
 		t += 1
 	r["laborer trained in [s]"] = _r(t / 30.0, 2)
-	# arrows: an enemy hoplite in range takes two arrows a volley of 6 x1.2
+	# arrows: an enemy hoplite in range takes three arrows a volley of 6 x1.2
 	var hop := int(sim.spawn_unit("hoplite", 2, float(b.x) + 6.0, float(b.z) + 6.0, 0.0))
 	var arrows := []
 	for i in 30 * 4:
@@ -723,7 +730,8 @@ func _case_citadel() -> void:
 	r["arrows on a hoplite (4 s)"] = arrows
 	var ok: bool = not r["cast on open ground"] and r["reason"] == "Target your or an ally's Town Center" and r["cast on the TC"]
 	ok = ok and r["max hp before / after"][1] - hp0 == 1200 and r["pop cap before / after"][1] - pop0 == 10 and _near(r["laborer trained in [s]"], 11.33 / 1.25, 0.05)
-	ok = ok and arrows.size() >= 4 and arrows[0][0] == arrows[1][0] and _near(arrows[0][1], 6.0 * 1.2 * (1.0 - 0.3), 0.01)
+	# Retold: the Egyptian TC's 2 arrows + the Citadel's 1 = 3 arrows a volley (one hoplite: all three on him at once)
+	ok = ok and arrows.size() >= 6 and arrows[0][0] == arrows[1][0] and arrows[1][0] == arrows[2][0] and arrows[3][0] != arrows[2][0] and _near(arrows[0][1], 6.0 * 1.2 * (1.0 - 0.3), 0.01)
 	_check("citadel.center", ok, r)
 
 # Ancestors -------------------------------------------------------------------------------
@@ -1461,6 +1469,186 @@ func _case_roc() -> void:
 	r["riders when it fell / pop after"] = [c2, int(sim.get_player(1).pop)]
 	ok = ok and c2 == 3 and int(sim.get_player(1).pop) == pop0 - 2
 	_check("roc.transport", ok, r)
+
+# Retold's immunities: the Roc is immune to god powers, the Son of Osiris to targeted ones
+# (EGYPT.md 5.2 / 3.1): the Greek Bolt, Lightning Storm and Meteor and an Egyptian enemy's
+# Locust Swarm and Thoth's Meteor land on the men beside them and never on them
+# (the Egyptian foe: Isis with Anubis / Sobek / Thoth)
+
+func _son_and_roc(sim: Object) -> Array:
+	var ph := _u(sim, "pharaoh", 1, 0, 0)
+	sim.tick(1)
+	var u: Dictionary = sim.get_unit(ph)
+	sim.set_player_resources(1, {"favor": 900})
+	sim.cast_power(1, "son_of_osiris", float(u.x), float(u.z))
+	sim.tick(1)
+	var sons: Array = _units_of(sim, 1, "son_of_osiris")
+	var roc := _u(sim, "roc", 1, 1.5, 0)
+	return [sons[0] if sons.size() > 0 else -1, roc]
+
+func _men(sim: Object, n: int) -> Array:
+	var out := []
+	for i in n:
+		out.append(_u(sim, "spearman", 1, -1.5 + (i % 3) * 1.5, 1.5 + (i / 3) * 1.0))
+	sim.tick(1)
+	sim.take_events()
+	return out
+
+func _case_immunity() -> void:
+	var r := {}
+	var sim := _fresh("ra", "zeus", 3, ["bast", "sobek", "osiris"])
+	sim.set_player_resources(2, {"favor": 900})
+	var sr := _son_and_roc(sim)
+	var son: int = sr[0]
+	var roc: int = sr[1]
+	r["son / roc hp"] = [_hp(sim, son), _hp(sim, roc)]
+	var ok: bool = son >= 0 and _hp(sim, son) == 609 and _hp(sim, roc) == 700
+	var su: Dictionary = sim.get_unit(son)
+	var sx := float(su.x)
+	var sz := float(su.z)
+	# Bolt aimed at the Son (the Roc beside him): neither is struck; the bolt finds a spearman
+	var men := _men(sim, 3)
+	r["bolt cast"] = sim.cast_power(2, "bolt", sx, sz)
+	var d := _damage_by(sim, 2.0)
+	r["bolt: son / roc / spearmen damage"] = [_r(float(d.get(son, 0.0))), _r(float(d.get(roc, 0.0))), _r(_sum(d, men))]
+	ok = ok and r["bolt cast"] and not d.has(son) and not d.has(roc) and _sum(d, men) > 0
+	# Lightning Storm over all of them for its whole length
+	men = _men(sim, 6)
+	r["storm cast"] = sim.cast_power(2, "lightning_storm", sx, sz)
+	d = _damage_by(sim, 14.0)
+	r["storm: son / roc / spearmen damage"] = [_r(float(d.get(son, 0.0))), _r(float(d.get(roc, 0.0))), _r(_sum(d, men))]
+	ok = ok and r["storm cast"] and not d.has(son) and not d.has(roc) and _sum(d, men) > 0
+	# the Greek Meteor
+	_step(sim, 4.0)
+	men = _men(sim, 3)
+	r["meteor cast"] = sim.cast_power(2, "meteor", sx, sz)
+	d = _damage_by(sim, 6.0)
+	r["meteor: son / roc / spearmen damage"] = [_r(float(d.get(son, 0.0))), _r(float(d.get(roc, 0.0))), _r(_sum(d, men))]
+	ok = ok and r["meteor cast"] and not d.has(son) and not d.has(roc) and _sum(d, men) > 0
+	r["son / roc hp after"] = [_hp(sim, son), _hp(sim, roc)]
+	ok = ok and _hp(sim, son) == 609 and _hp(sim, roc) == 700
+	# an Egyptian enemy (Isis: Anubis / Sobek / Thoth): Locust Swarm and Thoth's Meteor
+	var s2 := _fresh("ra", "isis", 3, ["bast", "sobek", "osiris"])
+	s2.set_minor_god(2, 1, "anubis")
+	s2.set_minor_god(2, 2, "sobek")
+	s2.set_minor_god(2, 3, "thoth")
+	s2.set_player_resources(2, {"favor": 900})
+	sr = _son_and_roc(s2)
+	son = sr[0]
+	roc = sr[1]
+	su = s2.get_unit(son)
+	sx = float(su.x)
+	sz = float(su.z)
+	men = _men(s2, 3)
+	r["locusts cast"] = s2.cast_power2(2, "locust_swarm", sx - 3.0, sz, sx + 10.0, sz)
+	d = _damage_by(s2, 3.0)
+	r["locusts: son / roc / spearmen damage"] = [_r(float(d.get(son, 0.0))), _r(float(d.get(roc, 0.0))), _r(_sum(d, men))]
+	ok = ok and r["locusts cast"] and not d.has(son) and not d.has(roc) and _sum(d, men) > 0
+	_step(s2, 20.0)
+	men = _men(s2, 3)
+	r["thoth meteor cast"] = s2.cast_power(2, "thoth_meteor", sx, sz)
+	d = _damage_by(s2, 4.0)
+	r["thoth meteor: son / roc / spearmen damage"] = [_r(float(d.get(son, 0.0))), _r(float(d.get(roc, 0.0))), _r(_sum(d, men))]
+	ok = ok and r["thoth meteor cast"] and not d.has(son) and not d.has(roc) and _sum(d, men) > 0
+	_check("immunity.son_roc", ok, r)
+
+static func _sum(d: Dictionary, ids: Array) -> float:
+	var t := 0.0
+	for id in ids:
+		t += float(d.get(id, 0.0))
+	return t
+
+# the Son of Osiris cannot be healed: a Priest beside a wounded Son and a wounded spearman
+# heals the spearman; the Son gains exactly his own 15 hp/s
+func _case_noheal() -> void:
+	var r := {}
+	var sim := _fresh("ra", "zeus", 3, ["bast", "sobek", "osiris"])
+	var son: int = _son_and_roc(sim)[0]
+	var su: Dictionary = sim.get_unit(son)
+	var man := int(sim.spawn_unit("spearman", 1, float(su.x) - 1.5, float(su.z), 0.0))
+	sim.tick(1)
+	sim.damage(son, 300.0)
+	sim.damage(man, 40.0)
+	sim.spawn_unit("priest", 1, float(su.x) + 1.0, float(su.z) + 1.0, 0.0)
+	sim.tick(1)
+	var s0 := _hp(sim, son)
+	var m0 := _hp(sim, man)
+	_step(sim, 2.0)
+	r["son hp 2 s beside a Priest"] = [_r(s0), _r(_hp(sim, son))]
+	r["spearman hp 2 s beside the Priest"] = [_r(m0), _r(_hp(sim, man))]
+	var ok: bool = s0 < 609 - 200 and _near(_hp(sim, son) - s0, 30.0, 0.6) and _hp(sim, man) > m0
+	# with the spearman full, the Priest finds no one to heal (the Son is skipped)
+	sim.damage(son, 100.0)
+	_step(sim, 6.0)
+	var s1 := _hp(sim, son)
+	_step(sim, 2.0)
+	r["son hp 2 s more, the spearman full"] = [_r(s1), _r(_hp(sim, son))]
+	ok = ok and _near(_hp(sim, man), float(sim.get_unit(man).max_hp), 0.01) and _near(_hp(sim, son) - s1, 30.0, 0.6)
+	_check("son.no_heal", ok, r)
+
+# Town Center volleys: Retold's Egyptian TC shoots 2 arrows a volley, the Greek one 1 (as
+# today), a Citadel Center 3 at up to 3 different enemies
+func _volleys(sim: Object, tc: int, foes: Array, seconds: float) -> Array:
+	# arrows landing within 0.5 s of a volley's first (a volley's arrows fly to men at different
+	# distances; the TC reloads in ~1.5 s)
+	var out := []
+	var t0 := -1e9
+	for t in int(round(seconds * FPS)):
+		sim.tick(1)
+		for e in sim.take_events():
+			if e.type == "unit:damaged" and foes.has(int(e.id)) and int(e.other) == tc and float(e.amount) > 4.0:
+				var now := float(sim.get_time())
+				if now - t0 > 0.5:
+					t0 = now
+					out.append([])
+				out[out.size() - 1].append(int(e.id))
+	return out
+
+func _case_volleys() -> void:
+	var r := {}
+	var sim := _fresh("ra", "zeus", 2, ["bast", "sekhmet"])
+	var tc1: int = _buildings_of(sim, 1, "town_center")[0]
+	var tc2: int = _buildings_of(sim, 2, "town_center")[0]
+	var b1: Dictionary = sim.get_building(tc1)
+	var b2: Dictionary = sim.get_building(tc2)
+	var hop := int(sim.spawn_unit("hoplite", 2, float(b1.x) + 6.0, float(b1.z) + 6.0, 0.0))
+	var spr := int(sim.spawn_unit("spearman", 1, float(b2.x) + 6.0, float(b2.z) + 6.0, 0.0))
+	sim.tick(1)
+	sim.take_events()
+	var v1 := _volleys(sim, tc1, [hop], 6.0)
+	sim.take_events()
+	var v2 := _volleys(sim, tc2, [spr], 6.0)
+	var sizes1 := []
+	for v in v1:
+		sizes1.append(v.size())
+	var sizes2 := []
+	for v in v2:
+		sizes2.append(v.size())
+	r["egyptian TC arrows a volley"] = sizes1
+	r["greek TC arrows a volley"] = sizes2
+	var ok: bool = sizes1.size() >= 2 and sizes1.count(2) == sizes1.size() and sizes2.size() >= 2 and sizes2.count(1) == sizes2.size()
+	# Citadel Center, three hoplites in range: 3 arrows a volley at 3 different men
+	sim.set_player_resources(1, {"favor": 400})
+	r["citadel"] = sim.cast_power(1, "citadel", float(b1.x), float(b1.z))
+	# (three fresh hoplites round the TC, the first one shot dead or not)
+	var hops := []
+	for off in [Vector2(6, 6), Vector2(-6, 6), Vector2(6, -6)]:
+		hops.append(int(sim.spawn_unit("hoplite", 2, float(b1.x) + off.x, float(b1.z) + off.y, 0.0)))
+	sim.tick(1)
+	sim.take_events()
+	var v3 := _volleys(sim, tc1, hops, 7.0)
+	var spread := []
+	for v in v3:
+		var uniq := {}
+		for id in v:
+			uniq[id] = true
+		spread.append([v.size(), uniq.size()])
+	r["citadel volleys [arrows, different men]"] = spread
+	# (the first and last groups may be cut by the window: the volleys between them are whole)
+	ok = ok and r["citadel"] and spread.size() >= 4
+	for i in range(1, spread.size() - 1):
+		ok = ok and spread[i] == [3, 3]
+	_check("tc.volleys", ok, r)
 
 func _case_ai() -> void:
 	var r := {}

@@ -164,7 +164,7 @@ const EgyptUnit *egypt_unit(int type) {
 			"as the myth units: speed x0.65, reload x1.15, armor x0.75" },
 		{ 0.375, 0, 0, 0, 0, 0, "son_of_osiris",
 			"Son of Osiris (Osiris' god power on a Pharaoh): 609 hp (Mythic), 50.75 divine chain lightning jumping to 4 targets, x3 vs myth, range 18, ROF 3, armor 30/50/99, speed 3.6, LOS 25; heals 15 hp/s, empowers at 120 %",
-			"the Mythic numbers (the power is Mythic); range 10.8, LOS 15, reload 3.45; the bolt jumps to the 3 nearest other enemies within 4.8 tiles of its target (same damage); empowers at 1.2; heals himself 15 hp/s (the Priests' heal of others does not apply)" },
+			"the Mythic numbers (the power is Mythic); range 10.8, LOS 15, reload 3.45; the bolt jumps to the 3 nearest other enemies within 4.8 tiles of its target (same damage); empowers at 1.2; heals himself 15 hp/s and nothing else heals him (Priests, Pharaohs, Isis' Monuments, the Temple and the Hymn skip him); immune to the aimed god powers, Greek ones too (GodPowers::power_immune)" },
 		{ 0.4125, 0, 0, 0, 0, 0, "phoenix_egg",
 			"Phoenix Egg (Rebirth): 300 hp, armor 15/55/99; hatches a free Phoenix 50 s after the Phoenix fell if it survives",
 			"a still unit (speed 0.01, no attack, 0 pop)" },
@@ -811,7 +811,7 @@ void Civs::auras(double dt) {
 		const double half = 0.5 * std::max(B.w[m], B.h[m]);
 		sim->movement.hash.for_each_near(B.x[m], B.z[m], SHIELD_RANGE_EMPOWERED + half + 2, [&](int r) {
 			if (r >= U.size() || U.removed[r] || U.dead[r] || !sim->is_ally(o, U.owner[r])) return;
-			if (U.hp[r] >= U.max_hp[r] || unit_def(U.type[r]).cls == CLS_SIEGE) return;
+			if (U.hp[r] >= U.max_hp[r] || unit_def(U.type[r]).cls == CLS_SIEGE || U.type[r] == U_SON_OF_OSIRIS) return; // (the Son: no heal)
 			if (std::max(0.0, rect_dist(m, U.x[r], U.z[r]) - U.radius[r]) > SHIELD_RANGE_EMPOWERED) return;
 			const bool busy = U.moving[r] || U.order_type[r] != O_IDLE;
 			const double before = U.hp[r];
@@ -1038,7 +1038,7 @@ void Civs::update(double dt) {
 		double bf = 2, bd = 0;
 		mv.hash.for_each_near(ux, uz, HEAL_RANGE + 1, [&](int o) {
 			if (o == r || o >= U.size() || U.removed[o] || U.dead[o] || !sim->is_ally(owner, U.owner[o])) return;
-			if (U.hp[o] >= U.max_hp[o] || unit_def(U.type[o]).cls == CLS_SIEGE) return;
+			if (U.hp[o] >= U.max_hp[o] || unit_def(U.type[o]).cls == CLS_SIEGE || U.type[o] == U_SON_OF_OSIRIS) return; // (Retold: he cannot be healed)
 			const double d = jsm::hypot(U.x[o] - ux, U.z[o] - uz) - U.radius[o];
 			if (d > HEAL_RANGE) return;
 			const double f = U.hp[o] / U.max_hp[o];

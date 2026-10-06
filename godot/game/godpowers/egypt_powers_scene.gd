@@ -21,7 +21,7 @@ const SETUPS := {
 	"vision": ["set", ["ptah", "sekhmet", "horus"], 3.2, 66.0, 56.0, 20.0],
 	"eclipse": ["ra", ["bast", "sobek", "horus"], 4.0, 30.0, 40.0, 28.0],
 	"shifting_sands": ["set", ["ptah", "sekhmet", "horus"], 2.4, 46.0, 50.0, 0.0],
-	"plague_of_serpents": ["isis", ["anubis", "nephthys", "thoth"], 3.2, 26.0, 46.0, 24.0],
+	"plague_of_serpents": ["isis", ["anubis", "nephthys", "thoth"], 8.0, 26.0, 46.0, 24.0],
 	"locust_swarm": ["ra", ["bast", "sobek", "horus"], 5.0, 34.0, 48.0, 24.0],
 	"citadel": ["ra", ["ptah", "sekhmet", "osiris"], 1.2, 34.0, 40.0, 30.0],
 	"ancestors": ["isis", ["bast", "nephthys", "osiris"], 7.0, 32.0, 44.0, 26.0],
@@ -123,9 +123,9 @@ static func scene_setup(game: Node) -> Dictionary:
 			u.call("priest", 1, 13.0, -7.0)   # (his eyes there: the destination must be visible)
 			focus = Vector2(cx - 1, cz - 4)
 		"plague_of_serpents", "ancestors":
-			if power == "plague_of_serpents":   # (on open ground before the Greek line: they rise, then go for it)
-				tx = cx + 1
-				tz = cz + 4
+			if power == "plague_of_serpents":   # (on open ground south of the Greek line: they rise in the clear, then go for it)
+				tx = cx + 2
+				tz = cz + 9
 			focus = Vector2(tx, tz)
 		"locust_swarm":
 			tx = cx + 2

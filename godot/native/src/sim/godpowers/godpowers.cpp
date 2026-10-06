@@ -182,7 +182,9 @@ std::vector<int> GodPowers::near(double x, double z, double r, int owner, int32_
 	sim->movement.hash.count_query(x, z, r);
 	sim->movement.hash.for_each_near(x, z, r, [&](int o) {
 		const double dx = U.x[o] - x, dz = U.z[o] - z;
-		if (dx * dx + dz * dz <= r2 && !U.dead[o] && U.id[o] != exclude_id && sim->is_enemy(owner, U.owner[o])) out.push_back(o);
+		if (dx * dx + dz * dz <= r2 && !U.dead[o] && U.id[o] != exclude_id && sim->is_enemy(owner, U.owner[o]) &&
+				!(sim->godot_rules && power_immune(o))) // (Godot-only: the Roc / Son of Osiris)
+			out.push_back(o);
 	});
 	return out;
 }

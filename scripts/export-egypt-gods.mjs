@@ -2,8 +2,9 @@
 // (json + bin.gz, the format of export-egypt-units.mjs, which VoxelModels.rig() falls back to
 // after "units" and "egypt_units"):
 //   serpent      Plague of Serpents' Serpent (Retold: an animal, a desert cobra rising out of
-//                the sand): banded sand / umber scales, a cream belly, a small hood with the
-//                army's colour, glowing red eyes and white fangs; the Wadjet's serpent pose
+//                the sand), a little larger than a man: banded venom-green scales with black
+//                saddles (the power's green: it reads on the sand and in a red Greek line), a
+//                yellow belly, a hood with the army's colour, glowing red eyes and white fangs; the Wadjet's serpent pose
 //                (anim 'medusa', pose 'serpent': coil, tailA..C, torso) without its wings
 //   phoenix_egg  the Phoenix's Rebirth egg: a gold-and-ember egg with glowing cracks and a
 //                team band, on a ring of charred nest twigs and hot coals (anim 'siege': still)
@@ -81,16 +82,16 @@ const rig = (type, meta, parts) => { RIGS[type] = { ...meta, parts }; };
 const TEAM_SHADE = 0xb4b4b4;
 const tset = (m, x, y, z, base) => { m.set(x, y, z, TEAM); m.get(x, y, z).c = base; return m; };
 
-// ---- the Serpent (0.1) -------------------------------------------------------------------
+// ---- the Serpent (0.12) ------------------------------------------------------------------
 {
-  // banded scales: sand with umber saddles every 4 voxels along the body, dark flecks
+  // banded scales: venom green with black saddles every 4 voxels along the body, dark flecks
   const band = (i) => (Math.floor(i / 4) % 2 === 0);
   const SC = (x, y, i) => {
     const h = hash3(x, y, i, 71);
-    if (band(i)) return h < 0.5 ? 0x3a2414 : 0x2e1c10;   // dark umber saddle
-    return h < 0.4 ? 0x9a7038 : h < 0.8 ? 0x8a6230 : 0xa87c40; // ochre-brown (reads on the sand)
+    if (band(i)) return h < 0.5 ? 0x16220c : 0x101a08;   // near-black saddle
+    return h < 0.4 ? 0x4e8e26 : h < 0.8 ? 0x447e20 : 0x5a9c2e; // venom green (the power's colour: reads on the sand and against a red army)
   };
-  const BELLY = 0xe0c890, BELLY_SH = 0xb8a070;
+  const BELLY = 0xe8dc78, BELLY_SH = 0xbcae58; // a yellow belly
   // a low coil, one and a half turns lying on the sand, the neck rising out of its middle
   const coil = new VoxelModel();
   for (let a = 0; a < 40; a++) {
@@ -135,17 +136,17 @@ const tset = (m, x, y, z, base) => { m.set(x, y, z, TEAM); m.get(x, y, z).c = ba
       else if ((x + y) % 2) head.set(x, y, -1, TEAM);   // the hood's back: the army's colour
       else tset(head, x, y, -1, TEAM_SHADE);
       // the hood's front: pale scales, dark bars across the throat
-      head.set(x, y, 0, edge ? 0x241608 : (y === 4 || y === 7) ? 0x2a1a0c : Math.abs(x) <= 1 ? BELLY : 0xb89058);
+      head.set(x, y, 0, edge ? 0x241608 : (y === 4 || y === 7) ? 0x2a1a0c : Math.abs(x) <= 1 ? BELLY : 0xa8c050);
     }
   }
-  const HD = (x, y, z) => { const h = hash3(x, y, z, 77); return y >= 11 ? (h < 0.5 ? 0x3e3418 : 0x4a3e1e) : (h < 0.5 ? 0x6a5428 : 0x5e4a22); };
+  const HD = (x, y, z) => { const h = hash3(x, y, z, 77); return y >= 11 ? (h < 0.5 ? 0x24400e : 0x2c4a12) : (h < 0.5 ? 0x3e6a1c : 0x365e18); };
   head.box(-1, 10, -1, 3, 2, 4, HD);
   head.box(-1, 10, 3, 3, 1, 1, HD);
-  head.set(0, 11, 3, 0x3e3418);
+  head.set(0, 11, 3, 0x24400e);
   head.set(-2, 11, 1, 0xff2a10, { glow: 0.9 }).set(2, 11, 1, 0xff2a10, { glow: 0.9 });
   head.set(-1, 9, 3, 0xfaf4e8).set(1, 9, 3, 0xfaf4e8);   // fangs
   head.set(0, 10, 4, 0xc02020);                          // a flicker of tongue
-  rig('serpent', { voxel: 0.1, anim: 'medusa', style: 'serpent', pose: 'serpent' }, [
+  rig('serpent', { voxel: 0.12, anim: 'medusa', style: 'serpent', pose: 'serpent' }, [
     part('coil', coil, [0, 0, 0], [0, 0, 0]),
     part('tailA', seg(7, 2.0, 1.6, 100), [0, 0, 0], [-3, 1, -5], 'coil'),
     part('tailB', seg(7, 1.6, 1.0, 107), [0, 0, 0], [0, 0, -7], 'tailA'),
