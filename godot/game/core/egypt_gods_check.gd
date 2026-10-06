@@ -210,8 +210,8 @@ func _damage_by(sim: Object, seconds: float, filter := Callable()) -> Dictionary
 func _run() -> void:
 	var t0 := Time.get_ticks_msec()
 	for c in ["defs", "gods", "passives", "model", "rain", "prosperity", "vision", "eclipse", "sands", "serpents", "locusts", "citadel",
-			"ancestors", "son", "tornado", "meteor", "myth", "techs", "bounds", "determinism",
-			"phantom", "blocks", "allies", "trees", "split", "roc", "immunity", "noheal", "volleys", "ai"]:
+			"ancestors", "son", "son_divine", "tornado", "meteor", "myth", "techs", "bounds", "determinism",
+			"phantom", "blocks", "allies", "trees", "split", "roc", "immunity", "noheal", "volleys", "shield_preview", "ai"]:
 		if _want(c):
 			call("_case_" + c)
 	result["ms"] = Time.get_ticks_msec() - t0
@@ -785,6 +785,65 @@ func _case_son() -> void:
 	var ok: bool = not r["cast on nothing"] and r["cast on the pharaoh"] and r["pharaohs / sons after"] == [0, 1] and float(su.get("max_hp", 0)) == 609
 	ok = ok and struck >= 4 and r["chained hits"] >= 3 and r["chain damage on the 2nd hoplite"] >= 50.75 - 0.01 and r["pharaohs 94 s later"] == 1
 	_check("son.osiris", ok, r)
+
+# the Son of Osiris' own bolt is divine (EGYPT.md 3.1 / 5.3: 50.75 D, x3 vs myth), as the jumps:
+# his first hit on his target goes through no armor, the same as the chain's
+func _case_son_divine() -> void:
+	var sim := _fresh("ra", "zeus", 3, ["bast", "sobek", "osiris"])
+	sim.set_player_resources(1, {"favor": 400})
+	var ph: Array = _units_of(sim, 1, "pharaoh")
+	var u: Dictionary = sim.get_unit(ph[0])
+	sim.cast_power(1, "son_of_osiris", float(u.x), float(u.z))
+	sim.tick(1)
+	var son := int(_units_of(sim, 1, "son_of_osiris")[0])
+	var su: Dictionary = sim.get_unit(son)
+	var r := {}
+	var firsts := {}
+	for kind in ["hoplite", "minotaur", "avenger"]:
+		var tgt := int(sim.spawn_unit(kind, 2, float(su.x) + 7.0, float(su.z), 0.0))
+		var other := int(sim.spawn_unit("hoplite", 2, float(su.x) + 8.5, float(su.z), 0.0))
+		sim.tick(1)
+		sim.take_events()
+		sim.order(son, {"type": "attack", "target": tgt})
+		var first := -1.0
+		var chained := -1.0
+		for t in int(4 * FPS):
+			sim.tick(1)
+			for e in sim.take_events():
+				if e.type != "unit:damaged":
+					continue
+				if int(e.id) == tgt and int(e.other) == son and first < 0:
+					first = float(e.amount)
+				if int(e.id) == other and int(e.other) == 0 and chained < 0:
+					chained = float(e.amount)
+			if first >= 0 and chained >= 0:
+				break
+		firsts[kind] = [_r(first), _r(chained)]
+		r["%s: first bolt, chain on a hoplite beside it" % kind] = firsts[kind]
+		sim.kill_unit(tgt)
+		sim.kill_unit(other)
+		_step(sim, 3.0)
+	var ok: bool = absf(firsts["hoplite"][0] - 50.75) < 0.02 and absf(firsts["hoplite"][1] - 50.75) < 0.02
+	ok = ok and absf(firsts["minotaur"][0] - 152.25) < 0.02 and absf(firsts["avenger"][0] - 152.25) < 0.02
+	_check("son.divine", ok, r)
+
+# Isis' Divine Shield refuses the Egyptian (and Greek) powers in cast_check, as the real cast does
+func _case_shield_preview() -> void:
+	var sim := _fresh("isis", "set", 3, ["anubis", "sobek", "thoth"])
+	sim.set_minor_god(2, 1, "ptah")
+	sim.set_minor_god(2, 2, "sekhmet")
+	sim.set_minor_god(2, 3, "horus")
+	sim.set_player_resources(2, {"favor": 900})
+	sim.spawn_building("monument_villagers", 1, C.x, C.y, true, false)
+	sim.tick(2)
+	var r := {}
+	var near: Dictionary = sim.cast_check(2, "tornado", C.x + 5, C.y)
+	var far: Dictionary = sim.cast_check(2, "tornado", C.x + 25, C.y)
+	r["preview at 5 / 25 tiles"] = [near.ok, far.ok, near.get("reason", "")]
+	r["cast at 5 tiles"] = sim.cast_power(2, "tornado", C.x + 5, C.y)
+	r["cast at 25 tiles"] = sim.cast_power(2, "tornado", C.x + 25, C.y)
+	var ok: bool = not near.ok and far.ok and not r["cast at 5 tiles"] and r["cast at 25 tiles"]
+	_check("shield.preview", ok, r)
 
 # Tornado -----------------------------------------------------------------------------------
 

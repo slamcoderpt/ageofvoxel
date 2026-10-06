@@ -2770,7 +2770,7 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   model: favor cost + `ramp` per cast (Rain 30, 45, 60...), the recharge after each cast, no
   limit of uses. Aims: point, global, two points (`cast_power2`: Shifting Sands from -> to,
   Locust Swarm at -> heading; with one point the swarm heads away from the caster's nearest
-  building), own Town Center, own Pharaoh. Isis' Divine Shield refuses them as the Greek ones.
+  building), own Town Center, own Pharaoh. Isis' Divine Shield refuses them as the Greek ones, and `cast_check` (the HUD preview) refuses the same casts ("Blocked by a Divine Shield").
   | power | Retold | here |
   |---|---|---|
   | Rain (Ra) | 30 fav, 90 s, +15; 50 s, farming +150 % | caster's farmers x2.5 |
@@ -2782,7 +2782,7 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   | Locust Swarm (Sobek) | 75, 150, +10; 5 swarms at 3 m/s for 20 s, 3.5 divine/s in 6 m, x6 Farms / berries, x0.1 own; Mythic +20 % | 1.8 tiles/s (3 x 0.6, the scale of every other distance), 3.6 tiles, applied every 8 ticks; off the map a swarm is gone |
   | Citadel (Sekhmet) | 150, 120, +50; own or allied TC +1200 hp, +2 attack, +1 arrow, +1 LOS, +10 pop, +10 % hack armor, +25 % work | arrows x1.2 and one more arrow a volley (an Egyptian TC's 2 -> 3, at different enemies in range; `volley_arrows`), train / research / age-up x1.25, a hack blow's vulnerability -0.10 (`building_hack_mult`) |
   | Ancestors (Nephthys) | 100, 180, +5; 13 Minions over 13 s in 16 m, dead 60 s after | 9.6 tiles (Atef Crown 120 s) |
-  | Son of Osiris (Osiris) | 350, 240, +50; own or ally's Pharaoh -> demigod, chain lightning, heals 15 hp/s; a new Pharaoh later | 609 hp, 50.75 per bolt jumping to 3 more within 4.8 tiles, +15 hp/s; an ally's Pharaoh becomes the ally's demigod; the Pharaoh respawns after 90 s; cannot be healed, immune to the aimed powers (below) |
+  | Son of Osiris (Osiris) | 350, 240, +50; own or ally's Pharaoh -> demigod, chain lightning, heals 15 hp/s; a new Pharaoh later | 609 hp, 50.75 divine per bolt (his own target's hit too: no armor, combat.cpp, x3 vs myth) jumping to 3 more within 4.8 tiles, +15 hp/s; an ally's Pharaoh becomes the ally's demigod; the Pharaoh respawns after 90 s; cannot be healed, immune to the aimed powers (below) |
   | Tornado (Horus) | 350, 240, +5; 20 s spiralling out, 25 hack + 100 crush every 0.5 s, full 5 m falling to 15 m, x0.1 Farms, slow 35 % 6 s | Archimedean spiral at 2.5 tiles/s; crush armor 99 % (myth 80 %, siege 85 %); flings units within 3 tiles; own x0.1; flattens the trees within 3 tiles; blocks other powers within 15 m of the funnel |
   | Meteor (Thoth) | 350, 240, +5; 12 meteors, first at 3 s, then from 6 s on the densest targets, 580 crush + 40 divine in 8 m, knockback | one a second, 4.8 tiles; flattens the trees in each blast; blocks other powers in its 25 m circle; the Greek meteor's visuals (sim `Meteor::kind` 1) |
   Their damage is exact (`DK_DIVINE` in combat: no bonus / armor / building factor; the caller

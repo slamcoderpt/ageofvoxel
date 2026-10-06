@@ -224,6 +224,7 @@ CastCheck GodPowers::cast_check(int owner, int id, double x, double z, double x2
 		if (sim->godot_rules && !std::isnan(x) && !std::isnan(z)) { // (a Tornado / Thoth's Meteor blocks the Greek ones too)
 			const std::string why = local_block(x, z);
 			if (!why.empty()) return { false, why };
+			if (!sim->civs.shield_allows(owner, x, z)) return { false, "Blocked by a Divine Shield" }; // (as cast())
 		}
 		return c;
 	}
@@ -232,6 +233,8 @@ CastCheck GodPowers::cast_check(int owner, int id, double x, double z, double x2
 	{
 		const std::string why = local_block(x, z);
 		if (!why.empty()) return { false, why };
+		// (Isis' Divine Shield: the preview refuses what cast_egypt() refuses)
+		if (!sim->civs.shield_allows(owner, x, z)) return { false, "Blocked by a Divine Shield" };
 	}
 	if (d.target == PT_OWN_TC) {
 		const int b = town_center_for(owner, x, z);

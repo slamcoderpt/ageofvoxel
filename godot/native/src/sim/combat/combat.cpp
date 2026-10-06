@@ -387,7 +387,9 @@ void Combat::damage(int32_t tid, double amount, const Hitter &a, uint8_t kind) {
 		// Godot-only (sim/techs): hack / pierce armor from the Armory, then
 		// divine damage, which no armor reduces (Phobos' Spear of Panic)
 		const double pre = dmg;
-		dmg *= 1 - (td ? sim->techs.unit_armor(t, a, kind) : 0);
+		// (sim/godpowers: the Son of Osiris' lightning is all divine, EGYPT.md 3.1 / 5.3: no armor on a unit)
+		const bool all_divine = ad && td && U.type[a.row] == U_SON_OF_OSIRIS;
+		dmg *= 1 - (td && !all_divine ? sim->techs.unit_armor(t, a, kind) : 0);
 		if (ad && td && is_egypt_myth(U.type[a.row])) dmg += sim->godpowers.myth_unit_crush(a.row, t, pre / (ad->bonus[td->cls] != 0 ? ad->bonus[td->cls] : 1)); // (sim/godpowers: the crush part)
 		if (ad) {
 			const double dv = sim->techs.divine(a.row);
