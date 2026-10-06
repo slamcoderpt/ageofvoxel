@@ -1142,9 +1142,27 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   winged scarab, latticed windows, a cart wheel), `siege_works` 7x7 (two
   tall workshop towers, a colonnade with green-footed columns under a long
   multicolour awning, wheels, barrels, a catapult arm, a siege-tower frame),
-  `armory` / `market` 4x4 (Retold's Egyptian ones: a forge under a dark
-  striped awning with a stepped chimney furnace, a trough and a gilt ankh /
-  a hall with three stalls of **team / white striped awnings** over produce),
+  `armory` / `market` 4x4 (Retold's Egyptian ones / a hall with three
+  stalls of **team / white striped awnings** over produce). The Armory
+  (round 19) is ONE smithy, not loose props: a continuous battered
+  mud-brick hall (`FBRICK`: big bricks, dark mortar, a mid red-brown value)
+  under a curved cavetto painted in lapis / red / ochre leaves over an ochre
+  torus roll (`B.cav` with a gorge list of more than two colours cycles them
+  per voxel; `B.cav.lift` brightens the sheet; `B.skip[face] = [u0, u1]`
+  leaves the cavetto and roll out where the chimney passes), a bright team
+  band under the roll, a winged sun over the door, the roof coping painted
+  as a continuous lapis / red / ochre band inside a pale lip (no team
+  outline on the roof), a whitewashed attic (`PLAST_W`) on the west half;
+  the forge shed is an L of the same brick off the east end (a back wall and
+  a pier), its timber lean-to seated on a ledger beam pegged to the hall's
+  wall and on the pier's coping, a slate / cream cloth laid on the rafters;
+  the furnace stands against the hall's front, its pale stone (`STONE_F`,
+  sooted up the stack) chimney rising up the wall through the cornice and
+  over the roof, a glowing fire mouth; under the lean-to a stone-kerbed
+  hearth of coals, bellows; before it a dark steel anvil on a stump and a
+  limestone quench trough of water; a gilt ankh on a step, barrel, crates.
+  Wood is `WOODG` (dark brown grain), so brick, plaster, stone and wood each
+  have their own texture and value.
   `obelisk` 1x1, drawn over 1.5 x 1.5 like the sentry tower (round 13, the
   town's landmark: a stepped plinth of a dark base course, a 10-wide tier
   with a limestone tread, an 8-wide tier with a painted lapis / red / ochre

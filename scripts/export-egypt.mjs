@@ -1495,8 +1495,10 @@ function skin(m) {
           for (let u = Math.floor(Lb); u < Math.ceil(Rb); u++) {
             const a0c = Math.max(u, La), a1c = Math.min(u + 1, Ra), b0c = Math.max(u, Lb), b1c = Math.min(u + 1, Rb);
             if (a1c - a0c <= 1e-6 && b1c - b0c <= 1e-6) continue;
-            _k.setHex(((u & 1) ? gA : gB));
-            const f = 0.74 + 0.09 * r;
+            if (B.skip && B.skip[face] && u >= B.skip[face][0] && u < B.skip[face][1]) continue;
+            const G = B.cav.gorge;
+            _k.setHex(G.length > 2 ? G[((u % G.length) + G.length) % G.length] : ((u & 1) ? gA : gB));
+            const f = (0.74 + 0.09 * r) * (B.cav.lift || 1);
             emit([P(a0c, ya, outer0 + sg * ea), P(a1c, ya, outer0 + sg * ea), P(b1c, yb2, outer0 + sg * eb), P(b0c, yb2, outer0 + sg * eb)], n3, [_k.r * f, _k.g * f, _k.b * f], 0);
           }
         }
@@ -1511,7 +1513,8 @@ function skin(m) {
           const pt = (u, t) => P(u, yc - r * Math.cos(t), plane(yc) + sg * r * Math.sin(t));
           const n3 = alongX ? [0, -Math.cos(tm), sg * Math.sin(tm)] : [sg * Math.sin(tm), -Math.cos(tm), 0];
           _k.setHex(B.roll === true ? ROLL_L : B.roll);
-          emit([pt(Lc, ta), pt(Rc, ta), pt(Rc, tb), pt(Lc, tb)], n3, [_k.r, _k.g, _k.b], 0);
+          const sk = B.skip && B.skip[face];
+          for (const [ua, ub] of sk ? [[Lc, sk[0]], [sk[1], Rc]] : [[Lc, Rc]]) emit([pt(ua, ta), pt(ub, ta), pt(ub, tb), pt(ua, tb)], n3, [_k.r, _k.g, _k.b], 0);
         }
       }
       // the cap between the skin's top edge and the top row's face, under the cornice
@@ -3407,55 +3410,118 @@ function monument(kind, god = 'ra') {
   return m;
 }
 
-// Armory (4 x 4; building_18): an L of flat-roofed blocks with team rims, an
-// open forge under a dark striped awning on a timber frame, a stepped
-// chimney furnace with glowing coals, a trough, a gilt ankh, crates.
+// Armory (4 x 4; building_18), round 19: ONE smithy. A continuous battered
+// mud-brick hall (the main body) under a curved cavetto painted in lapis /
+// red / ochre leaves over an ochre torus roll, a bright team band and a frieze
+// under it, a whitewashed attic on its roof (Retold's stepped roof); the
+// forge shed is an L of the same brick off its east end (a back wall and a
+// pier), a timber lean-to seated on a ledger pegged to the hall's wall and on
+// the pier's coping, a striped cloth laid on the rafters; the furnace is
+// built against the hall's front, its stone chimney rising up the wall
+// through the cornice and over the roof. The forge's parts stand apart at RTS
+// zoom: a glowing hearth under the lean-to, a steel anvil on a stump, a stone
+// quench trough of water. Each material has its own texture and value: brick
+// (mid red-brown, big bricks, dark mortar), whitewash (pale, smooth), stone
+// (pale grey ashlar, sooted up the stack), wood (dark brown, grain).
+const FBRICK = (x, y, z) => {
+  const row = Math.floor(Math.max(0, y - 1) / 3);
+  const u = x + z + (row & 1) * 3 + 256;
+  const blk = Math.floor(u / 6);
+  let c = pick(hash3(blk, row, (x - z) >> 3, 301), [0xb08356, 0xa77b50, 0xb88b5c]);
+  if ((y - 1) % 3 === 0) c = shade(c, 0.66);
+  else if (u % 6 === 0) c = shade(c, 0.7);
+  return c;
+};
+const PLAST_W = (x, y, z) => shade(hash3(x >> 2, y >> 2, z >> 2, 302) < 0.5 ? 0xefe4cc : 0xebdfc5, 0.995 + 0.01 * hash3(x, y, z, 303));
+const STONE_F = (x, y, z) => {
+  const row = Math.floor(Math.max(0, y - 1) / 4);
+  const u = x + z + (row & 1) * 3 + 256;
+  let c = pick(hash3(Math.floor(u / 5), row, 7, 304), [0xd6cdb9, 0xcbc1ab, 0xdfd6c4]);
+  if ((y - 1) % 4 === 0) c = shade(c, 0.8);
+  else if (u % 5 === 0) c = shade(c, 0.84);
+  if (y > 15) c = shade(c, Math.max(0.42, 1 - (y - 15) * 0.07));   // soot up the stack
+  return c;
+};
+const WOODG = (x, y, z) => pick(hash3(x >> 2, y, z, 305), [0x6a4428, 0x5c3b22, 0x734a2c]);
+const ANVIL = 0x3a3e42, ANVIL_T = 0x6c7278;
+const CAV = [BLUEP, BLUEP, 0xf2e8d0, RED_B, RED_B, 0xf2e8d0, OCHRE_B, OCHRE_B, 0xf2e8d0];
 function armory() {
   const m = lot(32, 32);
-  patch(m, 17, 3, 31, 23, EARTH, { seed: 4 });
-  // both blocks battered under a flared two-row cavetto and a pale lip (round 17:
-  // no plain boxes behind the Monuments)
-  block(m, 2, 4, 19, 16, 1, 13, { wall: WASH, roofC: MUDROOF, rimC: LIME, gorge: [0xb08458, 0xc49a6c], torus: true, lipOut: 2, flare: true, batter: 4, band: 'lapis', frieze: 1 });
-  block(m, 27, 4, 31, 22, 1, 10, { wall: MUDB, roofC: MUDROOF, rimC: LIME, gorge: [0xb08458, 0xc49a6c], torus: true, lipOut: 2, flare: true, batter: 5, band: 'ochre' });
-  door(m, '+z', 8, 4, 1, 8);
-  slit(m, '+z', 4, 7, 3, 1); slit(m, '+z', 15, 7, 3, 1);
-  // the forge frame: posts and beams, the dark striped awning over it
-  for (const [x, z] of [[19, 4], [19, 18]]) m.box(x, 1, z, 1, 12, 1, POLE);
-  for (let x = 19; x < 27; x++) for (const z of [4, 10, 16]) m.set(x, 12, z, DARKWOOD);
-  awning(m, '+x', 17, 5, 21, 12, 10, 3, [0x3a3f52, 0x4d5470, 0x2e3244, 0x4d5470], { sw: 1, posts: false, valance: true });
-  // the forge pit with coals and an anvil
-  for (let x = 21; x < 26; x++) for (let z = 8; z < 14; z++) m.set(x, 0, z, (x + z) & 1 ? FIRE[0] : 0x2a1a12, (x + z) & 1 ? { glow: 0.3 } : undefined);
-  m.box(22, 1, 15, 3, 2, 2, IRON); m.box(21, 3, 15, 5, 1, 2, IRON);
-  // the chimney furnace in the yard
-  for (let y = 1; y < 25; y++) {
-    const w = y < 5 ? 7 : y < 12 ? 5 : 4;
-    const o = (7 - w) / 2;
-    for (let x = 0; x < w; x++) for (let z = 0; z < w; z++) {
-      const X = Math.floor(9 + o + x), Z = Math.floor(19 + o + z);
-      const edge = x === 0 || x === w - 1 || z === 0 || z === w - 1;
-      if (y < 4 && Z === 25 && X >= 11 && X < 14) continue;   // the fire mouth
-      if (!edge && y === 24) continue;                         // the flue open at the top
-      m.set(X, y, Z, edge ? (y >= 22 ? (y === 22 ? LIME(X, y, Z) : 0x3a3330) : y === 4 || y === 11 ? LIME(X, y, Z) : OCHRE_W(X, y, Z)) : y === 23 ? FIRE[0] : DARK, !edge && y === 23 ? { glow: 0.3 } : undefined);
-    }
+  patch(m, 18, 6, 31, 27, EARTH, { seed: 4 });
+  // the hall: one battered brick body, the cornice as a curved painted cavetto
+  // over a torus (skin()), the voxel gorge rows outside the wall cut away
+  const h = 14, b = 5, lipOut = 2;
+  block(m, 2, 3, 21, 17, 1, h, { wall: FBRICK, batter: b, band: 'teamb', frieze: 0, lipOut, flare: true, gorge: [LAPIS, RED_M], torus: true, rimC: LIME, roofC: PLASTER });
+  const B = m.blocks[m.blocks.length - 1];
+  B.cav = { lipOut, gorge: CAV, lift: 2.0 }; B.roll = OCHRE_M; B.skip = { '+z': [6, 10] };
+  const top = 1 + h, K = Math.floor((h - 1) / b);
+  const a0 = 2 + K, a1 = 21 - K, b0 = 3 + K, b1 = 17 - K;
+  for (let y = top; y <= top + 1; y++) for (let x = a0 - lipOut; x < a1 + lipOut; x++) for (let z = b0 - lipOut; z < b1 + lipOut; z++) {
+    if (x < a0 || x >= a1 || z < b0 || z >= b1) m.remove(x, y, z);
   }
-  // the fire mouth: a dark opening cut into the base's front under a limestone
-  // lintel, the coals glowing a voxel back inside it (nothing proud of the face)
-  for (let x = 11; x < 14; x++) for (let y = 1; y < 4; y++) { m.set(x, y, 24, y === 1 ? FIRE[0] : DARK, y === 1 ? { glow: 0.3 } : undefined); }
-  for (let x = 10; x < 15; x++) m.set(x, 4, 25, LIME(x, 4, 25));
-  // a stone trough and the ankh
-  for (let x = 16; x < 21; x++) for (let z = 21; z < 25; z++) for (let y = 1; y < 3; y++) {
-    const rim = x === 16 || x === 20 || z === 21 || z === 24;
-    m.set(x, y, z, rim || y === 1 ? LIME(x, y, z) : WATER);
+  // the roof: a pale lip with a parapet, a shadowed line inside, a plaster deck (no team outline)
+  const T = m.lastTop;
+  for (let x = T.c0; x < T.c1; x++) for (let z = T.d0; z < T.d1; z++) {
+    const e = Math.min(x - T.c0, T.c1 - 1 - x, z - T.d0, T.d1 - 1 - z);
+    // the coping painted as the cornice's top: a continuous band of lapis /
+    // red / ochre leaves, the pale lip outside it (no team outline on the roof)
+    if (e === 0) m.set(x, T.y, z, LIP);
+    else if (e === 1) m.set(x, T.y, z, [BLUEP, BLUEP, BLUEP, RED_B, RED_B, RED_B, OCHRE_B, OCHRE_B, OCHRE_B][(x + z) % 9]);
+    else if (e === 2) m.set(x, T.y, z, LIME_S);
   }
-  paint(m, '+z', 4, 7, ['.G.', 'G.G', '.G.', 'GGG', '.G.', '.G.'], { G: GILT });
-  // one bold gilt ankh standing on a limestone step by the furnace (a clear
-  // loop, bar and stem two voxels deep), as in Retold's yard
-  m.box(5, 1, 26, 5, 1, 3, LIME);
-  for (let y = 2; y < 6; y++) for (let z = 27; z < 29; z++) m.set(7, y, z, GILT);
-  for (let x = 5; x < 10; x++) for (let z = 27; z < 29; z++) m.set(x, 6, z, GILT);
-  for (const [x, y] of [[6, 7], [8, 7], [6, 8], [8, 8], [7, 9]]) for (let z = 27; z < 29; z++) m.set(x, y, z, GILT);
-  rack(m, 1, 18, 6);
-  shield(m, '+z', 27, 3);   // on the annex (u 12 / 15 landed on the furnace's front)
+  // the whitewashed attic on the roof's west half, its own small cornice
+  block(m, 3, 4, 12, 12, T.y, 5, { wall: PLAST_W, batter: 0, band: 'ochre', frieze: 0, lipOut: 1, rimC: LIME, roofC: PLASTER, rim: false, plinth: false });
+  door(m, '+z', 13, 3, 1, 7, { sun: true });
+  slit(m, '+z', 17, 8, 3, 1);
+  // the forge shed: a back wall and a pier in the same brick, one L with the hall
+  const shed = { wall: FBRICK, batter: 4, band: 'ochre', frieze: 0, lipOut: 1, gorge: [0xb08458, 0xc49a6c], rimC: LIME, roofC: MUDROOF, rim: false };
+  block(m, 19, 3, 30, 7, 1, 8, shed);
+  block(m, 26, 6, 30, 18, 1, 8, shed);
+  // the lean-to: a ledger beam pegged along the hall's east wall, rafters
+  // from it down onto the pier's coping (y 10), the cloth laid on them
+  const ry = (x) => (x >= 26 ? 11 : Math.round(13 - ((x - 19) * 2) / 7));
+  for (let z = 7; z < 19; z++) m.set(19, 12, z, WOODG);
+  for (const z of [8, 11, 14, 17]) for (let x = 19; x < 30; x++) m.set(x, ry(x), z, DARKWOOD);
+  for (let x = 20; x < 29; x++) for (let z = 10; z < 19; z++) {
+    if (z === 11 || z === 14 || z === 17) { m.set(x, ry(x) + 1, z, (z & 1) ? 0x5f6a8a : 0xd8ccb0); continue; }
+    m.set(x, ry(x) + 1, z, ((z >> 1) & 1) ? 0xd8ccb0 : 0x5f6a8a);
+  }
+  for (let x = 20; x < 26; x += 2) m.set(x, ry(x), 18, 0x5f6a8a);   // the front hem
+  // the hearth under the lean-to: a stone kerb round glowing coals, bellows
+  for (let x = 21; x < 26; x++) for (let z = 9; z < 15; z++) {
+    const kerb = x === 21 || x === 25 || z === 9 || z === 14;
+    if (kerb) m.set(x, 1, z, STONE_F); else if (hash3(x, 1, z, 306) < 0.45) m.set(x, 1, z, hash3(x, 2, z, 307) < 0.5 ? FIRE[1] : FIRE[2], { glow: 0.5 }); else m.set(x, 1, z, 0x2a1a12);
+  }
+  m.box(22, 1, 7, 3, 2, 2, 0x6e4a30); m.set(23, 3, 7, WOODG); m.set(23, 1, 9, DARKWOOD);
+  // the anvil: a dark stump, a steel body with a bright face and a horn
+  m.box(21, 1, 18, 2, 2, 2, WOODG);
+  for (let x = 20; x < 24; x++) for (let z = 18; z < 20; z++) m.set(x, 3, z, ANVIL);
+  for (let x = 20; x < 24; x++) for (let z = 18; z < 20; z++) m.set(x, 4, z, ANVIL_T);
+  m.set(24, 4, 18, ANVIL_T); m.set(24, 4, 19, ANVIL_T);
+  m.set(23, 1, 20, DARKWOOD); m.set(23, 2, 20, DARKWOOD); m.set(23, 3, 20, ANVIL);   // a hammer leaning on it
+  // the quench trough: a limestone box of water before the shed
+  for (let x = 25; x < 31; x++) for (let z = 19; z < 23; z++) for (let y = 1; y < 3; y++) {
+    const rim = x === 25 || x === 30 || z === 19 || z === 22;
+    m.set(x, y, z, rim || y === 1 ? STONE_F : WATER);
+  }
+  // the furnace against the hall's front, its chimney up the wall and over the roof
+  for (let x = 4; x < 12; x++) for (let z = 14; z < 22; z++) for (let y = 1; y < 6; y++) m.set(x, y, z, y === 5 ? LIME : STONE_F);
+  for (let x = 6; x < 10; x++) for (let z = 14; z < 20; z++) for (let y = 6; y < 22; y++) {
+    const edge = x === 6 || x === 9 || z === 16 || z === 19;
+    if (z < 16) { m.set(x, y, z, STONE_F); continue; }
+    if (!edge && y === 21) continue;
+    m.set(x, y, z, !edge && y === 20 ? FIRE[0] : edge ? (y === 21 ? 0x3a3330 : STONE_F) : DARK, !edge && y === 20 ? { glow: 0.3 } : undefined);
+  }
+  // the fire mouth: cut two voxels into the front under a limestone lintel, coals glowing
+  for (let x = 6; x < 10; x++) for (let y = 1; y < 4; y++) { m.remove(x, y, 21); m.set(x, y, 20, y === 1 ? FIRE[1] : FIRE[0], { glow: y === 1 ? 0.5 : 0.25 }); }
+  for (let x = 5; x < 11; x++) m.set(x, 4, 21, LIME);
+  // a bold gilt ankh on a limestone step by the furnace
+  m.box(0, 1, 23, 5, 1, 3, LIME);
+  for (let y = 2; y < 6; y++) for (let z = 24; z < 26; z++) m.set(2, y, z, GILT);
+  for (let x = 0; x < 5; x++) for (let z = 24; z < 26; z++) m.set(x, 6, z, GILT);
+  for (const [x, y] of [[1, 7], [3, 7], [1, 8], [3, 8], [2, 9]]) for (let z = 24; z < 26; z++) m.set(x, y, z, GILT);
+  shield(m, '+z', 27, 3);
+  barrel(m, 21.5, 1, 23.5); crate(m, 27, 1, 24, 3, 3, 3); crate(m, 1, 1, 19, 2, 2, 2);
   return m;
 }
 
