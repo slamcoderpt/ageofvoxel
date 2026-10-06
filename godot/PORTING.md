@@ -181,6 +181,16 @@ godot --path godot -- --scene=town [--seed=N] [--mapsize=N] [--units=N] [--playe
 - `--out`: after `--frames` rendered frames (default 4, like `main.js`) save
   the viewport as PNG, print `AOV_CAPTURE {json}` and quit (exit 3 if the frame
   is blank: mean < 8 or std < 4 over a 160x90 downscale, as `shoot.mjs`).
+  The frame is also checked for a row-pitch shear (`main.gd shear_ratio`: mean
+  vertical / mean horizontal luminance step over every 3rd pixel, ~0.8-1.1 on a
+  real frame, ~2.3 when rows are read back 4 px off): above 1.6 the next frames
+  are read again (up to 6), then the capture fails with exit 3; `AOV_CAPTURE`
+  carries `shear` and godot-shoot.mjs prints it. The PNG is written to
+  `<out>.<pid>.tmp.png` and renamed into place, so two captures aimed at the
+  same path (agents sharing `shots/godot/<scene>.png`) never leave a torn file.
+  (Gods round 13: a critic's 1420x798 egypt_powers frame came back as diagonal
+  scanline smear; every power captured clean at 1420x798 here, shear 0.79-1.03,
+  so the guard and the atomic write are the fix for a cause not reproduced.)
 - `--quit`: same without saving. A watchdog quits (exit 4) after `--timeout`
   seconds (default 600) so a script error never hangs a capture.
 - Scenes: `skirmish town battle godpower coast economy hud stress` (same
@@ -3399,6 +3409,9 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   flat plates spread level, edge-on to the portrait camera (the Roc's card showed a thin brown
   stick); the portrait raises them in a soaring V (+-0.7 rad about the body's axis).
 - Capture: `node scripts/godot-shoot.mjs --scene egypt_powers --params "power=tornado&t=6"`
+  (round 13 framing: the default Tornado is framed on where the funnel stands at t, its
+  ground point slid 5 tiles away from the camera so the whole funnel sits mid-frame, at
+  distance 46; the Eclipse on its Sphinxes where they fight at t)
   (power = any key above, or rebirth (a Phoenix falls, its egg), roc (boarding), roc_unload;
   the Tornado and Thoth's Meteor strike a grove; Plague of Serpents rises on open, level sand
   10 tiles south of the scene's centre with the Greek army drawn back 6 tiles, out of the

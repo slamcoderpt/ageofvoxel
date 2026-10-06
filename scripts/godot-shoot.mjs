@@ -80,9 +80,10 @@ for (const l of lines) {
 if (code !== 0) errors.push(`godot exited with code ${code}`);
 if (!cap) errors.push('no AOV_CAPTURE line (capture did not happen)');
 else if (cap.mean < 8 || cap.std < 4) errors.push(`image looks blank (mean ${cap.mean}, std ${cap.std})`);
+else if (cap.shear > 1.6) errors.push(`image looks sheared (vertical/horizontal gradient ${cap.shear}: a row-pitch error)`);
 if (!fs.existsSync(out)) errors.push(`no PNG written at ${out}`);
 const secs = ((Date.now() - t0) / 1000).toFixed(1);
-if (cap) console.log(`[godot-shoot] ${args.scene} -> ${out} in ${secs}s  (mean ${cap.mean.toFixed(1)}, std ${cap.std.toFixed(1)}, tick ${cap.tick})`);
+if (cap) console.log(`[godot-shoot] ${args.scene} -> ${out} in ${secs}s  (mean ${cap.mean.toFixed(1)}, std ${cap.std.toFixed(1)}${cap.shear != null ? `, shear ${cap.shear}` : ''}, tick ${cap.tick})`);
 if (errors.length && args.verbose !== 'true') console.error(lines.filter((l) => l.trim()).slice(-25).join('\n'));
 else if (args.verbose === 'true') console.log(log);
 for (const e of errors) console.error(`[godot-shoot] ${e}`);

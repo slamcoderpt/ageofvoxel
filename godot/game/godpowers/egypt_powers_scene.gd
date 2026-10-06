@@ -26,7 +26,7 @@ const SETUPS := {
 	"citadel": ["ra", ["ptah", "sekhmet", "osiris"], 1.2, 34.0, 40.0, 30.0],
 	"ancestors": ["isis", ["bast", "nephthys", "osiris"], 7.0, 32.0, 44.0, 26.0],
 	"son_of_osiris": ["ra", ["bast", "sobek", "osiris"], 1.05, 24.0, 36.0, 24.0],
-	"tornado": ["set", ["ptah", "sekhmet", "horus"], 6.0, 40.0, 44.0, 24.0],
+	"tornado": ["set", ["ptah", "sekhmet", "horus"], 6.0, 46.0, 44.0, 24.0],
 	"thoth_meteor": ["isis", ["anubis", "nephthys", "thoth"], 8.6, 48.0, 50.0, 24.0],
 	"rebirth": ["isis", ["anubis", "nephthys", "thoth"], 5.0, 14.0, 36.0, 24.0],
 	"roc": ["ra", ["bast", "sobek", "horus"], 1.6, 18.0, 38.0, 24.0],
@@ -248,6 +248,26 @@ static func scene_setup(game: Node) -> Dictionary:
 			focus = (a + c) * 0.5
 			st = st.duplicate()
 			st[3] = clampf(a.distance_to(c) * 1.2 + 6.0, 9.0, 18.0)
+	# the effect at the frame's centre wherever it has gone by t (thumbnail framing): the
+	# Tornado's funnel where it now stands (its ground point slid away from the camera
+	# so the tall funnel, not its foot, sits mid-frame), the Eclipse's empowered myth units
+	# where they now fight
+	if power == "tornado":
+		var tor: PackedFloat32Array = sim.get_egypt_powers().get("tornadoes", PackedFloat32Array())
+		if tor.size() >= 8:
+			var yaw := deg_to_rad(float(game.args.get("ep_yaw", st[5])))
+			focus = Vector2(tor[5], tor[6]) + Vector2(-sin(yaw), -cos(yaw)) * 5.0
+	elif power == "eclipse":
+		var U: Dictionary = sim.get_units()
+		var names: PackedStringArray = sim.unit_type_names()
+		var cen := Vector2.ZERO
+		var n := 0
+		for k in U.ids.size():
+			if int(U.owner[k]) == 1 and names[U.type[k]] == "sphinx":
+				cen += Vector2(float(U.pos[k * 2]), float(U.pos[k * 2 + 1]))
+				n += 1
+		if n > 0:
+			focus = cen / n
 	focus += Vector2(float(game.args.get("ep_ax", 0.0)), float(game.args.get("ep_az", 0.0)))
 	if not game.args.has("cam"):
 		game.args["cam"] = "%f,%f,%f,%f,%f" % [focus.x, focus.y, float(game.args.get("ep_dist", st[3])),

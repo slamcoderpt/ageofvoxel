@@ -311,17 +311,42 @@ func _capture() -> void:
 	var code := 0
 	if args.has("out"):
 		var img := get_viewport().get_texture().get_image()
+		# Guard against a frame read back with a wrong row pitch (a critic once got a
+		# 1420-wide capture that was all diagonal scanline smear): in a sheared image
+		# neighbouring rows no longer match, so the vertical gradient dwarfs the
+		# horizontal one (a real frame ~0.8-1.2, a 4 px pitch error ~2.3). Re-read
+		# the next frames; give up loudly rather than save garbage.
+		var shear := shear_ratio(img)
+		var tries := 0
+		while shear > 1.6 and tries < 6:
+			tries += 1
+			printerr("AOV_CAPTURE_RETRY sheared frame (v/h %.2f), reading the next one" % shear)
+			await RenderingServer.frame_post_draw
+			img = get_viewport().get_texture().get_image()
+			shear = shear_ratio(img)
 		var out := str(args.out)
 		if not out.is_absolute_path():
 			out = OS.get_environment("AOV_CWD").path_join(out) if OS.get_environment("AOV_CWD") != "" else ProjectSettings.globalize_path("res://").path_join(out)
 		DirAccess.make_dir_recursive_absolute(out.get_base_dir())
-		var err := img.save_png(out)
+		# written beside the target and renamed into place, so two captures aimed at the same
+		# path (agents sharing shots/godot/<scene>.png) never interleave into a torn file
+		var tmp := "%s.%d.tmp.png" % [out.get_basename(), OS.get_process_id()]
+		var err := img.save_png(tmp)
+		if err == OK:
+			err = DirAccess.rename_absolute(tmp, out)
+		if err != OK:
+			DirAccess.remove_absolute(tmp)
 		var st := image_stats(img)
 		print("AOV_CAPTURE %s" % JSON.stringify({"out": out, "width": img.get_width(), "height": img.get_height(),
-			"mean": snappedf(st.mean, 0.01), "std": snappedf(st.std, 0.01), "tick": sim.get_tick(), "errors": errors}))
+			"mean": snappedf(st.mean, 0.01), "std": snappedf(st.std, 0.01), "shear": snappedf(shear, 0.01), "tick": sim.get_tick(), "errors": errors}))
 		if err != OK:
 			push_error("save_png failed: %s" % error_string(err))
 			code = 2
+		elif shear > 1.6:
+			push_error("capture looks sheared (row pitch?): vertical / horizontal gradient %.2f" % shear)
+			code = 3
+		if args.has("width") and (img.get_width() != int(args.width) or img.get_height() != int(args.height)):
+			printerr("AOV_CAPTURE_WARN capture is %dx%d, asked for %sx%s" % [img.get_width(), img.get_height(), args.width, args.height])
 		elif st.mean < 8.0 or st.std < 4.0:
 			push_error("capture looks blank (mean %.1f, std %.1f)" % [st.mean, st.std])
 			code = 3
@@ -344,6 +369,27 @@ static func image_stats(img: Image) -> Dictionary:
 		sum2 += l * l
 	var mean := sum / n
 	return {"mean": mean, "std": sqrt(maxf(0.0, sum2 / n - mean * mean))}
+
+## Mean |vertical| / mean |horizontal| luminance step over a full-resolution
+## sample of the frame (every 3rd row / column): ~1 for a real frame, > 2 when
+## the rows were read back with a wrong pitch (diagonal scanline smear).
+static func shear_ratio(img: Image) -> float:
+	var s := img.duplicate() as Image
+	s.convert(Image.FORMAT_RGB8)
+	var w := s.get_width()
+	var h := s.get_height()
+	var d := s.get_data()
+	var sh := 0.0
+	var sv := 0.0
+	for y in range(0, h - 1, 3):
+		for x in range(0, w - 1, 3):
+			var i := (y * w + x) * 3
+			var l := d[i] + d[i + 1] + d[i + 2]
+			var j := i + 3
+			var k := i + w * 3
+			sh += absi(l - (d[j] + d[j + 1] + d[j + 2]))
+			sv += absi(l - (d[k] + d[k + 1] + d[k + 2]))
+	return sv / maxf(sh, 1.0)
 
 func _fail(msg: String) -> void:
 	errors.append(msg)
