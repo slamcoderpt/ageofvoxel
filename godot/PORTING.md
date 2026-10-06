@@ -3477,6 +3477,20 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   its inner wall (mode 0, seen down the open top) is the deep colour; a sheath of wisps (mode 2)
   shows only near the silhouette in broken tufts, so no veil lies over the buildings; the
   **dust skirt** (mode 3, `_skirt_mesh`: a low dome from r 1 / 2.2 m high to r 5.4 on the
+- **One reading of "-X % vulnerability"** (gods round 15): every Egyptian god effect EGYPT.md
+  words as a vulnerability is damage taken x (1 - X), never flat armor: Skin of the Rhino
+  (Laborers hack and pierce x0.75) and Leather Frame Shield (Spearman pierce x0.85) are
+  `TE_HACK_VULN` / `TE_PIERCE_VULN` (`TechMods::hack_vuln / pierce_vuln`, 1 = none, multiplied),
+  applied by `Techs::tech_armor(owner, type, base, pierce)`: flat armor adds (capped 0.95), then
+  armor a -> 1 - (1 - a) x v, the same formula as the Eclipse's x0.9 (`GodPowers::armor_after`,
+  myth units). Every armor read goes through it (`Techs::unit_armor` for blows and arrows,
+  `Techs::stats` for the card, egypt_myth.cpp `armor_of`, the Tornado's hack share). Effects
+  worded as armor stay flat (the Citadel Center's +10 % hack armor), and the shared Armory lines
+  (Copper..Iron Armor / Shields, Aegis Shield; Greek data, Greeks unchanged) keep their +0.10 /
+  +0.15. egypt_gods_check `techs.ra_ptah_sobek_horus` asserts the ratios: a hoplite blow and a
+  toxotes arrow on a Laborer x0.7500 with Skin of the Rhino (7.313 -> 5.484, 5.163 -> 3.872; card
+  armor 0.1875 / 0.2625 -> 0.3906 / 0.4469), a toxotes arrow on a Spearman x0.8500 with Leather
+  Frame Shield (7.77 -> 6.605) and its hoplite blow untouched (6.3).
   ground) rolls lumps round and outward, darker than the sand with a sunlit outer roll and a
   crisp, lumpy edge; godpower_view_egypt.cpp keeps 44 soft round puffs rolling off its rim (no
   voxel squares). 12 big **wreckage** blocks (`CHUNKS`: roof tiles, beams, mud bricks, a

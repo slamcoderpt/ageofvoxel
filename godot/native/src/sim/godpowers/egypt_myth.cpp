@@ -73,8 +73,7 @@ static double armor_of(const Sim &S, int r, bool pierce) {
 	const UnitStore &U = S.entities.units;
 	const int t = U.type[r], o = U.owner[r];
 	const double base = pierce && is_egypt_unit(t) ? S.civs.base_pierce(r) : unit_def(t).armor;
-	const double add = pierce ? S.techs.mods[o].pierce[t] : S.techs.mods[o].hack[t];
-	return S.godpowers.armor_after(r, std::min(ARMOR_CAP, base + add));
+	return S.godpowers.armor_after(r, S.techs.tech_armor(o, t, base, pierce));
 }
 
 static bool organic(int type) {

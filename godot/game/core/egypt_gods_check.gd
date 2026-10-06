@@ -1243,16 +1243,46 @@ func _case_techs() -> void:
 	r["shaduf (ptah) at the granary"] = str(_tech(sim, gr, "shaduf").state)
 	var ok: bool = r["skin_of_the_rhino (ra) / flood_of_the_nile (isis) at the granary"] == ["available", "locked_god"] and r["sacred_cats (bast; ra took ptah)"] == "locked_god"
 	ok = ok and r["shaduf (ptah) at the granary"] == "available"
-	# Skin of the Rhino: a hoplite blow on a Laborer 9 x (1 - 0.1875) -> 9 x (1 - 0.4375)
+	# Skin of the Rhino: "-25 % hack and -25 % pierce vulnerability" is damage taken x0.75 (the
+	# Eclipse's reading, armor a -> 1 - (1 - a) x 0.75): a hoplite blow on a Laborer 9 x (1 - 0.1875)
+	# -> 9 x 0.8125 x 0.75, a toxotes arrow x0.75 too; the readout's armor 0.1875 -> 0.390625,
+	# pierce 0.2625 -> 0.446875
 	var lab := _u(sim, "laborer", 1, 4, 4)
 	var hop := _u(sim, "hoplite", 2, 5.4, 4)
+	var tox := _u(sim, "toxotes", 2, 4, 9)
 	sim.tick(1)
 	var before := _first_hit(sim, hop, lab)
+	var abefore := _first_hit(sim, tox, lab)
+	var lst0: Dictionary = sim.get_unit_stats(lab)
 	sim.grant_tech(1, "skin_of_the_rhino")
 	var after := _first_hit(sim, hop, lab)
-	r["hoplite blow on a laborer [before, skin of the rhino]"] = [_r(before), _r(after)]
-	ok = ok and _near(before, 9 * (1 - 0.1875), 0.01) and _near(after, 9 * (1 - 0.4375), 0.01)
+	var aafter := _first_hit(sim, tox, lab)
+	var lst1: Dictionary = sim.get_unit_stats(lab)
+	r["hoplite blow on a laborer [before, skin of the rhino, ratio]"] = [_r(before), _r(after), _r(after / before, 4)]
+	r["toxotes arrow on a laborer [before, skin of the rhino, ratio]"] = [_r(abefore), _r(aafter), _r(aafter / abefore, 4)]
+	r["laborer hack / pierce armor [before, skin of the rhino]"] = [[_r(lst0.hack_armor, 4), _r(lst0.pierce_armor, 4)], [_r(lst1.hack_armor, 4), _r(lst1.pierce_armor, 4)]]
+	ok = ok and _near(before, 9 * (1 - 0.1875), 0.01) and _near(after, 9 * (1 - 0.1875) * 0.75, 0.01)
+	ok = ok and _near(after / before, 0.75, 0.0005) and abefore > 0 and _near(aafter / abefore, 0.75, 0.0005)
+	ok = ok and _near(float(lst1.hack_armor), 0.390625, 0.0001) and _near(float(lst1.pierce_armor), 0.446875, 0.0001)
 	sim.kill_unit(hop)
+	# Leather Frame Shield (Ptah): "Spearman -15 % pierce vulnerability": a toxotes arrow on a
+	# Spearman x0.85 (not + 0.15 armor), its blows untouched
+	var spr := _u(sim, "spearman", 1, -4, 8)
+	var tox2 := _u(sim, "toxotes", 2, -4, 13)
+	var hop2 := _u(sim, "hoplite", 2, -2.6, 8)
+	sim.tick(1)
+	var sp_a0 := _first_hit(sim, tox2, spr)
+	var sp_h0 := _first_hit(sim, hop2, spr)
+	sim.grant_tech(1, "leather_frame_shield")
+	var sp_a1 := _first_hit(sim, tox2, spr)
+	var sp_h1 := _first_hit(sim, hop2, spr)
+	r["toxotes arrow on a spearman [before, leather frame shield, ratio]"] = [_r(sp_a0), _r(sp_a1), _r(sp_a1 / sp_a0, 4)]
+	r["hoplite blow on a spearman [before, leather frame shield]"] = [_r(sp_h0), _r(sp_h1)]
+	ok = ok and sp_a0 > 0 and _near(sp_a1 / sp_a0, 0.85, 0.0005) and sp_h0 > 0 and _near(sp_h1, sp_h0, 0.0001)
+	sim.kill_unit(tox)
+	sim.kill_unit(tox2)
+	sim.kill_unit(hop2)
+	sim.kill_unit(spr)
 	# Shaduf: a Farm 70 -> 35 gold
 	r["farm gold [before, shaduf]"] = [float(sim.get_building_def("farm", 1).cost.get("gold", 0))]
 	sim.grant_tech(1, "shaduf")

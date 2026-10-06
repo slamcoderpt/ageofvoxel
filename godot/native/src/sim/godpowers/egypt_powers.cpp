@@ -779,7 +779,7 @@ void GodPowers::update_egypt(double dt) {
 		for (int r : rows) {
 			const double f = fall(jsm::hypot(U.x[r] - nx, U.z[r] - nz));
 			if (f <= 0) continue;
-			const double hack = std::min(ARMOR_CAP, unit_def(U.type[r]).armor + S.techs.mods[U.owner[r]].hack[U.type[r]]);
+			const double hack = S.techs.tech_armor(U.owner[r], U.type[r], unit_def(U.type[r]).armor, false);
 			const double dmg = f * (TORNADO_HACK * (1 - hack) + TORNADO_CRUSH * (1 - crush_armor(U.type[r]))) * vuln_mult(r);
 			const int32_t id = U.id[r];
 			const bool own = S.is_ally(t.owner, U.owner[r]);

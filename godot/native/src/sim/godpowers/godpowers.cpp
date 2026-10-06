@@ -72,7 +72,7 @@ const PowerDef &power_def(int id) {
 		{ "thoth_meteor", "Meteor", "Thoth", Cost(0, 0, 0, 350), 240, 15, 18, 1, 580, 4.8, 3, "B",
 			"Twelve meteors fall in a large circle over 18 seconds, on the densest targets; each smashes everything within 8 m.", 5, 3, PT_POINT,
 			"350 favor, recharge 240 s, ramp +5, 18 s, 25 m circle; 12 meteors, the first in the centre after 3 s, the other 11 from 3 s later on the densest targets; each 580 crush + 40 divine in 8 m, x0.1 vs own units and Farms, knockback",
-			"circle 15 tiles, area 4.8 tiles, one meteor a second from 6 s; units' crush armor 99 % (myth 80 %, siege 85 %), buildings their own (Retold) or 5 %" },
+			"circle 15 tiles, area 4.8 tiles, the rest one every 1.2 s from 6 s (the last lands at 18 s); units' crush armor 99 % (myth 80 %, siege 85 %), buildings their own (Retold) or 5 %" },
 	};
 	// clang-format on
 	return D[id];
