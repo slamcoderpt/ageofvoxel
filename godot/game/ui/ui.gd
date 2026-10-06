@@ -82,8 +82,7 @@ const EGYPT_TRAIN_LINES := {
 	"camel_rider": "Raider, x2 vs cavalry.", "war_elephant": "Slow, very tough, x4 vs buildings.",
 	"siege_tower": "Siege: breaks buildings and walls.", "catapult": "Siege: long-range stones vs buildings.",
 }
-const HEIGHT := {"villager": 2.0, "hoplite": 2.25, "toxotes": 2.05, "hippikon": 2.75, "minotaur": 3.4, "hero": 3.7, "cyclops": 5.0, "centaur": 2.9, "medusa": 2.6,
-	"roc": 4.6, "phoenix": 4.0}  # (the flyers: picked on the bird, which hovers ~3 m up)
+const HEIGHT := {"villager": 2.0, "hoplite": 2.25, "toxotes": 2.05, "hippikon": 2.75, "minotaur": 3.4, "hero": 3.7, "cyclops": 5.0, "centaur": 2.9, "medusa": 2.6}
 
 var game: Node = null
 var sim: Object = null
@@ -1091,8 +1090,6 @@ func _egypt_unit_commands(us: Array, list: Array) -> void:
 	var priests := us.filter(func(e): return str(e.type) == "priest")
 	var phar := us.filter(func(e): return str(e.type) == "pharaoh")
 	var god := str(player.get("god", "")).to_lower()
-	if labs.is_empty():
-		_roc_commands(us, list)
 	if not labs.is_empty():
 		for i in EGYPT_GRID.size():
 			list.append(_egypt_build_cmd(str(EGYPT_GRID[i][0]), str(EGYPT_GRID[i][1]), i))
@@ -1118,59 +1115,6 @@ func _egypt_unit_commands(us: Array, list: Array) -> void:
 				if int(m.age) > int(player.get("age", 0)):
 					c["age_req"] = int(m.age)
 			list.append(c)
-
-## The Roc (gods piece, sim/godpowers egypt_myth.cpp; EGYPT.md 5.2: a flying transport for
-## 20, it lands 2 s to load or unload): with a Roc selected, Board (E) sends the other
-## selected men into it, Unload (R) + a ground or minimap click flies it there and sets
-## them down, Unload Here (T) lands it where it is. Right-clicking your Roc with men
-## selected boards it too (Commands::smart). Not carried: Rocs, Phoenixes, Serpents, siege.
-const ROC_NOT_CARRIED := ["roc", "phoenix", "phoenix_egg", "serpent"]
-
-func _roc_carries(t: String) -> bool:
-	return not (t in ROC_NOT_CARRIED) and str(_defs.get(t, {}).get("class", "")) != "siege"
-
-func _roc_commands(us: Array, list: Array) -> void:
-	var rocs := us.filter(func(e): return str(e.type) == "roc")
-	if rocs.is_empty():
-		return
-	var roc := int(rocs[0].id)
-	var st: Dictionary = sim.get_roc(roc)
-	var slots := int(st.get("slots", 20))
-	var cargo := (st.get("cargo", []) as Array).size()
-	var room := slots - cargo - (st.get("boarding", []) as Array).size()
-	var men := us.filter(func(e): return _roc_carries(str(e.type)))
-	var b := {"key": "E", "slot": 2, "svg": "roc_board", "title": "Board the Roc",
-		"lines": ["The other men selected walk to the Roc; it lands", "(2 s) and takes them in: %d of %d places free." % [maxi(room, 0), slots],
-			"Right-clicking your Roc with men selected does the same."],
-		"enabled": not men.is_empty() and room > 0, "action": "roc_board", "arg": roc}
-	if men.is_empty():
-		b["deny"] = "Select the men to carry with the Roc"
-	elif room <= 0:
-		b["deny"] = "The Roc is full (%d)" % slots
-	list.append(b)
-	var u := {"key": "R", "slot": 3, "svg": "roc_unload", "title": "Unload",
-		"lines": ["Click the ground or the minimap: the Roc flies there,", "lands (2 s) and sets its %d riders down." % cargo],
-		"enabled": cargo > 0, "action": "roc_unload", "arg": roc}
-	var h := {"key": "T", "slot": 4, "svg": "roc_unload_here", "title": "Unload Here",
-		"lines": ["The Roc lands where it is (2 s)", "and sets its %d riders down." % cargo], "enabled": cargo > 0, "action": "roc_unload_here", "arg": roc}
-	if cargo == 0:
-		u["deny"] = "The Roc carries no one"
-		h["deny"] = "The Roc carries no one"
-	list.append(u)
-	list.append(h)
-
-## the Roc's card lines: its riders, those walking to it, what it is doing
-func _roc_card(id: int, d: Dictionary) -> void:
-	var st: Dictionary = sim.get_roc(id)
-	var cargo := (st.get("cargo", []) as Array).size()
-	var boarding := (st.get("boarding", []) as Array).size()
-	var line := "Carrying %d / %d" % [cargo, int(st.get("slots", 20))]
-	if boarding > 0:
-		line += " · %d boarding" % boarding
-	d.tasks.append(line)
-	match int(st.get("mode", 0)):
-		1: d.tasks.append("Landing to take them in")
-		2: d.tasks.append("Flying to unload")
 
 ## An Egyptian building's train buttons (get_trains: his civ's list, Devotees' cost,
 ## the locks: a Temple for Priests, the minor god for a myth unit, the age).
@@ -1706,8 +1650,6 @@ func _info_for() -> Dictionary:
 				if (ot == 2 or ot == 3) and tk < 3:
 					s += " " + RES_NAMES[tk]
 				d.tasks.append(s)
-		if str(e.type) == "roc":
-			_roc_card(int(e.id), d)
 	elif e.kind == "building":
 		var bd: Dictionary = _bdefs[e.type]
 		_owner_fields(d, int(e.owner))
@@ -2156,9 +2098,6 @@ func _minimap_click(p: Vector2, button: int) -> void:
 	if button == MOUSE_BUTTON_LEFT and _mode.get("kind", "") == "attack_move":
 		_attack_move_at(w.x, w.y, 0)
 		_mm_drag = false
-	elif button == MOUSE_BUTTON_LEFT and _mode.get("kind", "") == "roc_unload":
-		_roc_unload_at(w.x, w.y)
-		_mm_drag = false
 	elif button == MOUSE_BUTTON_LEFT:
 		game.camera.target.x = w.x
 		game.camera.target.z = w.y
@@ -2344,21 +2283,6 @@ func _run_command(c: Dictionary) -> void:
 			_mode = {"kind": "empower", "ids": ids}
 			Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND)
 			message("Empower: click one of your buildings (Esc cancels)")
-		"roc_board":
-			var ids := []
-			for e in sel:
-				if e.kind == "unit" and int(e.owner) == me and int(e.id) != int(c.arg) and _roc_carries(str(e.type)):
-					ids.append(int(e.id))
-			var n := int(sim.roc_load(int(c.arg), PackedInt32Array(ids)))
-			message("%d boarding the Roc" % n if n > 0 else "The Roc cannot take them")
-		"roc_unload":
-			_cancel_mode()
-			_mode = {"kind": "roc_unload", "roc": int(c.arg)}
-			Input.set_default_cursor_shape(Input.CURSOR_CROSS)
-			message("Unload: click where the Roc sets them down (Esc cancels)")
-		"roc_unload_here":
-			if sim.roc_unload(int(c.arg), NAN, NAN):
-				message("The Roc lands to unload")
 		"summon":
 			var r: Dictionary = sim.summon_animal(int(c.arg[0]), str(c.arg[1]))
 			if not bool(r.ok): message(str(r.reason))
@@ -2395,11 +2319,6 @@ func _unhandled_input(e: InputEvent) -> void:
 				var g = pick_ground(e.position)
 				if g != null:
 					_attack_move_at(g.x, g.y, pick_entity(e.position))
-				return
-			if _mode.get("kind", "") == "roc_unload":
-				var g = pick_ground(e.position)
-				if g != null:
-					_roc_unload_at(g.x, g.y)
 				return
 			if _mode.get("kind", "") == "power":
 				var g = pick_ground(e.position)
@@ -2535,8 +2454,6 @@ func _order_at(x: float, z: float, target: int) -> void:
 	var own := _own_units()
 	if not own.is_empty():
 		sim.smart(PackedInt32Array(own), x, z, target)
-		if target != 0 and int(sim.entity_kind(target)) == 1 and _owner_of(target) == me and str(sim.get_unit(target).get("type", "")) == "roc":
-			message("Boarding the Roc")
 		var enemy: bool = target != 0 and sim.is_enemy(me, _owner_of(target))
 		_marker(x, z, Color("#ff4030") if enemy else Color("#7dff7a"))
 		return
@@ -2572,16 +2489,6 @@ func _attack_move_at(x: float, z: float, target: int) -> void:
 		sim.order_move(PackedInt32Array(rest), x, z)
 	_marker(x, z, AM_COLOR)
 	message("Attack-move")
-
-## Unload targeting click: the Roc flies there, lands and sets its riders down
-func _roc_unload_at(x: float, z: float) -> void:
-	var roc := int(_mode.get("roc", 0))
-	_cancel_mode()
-	if sim.roc_unload(roc, x, z):
-		_marker(x, z, Color("#7dff7a"))
-		message("The Roc flies there to unload")
-	else:
-		message("The Roc carries no one")
 
 func _marker(x: float, z: float, c: Color) -> void:
 	var mi := MeshInstance3D.new()
@@ -2771,7 +2678,7 @@ func _cancel_mode() -> void:
 	if _ghost:
 		_ghost.queue_free()
 		_ghost = null
-	if _mode.get("kind", "") == "attack_move" or _mode.get("kind", "") == "roc_unload":
+	if _mode.get("kind", "") == "attack_move":
 		Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 	_mode = {}
 	wall_preview = {}
@@ -2800,7 +2707,7 @@ func _update_ghost() -> void:
 		if g != null:
 			_update_wall_ghost(g)
 		return
-	if kind == "attack_move" or kind == "roc_unload":
+	if kind == "attack_move":
 		_am_ring.visible = g != null
 		if g != null:
 			var pulse := 0.85 + 0.15 * sin(Time.get_ticks_msec() * 0.008)
