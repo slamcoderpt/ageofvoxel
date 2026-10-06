@@ -3021,44 +3021,165 @@ const raptorLeg = (thigh, shank, claw) => {
   return m;
 };
 
-// Phoenix (flyer, 0.1): a bird of fire: a gold and orange body, the raptor
-// wings in flame colours (gold coverts, orange and red flight feathers) with
-// blue (team) flame on the feather tips, a flame crest, a long burning tail.
+// Phoenix (flyer, 0.1, myth_13): a bird of fire. (round 27) Built on its own,
+// not on the raptor kit: each wing is one continuous stepped surface. The arm
+// (wingL / wingR) is a solid wedge in section, thick at the shoulder (the
+// leading edge three voxels deep) and stepping down a voxel per feather tract
+// toward the trailing edge, so the tracts overlap like shingles; each tract
+// is one colour running the length of the wing (gold leading edge, gold and
+// orange coverts, red-orange secondaries) with a dark shadow row under each
+// step: feather-row stripes, no speckle. The hand (handL / handR, channels
+// foreL / foreR) carries five primaries as two-row bands laid side by side
+// (no gaps), each with a raised light shaft row, swept back and ending in a
+// stepped, rounded tip. The flame colour runs to a gradient band at every tip:
+// red-orange, crimson, a dark team step, then the team colour. The two span
+// columns at the wing root are darkened (ambient occlusion where the wing
+// meets the body). The head is about twice the old one: a big round orange
+// head with red feather chevrons, a dark eye voxel on each side, a yellow
+// hooked beak and a three-plume crest; a solid fanned tail of nine feathers
+// with two long streamers; gold legs with dark talons.
 {
-  const FIRE = (x, y, z) => { const h = hash3(x, y, z, 95); return h < 0.3 ? 0xd05010 : h < 0.7 ? 0xe8a018 : 0xe07810; };
-  const P = {
-    root: 9, wrist: 7, arm: 9, primScale: 1, tailLen: 14, tailZ: -5, joint: [2.5, 1.5, 2], glow: 0.12,
-    lead: 0xf0c020, lesser: pick3(97, 0xe8a818, 0xf0b820, 0xe09810), greater: 0xe07810, scallop: 0xc03008, coverTip: 0xf0b820,
-    sec: 0xd85010, sec2: 0xc03c08, prim: 0xd04810, prim2: 0xb83408, band: 0xf8d020,
-    neck: pick3(98, 0xe8a018, 0xe07810, 0xf0b820), head: pick3(99, 0xe8a018, 0xe07810, 0xf0b820), crown: 0xf0c020, brow: 0xa82806,
-    cere: 0xf0c020, beak: 0xf0d050, beakLow: 0xd0a020, beakTip: GOLD_DK,
+  const DIM = (c, f) => ((Math.round(((c >> 16) & 255) * f) << 16) | (Math.round(((c >> 8) & 255) * f) << 8) | Math.round((c & 255) * f));
+  // (the fire marker adds 1.1 x the colour as emission, so a full-value gold
+  // bleaches to cream: the flame colours sit a step deeper and more saturated)
+  const LEAD = 0xd89a00, C1 = 0xcc7c00, C1L = 0xd88c00, C2 = 0xc05800, C3 = 0xa83c00;
+  const SEC = 0x9a2a00, SEC2 = 0x8a2200, LINE = 0x5a1000, CRIM = 0x780c30;
+  const SHAFT = 0xcc7000, PRIM = 0xa83400, PRIM2 = 0x922800;
+  const BEAK = 0xb88c00, BEAK_LO = 0x8c6400, BEAK_TIP = 0x3a2400;
+  const NOGLOW = new Set([DARK, BEAK_TIP]);
+  // team voxels shaded by base (the tint multiplies); the tips glow a little
+  const tm = (m, x, y, z, base) => { m.set(x, y, z, TEAM, { glow: 0.12 }); m.get(x, y, z).c = base; };
+  // a tip gradient: u = 0 .. 1 along a feather; returns a colour or a team base
+  const tipC = (u, c) => (u > 0.86 ? ['t', 0xffffff] : u > 0.74 ? ['t', 0x8c8c8c] : u > 0.62 ? CRIM : c);
+  const put = (m, x, y, z, c, ao = 1) => {
+    if (Array.isArray(c)) return tm(m, x, y, z, c[1]);
+    m.set(x, y, z, ao < 1 ? DIM(c, ao) : c);
   };
+  const wing = (s) => {
+    const X = (x) => (s > 0 ? x : -x - 1);
+    const ARM = 10;
+    const arm = new VoxelModel();
+    for (let i = 0; i < ARM; i++) {
+      const ao = i === 0 ? 0.6 : i === 1 ? 0.8 : 1;
+      const k = i >> 1;                                  // the secondary feather this column belongs to
+      const ch = Math.round(11 - (i * 2) / ARM) + (k % 2 ? 0 : 1);   // chord 12 -> 9, alternating by feather
+      const rise = Math.floor(i * 0.2);
+      const base = i < 5 ? 2 : 1;                        // thick at the shoulder, thinner to the wrist
+      for (let v = 0; v <= ch; v++) {
+        const lvl = Math.max(0, base - Math.floor(v / 3));
+        const back = ch - v;                            // rows from the trailing edge
+        let c;
+        if (v === 0) c = LEAD;
+        else if (v <= 2) c = v === 1 ? C1L : C1;
+        else if (v <= 5) c = v === 3 ? DIM(C2, 0.72) : C2;            // lesser coverts, shadow row under the step
+        else if (v <= 8) c = v === 6 ? DIM(C3, 0.72) : C3;            // greater coverts
+        else c = v === 9 ? LINE : (k % 2 ? SEC : SEC2);               // secondaries
+        if (v >= 9) c = tipC(1 - back / 4.2, c);
+        else if (back <= 1) c = tipC(1 - back / 4.2, c);
+        for (let y = 0; y <= lvl; y++) put(arm, X(i), rise + y, -v, y < lvl && !Array.isArray(c) ? DIM(c, 0.85) : c, ao);
+      }
+    }
+    const armRise = Math.floor(ARM * 0.2);
+    const hand = new VoxelModel();
+    // five primaries, two chord rows each, laid side by side; the second is longest
+    const LEN = [12, 13.5, 12.5, 11, 9.5];
+    for (let p = 0; p < 5; p++) {
+      for (let r = 0; r < 2; r++) {
+        const v = p * 2 + r;
+        const L = LEN[p] - (r === 1 ? 1 : 0);          // a stepped, rounded tip
+        for (let x = 0; x <= L; x++) {
+          const z = -v - Math.round(x * 0.42) - (x > L - 3 ? p * 0.0 : 0);
+          const u = x / L;
+          const cov = x < 5 - p * 0.8 && v < 6;        // the hand's coverts over the primary roots
+          let c;
+          if (cov) c = v === 0 ? LEAD : v < 3 ? C1 : C2;
+          else c = r === 0 ? PRIM : PRIM2;
+          if (!cov) c = tipC(u, c);
+          put(hand, X(x), 0, z, c);
+          // shingle: each primary's leading row is raised a voxel over the one behind it
+          if (r === 0 && x < L - 1) put(hand, X(x), 1, z, cov ? (v === 0 ? LEAD : C1L) : tipC(u, SHAFT));
+          if (v === 0 && x < 6) put(hand, X(x), -1, z, DIM(LEAD, 0.85));   // the thick leading edge to the wrist
+        }
+      }
+    }
+    return { arm, hand, armRise, armLen: ARM };
+  };
+  // the body: a gold breast and an orange back in red feather chevrons
   const body = new VoxelModel();
-  body.ellipsoid(0, 0, 0, 2.6, 2.4, 4.8, FIRE);
-  body.ellipsoid(0, -1, 1, 2, 1.6, 3.4, 0xf0c020);              // the bright breast
-  raptorHead(body, P, 4, 1.5);
-  for (let i = 0; i < 6; i++) body.set(0, 5 + i, 6 - i, i > 3 ? TEAM : 0xf0b820, i > 3 ? { glow: 0.12 } : undefined);   // flame crest
-  for (let i = 0; i < 4; i++) body.set(0, 4 + i, 5 - i, 0xd05010);
-  // two long burning streamers trail past the tail fan
-  const tail = raptorTail(P);
-  for (let i = 0; i < 16; i++) for (const x of [-2, 2]) tail.set(x + Math.round(x * i * 0.06), -Math.round(i * 0.25), -i - 2, i > 12 ? TEAM : i > 7 ? 0xd05010 : 0xe8a018, i > 12 ? { glow: 0.12 } : undefined);
-  const L = raptorWing(1, P), R = raptorWing(-1, P);
-  const leg = raptorLeg(0xe07810, GOLD_DK, DARK);
-  // (round 20) every flame voxel carries glow 0.8, the unit shader's fire
-  // marker: it burns with its own light and keeps its orange through the
-  // grade (which bleaches a lit saturated orange to salmon); the team flame
-  // tips glow a little, the dark eyes, claws and beak tip stay unlit
-  const burn = (m) => { for (const v of m.vox.values()) if (!v.team && v.c !== DARK && v.c !== GOLD_DK) v.glow = 0.8; return m; };
+  const plumage = (x, y, z) => {
+    const band = ((Math.floor((z * 2 + Math.abs(x) * 1.2) / 3) % 3) + 3) % 3;
+    let c = y < 0 ? (band === 0 ? 0xc06800 : 0xd08c00) : band === 0 ? 0x8a2000 : band === 1 ? 0xb84c00 : 0xc87000;
+    if (Math.abs(x) >= 2 && y >= 0 && z > -3 && z < 4) c = DIM(c, 0.62);   // shade where the wings meet the body
+    return c;
+  };
+  body.ellipsoid(0, 0, 0, 3, 2.6, 5.2, plumage);
+  // neck and a big head (twice the old one)
+  for (let k = 0; k <= 3; k++) body.ellipsoid(0, 0.6 + k * 0.4, 4 + k * 0.9, 2.2, 2.1, 1.2, plumage);
+  const hz = 8.6, hy = 2.6;
+  body.ellipsoid(0, hy, hz, 3, 2.8, 3, (x, y, z) => {
+    const band = ((Math.floor((-(z - hz) * 2 + (y - hy) * 1.4) / 2.5) % 3) + 3) % 3;
+    return band === 0 ? 0x7a1600 : y > hy + 1 ? 0xc07000 : 0xa84800;
+  });
+  const ey = Math.round(hy + 0.5), ez = Math.round(hz + 1);
+  for (const x of [-3, 3]) {
+    body.set(x, ey, ez, DARK).set(x, ey, ez + 1, DARK);                  // the eye: two dark voxels set in the head
+    body.set(x, ey + 1, ez, 0x7a1800).set(x, ey + 1, ez - 1, 0x7a1800).set(x, ey + 1, ez + 1, 0x7a1800);   // a red brow
+    body.set(x, ey - 1, ez, 0xd89a00).set(x, ey, ez - 1, 0xd89a00);      // a gold eye-ring
+  }
+  // the beak: a broad yellow base, the upper mandible hooking down over the lower
+  const bz = Math.round(hz + 3);
+  body.box(-1, ey - 1, bz, 3, 2, 1, BEAK).box(-1, ey - 2, bz, 3, 1, 1, BEAK_LO);
+  body.box(-1, ey - 1, bz + 1, 3, 1, 1, BEAK).set(0, ey, bz + 1, BEAK).set(0, ey - 2, bz + 1, BEAK_LO);
+  body.set(0, ey - 1, bz + 2, BEAK).set(0, ey - 2, bz + 2, BEAK).set(0, ey - 3, bz + 2, BEAK_TIP);
+  // the crest: three plumes sweeping up and back, gold to red to team
+  for (const [px, len] of [[0, 9], [-1, 6], [1, 6]]) {
+    for (let i = 0; i < len; i++) {
+      const u = i / len, y = Math.round(hy + 2.6 + i * 0.45), z = Math.round(hz + 1 - i), x = px * (i < 3 ? 1 : 2);
+      const c = tipC(u, u < 0.35 ? C1 : SEC);
+      put(body, x, y, z, c);
+      put(body, x, y - 1, z, u > 0.62 ? c : u < 0.3 ? C2 : PRIM);    // two voxels deep: one solid plume
+    }
+  }
+  // the tail: a solid fan of nine feathers (shafts lighter, edges dark) and two long streamers
+  const tail = new VoxelModel();
+  const N = 9, SPREAD = 0.72, TL = 15;
+  for (let z = 0; z >= -TL - 2; z--) for (let x = -13; x <= 13; x++) {
+    const r = Math.hypot(x, z), a = Math.atan2(x, -z + 0.001);
+    if (Math.abs(a) > SPREAD + 0.06) continue;
+    const fi = (a + SPREAD) / (2 * SPREAD) * (N - 1), f = Math.round(fi), off = Math.abs(fi - f);
+    const L = TL - Math.abs(f - (N - 1) / 2) * 0.6 + (f % 2 ? 0 : 0.8);
+    if (r > L) continue;
+    const u = r / L;
+    let c = off > 0.38 ? LINE : off < 0.12 ? SHAFT : f % 2 ? PRIM : SEC;
+    if (r < 3) c = r < 2 ? C1 : C2;           // the coverts over the root of the fan
+    put(tail, x, -Math.round(r * 0.08), z, u > 0.62 ? tipC(u, c) : c);
+  }
+  // (two voxels deep and stepping straight back, so each streamer is one solid ribbon)
+  for (let i = 0; i < 14; i++) for (const x of [-1, 1]) {
+    const u = i / 14, sx = x * (1 + (i > 7 ? 1 : 0)), sy = -1 - (i >> 2);
+    put(tail, sx, sy, -i - 11, tipC(u, i < 5 ? SEC : PRIM2));
+    put(tail, sx, sy + 1, -i - 11, tipC(u, SHAFT));
+  }
+  // legs: orange "trousers", gold shanks two voxels thick, three forward toes and dark talons
+  const leg = new VoxelModel();
+  leg.ellipsoid(0, 3, 0, 1.4, 1.6, 1.4, C2);
+  leg.box(0, 0, 0, 2, 3, 2, BEAK_LO);
+  for (const tx of [-1, 1, 2]) leg.box(tx, -1, 1, 1, 1, 3, BEAK_LO).set(tx, -2, 4, DARK);
+  leg.box(0, -1, -1, 2, 1, 1, BEAK_LO).set(0, -2, -2, DARK);
+  const L = wing(1), R = wing(-1);
+  // every flame voxel carries glow 0.8 (the unit shader's fire marker, see
+  // PORTING "Raptors"); the team tips glow 0.12, the eyes and talons stay unlit
+  const burn = (m) => { for (const v of m.vox.values()) if (!v.team && !NOGLOW.has(v.c)) v.glow = 0.8; return m; };
   for (const m of [body, tail, L.arm, L.hand, R.arm, R.hand, leg]) burn(m);
   rig('phoenix', { voxel: 0.1, anim: 'flyer', style: 'phoenix', hover: 16 }, [
     part('body', body, [0, 0, 0], [0, 10, 0]),
-    part('wingL', L.arm, [0, 0, 0], [0.5 + P.joint[0], P.joint[1], P.joint[2]], 'body'),
+    part('wingL', L.arm, [0, 0, 0], [3.3, 1.5, 2.5], 'body'),
     part('handL', L.hand, [0, 0, 0], [L.armLen, L.armRise, 0], 'wingL', { anim: 'foreL' }),
-    part('wingR', R.arm, [0, 0, 0], [0.5 - P.joint[0], P.joint[1], P.joint[2]], 'body'),
+    part('wingR', R.arm, [0, 0, 0], [-2.3, 1.5, 2.5], 'body'),
     part('handR', R.hand, [0, 0, 0], [-R.armLen, R.armRise, 0], 'wingR', { anim: 'foreR' }),
-    part('tail', tail, [0, 0, 0], [0.5, 0, P.tailZ], 'body'),
-    part('legL', leg, [0.5, 3, 0], [1.6, -2, 0], 'body'),
-    part('legR', leg, [0.5, 3, 0], [-0.6, -2, 0], 'body'),
+    part('tail', tail, [0, 0, 0], [0.5, 1.5, -5], 'body'),
+    part('legL', leg, [0.5, 3, 0], [1.2, -2, -1], 'body'),
+    part('legR', leg, [0.5, 3, 0], [-1.2, -2, -1], 'body'),
   ]);
 }
 

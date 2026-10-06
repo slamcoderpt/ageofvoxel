@@ -2267,6 +2267,30 @@ death fall the body rolls only 0.3 rad, so both wings sag. `eu_one=roc` /
 (`"eu_one=roc&eu_turn=60&eu_zoom=1.7"`). Use `--params "eu_focus=roc"`
 (`&eu_state=walk|die`) and `"eu_focus=phoenix"` to check them.
 
+Phoenix (round 27, myth_13): the Phoenix no longer uses the raptor kit (the
+Roc still does). Each wing is one continuous stepped surface. The arm
+(`wingL / wingR`, 10 voxels, chord 12 -> 9, alternating by feather) is a solid
+wedge in section: three voxels deep at the shoulder's leading edge, then a
+voxel lower per feather tract toward the trailing edge, so the tracts overlap
+like shingles. Each tract is one colour running along the wing: a gold leading
+edge, gold, orange and red-orange coverts, then red secondaries. A dark shadow
+row sits under each step, so the feather rows read as stripes, not speckle.
+The hand (`handL / handR`) lays five two-row primaries side by side with no
+gaps. Each has a raised light shaft row, sweeps back and ends in a stepped,
+rounded tip. Every tip runs through a gradient: flame colour, crimson, a dark
+team step, then the team colour (no loose team cubes). The two span columns
+at the wing root, and the body where the wings join it, are a darker tone
+(ambient occlusion). The head is about twice the old size: orange with red
+feather chevrons, a dark two-voxel eye, a red brow, a gold eye-ring, a glowing
+yellow hooked beak and a three-plume crest. The body has chevron feather rows,
+not noise. The tail is a solid fan of nine feathers (light shafts, dark edges,
+team-gradient tips) with two solid two-voxel streamers. The legs have gold
+shanks two voxels thick and dark talons. The flame colours are set a step
+deeper than a lit colour would be (`LEAD 0xd89a00` .. `SEC 0x9a2a00`),
+because the fire marker's emission (1.1 x the colour) bleaches full-value
+gold to cream. Check it with `"eu_one=phoenix&eu_turn=60"`,
+`"eu_one=phoenix&eu_turn=90&eu_pitch=70"` (from above) and `eu_focus=phoenix`.
+
 Mounts (round 14): the camel's saddle cloth is a narrow drape over the hump
 (z 6..15 at the hem, only the seat z 8..13 on top, so the hump's tan fore and
 aft slopes, the rump, shoulders and lower flanks stay bare), one voxel proud of
