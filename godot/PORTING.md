@@ -2852,7 +2852,7 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   | Locust Swarm (Sobek) | 75, 150, +10; 5 swarms at 3 m/s for 20 s, 3.5 divine/s in 6 m, x6 Farms / berries, x0.1 own; Mythic +20 % | 1.8 tiles/s (3 x 0.6, the scale of every other distance), 3.6 tiles, applied every 8 ticks; off the map a swarm is gone |
   | Citadel (Sekhmet) | 150, 120, +50; own or allied TC +1200 hp, +2 attack, +1 arrow, +1 LOS, +10 pop, +10 % hack armor, +25 % work | arrows x1.2 and one more arrow a volley (an Egyptian TC's 2 -> 3, at different enemies in range; `volley_arrows`), train / research / age-up x1.25, a hack blow's vulnerability -0.10 (`building_hack_mult`) |
   | Ancestors (Nephthys) | 100, 180, +5; 13 Minions over 13 s in 16 m, dead 60 s after | 9.6 tiles (Atef Crown 120 s) |
-  | Son of Osiris (Osiris) | 350, 240, +50; own or ally's Pharaoh -> demigod, chain lightning, heals 15 hp/s; a new Pharaoh later | 609 hp, 50.75 divine per bolt (his own target's hit too: no armor, combat.cpp, x3 vs myth) jumping to 3 more within 4.8 tiles, +15 hp/s; an ally's Pharaoh becomes the ally's demigod; the Pharaoh respawns after 90 s; cannot be healed, immune to the aimed powers (below) |
+  | Son of Osiris (Osiris) | 350, 240, +50; own or ally's Pharaoh -> demigod, chain lightning, heals 15 hp/s; a new Pharaoh later | 609 hp, 50.75 divine per bolt (his own target's hit too: no armor, combat.cpp, x3 vs myth) jumping to 3 more within 4.8 tiles; heals allies 15 hp/s (the Pharaoh's 10 raised, civ.cpp EgyptUnit.heal); an ally's Pharaoh becomes the ally's demigod; the Pharaoh respawns after 90 s; cannot be healed, immune to the aimed powers (below) |
   | Tornado (Horus) | 350, 240, +5; 20 s spiralling out, 25 hack + 100 crush every 0.5 s, full 5 m falling to 15 m, x0.1 Farms, slow 35 % 6 s | Archimedean spiral at 2.5 tiles/s; crush armor 99 % (myth 80 %, siege 85 %); flings units within 3 tiles; own x0.1; flattens the trees within 3 tiles; blocks other powers within 15 m of the funnel |
   | Meteor (Thoth) | 350, 240, +5; 12 meteors, first at 3 s, then from 6 s on the densest targets, 580 crush + 40 divine in 8 m, knockback | one a second, 4.8 tiles; flattens the trees in each blast; blocks other powers in its 25 m circle; the Greek meteor's visuals (sim `Meteor::kind` 1) |
   Their damage is exact (`DK_DIVINE` in combat: no bonus / armor / building factor; the caller
@@ -2873,9 +2873,16 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   Lightning Storm's strikes and whirl, the Meteor) and by the Locust Swarm, Tornado and Thoth's
   Meteor loops: a Bolt aimed at them strikes the nearest other foe. (Round 3: a Greek Bolt took
   a Son 609 -> 329 and a Roc 700 -> 300.) The Shifting Sands still carry an own Son (not the Roc).
-  **No heal for the Son**: the Priests' / Pharaohs' heal (civ.cpp), Isis' Monuments, the Temple
-  of Healing, the Hymn and regeneration (techs.cpp) skip `U_SON_OF_OSIRIS`; he gains only his own
-  15 hp/s (egypt_myth.cpp).
+  **The Son heals, and is not healed**: EGYPT.md 3.1's "Heals 15/s" stands in the column where
+  the Pharaoh "heals 10/s" and the Priest "Heals 7.5/s", heals of allies, so his `EgyptUnit.heal`
+  is 15 and the civ heal loop (civ.cpp `Civs::update` step 3) uses him like a Pharaoh: idle, the
+  most hurt ally (own or allied player) in reach, half rate on a moving / fighting one; Spirit of
+  Maat (+50 % for Priest and Pharaoh) does not touch him. "Cannot be healed": the Priests' /
+  Pharaohs' / other Sons' heal, Isis' Monuments, the Temple of Healing, the Hymn and
+  regeneration (techs.cpp) skip `U_SON_OF_OSIRIS`, and he has no regeneration of his own (round
+  5: the earlier self-heal of 15 hp/s is gone). egypt_gods_check `son.heal`: a spearman beside a
+  Pharaoh alone +20 in 2 s, beside the Son alone +30, beside the Son and a Priest +45, the Son's
+  own hp unchanged throughout; `allies.citadel_son`: an ally's Son heals a P1 spearman +30 in 2 s.
   **Town Center volleys** (`GodPowers::volley_arrows`, combat.cpp's building loop calls
   `extra_arrows`): Retold's Egyptian Town Center shoots 2 arrows a volley, a Citadel Center one
   more (3); each extra arrow goes to another enemy in range when there is one. A Greek TC keeps
@@ -2915,7 +2922,12 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   gold columns, motes and glyph ring; Vision's swirling white edge and Eye of Horus; the
   Eclipse's blue dusk and pink halos; sand vortices; glyph rings and rising serpents / Minions;
   voxel locust clouds; the Citadel's pillar and heaving stones; the Son of Osiris' pillar, ring
-  and gold chain lightning; the sand funnel, debris and drifts of the Tornado; Thoth's circle.
+  and gold chain lightning (its own ribbon group G_ARC, a linear gold kept below where AgX
+  bleaches a saturated orange to pink, layered like the Lightning Storm's bolts: a tapering
+  leader, two halos and a veil, a second jittered strand, side tendrils, and at each struck man a
+  burst of light, a ground flash and sparks; `egypt_powers` power=son_of_osiris spawns five
+  hoplites in an arc before the capture tick and orders him on the middle one, so the default
+  t=1.05 is the first bolt and its 3 jumps, the next ones at about 4.2, 7.6 and 10.7 s); the sand funnel, debris and drifts of the Tornado; Thoth's circle.
 - Models (scripts/export-egypt-gods.mjs -> assets/models/egypt_gods, VoxelModels.rig()'s third
   group after "units" and "egypt_units"): the Serpent (a venom-green cobra with black saddles
   and a yellow belly, the power's green, at 0.12 a voxel a little taller than a man so it reads

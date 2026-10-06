@@ -25,7 +25,7 @@ const SETUPS := {
 	"locust_swarm": ["ra", ["bast", "sobek", "horus"], 5.0, 34.0, 48.0, 24.0],
 	"citadel": ["ra", ["ptah", "sekhmet", "osiris"], 1.2, 34.0, 40.0, 30.0],
 	"ancestors": ["isis", ["bast", "nephthys", "osiris"], 7.0, 32.0, 44.0, 26.0],
-	"son_of_osiris": ["ra", ["bast", "sobek", "osiris"], 1.4, 18.0, 30.0, 24.0],
+	"son_of_osiris": ["ra", ["bast", "sobek", "osiris"], 1.05, 24.0, 36.0, 24.0],
 	"tornado": ["set", ["ptah", "sekhmet", "horus"], 6.0, 40.0, 44.0, 24.0],
 	"thoth_meteor": ["isis", ["anubis", "nephthys", "thoth"], 8.6, 48.0, 50.0, 24.0],
 	"rebirth": ["isis", ["anubis", "nephthys", "thoth"], 5.0, 14.0, 36.0, 24.0],
@@ -193,12 +193,24 @@ static func scene_setup(game: Node) -> Dictionary:
 		ok = sim.cast_power2(1, power, tx, tz, x2, z2)
 	if not ok:
 		push_error("egypt_powers: %s refused: %s" % [power, sim.last_cast_reason()])
+	if power == "son_of_osiris":
+		# his foes stand in his reach as he rises, so the chain lightning crackles from the first
+		# bolt on (spawned before the capture tick: they are in every frame)
+		# (a loose arc 7 to 8 tiles out, about 2.3 tiles apart: each jump of the chain is in the
+		# clear, and all of them are within the 4.8 tiles of the middle one he is ordered on)
+		var hops := []
+		for i in 5:
+			var an := -0.6 + i * 0.3
+			hops.append(u.call("hoplite", 2, focus.x - cx + cos(an) * (7.5 + (i % 2) * 0.8), focus.y - cz + sin(an) * (7.5 + (i % 2) * 0.8), -PI * 0.5))
+		sim.tick(1)
+		var U: Dictionary = sim.get_units()
+		var names: PackedStringArray = sim.unit_type_names()
+		for k in U.ids.size():
+			if int(U.owner[k]) == 1 and names[U.type[k]] == "son_of_osiris":
+				sim.order(int(U.ids[k]), {"type": "attack", "target": hops[2]})
+		focus += Vector2(3.5, 0.0)   # (framed between him and them)
 	var t := float(game.args.get("t", st[2]))
 	sim.tick(int(round(t * 30.0)))
-	if power == "son_of_osiris":
-		# his foes close in, so the chain lightning crackles
-		for i in 5:
-			u.call("hoplite", 2, focus.x - cx + 5.0 + i, focus.y - cz + 1.0, -PI * 0.5)
 	focus += Vector2(float(game.args.get("ep_ax", 0.0)), float(game.args.get("ep_az", 0.0)))
 	if not game.args.has("cam"):
 		game.args["cam"] = "%f,%f,%f,%f,%f" % [focus.x, focus.y, float(game.args.get("ep_dist", st[3])),

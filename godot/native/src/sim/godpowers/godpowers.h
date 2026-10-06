@@ -75,7 +75,7 @@ constexpr double TORNADO_HACK = 25, TORNADO_CRUSH = 100, TORNADO_EVERY = 0.5, TO
 	TORNADO_SLOW_TIME = 6, TORNADO_SPEED = 2.5, TORNADO_SPIRAL = 1.2, TORNADO_OWN = 0.1, TORNADO_FARM = 0.1, TORNADO_LOS = 20 * 0.6;
 constexpr int THOTH_METEORS = 12;            // Thoth's Meteor: 12 meteors in a 25 m circle,
 constexpr double THOTH_FIRST = 3, THOTH_REST = 6, THOTH_STEP = 1.0, THOTH_AREA = 8 * 0.6, THOTH_CRUSH = 580, THOTH_DIVINE = 40, THOTH_OWN = 0.1;
-constexpr double SON_REGEN = 15;              // the Son of Osiris heals himself 15 hp/s
+constexpr double SON_HEAL = 15;               // the Son of Osiris heals allies 15 hp/s (civ.cpp EgyptUnit.heal)
 constexpr int TREE_FLAT = 100;                // a tree flattened by a Tornado / Thoth's Meteor: variant + 100 (the wood stays)
 constexpr double SERPENT_AGE = 0.20;          // Serpents +20 % hp and damage in the Heroic and in the Mythic Age
 // the Roc: a flying transport for 20 units; it lands (2 s) to load or unload

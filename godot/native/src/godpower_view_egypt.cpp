@@ -566,22 +566,54 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 		glow(true, x, gy + 1.6, z, 3.0, 3.4, gc.r, gc.g, gc.b, 0.22, 0);
 	}
 	{
+		// the chain lightning, layered as the Lightning Storm's bolts are (godpower_view.cpp
+		// bolt_lines): a hot deep-gold leader that tapers toward its target, two soft halos and
+		// a wide amber veil, a second jittered strand, crackling side tendrils, and at each
+		// struck man a burst of light, a scorch-gold ground flash and sparks thrown off
 		std::vector<Line> L;
 		for (const aov::Arc &a : G.arcs) {
 			const double age = now - a.t0;
 			if (age < 0 || age > 0.45) continue;
+			const double k = std::pow(1 - age / 0.45, 0.8);
+			const double flick = 0.75 + 0.25 * std::sin(now * 90 + a.seed % 97);
 			aov::RNG rng(a.seed ^ (uint32_t)std::floor(now * 20));
-			const std::vector<P> pts = fractal(rng, P{ a.x0, a.y0, a.z0 }, P{ a.x1, a.y1, a.z1 }, 5, 0.18);
-			const double k = std::pow(1 - age / 0.45, 1.2);
-			line(L, pts, 0.07, 1.1 * k, 0.2, 0);
-			line(L, pts, 0.42, 0.35 * k, 0.2, 0, true);
-			const Lin gc = hex_lin(0xfff0a0);
-			glow(false, a.x1, a.y1, a.z1, 1.6, 1.6, gc.r, gc.g, gc.b, 0.9 * k, 2);
+			const P p0{ a.x0, a.y0, a.z0 }, p1{ a.x1, a.y1, a.z1 };
+			const std::vector<P> pts = fractal(rng, p0, p1, 6, 0.16);
+			const double W = 0.24;
+			line(L, pts, W, 1.2 * k * flick, 0.35, 0);
+			line(L, pts, W * 2.4, 0.7 * k, 0.3, 0, true);
+			line(L, pts, W * 5.0, 0.3 * k, 0.25, 0, true);
+			line(L, pts, W * 8.0, 0.08 * k, 0.2, 0.1, true);
+			const std::vector<P> twin = fractal(rng, p0, p1, 5, 0.24);
+			line(L, twin, W * 0.45, 0.7 * k * (1.7 - flick), 0.5, 0.2);
+			line(L, twin, W * 1.6, 0.22 * k, 0.5, 0.2, true);
+			const int n = (int)pts.size();
+			for (int f = 0; f < 4 && n > 6; f++) {
+				const P q = pts[rng.int_(2, n - 3)];
+				const double len = rng.range(0.5, 1.3), an = rng.range(0, TAU);
+				const std::vector<P> tw = fractal(rng, q, P{ q.x + std::cos(an) * len, q.y + rng.range(-0.7, 0.3) * len, q.z + std::sin(an) * len }, 3, 0.25);
+				line(L, tw, W * 0.35, 0.8 * k, 0.9, 0.8);
+				line(L, tw, W * 1.5, 0.2 * k, 0.9, 0.85, true);
+			}
+			const Lin gc = hex_lin(0xffc040), hc = hex_lin(0xfff0a0);
+			glow(false, a.x1, a.y1, a.z1, 2.4, 2.4, gc.r, gc.g, gc.b, 0.95 * k, 2);
+			glow(false, a.x1, a.y1, a.z1, 0.9, 0.9, hc.r, hc.g, hc.b, 1.0 * k, 3);
+			glow(false, a.x0, a.y0, a.z0, 1.2, 1.2, gc.r, gc.g, gc.b, 0.6 * k, 2);
+			const double gy = h_at(a.x1, a.z1);
+			decal(I_DECAL_ADD, a.x1, gy + 0.1, a.z1, 1.8 + 1.2 * (age / 0.45), 0, gc.r, gc.g, gc.b, (float)(0.7 * k), 1);
+			for (int j = 0; j < 10; j++) { // sparks thrown off the struck man, falling back
+				const double tt = age * (1.2 + 0.6 * hr(a.seed, j, 211)), an = hr(a.seed, j, 212) * TAU, sp = 1.5 + 2.0 * hr(a.seed, j, 213);
+				const double sx = a.x1 + std::cos(an) * sp * tt, sz = a.z1 + std::sin(an) * sp * tt;
+				const double sy = a.y1 + (2.5 * hr(a.seed, j, 214)) * tt - 6 * tt * tt;
+				const double ss = 0.05 * k;
+				if (sy < gy || ss < 0.005) continue;
+				cube(I_EMBER, sx, sy, sz, now, an, 0, ss, ss, ss, 3.2f, 2.3f, 0.7f);
+			}
 		}
-		if (!L.empty()) emit_lines(G_GOLD, L, 1);
+		if (!L.empty()) emit_lines(G_ARC, L, 1);
 		if (!G.arcs.empty()) {
 			const aov::Arc &a = G.arcs.back();
-			lit(a.x1, a.y1 + 1, a.z1, 0xffe080, 16 * clamp01(1 - (now - a.t0) / 0.45), 10, 1.6);
+			lit(a.x1, a.y1 + 1, a.z1, 0xffc050, 22 * clamp01(1 - (now - a.t0) / 0.45), 12, 1.6);
 		}
 	}
 

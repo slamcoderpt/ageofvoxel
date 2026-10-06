@@ -1322,19 +1322,26 @@ func _case_allies() -> void:
 		var sons3: Array = _units_of(sim, 3, "son_of_osiris")
 		r["sons of P3 / P1"] = [sons3.size(), _units_of(sim, 1, "son_of_osiris").size()]
 		if sons3.size() > 0:
-			for t in ["priest", "pharaoh"]:   # (no healer of his near: his own 15 hp/s only)
+			for t in ["priest", "pharaoh"]:   # (no other healer near: he cannot be healed, and heals allies 15 hp/s)
 				for o in [1, 3]:
 					for id in _units_of(sim, o, t):
 						sim.kill_unit(id)
+			var su3: Dictionary = sim.get_unit(sons3[0])
+			var man := int(sim.spawn_unit("spearman", 1, float(su3.x) - 1.5, float(su3.z), 0.0))   # (P1's: an ally of P3)
+			sim.tick(1)
 			sim.damage(sons3[0], 300.0)
+			sim.damage(man, 75.0)
 			sim.tick(1)
 			sim.take_events()
 			var h0 := _hp(sim, sons3[0])
+			var m0 := _hp(sim, man)
 			var son: int = sons3[0]
-			var hurt := _damage_by(sim, 2.0, func(e): return int(e.id) == son)   # (blows taken meanwhile added back)
+			var hurt := _damage_by(sim, 2.0, func(e): return int(e.id) == son or int(e.id) == man)   # (blows taken meanwhile added back)
 			r["son hp healed in 2 s"] = _r(_hp(sim, son) - h0 + float(hurt.get(son, 0.0)), 2)
 			r["son hp [after the blow, 2 s on, max]"] = [h0, _hp(sim, son), float(sim.get_unit(son).max_hp)]
-		ok = ok and r["son on the ally's pharaoh"] and r["sons of P3 / P1"] == [1, 0] and _near(float(r.get("son hp healed in 2 s", 0)), 30.0, 0.6)
+			r["P1 spearman healed by P3's Son in 2 s"] = _r(_hp(sim, man) - m0 + float(hurt.get(man, 0.0)), 2)
+		ok = ok and r["son on the ally's pharaoh"] and r["sons of P3 / P1"] == [1, 0] and _near(float(r.get("son hp healed in 2 s", 1)), 0.0, 1e-6)
+		ok = ok and _near(float(r.get("P1 spearman healed by P3's Son in 2 s", 0)), 30.0, 0.6)
 	else:
 		ok = false
 		r["error"] = "P3 has no Pharaoh"
@@ -1617,33 +1624,67 @@ static func _sum(d: Dictionary, ids: Array) -> float:
 		t += float(d.get(id, 0.0))
 	return t
 
-# the Son of Osiris cannot be healed: a Priest beside a wounded Son and a wounded spearman
-# heals the spearman; the Son gains exactly his own 15 hp/s
+# the Son of Osiris heals allies at 15 hp/s (EGYPT.md 3.1, "Heals 15/s" in the column where
+# the Pharaoh heals 10/s and the Priest 7.5/s) and cannot be healed: no regeneration of his
+# own, and a Priest beside him heals the spearman and skips him
+func _kill_healers(sim: Object, owner: int, keep := -1) -> void:
+	for t in ["priest", "pharaoh"]:
+		for id in _units_of(sim, owner, t):
+			if id != keep:
+				sim.damage(id, 100000.0)
+	sim.tick(1)
+
 func _case_noheal() -> void:
 	var r := {}
+	# the Pharaoh alone (the control: 10 hp/s)
+	var p := _fresh("ra", "zeus", 3, ["bast", "sobek", "osiris"])
+	var ph := _u(p, "pharaoh", 1, 0, 0)
+	p.tick(1)
+	_kill_healers(p, 1, ph)
+	var pu: Dictionary = p.get_unit(ph)
+	var pm := int(p.spawn_unit("spearman", 1, float(pu.x) - 1.5, float(pu.z), 0.0))
+	p.tick(1)
+	p.damage(pm, 75.0)
+	p.tick(1)
+	var q0 := _hp(p, pm)
+	_step(p, 2.0)
+	r["spearman hp 2 s beside the Pharaoh alone"] = [_r(q0), _r(_hp(p, pm))]
+	var ok: bool = _near(_hp(p, pm) - q0, 20.0, 0.6)
+	# the Son alone: 15 hp/s on the spearman, his own hp does not move
 	var sim := _fresh("ra", "zeus", 3, ["bast", "sobek", "osiris"])
 	var son: int = _son_and_roc(sim)[0]
+	_kill_healers(sim, 1)
 	var su: Dictionary = sim.get_unit(son)
 	var man := int(sim.spawn_unit("spearman", 1, float(su.x) - 1.5, float(su.z), 0.0))
 	sim.tick(1)
 	sim.damage(son, 300.0)
-	sim.damage(man, 40.0)
-	sim.spawn_unit("priest", 1, float(su.x) + 1.0, float(su.z) + 1.0, 0.0)
+	sim.damage(man, 75.0)
 	sim.tick(1)
 	var s0 := _hp(sim, son)
 	var m0 := _hp(sim, man)
 	_step(sim, 2.0)
-	r["son hp 2 s beside a Priest"] = [_r(s0), _r(_hp(sim, son))]
-	r["spearman hp 2 s beside the Priest"] = [_r(m0), _r(_hp(sim, man))]
-	var ok: bool = s0 < 609 - 200 and _near(_hp(sim, son) - s0, 30.0, 0.6) and _hp(sim, man) > m0
-	# with the spearman full, the Priest finds no one to heal (the Son is skipped)
-	sim.damage(son, 100.0)
-	_step(sim, 6.0)
+	r["son hp 2 s, no other healer"] = [_r(s0), _r(_hp(sim, son))]
+	r["spearman hp 2 s beside the Son alone"] = [_r(m0), _r(_hp(sim, man))]
+	ok = ok and s0 < 609 - 200 and _near(_hp(sim, son), s0, 1e-6) and _near(_hp(sim, man) - m0, 30.0, 0.6)
+	r["heal per s (get_unit_def): son / pharaoh / priest"] = [float(sim.get_unit_def("son_of_osiris").get("heal", 0.0)), float(sim.get_unit_def("pharaoh").get("heal", 0.0)), float(sim.get_unit_def("priest").get("heal", 0.0))]
+	ok = ok and _near(float(sim.get_unit_def("son_of_osiris").get("heal", 0.0)), 15.0)
+	# a Priest joins: the spearman takes 15 + 7.5 hp/s, the Son still nothing
+	sim.damage(man, _hp(sim, man) - 10.0)
+	sim.spawn_unit("priest", 1, float(su.x) + 1.0, float(su.z) + 1.0, 0.0)
+	sim.tick(1)
 	var s1 := _hp(sim, son)
+	var m1 := _hp(sim, man)
 	_step(sim, 2.0)
-	r["son hp 2 s more, the spearman full"] = [_r(s1), _r(_hp(sim, son))]
-	ok = ok and _near(_hp(sim, man), float(sim.get_unit(man).max_hp), 0.01) and _near(_hp(sim, son) - s1, 30.0, 0.6)
-	_check("son.no_heal", ok, r)
+	r["son hp 2 s beside a Priest"] = [_r(s1), _r(_hp(sim, son))]
+	r["spearman hp 2 s beside the Son and a Priest"] = [_r(m1), _r(_hp(sim, man))]
+	ok = ok and _near(_hp(sim, son), s1, 1e-6) and _near(_hp(sim, man) - m1, 45.0, 0.9)
+	# with the spearman full, nothing heals the Son
+	_step(sim, 4.0)
+	var s2 := _hp(sim, son)
+	_step(sim, 2.0)
+	r["son hp 2 s more, the spearman full"] = [_r(s2), _r(_hp(sim, son))]
+	ok = ok and _near(_hp(sim, man), float(sim.get_unit(man).max_hp), 0.01) and _near(_hp(sim, son), s2, 1e-6)
+	_check("son.heal", ok, r)
 
 # Town Center volleys: Retold's Egyptian TC shoots 2 arrows a volley, the Greek one 1 (as
 # today), a Citadel Center 3 at up to 3 different enemies

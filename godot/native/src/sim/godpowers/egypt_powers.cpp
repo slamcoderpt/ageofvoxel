@@ -380,7 +380,7 @@ bool GodPowers::cast_egypt(int owner, int id, double x, double z, double x2, dou
 			const int u = S.units.spawn(U_SON_OF_OSIRIS, po, ux, uz, rot);
 			if (u >= 0) {
 				sons.push_back({ po, U.id[u], ux, uz, now });
-				any_myth_ = true; // (his 15 hp/s from this tick: egypt_myth.cpp)
+				any_myth_ = true;
 				myth_scan_ = 30;
 				rises.push_back({ 5, ux, uz, now, po, U.id[u] });
 			}

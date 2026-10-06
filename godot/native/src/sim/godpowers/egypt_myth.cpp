@@ -316,11 +316,8 @@ void GodPowers::update_myth(double dt) {
 		}
 	}
 	dots.erase(std::remove_if(dots.begin(), dots.end(), [&](const Dot &d) { return d.until < now && d.acc <= 0; }), dots.end());
-	// the Son of Osiris heals himself 15 hp/s (he cannot be healed by others: Retold)
-	if (any_myth_)
-		for (int r = 0; r < U.size(); r++)
-			if (!U.removed[r] && !U.dead[r] && U.type[r] == U_SON_OF_OSIRIS && U.hp[r] < U.max_hp[r])
-				U.hp[r] = std::min(U.max_hp[r], U.hp[r] + SON_REGEN * dt);
+	// (the Son of Osiris heals allies at 15 hp/s through the civ heal loop, sim/civ EgyptUnit.heal;
+	// he cannot be healed and has no regeneration of his own: EGYPT.md 3.1)
 	update_rocs(dt);
 	// Phoenix Eggs hatch
 	for (Egg &g : eggs) {

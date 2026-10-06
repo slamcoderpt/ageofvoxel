@@ -116,8 +116,11 @@ func setup(g: Node) -> void:
 		_ribbon_mat(0xffb030, 0xfff4c8, 2.4, 0xff7010),                  # gold: chain lightning, sun beams, spinning blades
 		_ribbon_mat(Vector3(0.28, 0.32, 0.38), Vector3(0.75, 0.8, 0.88), 0.55, Vector3(0.18, 0.2, 0.26), 0.0),  # rain streaks
 		_ribbon_mat(0xc8a060, 0xffe2a8, 0.9, 0x8a6a3a),                  # sand ribbons
+		# the Son of Osiris' chain lightning: linear gold leaning to yellow, kept below where AgX
+		# bleaches a saturated orange to salmon pink
+		_ribbon_mat(Vector3(1.0, 0.5, 0.0), Vector3(1.0, 0.72, 0.16), 0.95, Vector3(0.75, 0.28, 0.0)),
 	]
-	var prio := [30, 29, 31, 27, 27, 26, 30, 32, 29, 31, 24, 28]
+	var prio := [30, 29, 31, 27, 27, 26, 30, 32, 29, 31, 24, 28, 31]
 	for i in _ribbon_mats.size():
 		_ribbon_mats[i].render_priority = prio[i]
 	_ribbon_mesh.custom_aabb = aabb
