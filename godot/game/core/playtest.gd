@@ -281,7 +281,8 @@ func _run() -> void:
 	for c in ui.commands:
 		if c != null: used[str(c.key)] = true
 	var clash := []
-	for pn in sim.power_names():
+	# (the player's own powers: another civ's powers share hotkeys, never a player)
+	for pn in (sim.player_powers(1) if sim.has_method("player_powers") else sim.power_names()):
 		var k := str(sim.get_power_def(pn).get("hotkey", ""))
 		if k == "" or used.has(k): clash.append("%s:%s" % [pn, k])
 	_check("power hotkeys clash with no command", clash.is_empty(), str(clash))
