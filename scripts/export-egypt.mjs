@@ -3753,6 +3753,212 @@ function farm() {
   return m;
 }
 
+// The Wonder's sphinx (round 22), drawn at a third of a voxel into its own
+// model on m.fine (k = 3), so the face and the nemes have room: a lion lying
+// toward +z with a flat-based loaf body (a clear back line rising from the
+// rump to the shoulders), haunches bulging at the flanks, the hind paws
+// tucked forward, the forelegs reaching straight out to paws with toe
+// grooves, the tail curled along the right flank; a human head with a face
+// carved in relief (brow ridge and painted brows, ivory eyes with pupils and
+// kohl wings, a nose ridge to a tip with nostrils, lips, a chin, the false
+// beard) under a gold diadem and uraeus, in a nemes striped gold and lapis
+// whose wings frame the face and flare to the shoulders and whose lappets
+// hang in front of the chest. Built as signed shapes sampled at the fine
+// voxel centres (coarse coordinates), then shaded: tops a step lighter,
+// undersides and recesses darker, the sunward (-x) flank lighter.
+const SPX_ST = [0xae9a74, 0xcbba95, 0xd9caa8, 0xe3d6b8];   // deep, shade, base, light
+const SPX_GOLD = [0x7a5200, 0x9c6800, 0xb88400, 0xd09c18];
+const SPX_LAP = [0x203a66, 0x2b4a7c, 0x34558c, 0x4a6aa4];
+const SPX_IVORY = 0xf0e8d4, SPX_KOHL = 0x1a2a4a, SPX_BROW = 0x9c8662, SPX_LIP = 0xb88a6c, SPX_LIPD = 0x7a4a3a, SPX_GROOVE = 0x8c7a58;
+function sphinx(m, X0, sy) {
+  const k = 3, sub = new Rec(m.W * k, m.D * k);
+  // the head is drawn in its own space scaled by HS round the chin and the face plane
+  const HS = 0.86, chinY = sy + 10.4, zf = 33.4, zc = zf - 3.8;
+  const sm = (a, b, t) => { const u = Math.min(1, Math.max(0, (t - a) / (b - a))); return u * u * (3 - 2 * u); };
+  const ell = (px, py, pz, cx, cy, cz, rx, ry, rz) => ((px - cx) / rx) ** 2 + ((py - cy) / ry) ** 2 + ((pz - cz) / rz) ** 2 <= 1;
+  const sup = (a, b, e = 2.6) => Math.abs(a) ** e + Math.abs(b) ** e <= 1;
+  // material per sample: null (air) or [tag, ...]
+  function sample(px, py, pz) {
+    if (py < sy) return null;
+    const head = headPart((px - X0) / HS, (py - chinY) / HS, zf + (pz - zf) / HS);
+    return head ?? lionPart(px, py, pz);
+  }
+  function headPart(u, v, pz) {
+    const au = Math.abs(u);
+    // ---- the head: face, nemes, beard
+    const hw = 2.3 + 0.95 * sm(0, 2.6, v);                  // the face's half width: a narrow chin widening to the cheeks
+    if (v >= -0.2 && v < 7.7 && au < hw) {
+      let zs = zf - 0.11 * u * u - (v < 1.0 ? 0.35 * (1 - v) : 0);
+      const eu = au - 1.45, ev = v - 5.0;                    // eye-local
+      let tag = 'face';
+      if (Math.abs(eu) < 1.05 && Math.abs(ev) < 0.5) zs -= 0.34;                // the eye socket
+      if (Math.abs(eu) < 0.82 && Math.abs(ev) < 0.34) tag = Math.abs(eu) < 0.34 ? 'pupil' : 'eye';
+      else if (ev >= 0.34 && ev < 0.68 && eu > -1.0 && eu < 1.0 + 0.4) tag = 'kohl';    // the kohl line over the eye
+      else if (ev >= -0.34 && ev < 0.0 && eu >= 0.82 && eu < 1.6) tag = 'kohl';         // its wing to the temple
+      if (ev >= 0.68 && ev < 1.1 && Math.abs(eu + 0.05) < 1.12) { zs += 0.36; tag = 'brow'; }   // the brow ridge
+      if (v >= 2.1 && v < 5.6) {                               // the nose ridge, widening and rising to the tip
+        const t = (5.6 - v) / 3.5, nw = 0.36 + 0.42 * t;
+        if (au < nw) { zs = Math.max(zs, zf + 0.12 + 0.75 * t); tag = 'face'; }
+        if (v < 2.45 && au >= 0.3 && au < 0.8) { zs = Math.max(zs, zf + 0.12); tag = 'nostril'; }
+      }
+      if (v >= 0.85 && v < 1.95 && au < 1.15 - (v < 1.2 ? 0.15 : 0)) {          // the lips
+        zs = Math.max(zs, zf + (v >= 1.2 && v < 1.5 ? -0.05 : 0.25) - 0.06 * u * u);
+        tag = v >= 1.2 && v < 1.5 ? 'mouth' : 'lip';
+      }
+      if (v >= 6.95 && v < 7.7) { zs = zf + 0.3 - 0.08 * u * u; tag = 'gold'; }  // the diadem band
+      if (pz < zs && pz > zc - 3.6) return tag;
+    }
+    // the uraeus: a rearing cobra at the forehead
+    if (au < 0.42 && v >= 6.6 && v < 8.9 && pz >= zf - 0.2 && pz < zf + 0.75 + (v > 8.2 ? 0.35 : 0)) return 'gold';
+    // the nemes cap: a dome over the brow, the stripes running round it
+    if (v >= 7.6 && Math.abs(u / 4.6) ** 3 + Math.abs((v - 7.2) / 4.0) ** 3 + Math.abs((pz - zc + 0.4) / 4.3) ** 3 <= 1) return 'cap';
+    // the wings: framing the face, flaring from the temples to the shoulders
+    const W = v >= 7.6 ? 0 : v >= 0 ? 4.5 + 2.3 * (1 - v / 7.6) : 6.8;
+    if (v >= 0 && v < 7.6 && au < W && pz > zc - 4.4 && pz < zf - 0.45) {
+      if (au >= hw || pz < zf - 1.2 - 0.11 * u * u) return au < hw + 0.34 && pz > zf - 0.85 ? 'gold' : 'nemes';
+    }
+    if (v >= -3.4 && v < 0 && au >= 2.6 && au < 6.8 - 0.25 * (-v) && pz > zc - 4.4 && pz < zf - 2.0) return 'nemes';
+    // the neck under the chin
+    if (au < 2.6 && v >= -4 && v < 0.2 && pz > 26 && pz < zf - 1.0) return 'body';
+    // the lappets: two striped bands hanging in front of the chest
+    if (au >= 2.9 && au < 4.9 && v >= -5.4 && v < 0.5 && pz > zf - 1.9 && pz < zf - 0.45 - (v < -4.6 ? 0.3 : 0)) return au < 3.25 || au > 4.55 ? 'gold' : 'nemes';
+    // the false beard: plaited, a little forward at its foot
+    if (au < 0.72 + (v < -2.6 ? 0.12 : 0) && v >= -3.1 && v < 0.3 && pz > zf - 1.4 && pz < zf - 0.25 + (v < -2.4 ? 0.2 : 0)) return 'beard';
+    return null;
+  }
+  function lionPart(px, py, pz) {
+    const u = px - X0;
+    // ---- the lion
+    // the chest and neck rising under the head
+    if (ell(px, py, pz, X0, sy + 4.0, 28.4, 6.0, 7.6, 3.6)) return 'body';
+    // the body: a flat-based loaf; the back line climbs from the rump to the shoulders
+    if (pz >= 7.4 && pz < 28) {
+      const H = sy + 9.4 * sm(7.0, 11.5, pz) + 1.0 * sm(11.5, 22, pz) + 1.4 * sm(20, 27, pz) + 0.4;
+      const Wb = 6.2 - 0.8 * sm(12, 18, pz) + 1.2 * sm(19, 26, pz);
+      const end = pz < 11.5 ? Math.sqrt(Math.max(0, 1 - ((11.5 - pz) / 4.1) ** 2)) : 1;
+      if (sup(u / (Wb * Math.max(0.35, end)), (py - sy) / (H - sy), 2.4)) return 'body';
+    }
+    // haunches (the folded hind legs) and the hind paws tucked forward
+    for (const s of [-1, 1]) {
+      if (ell(px, py, pz, X0 + s * 4.7, sy + 3.4, 14.0, 3.2, 5.8, 6.6)) return 'body';
+      if (s * u > 5.2 && s * u < 8.0 && py < sy + 1.7 && pz > 15.5 && pz < 21.8 - 0.2 * (py - sy)) return pz > 21.0 && ((s * u - 5.2) % 0.85) < 0.3 ? 'groove' : 'body';
+      // the shoulder and upper foreleg
+      if (ell(px, py, pz, X0 + s * 4.9, sy + 4.4, 26.0, 2.8, 5.6, 3.7)) return 'body';
+      // the forearm reaching out, a little lower toward the paw
+      const lc = X0 + s * 5.25, lu = px - lc;
+      if (pz >= 26 && pz < 37.4) {
+        const lh = 4.4 - 1.0 * sm(26, 29, pz), lw = 2.0;
+        if (sup(lu / lw, (py - sy) / lh, 2.2)) return 'body';
+      }
+      // the paw: broad, rounded at the front, the toes grooved
+      if (pz >= 37.0 && pz < 39.9) {
+        const r = pz > 38.8 ? Math.sqrt(Math.max(0, 1 - ((pz - 38.8) / 1.1) ** 2)) : 1;
+        if (sup(lu / (2.25 * Math.max(0.45, r)), (py - sy) / (2.5 * Math.max(0.55, r)), 2.4)) {
+          const g = (lu + 2.25) % 1.12;
+          return pz > 38.3 && g < 0.34 && Math.abs(lu) < 1.9 ? 'groove' : 'body';
+        }
+      }
+    }
+    // the tail: from the rump along the right flank to a tuft
+    for (let i = 0; i <= 24; i++) {
+      const t = i / 24, a = 1 - t;
+      const tx = a * a * (X0 + 3.0) + 2 * a * t * (X0 + 8.6) + t * t * (X0 + 8.3);
+      const tz = a * a * 8.6 + 2 * a * t * 8.2 + t * t * 20.5;
+      const r = t > 0.9 ? 0.85 : 0.5;
+      const ty = sy + r;
+      if ((px - tx) ** 2 + (py - ty) ** 2 + (pz - tz) ** 2 <= r * r) return 'body';
+    }
+    return null;
+  }
+  // sample the box round the sphinx
+  const x0 = (X0 - 9) * k, x1 = (X0 + 9) * k, y0 = sy * k, y1 = (sy + 25) * k, z0 = 6 * k, z1 = 40 * k;
+  const NX = x1 - x0, NY = y1 - y0, NZ = z1 - z0;
+  const grid = new Array(NX * NY * NZ);
+  const id = (i, j, l) => (i * NY + j) * NZ + l;
+  for (let i = 0; i < NX; i++) for (let j = 0; j < NY; j++) for (let l = 0; l < NZ; l++) {
+    grid[id(i, j, l)] = sample((x0 + i + 0.5) / k, (y0 + j + 0.5) / k, (z0 + l + 0.5) / k);
+  }
+  const at = (i, j, l) => (i < 0 || j < 0 || l < 0 || i >= NX || j >= NY || l >= NZ ? (j < 0 ? 'deck' : null) : grid[id(i, j, l)]);
+  for (let i = 0; i < NX; i++) for (let j = 0; j < NY; j++) for (let l = 0; l < NZ; l++) {
+    const tag = grid[id(i, j, l)];
+    if (!tag) continue;
+    const open = DIRS6.filter(([a, b, c]) => !at(i + a, j + b, l + c));
+    if (!open.length) continue;
+    const up = open.some((d) => d[1] > 0), dn = open.some((d) => d[1] < 0), west = open.some((d) => d[0] < 0), east = open.some((d) => d[0] > 0);
+    // recesses: an open face whose cell has solid round it on 3+ of its 4 sides
+    const concave = open.some(([a, b, c]) => {
+      let n = 0;
+      for (const [p, q, r] of DIRS6) {
+        if ((p && a) || (q && b) || (r && c)) continue;
+        if (at(i + a + p, j + b + q, l + c + r)) n++;
+      }
+      return n >= 3;
+    });
+    // the light: a normal smoothed over the 5^3 neighbourhood (so the voxel
+    // steps of a curved flank shade as one surface, not as contour rings)
+    // against the sun from -x, high and a little in front
+    let nx = 0, ny = 0, nz = 0;
+    for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) for (let c = -2; c <= 2; c++) {
+      if (at(i + a, j + b, l + c)) { nx -= a; ny -= b; nz -= c; }
+    }
+    const nl = Math.hypot(nx, ny, nz) || 1;
+    const lit = (-0.45 * nx + 0.8 * ny + 0.4 * nz) / nl;
+    let s = lit > 0.62 ? 3 : lit > 0.18 ? 2 : lit > -0.3 ? 1 : 0;   // ramp index: 0 deep, 1 shade, 2 base, 3 light
+    if (concave && s > 0) s--;
+    const X = x0 + i, Y = y0 + j, Z = z0 + l;
+    let c;
+    if (tag === 'body' || tag === 'face') c = SPX_ST[s];
+    else if (tag === 'cap') {
+      // the cap's stripes fan out from the brow (Tutankhamun's mask)
+      const hu = ((X + 0.5) / k - X0) / HS, hv = ((Y + 0.5) / k - chinY) / HS;
+      c = (Math.floor(Math.atan2(hu, hv - 4.5) / 0.2 + 100) % 2 ? SPX_LAP : SPX_GOLD)[Math.max(1, s)];
+    } else if (tag === 'nemes') {
+      c = (Math.floor(j / 2) % 2 ? SPX_LAP : SPX_GOLD)[Math.max(1, s)];
+    } else if (tag === 'beard') {
+      c = (j % 2 ? SPX_LAP : SPX_GOLD)[Math.max(1, s)];
+    } else if (tag === 'gold') c = SPX_GOLD[Math.max(1, s)];
+    else if (tag === 'eye') c = SPX_IVORY;
+    else if (tag === 'pupil' || tag === 'kohl') c = SPX_KOHL;
+    else if (tag === 'brow') c = up ? SPX_ST[3] : SPX_BROW;
+    else if (tag === 'lip') c = SPX_LIP;
+    else if (tag === 'mouth') c = SPX_LIPD;
+    else if (tag === 'nostril') c = SPX_ST[0];
+    else if (tag === 'groove') c = SPX_GROOVE;
+    else c = SPX_ST[s];
+    sub.set(X, Y, Z, c);
+  }
+  // the gilded naos between the paws (building_21): a gold shrine on a dark
+  // gold foot, the owner's band, a lapis niche with a gold king in it, glyph
+  // columns down its sides, a flared gold cap; its top stays under the chin
+  const sx0 = X0 * k - 6, sx1 = X0 * k + 6, sz0 = 106, sz1 = 116, Y = sy * k;
+  const KING = ['..GGGG..', '.GGGGGG.', '.GgGGgG.', '..GGGG..', 'GGGGGGGG', 'G.GGGG.G', 'G.GGGG.G', '..GGGG..', '.GGGGGG.', '.GG..GG.', '.GG..GG.', 'GGG..GGG'];
+  const SH = 22;
+  for (let y = Y; y < Y + SH; y++) for (let x = sx0 - 1; x <= sx1; x++) for (let z = sz0 - 1; z <= sz1; z++) {
+    const r = y - Y, edgeX = x === sx0 || x === sx1 - 1, edgeZ = z === sz0 || z === sz1 - 1;
+    const out1 = x < sx0 || x >= sx1 || z < sz0 || z >= sz1;
+    if (r < 2) { sub.set(x, y, z, SPX_GOLD[1]); continue; }
+    if (r >= SH - 3) { if (r === SH - 1 || !out1) sub.set(x, y, z, r === SH - 1 ? SPX_GOLD[3] : SPX_GOLD[2]); else if (r === SH - 2) sub.set(x, y, z, SPX_GOLD[2]); continue; }
+    if (out1) continue;
+    let c = r < 4 ? TEAM : edgeX || edgeZ || r === 4 || r === SH - 4 ? SPX_GOLD[2] : SPX_GOLD[1];
+    // the glyph columns on the sides: lapis signs on the gold
+    if ((x === sx0 || x === sx1 - 1) && !edgeZ && r >= 6 && r < SH - 5) {
+      const g = BAND_GLYPHS5[Math.floor((r - 6) / 6) % BAND_GLYPHS5.length], jj = (r - 6) % 6, ii = z - sz0 - 3;
+      if (jj < 5 && ii >= 0 && ii < 3 && g[4 - jj][ii] === 'g') c = SPX_LAP[2];
+    }
+    sub.set(x, y, z, c);
+  }
+  // the niche: lapis, two voxels deep, the king in gold on it
+  for (let y = Y + 5; y < Y + SH - 4; y++) for (let x = X0 * k - 4; x < X0 * k + 4; x++) {
+    sub.remove(x, y, sz1 - 1);
+    const i = x - (X0 * k - 4), jrow = Y + SH - 5 - y;
+    const ch = jrow < KING.length && i >= 0 && i < 9 ? KING[jrow][i] : '.';
+    if (ch === 'G') sub.set(x, y, sz1 - 1, SPX_GOLD[3]);
+    else if (ch === 'g') sub.set(x, y, sz1 - 1, SPX_GOLD[0]);
+    else sub.set(x, y, sz1 - 2, SPX_LAP[2]);
+  }
+  (m.fine ??= []).push({ m: sub, k });
+}
+
 // Wonder (8 x 8; building_21): a huge sphinx lying on a stepped plinth
 // behind a gilded pylon gate with god reliefs and hieroglyph columns, an
 // obelisk either side of the door, column drums before it.
@@ -3762,73 +3968,71 @@ function wonder() {
   patch(m, 22, 44, 42, 64, PAVE, { seed: 8 });
   // the plinth: two steps
   block(m, 8, 4, 58, 44, 1, 8, { wall: LIME, frieze: 0, roofC: LIME, rim: false, parapet: false });
-  block(m, 12, 6, 54, 40, 9, 4, { wall: LIME, frieze: 0, roofC: LIME, rim: false, parapet: false, band: false });
-  // the sphinx: a lion lying toward +z on the plinth, the head in a striped nemes
-  const sy = 14;
-  const SPH = (x, y, z) => pick(hash3(x, y >> 1, z, 81), [0xe8dcc0, 0xdfd1b2, 0xece2ca, 0xd6c6a4]);
-  const SPH_D = (x, y, z) => shade(SPH(x, y, z), 0.86);
-  const X0 = 33;
-  for (let z = 8; z < 32; z++) {
-    const t = (z - 8) / 24;
-    const wx = 7.5 - 1.2 * Math.sin(t * Math.PI);            // the waist narrows
-    const hy = 7 + 4 * t;                                     // rising to the shoulders
-    for (let x = X0 - 9; x < X0 + 9; x++) for (let y = sy; y < sy + 12; y++) {
-      const dx = (x + 0.5 - X0) / wx, dy = (y + 0.5 - sy) / hy;
-      if (dx * dx + dy * dy <= 1) m.set(x, y, z, SPH(x, y, z));
+  block(m, 12, 6, 54, 40, 9, 8, { wall: LIME, frieze: 0, roofC: LIME, rim: false, parapet: false });
+  // the deck's flanks (building_21): a row of gold panels, each with a lapis
+  // sign (an ankh or a djed), between two lapis lines
+  const DK = { G: CG_L, g: CG, L: LAPIS_S, D: CG_D, T: TEAM };
+  for (const [face, u0, len] of [['+x', 39, 33], ['-x', 7, 33]]) {
+    const rows = ['L'.repeat(len), '', '', '', '', '', 'L'.repeat(len)];
+    for (let r = 1; r < 6; r++) {
+      let row = '';
+      for (let i = 0; i < len; i++) {
+        const c = i % 6, panel = c >= 1 && c <= 4;
+        const g = ['.gg.', 'g..g', '.gg.', 'gggg', '.gg.'][r - 1];
+        const g2 = ['gggg', '.gg.', 'gggg', '.gg.', '.gg.'][r - 1];
+        row += !panel ? '.' : (Math.floor(i / 6) % 2 ? g2 : g)[c - 1] === 'g' ? 'L' : 'G';
+      }
+      rows[r] = row;
     }
+    paint(m, face, u0, 16, rows, DK);
   }
-  // haunches (folded hind legs) and the tail curled along the right flank
-  for (const sx of [-1, 1]) for (let z = 9; z < 22; z++) for (let y = sy; y < sy + 6; y++) for (let k = 0; k < 3; k++) {
-    const x = X0 + sx * (7 + k);
-    const dz = (z - 15) / 7, dy = (y - sy) / 6;
-    if (dz * dz + dy * dy <= 1) m.set(sx > 0 ? x - 1 : x, y, z, SPH_D(x, y, z));
-  }
-  for (let z = 10; z < 24; z++) m.set(X0 + 9, sy + 1, z, SPH_D(X0 + 9, sy, z));
-  // the forelegs stretched forward with paws
-  for (const x0 of [X0 - 8, X0 + 3]) for (let z = 26; z < 45; z++) for (let y = sy; y < sy + 4; y++) for (let x = x0; x < x0 + 5; x++) {
-    if (y === sy + 3 && (x === x0 || x === x0 + 4)) continue;
-    m.set(x, y, z, z >= 42 && (x - x0) % 2 === 1 && y < sy + 2 ? SPH_D(x, y, z) : SPH(x, y, z));
-  }
-  // the chest
-  for (let x = X0 - 6; x < X0 + 6; x++) for (let z = 28; z < 35; z++) for (let y = sy; y < sy + 17; y++) {
-    if (z === 34 && y < sy + 4) continue;
-    m.set(x, y, z, SPH(x, y, z));
-  }
-  // the nemes: a trapezoid of stripes over the shoulders, lappets down the chest
-  for (let y = sy + 12; y < sy + 27; y++) {
-    const r = y - sy - 12;
-    const half = r < 6 ? 8 : Math.max(4, 8 - (r - 6) * 0.45);
-    for (let x = Math.round(X0 - half); x < Math.round(X0 + half); x++) for (let z = 27; z < 35; z++) {
-      const inner = x >= X0 - 4 && x < X0 + 4 && z >= 33;
-      if (inner && y < sy + 25) continue;              // the face is cut in below
-      m.set(x, y, z, (y & 1) ? 0xd8c69e : 0xbfa57a);
-    }
-  }
-  for (const lx of [X0 - 6, X0 + 4]) for (let y = sy + 8; y < sy + 18; y++) for (let x = lx; x < lx + 2; x++) m.set(x, y, 35, (y & 1) ? 0xd8c69e : 0xbfa57a);
-  // the face, the uraeus, the beard
-  for (let x = X0 - 4; x < X0 + 4; x++) for (let y = sy + 15; y < sy + 25; y++) m.set(x, y, 35, SPH(x, y, 35));
-  for (let x = X0 - 3; x < X0 + 3; x++) for (let y = sy + 16; y < sy + 25; y++) m.set(x, y, 36, SPH(x, y, 36));
-  m.set(X0 - 3, sy + 21, 37, INK); m.set(X0 + 2, sy + 21, 37, INK);
-  m.box(X0 - 1, sy + 18, 37, 2, 3, 1, SPH); m.box(X0 - 1, sy + 16, 37, 2, 1, 1, 0xb08a64);
-  m.box(X0 - 1, sy + 11, 36, 2, 5, 1, SPH_D);
-  m.box(X0 - 1, sy + 25, 36, 2, 2, 1, GILT);
-  // a gilded shrine with a pharaoh figure between the paws
-  plinth(m, 30, 36, 36, 42, sy, 4, { face: GILT_D, frame: GILT, team: true });
-  figure(m, 33, sy + 5, 39, { h: 9, skin: GILT, gold: GILT_L, kilt: GILT, kiltFront: TEAMB, arms: 'crossed', pose: 'stand', crown: 'nemes' });
+  // the sphinx (round 22: a third-voxel model on a deck raised so it stands
+  // clear over the gate, see sphinx())
+  const sy = 18, X0 = 33;
+  sphinx(m, X0, sy);
   // the pylon gate (two towers + the door block)
-  const RL = { G: GILT, g: GILT_D, K: INK, B: BLUEP, R: RED, T: TEAM };
+  // round 22: the reliefs in deep golds that stay gold under the grade, the
+  // hieroglyphs as a framed register of vertical columns (building_21): gold
+  // panels between dark-gold rules, one sign over another in lapis and red,
+  // a lapis rule over and under the register; no black
+  const RL = { G: CG_L, g: CG, D: CG_D, L: LAPIS_S, R: RED_M, T: TEAM, S: 0xb8301e };
+  const SIGNS = [
+    ['.g.', 'g.g', '.g.', 'ggg', '.g.'],   // ankh
+    ['ggg', '.g.', 'ggg', '.g.', '.g.'],   // djed
+    ['gg.', '.g.', '.g.', '.g.', 'g.g'],   // was sceptre
+    ['...', 'ggg', 'g.g', 'ggg', '...'],   // sun disc
+    ['g.g', 'ggg', '.g.', 'ggg', 'g.g'],   // scarab
+    ['.g.', 'gg.', 'gg.', 'gg.', '.g.'],   // feather
+  ];
+  const register = (x0, w, yTop, n, seed) => {
+    // n columns of 3, a dark-gold rule between: width 4n + 1
+    const rows = [];
+    const rule = 'L'.repeat(4 * n + 1);
+    rows.push(rule);
+    for (let r = 0; r < 5; r++) {
+      let row = '';
+      for (let c = 0; c < n; c++) {
+        row += 'D';
+        const sign = SIGNS[(c * 2 + seed) % SIGNS.length], rr = r;
+        const ink = (c + seed) % 3 === 2 ? 'R' : 'L';
+        for (let i = 0; i < 3; i++) row += rr < 5 && sign[rr][i] === 'g' ? ink : 'G';
+      }
+      rows.push(row + 'D');
+    }
+    rows.push(rule);
+    paint(m, '+z', x0 + Math.floor((w - (4 * n + 1)) / 2), yTop, rows, RL);
+  };
   for (const [x0, x1] of [[10, 28], [36, 54]]) {
     block(m, x0, 44, x1, 52, 1, 26, { wall: LIME, frieze: 2, batter: 13 });
-    // the gold reliefs: a god figure and hieroglyph columns on the front face
+    // the gold reliefs: two gods with a sun disc and a sceptre, a cartouche
+    // column between them, the register of glyph columns over them
     const mid = Math.floor((x0 + x1) / 2);
-    const god = ['..GG..', '.GGGG.', '..GG..', '.GGGG.', 'GGGGGG', 'G.GG.G', 'G.GG.G', '..GG..', '..GG..', '.GGGG.', '.G..G.', '.G..G.', '.G..G.', 'GG..GG'];
-    paint(m, '+z', mid - 6, 18, god, RL);
-    paint(m, '+z', mid + 1, 18, god, RL);
-    for (let c = 0; c < 5; c++) {
-      const col = [];
-      for (let r = 0; r < 6; r++) col.push(hash3(x0, r, c, 3) < 0.5 ? 'GK' : 'KG');
-      paint(m, '+z', x0 + 2 + c * 3, 24, col, RL);
-    }
+    const god = ['..SS..', '.SSSS.', '..GG..', '.GGGG.', 'GGGGGG', 'G.GG.G', 'G.GG.G', 'g.GG.G', '..GG.G', '..gg.G', '.GGGG.', '.G..G.', 'GG..GG'];
+    const GOD = { ...RL, G: CG, g: CG_D };   // the figures a step darker than the panels, so they stand off the pale stone
+    paint(m, '+z', mid - 7, 16, god, GOD);
+    paint(m, '+z', mid + 2, 16, god, GOD);
+    paint(m, '+z', mid - 1, 15, ['DDD', 'DGD', 'DLD', 'DGD', 'DRD', 'DGD', 'DLD', 'DGD', 'DRD', 'DGD', 'DDD'], RL);
+    register(x0 + 1, x1 - x0 - 2, 24, 4, x0 & 3);
     paint(m, '+z', x0 + 1, 3, ['T'.repeat(x1 - x0 - 2)], RL);
   }
   block(m, 28, 46, 36, 52, 1, 18, { wall: LIME, frieze: 2 });

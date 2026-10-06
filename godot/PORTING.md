@@ -1202,7 +1202,25 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   orange instead of the salmon pink the chroma limiter makes of orange),
   `wonder` 8x8
   (a sphinx on a stepped plinth behind a pylon gate with gold reliefs and
-  hieroglyph columns, obelisks, column drums), `sentry_tower`, `palm`
+  hieroglyph columns, obelisks, column drums; round 22: the sphinx is its
+  own third-voxel model on `m.fine` (k = 3, `sphinx()`), sampled from
+  signed shapes at the fine voxel centres: a flat-based loaf body whose back
+  line climbs from the rump to the shoulders, haunches, tucked hind paws,
+  forelegs reaching out to grooved paws, a tail along the right flank; a
+  human face in relief (brow ridge, ivory eyes with pupils and kohl wings,
+  a nose ridge to a tip with nostrils, lips, chin, a plaited false beard)
+  under a gold diadem and uraeus, the nemes striped gold / lapis: the cap's
+  stripes fan from the brow, the wings frame the face and flare to the
+  shoulders, two lappets hang before the chest. Shaded by a normal smoothed
+  over 5^3 neighbours against the sun (no contour rings on curved flanks).
+  The upper deck is 4 voxels taller so the body clears the gate; a gilded
+  naos with a lapis niche and a gold king stands between the paws; the
+  deck flanks carry gold panels with lapis signs between lapis lines. The
+  pylons' hieroglyphs are a framed register of vertical columns (gold
+  panels between dark-gold rules, one ankh / djed / was / sun / scarab /
+  feather sign each in lapis or red, lapis rules over and under, no black)
+  over two deep-gold gods with red sun discs and a cartouche column),
+  `sentry_tower`, `palm`
   (3 variants, scene dressing), `clutter` 2x2 (street dressing, 8 variants:
   0 jars and a basket, 1 crates and sacks, 2 a mud-brick wall run with a gap,
   3 a hand cart, 4 a pen corner, 5 a reed sunshade stall, 6 a woodpile,
