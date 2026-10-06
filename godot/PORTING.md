@@ -1811,6 +1811,24 @@ their rear row a shade darker, white lower flanks (was a team / white
 checker). `--params "eu_focus=wadjet"` (+ `eu_state=walk` for the backs),
 `"eu_one=wadjet&eu_turn=250"`, `"eu_focus=scorpion_man"` check it.
 
+Sphinx rebuild (round 17, myth_03): the body is swept from a side profile
+(`PROF`: z, back, belly, half width through a boxy round section) so it
+steps evenly: a deep chest under high withers (belly y 8), a narrow tucked-up
+waist, a low haunch, a flat back with no hump, a light underside, in a
+red-brown lion (0x9e6826, darker than sand so the grade keeps it brown).
+Forelegs thick with an elbow, team wrist bands, wide 5-voxel paws with four
+dark claws split in pairs; hind legs bent in the model (a broad thigh forward
+to the stifle, the gaskin back to the hock, a hock point, a sloped metatarsus,
+a team ankle band); a tail curling up into a team tuft. The neck rises thick
+from the withers with a gold collar and a light throat; the head is its own
+model at part scale 0.82 (about 1.4x the old 0.72 x faceN head), upright:
+a 7-wide face with a brow ridge, white-and-dark eyes either side of a standing
+nose, a mouth, a proud chin and a braided gold-tipped false beard, under a
+symmetric team / linen nemes (gold brow band and uraeus, a striped crown,
+wings flaring out 1 / 2 / 3 voxels down past the jaw, two 3-wide 2-deep
+lappets falling onto the chest with gold tips, a queue behind).
+`--params "eu_focus=sphinx"` / `"eu_one=sphinx&eu_turn=80&eu_zoom=0.9"` check it.
+
 Mounts (round 14): the camel's saddle cloth is a narrow drape over the hump
 (z 6..15 at the hem, only the seat z 8..13 on top, so the hump's tan fore and
 aft slopes, the rump, shoulders and lower flanks stay bare), one voxel proud of
