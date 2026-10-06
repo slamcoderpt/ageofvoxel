@@ -284,12 +284,24 @@ function headE(style) {
     faceN(m, FACE, 0xa87046, { eyes: [DARK, DARK], brow: null, nose: 0xc08858 });
     m.set(1, 4, 5, DARK).set(2, 4, 5, DARK).set(4, 4, 5, DARK).set(5, 4, 5, DARK);
     m.set(2, 3, 5, FACE(2, 3, 5)).set(4, 3, 5, FACE(4, 3, 5)).set(3, 1, 5, 0x7a3a24);
+    // (round 13) kohl-lined eyes with white corners under a brow ridge, nostril shadows
+    m.set(1, 4, 5, 0xf6eee2).set(5, 4, 5, 0xf6eee2);
+    for (const x of [1, 2, 4, 5]) m.set(x, 5, 6, 0x4a2412);
+    m.set(2, 2, 5, 0x7a4424).set(4, 2, 5, 0x7a4424).set(2, 1, 5, 0x6a3020).set(4, 1, 5, 0x6a3020);
   } else if (dark) faceN(m, SKIN_DK, SKIN_DK_SH, { nose: 0x6e4632, face: 0x6c4632 });
   else {
     // the light face plane: two dark kohl eyes (a voxel of the body each), a
     // brow line a value step down above them, the nose standing out lighter
-    faceN(m, SKIN, SKIN_SH, { eyes: [0xecd6bc, DARK], brow: 0x8a4422, nose: 0xeaa874, face: SKIN_FACE });
+    // (round 13) a defined face at RTS zoom: a dark brow ridge standing a
+    // voxel proud over the eyes (unbroken but for the nose bridge), white eye
+    // corners and dark pupils under it, a light nose line from the bridge to
+    // the tip with dark nostril shadows either side, a dark mouth line
+    faceN(m, SKIN, SKIN_SH, { eyes: [0xf6eee2, DARK], brow: 0x3a1c0e, nose: 0xf0b07a, face: SKIN_FACE });
     m.set(2, 3, 5, SKIN_FACE(2, 3, 5)).set(4, 3, 5, SKIN_FACE(4, 3, 5));
+    for (const x of [1, 2, 4, 5]) m.set(x, 5, 6, 0x4a2412);                    // the brow ridge
+    m.set(3, 5, 5, 0xd8925e).set(3, 4, 6, 0xe8a670);                            // the bridge of the nose
+    m.set(2, 2, 5, 0x5a2c16).set(4, 2, 5, 0x5a2c16);                            // nostril shadows
+    m.set(2, 1, 5, 0x4a2014).set(3, 1, 5, 0x3a1810).set(4, 1, 5, 0x4a2014);     // the mouth
   }
   if (style === 'laborer') {
     // (round 12, unit_11) close-cropped black hair with a clear hairline,
@@ -471,7 +483,7 @@ const teamTone = (m, x, y, z, base) => tset(m, x, y, z, base);
 // the front (form, not stripes), one wrap fold running diagonally down the
 // front, a pale hem, the front dipping a row lower; an optional apron panel
 // standing a voxel proud of the front, widening downwards
-function eKilt(m, { color = TEAM, len = 8, hem = TEAM_TRIM, side = TEAM_SHADE, apron = null, apronEdge = null, fold = true } = {}) {
+function eKilt(m, { color = TEAM, len = 8, hem = TEAM_TRIM, side = TEAM_SHADE, apron = null, apronEdge = null, fold = true, pleats = false } = {}) {
   for (let y = 1; y >= -len - 1; y--) {
     const i = 1 - y;
     // (round 12) a short trapezoid flaring from the belt: wider and deeper
@@ -485,11 +497,13 @@ function eKilt(m, { color = TEAM, len = 8, hem = TEAM_TRIM, side = TEAM_SHADE, a
       if (ex && (z === z0 || z === z1)) continue;
       const isHem = hem && (y === -len - 1 || (y === -len && ax > 3) || (y === -len && z < z1 - 1));
       const isSide = ex || z === z0;
-      const isFold = fold && z === z1 && Math.round(-2 - (1 - y) * 0.45) === x;
+      // (round 13) pleats: every third column of the front a tone down from
+      // the second row, so a team kilt reads as folded linen, not a blob
+      const isFold = (fold && z === z1 && Math.round(-2 - (1 - y) * 0.45) === x) || (pleats && i >= 2 && z === z1 && (x + 30) % 3 === 0);
       // the belt's shadow: the row under the belt a tone down all round
       const isShadow = i === 0;
       const dk = isSide || isFold || isShadow;
-      if (isHem) { m.set(x, y, z, hem); continue; }
+      if (isHem) { if (typeof hem === 'object') tset(m, x, y, z, hem.t); else m.set(x, y, z, hem); continue; }
       if (color === TEAM) tset(m, x, y, z, dk ? (isSide && (isFold || isShadow) ? 0x8a8a8a : side) : 0xffffff);
       else m.set(x, y, z, dk ? side : solid(color, x, y, z));
     }
@@ -573,10 +587,35 @@ function limbRows(m, rows, tone) {
 const ARM_ROWS = [
   [18, 1.6, 1.6], [17, 2.3, 2.0], [16, 2.4, 2.3], [15, 2.4, 2.3], [14, 2.4, 2.3], [13, 2.3, 2.1],
   [12, 2.0, 2.0], [11, 2.0, 2.0], [10, 1.6, 1.6], [9, 1.6, 1.6],
-  [8, 1.6, 1.6], [7, 1.6, 1.6], [6, 1.6, 1.6], [5, 1.6, 1.6], [4, 1.6, 1.6], [3, 1.6, 1.6],
-  [2, 1.6, 1.6], [1, 1.6, 1.6], [0, 1.6, 1.6],
+  [8, 1.6, 1.6], [7, 1.6, 1.6], [6, 1.6, 1.6], [5, 1.6, 1.6], [4, 1.6, 1.6], [3, 1.25, 1.25],
 ];
-function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, sleeve = null, fist = null, bend = 0 } = {}) {
+// (round 13) the hand: a narrower wrist (row 3, a plus section a tone down,
+// so the forearm visibly ends) over a fist a voxel deeper than the forearm,
+// the fingers curled forward: the back of the hand (row 2), the knuckles
+// (row 1, a lit row across the front, a thumb on the inner side) and the
+// curled fingertips (row 0, under the front). grip: a hole through the fist
+// (x 0, z 0..1, rows 0..2) a haft passes through, the fingers wrapped round
+// it in front (z 2) and the palm behind (z -1): GRIP_C is its centre (rig
+// voxels from the shoulder joint, straight arm)
+function handVox(m, pal, out, { grip = false, fist = null } = {}) {
+  const H = palH(pal);
+  for (let y = 0; y <= 2; y++) for (let x = -1; x <= 1; x++) for (let z = -1; z <= 2; z++) {
+    if (y === 0 && z === -1) continue;                    // the fingertips curl under the front
+    if (y === 2 && z === 2 && !grip) continue;            // the back of the hand slopes to the knuckles
+    if (grip && x === 0 && (z === 0 || z === 1)) continue;   // the haft's hole
+    const inner = x * out < 0, front = z === 2;
+    let c = front ? (y === 1 ? H : pal.L) : inner ? pal.D : pal.M;
+    if (front && y === 0) c = pal.M;                      // under the curled fingers
+    if (front && y === 1 && x === 0 && !grip) c = pal.L;  // the crease between the knuckles
+    if (z === -1 && y === 2) c = pal.M;
+    m.set(x, y, z, fist || c);
+  }
+  // the thumb laid over the fingers on the inner side
+  m.set(-out, 2, 2, fist || pal.L);
+  return m;
+}
+const GRIP_C = [0, -8.5, 0.25];
+function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, sleeve = null, fist = null, bend = 0, grip = false } = {}) {
   const m = new VoxelModel();
   const out = side === 'L' ? 1 : -1, H = palH(pal);
   limbRows(m, ARM_ROWS, (x, y, z, nx, nz) => {
@@ -584,36 +623,48 @@ function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, 
     let c = front ? pal.L : inner ? pal.D : pal.M;
     if (y >= 16 && nz > -0.6 && !inner) c = H;            // the lit shoulder cap
     if (y >= 17) c = inner ? pal.M : H;
-    if (y <= 2) c = fist || (front ? pal.L : pal.M);
-    if (bracer && y >= 3 && y <= 6) c = bracer;
+    if (y === 3) c = front ? pal.M : pal.D;               // the wrist, a tone down
+    if (bracer && y >= 4 && y <= 7) c = bracer;
     if (bnd && y >= 12 && y <= 13) c = bnd;
-    if (sleeve && y >= 13) c = sleeve;
+    if (sleeve && y >= 13) c = y === 13 ? (typeof sleeve === 'number' ? shadeC(sleeve, 0.86) : sleeve) : sleeve;
     return c;
   });
+  handVox(m, pal, out, { grip, fist });
   return bendArm(m, bend);
 }
+const shadeC = (c, k) => { const r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255; return (Math.round(r * k) << 16) | (Math.round(g * k) << 8) | Math.round(b * k); };
 // bend an arm (manArmM, half voxels) at the elbow: the forearm (y <= 9) turns
 // forward (+z) by a radians about the elbow (y 9.5, z 0.5), so the arm hangs
 // from the shoulder and the forearm comes forward instead of the whole arm
 // hanging straight; armFist(a) = the bent fist in rig voxels from the shoulder
-// joint (for a part attached to the hand)
+// joint (for a part attached to the hand). (round 13) The hand (rows 0..2)
+// is carried, not turned: the wrist flexes so the fist stays upright and a
+// haft held through it (grip) stands straight in it.
 const ELBOW_Y = 9.5;
+const handShift = (a) => {
+  const ca = Math.cos(a), sa = Math.sin(a);
+  return [Math.round(ELBOW_Y - 8 * ca - 1.5), Math.round(0.5 + 8 * sa - 0.5)];
+};
 function bendArm(m, a) {
   if (!a) return m;
-  const ca = Math.cos(a), sa = Math.sin(a), fore = [];
+  const ca = Math.cos(a), sa = Math.sin(a), fore = [], hand = [];
   for (const [k, v] of m.vox) {
     const x = ((k >> 20) & 1023) - 512, y = ((k >> 10) & 1023) - 512, z = (k & 1023) - 512;
-    if (y <= 9) fore.push([x, y, z, v]);
+    if (y <= 2) hand.push([x, y, z, v]); else if (y <= 9) fore.push([x, y, z, v]);
   }
-  for (const [x, y, z] of fore) m.remove(x, y, z);
+  for (const [x, y, z] of [...fore, ...hand]) m.remove(x, y, z);
   for (const [x, y, z, v] of fore) for (const oy of [0.2, 0.5, 0.8]) for (const oz of [0.2, 0.5, 0.8]) {
     const dy = y + oy - ELBOW_Y, dz = z + oz - 0.5;
     const ny = Math.floor(ELBOW_Y + dy * ca + dz * sa), nz = Math.floor(0.5 + dz * ca - dy * sa);
     if (ny > 9 && m.has(x, ny, nz)) continue;
     m.set(x, ny, nz, 0); Object.assign(m.get(x, ny, nz), v);
   }
+  const [hy, hz] = handShift(a);
+  for (const [x, y, z, v] of hand) { m.set(x, y + hy, z + hz, 0); Object.assign(m.get(x, y + hy, z + hz), v); }
   return m;
 }
+// the grip hole's centre in a bent arm (rig voxels from the shoulder joint)
+const gripBent = (a) => { const [hy, hz] = handShift(a); return [0, (1.5 + hy - 18.5) * BODY_SCALE, (1 + hz - 0.5) * BODY_SCALE]; };
 const armFist = (a) => [0, (ELBOW_Y - 8 * Math.cos(a) - 18.5) * BODY_SCALE, 8 * Math.sin(a) * BODY_SCALE];
 // Thigh / shin (half voxels), pivot [0.5, 14, 0.5] at the hip / knee: the
 // thigh a 5-wide rounded section (the two thighs meet under the pelvis, no
@@ -879,12 +930,27 @@ function ankhStaffM({ glow = 0 } = {}) {
   return m;
 }
 const ANKH_PIVOT = [1, 0, 1];
-// the pharaoh's crook, striped gold and team
+// the pharaoh's crook (round 13, unit_04), authored at half the rig voxel
+// (part scale 0.5, pivot [1, 0, 1]: the 2 x 2 shaft centred in the fist): a
+// long shaft banded gold and the army's colour three rows each, a gold butt
+// below the fist and, at the top, a wide hook curling over and down (outer
+// radius 5, a clear gap inside) with a gold tip: Retold's heqa sceptre, held
+// overhead it reads as a crook, not a stick
 function crookM() {
   const m = new VoxelModel();
-  const S = (x, y, z) => ((y >> 1) & 1 ? PH_GOLD(x, y, z) : TEAM);
-  for (let y = -3; y <= 10; y++) m.set(0, y, 0, S(0, y, 0)).set(1, y, 0, S(1, y, 0));
-  for (const [y, z] of [[11, 0], [12, 1], [12, 2], [11, 3], [10, 3], [9, 3]]) m.set(0, y, z, S(0, y, z)).set(1, y, z, S(1, y, z));
+  const S = (x, y, z) => (Math.floor((y + 30) / 3) & 1 ? PH_GOLD(x, y, z) : TEAM);
+  for (let y = -7; y <= 30; y++) for (let x = 0; x <= 1; x++) for (let z = 0; z <= 1; z++)
+    m.set(x, y, z, y <= -5 ? PH_GOLD_L : S(x, y, z));
+  // the hook: a half ring of radius 4.5 centred above the shaft's top, opening
+  // forward (+z) and down
+  const cy = 30, cz = 5;
+  for (let k = 0; k <= 20; k++) {
+    const a = Math.PI * k / 20;                         // 0 = the shaft side, PI = the far side
+    const y = Math.round(cy + Math.sin(a) * 4.5), z = Math.round(cz - Math.cos(a) * 4.5);
+    for (const [dy, dz] of [[0, 0], [0, 1], [1, 0], [1, 1]]) for (let x = 0; x <= 1; x++) m.set(x, y + dy - (dy && Math.sin(a) > 0.7 ? 1 : 0), z + dz, S(x, y + dy, z + dz));
+  }
+  for (let y = cy - 3; y <= cy; y++) for (let x = 0; x <= 1; x++) for (let z = 9; z <= 10; z++) m.set(x, y, z, S(x, y, z));
+  for (let x = 0; x <= 1; x++) m.set(x, cy - 4, 9, PH_GOLD_L).set(x, cy - 4, 10, PH_GOLD_L);
   return m;
 }
 // tools (built along +z like the Greek villager's)
@@ -988,7 +1054,7 @@ const sc = (j, s) => j.map((v) => v * s);
 // from a pale linen sash knotted at the front, close-cropped black hair.
 {
   const t = manTorso();
-  eKilt(t, { len: 6, hem: null });
+  eKilt(t, { len: 6, hem: TM_DK, pleats: true });
   eBelt(t, LINEN, LINEN_SH);
   t.box(0, -5, 3, 1, 6, 1, LINEN).set(0, -6, 3, LINEN_SH);                   // the sash's end down the front
   const showTool = () => ({ conditional: true, portrait: false });
@@ -1082,9 +1148,17 @@ const sc = (j, s) => j.map((v) => v * s);
 // hem, gold armlets, a white headcloth with a sun disc, the ankh staff.
 {
   const t = manTorso();
-  const RB = 0xf2ecdc, RB_SH = LINEN_SH;
+  // (round 13) three linen tones: RB lit fronts, RB_SH sides / folds, RB_DK
+  // the deep creases (under the arms, the belt's shadow, inside the folds
+  // nearest the hem), so the robe reads as hanging cloth, not a white block
+  const RB = 0xf2ecdc, RB_SH = LINEN_SH, RB_DK = 0xa8987a;
   paint(t, (x, y, z) => (y <= 14 ? (z >= 2 && Math.abs(x + 0.5) < 5 ? RB : RB_SH) : null));
   paint(t, (x, y, z) => (y >= 13 && y <= 14 ? RB : null));
+  // the flanks under the arms and the chest's underside
+  paint(t, (x, y, z) => { const ax = Math.abs(x + 0.5); return y >= 5 && y <= 11 && ax >= 4.5 ? RB_DK : y >= 4 && y <= 11 && ax >= 3.5 && z >= 2 ? RB_SH : null; });
+  // two folds drawn down from the collar to the sash, the cloth pulled by the shoulders
+  paint(t, (x, y, z) => (y >= 4 && y <= 10 && z >= 2 && (x === -3 || x === 2) ? RB_SH : null));
+  paint(t, (x, y, z) => (y >= 4 && y <= 6 && z >= 2 && Math.abs(x + 0.5) <= 2.5 ? RB_SH : null));   // the cloth bloused over the sash
   // the dark zigzag edge round the neck
   paint(t, (x, y, z) => { const a = Math.hypot(x + 0.5, (z + 0.5) * 1.25) + Math.max(0, 13.5 - (y + 0.5)); return y >= 11 && y <= 14 && a >= 3.4 && a < 4.4 && (x + y) % 2 ? 0x2a3a6a : null; });
   const LEN = 23;
@@ -1093,13 +1167,26 @@ const sc = (j, s) => j.map((v) => v * s);
     // (round 10) the robe gathers to the 8-wide waist under the sash and
     // flares over the hips to 16 at the hem: a waist, not a slab
     const w = i < 2 ? 8 : 2 * Math.round(Math.min(10 + (i - 2) * 0.5, 10 + (i - 2) * 6 / (LEN - 2)) / 2), z0 = -3 - Math.round(i * 1.5 / LEN), z1 = 2 + Math.round(i * 1.5 / LEN);
+    // (round 13) the folds fanning out from the sash: an inner pair either side
+    // of the sash's end and an outer pair over the thighs, each a shaded
+    // crease with its deep core lower down
+    const fi = 2 + Math.floor(i * 0.12), fo = 3 + Math.floor(i * 0.2);
     for (let x = -w / 2; x < w / 2; x++) for (let z = z0; z <= z1; z++) {
       const ex = x === -w / 2 || x === w / 2 - 1;
       if (ex && (z === z0 || z === z1)) continue;
-      t.set(x, y, z, i >= LEN - 1 ? GOLD : (ex || z === z0 ? RB_SH : RB));
+      let c = ex || z === z0 ? RB_SH : RB;
+      if (z === z1) {
+        if (x === -fi || x === fi + 1 || (i >= 6 && (x === -fo - 1 || x === fo + 1))) c = i >= 12 ? RB_DK : RB_SH;
+        if (i >= 6 && (x === -fo || x === fo)) c = RB_SH;
+      }
+      if (ex && z === z1 - 1) c = RB_DK;                  // the sides turn away into shade
+      if (ex && z === z0 + 1) c = RB_DK;
+      if (i <= 1) c = i === 0 ? RB_DK : RB_SH;            // the belt's shadow under the sash
+      if (i === LEN - 2) c = z === z1 || ex ? RB_SH : c;  // the cloth's shadow over the hem
+      t.set(x, y, z, i >= LEN - 1 ? GOLD : c);
     }
     if (i < 2) for (const x of [-5, 4]) for (let z = -3; z <= 2; z++) t.remove(x, y, z);
-    for (let x = 0; x <= 1; x++) t.set(x, y, z1 + 1, GOLD);               // the sash's long end down the front
+    for (let x = 0; x <= 1; x++) t.set(x, y, z1 + 1, i === 0 ? GOLD_DK : x === 1 && i > 2 ? 0xc8a000 : GOLD);   // the sash's long end down the front, shaded on one edge
   }
   eBelt(t, GOLD, GOLD);
   // (round 10) not a T-pose: the staff arm's shoulder raised half a voxel and
@@ -1108,13 +1195,13 @@ const sc = (j, s) => j.map((v) => v * s);
   // the legs are robed (linen to the ankle, bare feet), so a striding leg
   // that swings out of the rigid robe reads as cloth, not a bare plank
   const BR = 0.95, BL = 1.35;
-  const fistR = armFist(BR);
   rig('priest', { voxel: 0.07, anim: 'human', style: 'priest', pose: 'staff', stance: 0.3, upright: true }, [
-    ...manParts({ torso: t, head: 'priest', arm: { sleeve: RB, bracer: GOLD }, armL: { bend: BL }, armR: { bend: BR }, leg: { sandal: null, pal: { L: RB, M: RB_SH, D: RB_SH }, foot: PAL_SKIN.M },
+    ...manParts({ torso: t, head: 'priest', arm: { sleeve: RB, bracer: GOLD }, armL: { bend: BL }, armR: { bend: BR, grip: true }, leg: { sandal: null, pal: { L: RB, M: RB_SH, D: RB_SH }, foot: PAL_SKIN.M },
       liftR: 0.5, restL: [0, -0.75, 0.1], restR: [0, -0.35, -0.2] }),
     // the staff stands upright in the bent fist whatever the arm does (rig
     // "upright": unit_view.cpp gives the weapon the unit's orientation)
-    part('weapon', ankhStaffM(), ANKH_PIVOT, [fistR[0] - 0.4, fistR[1], fistR[2] + 0.2], 'armR', { scale: 0.5 }),
+    // (round 13) through the fist: the fingers wrap the shaft (manArmM grip)
+    part('weapon', ankhStaffM(), ANKH_PIVOT, gripBent(BR), 'armR', { scale: 0.5 }),
   ]);
 }
 
@@ -1162,10 +1249,12 @@ const sc = (j, s) => j.map((v) => v * s);
   }
   eBelt(t, PH_GOLD, PH_GOLD_L);
   rig('pharaoh', { voxel: 0.08, anim: 'human', style: 'pharaoh', pose: 'staff', stance: 0.3 }, [
-    ...manParts({ torso: t, head: 'pharaoh', headScale: 1.1, pal: PAL_PH, arm: { bracer: TEAM, band: PH_GOLD_L }, leg: { sandal: SANDAL },
+    ...manParts({ torso: t, head: 'pharaoh', headScale: 1.1, pal: PAL_PH, arm: { bracer: TEAM, band: PH_GOLD_L }, armR: { grip: true }, leg: { sandal: SANDAL },
       restL: [-0.35, 0, 0.42], restR: [-0.25, 0, -2.25] }),
-    // the crook stands up and out of the raised fist (counter-turned in the hand)
-    part('weapon', crookM(), [0, 0, 0], [0, -8.5, 0.6], 'armR', { rest: [0, 0, 2.75] }),
+    // (round 13) the crook through the raised fist (the fingers round the
+    // shaft), laid across over the crown with the hook out past his left
+    // shoulder, as Retold's Pharaoh holds it (unit_04)
+    part('weapon', crookM(), [1, 0, 1], GRIP_C, 'armR', { scale: 0.5, rest: [0, 0, 0.95] }),
   ]);
 }
 

@@ -637,18 +637,20 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 			// shin 7 rig voxels), the elbows bent, the shoulders driving into
 			// every blow; the Greek villagers keep the poses above
 			if (st == aov::A_BUILD) {
-				// kneeling at the foundation on the rear knee, the front foot
-				// planted; the mallet cocked behind the ear on a bent elbow and
-				// driven down, the body following it
-				const double p = t * 9;
-				const double s = std::max(0.0, S(p));
-				set(CH_legL, -1.45, 0, 0.06); set(CH_shinL, 1.05);
-				set(CH_legR, 0.15, 0, -0.06); set(CH_shinR, 1.75);
-				set(CH_torso, 0.42 - s * 0.14, -0.12);
-				set(CH_head, -0.3 + s * 0.08);
-				set(CH_armR, -0.95 - s * 1.35, 0, -0.12); set(CH_foreR, -0.3 - s * 1.0);
-				set(CH_armL, -0.85, 0.25, 0.12); set(CH_foreL, -0.75);
-				bob = -6.7 - (1 - s) * 0.25;
+				// (round 13, unit_11) standing square to the scaffold, feet
+				// apart, the front knee soft and the back leg braced; the free
+				// hand steadies the beam, the mallet is lifted behind the head
+				// on a bent elbow and driven in at chest height, the shoulders
+				// and hips following it (a slow lift, a fast blow)
+				const double cyc = std::fmod(t * 1.35 + uhash(id, 70), 1.0);
+				const double k = cyc < 0.62 ? smooth(cyc / 0.62) : 1 - smooth((cyc - 0.62) / 0.14);
+				set(CH_legL, -0.42, 0, 0.07); set(CH_shinL, 0.38);
+				set(CH_legR, 0.3, 0, -0.07); set(CH_shinR, 0.14);
+				set(CH_torso, 0.22 - k * 0.14, -0.1 - k * 0.12);
+				set(CH_head, -0.18 - k * 0.1);
+				set(CH_armR, ease(-1.2, -2.75, k), 0, -0.1); set(CH_foreR, ease(-0.3, -1.15, k));
+				set(CH_armL, -0.95 + k * 0.1, 0.2, 0.18); set(CH_foreL, -0.7);
+				bob = -0.85 - (1 - k) * 0.15;
 			} else if (res == aov::RES_FOOD) {
 				// squatting at the bush, both knees deep, reaching in and
 				// pulling back with bent arms
@@ -1321,18 +1323,49 @@ Dictionary AovUnitView::update(double dt, double alpha, int64_t local_player, co
 		}
 
 		// render()
-		const double x = U.prev_x[i] + (U.x[i] - U.prev_x[i]) * alpha;
-		const double z = U.prev_z[i] + (U.z[i] - U.prev_z[i]) * alpha;
+		double x = U.prev_x[i] + (U.x[i] - U.prev_x[i]) * alpha;
+		double z = U.prev_z[i] + (U.z[i] - U.prev_z[i]) * alpha;
+		// (round 13, Egyptian men: rig "stance") a builder is drawn standing
+		// just outside the site's footprint, square to its nearest side, so he
+		// hammers at the scaffold instead of standing in its beams (render
+		// only: the sim keeps him where it put him, within 1.3 of the site)
+		bool site_face = false;
+		double site_rot = 0;
+		if (rig.stance > 0 && !dead && st == aov::A_BUILD && U.order_type[i] == aov::O_BUILD) {
+			const int b = SM.entities.building_slot(U.order_target[i]);
+			if (b >= 0) {
+				const aov::BuildingStore &B = SM.entities.buildings;
+				const double x0 = B.tx[b], z0 = B.tz[b], x1 = x0 + B.w[b], z1 = z0 + B.h[b];
+				const double nx = std::clamp(x, x0, x1), nz = std::clamp(z, z0, z1);
+				double ox = x - nx, oz = z - nz;
+				double d = std::hypot(ox, oz);
+				if (d < 1e-6) {
+					// inside the footprint: out through the nearest side
+					const double dl = x - x0, dr = x1 - x, dt = z - z0, db = z1 - z;
+					const double m = std::min({ dl, dr, dt, db });
+					ox = m == dl ? -1 : m == dr ? 1 : 0; oz = m == dt ? -1 : m == db ? 1 : 0;
+					if (ox != 0 && oz != 0) oz = 0;
+					d = 0;
+				} else { ox /= d; oz /= d; }
+				const double gap = 0.62 + U.radius[i] * 0.5;
+				if (d < gap) {
+					const double ex = d > 0 ? nx : (ox < 0 ? x0 : ox > 0 ? x1 : x), ez = d > 0 ? nz : (oz < 0 ? z0 : oz > 0 ? z1 : z);
+					x = ex + ox * gap; z = ez + oz * gap;
+				}
+				site_face = true;
+				site_rot = std::atan2(-ox, -oz);
+			}
+		}
 		if (!planes.empty() && !on_screen(x, map.height_at(x, z) + 1.5 + U.air_y[i], z, (big ? 8.0 : 4.5) + U.radius[i])) continue; // (margin: their shadows reach into view)
 		double dr = U.rot[i] - U.prev_rot[i];
 		while (dr > PI) dr -= PI * 2;
 		while (dr < -PI) dr += PI * 2;
 		float bob = 0, fwd = 0;
 		pose_unit(i, ri, rot3, bob, fwd);
-		const double rot = U.prev_rot[i] + dr * alpha + (dead ? 0 : yaw_[id]);
+		const double rot = site_face ? site_rot + (uhash(id, 9) - 0.5) * 0.3 : U.prev_rot[i] + dr * alpha + (dead ? 0 : yaw_[id]);
 		const double push = dead ? 0 : press_[id] + fwd;
-		const double jl = (uhash(id, 5) - 0.5) * 2 * JITTER * (big ? 0.3 : 1);
-		const double jf = (uhash(id, 6) - 0.5) * 2 * JITTER * (big ? 0.3 : st == aov::A_ATTACK ? 0.2 : 0.6);
+		const double jl = site_face ? 0 : (uhash(id, 5) - 0.5) * 2 * JITTER * (big ? 0.3 : 1);
+		const double jf = site_face ? 0 : (uhash(id, 6) - 0.5) * 2 * JITTER * (big ? 0.3 : st == aov::A_ATTACK ? 0.2 : 0.6);
 		const double px = x + std::cos(rot) * jl + std::sin(rot) * (push + jf), pz = z - std::sin(rot) * jl + std::cos(rot) * (push + jf);
 		const double y = map.height_at(px, pz);
 		const double sc = big ? 1 : 0.93 + uhash(id, 7) * 0.13;

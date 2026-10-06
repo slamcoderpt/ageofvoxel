@@ -145,7 +145,12 @@ static func scene_setup(game: Node) -> Dictionary:
 		var mine = sim.spawn_resource("gold", int(cx) - 6, int(cz) + 4, 0)
 		var lab := PackedInt32Array()
 		for k in 6:
-			var id: int = spawn.call("laborer", 1, at.call(-4.0 + k * 0.8, 1.0 + (k % 2)), yaw)
+			# the two builders start on the camera's side of the site, so they
+			# hammer at its near face (unit_11), not hidden behind its beams
+			var p: Vector2 = at.call(-4.0 + k * 0.8, 1.0 + (k % 2))
+			if k >= 4:
+				p = Vector2(float(int(cx) + 2), float(int(cz) + 3)) + front * 2.6 + lat * (float(k - 4) * 1.6 - 0.8)
+			var id: int = spawn.call("laborer", 1, p, yaw)
 			if id > 0: lab.append(id)
 		if lab.size() >= 6:
 			sim.order_gather(PackedInt32Array([lab[0], lab[1]]), int(trees[1]))

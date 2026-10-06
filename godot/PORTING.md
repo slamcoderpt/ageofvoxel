@@ -1427,6 +1427,40 @@ same channel names, plus:
   white linen, so the priest's robe and face get the same thin clean line
   as a bare worker. `unit.gdshader`: a softer rim (0.18) on the Egyptian
   figures' own colours, which flared the lit edge of every limb pink.
+- **Hands, faces, robe folds, standing builders** (round 13): every man's
+  arm ends in a wrist and a hand (`handVox` in the exporter): row 3 a
+  narrower plus section a tone down, then a fist a voxel deeper than the
+  forearm with the fingers curled forward (back of the hand, a lit knuckle
+  row, curled fingertips, a thumb on the inner side). `manArmM({ grip })`
+  cuts a hole through the fist (x 0, z 0..1) and the haft goes through it
+  (`GRIP_C` straight, `gripBent(a)` bent), so the fingers wrap the shaft:
+  the Priest's ankh staff and the Pharaoh's crook. `bendArm` carries the
+  hand instead of turning it (the wrist flexes), so a held staff stands
+  straight in an upright fist. Faces (the men's default head and the
+  Pharaoh's): a dark brow ridge standing a voxel proud over white eye
+  corners and dark pupils, a light nose line from the bridge to the tip
+  with nostril shadows, a dark mouth line. The Priest's robe has three linen
+  tones (lit front, `LINEN_SH` folds and sides, `RB_DK` 0xa8987a deep
+  creases): dark flanks under the arms, two folds from the collar to the
+  sash, cloth bloused over the sash, the belt's shadow under it, two pairs
+  of folds fanning from the sash to the hem (deep cores lower down), the
+  sides turning into shade and a shadow over the gold hem; the sash's end
+  shaded on one edge. The Pharaoh's crook (`crookM`, half voxels, part
+  scale 0.5) is a long shaft banded gold / team three rows each with a gold
+  butt and a wide hook (outer radius ~5, open inside), held through the
+  raised fist and laid across over the crown with the hook out past his
+  left shoulder (unit_04). The Laborer's team kilt has pleats (`eKilt
+  pleats`: every third front column a tone down) and a dark team hem
+  (`hem: TM_DK`; `hem` takes a `{ t }` team tone). unit_view.cpp: an
+  Egyptian man (rig `stance`) building is drawn standing just outside the
+  site's footprint (0.62 + radius / 2 from its nearest side, inside points
+  pushed out through the nearest side), square to that side, with no crowd
+  yaw or jitter (render only, the sim's position is untouched), in a
+  standing hammer pose (feet apart, the free hand steadying the beam, the
+  mallet lifted behind the head on a bent elbow and driven in at chest
+  height; a slow lift and a fast blow, phase by unit id) instead of the
+  kneel. egypt_units `eu_group=eco` starts the two builders on the camera's
+  side of the site.
 - **Palette**: the grade's exposure and warm chroma limiter (grade_effect.gd)
   take about half the chroma of any warm colour: a deep gold (0xd2a400) reads
   olive-khaki, an orange gold (0xffb000) peach like the skin. The gold is a
