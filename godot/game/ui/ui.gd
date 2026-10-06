@@ -978,7 +978,7 @@ func _commands_for() -> Array:
 			for t in ([] if egypt() else bd.get("trains", [])):
 				var d: Dictionary = _defs[t]
 				var ok := int(d.get("min_age", 0)) <= age
-				var tc := {"key": str(d.hotkey), "tex": _portraits.unit(t, me), "title": "Train %s" % d.name,
+				var tc := {"key": str(d.hotkey), "tex": _portraits.bust(t, me), "bust": true, "title": "Train %s" % d.name,
 					"cost": d.cost, "enabled": ok and _can_afford(d.cost), "action": "train", "arg": t}
 				if not ok:
 					tc["warn"] = "Requires the %s Age" % AGES[int(d.min_age)]
@@ -1137,7 +1137,7 @@ func _egypt_unit_commands(us: Array, list: Array) -> void:
 		var keys := SUMMON_KEYS
 		for j in mini(menu.size(), keys.size()):
 			var m: Dictionary = menu[j]
-			var c := {"key": keys[j], "slot": 5 + j, "tex": _portraits.unit(str(m.type), me), "title": "Summon %s" % str(m.name), "cost": m.cost,
+			var c := {"key": keys[j], "slot": 5 + j, "tex": _portraits.bust(str(m.type), me), "bust": true, "title": "Summon %s" % str(m.name), "cost": m.cost,
 				"time": float(m.time), "lines": _summon_lines(m),
 				"enabled": bool(m.ok), "action": "summon", "arg": [int(phar[0].id), str(m.type)]}
 			if not bool(m.ok) and not str(m.reason).begins_with("Not enough"):
@@ -1237,7 +1237,7 @@ func _egypt_trains(b: Dictionary, list: Array) -> void:
 			j += 1   # (the Town Center's age-up buttons)
 		if j >= keys.size():
 			break
-		var c := {"key": keys[j], "slot": j, "tex": _portraits.unit(t, me), "title": "Train %s" % str(d.get("name", t)), "cost": tr.cost,
+		var c := {"key": keys[j], "slot": j, "tex": _portraits.bust(t, me), "bust": true, "title": "Train %s" % str(d.get("name", t)), "cost": tr.cost,
 			"enabled": bool(tr.ok) and _can_afford(tr.cost), "action": "train", "arg": t, "time": float(d.get("train_time", 0.0))}
 		var line := str(EGYPT_TRAIN_LINES.get(t, ""))
 		if line == "" and str(d.get("god", "")) != "":
@@ -1768,10 +1768,9 @@ func _info_for() -> Dictionary:
 			d.stats.append(["favor", "+" + _num(float(sim.get_building_def(str(e.type)).get("favor_per_min", 0.0)) * (1.0 + emp * float(sim.get_civ_state(int(e.owner)).get("empower_favor", 0.2)))), "favor / min"])
 		if bool(bd.get("age_up", false)) and bool(player.get("advancing", false)) and int(e.owner) == me:
 			d.tasks.append("Advancing · %d%%" % int(floor(float(hud_state.get("adv", 0)) * 100)))
-		for k in bd.get("dropoff", []):
-			d.stats.append([k, "", ""])
+		# the resources dropped off here: one labelled row on the card (hud.gd)
 		if not bd.get("dropoff", []).is_empty():
-			d.stats[d.stats.size() - 1][2] = "drop-off"
+			d["dropoff"] = Array(bd.get("dropoff", []))
 		if int(bd.get("pop", 0)) > 0:
 			d.stats.append(["house", "+%d" % int(bd.pop), "pop"])
 		var q: Array = e.get("queue", [])

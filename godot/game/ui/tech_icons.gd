@@ -200,6 +200,10 @@ static func svg(name: String) -> String:
 		return GODS[name]
 	if name.begins_with("e_") and EGYPT_GOD.has(name.substr(2)):
 		return _egypt_fallback(name.substr(2))
+	if name.begins_with("g_") and GOD_BUSTS.has(name.substr(2)):
+		# headless: the god's hieroglyph in gold (with a renderer: his bust)
+		var EI = load("res://game/ui/egypt_icons.gd")
+		return str(EI.SVG.get("mg_" + name.substr(2), "")).replace("currentColor", "#f2c14e")
 	var parts := name.split("_")
 	if parts.size() == 3 and parts[0] == "t" and TEMPLATES.has(parts[1]) and TIERS.has(parts[2]):
 		var c: Array = TIERS[parts[2]]
@@ -378,6 +382,18 @@ const BACKDROPS := {
 	"e_valley_of_the_kings": ["#4a3a1a", "#120c04", "#ffd070", 0.5, 0.3, 0.6, "blocks", "#7a6440", 0.6, 73],
 	"e_book_of_thoth": ["#16362e", "#020a08", "#90ffd0", 0.5, 0.3, 0.55, "stars", "#c0fff0", 0.75, 74],
 	"e_tusks_of_apedemak": ["#5a4a2e", "#14100a", "#ffe8c0", 0.7, 0.2, 0.65, "bokeh", "#f0e0b0", 0.55, 75],
+	# the Egyptian minor gods' busts (EgyptGodModels, the age-up buttons): a
+	# temple's light behind each head, in the colour of his domain
+	"g_anubis": ["#3a2c4e", "#0a060e", "#ffcc70", 0.72, 0.22, 0.6, "mist", "#c0a0d8", 0.6, 80],
+	"g_bast": ["#3e3020", "#0e0a06", "#c8f070", 0.7, 0.25, 0.6, "bokeh", "#e8d080", 0.55, 81],
+	"g_ptah": ["#4a3e26", "#120e06", "#ffe0a0", 0.72, 0.2, 0.65, "blocks", "#7a6440", 0.5, 82],
+	"g_hathor": ["#4a2a3a", "#10060c", "#ffc890", 0.7, 0.2, 0.6, "bokeh", "#ffd0b0", 0.5, 83],
+	"g_nephthys": ["#1e2a4e", "#04060e", "#c0d0ff", 0.7, 0.2, 0.6, "stars", "#e0e8ff", 0.7, 84],
+	"g_sekhmet": ["#6a3412", "#1a0802", "#ffc060", 0.7, 0.25, 0.6, "rays", "#ffd080", 0.6, 85],
+	"g_sobek": ["#1e4a3a", "#04100c", "#ffd060", 0.72, 0.2, 0.6, "waves", "#80d0b0", 0.5, 86],
+	"g_horus": ["#2a4a8a", "#060e22", "#ffe8a0", 0.72, 0.18, 0.6, "clouds", "#c0d0f0", 0.55, 87],
+	"g_osiris": ["#1e3a2c", "#040e08", "#e8ffd0", 0.7, 0.2, 0.6, "mist", "#b0f0c0", 0.55, 88],
+	"g_thoth": ["#16362e", "#020a08", "#c0ffe8", 0.72, 0.22, 0.55, "stars", "#c0fff0", 0.7, 89],
 }
 
 ## Per icon framing: [fit, dx, dy] (fit: the share of the tile the picture's
@@ -390,7 +406,14 @@ const FRAMING := {
 	"t_phobos": [1.04, 0.0, 0.0], "t_deimos": [0.92, 0.0, 0.04], "t_enyo": [0.96, 0.0, 0.0],
 	"t_sarissa": [1.02, 0.0, 0.0], "t_aegis": [1.0, 0.0, 0.05], "t_sun_ray": [1.06, 0.0, 0.0],
 	"t_monstrous_rage": [0.96, 0.0, 0.03], "t_omniscience": [1.0, 0.0, 0.0],
+	# a god's bust: a close-up portrait, the shoulders cropped by the frame's foot
+	"g_anubis": [1.1, 0.0, 0.1], "g_bast": [1.15, 0.0, 0.1], "g_ptah": [1.12, 0.0, 0.08],
+	"g_hathor": [1.1, 0.0, 0.1], "g_nephthys": [1.1, 0.0, 0.1], "g_sekhmet": [1.12, 0.0, 0.1],
+	"g_sobek": [1.1, 0.0, 0.1], "g_horus": [1.1, 0.0, 0.1], "g_osiris": [1.06, 0.0, 0.08], "g_thoth": [1.1, 0.0, 0.1],
 }
+
+## The Egyptian minor gods with a bust ("g_<god>": egypt_god_models.gd).
+const GOD_BUSTS := ["anubis", "bast", "ptah", "hathor", "nephthys", "sekhmet", "sobek", "horus", "osiris", "thoth"]
 
 ## The backdrop / framing key of an icon name (an Armory tier: its line).
 static func _line_key(name: String) -> String:
@@ -655,6 +678,8 @@ static func prewarm_step() -> bool:
 				names.append(k)
 		for k in EGYPT_GOD:
 			names.append("e_" + str(k))
+		for g in GOD_BUSTS:
+			names.append("g_" + str(g))
 		# the sizes they are drawn at, 1:1 (a rescaled tile goes soft):
 		# the command grid's 48 px, the queue's 34 px, the card's 22 px
 		for nm in names:
@@ -700,6 +725,8 @@ static func tile_names() -> Array:
 			names.append(k)
 	for k in EGYPT_GOD:
 		names.append("e_" + str(k))
+	for g in GOD_BUSTS:
+		names.append("g_" + str(g))
 	return names
 
 ## True when an icon's picture comes from its 3D model.

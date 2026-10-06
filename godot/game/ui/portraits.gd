@@ -26,6 +26,16 @@ func unit(type: String, owner: int) -> Texture2D:
 		_cache[key] = _render(_unit_object(type, owner))
 	return _cache[key]
 
+## A unit's command-button portrait (ui piece): a tight 3/4 close-up that fills
+## the button (a man's head and shoulders, a beast's or a rider's forequarters,
+## a machine whole), not the full figure of the card's portrait, so a train /
+## summon button reads as a face at 54 px (Retold's unit buttons are busts).
+func bust(type: String, owner: int) -> Texture2D:
+	var key := "ub:%s:%d" % [type, owner]
+	if not _cache.has(key):
+		_cache[key] = _render(_unit_object(type, owner), true)
+	return _cache[key]
+
 func building(type: String, owner: int) -> Texture2D:
 	var eg := _egypt_model(type, owner)
 	if FORT.has(type) and eg == "":
@@ -146,7 +156,7 @@ func _unit_object(type: String, owner: int) -> Node3D:
 		root.add_child(mi)
 	return root
 
-func _render(obj: Node3D) -> Texture2D:
+func _render(obj: Node3D, bust := false) -> Texture2D:
 	var vp := SubViewport.new()
 	vp.size = Vector2i(SIZE, SIZE)
 	vp.own_world_3d = true
@@ -184,14 +194,50 @@ func _render(obj: Node3D) -> Texture2D:
 	# other units already are (their weapons stay within half a body).
 	if not first_body and box.size.y > body.size.y * 1.5:
 		box = body
-	var ctr := box.get_center()
-	var r := maxf(box.size.x, maxf(box.size.y, box.size.z)) * 0.62
 	var cam := Camera3D.new()
 	cam.fov = 30.0
 	cam.near = 0.01
 	cam.far = 100.0
 	vp.add_child(cam)
+	if bust and not first_body:
+		_frame_bust(cam, body)
+		cam.current = true
+		return vp.get_texture()
+	var ctr := box.get_center()
+	var r := maxf(box.size.x, maxf(box.size.y, box.size.z)) * 0.62
 	cam.position = ctr + Vector3(r * 2.2, r * 1.4, r * 3.2)
 	cam.look_at(ctr, Vector3.UP)
 	cam.current = true
 	return vp.get_texture()
+
+## The bust framing (bust()): a standing figure (taller than wide) cropped to
+## its top 40 % (head and shoulders, the head high in the frame), a beast, a
+## rider or a machine to its front 70 %; seen from the front-right, a little
+## above eye level, the crop filling ~95 % of the frame.
+func _frame_bust(cam: Camera3D, body: AABB) -> void:
+	var tall := body.size.y > maxf(body.size.x, body.size.z) * 1.2
+	var crop := body
+	var dir := Vector3(0.62, 0.3, 1.0).normalized()
+	if tall:
+		var h := body.size.y * 0.4
+		crop = AABB(Vector3(body.position.x, body.end.y - h, body.position.z), Vector3(body.size.x, h, body.size.z))
+	else:
+		# the front of a long body (+z: where the unit looks) and its upper part
+		var d := body.size.z * 0.7
+		var h2 := body.size.y * 0.8
+		crop = AABB(Vector3(body.position.x, body.end.y - h2, body.end.z - d), Vector3(body.size.x, h2, d))
+		dir = Vector3(0.85, 0.42, 1.0).normalized()
+	var ctr := crop.get_center()
+	# the crop's extent across the view: its widest projected half-size
+	var half := 0.0
+	var right := Vector3.UP.cross(dir).normalized()
+	var up := dir.cross(right).normalized()
+	for k in 8:
+		var c := crop.get_endpoint(k) - ctr
+		half = maxf(half, maxf(absf(c.dot(right)), absf(c.dot(up))))
+	var dist := half / tan(deg_to_rad(cam.fov * 0.5)) / 0.95 + half * 0.5
+	cam.position = ctr + dir * dist
+	cam.look_at(ctr, Vector3.UP)
+	# a standing figure's head a little above the centre
+	if tall:
+		cam.position -= up * half * 0.06

@@ -474,6 +474,17 @@ func _run() -> void:
 	var ptah := _cmd_find(func(c): return str(c.get("action", "")) == "age_god" and str(c.get("arg", "")) == "ptah")
 	_check("the Town Center's age-up: Bast (A) or Ptah (S)", str(bast.get("key", "")) == "A" and str(ptah.get("key", "")) == "S" and bool(bast.get("enabled", false)),
 		"%s / %s" % [bast.get("title", ""), ptah.get("title", "")])
+	# one button kit (round 6): the gods' busts rendered (egypt_god_models.gd) on
+	# the grid's square tiles, distinct; the train buttons are bust portraits
+	# (portraits.gd bust()); the card's drop-off row lists food, wood and gold
+	var TIk = load("res://game/ui/tech_icons.gd")
+	var labc := _cmd_find(func(c): return str(c.get("action", "")) == "train" and str(c.get("arg", "")) == "laborer")
+	var busts_ok: bool = TIk.rendered("g_bast") and TIk.rendered("g_ptah") and TIk.BACKDROPS.has("g_bast")
+	for g in TIk.GOD_BUSTS:
+		busts_ok = busts_ok and TIk.rendered("g_" + str(g))
+	_check("the age-up gods are rendered busts, the train buttons bust portraits, the card's drop-off row",
+		busts_ok and bool(labc.get("bust", false)) and Array(ui.info.get("dropoff", [])) == ["food", "wood", "gold"],
+		"busts %s, laborer bust %s, dropoff %s" % [busts_ok, labc.get("bust", false), ui.info.get("dropoff", [])])
 	var lb := _units("laborer").size()
 	var tl = _cmd_where(func(c): return str(c.get("action", "")) == "train" and str(c.get("arg", "")) == "laborer")
 	if tl != null:

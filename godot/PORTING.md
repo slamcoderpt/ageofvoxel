@@ -3337,6 +3337,40 @@ Owner: the ui piece. Reference: `reference/egypt/ui_01..05.jpg`.
   playtest 34/34, techs_playtest (all ok), walls_playtest 38/38; the
   egyptui captures laborer / pharaoh / temple / tc / god / priest /
   pantheon (Ra, Isis, Set, Zeus) at 1920x1080.
+- **One button kit** (ui round 6, `hud.gd _draw_commands`, every civ):
+  every command button is a radial-lit face (a warm light high in the
+  middle, deep teal at the edges; slate when locked) under its picture, an
+  inner vignette and inset shadow, and the same bevelled gold-and-bronze
+  frame (`_bevel`: a 3 px cast-metal bevel lit gold on the top / left
+  faces and shaded bronze on the bottom / right, mitred corners with gold
+  studs, a dark outer line and inner lip; hover brightens it, pressed swaps
+  light and shade). A state recolours the metal (`FRAMES`: red can't
+  afford, blue training / researching, grey locked); a god tech keeps the
+  same frame with a violet inlay and its god's medallion (the purple corner
+  brackets are gone). Empty slots are faint recessed sockets 7 px smaller
+  than a button (`_socket`), not blank buttons. Train and summon buttons
+  show **bust portraits** (`portraits.gd bust()`, `"bust": true` on the
+  command): a standing figure cropped to its top 40 % (head and
+  shoulders), a beast / rider / machine to its front 70 %, a 3/4 view from
+  the front-right filling ~95 % of the cell; the card keeps the full
+  figure. The Egyptian age-up buttons show the **minor gods' busts**
+  (`game/ui/egypt_god_models.gd`, icon names `g_<god>`: Anubis' jackal,
+  Bast's cat, Ptah's green face and lapis skullcap, Hathor's horns and sun,
+  Nephthys' house glyph, Sekhmet's lioness, Sobek's crocodile under plumes,
+  Horus' falcon in the double crown, Osiris' atef, crook and flail, Thoth's
+  ibis and moon; narrowed shoulders (`SHOULDER_W`) cut at the wesekh
+  collar's foot and a lapis wig, so the head is the portrait at 48 px; a
+  0.5 rad 3/4 turn; eyes a third larger than life; glowing sun discs)
+  rendered in the tech icons' studio and baked on the same tiles
+  (`tech_icons.gd` BACKDROPS / FRAMING / `GOD_BUSTS`, in `tile_names()`);
+  headless they fall back to the gold hieroglyph. A building's card shows
+  one labelled **Drop-off** row (icon + name per resource, `info.dropoff`)
+  instead of bare icons. Captures: `egyptui_sel=tc` (TC grid, gods A / S),
+  default (laborer), `pharaoh`. Contact sheet of the busts: render
+  `TechIcons.render_models(host, ["g_bast", ...])`, `studio_finish()`,
+  `TechIcons.bake("g_bast", 96)`.
+  Verified (ui round 6): egypt_playtest 51/51, playtest 34/34,
+  techs_playtest 34/34, walls_playtest 38/38.
 - **Real-input playtest** (`game/core/egypt_playtest.gd`), launched with no
   scene argument like a player:
   ```
@@ -3348,7 +3382,8 @@ Owner: the ui piece. Reference: `reference/egypt/ui_01..05.jpg`.
   Play; the sim has you Egyptian; click / shift-click the Laborers, Ctrl+1;
   the Egyptian grid (keys, the Barracks' Classical lock, the Granary
   tooltip); Granary (button + ground click) and House (Q + click) built; H,
-  the age-up offers Bast / Ptah, a Laborer trained, a click on Bast: the
+  the age-up offers Bast / Ptah (all ten god busts rendered, the train
+  buttons bust portraits, the card's Drop-off row food / wood / gold), a Laborer trained, a click on Bast: the
   Classical Age with Bast and Eclipse; Barracks (D + click) built, a click
   on it, Q trains a Spearman; a Temple (S + click) built, a click on it:
   its grid holds the Priest and Bast's Sphinx and none of the other nine

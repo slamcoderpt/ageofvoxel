@@ -664,6 +664,9 @@ static func _custom(name: String, root: Node3D) -> bool:
 		"t_pious_sacrifice": _m_pious_sacrifice(root)
 		_:
 			# the Egyptian techs ("e_<key>"): their own models
+			# (the ui piece) the Egyptian minor gods' busts ("g_<god>"): the age-up buttons
+			if name.begins_with("g_"):
+				return load("res://game/ui/egypt_god_models.gd").build_into(name, root)
 			return name.begins_with("e_") and load("res://game/ui/egypt_tech_models.gd").build_into(name, root)
 	return true
 

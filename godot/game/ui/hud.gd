@@ -459,9 +459,7 @@ func _draw_commands() -> void:
 		var cr := Rect2(10 + col * 59, r.position.y + 3 + 14 + row * 59, 54, 54)
 		var c = cmds[i] if i < cmds.size() else null
 		if c == null:
-			S.vgrad(self, cr, [[0.0, Color(3 / 255.0, 14 / 255.0, 18 / 255.0, 0.55)], [1.0, Color(14 / 255.0, 44 / 255.0, 52 / 255.0, 0.45)]])
-			S.inset_shadow(self, cr, 8, 0.55)
-			draw_rect(cr, Color(216 / 255.0, 180 / 255.0, 108 / 255.0, 0.16), false, 1.0)
+			_socket(cr)
 			continue
 		var hover: bool = ui.hover_id == "cmd:%d" % i
 		var pressed: bool = hover and ui.mouse_down
@@ -470,14 +468,15 @@ func _draw_commands() -> void:
 			rr = cr.grow(-1)
 		var en: bool = c.enabled
 		var st := str(c.get("state", ""))
+		# the cell's face: a soft radial backdrop behind the picture (a warm
+		# light high in the middle, deep teal at the edges; grey when locked);
+		# the bevelled frame and the vignette come over the picture
+		# (_draw_cmd_state)
+		draw_rect(rr.grow(1), Color(0.02, 0.015, 0.0, 0.95))
 		if st == "locked" and not c.has("tech"):
-			# locked: the cell's plate goes grey with the portrait (no team-teal left)
-			S.cell(self, rr, [[0.0, Color("#3e4246")], [0.85, Color("#16181b")], [1.0, Color("#16181b")]], Vector2(0.5, 0.35))
-			# and its gold metal edge dims to the locked tech frame's grey
-			draw_rect(rr.grow(-1), Color("#5c5c62"), false, 2.0)
-			draw_rect(Rect2(rr.position + Vector2(0, 0), Vector2(rr.size.x, 1)), Color("#8a8a90"))
+			S.radial_box(self, rr.grow(-1), [[0.0, Color("#5a5c60")], [0.5, Color("#2a2c30")], [1.0, Color("#101114")]], Vector2(0.5, 0.36))
 		else:
-			S.cell(self, rr, [[0.0, Color("#3d6f86")], [0.85, Color("#0f2d38")], [1.0, Color("#0f2d38")]], Vector2(0.5, 0.35))
+			S.radial_box(self, rr.grow(-1), [[0.0, Color("#c8b48a")], [0.32, Color("#5f8a8c")], [0.72, Color("#173c48")], [1.0, Color("#081a22")]], Vector2(0.5, 0.36))
 		var mod := Color.WHITE if en or st == "unaffordable" or st == "training" else Color(0.45, 0.47, 0.5)
 		var ir := rr.grow(-3)
 		if c.has("tech"):
@@ -502,6 +501,9 @@ func _draw_commands() -> void:
 		elif c.get("tex") != null:
 			var ptex: Texture2D = c.tex
 			var pdst := Rect2(rr.grow(-2).position, Vector2(58, 58))  # CSS: the oversized grid item sits at the content box origin, overflowing right / down
+			if c.get("bust", false):
+				# a unit's bust (portraits.gd bust()): framed to fill the cell
+				pdst = rr.grow(-2)
 			if st == "locked" or st == "training" or st == "queued":
 				# locked: the portrait's greyscale copy (the tech tiles' "locked"
 				# grey); training / queued: its blue "busy" copy, as a tech being
@@ -518,12 +520,11 @@ func _draw_commands() -> void:
 			if st == "locked":
 				draw_rect(rr.grow(-2), Color(0.03, 0.05, 0.07, 0.22))
 		elif c.has("minor"):
-			_minor_tile(rr, str(c.minor), en or st == "researching" or st == "unaffordable")
+			_minor_tile(rr, ir, str(c.minor), en or st == "researching" or st == "unaffordable", st, float(c.get("progress", 0.0)))
 		else:
-			S.draw_icon(self, c.svg, Rect2(rr.get_center() - Vector2(16, 16), Vector2(32, 32)), true, mod)
-		_draw_cmd_state(c, rr, ir, st, hover)
+			S.draw_icon(self, c.svg, Rect2(rr.get_center() - Vector2(18, 18), Vector2(36, 36)), true, mod)
+		_draw_cmd_state(c, rr, ir, st, hover, pressed)
 		if hover and (en or st != ""):
-			draw_rect(rr.grow(-2), S.GOLD_HI if en else Color(1, 1, 1, 0.35), false, 1.0)
 			if en:
 				for k in 3:
 					draw_rect(rr.grow(1.0 + k * 2.0), Color(233 / 255.0, 200 / 255.0, 120 / 255.0, 0.3 - k * 0.09), false, 2.0)
@@ -540,25 +541,91 @@ func _draw_commands() -> void:
 				tip[k] = c[k]
 		zone(cr, "cmd", i, tip)
 
-## A minor god's age-up button (the Egyptians): a lapis disc under his gold
-## hieroglyph, dimmed when the button is locked.
-func _minor_tile(rr: Rect2, god: String, lit: bool) -> void:
+## A minor god's age-up button (the Egyptians): his bust (egypt_god_models.gd,
+## the tile "g_<god>") on the grid's own square tile, as a unit's portrait;
+## greyed when locked, the busy blue with the colour coming back while the
+## age is being reached. Headless (no studio): his gold hieroglyph on a disc.
+func _minor_tile(rr: Rect2, ir: Rect2, god: String, lit: bool, st := "", p := 0.0) -> void:
+	var busy := st == "researching"
+	var tex := TechIcons.tile("g_" + god, int(ir.size.x), "busy" if busy else ("normal" if lit else "locked"))
+	if tex and TechIcons.rendered("g_" + god):
+		draw_texture_rect(tex, ir, false)
+		if busy:
+			_reveal(TechIcons.tile("g_" + god, int(ir.size.x), "normal"), ir, ir, p)
+		return
 	var c := rr.get_center()
 	var stops := [[0.0, Color("#f8e6b0")], [0.45, Color("#2e5ea6")], [1.0, Color("#081836")]] if lit else \
 		[[0.0, Color("#8a8a86")], [0.45, Color("#3a3e48")], [1.0, Color("#101216")]]
 	draw_circle(c, 22.5, Color("#1a1206"), true, -1.0, true)
 	draw_circle(c, 21.5, Color("#d8b46c") if lit else Color("#6a6a6e"), true, -1.0, true)
 	S.disc(self, c, 20.0, S.radial_tex(stops, Vector2(0.5, 0.3), 0.7, 64))
-	var tex := S.icon("mg_" + god, 38, "#ffe9a8" if lit else "#a8a8a4")
-	if tex:
-		draw_texture_rect(tex, Rect2(c - Vector2(19, 20), Vector2(38, 38)), false, Color(0, 0, 0, 0.7))
-		draw_texture_rect(tex, Rect2(c - Vector2(19, 19), Vector2(38, 38)), false)
+	var em := S.icon("mg_" + god, 38, "#ffe9a8" if lit else "#a8a8a4")
+	if em:
+		draw_texture_rect(em, Rect2(c - Vector2(19, 20), Vector2(38, 38)), false, Color(0, 0, 0, 0.7))
+		draw_texture_rect(em, Rect2(c - Vector2(19, 19), Vector2(38, 38)), false)
+
+## An empty slot of the grid: a faint recessed socket, smaller than a button
+## (an inset shadow, a dark lip on the top / left and a faint lit lip on the
+## bottom / right, a pin-head at its centre), so the grid's empty places read
+## as sockets in the panel, not as blank buttons.
+func _socket(cr: Rect2) -> void:
+	var r := cr.grow(-7)
+	draw_rect(r, Color(0.0, 0.03, 0.04, 0.32))
+	S.inset_shadow(self, r, 6, 0.5)
+	draw_line(r.position, Vector2(r.end.x, r.position.y), Color(0, 0, 0, 0.55), 1.0)
+	draw_line(r.position, Vector2(r.position.x, r.end.y), Color(0, 0, 0, 0.45), 1.0)
+	draw_line(Vector2(r.position.x, r.end.y), r.end, Color(216 / 255.0, 180 / 255.0, 108 / 255.0, 0.16), 1.0)
+	draw_line(Vector2(r.end.x, r.position.y), r.end, Color(216 / 255.0, 180 / 255.0, 108 / 255.0, 0.12), 1.0)
+	draw_circle(r.get_center(), 1.6, Color(216 / 255.0, 180 / 255.0, 108 / 255.0, 0.1))
+
+## The bevelled gold-and-bronze frame of every button (ui piece, round 6): a
+## 3 px cast-metal bevel, lit gold on the top / left faces and shaded bronze
+## on the bottom / right, mitred at the corners, between a dark outer line and
+## a dark inner lip; a state recolours the metal (FRAMES: red / blue / grey).
+## Hover lifts it (brighter metal, a gold glow round it), pressed sinks it
+## (the light and the shade swap faces).
+const BEVEL_GOLD := ["#fff2bc", "#d6a64a", "#5c3c12"]
+const BEVEL_GOLD_DIM := ["#c8c0a8", "#8a8068", "#3a3428"]
+
+func _bevel(rr: Rect2, pal: Array, hover: bool, pressed: bool) -> void:
+	var hi := Color(str(pal[0]))
+	var mid := Color(str(pal[1]))
+	var lo := Color(str(pal[2]))
+	if hover:
+		hi = hi.lerp(Color.WHITE, 0.35)
+		mid = mid.lightened(0.2)
+		lo = lo.lightened(0.15)
+	var tl := hi
+	var br := lo
+	if pressed:
+		tl = lo
+		br = hi.lerp(mid, 0.4)
+	var o := rr
+	var w := 3.0
+	var i := o.grow(-w)
+	var O := [o.position, Vector2(o.end.x, o.position.y), o.end, Vector2(o.position.x, o.end.y)]
+	var I := [i.position, Vector2(i.end.x, i.position.y), i.end, Vector2(i.position.x, i.end.y)]
+	# top, left: lit; bottom, right: shaded (each face from its outer edge to its inner)
+	draw_polygon(PackedVector2Array([O[0], O[1], I[1], I[0]]), PackedColorArray([tl, tl.lerp(mid, 0.3), mid, mid.lerp(tl, 0.4)]))
+	draw_polygon(PackedVector2Array([O[0], I[0], I[3], O[3]]), PackedColorArray([tl.lerp(mid, 0.2), mid.lerp(tl, 0.2), mid.lerp(br, 0.4), tl.lerp(br, 0.6)]))
+	draw_polygon(PackedVector2Array([O[3], I[3], I[2], O[2]]), PackedColorArray([br.lerp(mid, 0.3), mid.lerp(br, 0.5), mid.lerp(br, 0.3), br]))
+	draw_polygon(PackedVector2Array([O[1], O[2], I[2], I[1]]), PackedColorArray([tl.lerp(br, 0.45), br, mid.lerp(br, 0.4), mid.lerp(tl, 0.1)]))
+	# a fine highlight on the top face's crest and a groove round the middle
+	draw_line(O[0] + Vector2(1, 0.5), O[1] + Vector2(-1, 0.5), Color(1, 1, 1, 0.45 if not pressed else 0.1), 1.0)
+	draw_rect(o.grow(-1.5), Color(lo.darkened(0.3), 0.35), false, 1.0)
+	# dark lines outside and at the inner lip
+	draw_rect(o.grow(0.5), Color(0.02, 0.015, 0.0, 0.95), false, 1.0)
+	draw_rect(i.grow(0.5), Color(0.03, 0.02, 0.0, 0.85), false, 1.0)
+	# a small gold stud on each corner of the bevel
+	for k in 4:
+		var cpt: Vector2 = O[k].lerp(I[k], 0.5)
+		draw_circle(cpt, 1.3, hi.lerp(Color.WHITE, 0.2))
 
 ## The state layer of a command button (PORTING.md "Command button states").
 ## One language for every button (tech, train, build, trade), read from the
-## frame's colour first: available: the family's bright bevel (gold generic /
-## purple god, the god's emblem on its corner; a portrait keeps the cell's
-## edge); unaffordable: the whole bevel red plus a red cast (techs and
+## frame's colour first: available: every button's gold-and-bronze bevel
+## (_bevel; a god tech with a violet inlay inside it and the god's emblem on
+## its corner); unaffordable: the whole bevel red plus a red cast (techs and
 ## portraits alike); researching / training / queued: the whole bevel blue,
 ## the picture in the blue "busy" duotone, its colour coming back clockwise
 ## as the work runs, a thick bar on the tile's foot; a queued tech its place
@@ -580,32 +647,31 @@ static func frame_of(fam: String, st: String) -> String:
 		"locked": return "grey" if fam != "" else ""
 	return fam
 
-func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bool) -> void:
+func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, hover := false, pressed := false) -> void:
 	var bold := S.font("bold")
 	var title := S.font("title")
 	var p := clampf(float(c.get("progress", 0.0)), 0.0, 1.0)
+	# the inner vignette: the picture's edges sink into the frame
+	draw_texture_rect(S.radial_tex([[0.0, Color(0, 0, 0, 0)], [0.62, Color(0, 0, 0, 0)], [1.0, Color(0, 0, 0, 0.62)]], Vector2(0.5, 0.42), 0.78, 64), rr.grow(-3), false)
+	S.inset_shadow(self, rr.grow(-3), 4, 0.6)
 	if st == "unaffordable":
 		# Retold: the picture in full colour under a red cast, deepest at the foot
 		S.vgrad(self, ir, [[0.0, Color(0.8, 0.06, 0.02, 0.08)], [0.45, Color(0.8, 0.06, 0.02, 0.16)], [1.0, Color(0.9, 0.05, 0.02, 0.42)]])
-	# the frame: a 3 px bevel, lit top / left, shaded bottom / right
+	# the frame: every button's bevelled gold-and-bronze metal (_bevel), the
+	# state's colour when it has one (red / blue / grey)
 	var fam := str(c.get("frame", ""))
 	var sf := frame_of(fam, st)
-	var o := rr.grow(-1)
-	if sf != "":
-		var fc: Array = FRAMES[sf]
-		var hi := Color(str(fc[0]))
-		var mid := Color(str(fc[1]))
-		var lo := Color(str(fc[2]))
-		if sf == "red" or sf == "blue":
-			# a glow into the gap between cells: the state reads from afar
-			draw_rect(rr.grow(1), Color(mid, 0.45), false, 2.0)
-		draw_rect(o.grow(1), Color(0.03, 0.02, 0.0, 0.9), false, 1.0)
-		draw_rect(Rect2(o.position, Vector2(o.size.x, 2)), hi)
-		draw_rect(Rect2(o.position, Vector2(2, o.size.y)), hi.lerp(mid, 0.4))
-		draw_rect(Rect2(o.position.x, o.end.y - 2, o.size.x, 2), lo)
-		draw_rect(Rect2(o.end.x - 2, o.position.y, 2, o.size.y), lo.lerp(mid, 0.3))
-		draw_rect(o, mid, false, 1.0)
-		draw_rect(o.grow(-2), Color(str(fc[3])) if str(fc[3]) != "" else Color(0, 0, 0, 0.6), false, 1.0)
+	var pal: Array = BEVEL_GOLD
+	if sf == "red" or sf == "blue" or sf == "grey":
+		pal = FRAMES[sf]
+	elif st == "locked":
+		pal = FRAMES["grey"]
+	if sf == "red" or sf == "blue":
+		# a glow into the gap between cells: the state reads from afar
+		draw_rect(rr.grow(1), Color(Color(str(pal[1])), 0.45), false, 2.0)
+	_bevel(rr, pal, hover and st != "locked", pressed)
+	if sf != "" and str(FRAMES[sf][3]) != "":
+		draw_rect(rr.grow(-3.5), Color(str(FRAMES[sf][3])), false, 1.0)
 	if st == "researching" or st == "training":
 		# where the colour stops: the sweep's leading edge on the picture
 		if p > 0.0 and p < 1.0:
@@ -627,14 +693,16 @@ func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bo
 		for k in 4:
 			draw_rect(Rect2(bar.position.x + 3 + k * (bar.size.x - 6) / 4.0, bar.position.y + 2, 4, 2), Color("#4a86c8"))
 	var lockd := st == "locked"
-	# identity: a god tech keeps its god in every state. Purple corner caps
-	# (an L bracket on each of the four corners, over the state's bevel) and
-	# the god's emblem on a medallion at the top-left: a red can't-afford or
+	# identity: a god tech keeps its god in every state: the god's emblem on
+	# a medallion at the top-left (and, available, a violet inlay): a red can't-afford or
 	# a blue researching god tech still reads "god tech" by shape, not only
 	# by a frame colour the state has taken over
 	var god := str(c.get("god", ""))
-	if fam == "purple":
-		_god_corners(rr, lockd)
+	if fam == "purple" and sf == "purple":
+		# a god tech: a violet inlay inside the same metal frame (no other
+		# frame shape: one button kit), and the god's medallion below
+		draw_rect(rr.grow(-3.5), Color("#b45ae6"), false, 1.0)
+		draw_rect(rr.grow(-4.5), Color(0.3, 0.08, 0.5, 0.6), false, 1.0)
 	if fam == "purple" and god != "":
 		var mc := rr.position + Vector2(3.5, 3.5)
 		draw_circle(mc, 8.0, Color(0.04, 0.0, 0.08, 0.95))
@@ -687,35 +755,6 @@ func _draw_cmd_state(c: Dictionary, rr: Rect2, ir: Rect2, st: String, _hover: bo
 		if qt:
 			S.draw_icon(self, "t_time", Rect2(br.position + Vector2(2, 2), Vector2(9, 9)), false)
 		draw_string(bold, Vector2(br.position.x + iw + (bw - iw - S.text_width(bold, n, 11)) * 0.5, br.end.y - 3), n, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
-
-## A god tech's corner caps: a purple L bracket on each corner of rr, set over
-## the frame's bevel (whatever colour the state gave it) and the gap round it.
-func _god_corners(rr: Rect2, dim: bool) -> void:
-	var hi := Color("#f6dcff") if not dim else Color("#8a8490")
-	var mid := Color("#a04ee0") if not dim else Color("#4a4452")
-	var arm := 12.0
-	var th := 3.0
-	var o := rr.grow(1)
-	for cx in [0, 1]:
-		for cy in [0, 1]:
-			var x := o.position.x if cx == 0 else o.end.x - arm
-			var y := o.position.y if cy == 0 else o.end.y - th
-			var xv := o.position.x if cx == 0 else o.end.x - th
-			var yv := o.position.y if cy == 0 else o.end.y - arm
-			var hr := Rect2(x, y, arm, th)
-			var vr := Rect2(xv, yv, th, arm)
-			draw_rect(hr.grow(1), Color(0.03, 0.0, 0.06, 0.95))
-			draw_rect(vr.grow(1), Color(0.03, 0.0, 0.06, 0.95))
-			draw_rect(hr, mid)
-			draw_rect(vr, mid)
-			# lit edge on the top / left faces
-			draw_rect(Rect2(hr.position, Vector2(hr.size.x, 1)), hi)
-			draw_rect(Rect2(vr.position, Vector2(1, vr.size.y)), hi.lerp(mid, 0.3))
-			# a stud on the bracket's end
-			var sx := hr.end.x - 1.5 if cx == 0 else hr.position.x + 1.5
-			var sy := vr.end.y - 1.5 if cy == 0 else vr.position.y + 1.5
-			draw_circle(Vector2(sx, hr.get_center().y), 1.1, hi)
-			draw_circle(Vector2(vr.get_center().x, sy), 1.1, hi)
 
 ## Darken the part of r a clockwise sweep from 12 o'clock has not reached at p.
 func _sweep(r: Rect2, p: float, col: Color) -> void:
@@ -866,6 +905,22 @@ func _draw_info() -> void:
 					S.text(self, sans, Vector2(vx + S.text_width(bold, str(s[1]), 15) + 5, cy + 16), s[2], 15, S.MUTED)
 				i += 1
 			var ty := sy + ((stats.size() + 1) / 2) * 22 + 3
+			# the drop-off row: "Drop-off" then each resource's icon and name
+			# (a Town Center: Food, Wood, Gold), one line under the stats
+			var dro: Array = info.get("dropoff", [])
+			if not dro.is_empty():
+				var dy := ty - 3
+				S.text(self, sans, Vector2(sx, dy + 16), "Drop-off", 15, S.MUTED)
+				var dx := sx + S.text_width(sans, "Drop-off", 15) + 9
+				for k in dro:
+					var nm := str(k).capitalize()
+					var wnm := S.text_width(bold, nm, 14)
+					if dx + 20 + wnm > r.end.x - 14:
+						break
+					S.draw_icon(self, str(k), Rect2(dx, dy + 1, 18, 18))
+					S.text(self, bold, Vector2(dx + 21, dy + 16), nm, 14, S.INK)
+					dx += 21 + wnm + 10
+				ty += 22
 			for t in info.get("tasks", []):
 				S.text(self, title, Vector2(sx, ty + 14), str(t).to_upper(), 13, S.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.85, 0.8)
 				ty += 20
