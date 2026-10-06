@@ -8,6 +8,14 @@
 //                (anim 'medusa', pose 'serpent': coil, tailA..C, torso) without its wings
 //   phoenix_egg  the Phoenix's Rebirth egg: a gold-and-ember egg with glowing cracks and a
 //                team band, on a ring of charred nest twigs and hot coals (anim 'siege': still)
+//   citadel      Sekhmet's Citadel (a static model, voxel 1/8 tile as the Egyptian buildings,
+//                pivot at the footprint centre): the fortress that rises round a Town Center made
+//                a Citadel Center: battered sandstone curtain walls with a crenellated parapet just
+//                outside the 7x7 footprint, four massive corner bastions crowned with a gilt cavetto
+//                cornice, merlons and a burning brazier, a gate between two pylons at the front with
+//                Sekhmet's red banners and a winged gold sun disc, team bands; drawn by
+//                game/godpowers/egypt_fx.gd over every Citadel Center (it rises out of the ground
+//                in the cast)
 // Same palette rules as export-egypt-units.mjs (sRGB hex, TEAM voxels tinted by the shader,
 // glow in extra.g); one outline width (0.3) as every Egyptian unit.
 //
@@ -232,8 +240,167 @@ const tset = (m, x, y, z, base) => { m.set(x, y, z, TEAM); m.get(x, y, z).c = ba
   ]);
 }
 
+// ---- Sekhmet's Citadel (0.125, static) ------------------------------------------------------------
+const STATIC = {};
+{
+  const m = new VoxelModel();
+  const pick = (h, a) => a[Math.min(a.length - 1, Math.floor(h * a.length))];
+  // sandstone in courses of 4 rows, blocks 6 long, a darker bed joint; a dark plinth; limestone string courses
+  const STONE = (x, y, z) => {
+    const course = y >> 2, along = (x + z + (course & 1) * 3);
+    const h = hash3(Math.floor(along / 6), course, (x * 7 + z * 13) >> 4, 81);
+    const c = pick(h, [0xe2c491, 0xd8b680, 0xcca874, 0xdcbd8a]);
+    if ((y & 3) === 3) return 0xb8955f;                       // bed joint
+    if (((along % 6) + 6) % 6 === 0) return 0xc29d68;          // head joint
+    return c;
+  };
+  const PLINTH = (x, y, z) => pick(hash3(x >> 1, y, z >> 1, 82), [0x8a6e4a, 0x7f6443, 0x947852]);
+  const LIME = (x, y, z) => pick(hash3(x, y, z, 83), [0xf1e6cf, 0xe6d8bb, 0xeadcc1]);
+  const GILT = 0xdcab3c, GILT_L = 0xf3cf5e, GILT_D = 0xa8782a;
+  const RED = 0xa8281c, RED_D = 0x7e1c14, DARK = 0x221c18, BASALT = 0x343a3c;
+  const FIRE = [0xffd040, 0xff9a20, 0xff7010];
+  const WALL_H = 16;            // curtain wall walk height (2 tiles)
+  const IN = 29, OUT = 34;      // |c| range of the curtain wall (the footprint ends at 28)
+  const absc = (v) => Math.abs(v + 0.5);
+  // the curtain walls: a battered outer face (it leans in 1 voxel every 6 rows), merlons on the outer edge
+  for (let x = -38; x < 38; x++) for (let z = -38; z < 38; z++) {
+    const ax = absc(x), az = absc(z), r = Math.max(ax, az);
+    if (r < IN) continue;
+    for (let y = 0; y < WALL_H + 4; y++) {
+      const out = OUT - Math.floor(y / 6) - 0.5;
+      if (r > out) continue;
+      const along = ax >= az ? z : x;            // position along this wall
+      const gate = az >= ax && z >= 0 && absc(along) < 6;
+      if (gate && y < 22) continue;              // the gate passage (the lintel above)
+      if (y >= WALL_H) {
+        // parapet: the outer 2 voxels, merlons 2 on / 2 off above a solid course
+        if (r < out - 2) continue;
+        if (y >= WALL_H + 1 && (((along >> 1) % 2) + 2) % 2 === 1) continue;
+      }
+      let c;
+      if (y < 3) c = PLINTH(x, y, z);
+      else if (y === 11 || y === WALL_H - 1) c = LIME(x, y, z);
+      else if ((y === 12 || y === 13) && r >= out - 1) c = TEAM;
+      else c = STONE(x, y, z);
+      m.set(x, y, z, c);
+    }
+  }
+  // the gate lintel (y 16..22) and its winged sun disc
+  for (let x = -6; x < 6; x++) for (let z = IN; z < OUT - 2; z++) for (let y = 16; y < 23; y++)
+    m.set(x, y, z, y === 22 ? LIME(x, y, z) : STONE(x, y, z));
+  for (let x = -8; x < 8; x++) for (let y = 17; y < 21; y++) {
+    const ax = absc(x), cy = y - 18.5;
+    const disc = ax * ax + cy * cy * 1.6 <= 4.2;
+    const wing = ax >= 2 && ax < 8 && y >= 18 + Math.floor((ax - 2) / 3) && y < 21;
+    if (disc) m.set(x, y, OUT - 2, ax < 1 && y === 20 ? RED : GILT_L);
+    else if (wing) m.set(x, y, OUT - 2, ((ax | 0) + y) % 2 ? GILT : GILT_D);
+  }
+  // the gate's doors, set back in the passage
+  for (let x = -6; x < 6; x++) for (let y = 0; y < 16; y++) m.set(x, y, IN, (x === -1 || x === 0) ? DARK : (y % 4 === 0 ? 0x5a3b22 : 0x7d4624));
+  // the corner bastions: 16 x 16 at the foot tapering 1 voxel every 8 rows, 34 rows, a gilt
+  // cavetto cornice, merlons, slit windows, a red banner on each outer face, a brazier on top
+  const TOWER_H = 32;
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const cx = sx * 33, cz = sz * 33;
+    for (let y = 0; y < TOWER_H + 5; y++) {
+      let hw = 8 - Math.floor(Math.min(y, TOWER_H - 1) / 8);
+      if (y >= TOWER_H - 3 && y < TOWER_H) hw += y - (TOWER_H - 4);   // the cornice flares out
+      if (y >= TOWER_H) hw = 8 - Math.floor((TOWER_H - 1) / 8) + 3;
+      for (let dx = -hw; dx < hw; dx++) for (let dz = -hw; dz < hw; dz++) {
+        const ex = dx === -hw || dx === hw - 1, ez = dz === -hw || dz === hw - 1;
+        const x = cx + dx, z = cz + dz;
+        if (y >= TOWER_H) {           // the crown: merlons round the edge, the floor inside
+          if (y > TOWER_H && !(ex || ez)) continue;
+          if (y > TOWER_H && (((dx + dz) >> 1) & 1)) continue;
+          m.set(x, y, z, y === TOWER_H ? GILT_D : STONE(x, y, z));
+          continue;
+        }
+        let c;
+        if (y < 3) c = PLINTH(x, y, z);
+        else if (y >= TOWER_H - 3) c = y === TOWER_H - 1 ? GILT_L : y === TOWER_H - 2 ? GILT : GILT_D;
+        else if (y === TOWER_H - 4) c = LIME(x, y, z);
+        else if (y === 11 || y === 22) c = LIME(x, y, z);
+        else if ((y === 12 || y === 13) && (ex || ez)) c = TEAM;
+        else c = STONE(x, y, z);
+        // slit windows in the middle of every face
+        if ((ex && Math.abs(dz + 0.5) < 1 || ez && Math.abs(dx + 0.5) < 1) && y >= 16 && y < 20) c = DARK;
+        m.set(x, y, z, c);
+      }
+    }
+    // Sekhmet's red banners down each outward face: a gilt pole, red cloth with a gold sun disc
+    for (const face of ['x', 'z']) {
+      const hwB = 8 - Math.floor(26 / 8);
+      for (let y = 9; y < 27; y++) for (let t = -3; t < 3; t++) {
+        const fx = face === 'x' ? cx + sx * (sx > 0 ? hwB : hwB + 1) : cx + t + (sx > 0 ? -2 : 2);
+        const fz = face === 'z' ? cz + sz * (sz > 0 ? hwB : hwB + 1) : cz + t + (sz > 0 ? -2 : 2);
+        const ty = y - 21.5, tt = t + 0.5;
+        let c = (t === -3 || t === 2) ? GILT_D : RED;
+        if (y === 26) c = GILT;
+        if (tt * tt + ty * ty <= 3.2) c = GILT_L;
+        if (y < 11 && ((t + y) & 1)) continue;           // the fringe
+        if (y < 12 && c === RED) c = RED_D;
+        m.set(fx, y, fz, c);
+      }
+    }
+    // the brazier: a basalt bowl on the bastion's roof, heaped with fire
+    for (let dx = -3; dx < 3; dx++) for (let dz = -3; dz < 3; dz++) {
+      const rim = dx === -3 || dx === 2 || dz === -3 || dz === 2;
+      m.set(cx + dx, TOWER_H + 1, cz + dz, BASALT);
+      if (rim) { m.set(cx + dx, TOWER_H + 2, cz + dz, (dx + dz) & 1 ? BASALT : GILT_D); continue; }
+      m.set(cx + dx, TOWER_H + 2, cz + dz, FIRE[2], { glow: 0.95 });
+      m.set(cx + dx, TOWER_H + 3, cz + dz, FIRE[1], { glow: 0.95 });
+      if (dx >= -1 && dx <= 0 && dz >= -1 && dz <= 0) {
+        m.set(cx + dx, TOWER_H + 4, cz + dz, FIRE[0], { glow: 0.95 });
+        if (dx === dz) m.set(cx + dx, TOWER_H + 5, cz + dz, FIRE[0], { glow: 0.95 });
+      }
+    }
+  }
+  // the gate pylons: 10 wide, 12 deep, 30 rows, battered on the outer sides, a gilt cornice, a
+  // red banner on the front with a gold sun disc, the team band
+  const PY_H = 30;
+  for (const sx of [-1, 1]) {
+    for (let y = 0; y < PY_H + 3; y++) {
+      const lean = Math.floor(y / 7);
+      let x0 = 6, x1 = 17 - lean, z0 = 28, z1 = 38 - Math.floor(lean / 2);
+      if (y >= PY_H - 2) { x1 += y - (PY_H - 3); z1 += y - (PY_H - 3); }
+      if (y >= PY_H) { x1 = 17 - Math.floor((PY_H - 1) / 7) + 2; z1 = 38 - Math.floor(Math.floor((PY_H - 1) / 7) / 2) + 2; }
+      for (let a = x0; a < x1; a++) for (let z = z0; z < z1; z++) {
+        const x = sx > 0 ? a : -1 - a;
+        if (y >= PY_H) {
+          const edge = a === x0 || a === x1 - 1 || z === z0 || z === z1 - 1;
+          if (y > PY_H && (!edge || ((a + z) >> 1) & 1)) continue;
+          m.set(x, y, z, y === PY_H ? GILT_D : STONE(x, y, z));
+          continue;
+        }
+        let c;
+        if (y < 3) c = PLINTH(x, y, z);
+        else if (y >= PY_H - 2) c = y === PY_H - 1 ? GILT_L : GILT;
+        else if (y === PY_H - 3 || y === 11) c = LIME(x, y, z);
+        else if ((y === 12 || y === 13) && (z === z1 - 1 || a === x1 - 1)) c = TEAM;
+        else c = STONE(x, y, z);
+        m.set(x, y, z, c);
+      }
+    }
+    // the banner on the pylon's front
+    const zf = 38 - Math.floor(Math.floor(24 / 7) / 2);
+    for (let y = 8; y < 26; y++) for (let a = 9; a < 14; a++) {
+      const x = sx > 0 ? a : -1 - a;
+      const ty = y - 20.5, ta = a - 11;
+      let c = (a === 9 || a === 13) ? GILT_D : RED;
+      if (y === 25) c = GILT;
+      if (ta * ta + ty * ty <= 3.2) c = GILT_L;
+      if (y < 10 && ((a + y) & 1)) continue;
+      if (y < 11 && c === RED) c = RED_D;
+      m.set(x, y, zf, c);
+    }
+  }
+  STATIC['citadel'] = { model: m, voxel: 0.125 };
+}
+
 // ---- write ---------------------------------------------------------------------------------
 const g = new Group('egypt_gods');
+for (const [name, S] of Object.entries(STATIC))
+  g.add(name, buildVoxelGeometry(S.model, { size: S.voxel, pivot: [0, 0, 0], jitter: 0.05, ao: true }), { outline: 1 });
 g.extra.rigs = {};
 for (const [type, R] of Object.entries(RIGS)) {
   const parts = R.parts.map((p) => ({ ...p, anim: p.anim || p.name }));

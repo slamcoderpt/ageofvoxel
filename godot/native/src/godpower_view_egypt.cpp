@@ -614,10 +614,25 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 		puff(false, c.t0, hmix(c.building, 9, 141), now, c.x, gy + 0.3, c.z, 90, 0xcfae78, 0.5, 2.0, 6, 1.0, 0.3, 1.2, half);
 		lit(c.x, gy + 6, c.z, 0xffcc60, 30 * pk, 22, 1.3);
 	}
+	Array cits; // (egypt_fx.gd: the Citadel's fortress model over each, rising in the cast)
 	for (int32_t id : G.citadels) {
 		const int b = E.building_slot(id);
 		if (b < 0 || B.dead[b]) continue;
 		const double half = std::max(B.w[b], B.h[b]) * 0.5, gy = h_at(B.x[b], B.z[b]);
+		{
+			double rise = 1;
+			for (const aov::CitadelCast &c : G.citadel_fx)
+				if (c.building == id) rise = sstep(0.2, 2.6, now - c.t0);
+			Dictionary cd;
+			cd["id"] = id;
+			cd["x"] = B.x[b];
+			cd["z"] = B.z[b];
+			cd["y"] = gy;
+			cd["w"] = std::max(B.w[b], B.h[b]);
+			cd["owner"] = B.owner[b];
+			cd["rise"] = rise;
+			cits.push_back(cd);
+		}
 		const Lin gc = hex_lin(0xffc850);
 		decal(I_DECAL_ADD, B.x[b], gy + 0.12, B.z[b], 2 * half * 1.45, now * 0.05, gc.r, gc.g, gc.b, 0.55f, 5, 0.86f, (float)(now * 0.05));
 		for (int i = 0; i < 16; i++) {
@@ -627,6 +642,8 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 			cube(I_EMBER, B.x[b] + std::cos(a) * rr, gy + 0.5 + f * 6, B.z[b] + std::sin(a) * rr, now, a, 0, s, s, s, 3.0f, 2.2f, 0.7f);
 		}
 	}
+
+	eg["citadels"] = cits;
 
 	// ---- the Son of Osiris: his gold ring, his chain lightning ----------------------------------------
 	for (int u = 0; u < U.size(); u++) {

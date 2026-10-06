@@ -2,7 +2,7 @@
  "format": 2,
  "group": "egypt_gods",
  "bin": "egypt_gods.bin.gz",
- "bytes": 321328,
+ "bytes": 3956864,
  "rigs": {
   "serpent": {
    "voxel": 0.12,
@@ -132,6 +132,23 @@
   "phoenix_egg"
  ],
  "models": {
+  "citadel": {
+   "vertices": 95672,
+   "indices": 143508,
+   "aabb": [
+    -5.125,
+    0,
+    -5.125,
+    5.125,
+    4.75,
+    5.125
+   ],
+   "position": 0,
+   "normal": 1148064,
+   "color": 2296128,
+   "extra": 2678816,
+   "index": 3061504
+  },
   "serpent/coil": {
    "vertices": 2440,
    "indices": 3660,
@@ -143,11 +160,11 @@
     0.96,
     0.84
    ],
-   "position": 0,
-   "normal": 29280,
-   "color": 58560,
-   "extra": 68320,
-   "index": 78080
+   "position": 3635536,
+   "normal": 3664816,
+   "color": 3694096,
+   "extra": 3703856,
+   "index": 3713616
   },
   "serpent/tailA": {
    "vertices": 504,
@@ -160,11 +177,11 @@
     0.36,
     0.12
    ],
-   "position": 92720,
-   "normal": 98768,
-   "color": 104816,
-   "extra": 106832,
-   "index": 108848
+   "position": 3728256,
+   "normal": 3734304,
+   "color": 3740352,
+   "extra": 3742368,
+   "index": 3744384
   },
   "serpent/tailB": {
    "vertices": 408,
@@ -177,11 +194,11 @@
     0.24,
     0.12
    ],
-   "position": 111872,
-   "normal": 116768,
-   "color": 121664,
-   "extra": 123296,
-   "index": 124928
+   "position": 3747408,
+   "normal": 3752304,
+   "color": 3757200,
+   "extra": 3758832,
+   "index": 3760464
   },
   "serpent/tailC": {
    "vertices": 216,
@@ -194,11 +211,11 @@
     0.24,
     0.12
    ],
-   "position": 127376,
-   "normal": 129968,
-   "color": 132560,
-   "extra": 133424,
-   "index": 134288
+   "position": 3762912,
+   "normal": 3765504,
+   "color": 3768096,
+   "extra": 3768960,
+   "index": 3769824
   },
   "serpent/torso": {
    "vertices": 1320,
@@ -211,11 +228,11 @@
     1.68,
     0.6
    ],
-   "position": 135584,
-   "normal": 151424,
-   "color": 167264,
-   "extra": 172544,
-   "index": 177824
+   "position": 3771120,
+   "normal": 3786960,
+   "color": 3802800,
+   "extra": 3808080,
+   "index": 3813360
   },
   "phoenix_egg/frame": {
    "vertices": 1776,
@@ -228,11 +245,11 @@
     0.16,
     0.56
    ],
-   "position": 185744,
-   "normal": 207056,
-   "color": 228368,
-   "extra": 235472,
-   "index": 242576
+   "position": 3821280,
+   "normal": 3842592,
+   "color": 3863904,
+   "extra": 3871008,
+   "index": 3878112
   },
   "phoenix_egg/body": {
    "vertices": 1792,
@@ -245,11 +262,11 @@
     1.28,
     0.4
    ],
-   "position": 253232,
-   "normal": 274736,
-   "color": 296240,
-   "extra": 303408,
-   "index": 310576
+   "position": 3888768,
+   "normal": 3910272,
+   "color": 3931776,
+   "extra": 3938944,
+   "index": 3946112
   }
  }
 }

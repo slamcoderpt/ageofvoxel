@@ -9,6 +9,11 @@ extends Node3D
 ##     camera;
 ##   - Horus' tornado funnels (tornado.gdshader): a dust column and a darker core on a ring
 ##     mesh, following the sim's spiral.
+##   - Sekhmet's Citadel: the fortress model (egypt_gods "citadel", export-egypt-gods.mjs:
+##     battered curtain walls, four bastions with braziers, a pylon gate with her red banners
+##     and a winged sun disc) over every Citadel Center, on the Egyptian buildings' shader in
+##     the owner's colour; it rises out of the ground in the cast (the view's "rise" 0..1) and
+##     shows where the Town Center would (the local player's or explored ground).
 ## Everything is a function of the sim time (a paused capture is exact).
 
 var gp: Node = null
@@ -21,6 +26,8 @@ var _grade_mat: ShaderMaterial
 var _rainbow: MeshInstance3D
 var _rainbow_mat: ShaderMaterial
 var _funnels := {}           # tornado id -> {root, mats}
+var _citadels := {}          # Town Center id -> MeshInstance3D (the Citadel's fortress)
+const CITADEL_MODEL_W := 7.0 # the model's footprint (tiles): the Egyptian Town Center's
 
 func setup(godpowers: Node) -> void:
 	gp = godpowers
@@ -98,6 +105,41 @@ func frame(eg: Dictionary, now: float) -> void:
 		if not seen.has(id):
 			_funnels[id].root.queue_free()
 			_funnels.erase(id)
+	_citadel_frame(eg.get("citadels", []))
+
+## The Citadel's fortress over each Citadel Center (the sim's citadels, from the view).
+func _citadel_frame(list: Array) -> void:
+	var seen := {}
+	for c in list:
+		var id := int(c.id)
+		seen[id] = true
+		var mi: MeshInstance3D = _citadels.get(id, null)
+		if mi == null:
+			var mesh: Mesh = null
+			if FileAccess.file_exists("res://assets/models/egypt_gods.json") and VoxelModels.info("egypt_gods", "citadel").size() > 0:
+				mesh = preload("res://game/buildings/building_ao.gd").mesh("egypt_gods", "citadel")
+			if mesh == null:
+				continue
+			mi = MeshInstance3D.new()
+			mi.name = "EG_Citadel_%d" % id
+			mi.mesh = mesh
+			var cols: Array = preload("res://game/buildings/buildings.gd").PLAYER_COLORS
+			var o := int(c.owner)
+			var col: int = cols[o] if o >= 0 and o < cols.size() else 0xffffff
+			mi.material_override = preload("res://game/buildings/egypt_buildings.gd").material(Color.hex((col << 8) | 0xff))
+			add_child(mi)
+			_citadels[id] = mi
+		var s := float(c.w) / CITADEL_MODEL_W
+		var rise := float(c.get("rise", 1.0))
+		mi.scale = Vector3(s, s, s)
+		# rising out of the ground (the terrain hides what is still below it)
+		mi.position = Vector3(float(c.x), float(c.y) - (1.0 - rise) * 4.8 * s, float(c.z))
+		var sim: Object = gp.game.sim if gp != null and gp.game != null else null
+		mi.visible = rise > 0.0 and (int(c.owner) == 1 or sim == null or sim.is_explored(float(c.x), float(c.z)))
+	for id in _citadels.keys():
+		if not seen.has(id):
+			_citadels[id].queue_free()
+			_citadels.erase(id)
 
 func _make_funnel() -> Dictionary:
 	var root := Node3D.new()

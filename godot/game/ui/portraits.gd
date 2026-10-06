@@ -127,6 +127,11 @@ func _unit_object(type: String, owner: int) -> Node3D:
 	for p in rig.parts:
 		var j: Array = p.joint
 		var t := Transform3D(Basis.IDENTITY, Vector3(j[0], j[1], j[2]) * v)
+		# (the gods piece) a flyer's wings (Roc, Phoenix) are flat plates spread level, edge-on
+		# from the portrait camera (a thin stick on the card): raise them in a soaring V
+		if str(rig.get("anim", "")) == "flyer" and (str(p.name) == "wingL" or str(p.name) == "wingR"):
+			var up := 0.7 if str(p.name) == "wingL" else -0.7
+			t.basis = Basis(Vector3.BACK, up) * Basis(Vector3.UP, -up * 0.35)
 		if p.parent != null and str(p.parent) != "" and world.has(p.parent):
 			t = world[p.parent] * t
 		world[p.name] = t

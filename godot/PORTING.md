@@ -3193,6 +3193,23 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   serpent pose without wings) and the Phoenix Egg (a fire-coloured egg with glowing cracks and a team band on a
   charred nest with coals; still). `node scripts/godot-shoot.mjs --scene egypt_units --params
   "eu_one=serpent"` / `eu_one=phoenix_egg`.
+- **The Citadel Center's look** (round 10): a static model `citadel` in the same group (1/8 tile
+  a voxel as the Egyptian buildings, pivot at the 7 x 7 footprint's centre): battered sandstone
+  curtain walls in 4-row courses just outside the footprint (a dark plinth, limestone string
+  courses, the team band, a crenellated parapet), four 16 x 16 corner bastions tapering as they
+  rise to a gilt cavetto cornice, merlons and a basalt brazier heaped with fire (glow voxels:
+  egypt_building.gdshader keeps them orange), slit windows and Sekhmet's red banners with a gold
+  sun disc on their outer faces, and a gate at the front between two pylons (their own banners,
+  gilt cornices) under a lintel with a winged gold sun disc. game/godpowers/egypt_fx.gd draws it
+  over every Citadel Center (the view's `egypt.citadels`: id, x, y, z, w, owner, rise) on
+  `EgyptBuildings.material` in the owner's colour, AO-baked by building_ao.gd, scaled w / 7 (a
+  Greek ally's Town Center gets it too); it rises out of the ground over the cast's first 2.6 s
+  among the heaved blocks and dust, and shows where the Town Center would (player 1's or
+  explored ground). `node scripts/godot-shoot.mjs --scene egypt_powers --params
+  "power=citadel&t=12"` (t=1.6: half risen).
+- **Flyer portraits** (round 10, game/ui/portraits.gd): the Roc's and the Phoenix's wings are
+  flat plates spread level, edge-on to the portrait camera (the Roc's card showed a thin brown
+  stick); the portrait raises them in a soaring V (+-0.7 rad about the body's axis).
 - Capture: `node scripts/godot-shoot.mjs --scene egypt_powers --params "power=tornado&t=6"`
   (power = any key above, or rebirth (a Phoenix falls, its egg), roc (boarding), roc_unload;
   the Tornado and Thoth's Meteor strike a grove; Plague of Serpents rises on open, level sand
