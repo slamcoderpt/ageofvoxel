@@ -62,7 +62,8 @@ extends SceneTree
 ##   volleys     the Egyptian Town Center shoots 2 arrows a volley, the Greek one 1 (as before),
 ##               a Citadel Center 3 at three different hoplites
 ##   eclipse_abilities  the Eclipse's +20 % on the abilities (Anubite Jump 10.5 -> 12.6, the
-##               Wadjet's venom and the Mummy's curse x1.2), the first myth unit on the map
+##               Wadjet's venom, the Mummy's curse and the Scarab's Causticity x1.2: 70 -> 84,
+##               100.8 in the Mythic Age), the first myth unit on the map
 ##               using its ability at once (the Jump on a fresh spawn), Force of the West Wind on
 ##               the Sphinx's 9 crush
 ##   myth_ages   (EGYPT.md 5: "Myth units get +HP/+attack bonuses from later age-ups") the ten
@@ -575,6 +576,22 @@ func _first_hit(sim: Object, att: int, tgt: int, max_s := 20.0) -> float:
 # same rule for every trainable myth unit: GodPowers::myth_age_mult, MYTH_AGE)
 const MYTH_AGE_UNITS := ["anubite", "wadjet", "sphinx", "petsuchos", "roc", "scarab", "scorpion_man", "mummy", "avenger", "phoenix"]
 
+# the Scarab's Causticity (70 divine to the enemies within 3.6 tiles when it dies) in a fresh
+# Ra / Bast / Sekhmet / Osiris match at `age`, with or without Bast's Eclipse: the hp a P2 hoplite
+# 2 tiles off loses (it goes through damage_mult like every other ability)
+func _causticity(age: int, eclipse: bool) -> float:
+	var sim := _fresh("ra", "zeus", age, ["bast", "sekhmet", "osiris"])
+	if eclipse:
+		if not bool(sim.cast_power(1, "eclipse", 0, 0)):
+			return -1.0
+	var sc := _u(sim, "scarab", 1, 0, 0)
+	var h := _u(sim, "hoplite", 2, 2, 0)
+	sim.tick(1)
+	var h0 := _hp(sim, h)
+	sim.kill_unit(sc)
+	sim.tick(10)
+	return _r(h0 - _hp(sim, h))
+
 func _case_myth_ages() -> void:
 	var r := {}
 	var ok := true
@@ -655,6 +672,10 @@ func _case_myth_ages() -> void:
 			trained.append(_r(float(s3.get_unit(u).max_hp)))
 	r["sphinx trained in the heroic age: max hp"] = trained
 	ok = ok and trained.size() == 1 and trained[0] == 360.0
+	# the Scarab's Causticity (an ability like the Whirlwind): 70 in the Heroic Age, 84 in the Mythic
+	var ca := [_causticity(2, false), _causticity(3, false)]
+	r["scarab causticity on a hoplite [heroic, mythic]"] = ca
+	ok = ok and _near(ca[0], 70.0, 0.01) and _near(ca[1], 70.0 * 1.2, 0.01)
 	_check("myth.ages", ok, r)
 
 # Bast's Eclipse: +20 % damage for the caster's myth units, abilities included (EGYPT.md 5.3):
@@ -706,9 +727,13 @@ func _case_eclipse_abilities() -> void:
 	r["anubite jump [day, eclipse]"] = jump
 	r["wadjet venom per 0.5 s tick [day, eclipse]"] = venom
 	r["mummy curse hit + dot over 3 s [day, eclipse]"] = curse
+	# the Scarab's Causticity on its death: x1.2 under the Eclipse, on top of the later-age x1.2
+	var caus := [_causticity(2, false), _causticity(2, true), _causticity(3, false), _causticity(3, true)]
+	r["scarab causticity [heroic, heroic + eclipse, mythic, mythic + eclipse]"] = caus
 	var ok: bool = r.get("cast", false) and _near(jump[0], 15.0 * 0.7, 0.01) and _near(jump[1], 15.0 * 0.7 * 1.2, 0.01)
 	ok = ok and _near(venom[0], 1.25, 0.001) and _near(venom[1], 1.5, 0.001)
 	ok = ok and curse[0] > 1.0 and _near(curse[1] / curse[0], 1.2, 0.01)
+	ok = ok and _near(caus[0], 70.0, 0.01) and _near(caus[1], 84.0, 0.01) and _near(caus[2], 84.0, 0.01) and _near(caus[3], 100.8, 0.01)
 	# Force of the West Wind on the Sphinx's crush part
 	var hits := []
 	for ww in [false, true]:
@@ -1127,7 +1152,7 @@ func _case_myth() -> void:
 	var vh0 := _hp(s2, vh)
 	var venom := _damage_by(s2, 5.6, func(e): return int(e.id) == vh and int(e.other) == 0)
 	a["wadjet hit / venom over 5 s"] = [_r(hit), _r(float(venom.get(vh, 0.0)))]
-	# Scarab Causticity: 70 to enemies near it when it dies
+	# Scarab Causticity: 70 to enemies near it when it dies (a Heroic Scarab in the Mythic Age: x1.2, myth_ages)
 	var sc := _u(s2, "scarab", 1, -10, 10)
 	var near := _u(s2, "hoplite", 2, -9, 10)
 	s2.tick(1)
@@ -1145,7 +1170,7 @@ func _case_myth() -> void:
 	var spin := _damage_by(s2, 5.5, func(e): return ring.has(int(e.id)) and int(e.other) == 0)
 	a["spin damage on the 2nd / 3rd hoplite (5 s)"] = [_r(float(spin.get(ring[1], 0.0))), _r(float(spin.get(ring[2], 0.0)))]
 	# (a Classical Wadjet in the Mythic Age: venom x1.4, myth_ages; the Avenger is Mythic: x1)
-	_check("myth.abilities_a", _near(a["wadjet hit / venom over 5 s"][1], 12.5 * 1.4, 0.6) and _near(a["causticity on a hoplite beside the scarab"], 70.0, 0.01)
+	_check("myth.abilities_a", _near(a["wadjet hit / venom over 5 s"][1], 12.5 * 1.4, 0.6) and _near(a["causticity on a hoplite beside the scarab"], 70.0 * 1.2, 0.01)
 		and _near(float(spin.get(ring[1], 0.0)), 100.0 * 0.7, 6.0), a)
 	var b := {}
 	var s3 := _fresh("isis", "zeus", 3, ["anubis", "nephthys", "thoth"])

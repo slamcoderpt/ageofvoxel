@@ -170,7 +170,9 @@ void GodPowers::on_myth_died(int32_t id, double x, double z) {
 				hit.push_back(U.id[o]);
 		});
 		std::sort(hit.begin(), hit.end());
-		for (int32_t h : hit) S.combat.damage(h, CAUSTIC_DAMAGE, Hitter::pseudo(owner), DK_DIVINE);
+		// (Eclipse and the later-age +20 % reach the death splash too, like every other ability)
+		const double caustic = CAUSTIC_DAMAGE * damage_mult(r);
+		for (int32_t h : hit) S.combat.damage(h, caustic, Hitter::pseudo(owner), DK_DIVINE);
 		rises.push_back({ 4, x, z, S.time, owner, id });
 	}
 	if (t == U_PHOENIX) { // Rebirth
