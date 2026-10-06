@@ -206,6 +206,8 @@ const HEAD_SCALE = 0.5;
 const HEAD_PIVOT = [3.5, 0, 3];
 const HEAD_TILT = [-0.22, 0, 0];   // chin up: the face turns to the camera above
 const LIP = 0x6a2c1c;
+// (round 24) the Mummy's dried bronze face: lit plane, skull, shade
+const MU_FACE_L = 0xb08258, MU_FACE_M = 0x8a6040, MU_FACE_D = 0x5e3e28;
 function faceN(m, skin = SKIN, shade = SKIN_SH, { eyes = null, brow = HAIR, nose = null, face = null } = {}) {
   for (let y = 0; y <= 7; y++) for (let x = 0; x <= 6; x++) for (let z = 0; z <= 5; z++) {
     const ex = x === 0 || x === 6, ez = z === 0 || z === 5;
@@ -313,6 +315,56 @@ function nemesT(m, { line = 0xf2ead2, chest = 8, tip = GOLD } = {}) {
     m.box(x0, -9, chest, 2, 1, 1, tip);
   }
   m.box(1, -6, -2, 5, 11, 1, S);                           // the back gathered into a queue
+  return m;
+}
+// (round 24) the Mummy's nemes as a hood, not a box: a rounded dome over the
+// skull (an elliptic shell narrowing towards a filled crown, myth_09's tall
+// rounded headcloth), horizontal team bands with a pale line every third row
+// (the crown banded front to back), a gold brow band and uraeus over the open
+// face, and the cloth falling behind the ears: side wings that start behind
+// the cheeks (z <= 3, the face stays clear) and flare a voxel out every
+// three or four rows down to the shoulders, joined by a back curtain, the lowest row a dark
+// shaded hem. Two lappets come forward over the shoulders onto the chest.
+function nemesH(m, { line = 0xf2ead2, chest = 8, tip = GOLD } = {}) {
+  const S = (y) => ((((y + 33) % 3) === 0) ? line : TEAM);
+  const put = (x, y, z, c) => { if (c === TEAM) tset(m, x, y, z, 0xffffff); else if (c === 'sh') tset(m, x, y, z, TEAM_SHADE); else if (c === 'dk') tset(m, x, y, z, 0x8a8a8a); else m.set(x, y, z, c); };
+  // the dome: y 5..10, the shell 1-1.4 voxels thick round the skull's centre
+  for (let y = 5; y <= 11; y++) {
+    // a round profile (not stepped in equal voxels like a pyramid)
+    const k = y <= 7 ? 1 : Math.sqrt(Math.max(0, 1 - ((y - 7) / 4.6) ** 2));
+    const rx = 4.3 * k + (y === 11 ? 0.4 : 0), rz = 3.9 * k + (y === 11 ? 0.4 : 0);
+    for (let x = -2; x <= 8; x++) for (let z = -2; z <= 7; z++) {
+      const nx = (x - 3) / rx, nz = (z - 2.5) / rz, d = nx * nx + nz * nz;
+      if (d > 1) continue;
+      const inner = ((x - 3) / (rx - 1.3)) ** 2 + ((z - 2.5) / (rz - 1.3)) ** 2;
+      if (y < 11 && rx > 2.6 && inner < 1 && (m.has(x, y, z) || y >= 8)) continue;   // the skull inside (hollow under the crown)
+      if (y < 7 && z >= 5) continue;                                       // the face open below the band
+      put(x, y, z, y >= 10 ? (((x + 33) % 3) === 1 ? line : TEAM) : S(y));
+    }
+  }
+  for (let x = 0; x <= 6; x++) m.set(x, 6, 6, GOLD);
+  m.set(-1, 6, 5, GOLD).set(7, 6, 5, GOLD);
+  m.set(3, 7, 7, GOLD).set(3, 8, 7, GOLD).set(3, 9, 7, GOLD_DK);           // the uraeus rearing from the band (no red: it read as a pink nose)
+  // the wings and the back curtain: from the temples (y 5) to the shoulders (y -4)
+  for (let y = 5; y >= -4; y--) {
+    const k = Math.min(2, Math.floor((5 - y) / 3.5));                   // a slight flare: a hood, not a bell
+    const zb = -2 - (y < 2 ? 1 : 0);
+    for (let x = -1 - k; x <= 7 + k; x++) for (let z = zb; z <= 3; z++) {
+      const side = x <= -1 || x >= 7;
+      if (!side && z !== zb) continue;                                   // the curtain is one layer at the back
+      if (side && x > -1 - k && x < 7 + k && z > zb && z < 3 && m.has(x, y, z)) continue;
+      const hem = y === -4;
+      const edge = z === 3 && side;                                      // the front edge behind the cheek, shaded
+      put(x, y, z, hem ? 'dk' : edge ? (S(y) === TEAM ? 'sh' : line) : S(y));
+    }
+  }
+  // the lappets: 2 wide, forward over the shoulders, then down the chest
+  for (const x0 of [-1, 6]) {
+    for (let z = 3; z <= chest; z++) for (let dx = 0; dx < 2; dx++) for (let dy = 0; dy < 2; dy++) put(x0 + dx, -4 - Math.floor((z - 3) * 0.3) + dy, z, S(-4 + dy));
+    const yt = -4 - Math.floor((chest - 3) * 0.3);
+    for (let y = yt - 1; y >= -8; y--) for (let dx = 0; dx < 2; dx++) put(x0 + dx, y, chest, S(y));
+    m.box(x0, -9, chest, 2, 1, 1, tip);
+  }
   return m;
 }
 function headE(style) {
@@ -427,12 +479,16 @@ function headE(style) {
     capN(m, LINEN, { y0: 5, front: 6, top: 8 });
     m.box(0, 9, 0, 7, 2, 6, TEAM).carve(0, 10, 0, 1, 1, 1).carve(6, 10, 5, 1, 1, 1).box(1, 11, 1, 5, 1, 4, TEAM);
   } else if (style === 'mummy') {
-    // the face under wrappings, glowing green eyes, a team and gold nemes
-    const WRAP = (x, y, z) => ((y & 1) ? 0xd2c6a6 : 0xb8aa86);
+    // (round 24) a dried bronze face, not a bandaged drone: a lit face plane,
+    // deep dark eyes (a dim ivory corner and a near-black pupil under a dark
+    // brow), a nose ridge, sunken cheeks, a thin mouth, one linen strip
+    // wrapped across the jaw; the hood-shaped nemes over it
     m.vox.clear();
-    faceN(m, WRAP, 0x8a7c5c, { eyes: [0x60ff90, 0x60ff90], brow: 0x7a6c50, nose: 0xc6b996 });
-    m.get(1, 4, 5).glow = 0.8; m.get(2, 4, 5).glow = 0.8; m.get(4, 4, 5).glow = 0.8; m.get(5, 4, 5).glow = 0.8;
-    nemesT(m, { chest: 8 });
+    faceN(m, MU_FACE_M, MU_FACE_D, { eyes: [0xdccca8, 0x0c0705], brow: 0x2a180e, nose: MU_FACE_L, face: MU_FACE_L });
+    m.set(2, 3, 5, MU_FACE_D).set(4, 3, 5, MU_FACE_D).set(3, 1, 5, 0x3a2216);
+    for (let x = 0; x <= 6; x++) for (let z = 0; z <= 5; z++) if (m.has(x, 0, z)) m.set(x, 0, z, z === 5 || x === 0 || x === 6 ? 0xd2c4a2 : 0xb4a482);
+    m.set(0, 1, 3, 0xb4a482).set(6, 1, 3, 0xb4a482);
+    nemesH(m, { chest: 6 });
   } else if (style === 'minion') {
     const GR = pick3(65, 0x8c8c86, 0x7e7e78, 0x9a9a92);
     m.vox.clear();
@@ -485,10 +541,13 @@ const TORSO_ROWS = {
 const solid = (c, x, y, z) => (typeof c === 'function' ? c(x, y, z) : c);
 const TM = { t: 0xffffff }, TM_SH = { t: TEAM_SHADE }, TM_DK = { t: 0x8a8a8a };   // team dye tones for paint()
 // the bare torso in two flat tones
-function manTorso(pal = PAL_SKIN) {
+// (round 24) slim: a lean frame (the Mummy): the 12-wide chest and shoulders
+// cut to 10, the deltoids a voxel in, so the shoulders are about 1.5 x the
+// headdress, not slabs (pair it with manParts' armX: SLIM_ARM_X)
+function manTorso(pal = PAL_SKIN, { slim = false } = {}) {
   const m = new VoxelModel();
-  for (const [ys, [w, z0, z1]] of Object.entries(TORSO_ROWS)) {
-    const y = +ys;
+  for (const [ys, [w0, z0, z1]] of Object.entries(TORSO_ROWS)) {
+    const y = +ys, w = slim && w0 >= 12 ? 10 : w0;
     for (let x = -w / 2; x < w / 2; x++) for (let z = z0; z <= z1; z++) {
       const ex = x === -w / 2 || x === w / 2 - 1, ez = z === z0 || z === z1;
       if (ex && ez && w >= 8) continue;                  // rounded edges
@@ -510,7 +569,7 @@ function manTorso(pal = PAL_SKIN) {
     }
   }
   // rounded deltoids standing out past the chest: the arms hang from under them
-  for (const x of [-7, 6]) for (let y = 10; y <= 13; y++) for (let z = -2; z <= 1; z++) {
+  for (const x of slim ? [-6, 5] : [-7, 6]) for (let y = 10; y <= 13; y++) for (let z = -2; z <= 1; z++) {
     if ((y === 10 || y === 13) && (z === -2 || z === 1)) continue;
     m.set(x, y, z, y >= 12 ? palH(pal) : z === 1 ? pal.L : pal.M);
   }
@@ -804,7 +863,7 @@ function eSash(m, color, x0 = -5, x1 = 4, y0 = 13, y1 = 3) {
 }
 // the parts of a standing Egyptian man; s scales a rider (joints and voxels)
 function manParts({ torso, head: hs, headScale = 0.9, headZ = MAN.headZ, pal = PAL_SKIN, arm = {}, armL = {}, armR = {}, leg = {}, s = 1,
-  legs = true, torsoJoint = null, torsoParent = null, restL = null, restR = null, liftL = 0, liftR = 0 } = {}) {
+  armX = MAN.armX, legs = true, torsoJoint = null, torsoParent = null, restL = null, restR = null, liftL = 0, liftR = 0 } = {}) {
   // (round 12) no baked corner AO on the men's bodies: on the rounded limb
   // sections it drew dark grooves down every arm and leg (a stick-built doll);
   // the scene's light shades the round forms instead
@@ -827,7 +886,7 @@ function manParts({ torso, head: hs, headScale = 0.9, headZ = MAN.headZ, pal = P
   // that hand is re-parented to the forearm by rig()
   for (const [sd, o, lift, rest] of [['L', armL, liftL, restL], ['R', armR, liftR, restR]]) {
     const a = manArmM({ pal, ...arm, ...o, side: sd });
-    const sx = sd === 'L' ? MAN.armX : -MAN.armX, R = rest ? { rest } : {};
+    const sx = sd === 'L' ? armX : -armX, R = rest ? { rest } : {};
     if ({ ...arm, ...o }.bend) { P.push(part(`arm${sd}`, a, [0.5, 18.5, 0.5], sc([sx, MAN.armY + lift, 0], s), 'torso', { ...X, ...R })); continue; }
     const [up, lo] = splitArm(a, pal);
     P.push(part(`arm${sd}`, up, [0.5, 18.5, 0.5], sc([sx, MAN.armY + lift, 0], s), 'torso', { ...X, ...R }));
@@ -1970,18 +2029,72 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
   ]);
 }
 
-// Mummy (human rig, 0.08), on the men's body: linen wrappings banded every
-// two rows (light / dark, no noise), a team and gold striped nemes, a
-// tattered skirt, a curved blade.
+// Mummy (human rig, 0.08), round 24 (myth_09): a lean body of dried
+// bronze-brown skin (four tones: lit shoulder tops, chest / thigh fronts,
+// sides, the inner faces) bound in a few broad linen strips, not a pale box:
+// two bandages crossing the chest from the shoulders to the hips, the waist
+// wrapped, a wrap round each upper arm, a bracer of linen on each forearm
+// standing a half voxel proud (the elbow and wrist read as steps), a wrap
+// below each knee and at the ankle; a slim torso (manTorso slim) so the
+// shoulders are about 1.5 x the headdress; a long opaque grey-brown linen
+// skirt with a hanging front panel and a dark hem row, notched at the hem;
+// a larger head (the face reads) under the hood-shaped nemes (nemesH);
+// the small khopesh. Rig `idles`: each mummy idles in its own pose
+// (unit_view.cpp: weight on one leg, the blade lowered or on the shoulder).
 {
-  const WL = (x, y, z) => ((y >> 1) & 1 ? 0xd8ccac : 0xc0b290), WM = (x, y, z) => ((y >> 1) & 1 ? 0xb4a684 : 0x9c8e6c);
-  const PAL_W = { L: WL, M: WM, D: 0x7a6c50 };
-  const t = manTorso(PAL_W);
-  eKilt(t, { color: 0x9a8e6e, side: 0x7e7258, hem: null, len: 8, fold: false });
-  for (let y = -6; y >= -9; y--) for (let x = -7; x <= 6; x++) for (let z = -4; z <= 3; z++) if (hash3(x, y, z, 64) < 0.35) t.remove(x, y, z);   // ragged hem
-  eBelt(t, TEAM, null);
-  rig('mummy', { voxel: 0.08, anim: 'human', style: 'mummy', pose: 'slash', stance: true }, [
-    ...manParts({ torso: t, head: 'mummy', headZ: 0.6, pal: PAL_W, leg: { sandal: null, foot: 0x6a6050 } }),
+  const W = { L: 0xdcd0b0, M: 0xbcae8a, D: 0x8e7f60 };              // the linen bandage, three tones
+  const PAL_MU = { H: 0x93693f, L: 0x7c5434, M: 0x603e26, D: 0x432a19 };
+  const t = manTorso(PAL_MU, { slim: true });
+  // the crossed chest bandages and the wrapped waist (outer voxels only)
+  paint(t, (x, y, z) => {
+    if (y < 2 || y > 13) return null;
+    const outer = !t.has(x, y, z + 1) || !t.has(x, y, z - 1) || !t.has(x + 1, y, z) || !t.has(x - 1, y, z);
+    if (!outer) return null;
+    if (y <= 5) return y === 5 ? W.D : (y === 2 ? W.M : W.L);            // the waist wrap, its upper edge shaded
+    const front = z >= 1, back = z <= -3;
+    if (!front && !back) return null;
+    const u = x + 0.5;
+    for (const s of [-1, 1]) {                                          // two strips, shoulder -> opposite hip
+      const xs = s * (4.2 - (13 - y) * 0.95);
+      const d = u - xs;
+      if (Math.abs(d) < 1.3) return d * s > 0.4 ? W.M : W.L;
+    }
+    return null;
+  });
+  eKilt(t, { color: 0x8c7b5c, side: 0x6c5d44, hem: 0x3e3324, len: 9, fold: false, pleats: true });
+  for (let x = -7; x <= 6; x++) for (let z = -5; z <= 5; z++) if ((x + 40) % 3 === 0) { t.remove(x, -10, z); }   // the notched hem
+  eBelt(t, W.M, null);
+  const MU_ARM = (side) => {
+    const a = manArmM({ pal: PAL_MU, side });
+    // linen round the upper arm, and a bracer a half voxel proud from wrist to mid-forearm
+    for (const [k, v] of a.vox) { const y = ((k >> 10) & 1023) - 512; if (y === 12 || y === 13) v.c = (k & 1023) - 512 >= 1 ? W.L : W.M; }
+    for (const [k, v] of a.vox) { const y = ((k >> 10) & 1023) - 512; if (y >= 4 && y <= 6) v.c = y === 4 ? W.D : (k & 1023) - 512 >= 1 ? W.L : W.M; }
+    for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) {
+      if (Math.abs(x) + Math.abs(z) > 3 || (Math.abs(x) < 2 && Math.abs(z) < 2)) continue;
+      a.set(x, 7, z, z >= 1 ? W.L : W.M);                                  // the bracer's upper edge stands a half voxel proud
+    }
+    return a;
+  };
+  const parts = manParts({ torso: t, head: 'mummy', headScale: 1.15, headZ: 0.55, pal: PAL_MU, armX: 3.5, leg: { sandal: null, foot: PAL_MU.M } });
+  for (const p of parts) {
+    if (p.name === 'shinL' || p.name === 'shinR') {
+      // a wrap below the knee and two at the ankle, a half voxel proud; a kneecap step
+      for (const y of [3, 11]) for (let x = -2; x <= 2; x++) for (let z = -3; z <= 2; z++) {
+        if (Math.abs(x) === 2 && (z === -3 || z === 2)) continue;
+        if (Math.abs(x) < 2 && z > -3 && z < 2 && p.model.has(x, y, z)) continue;
+        p.model.set(x, y, z, y === 11 ? (z >= 1 ? W.L : W.M) : y === 3 ? W.L : W.M);
+      }
+    }
+    if (p.name === 'legL' || p.name === 'legR') p.model.set(0, 1, 3, PAL_MU.H).set(0, 2, 3, PAL_MU.L);   // the kneecap stands out
+  }
+  // the arms: rebuilt with the wraps, split at the elbow as manParts does
+  for (const sd of ['L', 'R']) {
+    const [up, lo] = splitArm(MU_ARM(sd), PAL_MU);
+    parts.find((p) => p.name === `arm${sd}`).model = up;
+    parts.find((p) => p.name === `fore${sd}`).model = lo;
+  }
+  rig('mummy', { voxel: 0.08, anim: 'human', style: 'mummy', pose: 'slash', stance: true, idles: true }, [
+    ...parts,
     part('weapon', khopeshFine(), [1, 0, 1], HAND_E, 'armR', { scale: 0.5, rest: [0.3, -1.57, 0.3] }),
   ]);
 }

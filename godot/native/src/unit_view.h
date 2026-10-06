@@ -65,6 +65,7 @@ public:
 		bool sprawl = false;        // (the Petsuchos) a sprawling reptile: the upper limbs reach out sideways and sweep fore / aft (yaw) and lift (roll) as it walks, the body and tail sway side to side, no bob
 		bool upright = false;       // (the Egyptian Priest) the staff stays upright in the hand: the weapon counters the arm's and torso's pitch / roll
 		float stance = 0;           // (Egyptian men) idle in a relaxed stride (x this; robes less), not stiffly upright
+		bool idles = false;         // (the Mummy, round 24) each unit idles in one of four poses of its own (weight on one leg, the blade lowered / on the shoulder, slumped)
 		float voxel = 0.07f;
 		bool has_shield = false, has_armR = false;
 		std::vector<Part> parts;

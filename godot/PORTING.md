@@ -2043,6 +2043,37 @@ two 2-wide lappets running forward over the shoulders and down the chest to
 gold tips. `--params "eu_focus=mummy&eu_zoom=0.7"` (`&eu_state=walk`) and
 `"eu_focus=minion"` check it.
 
+The Mummy's body (round 24, myth_09): no longer the bandage-banded men's
+body (a pale box with rib-like stripes, slab shoulders, glowing green
+eyes). Skin is a dried bronze-brown in four tones (`PAL_MU` H / L / M / D:
+lit shoulder tops, fronts, sides, inner faces), bound in a few broad linen
+strips in three tones: two bandages crossing the chest from the shoulders to
+the opposite hips, a wrapped waist, a wrap round each upper arm, a forearm
+bracer whose top row stands half a voxel proud (a step at the elbow), a wrap
+below each knee and at the ankle, and a kneecap one voxel proud (a step at
+the knee). `manTorso(pal, { slim: true })` cuts the 12-wide chest and
+shoulders to 10 with the deltoids a voxel in, and `manParts({ armX })` sets
+the arm joints in to match (3.5), so the shoulders are about 1.5 x the
+headdress. The skirt is long (len 9), opaque grey-brown linen with pleats
+and a dark hem row, notched every third column at the hem only (the old
+random holes let the ground show through, so it looked like glass). The head
+is larger (headScale 1.15) with a lit bronze face, dark eyes (an ivory corner
+and a near-black pupil under a dark brow), a linen strip across the jaw, under
+`nemesH()`: a round hood (an elliptic shell with a circular profile, not
+stepped), team bands with a pale line every third row, a gold brow band and
+a gold uraeus, the cloth falling behind the ears (side wings from behind the
+cheeks, flaring by one or two voxels down to the shoulders, a back curtain, a
+dark hem row), and 2-wide lappets over the collarbones down the chest. Rig
+flag **`idles`** (unit_view.cpp `Rig::idles`, the Mummy only): four idles,
+picked by `(id * 3 + 1) & 3`, so consecutive units differ: weight on the right
+leg with the left knee bent, hip dropped and the blade hanging low; the blade
+resting on the right shoulder (`foreR` -2.0) with weight on the left leg;
+slumped forward with the arms dangling and one foot back; weight on the left
+leg with the blade low across the body. The relaxed-stride and glance
+layers still go on top. Other rigs never set the flag. Check it with
+`--params "eu_focus=mummy"` (`&eu_state=walk|die`) and
+`"eu_one=mummy&eu_zoom=1.3&eu_pitch=32"`.
+
 Raptors (round 20, myth_06 / myth_13): the Roc and the Phoenix share one bird
 build (`raptorWing / raptorTail / raptorHead / raptorLeg`,
 export-egypt-units.mjs). Each wing is two parts: the arm (`wingL / wingR`,

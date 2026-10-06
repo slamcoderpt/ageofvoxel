@@ -139,6 +139,9 @@ void AovUnitView::_bind_methods() {
 	ClassDB::bind_static_method("AovUnitView", D_METHOD("lod_mesh", "arrays", "factor", "shadow_only"), &AovUnitView::lod_mesh, DEFVAL(2), DEFVAL(false));
 }
 
+// (round 24) the Mummy's idle blade angles (CH_weapon pitch about the fist)
+static constexpr double IDLE_BLADE_LOW = 0.9, IDLE_BLADE_SHOULDER = -1.2, IDLE_BLADE_ACROSS = 0.35;
+
 AovUnitView::Rig AovUnitView::parse_rig(const Dictionary &R, int t) {
 	Rig rig;
 	const String kind = R.get("anim", "human");
@@ -154,6 +157,7 @@ AovUnitView::Rig AovUnitView::parse_rig(const Dictionary &R, int t) {
 	rig.upright = (bool)R.get("upright", false);
 	rig.sprawl = (bool)R.get("sprawl", false);
 	rig.sting = (bool)R.get("sting", false);
+	rig.idles = (bool)R.get("idles", false);
 	{ const Variant sv = R.get("stance", 0.0); rig.stance = sv.get_type() == Variant::BOOL ? ((bool)sv ? 1.0f : 0.0f) : (float)(double)sv; }
 	rig.voxel = (float)(double)R.get("voxel", 0.07);
 	const Array parts = R.get("parts", Array());
@@ -935,6 +939,45 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 			bob = -0.2 * k;
 			if (pose == P_SLING) { set(CH_armR, -0.35 + b * 0.03, 0, -0.26); set(CH_weapon, 0.6 + S(t * 1.6) * 0.25, 0, -0.4); set(CH_armL, -0.12, 0, 0.16); }
 			else if (!hoplite) { add(CH_armL, -0.08, 0, 0.07); add(CH_armR, 0.06, 0, -0.07); }
+		}
+		if (rig.idles && !beast) {
+			// (round 24, rig "idles": the Mummy) four idles by the unit id, so a
+			// group never stands in one stiff pose: 0 the weight on the right leg,
+			// the left knee bent, the hip dropped, the blade hanging low; 1 the
+			// blade resting on the right shoulder, the weight on the left leg;
+			// 2 slumped forward, the arms dangling, one foot back; 3 the weight on
+			// the left leg, the blade held low across the body
+			const int iv = (int)((id * 3 + 1) & 3);
+			const double sw = S(t * 0.8 + id) * 0.03;
+			if (iv == 0) {
+				set(CH_legR, 0.03, 0, -0.07); set(CH_shinR, 0.02);
+				set(CH_legL, -0.2, 0.2, 0.12); set(CH_shinL, 0.42);
+				set(CH_torso, 0.04, 0.15, 0.08); set(CH_head, 0.04 + sw, -0.25, -0.1);
+				set(CH_armR, 0.04 + sw, 0, -0.16); set(CH_foreR, -0.15); set(CH_weapon, IDLE_BLADE_LOW);
+				set(CH_armL, -0.05, 0, 0.12); set(CH_foreL, -0.35);
+				bob = -0.25;
+			} else if (iv == 1) {
+				set(CH_legL, 0.03, 0, 0.07); set(CH_shinL, 0.02);
+				set(CH_legR, -0.18, -0.2, -0.12); set(CH_shinR, 0.4);
+				set(CH_torso, 0.02, -0.18, -0.08); set(CH_head, 0.02, 0.3 + sw, 0.08);
+				set(CH_armR, -0.55, 0.2, -0.32); set(CH_foreR, -2.0); set(CH_weapon, IDLE_BLADE_SHOULDER);
+				set(CH_armL, -0.1 + sw, 0, 0.1); set(CH_foreL, -0.2);
+				bob = -0.25;
+			} else if (iv == 2) {
+				set(CH_legL, -0.04, 0, 0.06); set(CH_shinL, 0.22);
+				set(CH_legR, 0.2, 0, -0.06); set(CH_shinR, 0.28);
+				set(CH_torso, 0.16 + sw, 0.1, 0.05); set(CH_head, 0.18, -0.35, 0.2);
+				set(CH_armL, -0.3 + sw, 0, 0.06); set(CH_foreL, -0.4);
+				set(CH_armR, -0.28 - sw, 0, -0.1); set(CH_foreR, -0.45); set(CH_weapon, 0.5);
+				bob = -0.5;
+			} else {
+				set(CH_legL, 0.02, 0, 0.06); set(CH_shinL, 0.02);
+				set(CH_legR, -0.1, -0.12, -0.06); set(CH_shinR, 0.28);
+				set(CH_torso, 0.04, -0.1, -0.05); set(CH_head, 0.05, 0.4, 0.06 + sw);
+				set(CH_armR, -0.35, 0, 0.12); set(CH_foreR, -0.85); set(CH_weapon, IDLE_BLADE_ACROSS);
+				set(CH_armL, -0.05, 0, 0.14); set(CH_foreL, -0.3 + sw);
+				bob = -0.25;
+			}
 		}
 		const bool ordered_attack = U.order_type[row] == aov::O_ATTACK;
 		if (hoplite && (ordered_attack || U.combat_line[row]) && !hero) {
