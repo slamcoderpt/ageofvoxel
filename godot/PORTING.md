@@ -1480,6 +1480,37 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   hall, an ochre pier, a team banner on the portico. In `egypt_town` the
   obelisks are one pair flanking the temple's entrance (no more obelisks in
   the street grid).
+- **Houses and rooflines, round 25** (houses and workshops that read as
+  the same beige cubes as the sand, one striped awning on every roof):
+  `hbox()` is battered again (a voxel inward every 5 rows, registered in
+  `m.blocks` so `skin()` lays the smooth slope over the steps) and grimed at
+  its foot (`grimed()`: the bottom rows x 0.5 / 0.62 / 0.74 / 0.84 / 0.92,
+  with darker drips under random columns) instead of the mud-brick dado. The
+  house accent is an ochre red (`HACC`), applied consistently: the corner
+  torus up every corner, the roll under the cornice and every door frame.
+  The cavetto is three rows of dark painted leaves (`HGORGE`: lapis / red
+  ochre in pairs, x 0.62 / 0.82 / 0.96 from the foot up, flaring one and two
+  voxels out) under a pale lip; the decks are a cool pale plaster
+  (`HROOF_C`, blue enough that the grade's sandstone pass leaves it a cool
+  white above the sand's value). Two finishes: whitewash (`HWHITE`) and a
+  darker red-brown mud plaster (`HMUDW`). No cloth shades on house roofs;
+  every function prop stands on the ground outside the walls: 0 the
+  weaver's courtyard house (an upright loom with a striped cloth in the
+  court, a stair hutch on the roof terrace); 1 the potter (a tall beehive
+  kiln, a woodpile and fired jars outside, wheel and bench under the
+  portico); 2 the farmer's tower house (a heap of threshed grain on a reed
+  mat, sacks, a low store against it); 3 the baker's loggia house (a bread
+  oven with a glowing mouth and its fuel in the yard); 4 the jar merchant
+  (big jars stacked on a mat in front, a woodpile); 5 the stair house (two
+  round mud grain bins). Shared with every other Egyptian building: the
+  roof plasters `PLASTER`, `ROOFTILE`, `MUDROOF` are the same cool pale
+  (lighter and cooler than the sand); every beige gorge is now a dark
+  painted one (`GORGE` / `GORGE_L` dark lapis, the camps' and sheds' red
+  ochre); `block()` flares every deep cornice by default (`flare` defaults
+  to `lipOut > 1`: two dark gorge rows under the lip) and grimes a ground
+  block's foot over its base course; the ochre walls (`OCHRE_P`,
+  `OCHRE_W`) are a value darker than the sand. The Market's three canopies
+  are dyed madder red, woad green and saffron (no blue and white).
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8
