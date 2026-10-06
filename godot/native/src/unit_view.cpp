@@ -1020,6 +1020,22 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 			set(CH_legL, -0.15, 0, 0.05); set(CH_shinL, 0.2); set(CH_legR, 0.1, 0, -0.05); set(CH_shinR, 0.2);
 			set(CH_foreR, -0.55); set(CH_foreL, -0.3 + b * 0.05);
 			bob = -0.3 + b * 0.2;
+			if (rig.idles) {
+				// (round 25, rig "idles" on a beast-rig man: the Avenger) a
+				// combat stance, not a mannequin: the feet planted wide (the left
+				// forward, the right back), knees bent, the torso turned a
+				// quarter, the right sword raised over the shoulder, the left
+				// held low and forward in guard; the head turned back to the front
+				const double h = uhash(id, 91) * 0.25;
+				set(CH_legL, -0.42, 0.15, 0.24); set(CH_shinL, 0.45);
+				set(CH_legR, 0.2, -0.1, -0.24); set(CH_shinR, 0.25);
+				set(CH_torso, 0.14 + b * 0.02, 0.42 + h * 0.4, -0.04);
+				set(CH_head, -0.05 + b * 0.02, -0.38, 0.04);
+				set(CH_armR, -2.45 - h + b * 0.04, 0.25, -0.45); set(CH_foreR, -0.75);
+				set(CH_armL, -0.75, -0.2, 0.3 + b * 0.03); set(CH_foreL, -0.95);
+				set(CH_weapon, -0.25);
+				bob = -1.5 + b * 0.15;
+			}
 		}
 	}
 	if (beast && st == aov::A_WALK) { set(CH_foreR, -0.45 + S(t * 7) * 0.2); set(CH_foreL, -0.35 - S(t * 7) * 0.2); }

@@ -2123,6 +2123,31 @@ layers still go on top. Other rigs never set the flag. Check it with
 `--params "eu_focus=mummy"` (`&eu_state=walk|die`) and
 `"eu_one=mummy&eu_zoom=1.3&eu_pitch=32"`.
 
+The Avenger's swords, head and stance (round 25, myth_12): the long
+untextured blades (`longBladeM`, as long as the body, washed to salmon pink
+by the grade and blurred by their outline hull) are replaced by
+`bronzeSwordM()`, authored at half a rig voxel (part scale 0.5): a straight
+blade 17 voxels long (about 0.6 of the leg), five wide, in a yellow-leaning
+bronze ramp (a lit 1-voxel edge row each side 0xf4d81c, the face 0xa07400,
+an inner band 0x684a00, a dark raised spine 0x241800 standing out on both
+faces), tapering over its last four rows to a bright point; a gold
+crossguard nine wide with dark end caps and a shaded underside, a leather
+grip with a gold band, a gold pommel. Orange or red-gold albedos come out
+pale pink on the lit faces of a thin part (sun + sky + rim), so the metal
+leans yellow. A part may now carry `outline` (its hull width factor, default
+0.3); the Avenger's blades use 0.01, no halo. The head is `headE('falcon')`
+at HEAD_SCALE (was a dark feather ellipsoid under a slab): a cream face disc
+from throat to brow with 1-voxel black eyes under slate brows, dark malar
+stripes, a dark hooked beak over a yellow cere, framed by `nemesH` in team
+and gold stripes (line 0xd0a800) with lappets down the chest; the dark
+feather mantle stays on the back. Rig flag `idles` on a beast rig
+(unit_view.cpp, the Avenger only) gives a combat idle: feet planted wide
+(left forward, right back, knees bent), the torso turned a quarter, the
+head turned back to the front, the right sword raised over the shoulder and
+the left low and forward in guard, a slow breathing bob. Walk, attack and
+die are the beast rig's. Check with `--params "eu_focus=avenger"`,
+`"eu_one=avenger&eu_turn=20&eu_zoom=1.2&eu_pitch=30"` and `eu_group=myth`.
+
 Raptors (round 20, myth_06 / myth_13): the Roc and the Phoenix share one bird
 build (`raptorWing / raptorTail / raptorHead / raptorLeg`,
 export-egypt-units.mjs). Each wing is two parts: the arm (`wingL / wingR`,

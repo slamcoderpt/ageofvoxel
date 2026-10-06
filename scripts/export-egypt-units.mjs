@@ -489,6 +489,26 @@ function headE(style) {
     for (let x = 0; x <= 6; x++) for (let z = 0; z <= 5; z++) if (m.has(x, 0, z)) m.set(x, 0, z, z === 5 || x === 0 || x === 6 ? 0xd2c4a2 : 0xb4a482);
     m.set(0, 1, 3, 0xb4a482).set(6, 1, 3, 0xb4a482);
     nemesH(m, { chest: 6 });
+  } else if (style === 'falcon') {
+    // (round 25, the Avenger, myth_12) a falcon's face, not a black slab: a
+    // slate crown and nape, a cream face disc from throat to brow with
+    // 1-voxel black eyes under slate brows, a dark malar stripe under each
+    // eye, a dark hooked beak over a yellow cere standing out of the face
+    // (orange or gold beaks graded to pink); framed
+    // by the hood-shaped nemes in team and gold stripes with gold lappets
+    m.vox.clear();
+    const SL = 0x4a515c, SL_D = 0x30353d, CR = 0xeee6d2, CR_D = 0xc8bea6, EYE = 0x050403;
+    faceN(m, SL, SL_D, { eyes: [CR, EYE], brow: SL_D, nose: SL, face: CR });
+    for (let x = 1; x <= 5; x++) for (let y = 0; y <= 5; y++) m.set(x, y, 5, y === 0 ? CR_D : CR);   // the cream face disc, throat to brow
+    for (const x of [0, 6]) for (let y = 1; y <= 3; y++) if (m.has(x, y, 4)) m.set(x, y, 4, CR_D);
+    m.set(2, 4, 5, EYE).set(4, 4, 5, EYE);                                                       // 1-voxel black eyes
+    m.set(1, 5, 5, SL_D).set(2, 5, 5, SL_D).set(4, 5, 5, SL_D).set(5, 5, 5, SL_D);               // a slate brow over each
+    m.set(1, 3, 5, SL_D).set(1, 2, 5, SL_D).set(5, 3, 5, SL_D).set(5, 2, 5, SL_D);               // the malar stripes
+    m.set(3, 5, 5, SL).set(3, 4, 5, SL);                                                         // the bridge
+    m.box(2, 3, 6, 3, 1, 1, 0xe8c800).set(3, 4, 6, 0xe8c800);                                    // the yellow cere
+    m.set(3, 3, 7, 0x4a4440).set(3, 2, 7, 0x3a3430).set(3, 2, 8, 0x2a2420).set(3, 1, 8, 0x141210).set(3, 1, 7, 0x141210);   // the dark hooked beak
+    m.set(2, 2, 6, 0x3a3430).set(4, 2, 6, 0x3a3430).set(3, 2, 6, 0x3a3430);
+    nemesH(m, { line: 0xd0a800, chest: 6 });
   } else if (style === 'minion') {
     const GR = pick3(65, 0x8c8c86, 0x7e7e78, 0x9a9a92);
     m.vox.clear();
@@ -962,6 +982,32 @@ function camelSwordM() {
   m.box(-1, 1, -1, 4, 1, 4, GOLD);
   m.box(0, 2, 0, 2, 11, 2, 0x8a929a).box(0, 2, 1, 2, 11, 1, 0xb8c0c8);
   m.box(0, 13, 0, 2, 1, 2, 0xb8c0c8).set(0, 14, 1, 0xd0d6dc).set(1, 14, 1, 0xd0d6dc);
+  return m;
+}
+// (round 25) the Avenger's sword at half a rig voxel (part scale 0.5): a
+// straight bronze blade about 0.6 of the leg, five wide, in a ramp (a lit
+// 1-voxel edge row each side, a bronze face, a darker inner band, a dark
+// raised spine down the middle), tapering over the last four rows to a
+// bright point; a gold crossguard nine wide with dark end caps, a leather
+// grip with a gold band, a gold pommel
+function bronzeSwordM() {
+  const m = new VoxelModel();
+  const EDGE = 0xf4d81c, FACE = 0xa07400, IN = 0x684a00, SPINE = 0x241800, GLD = 0xc49c00;
+  m.box(-1, -6, -1, 3, 2, 3, GLD).set(0, -7, 0, 0x7a5008);           // pommel
+  m.box(-1, -4, -1, 3, 4, 3, LEATHER_DK).box(-1, -2, -1, 3, 1, 3, GLD);   // grip, a gold band
+  m.box(-4, 0, -1, 9, 1, 3, GLD).box(-3, 1, 0, 7, 1, 1, 0xd09a18);  // the crossguard
+  for (const x of [-4, 4]) m.box(x, 0, -1, 1, 1, 3, 0x7a5010);
+  m.box(-4, -1, 0, 9, 1, 1, 0x8a5a10);                                    // its shaded underside
+  const top = 18;
+  for (let y = 2; y <= top; y++) {
+    const w = y < 4 ? 1 : y <= top - 4 ? 2 : y <= top - 2 ? 1 : 0;       // ricasso, blade, taper
+    for (let x = -w; x <= w; x++) {
+      const a = Math.abs(x);
+      const c = y === top ? EDGE : a === w && w > 0 ? EDGE : a === 0 ? (w === 0 ? EDGE : SPINE) : a === 1 && w === 2 ? IN : FACE;
+      m.set(x, y, 0, c);
+    }
+    if (w >= 1 && y < top - 1) { m.set(0, y, 1, SPINE); m.set(0, y, -1, SPINE); }   // the raised spine both faces
+  }
   return m;
 }
 function longBladeM(col = GOLD, len = 12) {
@@ -2014,18 +2060,16 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
   const PAL_SC = { L: 0x6a7078, M: 0x4c525a, D: 0x363a40 };
   const shinA = manShinM({ pal: PAL_SC, sandal: null, foot: 0xd8b060 });
   shinA.set(-2, 0, 5, DARK).set(1, 0, 5, DARK).set(-1, 0, -3, DARK);   // talons
-  const headM = new VoxelModel();
-  headM.ellipsoid(2.5, 3, 2.5, 3, 3.2, 3, FEATH);
-  headM.box(1, 1, 5, 3, 2, 2, GOLD).box(2, 0, 7, 1, 2, 1, GOLD_DK).set(2, -1, 7, GOLD_DK);   // hooked beak
-  headM.box(0, 2, 4, 1, 2, 1, 0xf0f0ec).box(4, 2, 4, 1, 2, 1, 0xf0f0ec).set(0, 3, 5, 0xffb020, { glow: 0.5 }).set(4, 3, 5, 0xffb020, { glow: 0.5 });
-  headM.box(0, 1, -1, 5, 5, 1, FEATH).box(0, -3, -2, 5, 5, 2, FEATH).box(0, -4, -2, 5, 1, 2, 0xe8e8e4);
-  rig('avenger', { voxel: 0.1, anim: 'beast', style: 'beast' }, [
-    ...beastManParts({ torso: body, head: headM, headScale: 0.62, arm: { band: GOLD, bracer: TEAM }, leg: { kilt: TEAM, pal: { L: 0x4a5058, M: 0x3a3f48, D: 0x2e3239 } }, shin: shinA }),
+  rig('avenger', { voxel: 0.1, anim: 'beast', style: 'beast', idles: true }, [
+    ...beastManParts({ torso: body, head: headE('falcon'), headPivot: HEAD_PIVOT, headScale: HEAD_SCALE, headZ: 0.4, arm: { band: GOLD, bracer: TEAM }, leg: { kilt: TEAM, pal: { L: 0x4a5058, M: 0x3a3f48, D: 0x2e3239 } }, shin: shinA }),
     // (round 15) the blades low in a fighting grip, forward, down and out
     // from the fists (myth_12), never along the arms
     // in a deep orange-leaning gold (the plain GOLD reads pale beside the linen)
-    part('weapon', longBladeM(0xd89a28, 13), [0, 0, 0], BEAST_FIST, 'foreR', { rest: [2.0, 0, -0.35], scale: 0.8 }),
-    part('weapon2', longBladeM(0xd89a28, 13), [0, 0, 0], BEAST_FIST, 'foreL', { anim: 'weapon', rest: [2.0, 0, 0.35], scale: 0.8 }),
+    // (round 25) short bronze swords (bronzeSwordM, about 0.6 of the leg) with
+    // a crossguard and pommel, no outline hull round them (it blurred the
+    // thin blade into a pale halo)
+    part('weapon', bronzeSwordM(), [0, 0, 0], BEAST_FIST, 'foreR', { rest: [2.0, 0, -0.35], scale: 0.5, outline: 0.01 }),
+    part('weapon2', bronzeSwordM(), [0, 0, 0], BEAST_FIST, 'foreL', { anim: 'weapon', rest: [2.0, 0, 0.35], scale: 0.5, outline: 0.01 }),
   ]);
 }
 
@@ -3046,7 +3090,7 @@ for (const [type, R] of Object.entries(RIGS)) {
     // (round 12) one width for every part of every Egyptian unit (bodies,
     // heads, robes, gear), drawn in each surface's own shade
     // (unit_outline.gdshader), so no unit or part gets a heavier line
-    const ol = 0.3;
+    const ol = p.outline ?? 0.3;   // (round 25) a part may thin its own line (the Avenger's blades)
     g.add(`${type}/${p.name}`, buildVoxelGeometry(p.model, { size: R.voxel * (p.scale || 1), pivot: p.pivot, jitter: p.jitter ?? 0.05, ao: p.ao ?? true }), { outline: ol });
   }
 }
