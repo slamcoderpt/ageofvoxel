@@ -559,12 +559,12 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 			const double a = hr(w.seed, i, 111) * TAU + now * (0.3 + 0.2 * hr(w.seed, i, 112)), rr = R * 0.75 * std::sqrt(hr(w.seed, i, 113));
 			const double px = x + std::cos(a) * rr, pz = z + std::sin(a) * rr;
 			Basis bs;
-			const double s = 0.9 + 0.7 * hr(w.seed, i, 114) + 0.15 * std::sin(now * 1.3 + i);
+			const double s = 1.7 + 1.3 * hr(w.seed, i, 114) + 0.25 * std::sin(now * 1.3 + i); // (soft round puffs: the hard squares read as pale tiles over a Farm)
 			bs.rows[0] = Vector3((real_t)s, 0, 0);
 			bs.rows[1] = Vector3(0, (real_t)s, 0);
 			bs.rows[2] = Vector3(0, 0, 1);
 			const Lin hc = hex_lin(i % 3 ? 0x8a7656 : 0x6e604a);
-			inst(I_PUFF, bs, px, h_at(px, pz) + 0.6 + 2.2 * hr(w.seed, i, 115), pz, hc.r, hc.g, hc.b, (float)(0.22 * k), 0);
+			inst(I_PUFF, bs, px, h_at(px, pz) + 0.6 + 2.2 * hr(w.seed, i, 115), pz, hc.r, hc.g, hc.b, (float)(0.2 * k), (float)hr(w.seed, i, 116), 1);
 		}
 		// the locusts: 260 dark voxel bodies, each on its own looping path inside the cloud
 		const Lin c0 = hex_lin(0x3a3424), c1 = hex_lin(0x5a5030), c2 = hex_lin(0x24201a);

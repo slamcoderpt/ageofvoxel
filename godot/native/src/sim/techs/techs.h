@@ -139,8 +139,6 @@ enum TechEffectKind : uint8_t {
 	TE_HEROIC_SIEGE,  // Force of the West Wind: Catapults from the Heroic Age
 	TE_VALLEY,        // Valley of the Kings: an empowered Barracks / Migdol trains x v slower, a free copy of each unit
 	TE_MINION_LIFE,   // Atef Crown: Minions live x v
-	TE_HACK_VULN,     // x v vulnerability (damage taken = 1 - armor) vs melee blows: "-25 % hack vulnerability" is v 0.75
-	TE_PIERCE_VULN,   // x v vulnerability vs arrows (Skin of the Rhino, Leather Frame Shield; as the Eclipse's -10 %)
 	TE_COUNT
 };
 
@@ -276,14 +274,9 @@ struct TechMods {
 	double vs_infantry[U_TYPE_COUNT] = {}, vs_cavalry[U_TYPE_COUNT] = {}, lifesteal[U_TYPE_COUNT] = {}, rage[U_TYPE_COUNT] = {};
 	double heal_mult[U_TYPE_COUNT] = {}, cost[U_TYPE_COUNT] = {}, melee_poison[U_TYPE_COUNT] = {};
 	double trickle = 0, vision_recharge = 1, farm_discount = 1, mudbrick = 0, refund = 0, valley = 0, minion_life = 1;
-	double hack_vuln[U_TYPE_COUNT], pierce_vuln[U_TYPE_COUNT]; // x vulnerability (1 = none; TE_HACK_VULN / TE_PIERCE_VULN)
 	int pharaohs = 0;
 	bool heroic_siege = false;
-	TechMods() {
-		for (double &r : reload) r = 1;
-		for (double &v : hack_vuln) v = 1;
-		for (double &v : pierce_vuln) v = 1;
-	}
+	TechMods() { for (double &r : reload) r = 1; }
 };
 
 struct TechResult { bool ok = false; std::string reason; };
@@ -365,8 +358,8 @@ public:
 	double range_add(int urow) const;
 	double splash_add(int urow) const;
 	double unit_armor(int trow, const Hitter &a, uint8_t kind) const;
-	// a unit's armor from its base with its owner's techs: + flat armor (capped), then x vulnerability
-	// (Retold's "-X % vulnerability": damage taken x (1 - X)); the Eclipse is applied by the caller
+	// a unit's armor from its base with its owner's techs: + flat armor, capped (TECHS.md: "-X %
+	// vulnerability" is X points more armor, 30 % to 40 %); the Eclipse is applied by the caller
 	double tech_armor(int owner, int type, double base, bool pierce) const;
 	double vs_mult(int arow, int target_kind, int target_row) const;
 	double divine(int arow) const;

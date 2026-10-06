@@ -238,8 +238,8 @@ const TechDef &tech_def(int t) {
 		// ---- the Egyptian gods (EGYPT.md 4, 5; the effects' hooks: sim/techs, sim/godpowers, sim/civ) ----
 		// major gods' unique techs (Archaic)
 		{ "skin_of_the_rhino", "Skin of the Rhino", TH_TOWN_CENTER, -1, 0, Cost(50, 0, 0, 5), 15, -1, "ra", true,
-			{ E(TE_HACK_VULN, UM(U_LABORER), false, 0.75), E(TE_PIERCE_VULN, UM(U_LABORER), false, 0.75), N, N }, nullptr,
-			"Laborers -25% hack and -25% pierce vulnerability", "damage taken x0.75 vs blows and arrows (vulnerability 1 - armor x0.75, as the Eclipse's -10 %)" },
+			{ E(TE_HACK_ARMOR, UM(U_LABORER), false, 0.25), E(TE_PIERCE_ARMOR, UM(U_LABORER), false, 0.25), N, N }, nullptr,
+			"Laborers -25% hack and -25% pierce vulnerability", "+0.25 on the Laborer's hack (0.1875) and pierce (0.2625) armor (EGYPT.md / TECHS.md: -X % vulnerability is X points more armor)" },
 		{ "flood_of_the_nile", "Flood of the Nile", TH_GRANARY, -1, 0, Cost(0, 0, 150, 7.2), 40, -1, "isis", true,
 			{ E(TE_TRICKLE, 0, false, 1), N, N, N }, nullptr,
 			"A passive trickle of +1 food per second", "Isis' -10 % makes it 135 g; its favor is Retold's 7.2 as listed (150 g + 8 favor before Isis' -10 %; the -10 % leaves other techs' favor alone)" },
@@ -263,7 +263,7 @@ const TechDef &tech_def(int t) {
 		{ "scalloped_axe", "Scalloped Axe", TH_EG_BARRACKS, B_ARMORY, 1, Cost(50, 0, 0, 10), 30, -1, "ptah", false,
 			{ E(TE_ATTACK, UM(U_AXEMAN), false, 0.15), N, N, N }, nullptr, "Axeman +15% attack", "" },
 		{ "leather_frame_shield", "Leather Frame Shield", TH_EG_BARRACKS, B_ARMORY, 1, Cost(0, 75, 0, 10), 40, -1, "ptah", false,
-			{ E(TE_PIERCE_VULN, UM(U_SPEARMAN), false, 0.85), N, N, N }, nullptr, "Spearman -15% pierce vulnerability", "arrows' damage x0.85 (vulnerability 1 - pierce armor x0.85)" },
+			{ E(TE_PIERCE_ARMOR, UM(U_SPEARMAN), false, 0.15), N, N, N }, nullptr, "Spearman -15% pierce vulnerability", "+0.15 pierce armor (15 points, TECHS.md's convention)" },
 		{ "electrum_bullets", "Electrum Bullets", TH_EG_BARRACKS, B_ARMORY, 1, Cost(0, 0, 150, 15), 40, -1, "ptah", false,
 			{ E(TE_ATTACK, UM(U_SLINGER), false, 0.10), E(TE_DIVINE, UM(U_SLINGER), false, 0.5), N, N }, nullptr,
 			"Slinger +10% attack and +0.5 divine damage", "" },
@@ -679,8 +679,6 @@ void Techs::recompute(int owner) {
 					case TE_COST: m.cost[u] += f.v; break;
 					case TE_RAGE: m.rage[u] += f.v; break;
 					case TE_MELEE_POISON: m.melee_poison[u] += f.v; break;
-					case TE_HACK_VULN: m.hack_vuln[u] *= f.v; break;
-					case TE_PIERCE_VULN: m.pierce_vuln[u] *= f.v; break;
 					default: break;
 				}
 			}
@@ -790,15 +788,13 @@ double Techs::unit_armor(int tr, const Hitter &a, uint8_t kind) const {
 	if (!arrow && a.kind == K_UNIT && a.row >= 0 && a.row < U.size()) arrow = unit_def(U.type[a.row]).attack.projectile;
 	if (arrow && is_egypt_unit(t)) armor = sim->civs.base_pierce(tr); // (sim/civ: Egyptian units have a hack and a pierce armor)
 	armor = tech_armor(o, t, armor, arrow);
-	return sim->godpowers.armor_after(tr, armor); // (sim/godpowers: the Eclipse's -10 % vulnerability)
+	return sim->godpowers.armor_after(tr, armor); // (sim/godpowers: the Eclipse's -10 % vulnerability, +0.10 armor)
 }
 
 double Techs::tech_armor(int o, int t, double armor, bool pierce) const {
 	const TechMods &m = mods[o];
 	const double add = pierce ? m.pierce[t] : m.hack[t];
 	if (add != 0) armor = std::min(ARMOR_CAP, armor + add);
-	const double v = pierce ? m.pierce_vuln[t] : m.hack_vuln[t];
-	if (v != 1) armor = 1 - (1 - armor) * v;
 	return armor;
 }
 

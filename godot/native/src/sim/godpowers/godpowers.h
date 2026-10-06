@@ -61,7 +61,7 @@ struct PowerDef {
 constexpr double RAIN_FARM = 2.5;            // Rain: the caster's farming +150 % for 50 s
 constexpr double PROSPERITY_GOLD = 1.5;      // Prosperity: gold mining +50 % for 75 s
 constexpr double VISION_R0 = 10 * 0.6, VISION_GROW = 15 * 0.6; // Vision: 10 m growing 15 m/s to 70 m
-constexpr double ECLIPSE_DAMAGE = 1.2, ECLIPSE_SPEED = 1.15, ECLIPSE_VULN = 0.90, /* -10 % vulnerability: damage taken x0.9 */ ECLIPSE_FAVOR = 1.5, ECLIPSE_RECHARGE = 0.4;
+constexpr double ECLIPSE_DAMAGE = 1.2, ECLIPSE_SPEED = 1.15, ECLIPSE_ARMOR = 0.10, /* -10 % vulnerability: +10 points of hack / pierce / crush armor (TECHS.md) */ ECLIPSE_FAVOR = 1.5, ECLIPSE_RECHARGE = 0.4;
 constexpr double SANDS_MIN_DIST = 40 * 0.6;  // Shifting Sands: the destination at least 40 m away
 constexpr int SERPENTS = 14, SERPENT_WAVE = 2; // Plague of Serpents: 2 at once, then 2 every 3 s
 constexpr double SERPENT_EVERY = 3, SERPENT_GUARD = 6;
@@ -202,12 +202,11 @@ public:
 	// hooks (rules on)
 	double gather_mult(int urow, bool farm, int res, int node_type) const; // Rain, Prosperity
 	double damage_mult(int urow) const;   // Eclipse
-	double vuln_mult(int urow) const;     // Eclipse: x0.9 damage taken by the caster's myth units
 	// Retold's immunities (Godot-only, godot_rules): the Roc is immune to god powers, the Son of
 	// Osiris to targeted ones (every hostile power here is aimed: Bolt, Lightning Storm, Meteor,
 	// Locust Swarm, Tornado, Thoth's Meteor); near() / find_target() and the Egyptian loops skip them
 	bool power_immune(int urow) const;
-	double armor_after(int urow, double armor) const; // armor with the Eclipse's -10 % vulnerability
+	double armor_after(int urow, double armor) const; // armor with the Eclipse's -10 % vulnerability (+0.10)
 	double building_hack_mult(int brow, const Hitter &a, uint8_t kind) const; // the Citadel: +10 % hack armor
 	// god powers blocked locally (a live Tornado, Thoth's Meteor): "" if (x, z) is free
 	std::string local_block(double x, double z) const;

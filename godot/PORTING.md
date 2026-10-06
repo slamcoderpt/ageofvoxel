@@ -3373,7 +3373,7 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   | Rain (Ra) | 30 fav, 90 s, +15; 50 s, farming +150 % | caster's farmers x2.5 |
   | Prosperity (Isis) | 60, 120, +10; 75 s, gold +50 % | gold gatherers x1.5 |
   | Vision (Set) | 40, 240, +5; 10 m growing 15 m/s to 70 m, 20 s | a reveal 6 -> 42 tiles (Clairvoyance: recharge x0.5, no ramp) |
-  | Eclipse (Bast) | 90, 150, +25; 55 s; myth +20 % dmg, +15 % speed, -10 % vuln., -60 % ability recharge; Monuments +50 % favor; one at a time | as Retold (vulnerability x0.9: armor a -> 1 - (1 - a) x 0.9, `armor_after`) |
+  | Eclipse (Bast) | 90, 150, +25; 55 s; myth +20 % dmg, +15 % speed, -10 % vuln., -60 % ability recharge; Monuments +50 % favor; one at a time | as Retold (-10 % vulnerability = +0.10 hack / pierce / crush armor, TECHS.md convention; `armor_after`) |
   | Shifting Sands (Ptah) | 40, 180, +20; after 3 s own / allied units in 10 m to a visible point >= 40 m | 6 tiles, >= 24 tiles, in sight of his or an ally's unit / building (the fog is the local player's only) |
   | Plague of Serpents (Anubis) | 60, 180, +10; 14 serpents in 14 m, 2 then 2 every 3 s, uncontrolled guards | 8.4 tiles; Retold's Serpent (an animal: 50 hp, 5 hack, 10 % pierce, speed 4, LOS 16, +20 % hp / damage in the Heroic and again in the Mythic Age); `is_uncontrolled` |
   | Locust Swarm (Sobek) | 75, 150, +10; 5 swarms at 3 m/s for 20 s, 3.5 divine/s in 6 m, x6 Farms / berries, x0.1 own; Mythic +20 % | 1.8 tiles/s (3 x 0.6, the scale of every other distance), 3.6 tiles, applied every 8 ticks; off the map a swarm is gone |
@@ -3526,20 +3526,28 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   its inner wall (mode 0, seen down the open top) is the deep colour; a sheath of wisps (mode 2)
   shows only near the silhouette in broken tufts, so no veil lies over the buildings; the
   **dust skirt** (mode 3, `_skirt_mesh`: a low dome from r 1 / 2.2 m high to r 5.4 on the
-- **One reading of "-X % vulnerability"** (gods round 15): every Egyptian god effect EGYPT.md
-  words as a vulnerability is damage taken x (1 - X), never flat armor: Skin of the Rhino
-  (Laborers hack and pierce x0.75) and Leather Frame Shield (Spearman pierce x0.85) are
-  `TE_HACK_VULN` / `TE_PIERCE_VULN` (`TechMods::hack_vuln / pierce_vuln`, 1 = none, multiplied),
-  applied by `Techs::tech_armor(owner, type, base, pierce)`: flat armor adds (capped 0.95), then
-  armor a -> 1 - (1 - a) x v, the same formula as the Eclipse's x0.9 (`GodPowers::armor_after`,
-  myth units). Every armor read goes through it (`Techs::unit_armor` for blows and arrows,
-  `Techs::stats` for the card, egypt_myth.cpp `armor_of`, the Tornado's hack share). Effects
-  worded as armor stay flat (the Citadel Center's +10 % hack armor), and the shared Armory lines
-  (Copper..Iron Armor / Shields, Aegis Shield; Greek data, Greeks unchanged) keep their +0.10 /
-  +0.15. egypt_gods_check `techs.ra_ptah_sobek_horus` asserts the ratios: a hoplite blow and a
-  toxotes arrow on a Laborer x0.7500 with Skin of the Rhino (7.313 -> 5.484, 5.163 -> 3.872; card
-  armor 0.1875 / 0.2625 -> 0.3906 / 0.4469), a toxotes arrow on a Spearman x0.8500 with Leather
-  Frame Shield (7.77 -> 6.605) and its hoplite blow untouched (6.3).
+- **One reading of "-X % vulnerability"** (gods round 16; round 15's multiplicative reading
+  reverted): EGYPT.md's conventions are TECHS.md's, which define it exactly: "-10 % hack
+  vulnerability" means 10 percentage points more armor (30 % to 40 %). So every Egyptian god
+  effect worded as a vulnerability adds flat armor, as the shared Armory lines (Copper..Iron
+  Armor / Shields +0.10 / +0.15) already did: Skin of the Rhino is `TE_HACK_ARMOR` /
+  `TE_PIERCE_ARMOR` +0.25 on the Laborer, Leather Frame Shield `TE_PIERCE_ARMOR` +0.15 on the
+  Spearman, and Bast's Eclipse gives the caster's myth units +0.10 hack / pierce / crush armor
+  (`ECLIPSE_ARMOR`, `GodPowers::armor_after`: + 0.10 capped at `ARMOR_CAP` 0.95; an armor already
+  over the cap, the 99 % crush of human units, is left alone). Every armor read goes through
+  `Techs::tech_armor(owner, type, base, pierce)` (flat tech armor, capped) and then
+  `armor_after` (the Eclipse): `Techs::unit_armor` for blows and arrows, `Techs::stats` for the
+  card, egypt_myth.cpp `armor_of`, the myth units' crush part, the Tornado's hack and crush shares
+  and Thoth's meteors' crush (the old x0.9 `vuln_mult` on the whole hit is gone).
+  egypt_gods_check `techs.ra_ptah_sobek_horus` asserts it: Laborer card armor 0.1875 / 0.2625 ->
+  0.4375 / 0.5125 with Skin of the Rhino, so a hoplite blow 7.313 -> 5.063 (x0.6923 = 0.5625 /
+  0.8125) and a toxotes arrow 5.163 -> 3.413 (x0.6610 = 0.4875 / 0.7375); a Spearman's pierce
+  0.075 -> 0.225 with Leather Frame Shield, a toxotes arrow 7.77 -> 6.51 (x0.8378 = 0.775 /
+  0.925) and its hoplite blow untouched (6.3); `eclipse.myth_and_favor`: a hoplite blow on a
+  Sphinx 9 x (1 - 0.3375) = 5.962 -> 9 x (1 - 0.4375) = 5.063 under the Eclipse.
+- **Locust haze** (gods round 16): the swarm's dust haze is drawn with the puff shader's soft
+  round mode (`INSTANCE_CUSTOM.y` 1, as Thoth's smoke), larger and fainter, instead of hard
+  camera-facing squares that read as pale tiles over a Farm.
   ground) rolls lumps round and outward, darker than the sand with a sunlit outer roll and a
   crisp, lumpy edge; godpower_view_egypt.cpp keeps 44 soft round puffs rolling off its rim (no
   voxel squares). 12 big **wreckage** blocks (`CHUNKS`: roof tiles, beams, mud bricks, a

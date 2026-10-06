@@ -450,11 +450,12 @@ bool GodPowers::power_immune(int r) const {
 	const int t = sim->entities.units.type[r];
 	return t == U_ROC || t == U_SON_OF_OSIRIS;
 }
-double GodPowers::vuln_mult(int r) const { return eclipse_unit(*this, *sim, r) ? ECLIPSE_VULN : 1; }
-// Retold's armor is a vulnerability (damage taken = 1 - armor); -10 % vulnerability multiplies it
+// Retold's armor is a vulnerability (damage taken = 1 - armor); "-10 % vulnerability" is 10 points
+// more armor (TECHS.md conventions: 30 % to 40 %), capped as the techs' armor (an armor already over
+// the cap, the 99 % crush armor of human units, is left as it is)
 double GodPowers::armor_after(int r, double armor) const {
-	if (!eclipse_unit(*this, *sim, r)) return armor;
-	return 1 - (1 - armor) * ECLIPSE_VULN;
+	if (!eclipse_unit(*this, *sim, r) || armor >= ARMOR_CAP) return armor;
+	return std::min(ARMOR_CAP, armor + ECLIPSE_ARMOR);
 }
 // ---- the myth units' crush part (Retold: Sphinx 15 H + 9 C, Scarab 16 H + 100 C, Phoenix
 // 50 H + 65 C). The def's attack is the hack part; the crush part rides along each blow in the
@@ -779,8 +780,8 @@ void GodPowers::update_egypt(double dt) {
 		for (int r : rows) {
 			const double f = fall(jsm::hypot(U.x[r] - nx, U.z[r] - nz));
 			if (f <= 0) continue;
-			const double hack = S.techs.tech_armor(U.owner[r], U.type[r], unit_def(U.type[r]).armor, false);
-			const double dmg = f * (TORNADO_HACK * (1 - hack) + TORNADO_CRUSH * (1 - crush_armor(U.type[r]))) * vuln_mult(r);
+			const double hack = armor_after(r, S.techs.tech_armor(U.owner[r], U.type[r], unit_def(U.type[r]).armor, false));
+			const double dmg = f * (TORNADO_HACK * (1 - hack) + TORNADO_CRUSH * (1 - armor_after(r, crush_armor(U.type[r]))));
 			const int32_t id = U.id[r];
 			const bool own = S.is_ally(t.owner, U.owner[r]);
 			power_hit(t.owner, id, dmg, 1, TORNADO_OWN);
@@ -898,7 +899,7 @@ void GodPowers::impact_thoth(const Meteor &m) {
 	std::sort(rows.begin(), rows.end());
 	for (int r : rows) {
 		const int32_t id = U.id[r];
-		const double dmg = THOTH_CRUSH * (1 - crush_armor(U.type[r])) * vuln_mult(r) + THOTH_DIVINE;
+		const double dmg = THOTH_CRUSH * (1 - armor_after(r, crush_armor(U.type[r]))) + THOTH_DIVINE;
 		power_hit(m.owner, id, dmg, 1, THOTH_OWN);
 		const int r2 = E.unit_slot(id);
 		if (r2 >= 0 && !U.dead[r2]) {
