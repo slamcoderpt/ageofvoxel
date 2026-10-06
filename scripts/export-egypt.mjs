@@ -96,11 +96,11 @@ const LIME_S = 0xd9c9a8;      // the shadowed lip under a cornice
 // a few darker stains, single-voxel speckle at +-1 %
 const PLASTER = (x, y, z) => {
   const big = hash3((x + ((z >> 3) & 1) * 3) >> 3, y, (z + ((x >> 3) & 1) * 2) >> 3, 13);
-  let c = pick(big, [0xb0c4ee, 0xabbfea, 0xb5c8f0]);
+  let c = pick(big, [0xb59165, 0xae8b5f, 0xba966a]);   // round 26: a warm mud plaster a step under the walls
   if (hash3(x >> 1, y, z >> 1, 17) < 0.06) c = shade(c, 0.94);
   return shade(c, 0.99 + 0.02 * hash3(x, y, z, 18));
 };
-const ROOFTILE = (x, y, z) => { const c = pick(hash3(x >> 2, y, z >> 2, 14), [0xb6c9f0, 0xb0c4ec, 0xbccef2]); return (x % 4 === 0 || z % 4 === 0) ? shade(c, 0.9) : c; };
+const ROOFTILE = (x, y, z) => { const c = pick(hash3(x >> 2, y, z >> 2, 14), [0xb39066, 0xad8a60, 0xb8956b]); return (x % 4 === 0 || z % 4 === 0) ? shade(c, 0.92) : c; };
 // whitewashed plaster walls (Retold's houses and camps: a pale cream wash
 // over the brick, faint courses showing through), the lightest value on a lot
 const WASH = coursed([0xecd8b0, 0xd0b285, 0xe0c69a], { len: 6, seed: 7 });
@@ -396,7 +396,7 @@ const FRIEZE = [FRIEZE_SEP, RED_M, RED_M, FRIEZE_SEP, LAPIS, LAPIS, FRIEZE_SEP, 
 const OCHRE_P = coursed([0xb98450, 0xb27d4a, 0xc08a56], { course: 3, len: 8, bed: 0.91, head: 0.94, seed: 27 });
 const OCHRE_W = masonry([0xb98248, 0xb07a42, 0xc08a50], [0xaa743e, 0xb47e46, 0xa26e38], { len: 8, course: 3, bed: 0.82, head: 0.88, grime: 3, seed: 21 });
 const MUDB = masonry([0xa47448, 0x9a6b40, 0xad7c4f], [0x93653c, 0x9f7046, 0xa8784c], { len: 4, course: 2, bed: 0.84, head: 0.9, grime: 2, seed: 23 });
-const MUDROOF = (x, y, z) => { const c = pick(hash3(x >> 1, y, z >> 1, 24), [0xadc1ea, 0xa7bbe6, 0xb2c5ec]); return (x % 5 === 0 || z % 5 === 0) ? shade(c, 0.93) : c; };
+const MUDROOF = (x, y, z) => { const c = pick(hash3(x >> 1, y, z >> 1, 24), [0x9f7a52, 0x99744d, 0xa5805a]); return (x % 5 === 0 || z % 5 === 0) ? shade(c, 0.93) : c; };
 const FLAG = (x, y, z) => {
   const u = Math.floor((x + ((z >> 2) & 1) * 3) / 5), v = z >> 2;
   let c = pick(hash3(u, v, 9, 29), [0xa89d88, 0x9e937e, 0xb2a790, 0x978b76]);
@@ -1967,7 +1967,7 @@ function outStair(m, x0, z0, w, rise, dir, wall, cap) {
 // dados and mud roofs below it)
 const HWHITE = coursed([0xe2eaf5, 0xd8e0ec, 0xdfe7f2], { len: 7, bed: 0.94, head: 0.96, seed: 81 });
 const HOCHRE = coursed([0xd3874a, 0xc97f43, 0xda8f52], { len: 7, bed: 0.9, head: 0.94, seed: 82 });
-const HROOF_W = (x, y, z) => { const c = pick(hash3(x >> 1, y, z >> 1, 83), [0xe4ecf7, 0xdee6f2, 0xe7eef8]); return (x % 6 === 0 || z % 6 === 0) ? shade(c, 0.95) : c; };
+const HROOF_W = (x, y, z) => { const c = pick(hash3(x >> 1, y, z >> 1, 83), [0xbe9c70, 0xb8966a, 0xc3a176]); return (x % 6 === 0 || z % 6 === 0) ? shade(c, 0.95) : c; };
 // the ochre houses' roofs: a dark mud plaster with reed-mat patches, a
 // value under the sand so the deck reads against the ground from above
 const HROOF_M = (x, y, z) => {
@@ -2003,7 +2003,7 @@ const HGORGE = [HG_B, HG_B, HG_R, HG_R];
 const HGORGE_MUD = [0x7d5a3a, 0x7d5a3a, 0x94402a, 0x94402a];
 const HMUDW = coursed([0xa8764c, 0xa06f47, 0xb07e54], { len: 6, bed: 0.88, head: 0.92, seed: 86 });
 // the cool pale roof plaster (a faint slab grid)
-const HROOF_C = (x, y, z) => { const c = pick(hash3(x >> 2, y, z >> 2, 87), [0xb2c6f0, 0xacc1ec, 0xb7caf2]); return (x % 5 === 0 || z % 5 === 0) ? shade(c, 0.94) : c; };
+const HROOF_C = (x, y, z) => { const c = pick(hash3(x >> 2, y, z >> 2, 87), [0xb59165, 0xaf8b5f, 0xba966b]); return (x % 5 === 0 || z % 5 === 0) ? shade(c, 0.94) : c; };
 // grime at a wall's foot: r = rows above the ground block's first row
 const GRIME = [0.5, 0.62, 0.74, 0.84, 0.92, 0.97];
 function grimed(c, x, y, z, r) {
@@ -2374,31 +2374,82 @@ function miningCamp() {
   return m;
 }
 
-// Town Center (7 x 7; building_02, building_01): a walled sandstone compound
-// (battered enclosure walls with a gorge coping, corner piers), a battered
-// pylon gateway with painted reliefs and a gilt winged sun, the two-storey
-// hall with a lapis band and a latticed door, the east block, the front
-// room, faded striped awnings, a big and a small domed silo, a courtyard
-// with a fire pit, a basin, jars, crates, a palm, and the gilt falcon-headed
-// Ra statue (the bright team kilt) on a plinth at the front-left corner.
+// Town Center (7 x 7; building_02, building_01; round 26): a walled
+// compound whose every structure has its own height, silhouette and use, so
+// the eye reads them apart from the RTS camera:
+// - the gateway (the tallest and the strongest colour): two battered
+//   pylons with wide painted bands and reliefs, the gate block with a deep
+//   passage and the gilt winged sun;
+// - the sanctuary (centre back): a stepped temple of three receding tiers,
+//   each under its own flared cavetto cornice (red, lapis, the owner's band),
+//   a latticed door and a dark shrine opening above it;
+// - the colonnaded hall (back right): a low pillared hall, its reed-mat
+//   roof carried on a row of painted papyrus columns along the front and the
+//   courtyard side, a deep shadowed portico in front of an ochre back wall,
+//   the open court before it (jars, a goods box) so the columns show;
+// - the granary: a big domed brick silo at the front left (ladder, sacks)
+//   and a small domed silo turret on the front-right corner of the wall;
+// - the sandstone falcon-headed Ra statue with gold regalia and the owner's
+//   kilt on a sandstone plinth at the front-left corner.
+// Roofs are a warm mud plaster a step under the walls (never the brightest
+// thing); the hall's and the silos' a darker mud, so each roof reads apart.
+// Interior buildings are drawn in their own scratch model (inner()) so their
+// doors and slits never cut through the enclosure wall in front of them
+// (voxels only: poly() meshes such as silo() go on the lot model itself).
+const TC_SAND = [0x9a7448, 0xc8a26c, 0xdcb984, 0xeacc96];   // the statue's sandstone ramp: deep, shade, base, light
+function tcSandstone(c, x, y, z) {
+  if ([GRAN_R, GRAN_D, 0x151820, 0x1f2432, PL_GRAN_D].includes(c)) return TC_SAND[0];
+  if ([GRAN_H, GRAN_F, 0x58637a, 0x4b556c].includes(c)) return TC_SAND[3];
+  if ([GRAN, GRAN_G, GRAN_G2, 0x353d50, 0x3d465a, 0x2f3646].includes(c)) return hash3(x, y, z, 311) < 0.2 ? TC_SAND[1] : TC_SAND[2];
+  if (c === PL_GRAN) return shade(TC_SAND[1], 0.92 + 0.06 * hash3(x >> 1, y, z >> 1, 312));
+  if (c === DARK2) return TC_SAND[0];
+  return c;
+}
+function inner(m, fn) {
+  const s = new Rec(m.W, m.D);
+  s.blocks = m.blocks; s.feet = m.feet; s.paths = m.paths; s.cloths = m.cloths;
+  const r = fn(s);
+  for (const [x, y, z] of s.coords) {
+    const v = s.get(x, y, z);
+    if (!v) continue;
+    m.set(x, y, z, v.c);
+    Object.assign(m.get(x, y, z), v);
+  }
+  if (s.fine) (m.fine ??= []).push(...s.fine);
+  return r;
+}
+// a painted papyrus column (2 x 2) from y0 to y1 - 1 in sandstone: a dark
+// foot, a sandstone shaft with red and lapis binding bands, a green bell
+// capital flaring a voxel each way under a pale abacus
+function tcColumn(m, x, z, y0, y1) {
+  for (let y = y0; y < y1; y++) for (let i = 0; i < 2; i++) for (let k = 0; k < 2; k++) {
+    const r = y - y0, t = y1 - 1 - y;
+    const c = r === 0 ? PLINTH(x + i, y, z + k) : t === 0 ? LIME(x + i, y, z + k) : t <= 2 ? ((i + k) & 1 ? H_G : 0x2f7048) : t === 3 ? RED_B : t === 4 ? LAPIS : r === 1 ? LIME_S : SAND(x + i, y, z + k);
+    m.set(x + i, y, z + k, c);
+  }
+  for (const [a, b] of [[-1, 0], [-1, 1], [2, 0], [2, 1], [0, -1], [1, -1], [0, 2], [1, 2]]) { m.set(x + a, y1 - 2, z + b, H_G); m.set(x + a, y1 - 1, z + b, LIME); }
+}
+// the hall's roof: a reed-mat deck laid in strips across the beams (palm
+// ribs every third row), a different material from every plaster roof
+const TC_HALLROOF = (x, y, z) => { const c = pick(hash3(x, y, z >> 1, 313), [0xa08a58, 0x968050, 0xaa9462, 0x8c7648]); return z % 3 === 0 ? shade(c, 0.8) : c; };
 function townCenter() {
   const N = 56;
   const m = lot(N, N);
   // the courtyard: cool grey flagstones, a value apart from every wall
   patch(m, 6, 6, 50, 50, FLAG, { rag: 1, seed: 1 });
-  // the enclosure walls (battered, warm ochre sandstone, a pale coping) with
-  // the gate gap on the front
-  const wo = { wall: OCHRE_W, batter: 4, band: null, rim: false, torus: false, socle: 1, rimC: LIME, gorge: [0x34588a, 0x3f6596] };
-  block(m, 4, 4, 52, 7, 1, 6, wo);
-  block(m, 4, 4, 7, 52, 1, 6, wo);
-  block(m, 49, 4, 52, 52, 1, 6, wo);
-  block(m, 4, 49, 18, 52, 1, 6, wo);
-  block(m, 38, 49, 52, 52, 1, 6, wo);
-  for (const [px, pz] of [[2, 2], [48, 2], [48, 48]]) block(m, px, pz, px + 6, pz + 6, 1, 9, { wall: OCHRE_W, batter: 5, band: null, torus: false, rimC: LIME });
+  // the enclosure walls (battered, warm ochre sandstone, a gorge coping) with
+  // the gate gap on the front; squat piers at the two back corners
+  const wo = { wall: OCHRE_W, batter: 4, band: null, rim: false, torus: false, socle: 1, rimC: LIME, gorge: [0x34588a, 0x3f6596], roofC: MUDROOF };
+  block(m, 4, 4, 52, 7, 1, 5, wo);
+  block(m, 4, 4, 7, 52, 1, 5, wo);
+  block(m, 49, 4, 52, 49, 1, 5, wo);
+  block(m, 4, 49, 18, 52, 1, 4, wo);
+  block(m, 38, 49, 48, 52, 1, 4, wo);
+  for (const [px, pz] of [[2, 2], [48, 2]]) block(m, px, pz, px + 6, pz + 6, 1, 7, { wall: OCHRE_W, batter: 5, band: null, torus: false, rimC: LIME, roofC: MUDROOF });
   // the gateway: two battered sandstone pylons with wide painted bands (red,
   // ochre, turquoise between ink rules) over relief panels, a gate block
   // between them with a deep black passage and a dark leaf, the lintel bridge
-  // with the gilt winged sun
+  // with the gilt winged sun; a team pennant on a staff before each pylon
   const PB = [INK, RED_B, RED_B, INK, OCHRE_B, OCHRE_B, INK, TURQ, TURQ, INK];
   for (const [x0, x1] of [[14, 25], [31, 42]]) {
     block(m, x0, 44, x1, 54, 1, 20, { batter: 8, band: null, frieze: 0, lipOut: 2 });
@@ -2409,46 +2460,68 @@ function townCenter() {
   for (let x = 22; x < 34; x++) for (let z = 45; z < 54; z++) { const e = Math.min(x - 22, 33 - x, z - 45, 53 - z); m.set(x, 18, z, e === 0 ? LIME(x, 18, z) : PLASTER(x, 18, z)); }
   door(m, '+z', 26, 4, 1, 11, { deep: 4, frame: LIME, lintel: false });
   for (let y = 1; y < 11; y++) for (let x = 26; x < 30; x++) m.set(x, y, 47, x === 27 || x === 28 ? REVEAL : shade(DOOR(x, y, 47), 0.5));
+  // the flagstaffs against the pylons' fronts, the owner's pennants above the cornices
+  banner(m, 17, 1, 54, 30, '+z'); banner(m, 38, 1, 54, 30, '+z');
   paint(m, '+z', 24, 16, ['GG.GGG.GG', '.GGGRGGG.'], { G: GILT, R: RED });
   for (const px of [16, 34]) {
     paint(m, '+z', px + 1, 9, ['.O.', 'OOO', '.O.', 'BOB', 'B.B', 'B.B', 'K.K'], { O: OCHRE, B: TURQ, K: INK });
     paint(m, '+z', px + 5, 9, ['K', '.', 'R', 'K', '.', 'B', 'K'], { K: INK, R: RED, B: TURQ });
   }
-  // the main hall (two storeys, pale limestone, a pale tiled roof inside the
-  // team rim) at the back left, its deep latticed door on the courtyard
-  const t1 = block(m, 8, 8, 30, 27, 1, 15, { wall: LIME, batter: 6, band: null, roofC: ROOFTILE, lipOut: 2, rimC: LIME, gorge: [0x34588a, 0x3f6596] });
-  block(m, 13, 11, 25, 21, t1 - 1, 6, { wall: LIME, batter: 4, band: null, roofC: ROOFTILE, lipOut: 2, rimC: LIME, gorge: [0x34588a, 0x3f6596] });
-  door(m, '+z', 23, 4, 1, 8, { lattice: true, sun: true, deep: 3, frame: SAND });
-  slit(m, '+z', 11, 9, 3, 1); slit(m, '+z', 18, 9, 3, 1); slit(m, '+x', 13, 9, 3, 1); slit(m, '+x', 20, 9, 3, 1);
-  beams(m, '+x', 11, 25, 13, 3);
-  clothAwning(m, '+z', 25, 9, 16, 11, 7, 4, { sw: 1, stripes: [CANVAS_T, CANVAS, CANVAS], sag: 0.8 });
-  // the east block (dark mud brick, a pale lip) with an awning over its door
-  const mb = { wall: MUDB, batter: 6, band: null, roofC: MUDROOF, rimC: LIME, lipOut: 2, gorge: [0x8a5e38, 0x946640], torus: false };
-  block(m, 35, 8, 48, 22, 1, 12, mb);
-  door(m, '+z', 39, 4, 1, 7, { deep: 3 });
-  slit(m, '+x', 12, 6, 3, 1); slit(m, '+x', 17, 6, 3, 1);
-  clothAwning(m, '-x', 36, 11, 20, 9, 5, 3, { sw: 1, stripes: [CANVAS_T, CANVAS, CANVAS], sag: 0.8 });
-  // the front-right room (mud brick)
-  block(m, 36, 29, 47, 39, 1, 10, mb);
-  door(m, '+z', 42, 3, 1, 6, { deep: 3 });
-  slit(m, '+x', 31, 6, 2, 1); slit(m, '+x', 35, 6, 2, 1);
-  beams(m, '+x', 30, 38, 8, 3);
-  // the big domed silo (front left) and a smaller one
-  silo(m, 14.5, 36.5, 1, 6, 13);
-  silo(m, 23.5, 31.5, 1, 3.6, 9);
-  // the courtyard: a fire pit, a basin, jars, crates, a palm
+  // the sanctuary: three receding tiers, each under its own cornice
+  inner(m, (s) => {
+    const g = [0x34588a, 0x3f6596];
+    const t1 = block(s, 8, 8, 30, 27, 1, 9, { wall: LIME, batter: 6, band: 'red', roofC: PLASTER, lipOut: 2, rimC: LIME, gorge: g });
+    const t2 = block(s, 12, 10, 26, 23, t1 - 1, 6, { wall: SAND, batter: 0, band: 'lapis', roofC: PLASTER, lipOut: 2, rimC: LIME, gorge: [RED_M, 0xa8563a] });
+    block(s, 15, 12, 23, 20, t2 - 1, 5, { wall: LIME, batter: 0, band: 'team', roofC: PLASTER, lipOut: 1, rimC: LIME, gorge: g, torus: false });
+    door(s, '+z', 17, 4, 1, 8, { lattice: true, sun: true, deep: 3, frame: SAND });
+    door(s, '+z', 17, 4, t1, 4, { leaf: false, deep: 2, frame: LIME });
+    slit(s, '+z', 11, 4, 3, 1); slit(s, '+z', 26, 4, 3, 1); slit(s, '+x', 13, 4, 3, 1); slit(s, '+x', 20, 4, 3, 1);
+    // painted reliefs either side of the door: an offering king, a god
+    paint(s, '+z', 12, 8, ['.O.', 'OOO', '.O.', 'BOB', 'B.B', 'K.K'], { O: OCHRE, B: LAPIS, K: INK });
+    paint(s, '+z', 23, 8, ['.R.', 'OOO', '.O.', 'BOB', 'B.B', 'K.K'], { O: OCHRE, B: TURQ, K: INK, R: RED });
+  });
+  // the colonnaded hall: a low flat roof on papyrus columns, an ochre back
+  // wall, the portico deep in shadow
+  inner(m, (s) => {
+    const X0 = 34, X1 = 49, Z0 = 8, Z1 = 25, H = 10;
+    block(s, 37, Z0, X1, 17, 1, H - 1, { wall: OCHRE_P, batter: 0, band: null, parapet: false, torus: false });
+    door(s, '+z', 41, 3, 1, 6, { deep: 2 });
+    paint(s, '+z', 38, 7, ['BRB', 'O.O', 'BRB'], { O: OCHRE, B: LAPIS, R: RED });
+    paint(s, '+z', 45, 7, ['BRB', 'O.O', 'BRB'], { O: OCHRE, B: LAPIS, R: RED });
+    for (const x of [35, 39, 43, 46]) tcColumn(s, x, Z1 - 3, 1, H);
+    for (const z of [Z0 + 3, Z0 + 8]) tcColumn(s, X0 + 1, z, 1, H);
+    // the architrave: a painted beam round the edge (red / lapis blocks), the
+    // gorge flaring a voxel out above it, the mud roof inside a pale lip
+    for (let x = X0; x < X1; x++) for (let z = Z0; z < Z1; z++) {
+      const e = Math.min(x - X0, X1 - 1 - x, z - Z0, Z1 - 1 - z);
+      s.set(x, H, z, e === 0 ? ((((x + z) >> 1) & 1) ? RED_M : LAPIS) : SAND_D(x, H, z));
+    }
+    for (let x = X0 - 1; x <= X1; x++) for (let z = Z0 - 1; z <= Z1; z++) {
+      const e = Math.min(x - X0 + 1, X1 - x, z - Z0 + 1, Z1 - z);
+      s.set(x, H + 1, z, e === 0 ? LIME(x, H + 1, z) : TC_HALLROOF(x, H + 1, z));
+    }
+  });
+  // the granary: a big domed silo at the front left with a ladder and sacks
+  // (silo(), ladder() lay mesh polygons on m itself, so not through inner())
+  silo(m, 15.5, 36.5, 1, 6, 11);
+  ladder(m, [22.6, 1, 38.4], [21.4, 11.6, 37.6]);
+  sack(m, 22, 1, 31); sack(m, 24, 1, 33); sack(m, 22, 3, 31);
+  // the small domed silo turret on the front-right corner of the wall
+  silo(m, 50.5, 50.5, 1, 3.8, 8);
+  // the courtyard: a fire pit, a basin, jars, a palm
   m.box(27, 1, 34, 5, 1, 5, LIME); m.box(28, 1, 35, 3, 1, 3, DARK);
   m.set(29, 2, 36, FIRE[3], FG); m.set(28, 2, 36, FIRE[1], FG); m.set(29, 2, 35, FIRE[2], FG); m.set(30, 2, 37, FIRE[0], FG); m.set(29, 3, 36, FIRE[2], FG);
-  for (let x = 33; x < 38; x++) for (let z = 25; z < 29; z++) m.set(x, 1, z, x === 33 || x === 37 || z === 25 || z === 28 ? LIME : WATER);
-  jar(m, 32.5, 1, 31.5, 0xb8683e, true);
-  goodsBox(m, 40, 1, 40, 4, 3, 'grain');
+  for (let x = 31; x < 35; x++) for (let z = 21; z < 25; z++) m.set(x, 1, z, x === 31 || x === 34 || z === 21 || z === 24 ? LIME : WATER);
+  goodsBox(m, 42, 1, 38, 4, 3, 'grain'); crate(m, 46, 1, 37, 3, 3, 3); sack(m, 38, 1, 39);
   palm(m, 8, 1, 28, 21, { lx: 0.3, lz: 1, len: 7 });
-  // outside the walls: pots by the gate, a basket, a cart wheel
-  // the Ra statue on its plinth at the front-left corner (outside the wall line)
-  // (half voxels: a gold-feathered falcon head with a dark hooked beak, the
-  // sun disc, a striped wig, a broad collar, crook and flail crossed on the
-  // chest, a pleated gold kilt under a belt, a cartouche on every plinth face)
+  // the Ra statue on its plinth at the front-left corner, in sandstone with
+  // gold regalia and the owner's kilt (building_02)
   fineStatue(m, 2, 45, 12, 54, 1, 9, { h: 25, skin: BASALT, gold: GILT_L, kilt: GILT, kiltFront: TEAMB, head: 'falcon', crown: 'disc', arms: 'crossed', pose: 'stride' }, 1);
+  const st = m.fine[m.fine.length - 1].m;
+  for (const [x, y, z] of st.coords) {
+    const v = st.get(x, y, z);
+    if (v && !v.team) v.c = tcSandstone(v.c, x, y, z);
+  }
   return m;
 }
 

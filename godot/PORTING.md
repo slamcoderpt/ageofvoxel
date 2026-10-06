@@ -1511,6 +1511,30 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   block's foot over its base course; the ochre walls (`OCHRE_P`,
   `OCHRE_W`) are a value darker than the sand. The Market's three canopies
   are dyed madder red, woad green and saffron (no blue and white).
+- **Town Center and roofs, round 26** (a compound that read as one beige
+  mass of near-white flat roof caps): every roof plaster (`PLASTER`,
+  `ROOFTILE`, `MUDROOF`, the houses' `HROOF_C` / `HROOF_W`) is now a warm
+  sand / mud plaster a value step under the walls, never the brightest thing
+  on screen (the pale lip still frames each deck). `townCenter()` is rebuilt
+  so each structure has its own height, silhouette and use: the gateway
+  (two banded pylons, the tallest mass, with team pennants on staffs in front
+  of them); a stepped sanctuary at the centre back (three receding tiers,
+  each under its own cornice: red, lapis, then the owner's band; a latticed
+  door and a dark shrine opening above it); a low colonnaded hall at the back
+  right (a reed-mat roof, `TC_HALLROOF`, on six painted papyrus columns,
+  `tcColumn()`, over a deep shadowed portico and an ochre back wall, the court
+  in front left open so the columns show); a big domed granary silo at the
+  front left and a small domed silo turret replacing the front-right corner
+  pier; lower enclosure walls (5, front 4). Interior structures are drawn in
+  a scratch model (`inner()`) and copied in, so their `door()` / `slit()` /
+  `paint()` rays never hit the enclosure wall in front of them (the old
+  stray voxels along the right wall and at the right pylon's foot were slits
+  and doors cut into the enclosure, and beams floating over it). The Ra
+  statue is recoloured to a sandstone ramp (`TC_SAND`, `tcSandstone()`: body
+  and plinth) with its gold regalia, lapis and the owner's kilt kept.
+  Note: `export-egypt.mjs --only <type>` rewrites the whole `egypt*` files
+  with that type alone; use `--out <scratch dir>` with it, or run the full
+  export (~17 s).
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8
