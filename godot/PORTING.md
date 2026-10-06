@@ -1784,8 +1784,9 @@ same channel names, plus:
   gold collar, two gold blades), `son_of_osiris` (beast, a gold falcon god
   with a sun disc), `mummy`, `minion` (human), `sphinx` (four-legged: lion
   body, a man's head in a team and white nemes), `petsuchos` (jewelled
-  crocodile, horned sun-disc crown, team tail tip), `scarab` (six legs on the
-  four leg channels, iridescent shell with team blotches, mandibles),
+  crocodile, horned sun-disc crown, team tail tip), `scarab` (six jointed legs on the
+  four leg channels, a green two-domed shell with a mirrored team pattern,
+  stag mandibles),
   `scorpion_man` (a man on a team and white scorpion: eight legs, pincers on
   the `neck` channel, a tail arching over the back), `wadjet` (serpent:
   coil, hood, team wings with red bars), `phoenix`, `roc` (flyers; the roc
@@ -1901,6 +1902,28 @@ idle lies still with the tail tip curling; attacking zeroes the limbs (feet
 stay planted) and rears the head; dying it slumps 0.12 rad to one flank
 instead of the horse's roll onto its side. `--params "eu_focus=petsuchos"`
 (`&eu_state=walk|die`) / `"eu_one=petsuchos&eu_turn=80&eu_pitch=12"` check it.
+
+Scarab (round 21, myth_07 / myth_14): the shell is no longer a noise field.
+Each elytron is an oval dome (footprint an ellipse 4.3 wide about 2.5 voxels
+out from the seam, round at the rear, square-shouldered at the front, height
+`6.2 * sqrt(q)`), so the two domes meet low at a two-voxel-deep near-black
+seam. One green ramp by height above the shell base: a near-black rim row
+(and the outermost voxel of the row above) as a lip over the dark belly
+keel, bottle green on the lower flanks, emerald, a light green crown and a
+five-voxel yellow-green glint along each crown. The team colour is one
+pattern painted by `d = |x - 6|`, so both halves match voxel for voxel: an
+oblique streak across each elytron and a round rear spot. No red or orange
+(those grade to salmon). In front, a rounded bronze-green pronotum behind a
+dark gap, two glints; the head (`neck` channel) a dark wedge with a brow
+ridge, pale yellow side eyes and two stag mandibles (three tapering tube
+segments, out, forward, then closing in, plus an inner tooth; lighter brown
+on top, near-black tips). Each of the six legs is a femur (`legFL`..,
+r 1.35 -> 1.0) leaving the body sideways and rising to the knee, and a tibia
+(`cannonFL`.., r 1.0 -> 0.72) angling down and out with two outer spurs, then
+a tarsus (r 0.72 -> 0.55) to a dark claw on the ground; the front pair reach
+forward, the middle out, the hind pair back. The middle legs ride the
+`BR / BL` channels (horse anim). `--params "eu_focus=scarab"`
+(`&eu_state=walk|die`) / `"eu_one=scarab&eu_turn=60"` check it.
 
 Raptors (round 20, myth_06 / myth_13): the Roc and the Phoenix share one bird
 build (`raptorWing / raptorTail / raptorHead / raptorLeg`,

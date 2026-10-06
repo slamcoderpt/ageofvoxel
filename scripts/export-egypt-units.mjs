@@ -26,7 +26,7 @@
 // broad collars, axes, crowns and staffs. Animals: a white chariot horse in a
 // striped blanket, a tan camel with a hump and a long neck, a grey elephant
 // with a howdah and a forehead plate, a lion-bodied sphinx, a jewelled
-// crocodile, a rainbow scarab, a blue scorpion under a man, a winged cobra,
+// crocodile, a green-shelled stag scarab, a blue scorpion under a man, a winged cobra,
 // a falcon warrior, a jackal warrior, mummies, a fire bird, a giant roc.
 import * as THREE from 'three';
 import fs from 'node:fs';
@@ -2278,43 +2278,126 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
   ]);
 }
 
-// Scarab (six-legged rig, 0.1): a giant beetle with an iridescent shell
-// (green, orange, red) blotched with the army's colour, a dark horned head
-// with great mandibles.
+// Scarab (six-legged rig, 0.1): a giant stag-scarab (myth_07 / myth_14).
+// Round 21: no scattered hues. The elytra are two smooth symmetric domes, one
+// each side of a dark seam, in one metallic green ramp (a near-black rim row
+// overhanging the dark belly, bottle green low on the flanks, emerald, a light
+// green on each crown and a yellow-green glint on its top); one team-colour
+// pattern repeated mirror-exact on both halves (an oblique streak and a rear
+// spot, like Retold's blue marks). A rounded bronze-green pronotum, a dark head
+// with pale yellow eyes and great curved stag mandibles (an inner tooth each,
+// lighter on top); six jointed legs that leave the body sideways, rise to a
+// knee and taper down and out to clawed tarsi, the front pair reaching
+// forward, the hind pair back.
 {
-  const SHELL = (x, y, z) => { const u = Math.sin(z * 0.45 + x * 0.3) + Math.sin(y * 0.6 - x * 0.2); return u > 0.9 ? 0xd8701c : u > 0.1 ? 0x2f8a3a : u > -0.7 ? 0xb83a1c : 0x1f5a6a; };
-  const CHIT = pick3(81, 0x2a2018, 0x3a2c1e, 0x221a14);
+  const S_RIM = 0x07160e, S_LOW = 0x0f3420, S_MID = 0x1a5c30, S_HI = 0x369a46, S_GLINT = 0x80c858, S_SEAM = 0x040a06;
+  const CH_D = 0x1c1610, CH_M = 0x2c2218, CH_L = 0x45362a;
+  const PR_D = 0x1a2416, PR_M = 0x2e3e22, PR_L = 0x55682e;
   const body = new VoxelModel();
-  body.ellipsoid(5, 4, 9, 5.8, 4.4, 8.6, SHELL);
-  for (let y = 0; y <= 2; y++) for (let z = 1; z <= 17; z++) for (let x = 0; x <= 10; x++) if (body.has(x, y, z)) body.set(x, y, z, CHIT(x, y, z));
-  // the wing-case seam and team blotches on the shell
-  for (let z = 2; z <= 16; z++) { let y = 10; while (y > 0 && !body.has(5, y, z)) y--; if (y > 0) body.set(5, y, z, 0x14100c); }
-  for (const [x, z] of [[2, 6], [8, 11], [3, 13], [7, 4]]) for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 2; dz++) {
-    let y = 10; while (y > 0 && !body.has(x + dx, y, z + dz)) y--;
-    if (y > 2 && (dx * dx + (dz - 0.5) * (dz - 0.5)) < 2.4) body.set(x + dx, y, z + dz, TEAM, { glow: 0.1 });
+  // the belly: a dark chitin keel under the shell, narrower than the shell
+  body.ellipsoid(6, 2.2, 9.5, 4.6, 2.2, 7.6, (x, y) => (y >= 3 ? CH_M : CH_D));
+  // the elytra: per elytron a dome centred 2.4 out from the seam (d = |x - 6|),
+  // long and round at the rear, square-shouldered at the front (a superellipse)
+  // each elytron an oval dome: footprint an ellipse (rx 4.3 about 2.5 out from
+  // the seam, round at the rear, square-shouldered at the front), height a
+  // smooth cap over it, so both domes meet low at the seam
+  const ZC = 9.5, BASE = 3, HT = 6.2;
+  const elyH = (x, z) => {
+    const d = Math.abs(x - 6), u = (d - 2.5) / 4.3;
+    const w = z < ZC ? (ZC - z) / 9.8 : (z - ZC) / 8.6;
+    const q = 1 - u * u - (z < ZC ? w * w : w * w * w * w);
+    if (q <= 0) return -1;
+    return HT * Math.sqrt(q);
+  };
+  for (let z = 0; z <= 18; z++) for (let x = 0; x <= 12; x++) {
+    const h = elyH(x, z);
+    if (h < 0) continue;
+    const top = Math.round(BASE + h);
+    for (let y = BASE; y <= top; y++) {
+      const f = (y - BASE) / HT;
+      let c = f < 0.35 ? S_LOW : f < 0.75 ? S_MID : S_HI;
+      if (y === BASE) c = S_RIM;
+      body.set(x, y, z, c);
+    }
   }
+  // the darker rim: the lowest shell row and every outermost voxel of the row
+  // above it, so the shell's edge reads as a lip over the body
+  for (let z = 0; z <= 18; z++) for (let x = 0; x <= 12; x++) {
+    if (body.get(x, BASE + 1, z) && !body.has(x + (x < 6 ? -1 : 1), BASE + 1, z)) body.set(x, BASE + 1, z, S_RIM);
+  }
+  const topY = (x, z) => { let y = 12; while (y > BASE && !body.has(x, y, z)) y--; return y; };
+  // a glint on each crown (the same two places on both halves)
+  for (const x of [3, 9]) for (const z of [10, 11, 12, 13, 14]) { const y = topY(x, z); if (y > BASE + 3) body.set(x, y, z, S_GLINT); }
+  // the pattern: an oblique team streak across each elytron and a rear spot,
+  // mirrored exactly (painted by d = |x - 6|)
+  for (let z = 0; z <= 18; z++) for (let x = 0; x <= 12; x++) {
+    const d = Math.abs(x - 6);
+    if (d === 0) continue;
+    const streak = d >= 1 && d <= 5 && Math.abs((z - 6.5) - (d - 1) * 0.75) < 0.85;
+    const spot = (d - 3) * (d - 3) + (z - 2.5) * (z - 2.5) <= 1.3;
+    if (!streak && !spot) continue;
+    const y = topY(x, z);
+    if (y <= BASE + 1) continue;
+    body.set(x, y, z, TEAM, { glow: 0.08 });
+    const v = body.get(x, y - 1, z);
+    if (v && !v.team && !body.has(x + (x < 6 ? -1 : 1), y - 1, z)) { body.set(x, y - 1, z, TEAM); body.get(x, y - 1, z).c = TEAM_SHADE; }
+  }
+  // the seam: the dark line between the wing cases, two voxels deep
+  for (let z = 0; z <= 18; z++) { const y = topY(6, z); if (y > BASE) { body.set(6, y, z, S_SEAM); body.set(6, y - 1, z, S_SEAM); } }
+  // the pronotum: a rounded shield in front of the elytra, a dark gap between
+  for (let z = 19; z <= 23; z++) for (let x = 1; x <= 11; x++) {
+    const dx = (x - 6) / 5.2, dz = (z - 19.5) / 4.6;
+    const q = 1 - dx * dx * dx * dx - dz * dz;
+    if (q <= 0) continue;
+    const top = Math.round(BASE - 0.5 + 4.2 * Math.sqrt(q));
+    for (let y = BASE - 1; y <= top; y++) body.set(x, y, z, y >= top && q > 0.55 ? PR_L : y >= top - 1 ? PR_M : PR_D);
+  }
+  for (let x = 2; x <= 10; x++) { const y = topY(x, 19); if (y >= BASE) body.set(x, y, 19, PR_D); }
+  for (const x of [4, 8]) body.set(x, topY(x, 21), 21, S_GLINT);
+  // the head (neck channel): a dark wedge, pale yellow eyes on its sides,
+  // two great curved mandibles reaching forward and closing at the tips
   const headM = new VoxelModel();
-  headM.ellipsoid(4, 3, 2, 3.6, 2.8, 2.6, CHIT);
-  headM.set(1, 4, 4, 0xe0e040, { glow: 0.7 }).set(7, 4, 4, 0xe0e040, { glow: 0.7 });
-  headM.box(2, 5, 0, 5, 1, 3, 0x3a5a2a);
-  // mandibles: great curved horns forward and in
+  headM.ellipsoid(0, 2.5, 2.4, 3.6, 2.4, 2.8, (x, y) => (y >= 4 ? CH_L : y >= 2 ? CH_M : CH_D));
+  headM.box(-2, 4, 3, 5, 1, 2, CH_L);                          // a ridge across the brow
   for (const s of [-1, 1]) {
-    tube(headM, [4 + s * 2, 2, 3.5], [4 + s * 4.2, 2.5, 7], 1.1, 0.9, CHIT);
-    tube(headM, [4 + s * 4.2, 2.5, 7], [4 + s * 2.6, 2.5, 10.5], 0.9, 0.6, CHIT);
-    tube(headM, [4 + s * 2.6, 2.5, 10.5], [4 + s * 0.8, 2.5, 11], 0.6, 0.5, 0x4a3828);
+    headM.set(s * 4, 3, 2, 0xe8e070, { glow: 0.55 }).set(s * 4, 3, 3, 0xe8e070, { glow: 0.55 }).set(s * 4, 4, 2, 0xc8c058, { glow: 0.4 });
+    headM.set(s * 4, 2, 3, CH_D);
   }
-  const legUp = new VoxelModel().box(0, 0, 0, 2, 5, 2, CHIT);
-  const legLow = new VoxelModel().box(0, 1, 0, 1, 6, 1, CHIT).box(0, 0, 0, 1, 1, 3, CHIT).set(0, 4, 1, CHIT);
-  const leg = (nm, x, z, ch) => [
-    part(`leg${nm}`, legUp, [1, 5, 1], [x, 3, z], 'body', { anim: `leg${ch}` }),
-    part(`cannon${nm}`, legLow, [0.5, 7, 0.5], [x > 0 ? 2 : -2, -4, 0], `leg${nm}`, { anim: `cannon${ch}` }),
-  ];
+  const MAND = (x, y, z, t) => (t > 0.85 ? 0x1a100a : y >= 3 ? 0x6a4428 : 0x40281a);
+  for (const s of [-1, 1]) {
+    tube(headM, [s * 2.2, 2.2, 4.5], [s * 5.2, 2.6, 8.2], 1.5, 1.15, MAND);
+    tube(headM, [s * 5.2, 2.6, 8.2], [s * 4.8, 3.0, 12.2], 1.15, 0.85, MAND);
+    tube(headM, [s * 4.8, 3.0, 12.2], [s * 2.0, 3.0, 14.2], 0.85, 0.45, MAND);
+    tube(headM, [s * 5.0, 2.6, 10.0], [s * 3.2, 2.6, 10.8], 0.6, 0.35, MAND);   // the inner tooth
+  }
+  // six legs: the femur leaves the body sideways and rises to the knee, the
+  // tibia angles down and out (two outer spurs), the tarsus reaches on to a
+  // claw on the ground; each segment thinner than the last
+  const LEG_C = (x, y, z, t) => (y >= 0 ? CH_L : CH_M);
+  const legs = [];
+  const leg = (nm, ch, zj, zdir) => {
+    for (const s of [1, -1]) {
+      const fem = new VoxelModel();
+      tube(fem, [0, 0, 0], [s * 4.6, 1.6, zdir * 1.4], 1.35, 1.0, LEG_C);
+      const tib = new VoxelModel();
+      const k = [s * 3.0, -5.0, zdir * 2.0], f = [s * 4.6, -6.6, zdir * 3.4];
+      tube(tib, [0, 0, 0], k, 1.0, 0.72, (x, y, z, t) => (t < 0.3 ? CH_L : CH_M));
+      tube(tib, k, f, 0.72, 0.55, CH_D);
+      for (const t of [0.35, 0.65]) tib.set(Math.round(k[0] * t + s), Math.round(k[1] * t), Math.round(k[2] * t), CH_D);
+      tib.set(Math.round(f[0] + s * 0.6), Math.round(f[1]), Math.round(f[2] + zdir * 0.6), 0x120c08);
+      const L = `${s > 0 ? 'L' : 'R'}`;
+      const c = ch[s > 0 ? 0 : 1];
+      legs.push(part(`leg${nm}${L}`, fem, [0, 0, 0], [s * 4.4, 1.5, zj], 'body', { anim: `leg${c}` }));
+      legs.push(part(`cannon${nm}${L}`, tib, [0, 0, 0], [s * 4.6, 1.6, zdir * 1.4], `leg${nm}${L}`, { anim: `cannon${c}` }));
+    }
+  };
+  leg('F', ['FL', 'FR'], 6.5, 1.3);
+  leg('M', ['BR', 'BL'], 2.5, 0.1);
+  leg('B', ['BL', 'BR'], -1.5, -1.6);
   rig('scarab', { voxel: 0.1, anim: 'horse', style: 'beetle', gait: 1.1, stride: 0.6 }, [
-    part('body', body, [5, 0, 9], [0, 6, 0]),
-    part('neck', headM, [4, 2, 0], [0, 2, 8], 'body'),
-    ...leg('FL', 5, 6, 'FL'), ...leg('FR', -5, 6, 'FR'),
-    ...leg('ML', 6, 0, 'BR'), ...leg('MR', -6, 0, 'BL'),
-    ...leg('BL', 5, -6, 'BL'), ...leg('BR', -5, -6, 'BR'),
+    part('body', body, [6, 0, 9], [0, 3, 0]),
+    part('neck', headM, [0, 1.5, 0], [0, 2.2, 14.6], 'body'),
+    ...legs,
   ]);
 }
 
