@@ -29,6 +29,7 @@ class AovSim : public RefCounted {
 protected:
 	static void _bind_methods();
 	static void _bind_civ_methods(); // aov_sim_civ.cpp
+	static void _bind_gods_methods(); // aov_sim_gods.cpp
 	void civ_unit_def(int type, Dictionary &d) const;
 	void civ_building_def(int type, int civ, Dictionary &d) const;
 
@@ -227,6 +228,18 @@ public:
 	Dictionary summon_animal(int64_t pharaoh, const String &type); // {ok, reason}: pays the favor, queues it on him
 	Array get_summons(int64_t owner) const;                   // [{pharaoh, type, t, total}] in queue order
 	void order_convert(const PackedInt32Array &ids, int64_t animal); // Set's Priests on a wild animal (resource id)
+	// --- the gods (aov_sim_gods.cpp; sim/godpowers egypt_powers.cpp / egypt_myth.cpp, sim/techs)
+	PackedStringArray player_powers(int64_t owner) const;        // the powers he may cast now (his gods'), hotkey order
+	Dictionary get_power_info(int64_t owner, const String &power) const; // def + {cost (ramped), has, can, reason, cooldown_left, recharge, casts, target, age, ramp}
+	Dictionary cast_check(int64_t owner, const String &power, double x, double z) const; // {ok, reason}
+	bool cast_power2(int64_t owner, const String &power, double x, double z, double x2, double z2); // two-point powers
+	String last_cast_reason() const { return String(sim_.godpowers.last_reason.c_str()); }
+	Dictionary get_gods(int64_t owner) const;                     // {major, civ, minor {1..3}, offered {1..3: [gods]}, powers [keys]}
+	PackedStringArray minor_gods_of(const String &major, int64_t age) const;
+	Dictionary get_egypt_powers() const;                          // the Egyptian powers' state (game/godpowers draws it)
+	Dictionary get_power_stats(int64_t owner) const;              // counters (egypt_gods_check.gd)
+	bool is_uncontrolled(int64_t unit) const { return sim_.godpowers.is_uncontrolled((int32_t)unit); }
+	double ability_ready(int64_t unit) const { return sim_.godpowers.ability_ready((int32_t)unit); }
 
 	// --- events: [{type: "entity:added", id, kind, other, owner, a, x, z, amount}], cleared on read
 	Array take_events();

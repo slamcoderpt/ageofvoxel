@@ -353,10 +353,14 @@ void Combat::damage(int32_t tid, double amount, const Hitter &a, uint8_t kind) {
 	const UnitDef *ad = a.kind == K_UNIT ? &unit_def(U.type[a.row]) : nullptr;
 	const UnitDef *td = tk == K_UNIT ? &unit_def(U.type[t]) : nullptr;
 	double dmg = amount;
+	// (Godot-only, sim/godpowers: DK_DIVINE is exact damage the caller computed: no
+	// bonus, no armor, no building factor: the Egyptian god powers, venom, curses)
+	const bool exact = sim->godot_rules && kind == DK_DIVINE;
+	if (exact) ad = nullptr;
 	if (ad && td && ad->bonus[td->cls] != 0) dmg *= ad->bonus[td->cls];
 	if (sim->godot_rules && ad) dmg *= sim->techs.vs_mult(a.row, tk, t); // (Godot-only: Burning Pitch, Olympian Weapons)
 	bool siege = false; // (Godot-only, sim/civ: Egyptian siege's crush vs a building)
-	if (tk == K_BUILDING) {
+	if (tk == K_BUILDING && !exact) {
 		const EgyptUnit *eu = sim->godot_rules && ad ? egypt_unit(U.type[a.row]) : nullptr;
 		if (eu && eu->crush_vs_building > 0) {
 			// the crush part of the attack (with the attack upgrades' factor), less the building's crush armor
@@ -373,9 +377,10 @@ void Combat::damage(int32_t tid, double amount, const Hitter &a, uint8_t kind) {
 		// friend, whatever happened in flight; walls / towers have their own armor
 		const int towner = tk == K_UNIT ? U.owner[t] : B.owner[t];
 		if (a.kind == K_BUILDING && !sim->is_enemy(a.owner, towner)) return;
-		if (tk == K_BUILDING && is_fort_type(B.type[t]) && !siege) dmg *= sim->fortify.armor_mult(t, a, kind);
+		if (tk == K_BUILDING && is_fort_type(B.type[t]) && !siege && !exact) dmg *= sim->fortify.armor_mult(t, a, kind);
 	}
-	if (sim->godot_rules) {
+	if (exact) {
+	} else if (sim->godot_rules) {
 		// Godot-only (sim/techs): hack / pierce armor from the Armory, then
 		// divine damage, which no armor reduces (Phobos' Spear of Panic)
 		dmg *= 1 - (td ? sim->techs.unit_armor(t, a, kind) : 0);
@@ -830,7 +835,8 @@ void Combat::update(double dt) {
 		if (e >= 0) {
 			B.attack_cd[b] = d.attack_cooldown;
 			if (sim->godot_rules && B.civ_empower[b] > 0) B.attack_cd[b] *= sim->civs.reload_mult(b); // (sim/civ: empowered, x0.75)
-			fire(B.id[b], U.id[e], d.attack_damage, 4);
+			fire(B.id[b], U.id[e], sim->godot_rules ? d.attack_damage * sim->godpowers.building_attack_mult(b) : d.attack_damage, 4);
+			if (sim->godot_rules) sim->godpowers.extra_arrows(b, e, d.attack_damage); // (sim/godpowers: the Citadel's third arrow)
 		}
 	}
 	hold_lines();

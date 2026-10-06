@@ -76,7 +76,8 @@ constexpr double AM_LOST_TIME = 2;      // s a foe may stay out of sight before 
 constexpr double RETALIATE_DOT = -0.25; // moving units fight back unless hit from behind
 constexpr double RALLY_RADIUS = 4;      // the men beside one who fights back join him
 constexpr double NEXT_FOE_RADIUS = 4;   // a fighting enemy this close keeps a man in the fight
-enum DamageKind : uint8_t { DK_DEFAULT = 0, DK_ARROW = 1, DK_MELEE = 2 };
+enum DamageKind : uint8_t { DK_DEFAULT = 0, DK_ARROW = 1, DK_MELEE = 2,
+	DK_DIVINE = 3 }; // (Godot-only, sim/godpowers: exact damage, no armor / bonus / building factor)
 
 // The JS `attacker` argument of combat.damage: a unit, a building, or a
 // pseudo attacker ({owner, id: 0} for god powers, {owner} for an arrow whose

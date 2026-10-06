@@ -236,7 +236,7 @@ func _case_defs() -> void:
 	ok = ok and float(sim.get_unit_def("war_elephant").hp) == 450 and int(sim.get_unit_def("pharaoh").pop) == 0 and float(sim.get_unit_def("priest").cost.gold) == 100
 	var bb: Dictionary = sim.get_unit_def("baboon_of_set")
 	ok = ok and float(bb.hp) == 20 and float(bb.attack.damage) == 3 and float(bb.cost.favor) == 3 and int(bb.pop) == 1 and str(bb.civ) == "egyptian"
-	_check("defs.units", ok and units.size() == 23, units)
+	_check("defs.units", ok and units.size() == 37, units) # (23 + the gods' 10 myth units and 4 power units, egypt_gods_check.gd)
 	# every Egyptian building's numbers (for an Egyptian owner)
 	var blds := {}
 	for t in e.build_menu:
@@ -1310,7 +1310,9 @@ func _case_locks() -> void:
 	r["egyptian temple techs"] = keys.call(etm)
 	r["egyptian armory techs"] = keys.call(earm).size()
 	r["greek armory techs"] = keys.call(garm).size()
-	ok = ok and r["greek temple techs"] == 23 and r["egyptian temple techs"] == ["hands_of_the_pharaoh"] and r["egyptian armory techs"] == 11 and r["greek armory techs"] == 21
+	# (the Egyptian gods' techs, egypt_gods_check.gd: Hands of the Pharaoh, then the gods' Temple
+	# techs; at the Armory the 11 generic ones + Ptah's 3, Anubis' Serpent Spear, Sekhmet's 2)
+	ok = ok and r["greek temple techs"] == 23 and r["egyptian temple techs"][0] == "hands_of_the_pharaoh" and not r["egyptian temple techs"].has("omniscience") and r["egyptian armory techs"] == 17 and r["greek armory techs"] == 21
 	# Monuments: in order, one each
 	r["monument 2 first"] = sim.can_build(2, "monument_soldiers")
 	var m1 := int(sim.place_building("monument_villagers", 2, C.x + 2, C.y - 18, PackedInt32Array([lb])))

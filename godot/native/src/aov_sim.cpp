@@ -11,6 +11,7 @@ using namespace godot;
 void AovSim::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("version"), &AovSim::version);
 	_bind_civ_methods(); // (aov_sim_civ.cpp: sim/civ)
+	_bind_gods_methods(); // (aov_sim_gods.cpp: the Egyptian gods, sim/godpowers)
 	ClassDB::bind_method(D_METHOD("new_game", "seed", "map_size", "preset", "players"), &AovSim::new_game, DEFVAL(128), DEFVAL("skirmish"), DEFVAL(2));
 	ClassDB::bind_method(D_METHOD("tick", "n"), &AovSim::tick, DEFVAL(1));
 	ClassDB::bind_method(D_METHOD("get_tick"), &AovSim::get_tick);
@@ -1591,6 +1592,7 @@ void AovSim::set_player_age(int64_t owner, int64_t age) {
 	const int from = sim_.players[owner].age;
 	sim_.players[owner].age = (int)std::max<int64_t>(0, std::min<int64_t>(3, age));
 	sim_.civs.age_set((int)owner, from, sim_.players[owner].age); // (Godot-only, sim/civ: hero ages, Set's age-up animals)
+	if (sim_.godot_rules) sim_.techs.auto_minor((int)owner); // (Godot-only, sim/techs: an Egyptian's minor gods for the ages skipped)
 }
 
 PackedInt32Array AovSim::spawn_herd(const String &type, double x, double z, int64_t n) {

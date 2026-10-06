@@ -35,6 +35,36 @@ const char *const *minor_gods(int age) {
 	return age == 1 ? CLASSICAL_GODS : age == 2 ? HEROIC_GODS : age == 3 ? MYTHIC_GODS : none;
 }
 
+std::string canonical_god(const std::string &god) {
+	const std::string g = lower(god);
+	return g == "hathor" ? "sobek" : g;
+}
+
+const char *const *minor_gods_of(const std::string &major, int age) {
+	static const char *const none[] = { nullptr };
+	// EGYPT.md 4 (Retold: Sobek in the Heroic Age where AoM had Hathor)
+	static const char *const RA[4][3] = { { nullptr }, { "bast", "ptah", nullptr }, { "sobek", "sekhmet", nullptr }, { "horus", "osiris", nullptr } };
+	static const char *const ISIS[4][3] = { { nullptr }, { "anubis", "bast", nullptr }, { "sobek", "nephthys", nullptr }, { "osiris", "thoth", nullptr } };
+	static const char *const SET[4][3] = { { nullptr }, { "anubis", "ptah", nullptr }, { "nephthys", "sekhmet", nullptr }, { "horus", "thoth", nullptr } };
+	if (age < 1 || age > 3) return none;
+	const std::string m = lower(major);
+	if (m == "ra") return RA[age];
+	if (m == "isis") return ISIS[age];
+	if (m == "set") return SET[age];
+	return minor_gods(age);
+}
+
+int egypt_god_age(const std::string &god) {
+	const std::string g = canonical_god(god);
+	if (g == "ra" || g == "isis" || g == "set") return 0;
+	if (g == "bast" || g == "ptah" || g == "anubis") return 1;
+	if (g == "sobek" || g == "sekhmet" || g == "nephthys") return 2;
+	if (g == "osiris" || g == "horus" || g == "thoth") return 3;
+	return -1;
+}
+
+bool is_egypt_god(const std::string &god) { return egypt_god_age(god) >= 0; }
+
 const char *tech_state_name(int s) {
 	static const char *n[] = { "available", "locked_age", "locked_prereq", "locked_god", "researching", "queued", "done", "unavailable" };
 	return s >= 0 && s <= TS_UNAVAILABLE ? n[s] : "?";
@@ -205,6 +235,117 @@ const TechDef &tech_def(int t) {
 			{ E(TE_RANGE, UM(U_PRIEST), false, 3 * D, 3), E(TE_SIGHT, UM(U_PRIEST), false, 3 * D, 3), N, N }, nullptr,
 			"Priests +3 range, +3 LOS; they can carry relics and Auto Scout",
 			"range / LOS +3 x DIST_SCALE = +1.8 tiles; relics and Auto Scout: none here" },
+		// ---- the Egyptian gods (EGYPT.md 4, 5; the effects' hooks: sim/techs, sim/godpowers, sim/civ) ----
+		// major gods' unique techs (Archaic)
+		{ "skin_of_the_rhino", "Skin of the Rhino", TH_TOWN_CENTER, -1, 0, Cost(50, 0, 0, 5), 15, -1, "ra", true,
+			{ E(TE_HACK_ARMOR, UM(U_LABORER), false, 0.25), E(TE_PIERCE_ARMOR, UM(U_LABORER), false, 0.25), N, N }, nullptr,
+			"Laborers -25% hack and -25% pierce vulnerability", "+0.25 on the Laborer's hack (0.1875) and pierce (0.2625) armor" },
+		{ "flood_of_the_nile", "Flood of the Nile", TH_GRANARY, -1, 0, Cost(0, 0, 150, 8), 40, -1, "isis", true,
+			{ E(TE_TRICKLE, 0, false, 1), N, N, N }, nullptr,
+			"A passive trickle of +1 food per second", "Isis' -10 % makes it 135 g + 8 favor (Retold: 7.2 favor; the favor part is not reduced here)" },
+		{ "clairvoyance", "Clairvoyance", TH_TEMPLE, -1, 0, Cost(0, 0, 150, 10), 40, -1, "set", true,
+			{ E(TE_VISION_RECHARGE, 0, false, 0.5), N, N, N }, nullptr,
+			"Vision recharges 50% faster and recasting it is free", "Vision's recharge x0.5; its cost no longer ramps (every cast 40 favor)" },
+		// Bast (Classical)
+		{ "criosphinx", "Criosphinx", TH_TEMPLE, -1, 1, Cost(0, 150, 0, 5), 40, -1, "bast", false,
+			{ E(TE_HP, UM(U_SPHINX), false, 0.20), E(TE_ATTACK, UM(U_SPHINX), false, 0.20), N, N }, nullptr,
+			"Sphinx +20% hp, +20% hack and +50% crush damage", "the Sphinx's one attack number is its hack: +20 % (the crush part: none here)" },
+		{ "hieracosphinx", "Hieracosphinx", TH_TEMPLE, -1, 1, Cost(0, 150, 0, 10), 30, T_CRIOSPHINX, "bast", false,
+			{ E(TE_SPEED, UM(U_SPHINX), false, 0.10), E(TE_ATTACK, UM(U_SPHINX), false, 0.20), N, N }, nullptr,
+			"Sphinx +10% speed, a further +20% hack and +50% crush damage", "additive: +40 % attack with both" },
+		{ "sacred_cats", "Sacred Cats", TH_GRANARY, -1, 1, Cost(0, 0, 55, 10), 30, -1, "bast", false,
+			{ E(TE_GATHER_FARM, UM(U_LABORER), false, 0.08), E(TE_GATHER_FOOD, UM(U_LABORER), false, 0.10), N, N }, nullptr,
+			"Laborers +8% farming, +10% other food gathering", "" },
+		{ "adze_of_wepwawet", "Adze of Wepwawet", TH_LUMBER_CAMP, -1, 1, Cost(0, 0, 50, 10), 40, -1, "bast", false,
+			{ E(TE_GATHER_WOOD, UM(U_LABORER), false, 0.10), N, N, N }, nullptr,
+			"Laborers fell trees in one hit; +10% wood gathering", "+10 % wood; trees here fall at once anyway" },
+		// Ptah (Classical)
+		{ "scalloped_axe", "Scalloped Axe", TH_EG_BARRACKS, B_ARMORY, 1, Cost(50, 0, 0, 10), 30, -1, "ptah", false,
+			{ E(TE_ATTACK, UM(U_AXEMAN), false, 0.15), N, N, N }, nullptr, "Axeman +15% attack", "" },
+		{ "leather_frame_shield", "Leather Frame Shield", TH_EG_BARRACKS, B_ARMORY, 1, Cost(0, 75, 0, 10), 40, -1, "ptah", false,
+			{ E(TE_PIERCE_ARMOR, UM(U_SPEARMAN), false, 0.15), N, N, N }, nullptr, "Spearman -15% pierce vulnerability", "+0.15 pierce armor" },
+		{ "electrum_bullets", "Electrum Bullets", TH_EG_BARRACKS, B_ARMORY, 1, Cost(0, 0, 150, 15), 40, -1, "ptah", false,
+			{ E(TE_ATTACK, UM(U_SLINGER), false, 0.10), E(TE_DIVINE, UM(U_SLINGER), false, 0.5), N, N }, nullptr,
+			"Slinger +10% attack and +0.5 divine damage", "" },
+		{ "shaduf", "Shaduf", TH_TEMPLE, B_GRANARY, 1, Cost(0, 100, 0, 10), 20, -1, "ptah", false,
+			{ E(TE_FARM_DISCOUNT, 0, false, 0.5), N, N, N }, nullptr,
+			"Farms -50% cost and -50% build time", "an Egyptian Farm 70 -> 35 gold, 10 -> 5 s base (a Laborer x4/3)" },
+		// Anubis (Classical)
+		{ "feet_of_the_jackal", "Feet of the Jackal", TH_TEMPLE, -1, 1, Cost(0, 0, 200, 10), 30, -1, "anubis", false,
+			{ E(TE_HP, UM(U_ANUBITE), false, 0.40), E(TE_ATTACK, UM(U_ANUBITE), false, 0.20), N, N }, nullptr,
+			"Anubite -> Guardian Anubite: +40% hp, +20% hack, +3 jump distance", "the jump's reach +1.8 tiles (x DIST_SCALE)" },
+		{ "serpent_spear", "Serpent Spear", TH_EG_BARRACKS, B_ARMORY, 1, Cost(125, 0, 0, 12), 40, -1, "anubis", false,
+			{ E(TE_MELEE_POISON, UM(U_SPEARMAN), false, 0.125), N, N, N }, nullptr,
+			"Spearmen poison: 0.125 divine damage per second over 6 s", "a blow restarts the 6 s (no armor)" },
+		{ "necropolis", "Necropolis", TH_TEMPLE, -1, 1, Cost(0, 50, 150, 0), 30, -1, "anubis", false,
+			{ E(TE_FAVOR, 0, false, 0.25), N, N, N }, nullptr, "Monuments +25% favor", "the owner's favor rate x1.25" },
+		// Sobek (Heroic; Retold's replacement for AoM's Hathor)
+		{ "sun_dried_mud_brick", "Sun-dried Mud-brick", TH_TOWN_CENTER, -1, 2, Cost(0, 200, 0, 20), 15, -1, "sobek", false,
+			{ E(TE_MUDBRICK, 0, false, 0.10), N, N, N }, nullptr,
+			"All buildings +10% hp, -10% gold cost, -15% build time", "existing buildings too (max and current hp x1.1)" },
+		{ "crocodilopolis", "Crocodilopolis", TH_TEMPLE, -1, 2, Cost(0, 200, 0, 15), 40, -1, "sobek", false,
+			{ E(TE_RANGE, UM(U_PETSUCHOS), false, 6 * D, 6), E(TE_SIGHT, UM(U_PETSUCHOS), false, 6 * D, 6), N, N }, nullptr,
+			"Petsuchos -> Petsobek: +6 range, +6 LOS", "+3.6 tiles (x DIST_SCALE)" },
+		{ "dark_water", "Dark Water", TH_MARKET, B_MIGDOL, 2, Cost(200, 0, 0, 18), 30, -1, "sobek", false,
+			{ E(TE_HP, UM(U_CAMEL_RIDER), false, 0.15), E(TE_REGEN, UM(U_CAMEL_RIDER), false, 0.5), N, N }, nullptr,
+			"Camel Riders and Caravans +15% hp, +0.5 hp/s regeneration", "Caravans: none here" },
+		{ "solar_barque", "Solar Barque", TH_TEMPLE, -1, 2, Cost(0, 150, 0, 10), 30, -1, "sobek", false,
+			{ N, N, N, N }, "Kebenit", "Kebenits spawn 3 Sea Snakes per 200 damage dealt to ships (Dock)", "" },
+		// Sekhmet (Heroic)
+		{ "bone_bow", "Bone Bow", TH_MIGDOL, B_ARMORY, 2, Cost(0, 125, 0, 20), 40, -1, "sekhmet", false,
+			{ E(TE_RANGE, UM(U_CHARIOT_ARCHER), false, 2 * D, 2), E(TE_SIGHT, UM(U_CHARIOT_ARCHER), false, 4 * D, 4), N, N }, nullptr,
+			"Chariot Archer +2 range, +4 LOS", "+1.2 / +2.4 tiles (x DIST_SCALE)" },
+		{ "slings_of_the_sun", "Slings of the Sun", TH_EG_BARRACKS, B_ARMORY, 2, Cost(0, 0, 100, 15), 40, -1, "sekhmet", false,
+			{ E(TE_VS_INFANTRY, UM(U_SLINGER), false, 0.75), N, N, N }, nullptr, "Slinger +0.75x damage vs infantry", "" },
+		{ "crimson_linen", "Crimson Linen", TH_TEMPLE, -1, 2, Cost(125, 0, 0, 20), 40, -1, "sekhmet", false,
+			{ E(TE_LIFESTEAL, M_EG_MYTH & ~UM(U_SCARAB), false, 0.25), E(TE_LIFESTEAL, UM(U_SCARAB), false, 0.75), N, N }, nullptr,
+			"Myth units regain 25% of the damage they deal as hp (Scarab 75%)", "" },
+		{ "force_of_the_west_wind", "Force of the West Wind", TH_SIEGE_WORKS, -1, 2, Cost(0, 0, 150, 25), 90, -1, "sekhmet", false,
+			{ E(TE_ATTACK, UM(U_SIEGE_TOWER) | UM(U_CATAPULT) | UM(U_SCARAB) | UM(U_PHOENIX), false, 0.15), E(TE_HEROIC_SIEGE, 0, false, 1), N, N }, nullptr,
+			"Siege and myth units +15% crush damage; Catapults available in the Heroic Age",
+			"+15 % attack of the siege weapons and the crushing myth units (Scarab, Phoenix)" },
+		// Nephthys (Heroic)
+		{ "funeral_rites", "Funeral Rites", TH_TEMPLE, B_TOWN_CENTER, 2, Cost(0, 0, 100, 15), 40, -1, "nephthys", false,
+			{ E(TE_REFUND, M_EG_HUMAN | M_HERO, false, 8), N, N, N }, nullptr,
+			"Every human soldier or hero of yours that dies refunds 8 gold", "" },
+		{ "spirit_of_maat", "Spirit of Maat", TH_TEMPLE, B_TOWN_CENTER, 2, Cost(0, 0, 100, 25), 30, -1, "nephthys", false,
+			{ E(TE_HEAL_MULT, UM(U_PRIEST) | UM(U_PHARAOH), false, 0.5), E(TE_COST, UM(U_PRIEST), false, -0.30), N, N }, nullptr,
+			"Priest and Pharaoh healing +50%; Priests -30% cost", "" },
+		{ "nebty", "Nebty", TH_TEMPLE, B_TOWN_CENTER, 2, Cost(0, 100, 0, 15), 30, -1, "nephthys", false,
+			{ E(TE_VS_MYTH, UM(U_PRIEST) | UM(U_PHARAOH), false, 1.0), E(TE_HP, UM(U_PRIEST) | UM(U_PHARAOH), false, 0.10), N, N }, nullptr,
+			"Priest and Pharaoh +1x damage vs myth units, +10% hp", "" },
+		{ "funeral_barge", "Funeral Barge", TH_TEMPLE, -1, 2, Cost(0, 0, 200, 20), 30, -1, "nephthys", false,
+			{ N, N, N, N }, "War Barge", "A destroyed War Barge has a 10% chance to spawn a Leviathan (Dock)", "" },
+		// Osiris (Mythic)
+		{ "new_kingdom", "New Kingdom", TH_TOWN_CENTER, B_TEMPLE, 3, Cost(0, 0, 150, 20), 30, -1, "osiris", false,
+			{ E(TE_PHARAOH, 0, false, 1), N, N, N }, nullptr, "A second Pharaoh", "he appears at once at the home Town Center; both respawn" },
+		{ "desert_wind", "Desert Wind", TH_MIGDOL, -1, 3, Cost(0, 0, 300, 30), 40, -1, "osiris", false,
+			{ E(TE_HP, UM(U_CAMEL_RIDER), false, 0.15), E(TE_SPEED, UM(U_CAMEL_RIDER), false, 0.15), E(TE_ATTACK, UM(U_CAMEL_RIDER), false, 0.15), N }, nullptr,
+			"Camel Rider +15% hp, speed and hack damage", "" },
+		{ "atef_crown", "Atef Crown", TH_TEMPLE, -1, 3, Cost(0, 0, 200, 20), 40, -1, "osiris", false,
+			{ E(TE_HP, UM(U_MUMMY), false, 0.20), E(TE_ATTACK, UM(U_MUMMY), false, 0.40), E(TE_MINION_LIFE, 0, false, 2), N }, nullptr,
+			"Mummy -> Mummy Vizier: +20% hp, +40% attack; Minions live twice as long", "Ancestors' Minions 60 -> 120 s" },
+		// Horus (Mythic)
+		{ "axe_of_vengeance", "Axe of Vengeance", TH_EG_BARRACKS, -1, 3, Cost(0, 150, 0, 20), 40, -1, "horus", false,
+			{ E(TE_RAGE, UM(U_AXEMAN), false, 0.5), E(TE_VS_BUILDINGS, UM(U_AXEMAN), false, 2.0), N, N }, nullptr,
+			"Axemen +0.5% attack per 1% of hp missing, +2x damage vs buildings", "" },
+		{ "greatest_of_fifty", "Greatest of Fifty", TH_EG_BARRACKS, -1, 3, Cost(0, 0, 150, 20), 40, -1, "horus", false,
+			{ E(TE_HP, M_EG_INFANTRY, false, 0.20), E(TE_SPEED, M_EG_INFANTRY, false, 0.10), N, N }, nullptr,
+			"Infantry +20% hp and +10% speed; unlocks the Wedge formation", "infantry = Spearman, Axeman, Mercenary; formations: none here" },
+		{ "spear_of_horus", "Spear of Horus", TH_EG_BARRACKS, -1, 3, Cost(250, 0, 0, 25), 40, -1, "horus", false,
+			{ E(TE_ATTACK, UM(U_SPEARMAN), false, 0.10), E(TE_VS_CAVALRY, UM(U_SPEARMAN), false, 1.0), N, N }, nullptr,
+			"Spearmen +10% attack, +1x damage vs cavalry", "x2 -> x3 vs cavalry" },
+		// Thoth (Mythic)
+		{ "valley_of_the_kings", "Valley of the Kings", TH_MIGDOL, -1, 3, Cost(0, 0, 500, 40), 20, -1, "thoth", false,
+			{ E(TE_VALLEY, 0, false, 1.6), N, N, N }, nullptr,
+			"A Pharaoh-empowered Barracks or Migdol trains 60% slower but spawns a free extra copy of each unit", "" },
+		{ "book_of_thoth", "Book of Thoth", TH_TOWN_CENTER, -1, 3, Cost(0, 300, 0, 30), 40, -1, "thoth", false,
+			{ E(TE_GATHER_FARM, UM(U_LABORER), false, 0.10), E(TE_GATHER_FOOD, UM(U_LABORER), false, 0.10),
+				E(TE_GATHER_WOOD, UM(U_LABORER), false, 0.10), E(TE_GATHER_GOLD, UM(U_LABORER), false, 0.10) }, nullptr,
+			"Laborers +10% gather rate", "" },
+		{ "tusks_of_apedemak", "Tusks of Apedemak", TH_MIGDOL, -1, 3, Cost(250, 0, 0, 15), 40, -1, "thoth", false,
+			{ E(TE_ATTACK, UM(U_WAR_ELEPHANT), false, 0.10), E(TE_COST, UM(U_WAR_ELEPHANT), false, -0.10), N, N }, nullptr,
+			"War Elephant +10% attack, -10% cost, -1 pop", "the -1 pop is not applied (this sim's pop is per type: 3)" },
 	};
 	// clang-format on
 	return T[t >= 0 && t < T_COUNT ? t : 0];
@@ -217,20 +358,34 @@ int tech_of(const char *key) {
 }
 
 int tech_civ(int t) {
-	if (t == T_HANDS_OF_THE_PHARAOH) return CIV_EGYPT;
+	if (t >= T_HANDS_OF_THE_PHARAOH) return CIV_EGYPT; // (Hands of the Pharaoh, the Egyptian gods' techs)
 	const TechDef &d = tech_def(t);
 	return d.god || d.home == TH_TEMPLE ? CIV_GREEK : -1;
 }
 
-int tech_home_building(int home) { return home == TH_ARMORY ? B_ARMORY : home == TH_MARKET ? B_MARKET : B_TEMPLE; }
+int tech_home_building(int home) {
+	switch (home) {
+		case TH_ARMORY: return B_ARMORY;
+		case TH_MARKET: return B_MARKET;
+		case TH_TOWN_CENTER: return B_TOWN_CENTER;
+		case TH_GRANARY: return B_GRANARY;
+		case TH_LUMBER_CAMP: return B_LUMBER_CAMP;
+		case TH_EG_BARRACKS: return B_EG_BARRACKS;
+		case TH_MIGDOL: return B_MIGDOL;
+		case TH_SIEGE_WORKS: return B_SIEGE_WORKS;
+		default: return B_TEMPLE;
+	}
+}
 
 // ---- setup ------------------------------------------------------------------
 
 void Techs::init(Sim *s) {
 	sim = s;
 	for (int i = 0; i < MAX_PLAYERS; i++) {
-		done[i] = 0;
+		done[i].reset();
 		mods[i] = TechMods();
+		trickled[i] = refunded[i] = stolen[i] = 0;
+		valley_copies[i] = 0;
 		for (auto &g : minor[i]) g.clear();
 	}
 	for (double &p : price) p = MARKET_BASE;
@@ -244,8 +399,35 @@ void Techs::init(Sim *s) {
 		const int r = sim->entities.unit_slot(e.id);
 		if (r < 0) return;
 		const int o = sim->entities.units.owner[r];
-		if (o <= 0 || o >= MAX_PLAYERS || !done[o]) return;
+		if (o <= 0 || o >= MAX_PLAYERS || done[o].none()) return;
 		apply_unit(r, TechMods(), mods[o]);
+	});
+	// (the Egyptian gods) an Egyptian reaching an age takes a minor god if he chose none
+	s->events.on(EV_AGE_ADVANCED, [this](const Event &e) {
+		if (sim->godot_rules) auto_minor(e.owner);
+	});
+	// lifesteal (Crimson Linen), Serpent Spear's poison
+	s->events.on(EV_UNIT_DAMAGED, [this](const Event &e) {
+		if (sim->godot_rules) on_damaged(e);
+	});
+	// Shaduf / Sun-dried Mud-brick on a new building (after sim/civ's own build time: its
+	// handler was registered first, Civs::init runs before... see build_time_mult)
+	s->events.on(EV_BUILDING_PLACED, [this](const Event &e) {
+		if (!sim->godot_rules) return;
+		const int b = sim->entities.building_slot(e.id);
+		if (b < 0) return;
+		BuildingStore &B = sim->entities.buildings;
+		const int o = B.owner[b];
+		if (o <= 0 || o >= MAX_PLAYERS) return;
+		const double k = build_time_mult(o, B.type[b]);
+		if (k != 1) {
+			const double base = civ_build_time(sim->civs.civ(o), B.type[b]);
+			B.fort_build_time[b] = (B.fort_build_time[b] > 0 ? B.fort_build_time[b] : base > 0 ? base : building_def(B.type[b]).build_time) * k;
+		}
+		if (mods[o].mudbrick > 0) {
+			B.max_hp[b] *= 1 + mods[o].mudbrick;
+			B.hp[b] *= 1 + mods[o].mudbrick;
+		}
 	});
 	s->events.on(EV_ENTITY_DIED, [this](const Event &e) {
 		if (!sim->godot_rules || e.kind != K_UNIT) return;
@@ -297,8 +479,11 @@ int Techs::state(int owner, int t, std::string *reason) const {
 		if (d.major) {
 			if (lower(p.god) != d.god) { why(std::string("Requires ") + (char)std::toupper(d.god[0]) + (d.god + 1)); return TS_LOCKED_GOD; }
 		} else {
+			// (Greeks: none chosen opens every god's techs; Egyptians take a god at every age-up,
+			// Techs::auto_minor, so theirs need him)
 			const std::string &m = minor[owner][d.age];
-			if (!m.empty() && m != d.god) { why(std::string("Requires the minor god ") + (char)std::toupper(d.god[0]) + (d.god + 1)); return TS_LOCKED_GOD; }
+			const bool strict = p.civ == CIV_EGYPT;
+			if ((strict || !m.empty()) && m != d.god) { why(std::string("Requires the minor god ") + (char)std::toupper(d.god[0]) + (d.god + 1)); return TS_LOCKED_GOD; }
 		}
 	}
 	if (p.age < d.age) { why(std::string("Requires ") + AGES[d.age] + " Age"); return TS_LOCKED_AGE; }
@@ -389,32 +574,59 @@ bool Techs::training_paused(int b) const {
 
 void Techs::grant(int owner, int t) {
 	if (owner <= 0 || owner >= MAX_PLAYERS || t < 0 || t >= T_COUNT || is_done(owner, t)) return;
-	done[owner] |= 1ull << t;
+	done[owner].set(t);
 	recompute(owner);
+	on_done(owner, t);
 }
 
 TechResult Techs::set_minor_god(int owner, int age, const std::string &god) {
 	TechResult r;
 	if (owner <= 0 || owner >= MAX_PLAYERS || !sim->players[owner].exists) { r.reason = "No such player"; return r; }
 	if (age < 1 || age > 3) { r.reason = "Minor gods are chosen for the Classical, Heroic and Mythic Ages"; return r; }
-	const std::string g = lower(god);
+	const std::string g = canonical_god(god); // ("hathor" = Retold's Sobek)
+	const std::string &major = sim->players[owner].god;
+	const bool egypt = sim->players[owner].civ == CIV_EGYPT;
 	if (!g.empty()) {
 		bool ok = false;
-		for (const char *const *m = minor_gods(age); *m; m++)
+		for (const char *const *m = egypt ? minor_gods_of(major, age) : minor_gods(age); *m; m++)
 			if (g == *m) ok = true;
-		if (!ok) { r.reason = "Not a minor god of the " + std::string(AGES[age]) + " Age"; return r; }
+		if (!ok) {
+			if (egypt && egypt_god_age(g) == age) r.reason = std::string(1, (char)std::toupper(major.empty() ? '?' : major[0])) + (major.empty() ? "" : major.substr(1)) + " does not offer " + (char)std::toupper(g[0]) + g.substr(1);
+			else r.reason = "Not a minor god of the " + std::string(AGES[age]) + " Age";
+			return r;
+		}
 	}
+	// (Retold chooses him once, at the age-up: the UI only offers the choice there; an
+	// Egyptian who reached the age without one got the first offered, Techs::auto_minor)
+	if (egypt && g.empty()) { r.reason = "An Egyptian needs a minor god for every age"; return r; }
 	minor[owner][age] = g;
 	r.ok = true;
 	return r;
 }
 
+void Techs::auto_minor(int owner) {
+	if (owner <= 0 || owner >= MAX_PLAYERS || !sim->players[owner].exists || sim->players[owner].civ != CIV_EGYPT) return;
+	const Player &p = sim->players[owner];
+	for (int a = 1; a <= std::min(3, p.age); a++)
+		if (minor[owner][a].empty()) {
+			const char *const *m = minor_gods_of(p.god, a);
+			if (*m) minor[owner][a] = *m;
+		}
+}
+
+int Techs::min_age_for(int owner, int type) const {
+	const int a = rules_min_age(type);
+	if (type == U_CATAPULT && owner > 0 && owner < MAX_PLAYERS && mods[owner].heroic_siege) return std::min(a, 2);
+	return a;
+}
+
 void Techs::finish(int b, int t) {
 	BuildingStore &B = sim->entities.buildings;
 	const int owner = B.owner[b];
-	done[owner] |= 1ull << t;
+	done[owner].set(t);
 	researched++;
 	recompute(owner);
+	on_done(owner, t);
 	Event e;
 	e.type = EV_TECH_RESEARCHED;
 	e.kind = K_BUILDING;
@@ -455,6 +667,17 @@ void Techs::recompute(int owner) {
 					case TE_POISON: m.poison[u] = true; break;
 					case TE_FRENZY: m.frenzy[u] = true; break;
 					case TE_REVEAL: m.reveal[u] = true; break;
+					case TE_GATHER_FARM: m.gather[0][u] += f.v; break;
+					case TE_GATHER_FOOD: m.gather[1][u] += f.v; break;
+					case TE_GATHER_WOOD: m.gather[2][u] += f.v; break;
+					case TE_GATHER_GOLD: m.gather[3][u] += f.v; break;
+					case TE_VS_INFANTRY: m.vs_infantry[u] += f.v; break;
+					case TE_VS_CAVALRY: m.vs_cavalry[u] += f.v; break;
+					case TE_LIFESTEAL: m.lifesteal[u] += f.v; break;
+					case TE_HEAL_MULT: m.heal_mult[u] += f.v; break;
+					case TE_COST: m.cost[u] += f.v; break;
+					case TE_RAGE: m.rage[u] += f.v; break;
+					case TE_MELEE_POISON: m.melee_poison[u] += f.v; break;
 					default: break;
 				}
 			}
@@ -472,6 +695,15 @@ void Techs::recompute(int owner) {
 				case TE_OMNISCIENCE: m.omniscience = true; break;
 				case TE_QUEUE_VIEW: m.queue_view = true; break;
 				case TE_ARMORY_DISCOUNT: m.armory_discount = true; break;
+				case TE_TRICKLE: m.trickle += f.v; break;
+				case TE_VISION_RECHARGE: m.vision_recharge *= f.v; break;
+				case TE_FARM_DISCOUNT: m.farm_discount *= f.v; break;
+				case TE_MUDBRICK: m.mudbrick += f.v; break;
+				case TE_REFUND: m.refund += f.v; break;
+				case TE_PHARAOH: m.pharaohs += (int)f.v; break;
+				case TE_HEROIC_SIEGE: m.heroic_siege = true; break;
+				case TE_VALLEY: m.valley = f.v; break;
+				case TE_MINION_LIFE: m.minion_life *= f.v; break;
 				default: break;
 			}
 		}
@@ -507,6 +739,8 @@ double Techs::unit_damage(int r) const {
 	const int t = U.type[r], o = U.owner[r];
 	double d = sim->civs.base_damage(r) * (1 + mods[o].attack[t]); // (sim/civ: Priest / Pharaoh by age; else the def's)
 	if (mods[o].frenzy[t] && U.tech_frenzy_t[r] >= sim->time) d *= FRENZY_DAMAGE;
+	if (mods[o].rage[t] > 0 && U.max_hp[r] > 0) d *= 1 + mods[o].rage[t] * std::max(0.0, 1 - U.hp[r] / U.max_hp[r]); // (Axe of Vengeance)
+	d *= sim->godpowers.damage_mult(r); // (sim/godpowers: Bast's Eclipse)
 	return d;
 }
 
@@ -539,7 +773,7 @@ double Techs::unit_armor(int tr, const Hitter &a, uint8_t kind) const {
 	bool arrow = kind == DK_ARROW || a.kind == K_BUILDING;
 	if (!arrow && a.kind == K_UNIT && a.row >= 0 && a.row < U.size()) arrow = unit_def(U.type[a.row]).attack.projectile;
 	if (arrow && is_egypt_unit(t)) armor = sim->civs.base_pierce(tr); // (sim/civ: Egyptian units have a hack and a pierce armor)
-	const double add = arrow ? mods[o].pierce[t] : mods[o].hack[t];
+	const double add = (arrow ? mods[o].pierce[t] : mods[o].hack[t]) + sim->godpowers.armor_add(tr); // (sim/godpowers: Eclipse)
 	if (add == 0) return armor;
 	return std::min(ARMOR_CAP, armor + add);
 }
@@ -550,10 +784,15 @@ double Techs::vs_mult(int ar, int tk, int tr) const {
 	const UnitStore &U = sim->entities.units;
 	const int at = U.type[ar], o = U.owner[ar];
 	if (tk == K_BUILDING) return 1 + mods[o].vs_buildings[at];
-	if (tk == K_UNIT && mods[o].vs_myth[at] != 0 && unit_def(U.type[tr]).cls == CLS_MYTH) {
-		const double base = unit_def(at).bonus[CLS_MYTH] != 0 ? unit_def(at).bonus[CLS_MYTH] : 1;
-		return (base + mods[o].vs_myth[at]) / base;
-	}
+	if (tk != K_UNIT) return 1;
+	const int tc = unit_def(U.type[tr]).cls;
+	auto add = [&](int cls, double v) { // (multipliers add: x2 vs cavalry + 1 = x3)
+		const double base = unit_def(at).bonus[cls] != 0 ? unit_def(at).bonus[cls] : 1;
+		return (base + v) / base;
+	};
+	if (mods[o].vs_myth[at] != 0 && tc == CLS_MYTH) return add(CLS_MYTH, mods[o].vs_myth[at]);
+	if (mods[o].vs_infantry[at] != 0 && tc == CLS_INFANTRY) return add(CLS_INFANTRY, mods[o].vs_infantry[at]); // (Slings of the Sun)
+	if (mods[o].vs_cavalry[at] != 0 && tc == CLS_CAVALRY) return add(CLS_CAVALRY, mods[o].vs_cavalry[at]);     // (Spear of Horus)
 	return 1;
 }
 
@@ -610,6 +849,16 @@ const char *myth_unit_god(int type) {
 		case U_CYCLOPS: return "ares";
 		case U_CENTAUR: return "hermes";
 		case U_MEDUSA: return "hera";
+		// the Egyptian gods' (EGYPT.md 5, sim/godpowers egypt_myth.cpp)
+		case U_SPHINX: return "bast";
+		case U_WADJET: return "ptah";
+		case U_ANUBITE: return "anubis";
+		case U_PETSUCHOS: case U_ROC: return "sobek";
+		case U_SCARAB: return "sekhmet";
+		case U_SCORPION_MAN: return "nephthys";
+		case U_MUMMY: return "osiris";
+		case U_AVENGER: return "horus";
+		case U_PHOENIX: return "thoth";
 		default: return nullptr;
 	}
 }
@@ -629,7 +878,8 @@ bool Techs::god_allows_unit(int owner, int type, std::string *reason) const {
 	const char *g = myth_unit_god(type);
 	if (!g || owner <= 0 || owner >= MAX_PLAYERS) return true;
 	const std::string &m = minor[owner][rules_min_age(type)];
-	if (m.empty() || m == g) return true;
+	if (m == g) return true;
+	if (m.empty() && !is_egypt_myth(type)) return true; // (Greeks: none chosen opens every god's unit; the Egyptians' need their god)
 	if (reason) *reason = std::string("Requires the minor god ") + (char)std::toupper(g[0]) + (g + 1);
 	return false;
 }
@@ -696,6 +946,11 @@ void Techs::on_died(int32_t id, int32_t killer, double x, double z) {
 	const int v = E.unit_slot(id);
 	if (v < 0) return;
 	const int vo = U.owner[v];
+	// Funeral Rites: his human soldier or hero refunds gold
+	if (vo > 0 && vo < MAX_PLAYERS && mods[vo].refund > 0 && ((M_EG_HUMAN | M_HERO) >> U.type[v] & 1)) {
+		sim->players[vo].res[RES_GOLD] += mods[vo].refund;
+		refunded[vo] += mods[vo].refund;
+	}
 	// the killer's frenzy
 	const int k = killer ? E.unit_slot(killer) : -1;
 	if (k >= 0 && !U.dead[k]) {
@@ -820,6 +1075,104 @@ TradeResult Techs::tribute(int from, int to, int res, double amount) {
 	return r;
 }
 
+// ---- the Egyptian gods' techs: hooks ---------------------------------------------------
+
+double Techs::favor_mult(int owner) const {
+	if (owner <= 0 || owner >= MAX_PLAYERS) return 1;
+	return (1 + mods[owner].favor) * sim->godpowers.favor_mult(owner); // (sim/godpowers: Bast's Eclipse +50 % Monument favor)
+}
+
+double Techs::gather_mult(int r, bool farm, int res, int node_type) const {
+	const UnitStore &U = sim->entities.units;
+	const int o = U.owner[r], t = U.type[r];
+	if (o <= 0 || o >= MAX_PLAYERS) return 1;
+	const TechMods &m = mods[o];
+	const int k = farm ? 0 : res == RES_FOOD ? 1 : res == RES_WOOD ? 2 : res == RES_GOLD ? 3 : -1;
+	const double tech = k >= 0 ? 1 + m.gather[k][t] : 1;
+	return tech * sim->godpowers.gather_mult(r, farm, res, node_type); // (Ra's Rain, Isis' Prosperity)
+}
+
+double Techs::train_cost_mult(int owner, int utype) const {
+	if (owner <= 0 || owner >= MAX_PLAYERS || utype < 0 || utype >= U_TYPE_COUNT) return 1;
+	return std::max(0.0, 1 + mods[owner].cost[utype]);
+}
+
+double Techs::heal_mult(int r) const {
+	const UnitStore &U = sim->entities.units;
+	const int o = U.owner[r];
+	if (o <= 0 || o >= MAX_PLAYERS) return 1;
+	return 1 + mods[o].heal_mult[U.type[r]];
+}
+
+void Techs::building_cost(int owner, int btype, Cost &c) const {
+	if (owner <= 0 || owner >= MAX_PLAYERS) return;
+	const TechMods &m = mods[owner];
+	if (btype == B_FARM && m.farm_discount != 1)
+		for (int k = 0; k < RES_FAVOR; k++) c.v[k] *= m.farm_discount;
+	if (m.mudbrick > 0) c.v[RES_GOLD] *= 0.9;
+}
+
+double Techs::build_time_mult(int owner, int btype) const {
+	if (owner <= 0 || owner >= MAX_PLAYERS) return 1;
+	const TechMods &m = mods[owner];
+	double k = 1;
+	if (btype == B_FARM) k *= m.farm_discount;
+	if (m.mudbrick > 0) k *= 0.85;
+	return k;
+}
+
+int Techs::pharaoh_count(int owner) const { return 1 + (owner > 0 && owner < MAX_PLAYERS ? mods[owner].pharaohs : 0); }
+
+double Techs::train_speed(int b, int utype) const {
+	const BuildingStore &B = sim->entities.buildings;
+	const int o = B.owner[b];
+	double k = sim->godpowers.work_mult(b); // (Sekhmet's Citadel: +25 %)
+	if (o > 0 && o < MAX_PLAYERS && mods[o].valley > 0 && B.civ_empower[b] > 0 && (B.type[b] == B_EG_BARRACKS || B.type[b] == B_MIGDOL) &&
+			utype != U_LABORER)
+		k /= mods[o].valley; // (Valley of the Kings: 60 % slower, a free copy)
+	return k;
+}
+
+void Techs::on_trained(int b, int utype, int32_t) {
+	BuildingStore &B = sim->entities.buildings;
+	const int o = B.owner[b];
+	if (o <= 0 || o >= MAX_PLAYERS || mods[o].valley <= 0 || B.civ_empower[b] <= 0) return;
+	if (B.type[b] != B_EG_BARRACKS && B.type[b] != B_MIGDOL) return;
+	if (sim->economy.spawn_from_building(b, utype) >= 0) valley_copies[o]++;
+}
+
+void Techs::on_done(int owner, int t) {
+	if (t == T_NEW_KINGDOM) sim->civs.spawn_pharaoh(owner); // (his second Pharaoh, at once)
+	if (t == T_SUN_DRIED_MUD_BRICK) {
+		BuildingStore &B = sim->entities.buildings;
+		for (int b = 0; b < B.size(); b++)
+			if (!B.removed[b] && !B.dead[b] && B.owner[b] == owner) {
+				B.max_hp[b] *= 1 + mods[owner].mudbrick;
+				B.hp[b] *= 1 + mods[owner].mudbrick;
+			}
+	}
+}
+
+void Techs::on_damaged(const Event &e) {
+	if (e.kind != K_UNIT || e.other <= 0 || e.amount <= 0) return;
+	Entities &E = sim->entities;
+	UnitStore &U = E.units;
+	const int a = E.unit_slot(e.other);
+	if (a < 0 || U.dead[a]) return;
+	const int o = U.owner[a], t = U.type[a];
+	if (o <= 0 || o >= MAX_PLAYERS) return;
+	const TechMods &m = mods[o];
+	if (m.lifesteal[t] > 0 && U.hp[a] < U.max_hp[a]) { // (Crimson Linen)
+		const double before = U.hp[a];
+		U.hp[a] = std::min(U.max_hp[a], U.hp[a] + e.amount * m.lifesteal[t]);
+		stolen[o] += U.hp[a] - before;
+	}
+	if (m.melee_poison[t] > 0 && !unit_def(t).attack.projectile) { // (Serpent Spear)
+		const int v = E.unit_slot(e.id);
+		if (v >= 0 && !U.dead[v]) sim->godpowers.add_dot(e.id, o, m.melee_poison[t], POISON_TIME, DOT_POISON);
+	}
+}
+
 // ---- tick -------------------------------------------------------------------------
 
 void Techs::update(double dt) {
@@ -835,6 +1188,7 @@ void Techs::update(double dt) {
 		const int owner = B.owner[b];
 		double rate = B.type[b] == B_ARMORY && mods[owner].armory_discount ? 1.5 : 1.0; // (Forge of Olympus)
 		if (B.civ_empower[b] > 0) rate *= sim->civs.research_mult(b); // (sim/civ: the Pharaoh's empowerment)
+		rate *= sim->godpowers.work_mult(b); // (sim/godpowers: Sekhmet's Citadel +25 %)
 		q.t += dt * rate;
 		if (q.t >= q.total) {
 			const int t = q.tech;
@@ -842,6 +1196,12 @@ void Techs::update(double dt) {
 			finish(b, t);
 		}
 	}
+	// Flood of the Nile's food trickle
+	for (int o = 1; o < MAX_PLAYERS; o++)
+		if (mods[o].trickle > 0 && sim->players[o].exists) {
+			sim->players[o].res[RES_FOOD] += mods[o].trickle * dt;
+			trickled[o] += mods[o].trickle * dt;
+		}
 	// market prices drift back towards the base price
 	for (int k = 0; k < RES_COUNT; k++) {
 		if (!market_tradable(k)) continue;

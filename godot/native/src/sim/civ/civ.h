@@ -148,6 +148,7 @@ constexpr double EMPOWER_RELOAD = 0.75;  // x0.75 reload (shooting buildings)
 constexpr double EMPOWER_LOS = 0.75;     // +75 % Obelisk LOS
 constexpr double EMPOWER_REACH = 2.0;    // tiles from the building's rect
 constexpr double RA_PRIEST_EMPOWER = 0.6;
+constexpr double SON_OF_OSIRIS_EMPOWER = 1.2; // (sim/godpowers: the Son of Osiris empowers at 120 %)
 constexpr double PHARAOH_RESPAWN = 90;
 constexpr double HEAL_RANGE = 10 * 0.6;  // Retold 10 x DIST_SCALE
 constexpr double ISIS_OBELISK_BUILD = 1.4;

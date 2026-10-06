@@ -21,6 +21,58 @@ const PowerDef &power_def(int id) {
 		{ "bolt", "Bolt", "Zeus", Cost(0, 0, 0, 15), 12, 1.5, 0, 0, 400, 0, 0, "C", "A single bolt that slays one target." },
 		{ "meteor", "Meteor", "Hephaestus", Cost(0, 0, 0, 30), 30, 4.5, 0, 0, 260, 0, 1.8, "V",
 			"A blazing meteor falls from the heavens, smashing units and buildings where it lands." },
+		// ---- the Egyptian gods (egypt_powers.cpp; EGYPT.md 4, 5). cost = Retold's favor (+ ramp per
+		// cast), cooldown = the recharge, radius in tiles (Retold m x0.6), hotkey by age: Z Archaic,
+		// C Classical, V Heroic, B Mythic
+		{ "rain", "Rain", "Ra", Cost(0, 0, 0, 30), 90, 0, 50, 0, 0, 0, 0, "Z",
+			"For 50 seconds your Laborers farm 150% faster.", 15, 0, PT_GLOBAL,
+			"30 favor, recharge 90 s, ramp +15; 50 s: the caster's Laborers farm +150 %, Fishing Ships +50 %",
+			"every farmer of the caster x2.5 on Farms (no Fishing Ships for the Egyptians here)" },
+		{ "prosperity", "Prosperity", "Isis", Cost(0, 0, 0, 60), 120, 0, 75, 0, 0, 0, 0, "Z",
+			"For 75 seconds your Laborers mine gold 50% faster.", 10, 0, PT_GLOBAL,
+			"60 favor, recharge 120 s, ramp +10; 75 s: Laborers mine gold +50 %, Caravans +20 % gold (update 19.16313)",
+			"every gold gatherer of the caster x1.5 (no Caravans here)" },
+		{ "vision", "Vision", "Set", Cost(0, 0, 0, 40), 240, 42, 20, 0, 0, 0, 0, "Z",
+			"Reveals a circle anywhere on the map for 20 seconds, growing to 70 m.", 5, 0, PT_POINT,
+			"40 favor, recharge 240 s, ramp +5; reveals 70 m (from 10 m, +15 m/s) for 20 s to the caster and allies",
+			"radius 6 tiles growing 9 tiles/s to 42 tiles (x0.6)" },
+		{ "eclipse", "Eclipse", "Bast", Cost(0, 0, 0, 90), 150, 0, 55, 0, 0, 0, 0, "C",
+			"For 55 seconds the sky darkens: your myth units deal +20% damage, move 15% faster, take 10% less damage and recharge their abilities 60% faster; Monuments give +50% favor.",
+			25, 1, PT_GLOBAL,
+			"90 favor, recharge 150 s, ramp +25; 55 s, whole map; myth units +20 % damage, -60 % ability recharge, +15 % speed, -10 % vulnerability; Monuments +50 % favor; one Eclipse at a time",
+			"-10 % vulnerability: +0.10 armor; ability recharge x0.4" },
+		{ "shifting_sands", "Shifting Sands", "Ptah", Cost(0, 0, 0, 40), 180, 6, 0, 0, 0, 0, 3, "C",
+			"After 3 seconds, teleports your units in a small circle to a visible point at least 40 m away.", 20, 1, PT_TWO_POINTS,
+			"40 favor, recharge 180 s, ramp +20; after 3 s all own and allied units (not ships, Titans) in 10 m go to a visible point at least 40 m away",
+			"radius 6 tiles, destination >= 24 tiles away and in sight of one of the caster's or his allies' units or buildings; formation kept" },
+		{ "plague_of_serpents", "Plague of Serpents", "Anubis", Cost(0, 0, 0, 60), 180, 8.4, 18, 3, 0, 0, 0, "C",
+			"Fourteen serpents rise from the sand around the target, two at a time, and attack nearby enemies.", 10, 1, PT_POINT,
+			"60 favor, recharge 180 s, ramp +10; 14 Serpents within 14 m: 2 at once, then 2 every 3 s; uncontrolled, they guard the spot, attack enemies, ignore buildings, live until killed",
+			"radius 8.4 tiles; a Serpent attacks enemy units within 6 tiles of where it rose and walks back" },
+		{ "locust_swarm", "Locust Swarm", "Sobek", Cost(0, 0, 0, 75), 150, 3.6, 20, 0, 3.5, 0, 0, "V",
+			"Sends five locust swarms across the land for 20 seconds; they devour Farms and berry bushes and sting everything in their path.", 10, 2, PT_TWO_POINTS,
+			"75 favor, recharge 150 s, ramp +10; 5 swarms in a direction at 3 m/s for 20 s, each 3.5 divine/s in 6 m, x6 vs Farms and berry bushes, x0.1 vs own units, kills livestock; Mythic +20 %",
+			"speed 1.95 tiles/s, radius 3.6 tiles; the swarms side by side 2.2 tiles apart; berry bushes lose 21 food/s per swarm; (no livestock here)" },
+		{ "citadel", "Citadel", "Sekhmet", Cost(0, 0, 0, 150), 120, 0, 0, 0, 0, 0, 0, "V",
+			"Turns one of your Town Centers into a Citadel Center: +1200 hp, stronger arrows, +10 population, and it works 25% faster.", 50, 2, PT_OWN_TC,
+			"150 favor, recharge 120 s, ramp +50, instant; a Town Center becomes a Citadel Center: +1200 hp, +2 attack, +1 arrow, +1 LOS, +10 pop, +10 % hack armor, +25 % work rate",
+			"arrows x1.2 (+2 of Retold's 10) and one more arrow a volley; +0.6 LOS; trains, researches and ages x1.25; the +10 % hack armor is not applied (the Town Center keeps the browser's flat factor)" },
+		{ "ancestors", "Ancestors", "Nephthys", Cost(0, 0, 0, 100), 180, 9.6, 13, 1, 0, 0, 0, "V",
+			"Over 13 seconds raises 13 Minions around the target; they serve you for 60 seconds.", 5, 2, PT_POINT,
+			"100 favor, recharge 180 s, ramp +5; over 13 s 13 controllable Minions within 16 m, all dead 60 s after the cast",
+			"radius 9.6 tiles; one Minion a second (Atef Crown: they live 120 s)" },
+		{ "son_of_osiris", "Son of Osiris", "Osiris", Cost(0, 0, 0, 350), 240, 0, 0, 0, 0, 0, 0, "B",
+			"Your Pharaoh becomes the Son of Osiris, a demigod who hurls chain lightning. A new Pharaoh appears later.", 50, 3, PT_OWN_PHARAOH,
+			"350 favor, recharge 240 s, ramp +50; a Pharaoh becomes the Son of Osiris at full hp; a new Pharaoh appears at the Town Center later",
+			"the Pharaoh nearest the target (within 3 tiles); the new one after the 90 s respawn" },
+		{ "tornado", "Tornado", "Horus", Cost(0, 0, 0, 350), 240, 9, 20, 0.5, 25, 0, 0, "B",
+			"A whirlwind spirals out from the target for 20 seconds, wrecking buildings and slowing and flinging units.", 5, 3, PT_POINT,
+			"350 favor, recharge 240 s, ramp +5; 20 s spiralling anticlockwise out from the target, 25 hack + 100 crush every 0.5 s, full within 5 m falling off to 15 m, x0.1 vs Farms; slows 35 % for 6 s; 20 m LOS; a little friendly fire",
+			"an Archimedean spiral at 2.5 tiles/s; full within 3 tiles, falling to 0 at 9; units' crush armor 99 % (myth 80 %, siege 85 %); own units x0.1; units within 3 tiles flung" },
+		{ "thoth_meteor", "Meteor", "Thoth", Cost(0, 0, 0, 350), 240, 15, 18, 1, 580, 4.8, 3, "B",
+			"Twelve meteors fall in a large circle over 18 seconds, on the densest targets; each smashes everything within 8 m.", 5, 3, PT_POINT,
+			"350 favor, recharge 240 s, ramp +5, 18 s, 25 m circle; 12 meteors, the first in the centre after 3 s, the other 11 from 3 s later on the densest targets; each 580 crush + 40 divine in 8 m, x0.1 vs own units and Farms, knockback",
+			"circle 15 tiles, area 4.8 tiles, one meteor a second from 6 s; units' crush armor 99 % (myth 80 %, siege 85 %), buildings their own (Retold) or 5 %" },
 	};
 	// clang-format on
 	return D[id];
@@ -43,6 +95,7 @@ void GodPowers::init(Sim *s) {
 	airborne.clear();
 	std::memset(cooldowns, 0, sizeof(cooldowns));
 	vrng = RNG(8675309);
+	init_egypt();
 }
 
 double GodPowers::cooldown_left(int owner, int id) const {
@@ -54,12 +107,19 @@ CastCheck GodPowers::can_cast(int owner, int id) const {
 	if (id < 0 || id >= GP_COUNT) return { false, "Unknown power" };
 	const Player *p = const_cast<Sim *>(sim)->player(owner);
 	if (!p) return { false, "No such player" };
+	if (!has_power(owner, id)) return { false, power_lock(owner, id) }; // (Godot-only: his gods' powers)
 	if (cooldown_left(owner, id) > 0) return { false, "Recharging" };
+	if (is_egypt_power(id)) {
+		if (p->res[RES_FAVOR] < power_cost(owner, id)) return { false, "Not enough favor" };
+		if (id == GP_ECLIPSE && eclipse.until > sim->time) return { false, "An Eclipse is already darkening the sky" };
+		return { true, "" };
+	}
 	if (!p->can_afford(power_def(id).cost)) return { false, "Not enough favor" };
 	return { true, "" };
 }
 
 bool GodPowers::cast(int owner, int id, double x, double z) {
+	if (is_egypt_power(id)) return cast_egypt(owner, id, x, z, NAN, NAN, false); // (Godot-only, egypt_powers.cpp)
 	if (!can_cast(owner, id).ok) return false;
 	Sim &S = *sim;
 	if (!S.map().clamp_to_map(x, z)) return false; // bounds: off-map target -> the edge tile, NaN refused (nothing paid)
@@ -222,6 +282,7 @@ void GodPowers::strike(int owner, double x, double z, double damage, double spla
 }
 
 void GodPowers::impact_meteor(const Meteor &m) {
+	if (m.kind == 1) { impact_thoth(m); return; } // (Godot-only: Thoth's Meteor, egypt_powers.cpp)
 	Sim &S = *sim;
 	UnitStore &U = S.entities.units;
 	const PowerDef &def = power_def(GP_METEOR);
@@ -286,6 +347,10 @@ void GodPowers::update(double dt) {
 	}
 	for (Fire &f : fires)
 		if (S.time - f.t0 > f.dur) f.done = true;
+	if (S.godot_rules) {
+		update_egypt(dt); // (Godot-only: the Egyptian powers, egypt_powers.cpp)
+		update_myth(dt);  // (the Egyptian myth units' abilities, egypt_myth.cpp)
+	}
 	update_airborne(dt);
 	const double now = S.time;
 	meteors.erase(std::remove_if(meteors.begin(), meteors.end(), [](const Meteor &m) { return m.done; }), meteors.end());

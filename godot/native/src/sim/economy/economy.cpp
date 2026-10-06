@@ -244,7 +244,7 @@ Result Economy::train(int b, int type) {
 	std::string civ_why;
 	const int civ_check = rules ? sim->civs.train_check(b, type, &civ_why) : 0;
 	if (!B.built[b] || (rules ? civ_check == 1 : !building_def(B.type[b]).trains_type(type))) return { false, B.built[b] && rules ? civ_why : "Cannot train here" };
-	const int min_age = rules ? rules_min_age(type) : def.min_age;
+	const int min_age = rules ? sim->techs.min_age_for(B.owner[b], type) : def.min_age; // (Force of the West Wind)
 	if (min_age > p.age) return { false, std::string("Requires ") + AGES[min_age] + " Age" };
 	if (rules) {
 		std::string why;
@@ -411,7 +411,7 @@ void Economy::recount() {
 		if (B.removed[b]) continue;
 		Player &p = sim->players[B.owner[b]];
 		const BuildingDef &d = building_def(B.type[b]);
-		if (B.built[b] && d.pop) p.pop_cap += sim->godot_rules ? d.pop + sim->civs.pop_bonus(B.owner[b], B.type[b]) : d.pop; // (sim/civ: Isis' TC +5)
+		if (B.built[b] && d.pop) p.pop_cap += sim->godot_rules ? d.pop + sim->civs.pop_bonus(B.owner[b], B.type[b]) + sim->godpowers.pop_bonus(b) : d.pop; // (sim/civ: Isis' TC +5; sim/godpowers: the Citadel +10)
 		for (const TrainItem &q : B.queue[b]) p.pop += unit_def(q.type).pop;
 	}
 	if (sim->godot_rules) // (Godot-only, sim/civ: Set's Pharaoh's queued summons)
@@ -471,13 +471,15 @@ void Economy::update(double dt) {
 		if (B.removed[b] || !B.built[b] || B.queue[b].empty()) continue;
 		if (sim->techs.training_paused(b)) continue; // (Godot-only: researching here, sim/techs)
 		TrainItem &q = B.queue[b][0];
-		if (sim->godot_rules && B.civ_empower[b] > 0) q.t += dt * sim->civs.train_mult(b, q.type); // (Godot-only, sim/civ: empowered +75 %)
-		else q.t += dt;
+		const double ws = sim->godot_rules ? sim->techs.train_speed(b, q.type) : 1; // (Godot-only: Citadel, Valley of the Kings)
+		if (sim->godot_rules && B.civ_empower[b] > 0) q.t += dt * ws * sim->civs.train_mult(b, q.type); // (Godot-only, sim/civ: empowered +75 %)
+		else q.t += dt * ws;
 		if (q.t >= q.total) {
 			const int type = q.type;
 			B.queue[b].erase(B.queue[b].begin());
 			sim->players[B.owner[b]].pop -= unit_def(type).pop; // re-counted below
-			spawn_from_building(b, type);
+			const int u = spawn_from_building(b, type);
+			if (sim->godot_rules && u >= 0) sim->techs.on_trained(b, type, sim->entities.units.id[u]); // (Godot-only: Valley of the Kings)
 		}
 	}
 	recount();
@@ -486,7 +488,7 @@ void Economy::update(double dt) {
 	for (int id = 0; id < MAX_PLAYERS; id++) {
 		Player &p = sim->players[id];
 		if (!p.exists || !p.advancing) continue;
-		p.advancing_t += dt;
+		p.advancing_t += sim->godot_rules ? dt * sim->godpowers.age_mult(id) : dt; // (Godot-only: Sekhmet's Citadel +25 %)
 		if (p.advancing_t >= p.advancing_total) {
 			p.advancing = false;
 			p.age = std::min(3, p.age + 1);
@@ -607,6 +609,7 @@ void Economy::update_gatherer(int r, double dt) {
 			if (sim->godot_rules && U.type[r] == U_LABORER && tk == K_RESOURCE) base *= sim->civs.gather_bonus(r, R.type[t]); // (sim/civ: Ra's berries)
 		}
 		double rate = base * dt;
+		if (sim->godot_rules) rate *= sim->techs.gather_mult(r, farm, rt, tk == K_RESOURCE ? R.type[t] : -1); // (Godot-only: the Egyptian gods' techs, Rain, Prosperity)
 		const double gm = sim->players[U.owner[r]].gather_mult; // (Godot-only: Titan AI; 1 = exact)
 		if (gm != 1) rate *= gm;
 		U.carry_type[r] = (uint8_t)rt;

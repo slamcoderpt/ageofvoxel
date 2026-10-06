@@ -279,6 +279,8 @@ func _run() -> void:
 	for pi in powers.size():
 		for k in gtargets.size():
 			var owner: int = [1, 3, 4][k]
+			if not Array(sim.player_powers(owner)).has(powers[pi]):
+				continue # (the Egyptian gods' powers: not these Greek players'; egypt_gods_check.gd "bounds")
 			sim.set_player_resources(owner, {"favor": 100})
 			var t = gtargets[k]
 			var f0 := float(sim.get_player(owner).favor)

@@ -20,7 +20,13 @@ enum UnitType : uint8_t { U_VILLAGER, U_HOPLITE, U_TOXOTES, U_HIPPIKON, U_MINOTA
 	// Set's Animals of Set (sim/civ): the Pharaoh's summons / age-up gifts, then the converted wild animals
 	U_GAZELLE_OF_SET, U_HYENA_OF_SET, U_GIRAFFE_OF_SET, U_CROCODILE_OF_SET, U_HIPPO_OF_SET, U_RHINO_OF_SET, U_ELEPHANT_OF_SET,
 	U_DEER_OF_SET, U_BOAR_OF_SET,
+	// the Egyptian gods' myth units (sim/godpowers egypt_myth.cpp, sim/techs: trained at the
+	// Temple with their minor god), then the god powers' units (Plague of Serpents, Ancestors,
+	// Son of Osiris) and the Phoenix Egg (Rebirth)
+	U_ANUBITE, U_WADJET, U_SPHINX, U_PETSUCHOS, U_ROC, U_SCARAB, U_SCORPION_MAN, U_MUMMY, U_AVENGER, U_PHOENIX,
+	U_SERPENT, U_MINION, U_SON_OF_OSIRIS, U_PHOENIX_EGG,
 	U_TYPE_COUNT };
+inline bool is_egypt_myth(int t) { return t >= U_ANUBITE && t <= U_PHOENIX_EGG; }
 inline bool is_set_animal(int t) { return t >= U_BABOON && t <= U_BOAR_OF_SET; }
 constexpr int U_GREEK_COUNT = U_LABORER; // the browser's types (Greek); the rest are Egyptian
 inline bool is_egypt_unit(int t) { return t >= U_LABORER && t < U_TYPE_COUNT; }
@@ -126,6 +132,43 @@ inline const UnitDef *unit_defs() {
 			true, { 3, 0.6, 1.265, 0, false }, 0.2625, { 0 }, { 0 }, 0 },
 		{ "boar_of_set", "Boar of Set", CLS_ANIMAL, 70, 3.25, 0.5, 8.4, 2, Cost(), 50, "", false, false, false, false, 0,
 			true, { 6, 0.6, 1.15, 0, false }, 0.15, { 0 }, { 0 }, 0 },
+		// ---- the Egyptian gods' myth units (EGYPT.md 5; Retold mapped as above: hp, damage as Retold,
+		// speed x0.65, range / LOS x0.6, reload x1.15, hack armor x0.75 (pierce: civ.h egypt_unit),
+		// pop as Retold (myth units: not halved, as the Greek ones), melee reach 0.8 (Retold 0.5-1);
+		// min_age = the minor god's age; myth units x0.5 vs heroes is not applied (the Greek ones: none))
+		// bonus: villager, infantry, archer, cavalry, myth, hero, siege, animal
+		{ "anubite", "Anubite", CLS_MYTH, 200, 3.25, 0.42, 9.6, 2, Cost(100, 0, 0, 15), 9, "Q", false, false, true, false, 1,
+			true, { 11, 0.8, 0.92, 0, false }, 0.45, { 0, 0, 0, 0, 3.0, 0, 0 }, { 0 }, 0 },
+		{ "wadjet", "Wadjet", CLS_MYTH, 270, 2.47, 0.5, 12, 2, Cost(0, 150, 0, 15), 17, "Q", false, false, true, false, 1,
+			true, { 12, 10.8, 1.725, 0, true }, 0.1875, { 0, 0, 0, 0, 2.0, 0, 0 }, { 0 }, 0 },
+		{ "sphinx", "Sphinx", CLS_MYTH, 300, 3.445, 0.7, 9.6, 3, Cost(0, 0, 120, 18), 17, "Q", false, false, true, false, 1,
+			true, { 15, 0.8, 1.495, 0, false }, 0.3375, { 0, 0, 0, 0, 3.0, 0, 0 }, { 0 }, 0 },
+		{ "petsuchos", "Petsuchos", CLS_MYTH, 400, 2.34, 0.7, 13.2, 3, Cost(0, 0, 200, 16), 20, "W", false, false, true, false, 2,
+			true, { 50, 12, 2.3, 0, true }, 0.30, { 0, 0, 0, 0, 2.5, 0, 0 }, { 0 }, 0 },
+		{ "roc", "Roc", CLS_MYTH, 700, 3.445, 0.9, 9.6, 2, Cost(0, 0, 100, 5), 14, "E", false, false, true, false, 2,
+			false, { 0, 0, 0, 0, false }, 0, { 0 }, { 0 }, 0 },
+		{ "scarab", "Scarab", CLS_MYTH, 1000, 2.145, 0.95, 9.6, 4, Cost(240, 0, 0, 18), 20, "W", false, false, true, false, 2,
+			true, { 16, 0.8, 1.725, 0, false }, 0.075, { 0, 0, 0, 0, 2.0, 0, 0 }, { 0 }, 0 },
+		{ "scorpion_man", "Scorpion Man", CLS_MYTH, 550, 3.25, 0.75, 9.6, 3, Cost(0, 200, 0, 22), 20, "W", false, false, true, false, 2,
+			true, { 30, 0.8, 1.38, 0, false }, 0.375, { 0, 0, 0, 0, 3.0, 0, 0 }, { 0 }, 0 },
+		{ "mummy", "Mummy", CLS_MYTH, 450, 2.6, 0.45, 9.6, 4, Cost(0, 275, 0, 25), 17, "T", false, false, true, false, 3,
+			true, { 30, 7.2, 1.955, 0, true }, 0.2625, { 0, 0, 0, 0, 3.0, 0, 0 }, { 0 }, 0 },
+		{ "avenger", "Avenger", CLS_MYTH, 700, 3.575, 0.5, 9.6, 3, Cost(250, 0, 0, 22), 24, "T", false, false, true, false, 3,
+			true, { 28, 0.8, 1.15, 0, false }, 0.45, { 0, 0, 0, 0, 3.0, 0, 0 }, { 0 }, 0 },
+		{ "phoenix", "Phoenix", CLS_MYTH, 600, 2.925, 0.8, 9.6, 4, Cost(0, 0, 200, 22), 24, "T", false, false, true, false, 3,
+			true, { 50, 2.4, 3.105, 2.4, false }, 0.1125, { 0, 0, 0, 0, 2.0, 0, 0 }, { 0 }, 0 },
+		// the god powers' units: Plague of Serpents' Serpent (EGYPT.md gives no stats: AoM's,
+		// 100 hp, 8 hack, ROF 1, 30 % armor, speed 4, LOS 12), Ancestors' Minion (EGYPT.md 5.2),
+		// the Son of Osiris (EGYPT.md 3.1, Mythic: 609 hp, 50.75 divine chain lightning), the
+		// Phoenix Egg (300 hp, 15 / 55 / 99, hatches a Phoenix after 50 s)
+		{ "serpent", "Serpent", CLS_MYTH, 100, 2.6, 0.4, 7.2, 0, Cost(), 0, "", false, false, true, false, 0,
+			true, { 8, 0.8, 1.15, 0, false }, 0.225, { 0 }, { 0 }, 0 },
+		{ "minion", "Minion", CLS_MYTH, 140, 3.0875, 0.42, 9.6, 0, Cost(), 0, "", false, false, true, false, 0,
+			true, { 10, 0.8, 1.035, 0, false }, 0.2625, { 0.5, 0, 0, 0, 0, 0, 0 }, { 0 }, 0 },
+		{ "son_of_osiris", "Son of Osiris", CLS_HERO, 609, 2.34, 0.5, 15, 0, Cost(), 0, "", false, false, false, true, 3,
+			true, { 50.75, 10.8, 3.45, 0, true }, 0.225, { 0, 0, 0, 0, 3.0, 0, 0 }, { 0 }, 0 },
+		{ "phoenix_egg", "Phoenix Egg", CLS_MYTH, 300, 0.01, 0.5, 4.8, 0, Cost(), 0, "", false, false, true, false, 3,
+			false, { 0, 0, 0, 0, false }, 0.1125, { 0 }, { 0 }, 0 },
 	};
 	// clang-format on
 	return D;

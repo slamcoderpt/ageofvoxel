@@ -124,6 +124,50 @@ const EgyptUnit *egypt_unit(int type) {
 		{ 0.225, 0, 0.5, 0, 0, 0, "baboon_of_set",
 			"Boar of Set: a wild Boar a Priest of Set converted (50 s at range 10); 2 pop, 70 hp, 6 hack, ROF 1, armor 20/30/99, speed 5, LOS 14; keeps 75 % of the Boar's food",
 			"as the Animals of Set; food 187.5 = 75 % of this sim's boar (250)" },
+		// ---- the Egyptian gods' myth units and the god powers' units (sim/godpowers egypt_myth.cpp;
+		// their abilities, god and techs there and in sim/techs; EGYPT.md 5)
+		{ 0.4125, 0, 0, 0, 0, 0, "anubite",
+			"Anubite (Anubis, Classical): 100 f + 15 fav, 2 pop, 9 s, 200 hp, 11 hack, ROF 0.8, x3 vs myth, armor 60/55/80, speed 5, LOS 16; Jump: leaps onto an enemy 4-11 m away for 15 hack (recharge 12 s)",
+			"hp, damage as Retold; speed x0.65, LOS / ranges x0.6 (Jump 2.4-6.6 tiles), reload x1.15, armor x0.75; pop 2 (myth units keep Retold's pop)" },
+		{ 0.2625, 0, 0, 0, 0, 0, "wadjet",
+			"Wadjet (Ptah, Classical): 150 w + 15 fav, 2 pop, 17 s, 270 hp, 12 pierce, range 18, ROF 1.5, Venomous +2.5 divine/s for 5 s on organic units, x2 vs myth, armor 25/35/80, speed 3.8, LOS 20",
+			"hp, damage as Retold; range 10.8, LOS 12; the venom: 2.5 hp/s for 5 s (no armor) on non-siege, non-building targets, a new hit restarts it" },
+		{ 0.45, 0, 0, 0, 0, 0, "sphinx",
+			"Sphinx (Bast, Classical): 120 g + 18 fav, 3 pop, 17 s, 300 hp, 15 hack + 9 crush, ROF 1.3, x3 vs myth, armor 45/60/80, speed 5.3, LOS 16; Whirlwind: 30 hack over 2 s to adjacent enemies in 2.5 m (recharge 15 s)",
+			"one attack number: the 15 hack (the 9 crush only counts on buildings: myth units deal x1.2 there, as the Greek ones); Whirlwind radius 1.5 tiles" },
+		{ 0.3375, 0, 0, 0, 0, 0, "petsuchos",
+			"Petsuchos (Sobek, Heroic): 200 g + 16 fav, 3 pop, 20 s, 400 hp, sun beam 10 P + 30 P over 1 s + 2 D + 8 D over 1 s, 100 % accuracy, range 20, ROF 2, x2.5 vs myth, armor 40/45/80, speed 3.6, LOS 22; its hits Illuminate the target (25 LOS for 6 s)",
+			"one beam of 50 (40 pierce + 10 divine summed, homing: 100 % accuracy); range 12, LOS 13.2; Illuminate: a 15-tile reveal for 6 s" },
+		{ 0.1875, 0, 0, 0, 0, 0, "roc",
+			"Roc (Sobek, Heroic): 100 g + 5 fav, 2 pop, 14 s, 700 hp, no attack, armor 0/25/80, speed 5.3, LOS 16; a flying transport for 20 units, immune to god powers",
+			"no transport here (this sim has no garrison of units): a fast flying scout with Retold's hp; god powers skip it" },
+		{ 0.5625, 110, 0, 0, 0, 0, "scarab",
+			"Scarab (Sekhmet, Heroic): 240 f + 18 fav, 4 pop, 20 s, 1000 hp, 16 hack + 100 crush, ROF 1.5, x2 vs myth, armor 10/75/80, speed 3.3, LOS 16; Causticity: dying, it splashes 70 divine in 6 m",
+			"16 per blow on units; on a building 110 crush (the 100 crush + the 16 hack through ~40 % hack armor) less the building's crush armor; Causticity: 70 to enemies within 3.6 tiles" },
+		{ 0.30, 0, 0, 0, 0, 0, "scorpion_man",
+			"Scorpion Man (Nephthys, Heroic): 200 w + 22 fav, 3 pop, 20 s, 550 hp, 30 hack, ROF 1.2, x3 vs myth, armor 50/40/80, speed 5, LOS 16; Sting (recharge 16 s): a few enemies in 2 m stung 3 times, each 4 divine at once + 6 divine over 6 s",
+			"Sting: the 3 nearest enemies within 1.2 tiles, 3 stings 0.5 s apart, each 4 + 1/s for 6 s" },
+		{ 0.375, 0, 0, 0, 0, 0, "mummy",
+			"Mummy (Osiris, Mythic): 275 w + 25 fav, 4 pop, 17 s, 450 hp, 30 pierce, range 12, ROF 1.7, x3 vs myth, armor 35/50/80, speed 4, LOS 16; Reincarnation (recharge 18 s): a curse in 2 m, range 12, 15 s, 2 P + 4 divine/s; a target that dies under it rises as your Minion",
+			"range 7.2; the curse: radius 1.2 tiles round its target, 2 + 4/s for 15 s (no armor); a cursed human or myth unit (not a hero) that dies becomes the Mummy's owner's Minion" },
+		{ 0.30, 0, 0, 0, 0, 0, "avenger",
+			"Avenger (Horus, Mythic): 250 f + 22 fav, 3 pop, 24 s, 700 hp, 28 hack, ROF 1, x3 vs myth, armor 60/40/80, speed 5.5, LOS 16; Spin (recharge 10 s): 100 hack over 5 s to adjacent enemies in 4 m",
+			"Spin: 20 hack per s for 5 s to enemies within 2.4 tiles, through their hack armor" },
+		{ 0.4125, 65, 0, 0, 0, 0, "phoenix",
+			"Phoenix (Thoth, Mythic): 200 g + 22 fav, 4 pop, 600 hp, 50 hack + 65 crush, range 4, area 4, ROF 2.7, x2 vs myth, armor 15/55/80, speed 4.5, LOS 16, flying; Rebirth: dying, it leaves a Phoenix Egg (300 hp) that hatches a free Phoenix after 50 s",
+			"50 per blow on units (splash 2.4 tiles, half), 65 crush on buildings; train time 24 s (the wiki infobox's 6 s is an error, EGYPT.md); the egg is a unit of its own (U_PHOENIX_EGG)" },
+		{ 0.225, 0, 0, 0, 0, 0, "wadjet",
+			"Serpent (Plague of Serpents): uncontrolled, guards where it rose, attacks nearby enemies, ignores buildings, gives its LOS, lives until killed (EGYPT.md gives no stats)",
+			"AoM's serpent: 100 hp, 8 hack, ROF 1 (x1.15), 30 % hack / pierce armor (x0.75), speed 4 (x0.65), LOS 12 (x0.6); a Wadjet-shaped rig until it has its own model" },
+		{ 0.30, 0, 0, 0, 0, 0, "minion",
+			"Minion (Ancestors, the Mummy's curse): 140 hp, 10 hack, ROF 0.9, armor 35/40/80, speed 4.75, x0.5 vs villagers; Ancestors' die 60 s after the cast",
+			"as the myth units: speed x0.65, reload x1.15, armor x0.75" },
+		{ 0.375, 0, 0, 0, 0, 15, "son_of_osiris",
+			"Son of Osiris (Osiris' god power on a Pharaoh): 609 hp (Mythic), 50.75 divine chain lightning jumping to 4 targets, x3 vs myth, range 18, ROF 3, armor 30/50/99, speed 3.6, LOS 25; heals 15 hp/s, empowers at 120 %",
+			"the Mythic numbers (the power is Mythic); range 10.8, LOS 15, reload 3.45; the bolt jumps to the 3 nearest other enemies within 4.8 tiles of its target (same damage); empowers at 1.2" },
+		{ 0.4125, 0, 0, 0, 0, 0, "phoenix",
+			"Phoenix Egg (Rebirth): 300 hp, armor 15/55/99; hatches a free Phoenix 50 s after the Phoenix fell if it survives",
+			"a still unit (speed 0.01, no attack, 0 pop)" },
 	};
 	return is_egypt_unit(type) ? &T[type - U_LABORER] : nullptr;
 }
@@ -138,6 +182,9 @@ std::string unit_plural(int type) {
 		return k + " of Set";
 	}
 	if (type == U_MERCENARY_CAVALRY) return n; // (a collective)
+	if (type == U_PETSUCHOS) return "Petsuchoi";
+	if (type == U_SCORPION_MAN) return "Scorpion Men";
+	if (type == U_SON_OF_OSIRIS) return "Sons of Osiris";
 	if (n.size() > 1 && n.back() == 'y' && !std::strchr("aeiou", n[n.size() - 2])) return n.substr(0, n.size() - 1) + "ies";
 	if (n.size() && (n.back() == 's' || n.back() == 'x')) return n + "es";
 	return n + "s";
@@ -275,7 +322,9 @@ const int *civ_build_menu(int civ) {
 const int *civ_trains(int civ, int btype) {
 	static const int NONE[] = { -1 };
 	static const int E_TC[] = { U_LABORER, U_MERCENARY, U_MERCENARY_CAVALRY, U_PRIEST, -1 };
-	static const int E_TEMPLE[] = { U_PRIEST, -1 };
+	// (the myth units: sim/godpowers egypt_myth.cpp, each with its minor god, Techs::god_allows_unit)
+	static const int E_TEMPLE[] = { U_PRIEST, U_ANUBITE, U_WADJET, U_SPHINX, U_PETSUCHOS, U_ROC, U_SCARAB, U_SCORPION_MAN, U_MUMMY,
+		U_AVENGER, U_PHOENIX, -1 };
 	static const int E_BARRACKS[] = { U_SPEARMAN, U_AXEMAN, U_SLINGER, -1 };
 	static const int E_MIGDOL[] = { U_CHARIOT_ARCHER, U_CAMEL_RIDER, U_WAR_ELEPHANT, -1 };
 	static const int E_SIEGE[] = { U_SIEGE_TOWER, U_CATAPULT, -1 };
@@ -423,6 +472,7 @@ Cost Civs::cost(int owner, int btype) const {
 	if (c != CIV_EGYPT) return k;
 	if (god_is(owner, "set") && (btype == B_EG_BARRACKS || btype == B_SIEGE_WORKS || btype == B_MIGDOL)) k.v[RES_GOLD] *= SET_MILITARY_GOLD;
 	if (god_is(owner, "isis") && btype == B_OBELISK) k.v[RES_GOLD] = 5;
+	sim->techs.building_cost(owner, btype, k); // (sim/techs: Shaduf's Farms -50 %, Sun-dried Mud-brick -10 % gold)
 	return k;
 }
 
@@ -622,11 +672,14 @@ double Civs::train_mult(int b, int utype) const {
 bool Civs::can_empower(int u) const {
 	const UnitStore &U = sim->entities.units;
 	const int t = U.type[u], o = U.owner[u];
-	if (t == U_PHARAOH) return true;
+	if (t == U_PHARAOH || t == U_SON_OF_OSIRIS) return true; // (sim/godpowers: the Son of Osiris empowers at 120 %)
 	return t == U_PRIEST && o > 0 && o < MAX_PLAYERS && lower_str(sim->players[o].god) == "ra";
 }
 
-double Civs::empower_strength(int u) const { return sim->entities.units.type[u] == U_PHARAOH ? 1.0 : RA_PRIEST_EMPOWER; }
+double Civs::empower_strength(int u) const {
+	const int t = sim->entities.units.type[u];
+	return t == U_PHARAOH ? 1.0 : t == U_SON_OF_OSIRIS ? SON_OF_OSIRIS_EMPOWER : RA_PRIEST_EMPOWER;
+}
 
 double Civs::base_hack(int r) const { return unit_def(sim->entities.units.type[r]).armor; }
 
@@ -722,7 +775,11 @@ int32_t Civs::devotee_monument(int b) const {
 	return best;
 }
 
-double Civs::train_cost_mult(int b, int) const { return devotee_monument(b) ? DEVOTEES_COST : 1; }
+double Civs::train_cost_mult(int b, int utype) const {
+	// (sim/techs: Spirit of Maat's Priests -30 %, Tusks of Apedemak's War Elephants -10 %)
+	const double k = sim->techs.train_cost_mult(sim->entities.buildings.owner[b], utype);
+	return (devotee_monument(b) ? DEVOTEES_COST : 1) * k;
+}
 
 void Civs::auras(double dt) {
 	Entities &E = sim->entities;
@@ -993,7 +1050,7 @@ void Civs::update(double dt) {
 		});
 		if (best < 0) continue;
 		const bool busy = U.moving[best] || U.order_type[best] != O_IDLE;
-		U.hp[best] = std::min(U.max_hp[best], U.hp[best] + eu->heal * (busy ? 0.5 : 1) * dt);
+		U.hp[best] = std::min(U.max_hp[best], U.hp[best] + eu->heal * sim->techs.heal_mult(r) * (busy ? 0.5 : 1) * dt); // (sim/techs: Spirit of Maat)
 		U.civ_heal[r] = U.id[best];
 		U.rot[r] = jsm::atan2(U.x[best] - ux, U.z[best] - uz);
 		U.anim_want[r] = A_WORSHIP;
@@ -1010,8 +1067,10 @@ void Civs::update(double dt) {
 
 	// 5. the Pharaoh comes back at the Town Center PHARAOH_RESPAWN s after he fell
 	bool has_pharaoh[MAX_PLAYERS] = {};
+	int pharaohs[MAX_PLAYERS] = {};
 	for (int r = 0; r < U.size(); r++)
-		if (!U.removed[r] && !U.dead[r] && U.type[r] == U_PHARAOH) has_pharaoh[U.owner[r]] = true;
+		if (!U.removed[r] && !U.dead[r] && U.type[r] == U_PHARAOH) pharaohs[U.owner[r]]++;
+	for (int o = 1; o < MAX_PLAYERS; o++) has_pharaoh[o] = pharaohs[o] >= sim->techs.pharaoh_count(o); // (sim/techs: New Kingdom's second)
 	for (int o = 1; o < MAX_PLAYERS; o++) {
 		const Player &p = sim->players[o];
 		if (!p.exists || p.civ != CIV_EGYPT || has_pharaoh[o]) {

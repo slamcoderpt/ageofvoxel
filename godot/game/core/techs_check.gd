@@ -196,13 +196,13 @@ func _case_defs() -> void:
 	var names: PackedStringArray = sim.tech_names()
 	var per := {"armory": 0, "market": 0, "temple": 0}
 	var missing := []
-	for k in names:
+	for k in names.slice(0, 48): # (the Egyptian gods' techs after them: egypt_gods_check.gd)
 		var d: Dictionary = sim.get_tech_def(k)
 		per[str(d.building)] += 1
 		if str(d.missing) != "":
 			missing.append(k)
 	# (+1 Temple tech of the Egyptians, sim/civ: Hands of the Pharaoh; egypt_check.gd checks it)
-	_check("defs.count", names.size() == 48 and per.armory == 21 and per.market == 3 and per.temple == 24, {"n": names.size(), "per": per})
+	_check("defs.count", names.size() == 48 + 35 and per.armory == 21 and per.market == 3 and per.temple == 24, {"n": names.size(), "per": per})
 	# spot checks against reference/techs/TECHS.md
 	var want := {
 		"copper_weapons": [{"food": 100.0, "gold": 100.0}, 30.0, 1, ""],
