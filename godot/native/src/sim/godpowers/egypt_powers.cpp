@@ -443,7 +443,8 @@ static bool eclipse_unit(const GodPowers &G, const Sim &S, int r) {
 
 double GodPowers::damage_mult(int r) const {
 	if (sim->entities.units.type[r] == U_SERPENT) return serpent_mult(sim->entities.units.owner[r]); // (Heroic / Mythic +20 %)
-	return eclipse_unit(*this, *sim, r) ? ECLIPSE_DAMAGE : 1;
+	const double age = myth_age_mult(sim->entities.units.owner[r], sim->entities.units.type[r]); // (later ages +20 % each)
+	return (eclipse_unit(*this, *sim, r) ? ECLIPSE_DAMAGE : 1) * age;
 }
 bool GodPowers::power_immune(int r) const {
 	const int t = sim->entities.units.type[r];
@@ -942,6 +943,14 @@ double GodPowers::serpent_mult(int owner) const {
 	if (owner <= 0 || owner >= MAX_PLAYERS) return 1;
 	const int age = sim->players[owner].age;
 	return 1 + SERPENT_AGE * std::max(0, std::min(2, age - 1));
+}
+// the trainable Egyptian myth units (Anubite .. Phoenix; not the Serpent, Minion, Son or Egg):
+// +20 % per age the owner is past the unit's age (its def's min_age, the minor god's age)
+double GodPowers::myth_age_mult(int owner, int type) const {
+	if (!sim->godot_rules || type < U_ANUBITE || type > U_PHOENIX) return 1;
+	if (owner <= 0 || owner >= MAX_PLAYERS || sim->players[owner].civ != CIV_EGYPT) return 1;
+	const int later = std::max(0, std::min(3, sim->players[owner].age) - unit_def(type).min_age);
+	return 1 + MYTH_AGE * later;
 }
 
 // Eclipse (+15 % for the caster's myth units) and Tornado (-35 % for 6 s) change speeds: the

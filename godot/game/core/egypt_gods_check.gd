@@ -54,7 +54,8 @@ extends SceneTree
 ##               at its Temple and flies part of a wave to its target
 ##   immunity    Retold's immunities: a Zeus player's Bolt, Lightning Storm and Meteor and an
 ##               Egyptian foe's Locust Swarm and Thoth's Meteor strike the spearmen beside a Son
-##               of Osiris and a Roc and never them (0 damage events, hp 609 / 700 kept)
+##               of Osiris and a Roc and never them (0 damage events, hp 609 / 840 kept: the
+##               Roc's 700 x1.2 in the Mythic Age)
 ##   noheal      (son.heal) the Son of Osiris heals allies 15 hp/s and cannot be healed: a
 ##               spearman +20 in 2 s by a Pharaoh, +30 by the Son, +45 by the Son and a Priest;
 ##               the Son's own hp unchanged
@@ -64,6 +65,13 @@ extends SceneTree
 ##               Wadjet's venom and the Mummy's curse x1.2), the first myth unit on the map
 ##               using its ability at once (the Jump on a fresh spawn), Force of the West Wind on
 ##               the Sphinx's 9 crush
+##   myth_ages   (EGYPT.md 5: "Myth units get +HP/+attack bonuses from later age-ups") the ten
+##               trainable Egyptian myth units +20 % hp and damage per age past their own (a
+##               Classical Sphinx 300 / 15 -> 360 / 18 -> 420 / 21, a Heroic Scarab 1000 -> 1200, a
+##               Mythic Avenger x1): read from get_unit_stats, measured on blows (a Sphinx on a
+##               hoplite, its Whirlwind, its crush on a House), on a Sphinx alive through a real
+##               advance_age (hp re-based, its wounds kept in proportion) and one trained after it;
+##               a Greek Minotaur unchanged in every age
 ##   ai          an Egyptian AI seat casts its gods' powers (Rain on its Farms, a Tornado / Plague
 ##               of Serpents / Ancestors on a cluster of foes)
 ##
@@ -222,7 +230,7 @@ func _run() -> void:
 	var t0 := Time.get_ticks_msec()
 	for c in ["defs", "gods", "passives", "model", "rain", "prosperity", "vision", "eclipse", "sands", "serpents", "locusts", "citadel",
 			"ancestors", "son", "son_divine", "tornado", "meteor", "myth", "techs", "bounds", "determinism",
-			"phantom", "blocks", "allies", "trees", "split", "roc", "roc_smart", "roc_ai", "immunity", "noheal", "volleys", "shield_preview", "eclipse_abilities", "ai"]:
+			"phantom", "blocks", "allies", "trees", "split", "roc", "roc_smart", "roc_ai", "immunity", "noheal", "volleys", "shield_preview", "eclipse_abilities", "myth_ages", "ai"]:
 		if _want(c):
 			call("_case_" + c)
 	result["ms"] = Time.get_ticks_msec() - t0
@@ -563,6 +571,92 @@ func _first_hit(sim: Object, att: int, tgt: int, max_s := 20.0) -> float:
 				return float(e.amount)
 	return -1.0
 
+# the myth units' later-age bonus (EGYPT.md 5; Retold gives +20 % per age for the Serpent, the
+# same rule for every trainable myth unit: GodPowers::myth_age_mult, MYTH_AGE)
+const MYTH_AGE_UNITS := ["anubite", "wadjet", "sphinx", "petsuchos", "roc", "scarab", "scorpion_man", "mummy", "avenger", "phoenix"]
+
+func _case_myth_ages() -> void:
+	var r := {}
+	var ok := true
+	# every unit at every age from its own: hp and damage x(1 + 0.2 x ages past its own)
+	var table := {}
+	for age in [1, 2, 3]:
+		var sim := _fresh("ra", "zeus", age, ["bast", "sobek", "osiris"])
+		var row := {}
+		for t in MYTH_AGE_UNITS:
+			var d: Dictionary = sim.get_unit_def(t)
+			if int(d.min_age) > age:
+				continue
+			var u := _u(sim, t, 1, 0, 0)
+			sim.tick(1)
+			var st: Dictionary = sim.get_unit_stats(u)
+			var k: float = 1.0 + 0.2 * (int(age) - int(d.min_age))
+			var dmg := float(d.attack.damage) if d.has("attack") else 0.0
+			row[t] = [_r(float(st.max_hp)), _r(float(st.damage))]
+			ok = ok and _near(float(st.max_hp), float(d.hp) * k, 0.01) and _near(float(st.damage), dmg * k, 0.01)
+			sim.kill_unit(u)
+		# a Greek myth unit: as before in every age
+		var mi := _u(sim, "minotaur", 2, 20, 0)
+		sim.tick(1)
+		var ms: Dictionary = sim.get_unit_stats(mi)
+		row["greek minotaur"] = [_r(float(ms.max_hp)), _r(float(ms.damage))]
+		ok = ok and float(ms.max_hp) == float(sim.get_unit_def("minotaur").hp) and float(ms.damage) == float(sim.get_unit_def("minotaur").attack.damage)
+		table["age %d" % age] = row
+	r["max hp / damage per age"] = table
+	# blows measured: a Sphinx on a hoplite (15 x 0.7 hack + 9 crush x 0.01), its Whirlwind on a 2nd hoplite, its
+	# crush on a House (15 x 0.35 + 9 x 0.95), Classical vs Mythic
+	var blows := []
+	var whirl := []
+	var house := []
+	for age in [1, 3]:
+		var sim := _fresh("ra", "zeus", age, ["bast", "sobek", "osiris"])
+		var sp := _u(sim, "sphinx", 1, 0, 0)
+		var h1 := _u(sim, "hoplite", 2, 1.2, 0)
+		var h2 := _u(sim, "hoplite", 2, 0.6, 1.0)
+		sim.tick(1)
+		blows.append(_r(_first_hit(sim, sp, h1)))
+		var wd := _damage_by(sim, 16.0, func(e): return int(e.id) == h2 and int(e.other) == 0)
+		whirl.append(_r(float(wd.get(h2, 0.0))))
+		sim.kill_unit(sp)
+		var hs := _b(sim, "house", 2, 12, 12)
+		var s2 := _u(sim, "sphinx", 1, 10.4, 12)
+		sim.tick(1)
+		house.append(_r(_first_hit(sim, s2, hs)))
+	r["sphinx blow on a hoplite [classical, mythic]"] = blows
+	r["whirlwind on the 2nd hoplite in 16 s [classical, mythic]"] = whirl
+	r["sphinx blow on a house [classical, mythic]"] = house
+	ok = ok and _near(blows[0], 15 * 0.7 + 9 * 0.01, 0.02) and _near(blows[1], (15 * 0.7 + 9 * 0.01) * 1.4, 0.02)
+	ok = ok and whirl[0] > 1.0 and _near(whirl[1] / whirl[0], 1.4, 0.02)
+	ok = ok and _near(house[0], 15 * 0.35 + 9 * 0.95, 0.02) and _near(house[1], (15 * 0.35 + 9 * 0.95) * 1.4, 0.02)
+	# a Sphinx alive through a real age-up (Classical -> Heroic): its hp re-based, its wound kept
+	# in proportion; one trained after the age-up gets it too
+	var s3 := _fresh("ra", "zeus", 1, ["bast", "sobek"])
+	s3.set_player_resources(1, {"food": 9000, "wood": 9000, "gold": 9000, "favor": 200})
+	var tm := _b(s3, "temple", 1, 0, -8)
+	_b(s3, "armory", 1, -8, -8)
+	var old := _u(s3, "sphinx", 1, 0, 6)
+	s3.tick(1)
+	s3.damage(old, 100.0)
+	var before := [_r(_hp(s3, old)), _r(float(s3.get_unit(old).max_hp))]
+	var adv: Dictionary = s3.advance_age(1)
+	var t := 0
+	while int(s3.get_player(1).age) < 2 and t < 30 * 120:
+		s3.tick(1)
+		t += 1
+	var after := [_r(_hp(s3, old)), _r(float(s3.get_unit(old).max_hp))]
+	r["advance to heroic"] = {"ok": adv.ok, "reason": adv.get("reason", ""), "age": int(s3.get_player(1).age)}
+	r["sphinx through the age-up [hp, max] before / after"] = [before, after]
+	ok = ok and bool(adv.ok) and int(s3.get_player(1).age) == 2 and after[1] == 360.0 and _near(after[0], before[0] * 1.2, 0.5)
+	s3.train(tm, "sphinx")
+	_step(s3, 19.0)
+	var trained := []
+	for u in _units_of(s3, 1, "sphinx"):
+		if u != old:
+			trained.append(_r(float(s3.get_unit(u).max_hp)))
+	r["sphinx trained in the heroic age: max hp"] = trained
+	ok = ok and trained.size() == 1 and trained[0] == 360.0
+	_check("myth.ages", ok, r)
+
 # Bast's Eclipse: +20 % damage for the caster's myth units, abilities included (EGYPT.md 5.3):
 # the Anubite's Jump, the Wadjet's venom, the Mummy's curse (its hit and its damage over time),
 # each measured in a fresh match with and without the Eclipse. The myth units are spawned after
@@ -627,7 +721,8 @@ func _case_eclipse_abilities() -> void:
 		hits.append(_r(_first_hit(s3, sph, hs)))
 	# on a Greek House: 15 hack x0.35 + 9 crush x0.95 -> + 9 x1.15 crush
 	r["sphinx blow on a house [before, force of the west wind]"] = hits
-	ok = ok and _near(hits[0], 15 * 0.35 + 9 * 0.95, 0.02) and _near(hits[1], 15 * 0.35 + 9 * 1.15 * 0.95, 0.02)
+	# (a Classical Sphinx in the Heroic Age: x1.2 on both parts, myth_ages)
+	ok = ok and _near(hits[0], (15 * 0.35 + 9 * 0.95) * 1.2, 0.02) and _near(hits[1], (15 * 0.35 + 9 * 1.15 * 0.95) * 1.2, 0.02)
 	_check("eclipse.abilities_and_west_wind", ok, r)
 
 func _case_eclipse() -> void:
@@ -1049,7 +1144,8 @@ func _case_myth() -> void:
 	s2.order(av, {"type": "attack", "target": ring[0]})
 	var spin := _damage_by(s2, 5.5, func(e): return ring.has(int(e.id)) and int(e.other) == 0)
 	a["spin damage on the 2nd / 3rd hoplite (5 s)"] = [_r(float(spin.get(ring[1], 0.0))), _r(float(spin.get(ring[2], 0.0)))]
-	_check("myth.abilities_a", _near(a["wadjet hit / venom over 5 s"][1], 12.5, 0.6) and _near(a["causticity on a hoplite beside the scarab"], 70.0, 0.01)
+	# (a Classical Wadjet in the Mythic Age: venom x1.4, myth_ages; the Avenger is Mythic: x1)
+	_check("myth.abilities_a", _near(a["wadjet hit / venom over 5 s"][1], 12.5 * 1.4, 0.6) and _near(a["causticity on a hoplite beside the scarab"], 70.0, 0.01)
 		and _near(float(spin.get(ring[1], 0.0)), 100.0 * 0.7, 6.0), a)
 	var b := {}
 	var s3 := _fresh("isis", "zeus", 3, ["anubis", "nephthys", "thoth"])
@@ -1080,7 +1176,7 @@ func _case_myth() -> void:
 	var st := _damage_by(s3, 2.0, func(e): return int(e.id) == sh and int(e.other) == 0)
 	b["sting damage on its foe (2 s)"] = _r(float(st.get(sh, 0.0)))
 	_check("myth.abilities_b", b["eggs after the phoenix fell"] == 1 and b["phoenixes at 49 s"] == 0 and b["phoenixes at 50.5 s / eggs"] == [1, 0]
-		and _near(jd, 15.0 * 0.7, 0.01) and b["anubite jump: first damage, distance after"][1] < 1.6 and b["sting damage on its foe (2 s)"] >= 12.0, b)
+		and _near(jd, 15.0 * 0.7 * 1.4, 0.01) and b["anubite jump: first damage, distance after"][1] < 1.6 and b["sting damage on its foe (2 s)"] >= 12.0, b)
 	# Mummy Reincarnation: a cursed villager that dies rises as the Mummy owner's Minion
 	var c := {}
 	var s4 := _fresh("ra", "zeus", 3, ["bast", "sobek", "osiris"])
@@ -1743,7 +1839,7 @@ func _case_immunity() -> void:
 	var son: int = sr[0]
 	var roc: int = sr[1]
 	r["son / roc hp"] = [_hp(sim, son), _hp(sim, roc)]
-	var ok: bool = son >= 0 and _hp(sim, son) == 609 and _hp(sim, roc) == 700
+	var ok: bool = son >= 0 and _hp(sim, son) == 609 and _hp(sim, roc) == 700 * 1.2 # (a Heroic Roc in the Mythic Age, myth_ages)
 	var su: Dictionary = sim.get_unit(son)
 	var sx := float(su.x)
 	var sz := float(su.z)
@@ -1767,7 +1863,7 @@ func _case_immunity() -> void:
 	r["meteor: son / roc / spearmen damage"] = [_r(float(d.get(son, 0.0))), _r(float(d.get(roc, 0.0))), _r(_sum(d, men))]
 	ok = ok and r["meteor cast"] and not d.has(son) and not d.has(roc) and _sum(d, men) > 0
 	r["son / roc hp after"] = [_hp(sim, son), _hp(sim, roc)]
-	ok = ok and _hp(sim, son) == 609 and _hp(sim, roc) == 700
+	ok = ok and _hp(sim, son) == 609 and _hp(sim, roc) == 700 * 1.2
 	# an Egyptian enemy (Isis: Anubis / Sobek / Thoth): Locust Swarm and Thoth's Meteor
 	var s2 := _fresh("ra", "isis", 3, ["bast", "sobek", "osiris"])
 	s2.set_minor_god(2, 1, "anubis")

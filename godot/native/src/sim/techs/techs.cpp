@@ -399,7 +399,7 @@ void Techs::init(Sim *s) {
 		const int r = sim->entities.unit_slot(e.id);
 		if (r < 0) return;
 		const int o = sim->entities.units.owner[r];
-		if (o <= 0 || o >= MAX_PLAYERS || done[o].none()) return;
+		if (o <= 0 || o >= MAX_PLAYERS || (done[o].none() && sim->players[o].civ != CIV_EGYPT)) return; // (Egyptians: myth units' age hp)
 		apply_unit(r, TechMods(), mods[o]);
 	});
 	// (the Egyptian gods) an Egyptian reaching an age takes a minor god if he chose none
@@ -612,6 +612,7 @@ void Techs::auto_minor(int owner) {
 			const char *const *m = minor_gods_of(p.god, a);
 			if (*m) minor[owner][a] = *m;
 		}
+	recompute(owner); // (the myth units' later-age hp, GodPowers::myth_age_mult, re-based on every unit)
 }
 
 int Techs::min_age_for(int owner, int type) const {
@@ -708,6 +709,13 @@ void Techs::recompute(int owner) {
 			}
 		}
 	}
+	// (Egyptians, rules on) the myth units' +20 % hp per later age (EGYPT.md 5), on top of the techs';
+	// their damage part rides in GodPowers::damage_mult
+	if (sim->godot_rules)
+		for (int u = U_ANUBITE; u <= U_PHOENIX; u++) {
+			const double k = sim->godpowers.myth_age_mult(owner, u);
+			if (k != 1) m.hp[u] = (1 + m.hp[u]) * k - 1;
+		}
 	mods[owner] = m;
 	UnitStore &U = sim->entities.units;
 	for (int r = 0; r < U.size(); r++)

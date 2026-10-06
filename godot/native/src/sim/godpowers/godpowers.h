@@ -80,6 +80,10 @@ constexpr double SON_HEAL = 15;               // the Son of Osiris heals allies 
 constexpr double THOTH_CRATER_LIFE = 90;      // (visual only) how long its glowing craters stay drawn
 constexpr int TREE_FLAT = 100;                // a tree flattened by a Tornado / Thoth's Meteor: variant + 100 (the wood stays)
 constexpr double SERPENT_AGE = 0.20;          // Serpents +20 % hp and damage in the Heroic and in the Mythic Age
+// (EGYPT.md 5: "Myth units get +HP/+attack bonuses from later age-ups") the ten trainable Egyptian
+// myth units: +20 % hp and damage (abilities and crush part included) for each age their owner is
+// past the unit's own age, the Serpent's rule (Classical units +20 % Heroic / +40 % Mythic)
+constexpr double MYTH_AGE = 0.20;
 // the Roc: a flying transport for 20 units; it lands (2 s) to load or unload
 constexpr int ROC_SLOTS = 20;
 constexpr double ROC_LAND = 2, ROC_REACH = 2.5, ROC_DROP = 2.8; // land / reach (tiles) / how far it comes down to land
@@ -213,6 +217,7 @@ public:
 	double myth_unit_crush(int arow, int urow, double amount) const;             // added after the hack part
 	double myth_crush(int arow) const; // its crush per blow (Criosphinx / Hieracosphinx, West Wind)
 	double serpent_mult(int owner) const; // Serpents by the owner's age
+	double myth_age_mult(int owner, int type) const; // Egyptian myth units by the owner's age (MYTH_AGE)
 	// the Roc: board units (they walk to it; it lands), unload them round (x, z)
 	int roc_load(int32_t roc, const std::vector<int32_t> &units);
 	bool roc_unload(int32_t roc, double x, double z);
