@@ -15,7 +15,7 @@ extends Node3D
 ## shared ones (town_center, house, farm, temple, armory, market); plus
 ## render-only lighthouse, wonder, sentry_tower, palm and clutter (street
 ## dressing: jars, crates, mud-brick walls, carts, stalls; set_static).
-## Variants: house = the sim's variant % 3; temple and monument_gods = the
+## Variants: house = (the sim's variant + 3 x a lot hash) % 6; temple and monument_gods = the
 ## owner's major god (ra / isis / set). A building whose sim footprint is not
 ## the model's is scaled uniformly to fit.
 ## buildings.gd asks `owns(type, civ, owner)` per row and skips those rows;
@@ -170,7 +170,12 @@ func from_buildings(B: Dictionary, names: PackedStringArray) -> void:
 		var id: int = B.ids[i]
 		seen[id] = true
 		var P := _player(owner)
-		var key := model_key(type, int(B.variant[i]), B.built[i] != 0, float(B.progress[i]), int(P.age), str(P.god))
+		var vv := int(B.variant[i])
+		if type == "house":
+			# six house plans from the sim's three variants: the lot picks the half
+			var rr: PackedInt32Array = B.rect
+			vv += 3 * posmod(rr[i * 4] * 7 + rr[i * 4 + 1] * 13, 2)
+		var key := model_key(type, vv, B.built[i] != 0, float(B.progress[i]), int(P.age), str(P.god))
 		if model_override.has(id):
 			key = str(model_override[id])
 		var e: Dictionary = _nodes.get(id, {})

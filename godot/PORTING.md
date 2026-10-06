@@ -1385,7 +1385,29 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   (`teamb`) under a two-row flared cavetto (`flare: true`) and a bright team
   line round the roof deck (`block(..., { rimTeam })`, default `TEAM`), as on
   Retold's blue-rimmed houses (building_04); Archaic mud houses keep the
-  dark line.
+  dark line. **Superseded in round 23** (the bright rim read as a selection
+  marker repeated on every house): no team line on the roof deck
+  (`rim: false`); the two-row flared cavetto is painted (`gorge`: a muted
+  Egyptian blue `GORGE_BLUE` or an ochre red `GORGE_RED`, mud on Archaic
+  houses) over a matching painted band (`band: 'lapis' | 'red'`); the
+  owner's colour is the weathered `TEAM` on every door lintel
+  (`door(..., { lintelC })`). Doorways are three voxels deep with a
+  near-black leaf (`leafShade: 0.45`) or an open black passage, and skin()
+  darkens the reveals of recesses deeper than two voxels (0.24 / 0.26).
+  Six plans (`house(v)`, variants `0`..`5`), each its own footprint and
+  height: 0 a main block and a side room under a palm-trunk awning
+  (`palmAwning()`: ringed palm posts, palm-log beam and rafters, a dried
+  frond mat with a ragged fringe); 1 a roof terrace (`roofParapet()`) with a
+  stair hutch (a black door under a limestone lintel) and a frond shade on
+  poles; 2 an L round a walled yard with a wind-catcher (`windCatcher()`:
+  a whitewashed shaft, a dark mouth in a palm-wood frame, a lean roof); 3 a
+  narrow tall tower house with a set-back upper room and beam ends; 4 a wide
+  low house with stacked storage jars on a frond mat on its roof
+  (`jarStack()`) and a palm awning; 5 a tall block with a wind-catcher next
+  to a low block whose parapeted terrace is reached by an outside stair
+  (`outStair()`). The sim has three house variants: `egypt_buildings.gd`
+  draws plan `variant + 3 x ((x * 7 + z * 13) mod 2)` of the lot's tile, so
+  a row of houses mixes all six.
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8
