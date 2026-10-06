@@ -120,6 +120,12 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_layout)
 
 	# --god=ra|isis|set|zeus: your pantheon (captures), --god2=: the first AI's
+	# (the egyptui capture's egyptui_sel=pantheon: Select Pantheon open on Ra, or on --god=)
+	var pantheon := str(args.get("egyptui_sel", "")) == "pantheon"
+	if pantheon:
+		if not args.has("god"):
+			args["god"] = "ra"
+		args["open"] = "god"
 	for k in [["god", 0], ["god2", 1]]:
 		var gk := str(args.get(k[0], "")).to_lower()
 		if M.GODS.has(gk) and bool(M.GODS[gk].available) and int(k[1]) < _players().size():
@@ -1036,7 +1042,15 @@ func _wrap(ci: CanvasItem, s: String, pos: Vector2, width: float, size: int, col
 	var f := S.font("sans")
 	var line := ""
 	var y := pos.y
-	for word in s.split(" "):
+	# a number and its unit stay on one line ("10 %", "30 m", "20 s", "15 hp")
+	var words: Array[String] = []
+	for w in s.split(" "):
+		if not words.is_empty() and w.trim_suffix(".").trim_suffix(",").trim_suffix(";").trim_suffix(")") in ["%", "m", "s", "hp"] \
+				and not words[-1].is_empty() and words[-1].right(1).is_valid_int():
+			words[-1] += " " + w
+		else:
+			words.append(w)
+	for word in words:
 		var t := word if line == "" else line + " " + word
 		if f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width and line != "":
 			S.text(ci, f, Vector2(pos.x, y), line, size, col, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.6)

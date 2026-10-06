@@ -1246,7 +1246,15 @@ func _draw_tooltip() -> void:
 static func _wrap(f: Font, s: String, px: int, w: float) -> Array:
 	var out := []
 	var cur := ""
-	for word in s.split(" ", false):
+	# a number and its unit stay on one line ("+20 %", "30 m", "20 s")
+	var words: Array[String] = []
+	for wd in s.split(" ", false):
+		if not words.is_empty() and wd.trim_suffix(".").trim_suffix(",").trim_suffix(";").trim_suffix(")") in ["%", "m", "s", "hp"] \
+				and words[-1].right(1).is_valid_int():
+			words[-1] += " " + wd
+		else:
+			words.append(wd)
+	for word in words:
 		var tryw: String = word if cur == "" else cur + " " + word
 		if cur != "" and S.text_width(f, tryw, px) > w:
 			out.append(cur)

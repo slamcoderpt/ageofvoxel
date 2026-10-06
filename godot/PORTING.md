@@ -2944,8 +2944,16 @@ Owner: the ui piece. Reference: `reference/egypt/ui_01..05.jpg`.
   short, a Laborer selected with the build grid and the Granary's tooltip
   open: `node scripts/godot-shoot.mjs --scene egyptui --width 1920 --height 1080`;
   `--params "egyptui_sel=pharaoh"` (Empower), `egyptui_sel=tc` (or `god`:
-  the age-up's minor-god pick, Sobek / Sekhmet), `temple`, `priest`;
-  `egyptui_tip=<slot>` (-1: no tooltip).
+  the age-up's minor-god pick, Sobek / Sekhmet), `temple`, `priest`,
+  `pantheon` (the setup screen's Select Pantheon over the match, on Ra;
+  `&god=isis|set|zeus` for another card: setup.gd reads `egyptui_sel`);
+  `egyptui_tip=<slot>` (-1: no tooltip). Word wrap (setup.gd `_wrap`, hud.gd
+  `_wrap`) keeps a number with its unit ("10 %", "30 m", "20 s") on one line.
+- **Verified together (ui round 4, one tree, lavapipe)**: egypt_playtest
+  40/40, setup_check 25/25, menu_check 34/34, menu_playtest 59/59,
+  playtest 34/34, techs_playtest (all ok), walls_playtest 38/38; the
+  egyptui captures laborer / pharaoh / temple / tc / god / priest /
+  pantheon (Ra, Isis, Set, Zeus) at 1920x1080.
 - **Real-input playtest** (`game/core/egypt_playtest.gd`), launched with no
   scene argument like a player:
   ```
@@ -3068,8 +3076,31 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   within 2.5 tiles: they leave the world (their row removed; `Cargo` keeps type, owner, hp share;
   their pop still counts in Economy::recount). Unloading flies it there, lands it 2 s and sets
   them down in rings round it. A Roc that falls takes its riders. Not Phoenixes, Rocs, siege,
-  Serpents. The HUD has no Roc button yet (UI piece: right-click / a "Board" command calling
-  roc_load, an "Unload" target calling roc_unload).
+  Serpents.
+  **The Roc in play** (round 9): a right-click on one's own Roc with men selected boards it
+  (`Commands::smart`, godot_rules: the men it can carry walk to it, the Roc itself if selected
+  stays to land, a catapult or anything else it cannot carry walks there; a boarder its player
+  sends to fight, gather, build or walk off drops out, one hitting back at a foe beside it stays
+  in). The HUD (game/ui/ui.gd `_roc_commands`, with a Roc in a selection without Laborers):
+  **Board the Roc** (E: the other men selected board it; greyed with no one to carry or no room),
+  **Unload** (R, then a ground or minimap click under the attack-move ring: it flies there, lands
+  2 s and sets them down round it), **Unload Here** (T: it lands where it is); their icons
+  `roc_board` / `roc_unload` / `roc_unload_here` (egypt_icons.gd: the bird and a green arrow);
+  its card "Carrying n / 20 · m boarding", "Landing to take them in" / "Flying to unload"; the
+  Roc and the Phoenix are picked on the bird (ui.gd HEIGHT 4.6 / 4.0: it hovers ~3 m up).
+  **The Egyptian AI** (`EnemyAI::egypt_myth`, combat/enemy_ai.cpp): its Temple, queue empty
+  (Priests first) and 100 gold to spare past the escrow, trains its newest minor god's myth
+  unit (Phoenix / Avenger / Mummy, else Scorpion Man / Scarab / Petsuchos, else Sphinx / Wadjet /
+  Anubite) up to 2 + its age of them, and under Sobek (Ra's and Isis' first Heroic god, the one
+  `Techs::auto_minor` gives an AI) first one Roc once it has 6 soldiers. Each new wave, half its
+  men (4 to 20, the nearest) board the Roc at home; once in (or 25 s on) it flies to 9 tiles
+  short of the wave's target, lands and sets them down, they press on (the strays rule), and it
+  flies home. `get_ai(owner).myth` = {trained, roc_lifts, roc_riders}. Greek seats unchanged.
+  Playtest: `game/core/roc_playtest.gd` (real input, `-- --scene=egypt`, xvfb + lavapipe as
+  playtest.gd; `--shots=/abs/dir` saves roc_play_1_boarding .. 4_unloaded): the Temple's Train
+  Roc clicked (100 gold + 5 favor paid), spearmen drag-selected and right-clicked onto the Roc,
+  its card and buttons, R + a ground click (it lands by the click, sets them down), the Roc
+  clicked and spearmen shift-clicked to it, E boards them, T unloads where it stands.
 - **Techs** (sim/techs `T_SKIN_OF_THE_RHINO ..`, 35): the three unique techs and every minor
   god's, at Retold's buildings (`TechHome` TC, Granary, Lumber Camp, Barracks, Migdol, Siege
   Works besides Armory / Market / Temple); Solar Barque and Funeral Barge have no ships here
@@ -3140,7 +3171,7 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   Each serpent / Minion rises in soft round dust (puff(..., soft = 1): puff.gdshader's ragged
   puff, not the voxel square that read as pale boxes round a serpent seen close) and a spray of
   sand grains. All fifteen keys capture (checked round 8, each power at its default t).
-- Check: `godot --headless --path godot -s res://game/core/egypt_gods_check.gd [-- --only=defs,gods,passives,model,rain,prosperity,vision,eclipse,sands,serpents,locusts,citadel,ancestors,son,tornado,meteor,myth,techs,bounds,determinism,phantom,blocks,allies,trees,split,roc,immunity,noheal,volleys,shield_preview,eclipse_abilities,ai]` (~5 min, 44 cases: eclipse.abilities_and_west_wind (`--only=eclipse_abilities`) = the Eclipse's x1.2 on the abilities (Anubite Jump 10.5 -> 12.6 on a hoplite, Wadjet venom 1.25 -> 1.5 per 0.5 s, the Mummy's curse hit + damage over time x1.2), each on the first myth unit spawned after the 30-tick ability rescan (it leaps / curses at once), and Force of the West Wind on the Sphinx's 9 crush (a blow on a House 13.8 -> 15.08); immunity = a Zeus Bolt / Lightning Storm / Meteor and an Egyptian foe's Locust Swarm / Thoth's Meteor strike the spearmen beside a Son and a Roc, never them; son.heal (`--only=noheal`) = a spearman +20 in 2 s by a Pharaoh, +30 by the Son, +45 by the Son and a Priest, the Son's hp unchanged (he heals allies 15 hp/s and is never healed); son.divine = his first bolt and chain 50.75 divine (x3 vs myth); allies.citadel_son = the Citadel's hack blow x0.9 (3.15 -> 2.835) and an ally's Son healing; volleys = Egyptian TC 2 arrows a volley, Greek 1, Citadel 3 at three men; shield.preview = cast_check refuses under a Divine Shield as the cast does).
+- Check: `godot --headless --path godot -s res://game/core/egypt_gods_check.gd [-- --only=defs,gods,passives,model,rain,prosperity,vision,eclipse,sands,serpents,locusts,citadel,ancestors,son,tornado,meteor,myth,techs,bounds,determinism,phantom,blocks,allies,trees,split,roc,immunity,noheal,volleys,shield_preview,eclipse_abilities,ai,roc_smart,roc_ai]` (~5 min, 46 cases: roc.right_click (`--only=roc_smart`) = AovSim.smart on one's own Roc boards 6 spearmen (not the catapult, not a foe's hoplite selected with them), the one sent off drops out, 5 carried and set down round the Roc by the Unload click; roc.ai_lifts (`--only=roc_ai`) = a Ra AI with Sobek (Heroic) trains a Roc and Petsuchoi at its Temple and lifts 20 of a wave to its target; eclipse.abilities_and_west_wind (`--only=eclipse_abilities`) = the Eclipse's x1.2 on the abilities (Anubite Jump 10.5 -> 12.6 on a hoplite, Wadjet venom 1.25 -> 1.5 per 0.5 s, the Mummy's curse hit + damage over time x1.2), each on the first myth unit spawned after the 30-tick ability rescan (it leaps / curses at once), and Force of the West Wind on the Sphinx's 9 crush (a blow on a House 13.8 -> 15.08); immunity = a Zeus Bolt / Lightning Storm / Meteor and an Egyptian foe's Locust Swarm / Thoth's Meteor strike the spearmen beside a Son and a Roc, never them; son.heal (`--only=noheal`) = a spearman +20 in 2 s by a Pharaoh, +30 by the Son, +45 by the Son and a Priest, the Son's hp unchanged (he heals allies 15 hp/s and is never healed); son.divine = his first bolt and chain 50.75 divine (x3 vs myth); allies.citadel_son = the Citadel's hack blow x0.9 (3.15 -> 2.835) and an ally's Son healing; volleys = Egyptian TC 2 arrows a volley, Greek 1, Citadel 3 at three men; shield.preview = cast_check refuses under a Divine Shield as the cast does).
 - **AI** (combat/enemy_ai.cpp `egypt_powers`): an Egyptian seat casts its gods' powers through
   the same cast_check / cast2 as the HUD, deterministic: Tornado / Thoth's Meteor / Plague of
   Serpents / Ancestors on the densest cluster of foes in reach (Thoth's also on a clump of enemy
@@ -3151,7 +3182,7 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
 - API (aov_sim_gods.cpp): `player_powers`, `get_power_info`, `cast_check`, `cast_power2`,
   `last_cast_reason`, `get_gods`, `minor_gods_of`, `get_egypt_powers`, `get_power_stats`,
   `is_uncontrolled`, `ability_ready`, `set_player_god`, `roc_load`, `roc_unload`, `get_roc`.
-- Not yet: Leviathan / War Turtle (no ships); the Roc's HUD command (API ready).
+- Not yet: Leviathan / War Turtle (no ships).
 
 ## Conventions
 
