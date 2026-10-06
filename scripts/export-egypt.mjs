@@ -3570,43 +3570,167 @@ function market() {
   return m;
 }
 
-// Lighthouse (3 x 3; building_20, Mythic): a tall square stone tower (the
-// Pharos) with team bands, a stair to its door, a crenellated gallery, an
-// octagonal storey, a columned lantern with a glowing fire and a conical cap,
-// fire bowls at the foot.
+// Lighthouse (3 x 3; building_20, Mythic; round 21): the Pharos in three
+// crisp stages on a dark plinth course. The square shaft tapers all the way
+// up in four 7-row tiers (a voxel in per side each tier, a pale limestone
+// string course on every ledge), each face framed by pale corner piers and
+// a centre pilaster with warm sandstone panels between them, the masonry
+// banded in courses of four tones (every three rows a lighter or darker
+// course), slit windows framed by a lintel and sill in every panel, two team
+// bands at the foot, a stair to a framed door. On top a gallery slab with a
+// crenellated parapet and corner posts; the octagonal stage (true diagonal
+// facets, pale arrises, a team band, a window on each flat face) under its
+// own overhanging slab and crenellated parapet; a round drum, then the
+// colonnaded lantern: eight slim columns round a bright emissive fire on a
+// pale floor, an entablature and one ribbed pointed cap with a gilt finial.
+// Every part rests on the one below (no stubs). Fire bowls at the foot.
+const PHAROS_T = [0xe6cd9c, 0xd2b482, 0xdcc190, 0xc6a672];
+const PHAROS = (x, y, z) => {
+  const row = Math.floor(Math.max(0, y - 1) / 3);
+  const seq = [0, 1, 2, 1, 0, 3];
+  const u = x + z + (row & 1) * 3 + 256;
+  let c = PHAROS_T[seq[row % seq.length]];
+  c = shade(c, 0.975 + 0.05 * hash3(Math.floor(u / 6), row, (x - z) >> 3, 211));
+  if ((y - 1) % 3 === 0) c = shade(c, 0.9);
+  else if (u % 6 === 0) c = shade(c, 0.92);
+  return c;
+};
+const PIER = (x, y, z) => { const c = LIME(x, y, z); return (y - 1) % 3 === 0 ? shade(c, 0.95) : c; };
+// the beacon: glow 0.95 marks a fire voxel, which egypt_building.gdshader
+// passes through the grade in its own colour (yellow core, orange, embers)
+const BEACON = [0xffd040, 0xffa020, 0xf07010, 0xc84808];
 function lighthouse() {
   const m = lot(24, 24);
-  const t = block(m, 4, 3, 20, 19, 1, 30, { wall: LIME, batter: 10, frieze: 0, roofC: LIME, rim: false, parapet: false });
-  for (let x = 4; x < 20; x++) for (let z = 3; z < 19; z++) {
-    const e = Math.min(x - 4, 19 - x, z - 3, 18 - z);
-    if (e > 1) continue;
-    for (const y of [4, 5]) { const p = outer(m, '+z', x, y, lim(m)); if (e === 0 && p) m.set(p[0], y, p[2], TEAM); }
+  const C = 12;
+  // the plinth course: three rows of dark stone, a voxel out from the shaft
+  for (let x = C - 9; x < C + 9; x++) for (let z = C - 9; z < C + 9; z++) for (let y = 1; y < 4; y++) m.set(x, y, z, PLINTH);
+  // the shaft: tiers of 7 rows, half-width 7, 6, 5, 4 (+1 for the piers)
+  const T0 = 4, TH = 7, tiers = [7, 6, 5, 4];
+  const top = T0 + TH * tiers.length;          // the gallery slab row
+  const isPier = (a, hw) => a < -hw + 2 || a >= hw - 2;
+  const isPil = (a, hw, y, front) => (a === -1 || a === 0) && !(front && y < T0 + 9);
+  const slits = [];
+  tiers.forEach((hw, ti) => {
+    const y0 = T0 + ti * TH;
+    for (let y = y0; y < y0 + TH; y++) {
+      const coping = y === y0 + TH - 1;
+      const team = y === 5 || y === 7;
+      for (let x = C - hw - 1; x < C + hw + 1; x++) for (let z = C - hw - 1; z < C + hw + 1; z++) {
+        const ox = x < C - hw || x >= C + hw, oz = z < C - hw || z >= C + hw;
+        const ax = x - C, az = z - C;
+        let c = null;
+        if (!ox && !oz) {
+          const e = Math.min(x - (C - hw), C + hw - 1 - x, z - (C - hw), C + hw - 1 - z);
+          c = e > 0 ? SAND_D : PHAROS;
+        } else if (ox && oz) c = PIER;                                       // the corner arris of the pier
+        else {
+          const a = ox ? az : ax;                                            // along the face
+          const front = oz && z >= C + hw;
+          if (isPier(a, hw)) c = PIER;
+          else if (isPil(a, hw, y, front)) c = PIER;
+          else continue;                                                     // the panel stays recessed
+        }
+        if (coping) c = LIME;
+        if (team && (ox || oz || Math.min(x - (C - hw), C + hw - 1 - x, z - (C - hw), C + hw - 1 - z) === 0)) c = TEAM;
+        m.set(x, y, z, c);
+      }
+    }
+    // a slit window in each panel, mid-tier
+    const sa = hw >= 5 ? [-3, 2] : [-2, 1];
+    for (const a of sa) slits.push([hw, a, y0 + 2]);
+  });
+  for (const [hw, a, y0] of slits) for (const face of ['+z', '-z', '+x', '-x']) {
+    if (face === '+z' && y0 < T0 + 9) continue;          // the door's tier
+    const n = OUT_N[face];
+    const cell = (k) => face[1] === 'z' ? [C + a, C + (n[2] > 0 ? hw - 1 - k : -hw + k)] : [C + (n[0] > 0 ? hw - 1 - k : -hw + k), C + a];
+    const [fx, fz] = cell(0), [bx, bz] = cell(1);
+    for (let y = y0; y < y0 + 3; y++) { m.remove(fx, y, fz); m.set(bx, y, bz, y === y0 + 2 ? REVEAL2 : REVEAL); }
+    m.set(fx, y0 + 3, fz, LIME); m.set(fx, y0 - 1, fz, LIME_S);
   }
-  for (const face of ['+z', '+x', '-z', '-x']) for (let y = 3; y < 6; y++) for (let u = 3; u < 21; u++) { const p = outer(m, face, u, y, lim(m)); if (p && y === 4) m.set(p[0], p[1], p[2], TEAM); }
-  for (const face of ['+z', '+x']) for (const u of [8, 12, 15]) { slit(m, face, u, 12, 4, 1); slit(m, face, u, 20, 4, 1); }
-  door(m, '+z', 10, 4, 1, 7);
-  // the stair up to the door
-  for (let s = 0; s < 4; s++) m.box(9, 1, 19 + s, 6, 4 - s, 1, LIME);
-  // the gallery crenellations
-  for (let x = 4; x < 21; x++) for (let z = 3; z < 20; z++) {
-    const e = Math.min(x - 4, 20 - x, z - 3, 19 - z);
-    if (e === 0 && (x + z) % 3 !== 0) m.set(x, t, z, LIME(x, t, z));
+  door(m, '+z', 10, 4, T0, 6);
+  for (let s = 0; s < 3; s++) m.box(10, 1, 21 + s, 4, 3 - s, 1, LIME);
+  // the gallery: a slab a voxel over the top tier's piers, a crenellated
+  // parapet on its edge (a low wall, merlons on alternate voxels), corner posts
+  const G = 6;
+  for (let x = C - G; x < C + G; x++) for (let z = C - G; z < C + G; z++) {
+    const e = Math.min(x - (C - G), C + G - 1 - x, z - (C - G), C + G - 1 - z);
+    m.set(x, top, z, e === 0 ? LIME_S : e === 1 ? TEAM : LIME);
+    if (e !== 0) continue;
+    m.set(x, top + 1, z, PIER);
+    const corner = (x === C - G || x === C + G - 1) && (z === C - G || z === C + G - 1);
+    if (corner) { m.box(x, top + 2, z, 1, 3, 1, PIER); m.set(x, top + 5, z, GILT); }
+    else if (((x + z) & 1) === 0) m.set(x, top + 2, z, PIER);
   }
-  // the octagonal storey
-  const oc = 12, ocz = 11;
-  lathe(m, oc, ocz, t - 1, t + 9, () => 5.2, (x, y, z) => (y === t + 1 ? TEAM : LIME(x, y, z)));
-  lathe(m, oc, ocz, t + 9, t + 10, () => 6, LIME_S);
-  // the lantern: columns round a glowing fire
-  for (let k = 0; k < 8; k++) {
-    const a = (k / 8) * Math.PI * 2;
-    const x = Math.round(oc - 0.5 + Math.cos(a) * 3.3), z = Math.round(ocz - 0.5 + Math.sin(a) * 3.3);
-    m.box(x, t + 10, z, 1, 5, 1, LIME);
+  // the octagonal stage: half-width 4, the corners cut on the diagonal
+  const inOct = (x, z, R, L) => { const dx = Math.abs(x + 0.5 - C), dz = Math.abs(z + 0.5 - C); return dx < R && dz < R && dx + dz <= L; };
+  const o0 = top + 1, OH = 8, o1 = o0 + OH;
+  for (let y = o0; y < o1; y++) for (let x = C - 4; x < C + 4; x++) for (let z = C - 4; z < C + 4; z++) {
+    if (!inOct(x, z, 4, 5.5)) continue;
+    const edge = !inOct(x + 1, z, 4, 5.5) || !inOct(x - 1, z, 4, 5.5) || !inOct(x, z + 1, 4, 5.5) || !inOct(x, z - 1, 4, 5.5);
+    const diag = Math.abs(x + 0.5 - C) + Math.abs(z + 0.5 - C) === 5;   // the diagonal facets' arrises
+    let c = !edge ? SAND_D : diag ? PIER : PHAROS;
+    if (y === o0 + 1 && edge) c = TEAM;
+    if (y === o1 - 1 && edge) c = LIME;
+    m.set(x, y, z, c);
   }
-  lathe(m, oc, ocz, t + 10, t + 14, () => 2.2, (x, y, z) => FIRE[2 + ((x + y + z) & 1)]);
-  lathe(m, oc, ocz, t + 15, t + 19, (y) => 4.2 - (y - t - 15) * 1.1, (x, y, z) => LIME(x, y, z));
-  m.set(11, t + 19, 10, GILT);
-  for (const v of m.coords) { const p = m.get(...v); if (p && (p.c === FIRE[2] || p.c === FIRE[3]) && v[1] >= t + 10) p.glow = FG.glow; }
-  brazier(m, 5, 1, 21, 3); brazier(m, 19, 1, 21, 3);
+  // a window on each flat face of the octagon (two voxels wide, four tall, under a lintel)
+  for (const face of ['+z', '-z', '+x', '-x']) {
+    const n = OUT_N[face];
+    for (const a of [-1, 0]) {
+      const at = (k) => face[1] === 'z' ? [C + a, C + (n[2] > 0 ? 3 - k : -4 + k)] : [C + (n[0] > 0 ? 3 - k : -4 + k), C + a];
+      const [fx, fz] = at(0), [bx, bz] = at(1);
+      for (let y = o0 + 2; y < o0 + 6; y++) { m.remove(fx, y, fz); m.set(bx, y, bz, y === o0 + 5 ? REVEAL2 : REVEAL); }
+      m.set(fx, o0 + 6, fz, LIME);
+    }
+  }
+  // its slab (a voxel out, the same octagon) and crenellated parapet
+  const inO5 = (x, z) => inOct(x, z, 5, 7.5);
+  for (let x = C - 5; x < C + 5; x++) for (let z = C - 5; z < C + 5; z++) {
+    if (!inO5(x, z)) continue;
+    const edge = !inO5(x + 1, z) || !inO5(x - 1, z) || !inO5(x, z + 1) || !inO5(x, z - 1);
+    m.set(x, o1, z, edge ? LIME_S : LIME);
+    if (!edge) continue;
+    m.set(x, o1 + 1, z, PIER);
+    if (((x + z) & 1) === 0) m.set(x, o1 + 2, z, PIER);
+  }
+  // the drum, the lantern floor
+  const d0 = o1 + 1;
+  lathe(m, C, C, d0, d0 + 2, () => 2.9, (x, y, z) => (y === d0 ? TEAM : PHAROS(x, y, z)));
+  lathe(m, C, C, d0 + 2, d0 + 3, () => 3.4, (x, y, z) => { const d = Math.hypot(x + 0.5 - C, z + 0.5 - C); return d > 2.9 ? LIME_S : LIME; });
+  // the colonnade: eight slim columns (base, shaft, capital) round the fire
+  const L0 = d0 + 3, LH = 6;
+  const cols = [];
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) cols.push([sx * 2.5, sz * 1.5], [sx * 1.5, sz * 2.5]);
+  for (const [dx, dz] of cols) {
+    const x = Math.floor(C + dx), z = Math.floor(C + dz);
+    for (let y = L0; y < L0 + LH; y++) m.set(x, y, z, y === L0 + LH - 1 ? GILT_D : y === L0 ? LIME_S : 0xf3ead6);
+  }
+  // the fire: a bright emissive core (the beacon) on a bed of embers
+  for (let x = C - 2; x < C + 2; x++) for (let z = C - 2; z < C + 2; z++) {
+    const dx = Math.abs(x + 0.5 - C), dz = Math.abs(z + 0.5 - C);
+    if (dx > 1.5 || dz > 1.5) continue;
+    const core = dx < 1 && dz < 1;
+    m.set(x, L0, z, core ? BEACON[2] : BEACON[3], { glow: 0.95 });
+    m.set(x, L0 + 1, z, core ? BEACON[0] : BEACON[1], { glow: 0.95 });
+    m.set(x, L0 + 2, z, core ? BEACON[0] : BEACON[1], { glow: 0.95 });
+    if (core) { m.set(x, L0 + 3, z, BEACON[0], { glow: 0.95 }); m.set(x, L0 + 4, z, BEACON[1], { glow: 0.95 }); }
+  }
+  // the entablature, the cornice, one ribbed pointed cap, the finial
+  const E = L0 + LH;
+  lathe(m, C, C, E, E + 1, () => 3.3, (x, y, z) => (Math.hypot(x + 0.5 - C, z + 0.5 - C) > 2.6 ? LIME_S : LIME(x, y, z)));
+  for (let x = C - 4; x < C + 4; x++) for (let z = C - 4; z < C + 4; z++) if (inOct(x, z, 4, 5.5)) m.set(x, E + 1, z, inOct(x, z, 3, 4) ? LIME(x, E + 1, z) : PIER);
+  // the cap: concentric octagons a voxel in per row, ribbed light / shadow
+  // on the diagonal facets, then a gilt point
+  const RIB = (x, y, z) => { const dx = Math.abs(x + 0.5 - C), dz = Math.abs(z + 0.5 - C); return Math.abs(dx - dz) < 1.1 ? 0xcfc2a4 : 0xebe2cc; };
+  [[4, 5.5], [3, 4], [2, 2.5]].forEach(([R, L], i) => {
+    for (let x = C - R; x < C + R; x++) for (let z = C - R; z < C + R; z++) if (inOct(x, z, R, L)) m.set(x, E + 2 + i, z, RIB);
+  });
+  m.box(C - 1, E + 5, C - 1, 2, 1, 2, 0xd8ccb0);
+  m.box(C - 1, E + 6, C - 1, 2, 1, 2, GILT_D);
+  m.set(C - 1, E + 7, C - 1, GILT); m.set(C - 1, E + 8, C - 1, GILT_L);
+  brazier(m, 2, 1, 22, 3); brazier(m, 22, 1, 22, 3);
+  // the fire bowls' flames burn in their own orange too (glow 0.95)
+  for (const v of m.coords) { const p = m.get(...v); if (p && p.glow && v[1] < 10) { p.glow = 0.95; p.c = v[1] === 4 ? BEACON[3] : v[1] === 5 ? BEACON[1] : BEACON[0]; } }
   return m;
 }
 

@@ -93,6 +93,10 @@ void fragment() {
 	vec3 amb = mix(ambient_lin, lum(ambient_lin) * warm() * shade_gain, sw) * mix(1.0, gold_shade, v_gold);
 	vec3 b = srgb_to_linear(bounce_color) * bounce * v_low;
 	EMISSION = c * v_ao * (amb + b) + c * v_glow * glow_gain + vec3(1.0, 0.95, 0.85) * v_flash;
+	// a fire voxel (glow >= 0.85: the Lighthouse's beacon) keeps its own
+	// orange through the grade (grade_effect.gd: a negative blue, -8 x the
+	// brightest channel, skips the chroma limiter that turns orange pink)
+	if (v_glow > 0.85) EMISSION.b = -8.0 * max(EMISSION.r, EMISSION.g);
 }
 
 void light() {

@@ -1182,8 +1182,25 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   granite and gold on granite plinths with a sunk glyph band and a cavetto
   cornice (see "Clean statues"); `monument_gods` 4x4 with
   variants `ra` / `isis` / `set`, Eye of Horus panels and glowing sun bowls).
-  Render-only (no sim type yet): `lighthouse` 3x3 (the Pharos: a battered
-  tower, an octagonal storey, a columned lantern with a fire), `wonder` 8x8
+  Render-only (no sim type yet): `lighthouse` 3x3 (the Pharos, round 21,
+  building_20: three crisp stages on a three-row dark plinth course. The
+  square shaft tapers all the way up in four 7-row tiers (a voxel in per side
+  each tier, a limestone string course on every ledge); each face is framed
+  by pale limestone corner piers and a centre pilaster with warm sandstone
+  panels between them, the panels banded in courses of four tones (every
+  three rows a lighter or darker course, `PHAROS`), a slit window with
+  lintel and sill in every panel, two team bands at the foot, a stair to a
+  framed door. Then a gallery slab with a crenellated parapet and gilt-tipped
+  corner posts; the octagonal stage (true diagonal facets with pale arrises,
+  a team band, a tall window on each flat face) under its own overhanging
+  octagonal slab and crenellated parapet; a short round drum; the colonnaded
+  lantern: eight slim columns round a 4x4 fire on a pale floor, an
+  entablature, one ribbed cap of concentric octagons with a gilt point.
+  Nothing hangs on stubs. Fire voxels (glow >= 0.85: the beacon and the two
+  fire bowls) get a negative emission blue in `egypt_building.gdshader`, the
+  grade's keep-my-colour marker (grade_effect.gd), so they burn yellow /
+  orange instead of the salmon pink the chroma limiter makes of orange),
+  `wonder` 8x8
   (a sphinx on a stepped plinth behind a pylon gate with gold reliefs and
   hieroglyph columns, obelisks, column drums), `sentry_tower`, `palm`
   (3 variants, scene dressing), `clutter` 2x2 (street dressing, 8 variants:
