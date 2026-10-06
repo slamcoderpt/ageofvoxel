@@ -36,8 +36,9 @@ extends SceneTree
 ##               match (the renderer's timed list is empty at 0, 1 and 2.5 s)
 ##   blocks      a live Tornado and Thoth's Meteor block other god powers locally (a Greek
 ##               Lightning Storm / Meteor inside refused, outside allowed; an Egyptian power too)
-##   allies      the Citadel on an ally's Town Center and its +10 % hack armor; the Son of Osiris
-##               on an ally's Pharaoh (the demigod is the ally's) and his 15 hp/s self-heal
+##   allies      the Citadel on an ally's Town Center and its +10 % hack armor (Retold's 50 % ->
+##               55 %: a hoplite blow x0.9, 3.15 -> 2.835); the Son of Osiris on an ally's Pharaoh
+##               (the demigod is the ally's) heals P1's spearman 15 hp/s and is never healed
 ##   trees       a Tornado and Thoth's Meteor flatten the trees they cross (no longer blocking,
 ##               the wood kept)
 ##   split       the myth units' split damage: the Sphinx's 9 crush (x1.5 Criosphinx, x2 with
@@ -49,8 +50,9 @@ extends SceneTree
 ##   immunity    Retold's immunities: a Zeus player's Bolt, Lightning Storm and Meteor and an
 ##               Egyptian foe's Locust Swarm and Thoth's Meteor strike the spearmen beside a Son
 ##               of Osiris and a Roc and never them (0 damage events, hp 609 / 700 kept)
-##   noheal      the Son of Osiris cannot be healed: a Priest beside him heals a spearman, the
-##               Son gains only his own 15 hp/s (+30 in 2 s)
+##   noheal      (son.heal) the Son of Osiris heals allies 15 hp/s and cannot be healed: a
+##               spearman +20 in 2 s by a Pharaoh, +30 by the Son, +45 by the Son and a Priest;
+##               the Son's own hp unchanged
 ##   volleys     the Egyptian Town Center shoots 2 arrows a volley, the Greek one 1 (as before),
 ##               a Citadel Center 3 at three different hoplites
 ##   ai          an Egyptian AI seat casts its gods' powers (Rain on its Farms, a Tornado / Plague
@@ -1299,7 +1301,8 @@ func _case_allies() -> void:
 	var tc2: int = _buildings_of(sim, 2, "town_center")[0]
 	var b2: Dictionary = sim.get_building(tc2)
 	r["citadel on the enemy's TC"] = sim.cast_check(1, "citadel", float(b2.x), float(b2.z)).ok
-	# +10 % hack armor: a hoplite blow on a plain TC (P1's) vs the Citadel Center (P3's)
+	# +10 % hack armor: a hoplite blow on a plain TC (P1's) vs the Citadel Center (P3's): Retold's
+	# 50 % -> 55 % hack armor (EGYPT.md 1.7 and §2's Citadel Center row), so x0.45 / 0.50 = x0.9 of the TC's blow
 	var b1: Dictionary = sim.get_building(tc1)
 	var hop := int(sim.spawn_unit("hoplite", 2, float(b1.x) + float(b1.w) * 0.5 + 0.8, float(b1.z), 0.0))
 	sim.tick(1)
@@ -1310,9 +1313,8 @@ func _case_allies() -> void:
 	var cit := _first_hit(sim, hop2, tc3)
 	sim.kill_unit(hop2)
 	r["hoplite blow on a TC / on the Citadel Center"] = [_r(plain), _r(cit)]
-	var v := plain / 9.0
 	var ok: bool = r["citadel on the ally's TC"] and r["ally TC max hp +"] == 1200.0 and not r["citadel on the enemy's TC"]
-	ok = ok and plain > 0 and _near(cit, 9.0 * (v - 0.10), 0.02)
+	ok = ok and plain > 0 and _near(cit, plain * 0.9, 0.02)
 	# the Son of Osiris on the ally's Pharaoh
 	var ph: Array = _units_of(sim, 3, "pharaoh")
 	if ph.size() > 0:

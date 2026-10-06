@@ -16,6 +16,8 @@
 //     arms fade in (fraction of the radius), custom.z = phase
 //   7 the Eye of Horus (wedjat): almond eye, pupil, brow, the cheek drop and
 //     the curled tail, with a soft glow round its strokes
+//   8 a soft pool of light: COLOR.rgb * COLOR.a, a smooth falloff to the edge
+//     (no hard-coded hue, unlike 1)
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled, fog_disabled, shadows_disabled;
 
@@ -143,6 +145,9 @@ void fragment() {
 		s = max(s, 1.0 - smoothstep(0.05, 0.08, length(e - vec2(0.36 + 0.26 * cos(-2.6), -0.42 + 0.26 * sin(-2.6)))));
 		float halo = exp(-d * d * 3.0) * 0.12;
 		c = v_col.rgb * (s * 1.1 + halo) * v_col.a;
+	} else if (kind == 8) {
+		c = v_col.rgb * v_col.a * (exp(-d * d * 3.5) - 0.03) * (1.0 - smoothstep(0.85, 1.0, d));
+		c = max(c, vec3(0.0));
 	} else {
 		float r0 = v_c.y, t = v_c.z;
 		float b = (d - (r0 + 1.0) * 0.5) / ((1.0 - r0) * 0.5);

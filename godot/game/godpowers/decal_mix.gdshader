@@ -11,6 +11,11 @@
 //     golden sand / 1 a darker dust
 //   3 sand drift: a soft heaped patch of sand with wind ripples (left on the
 //     Tornado's track); custom.y = seed
+//   4 gilt glyph ring (Prosperity): a band of hieroglyph-like voxel signs in
+//     painted gold between two gold rims, outlined in dark bronze, gilt dust
+//     and glittering flecks inside; custom.y = the band's inner radius
+//     (fraction), custom.z = phase. Painted, not added: an additive gold on
+//     bright sand only lightens the sand (and AgX turns it salmon)
 shader_type spatial;
 render_mode unshaded, blend_mix, depth_draw_never, cull_disabled, fog_disabled, shadows_disabled;
 
@@ -54,6 +59,38 @@ void fragment() {
 			float a = (0.35 + 0.55 * streak) * (1.0 - smoothstep(0.55, 1.0, d)) * (0.85 + 0.15 * grain);
 			ALBEDO = mix(deepc, sandc, streak * 0.8 + 0.2 * grain);
 			ALPHA = clamp(a * v_col.a, 0.0, 1.0);
+		} else if (v_c.x > 3.5) {
+			float r0 = v_c.y, ph = v_c.z;
+			float an = atan(p.y, p.x) + 3.14159265 + ph * 0.35;
+			float b = (d - r0) / (1.0 - r0);               // 0 inner rim .. 1 outer rim
+			// (unshaded, so the grade's exposure x2.1 lands on it whole: kept below the tone curve's
+			// knee, where it stays saturated, instead of a bright gold the curve bleaches to cream)
+			vec3 goldc = vec3(0.38, 0.165, 0.0), lightc = vec3(0.4, 0.215, 0.004), bronze = vec3(0.03, 0.012, 0.0);
+			vec3 P = vec3(0.0);
+			float A = 0.0;
+			// gilt dust inside the ring, blotchy, thinning outward
+			vec2 cell = floor(UV * 48.0);
+			float hc = h2(cell + 3.7);
+			float dust = (1.0 - smoothstep(r0 * 0.4, r0 * 0.98, d)) * (0.18 + 0.22 * hc);
+			over(P, A, mix(goldc, lightc, hc), dust);
+			if (d < r0 * 0.95 && hc > 0.93) over(P, A, lightc, 0.9 * (0.6 + 0.4 * sin(ph * 30.0 + hc * 40.0)));
+			// the band: bronze outline rims, gold rims over them, signs between
+			float rimw = 0.07;
+			float outl = max(exp(-pow(b / (rimw * 1.9), 2.0)), exp(-pow((b - 1.0) / (rimw * 1.9), 2.0)));
+			float rims = max(exp(-pow(b / rimw, 2.0)), exp(-pow((b - 1.0) / rimw, 2.0)));
+			float n = 40.0;
+			float cl = floor(an / 6.2831853 * n);
+			float fa = fract(an / 6.2831853 * n);
+			vec2 g = vec2(floor(fa * 4.0), floor((b - 0.18) / 0.64 * 3.0));
+			float sg = 0.0, sgo = 0.0;
+			if (b > 0.1 && b < 0.9 && fa < 0.86) sgo = 1.0;
+			if (fa < 0.78 && b > 0.18 && b < 0.82) sg = step(0.45, h1(cl * 7.0 + g.x * 3.0 + g.y * 11.0 + 0.5));
+			float band = step(-0.12, b) * step(b, 1.12);
+			over(P, A, bronze, band * max(outl, sgo * 0.7) * 0.92);
+			float flick = 0.8 + 0.2 * sin(ph * 6.0 + cl * 1.7);
+			over(P, A, mix(goldc, lightc, 0.35 * flick), band * max(rims, sg) * 0.97);
+			ALBEDO = A > 0.0 ? P / A : vec3(0.0);
+			ALPHA = clamp(A * v_col.a * (1.0 - smoothstep(0.98, 1.0, d)), 0.0, 1.0);
 		} else {
 			float seed = v_c.y * 53.0;
 			float blob = 1.0 - smoothstep(0.35 + 0.25 * h1(floor(atan(p.y, p.x) * 3.0) + seed), 1.0, d);

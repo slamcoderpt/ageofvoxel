@@ -67,7 +67,8 @@ constexpr int SERPENTS = 14, SERPENT_WAVE = 2; // Plague of Serpents: 2 at once,
 constexpr double SERPENT_EVERY = 3, SERPENT_GUARD = 6;
 constexpr int SWARMS = 5;                    // Locust Swarm: 5 swarms at 3 m/s for 20 s,
 constexpr double SWARM_SPEED = 3 * 0.6, SWARM_DPS = 3.5, SWARM_FARM = 6, SWARM_OWN = 0.1, SWARM_TICK = 0.25; // 3.5 divine/s in 6 m
-constexpr double CITADEL_HP = 1200, CITADEL_ATTACK = 1.2, CITADEL_SIGHT = 1 * 0.6, CITADEL_WORK = 1.25, CITADEL_HACK = 0.10;
+constexpr double CITADEL_HP = 1200, CITADEL_ATTACK = 1.2, CITADEL_SIGHT = 1 * 0.6, CITADEL_WORK = 1.25,
+	CITADEL_HACK_VULN = (1 - 0.55) / (1 - 0.50); // (Retold: TC 50 % hack armor, Citadel Center 55 %)
 constexpr int CITADEL_POP = 10;
 constexpr int MINIONS = 13;                  // Ancestors: 13 Minions over 13 s, dead 60 s after the cast
 constexpr double MINION_LIFE = 60;

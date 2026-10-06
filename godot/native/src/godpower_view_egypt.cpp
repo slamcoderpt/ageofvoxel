@@ -233,26 +233,83 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 			}
 			if (his) mines.push_back(r);
 		}
-		const Lin gold = hex_lin(0xff9a10), pale = hex_lin(0xffc040);
+		// (linear golds leaning to yellow: AgX bleaches a saturated orange such as 0xff9a10 to salmon
+		// pink on sand, and an additive gold on bright sand only lightens it; the ground is painted
+		// gold, alpha-blended (decal_mix kind 4), and the light keeps g / r near 0.7)
+		const Lin gold = { 1.0f, 0.66f, 0.1f }, hot = { 1.0f, 0.86f, 0.42f };
+		std::vector<Line> L;
 		for (size_t m = 0; m < mines.size(); m++) {
 			const int r = mines[m];
 			const double x = R.x[r], z = R.z[r], gy = h_at(x, z);
-			const double pulse = 0.8 + 0.2 * std::sin(now * 2.2 + m);
-			glow(false, x, gy + 3.5, z, 2.4, 7.5, gold.r, gold.g * 0.8f, gold.b, 0.22 * k * pulse, 0);
-			glow(false, x, gy + 1.2, z, 5.0, 2.0, gold.r, gold.g * 0.8f, gold.b, 0.18 * k, 0);
-			decal(I_DECAL_ADD, x, gy + 0.1, z, 8.5, now * 0.15, gold.r, gold.g, gold.b, (float)(1.2 * k), 5, 0.78f, (float)(now * 0.1));
-			decal(I_DECAL_ADD, x, gy + 0.08, z, 6.0, 0, gold.r, gold.g, gold.b, (float)(0.35 * k), 1);
-			for (int i = 0; i < 46; i++) {
+			const double pulse = 0.85 + 0.15 * std::sin(now * 2.2 + m);
+			// the column of gold light over the mine: a soft wide shaft and a hot heart, fading up
+			// to 11 tiles, with thin rays climbing it
+			{
+				std::vector<P> col;
+				for (int j = 0; j <= 8; j++) {
+					const double f = j / 8.0;
+					P q{ x, gy + 1.2 + f * 10.0, z };
+					q.m = (float)(std::pow(1 - f, 1.4) * (0.6 + 0.4 * std::sin(f * 9 - now * 3.0 + m) * 0.5 + 0.2));
+					q.wm = (float)(1.0 - 0.35 * f);
+					col.push_back(q);
+				}
+				L.push_back(Line{ col, 4.4, 0.34 * k * pulse, 0, 0, true, G_GILD });
+				L.push_back(Line{ col, 1.8, 0.5 * k * pulse, 0, 0, true, G_GILD });
+				L.push_back(Line{ col, 0.4, 0.6 * k * pulse, 0, 0, false, G_GILD });
+				for (int i = 0; i < 7; i++) { // rays: a stretch of light rising up the shaft
+					const double per = 1.6 + 0.8 * hr(r, i, 41), f = std::fmod(now / per + hr(r, i, 42), 1.0);
+					const double an = hr(r, i, 43) * TAU, rr = 0.25 + 0.9 * hr(r, i, 44);
+					const double y0 = gy + 1.0 + f * 8.0, len = 1.5 + 2.5 * hr(r, i, 45);
+					std::vector<P> ray{ P{ x + std::cos(an) * rr, y0, z + std::sin(an) * rr }, P{ x + std::cos(an) * rr * 0.8, y0 + len * 0.5, z + std::sin(an) * rr * 0.8 },
+						P{ x + std::cos(an) * rr * 0.6, y0 + len, z + std::sin(an) * rr * 0.6 } };
+					ray[0].m = 0.3f; ray[2].m = 0.2f;
+					L.push_back(Line{ ray, 0.16, 1.1 * k * std::sin(f * PI), 0.4, 0, false, G_GILD });
+				}
+			}
+			// a warm bloom over the mine and its camp (yellow, kept below the bleach)
+			glow(false, x, gy + 2.2, z, 6.5, 4.5, gold.r, gold.g, gold.b, 0.16 * k * pulse, 0);
+			glow(false, x, gy + 1.9, z, 2.2, 1.4, hot.r, hot.g, hot.b, 0.2 * k * pulse, 0);
+			// the ground: a painted gold glyph ring and gilt dust round the mine (alpha-blended, so it
+			// reads as gold against sand), and a faint additive sheen under it
+			decal(I_DECAL_MIX, x, gy + 0.1, z, 9.5, now * 0.15, 1, 1, 1, (float)(0.95 * k), 4, 0.74f, (float)(now * 0.1));
+			decal(I_DECAL_ADD, x, gy + 0.08, z, 8.0, 0, gold.r, gold.g * 0.85f, gold.b, (float)(0.22 * k * pulse), 8);
+			// glittering nuggets on the mine's face
+			for (int i = 0; i < 26; i++) {
+				const double an = hr(r, i, 51) * TAU, rr = 0.5 + 1.2 * hr(r, i, 52);
+				const double tw = std::pow(0.5 + 0.5 * std::sin(now * (3 + 3 * hr(r, i, 53)) + i * 1.7), 3.0);
+				const double s = 0.09 + 0.07 * hr(r, i, 54);
+				cube(I_EMBER, x + std::cos(an) * rr, gy + 0.6 + 0.9 * (1 - rr / 1.7) + 0.25 * hr(r, i, 55), z + std::sin(an) * rr, an, i, 0.3, s, s, s,
+						(float)(k * (0.36 + 0.9 * tw)), (float)(k * (0.16 + 0.55 * tw)), (float)(k * (0.0 + 0.12 * tw)));
+			}
+			// gold motes spiralling up the column
+			for (int i = 0; i < 48; i++) {
 				const double per = 2.4 + hr(r, i, 31) * 1.6, ph = now / per + hr(r, i, 32);
 				const double f = ph - std::floor(ph);
-				const double a = hr(r, i, 33) * TAU + f * 3.2, rr = 0.6 + 1.6 * hr(r, i, 34) * (1 - 0.5 * f);
-				const double s = (0.045 + 0.05 * hr(r, i, 35)) * std::sin(f * PI);
-				const double b2 = 0.6 + 0.6 * std::sin(now * 9 + i);
-				cube(I_EMBER, x + std::cos(a) * rr, gy + 0.4 + f * 6.5, z + std::sin(a) * rr, now * 3 + i, a, i, s, s, s,
-						(float)(4.0 * k * b2), (float)(1.9 * k * b2), (float)(0.25 * k * b2));
+				const double a = hr(r, i, 33) * TAU + f * 3.2, rr = 0.5 + 1.8 * hr(r, i, 34) * (1 - 0.5 * f);
+				const double s = (0.1 + 0.08 * hr(r, i, 35)) * std::sin(f * PI);
+				const double b2 = 0.75 + 0.35 * std::sin(now * 9 + i);
+				cube(I_EMBER, x + std::cos(a) * rr, gy + 0.4 + f * 8.0, z + std::sin(a) * rr, now * 3 + i, a, i, s, s, s,
+						(float)((i % 3 ? 0.46 : 1.1) * k * b2), (float)((i % 3 ? 0.235 : 0.72) * k * b2), (float)((i % 3 ? 0.004 : 0.12) * k * b2));
 			}
-			if (m == 0) lit(x, gy + 3, z, 0xffc040, 9 * k * pulse, 12, 1.6);
+			if (m == 0) {
+				lit(x, gy + 3.5, z, 0xffc030, 14 * k * pulse, 14, 1.3);
+				// and the drop site his miners carry it to (the Mining Camp in power_03) lit gold
+				int best = -1;
+				double bd = 1e9;
+				for (int b = 0; b < B.size(); b++) {
+					if (B.removed[b] || B.dead[b] || B.owner[b] != o) continue;
+					if (!(B.type[b] == aov::B_MINING_CAMP || B.type[b] == aov::B_TOWN_CENTER || B.type[b] == aov::B_STOREHOUSE)) continue;
+					const double d = std::hypot(B.x[b] - x, B.z[b] - z);
+					if (d < bd) { bd = d; best = b; }
+				}
+				if (best >= 0 && bd < 14) {
+					const double bx = B.x[best], bz = B.z[best], by = h_at(bx, bz);
+					lit(bx, by + 3.2, bz, 0xffc030, 10 * k * pulse, 8, 1.4);
+					glow(false, bx, by + 2.6, bz, 3.4, 2.4, gold.r, gold.g, gold.b, 0.14 * k * pulse, 0);
+				}
+			}
 		}
+		if (!L.empty()) emit_lines(G_GILD, L, 1);
 		// glints over his miners
 		int ng = 0;
 		for (int u = 0; u < U.size() && ng < 40; u++) {
@@ -261,7 +318,8 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 			double x, z;
 			upos(u, x, z);
 			const double tw = 0.5 + 0.5 * std::sin(now * 7 + u);
-			cube(I_EMBER, x, h_at(x, z) + 2.4 + 0.15 * std::sin(now * 3 + u), z, now * 2, u, 0.6, 0.07, 0.07, 0.07, 3.2f * tw, 2.4f * tw, 0.6f * tw);
+			const double s = 0.08 + 0.05 * tw;
+			cube(I_EMBER, x, h_at(x, z) + 2.5 + 0.15 * std::sin(now * 3 + u), z, now * 2, u, 0.6, s, s, s, (float)(0.38 + 0.6 * tw), (float)(0.17 + 0.4 * tw), (float)(0.0 + 0.06 * tw));
 		}
 		// the cast: a gold ring racing out from his Town Center
 		const double age = now - t.t0;
@@ -269,7 +327,7 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 		if (age < 2.5 && tc >= 0) {
 			const double f = age / 2.5;
 			decal(I_DECAL_ADD, B.x[tc], h_at(B.x[tc], B.z[tc]) + 0.15, B.z[tc], 6 + 40 * std::pow(f, 0.7), 0, gold.r, gold.g, gold.b,
-					(float)(2.4 * (1 - f)), 4, 0.06f, 0.37f);
+					(float)(1.3 * (1 - f)), 4, 0.06f, 0.37f);
 		}
 	}
 
@@ -600,7 +658,7 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 			glow(false, a.x1, a.y1, a.z1, 0.9, 0.9, hc.r, hc.g, hc.b, 1.0 * k, 3);
 			glow(false, a.x0, a.y0, a.z0, 1.2, 1.2, gc.r, gc.g, gc.b, 0.6 * k, 2);
 			const double gy = h_at(a.x1, a.z1);
-			decal(I_DECAL_ADD, a.x1, gy + 0.1, a.z1, 1.8 + 1.2 * (age / 0.45), 0, gc.r, gc.g, gc.b, (float)(0.7 * k), 1);
+			decal(I_DECAL_ADD, a.x1, gy + 0.1, a.z1, 2.2 + 1.2 * (age / 0.45), 0, gc.r, gc.g, gc.b, (float)(0.9 * k), 8);
 			for (int j = 0; j < 10; j++) { // sparks thrown off the struck man, falling back
 				const double tt = age * (1.2 + 0.6 * hr(a.seed, j, 211)), an = hr(a.seed, j, 212) * TAU, sp = 1.5 + 2.0 * hr(a.seed, j, 213);
 				const double sx = a.x1 + std::cos(an) * sp * tt, sz = a.z1 + std::sin(an) * sp * tt;

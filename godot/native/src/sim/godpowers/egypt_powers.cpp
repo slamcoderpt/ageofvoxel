@@ -517,8 +517,10 @@ double GodPowers::age_mult(int owner) const {
 }
 int GodPowers::pop_bonus(int b) const { return is_citadel(b) ? CITADEL_POP : 0; }
 double GodPowers::building_attack_mult(int b) const { return is_citadel(b) ? CITADEL_ATTACK : 1; }
-// the Citadel Center's +10 % hack armor: a hack blow's vulnerability v becomes v - 0.10 (the
-// Town Center's v: Retold's armor where the rules give it one, else this sim's 0.35 for a blow)
+// the Citadel Center's +10 % hack armor: Retold's Town Center takes hack at 50 % armor, its Citadel
+// Center at 55 % (EGYPT.md §2 and 1.7: 50/90/10 -> 55/90/10, the +10 % taking a tenth off what gets
+// through), so a hack blow on it does 0.45 / 0.50 = x0.9 of what it does on the Town Center, on
+// whatever factor this sim gives the Town Center (the browser's 0.35 for a blow: 3.15 -> 2.835)
 double GodPowers::building_hack_mult(int b, const Hitter &a, uint8_t kind) const {
 	if (!is_citadel(b)) return 1;
 	const Entities &E = sim->entities;
@@ -530,9 +532,7 @@ double GodPowers::building_hack_mult(int b, const Hitter &a, uint8_t kind) const
 		myth = myth || d.cls == CLS_MYTH;
 	}
 	if (arrow || myth) return 1;
-	const int bt = E.buildings.type[b];
-	const double v = rules_armored(bt) ? 1 - civ_building_armor(bt).hack : 0.35;
-	return v > 0 ? std::max(0.0, v - CITADEL_HACK) / v : 1;
+	return CITADEL_HACK_VULN;
 }
 
 // a volley's arrows after the first (combat fires the first): Retold's Egyptian Town Center

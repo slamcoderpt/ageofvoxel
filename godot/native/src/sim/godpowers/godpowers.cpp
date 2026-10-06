@@ -56,7 +56,7 @@ const PowerDef &power_def(int id) {
 		{ "citadel", "Citadel", "Sekhmet", Cost(0, 0, 0, 150), 120, 0, 0, 0, 0, 0, 0, "V",
 			"Turns one of your Town Centers into a Citadel Center: +1200 hp, stronger arrows, +10 population, and it works 25% faster.", 50, 2, PT_OWN_TC,
 			"150 favor, recharge 120 s, ramp +50, instant; a Town Center becomes a Citadel Center: +1200 hp, +2 attack, +1 arrow, +1 LOS, +10 pop, +10 % hack armor, +25 % work rate",
-			"arrows x1.2 (+2 of Retold's 10) and one more arrow a volley; +0.6 LOS; trains, researches and ages x1.25; +10 % hack armor (building_hack_mult)" },
+			"arrows x1.2 (+2 of Retold's 10) and one more arrow a volley; +0.6 LOS; trains, researches and ages x1.25; +10 % hack armor (building_hack_mult: Retold's 50 % -> 55 %, a hack blow x0.9)" },
 		{ "ancestors", "Ancestors", "Nephthys", Cost(0, 0, 0, 100), 180, 9.6, 13, 1, 0, 0, 0, "V",
 			"Over 13 seconds raises 13 Minions around the target; they serve you for 60 seconds.", 5, 2, PT_POINT,
 			"100 favor, recharge 180 s, ramp +5; over 13 s 13 controllable Minions within 16 m, all dead 60 s after the cast",

@@ -2904,7 +2904,7 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   | Shifting Sands (Ptah) | 40, 180, +20; after 3 s own / allied units in 10 m to a visible point >= 40 m | 6 tiles, >= 24 tiles, in sight of his or an ally's unit / building (the fog is the local player's only) |
   | Plague of Serpents (Anubis) | 60, 180, +10; 14 serpents in 14 m, 2 then 2 every 3 s, uncontrolled guards | 8.4 tiles; Retold's Serpent (an animal: 50 hp, 5 hack, 10 % pierce, speed 4, LOS 16, +20 % hp / damage in the Heroic and again in the Mythic Age); `is_uncontrolled` |
   | Locust Swarm (Sobek) | 75, 150, +10; 5 swarms at 3 m/s for 20 s, 3.5 divine/s in 6 m, x6 Farms / berries, x0.1 own; Mythic +20 % | 1.8 tiles/s (3 x 0.6, the scale of every other distance), 3.6 tiles, applied every 8 ticks; off the map a swarm is gone |
-  | Citadel (Sekhmet) | 150, 120, +50; own or allied TC +1200 hp, +2 attack, +1 arrow, +1 LOS, +10 pop, +10 % hack armor, +25 % work | arrows x1.2 and one more arrow a volley (an Egyptian TC's 2 -> 3, at different enemies in range; `volley_arrows`), train / research / age-up x1.25, a hack blow's vulnerability -0.10 (`building_hack_mult`) |
+  | Citadel (Sekhmet) | 150, 120, +50; own or allied TC +1200 hp, +2 attack, +1 arrow, +1 LOS, +10 pop, +10 % hack armor, +25 % work | arrows x1.2 and one more arrow a volley (an Egyptian TC's 2 -> 3, at different enemies in range; `volley_arrows`), train / research / age-up x1.25, a hack blow x0.9 (`building_hack_mult`: EGYPT.md gives the Town Center 50 % hack armor and the Citadel Center 55 %, so 0.45 / 0.50 of what gets through, on whatever factor the TC has here: a hoplite's 3.15 -> 2.835) |
   | Ancestors (Nephthys) | 100, 180, +5; 13 Minions over 13 s in 16 m, dead 60 s after | 9.6 tiles (Atef Crown 120 s) |
   | Son of Osiris (Osiris) | 350, 240, +50; own or ally's Pharaoh -> demigod, chain lightning, heals 15 hp/s; a new Pharaoh later | 609 hp, 50.75 divine per bolt (his own target's hit too: no armor, combat.cpp, x3 vs myth) jumping to 3 more within 4.8 tiles; heals allies 15 hp/s (the Pharaoh's 10 raised, civ.cpp EgyptUnit.heal); an ally's Pharaoh becomes the ally's demigod; the Pharaoh respawns after 90 s; cannot be healed, immune to the aimed powers (below) |
   | Tornado (Horus) | 350, 240, +5; 20 s spiralling out, 25 hack + 100 crush every 0.5 s, full 5 m falling to 15 m, x0.1 Farms, slow 35 % 6 s | Archimedean spiral at 2.5 tiles/s; crush armor 99 % (myth 80 %, siege 85 %); flings units within 3 tiles; own x0.1; flattens the trees within 3 tiles; blocks other powers within 15 m of the funnel |
@@ -2973,7 +2973,17 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   refunds, the second Pharaoh. `Techs::done` is a 128-bit set, `UnitMask` 64 bits.
 - **Visuals** (godpower_view_egypt.cpp + game/godpowers/egypt_fx.gd, same buffers as the
   Lightning Storm): Rain streaks, splashes, wet farms, a rainbow and a grey wash; Prosperity's
-  gold columns, motes and glyph ring; Vision's swirling white edge and Eye of Horus; the
+  gold over each of the caster's mines (power_03's golden glow over the Mining Camp): a column of
+  light in its own ribbon group G_GILD (a linear gold leaning to yellow, wide soft shaft, hot heart,
+  rays climbing it), a yellow bloom, a gold glyph ring painted (decal_mix kind 4: gold signs and
+  rims outlined in dark bronze, gilt dust and flecks inside) rather than added, glittering nuggets,
+  gold motes spiralling up, gold glints over loaded miners, and gold light on the mine and on the
+  nearest drop site. The golds are kept under what the post grade (game/lighting/grade_effect.gd:
+  exposure x2.1, a Neutral tone curve with a knee near 0.76, a warm chroma limiter) bleaches: an
+  unshaded colour is laid at about 0.36 / 0.17 / 0 linear, which comes out as gold, where the
+  earlier 0xff9a10 / 0xffc040 added at HDR strength came out as a pinkish lighter sand. A soft
+  light pool (decal_add kind 8, no built-in hue) replaces the strike-flash disc (kind 1, which has
+  a violet rim) under the mines and under the chain lightning's hits; Vision's swirling white edge and Eye of Horus; the
   Eclipse's blue dusk and pink halos; sand vortices; glyph rings and rising serpents / Minions;
   voxel locust clouds; the Citadel's pillar and heaving stones; the Son of Osiris' pillar, ring
   and gold chain lightning (its own ribbon group G_ARC, a linear gold kept below where AgX
@@ -2993,7 +3003,7 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   (power = any key above, or rebirth (a Phoenix falls, its egg), roc (boarding), roc_unload;
   the Tornado and Thoth's Meteor strike a grove; Plague of Serpents rises on open ground south
   of the Greek line, default t = 8 when the serpents are at it; ep_dist / ep_pitch / ep_yaw / ep_ax / ep_az framing).
-- Check: `godot --headless --path godot -s res://game/core/egypt_gods_check.gd [-- --only=defs,gods,passives,model,rain,prosperity,vision,eclipse,sands,serpents,locusts,citadel,ancestors,son,tornado,meteor,myth,techs,bounds,determinism,phantom,blocks,allies,trees,split,roc,immunity,noheal,volleys,ai]` (~5 min, 41 cases: immunity = a Zeus Bolt / Lightning Storm / Meteor and an Egyptian foe's Locust Swarm / Thoth's Meteor strike the spearmen beside a Son and a Roc, never them; noheal = a Priest heals a spearman, the Son only his own +30 in 2 s; volleys = Egyptian TC 2 arrows a volley, Greek 1, Citadel 3 at three men).
+- Check: `godot --headless --path godot -s res://game/core/egypt_gods_check.gd [-- --only=defs,gods,passives,model,rain,prosperity,vision,eclipse,sands,serpents,locusts,citadel,ancestors,son,tornado,meteor,myth,techs,bounds,determinism,phantom,blocks,allies,trees,split,roc,immunity,noheal,volleys,ai]` (~5 min, 43 cases: immunity = a Zeus Bolt / Lightning Storm / Meteor and an Egyptian foe's Locust Swarm / Thoth's Meteor strike the spearmen beside a Son and a Roc, never them; son.heal (`--only=noheal`) = a spearman +20 in 2 s by a Pharaoh, +30 by the Son, +45 by the Son and a Priest, the Son's hp unchanged (he heals allies 15 hp/s and is never healed); son.divine = his first bolt and chain 50.75 divine (x3 vs myth); allies.citadel_son = the Citadel's hack blow x0.9 (3.15 -> 2.835) and an ally's Son healing; volleys = Egyptian TC 2 arrows a volley, Greek 1, Citadel 3 at three men; shield.preview = cast_check refuses under a Divine Shield as the cast does).
 - **AI** (combat/enemy_ai.cpp `egypt_powers`): an Egyptian seat casts its gods' powers through
   the same cast_check / cast2 as the HUD, deterministic: Tornado / Thoth's Meteor / Plague of
   Serpents / Ancestors on the densest cluster of foes in reach (Thoth's also on a clump of enemy

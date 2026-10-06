@@ -52,8 +52,8 @@ public:
 		int grp = -1; // ribbon group override (-1: the emit_lines group)
 	};
 	// G_GOLD .. G_ARC: the Egyptian powers (godpower_view_egypt.cpp): gold bolts and beams, rain
-	// streaks, sand ribbons, the Son of Osiris' deep-gold chain lightning
-	enum Group { G_BOLT, G_SKY, G_ZAP, G_BAND, G_BAND2, G_TRAIL, G_FIRE, G_SPARK, G_BLOOM, G_GOLD, G_RAIN, G_SAND, G_ARC, G_COUNT };
+	// streaks, sand ribbons, the Son of Osiris' deep-gold chain lightning, Prosperity's gold light
+	enum Group { G_BOLT, G_SKY, G_ZAP, G_BAND, G_BAND2, G_TRAIL, G_FIRE, G_SPARK, G_BLOOM, G_GOLD, G_RAIN, G_SAND, G_ARC, G_GILD, G_COUNT };
 	enum Inst { I_DEBRIS, I_EMBER, I_GLOW, I_RIM, I_DECAL_MIX, I_DECAL_ADD, I_DECAL_MUL, I_PUFF, I_FLAME, I_COUNT };
 
 	struct Ribbon {
