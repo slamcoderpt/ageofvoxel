@@ -430,7 +430,7 @@ function bandColor(kind, x, z) {
   if (kind === 'lapis') return (x + z) % 5 === 0 ? shade(LAPIS, 0.78) : LAPIS;
   return null;
 }
-function block(m, x0, z0, x1, z1, y0, h, { wall = SAND, socle = 1, frieze = 0, band = 'ochre', cornice = true, roofC = PLASTER, rim = true, batter = 0, parapet = true, solid = true, rimC = LIP, flute = true, torus = true, gorge = null, lipOut = 1, plinth = true, flare = false } = {}) {
+function block(m, x0, z0, x1, z1, y0, h, { wall = SAND, socle = 1, frieze = 0, band = 'ochre', cornice = true, roofC = PLASTER, rim = true, batter = 0, parapet = true, solid = true, rimC = LIP, flute = true, torus = true, gorge = null, lipOut = 1, plinth = true, flare = false, rimTeam = TEAM } = {}) {
   const [gA, gB] = gorge || [GORGE, GORGE_L];
   if (parapet === false) cornice = false;
   const baseH = y0 === 1 && plinth && h >= 6 ? BASE_H : 0;
@@ -468,7 +468,7 @@ function block(m, x0, z0, x1, z1, y0, h, { wall = SAND, socle = 1, frieze = 0, b
     for (let x = a0; x < a1; x++) for (let z = b0; z < b1; z++) {
       const e = Math.min(x - a0, a1 - 1 - x, z - b0, b1 - 1 - z);
       m.set(x, top, z, e === 0 ? rimC : roofC);
-      if (e === 1 && rim) m.set(x, top, z, TEAM);
+      if (e === 1 && rim) m.set(x, top, z, rimTeam);
     }
     m.lastTop = { c0: a0, c1: a1, d0: b0, d1: b1, y: top };
     return top + 1;
@@ -503,7 +503,7 @@ function block(m, x0, z0, x1, z1, y0, h, { wall = SAND, socle = 1, frieze = 0, b
   const c0 = a0 - lo, c1 = a1 + lo, d0 = b0 - lo, d1 = b1 + lo;
   for (let x = c0; x < c1; x++) for (let z = d0; z < d1; z++) {
     const e = Math.min(x - c0, c1 - 1 - x, z - d0, d1 - 1 - z);
-    m.set(x, ly, z, e === 0 ? rimC : (e === 1 && rim) ? TEAM : roofC);
+    m.set(x, ly, z, e === 0 ? rimC : (e === 1 && rim) ? rimTeam : roofC);
   }
   m.lastTop = { c0, c1, d0, d1, y: ly };
   return ly + 1;
@@ -1178,7 +1178,7 @@ function fineStatue(m, x0, z0, x1, z1, y0, h, o = {}, seed = 0) {
   const sub = new Rec(m.W * 2, m.D * 2);
   const py = monPlinth(sub, x0 * 2, z0 * 2, x1 * 2, z1 * 2, y0 * 2, h * 2 - 3, { seed });
   const pd = monDie(sub, x0 * 2 + 3, z0 * 2 + 3, x1 * 2 - 3, z1 * 2 - 3, py, 2);
-  figure(sub, x0 + x1, pd, z0 + z1 - 0.5, { ...o, h: (o.h ?? 24) * 2 });
+  cleanStatue(sub, x0 + x1, pd, z0 + z1 - 1, toClean(o));
   (m.fine ??= []).push({ m: sub, k: 2 });
 }
 // The old box-built figure, kept for tiny statues (under 14 voxels, e.g. the
@@ -1364,7 +1364,7 @@ function weather(m) {
   const updates = [];
   for (const [x, y, z] of m.coords) {
     const v = m.get(x, y, z);
-    if (!v || v.glow || y < 1) continue;
+    if (!v || v.glow || v.clean || y < 1) continue;
     if (v.team) {
       let c = v.bright ? (hash3(x, y, z, 97) < 0.5 ? 0xf6f6f6 : 0xe6e6e6) : (hash3(x, y, z, 97) < 0.5 ? 0x6e665a : 0x655e53);
       if (!v.bright) v.team = 0.62;     // a muted tint: the owner's colour as a dark lapis line
@@ -1869,7 +1869,9 @@ function house(v, age) {
   const m = lot(24, 24);
   const arch = age === 1;
   const W = arch ? MUD : WASH;
-  const bo = { wall: W, roofC: arch ? THATCH : PLASTER, band: arch ? null : 'ochre', batter: 6, rimC: arch ? MUDCAP : LIP, gorge: arch ? [MUDCAP_D, 0xb8925f] : null, torus: !arch, lipOut: 2 };
+  // battered walls (a step in every 4 rows under the skin, so the slope reads
+  // from the RTS camera), a team band under a flared two-row cavetto cornice
+  const bo = { wall: W, roofC: arch ? THATCH : PLASTER, band: arch ? null : 'teamb', batter: 4, rimC: arch ? MUDCAP : LIP, gorge: arch ? [MUDCAP_D, 0xb8925f] : null, torus: !arch, lipOut: 2, flare: true, rimTeam: arch ? TEAM : TEAMB };
   const poles = (T) => { if (!arch) return; for (let x = T.c0 + 2; x < T.c1 - 1; x += 3) for (let z = T.d0 - 1; z <= T.d1; z++) m.set(x, T.y + 1, z, (z + x) % 4 ? DARKWOOD : 0x6a4a2c); };
   // high windows: three slits under one lintel just below the band
   const hw = (face, u, yTop) => win(m, face, u, yTop - 3, { n: 3, h: 3 });
@@ -2711,82 +2713,370 @@ function eyePanel(m, f, x0, z0, x1, z1, y0, a0, r0) {
     at(Math.round(a), r0 + j, c);
   }
 }
-// a black-and-gold plinth: gold corner posts and base, basalt faces with a
-// raised cartouche (or Eye of Horus panels), a team line under a gold
-// cornice that overhangs a voxel, a dark deck. Returns the deck top.
-function monPlinth(m, x0, z0, x1, z1, y0, h, { faces = {}, seed = 0 } = {}) {
-  for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) {
-    const ex = x <= x0 + 1 || x >= x1 - 2, ez = z <= z0 + 1 || z >= z1 - 2;
-    const sx = x === x0 || x === x1 - 1, sz = z === z0 || z === z1 - 1;
-    if (!sx && !sz) continue;
-    const r = y - y0;
-    let c = BASALT(x, y, z);
-    if (ex && ez) c = r === h - 1 ? SG_L : SG;                  // corner posts
-    else if (r <= 1) c = r === 0 ? SG_D : SG;                   // the base course
-    else if (r === h - 1) c = SG;
-    else if (r === h - 2) c = TEAM;                             // the owner's line
-    m.set(x, y, z, c);
+// a black granite plinth in Retold's manner, drawn as a few clean courses: a
+// foot course one voxel proud, a smooth granite body with a band of gold
+// hieroglyphs on a lapis ground sunk a voxel into every face (or an Eye of
+// Horus panel), the owner's colour as one continuous line under a gold torus
+// roll, then a cavetto cornice flaring out two voxels in two fluted rows
+// (gold / granite flutes in a regular rhythm) to a gold-edged lip. Returns the
+// deck top.
+const PL_GRAN = 0x2b313a, PL_GRAN_D = 0x22272f;
+const BAND_GLYPHS5 = [
+  ['.g.', 'g.g', '.g.', 'ggg', '.g.'],   // ankh
+  ['ggg', '.g.', 'ggg', '.g.', '.g.'],   // djed
+  ['gg.', '.g.', '.g.', '.g.', 'g.g'],   // was sceptre
+  ['...', 'ggg', 'g.g', 'ggg', '...'],   // sun disc
+];
+const BAND_GLYPHS3 = [['ggg', 'g.g', 'ggg'], ['.g.', '.g.', '.g.']];
+function glyphBand(m, f, x0, z0, x1, z1, y0, r0, r1, seed = 0) {
+  // sunk band over rows r0 .. r1 (inclusive), a = 2 .. L - 3 along the face
+  const L = f === '+z' || f === '-z' ? x1 - x0 : z1 - z0;
+  const at = (a, r, c, out) => { const [x, z] = faceXZ(f, x0, z0, x1, z1, a, out); m.set(x, y0 + r, z, c); };
+  const rem = (a, r) => { const [x, z] = faceXZ(f, x0, z0, x1, z1, a, 0); m.remove(x, y0 + r, z); };
+  const a0 = 2, a1 = L - 3, rows = r1 - r0 + 1;
+  const G = rows - 2 >= 5 ? BAND_GLYPHS5 : BAND_GLYPHS3, gh = G[0].length;
+  const n = Math.max(1, Math.floor((a1 - a0 + 1 - 1) / 4)), span = n * 4 - 1;
+  const ga = a0 + Math.floor((a1 - a0 + 1 - span) / 2), gr = r0 + Math.floor((rows - gh) / 2);
+  for (let a = a0; a <= a1; a++) for (let r = r0; r <= r1; r++) {
+    rem(a, r);
+    let c = ST_LAPIS;
+    const i = a - ga, j = r - gr;
+    if (i >= 0 && i < span && (i % 4) < 3 && j >= 0 && j < gh) {
+      const g = G[(Math.floor(i / 4) + seed) % G.length];
+      if (g[gh - 1 - j][i % 4] === 'g') c = SG_L;
+    }
+    at(a, r, c, -1);
   }
-  m.box(x0 + 1, y0, z0 + 1, x1 - x0 - 2, h, z1 - z0 - 2, DARK2);
-  // the cornice: overhangs a voxel, gold edge round a dark deck
-  for (let x = x0 - 1; x <= x1; x++) for (let z = z0 - 1; z <= z1; z++) {
-    const e = x === x0 - 1 || x === x1 || z === z0 - 1 || z === z1;
-    m.set(x, y0 + h, z, e ? SG_L : (x === x0 || x === x1 - 1 || z === z0 || z === z1 - 1 ? SG : BASALT(x, y0 + h, z)));
+}
+function monPlinth(m, x0, z0, x1, z1, y0, h, { faces = {}, seed = 0 } = {}) {
+  const rTeam = h - 4, rTorus = h - 3;
+  // the foot course, one voxel proud
+  for (let x = x0 - 1; x <= x1; x++) for (let z = z0 - 1; z <= z1; z++) m.set(x, y0, z, PL_GRAN_D);
+  // the body: solid granite, the owner's line, the torus roll
+  for (let r = 1; r < rTorus; r++) for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) {
+    const edge = x === x0 || x === x1 - 1 || z === z0 || z === z1 - 1;
+    m.set(x, y0 + r, z, !edge ? DARK2 : r === rTeam ? TEAM : PL_GRAN);
+  }
+  for (let x = x0 - 1; x <= x1; x++) for (let z = z0 - 1; z <= z1; z++) m.set(x, y0 + rTorus, z, SG);
+  // the cavetto: two fluted rows flaring out one then two voxels, a gold lip
+  for (const [r, o] of [[h - 2, 1], [h - 1, 2], [h, 2]]) {
+    for (let x = x0 - o; x < x1 + o; x++) for (let z = z0 - o; z < z1 + o; z++) {
+      const ring = x === x0 - o || x === x1 + o - 1 || z === z0 - o || z === z1 + o - 1;
+      if (r === h) { m.set(x, y0 + r, z, ring ? SG_L : x === x0 - o + 1 || x === x1 + o - 2 || z === z0 - o + 1 || z === z1 + o - 2 ? SG : PL_GRAN); continue; }
+      if (!ring) { m.set(x, y0 + r, z, PL_GRAN); continue; }
+      const a = x === x0 - o || x === x1 + o - 1 ? z - z0 : x - x0;   // position along the face
+      const corner = (x === x0 - o || x === x1 + o - 1) && (z === z0 - o || z === z1 + o - 1);
+      m.set(x, y0 + r, z, corner ? SG : ((a % 3) + 3) % 3 === 0 ? SG : PL_GRAN);
+    }
   }
   for (const f of ['+z', '-z', '+x', '-x']) {
     const L = f === '+z' || f === '-z' ? x1 - x0 : z1 - z0;
-    const kind = faces[f] ?? 'cart';
-    if (kind === 'cart') cartouche(m, f, x0, z0, x1, z1, y0, (L - 1) / 2, 2, 7, h - 5, seed + f.length + (f[1] === 'x' ? 1 : 0));
-    else if (kind === 'cart2') for (const k of [-1, 1]) cartouche(m, f, x0, z0, x1, z1, y0, (L - 1) / 2 + k * 6, 2, 7, h - 5, seed + (k > 0 ? 1 : 0));
-    else if (kind === 'eye') {
-      eyePanel(m, f, x0, z0, x1, z1, y0, L / 2, 3);
-      if (L >= 40) for (const k of [-1, 1]) cartouche(m, f, x0, z0, x1, z1, y0, (L - 1) / 2 + k * 15, 2, 7, h - 5, seed + (k > 0 ? 3 : 0));
-    }
+    const kind = faces[f] ?? 'band';
+    if (kind === 'eye') {
+      eyePanel(m, f, x0, z0, x1, z1, y0, L / 2, 2);
+      if (L >= 40) for (const k of [-1, 1]) {
+        // short glyph bands either side of the eye
+        const a = Math.round((L - 1) / 2 + k * 15);
+        glyphBandAt(m, f, x0, z0, x1, z1, y0, a - 4, a + 4, 2, rTeam - 2, seed + (k > 0 ? 1 : 0));
+      }
+    } else glyphBand(m, f, x0, z0, x1, z1, y0, 2, rTeam - 2, seed + f.length + (f[1] === 'x' ? 1 : 0));
   }
   return y0 + h + 1;
 }
-// a die on the deck: gold, its sides a frieze of dark notches, a pale lip
-function monDie(m, x0, z0, x1, z1, y0, h) {
-  for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) {
-    const sx = x === x0 || x === x1 - 1, sz = z === z0 || z === z1 - 1;
-    if (!sx && !sz) { m.set(x, y, z, DARK2); continue; }
-    const r = y - y0, a = sx && sz ? 0 : sx ? z : x;
-    m.set(x, y, z, r === h - 1 ? SG_L : r === 0 ? SG_D : (a & 1 ? 0x1e242c : SG));
+// a sunk glyph panel over a = a0 .. a1 only (beside the Eye of Horus panels)
+function glyphBandAt(m, f, x0, z0, x1, z1, y0, a0, a1, r0, r1, seed) {
+  const at = (a, r, c, out) => { const [x, z] = faceXZ(f, x0, z0, x1, z1, a, out); m.set(x, y0 + r, z, c); };
+  const rem = (a, r) => { const [x, z] = faceXZ(f, x0, z0, x1, z1, a, 0); m.remove(x, y0 + r, z); };
+  const rows = r1 - r0 + 1, G = BAND_GLYPHS5, gh = 5;
+  const n = Math.max(1, Math.floor((a1 - a0) / 4)), span = n * 4 - 1;
+  const ga = a0 + Math.floor((a1 - a0 + 1 - span) / 2);
+  for (let a = a0; a <= a1; a++) for (let r = r0; r <= r1; r++) {
+    rem(a, r);
+    let c = ST_LAPIS;
+    const i = a - ga;
+    // glyphs stacked down the panel, a gap row between
+    const j = (r1 - 1) - r, k = Math.floor(j / (gh + 1)), jj = j % (gh + 1);
+    if (i >= 0 && i < span && (i % 4) < 3 && j >= 0 && jj < gh && r > r0) {
+      const g = G[(Math.floor(i / 4) + k + seed) % G.length];
+      if (g[jj][i % 4] === 'g') c = SG_L;
+    }
+    at(a, r, c, -1);
   }
-  for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) m.set(x, y0 + h, z, x === x0 || z === z0 || x === x1 - 1 || z === z1 - 1 ? SG_L : BASALT(x, y0 + h, z));
+}
+// a die on the deck: a plain granite block with a 1-voxel gold edge on top
+function monDie(m, x0, z0, x1, z1, y0, h) {
+  for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) m.set(x, y, z, PL_GRAN);
+  for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) m.set(x, y0 + h, z, x === x0 || z === z0 || x === x1 - 1 || z === z1 - 1 ? SG : PL_GRAN);
   return y0 + h + 1;
+}
+// A Monument statue built from a few large clean volumes (the Monuments to
+// Villagers, Soldiers, Priests and the Pharaoh): one flat blue-black granite
+// for the whole body, gold only as continuous one-voxel bands (diadem,
+// collar rings, belt, armlets, bracelets) and in a striped nemes whose stripes
+// run in a fixed rhythm (two gold rows, one lapis row) over the cap, the wings
+// and the lappets. Axis-aligned boxes on a fixed canon (fine voxels, ~46
+// high standing), so every plane is flat: a flat-faced head with a one-voxel
+// nose, inlaid eyes and the false beard, a stepped torso (waist, chest,
+// shoulders), arms as blocks (at the sides, crossed on the chest, or forward
+// holding gold offering pots), a stepped kilt with the owner's apron. Voxels
+// are marked clean so weathering leaves no speckle. (cx, cz): the body's
+// centre (a voxel corner in x), facing +z, standing on y0.
+// pose: stride | stand | kneel | mummy; head: nemes | double (the white and
+// red crown of the Two Lands) ; arms: side | crossed | pots
+const COLUMN_GLYPHS = [
+  ['.gg.', 'g..g', '.gg.', 'gggg', '.gg.'],   // ankh
+  ['gggg', '.gg.', 'gggg', '.gg.', '.gg.'],   // djed
+  ['.gg.', 'gggg', 'gggg', '.gg.'],           // sun disc
+];
+const GRAN = 0x2a3039, GRAN_D = 0x1c2027, CG = 0xc89000, CG_L = 0xe0a800;
+// figure()'s options in cleanStatue()'s terms (the Town Center's and the
+// Temple's gods)
+function toClean(o) {
+  const head = o.head === 'falcon' || o.head === 'jackal' ? o.head : (o.crown ?? 'nemes') === 'nemes' ? 'nemes' : o.crown === 'tall' || o.crown === 'atef' ? 'double' : 'wig';
+  const crown = o.crown === 'disc' || o.crown === 'horns' ? o.crown : o.crown === 'vulture' ? 'modius' : null;
+  const arms = o.arms === 'bowls' ? 'pots' : o.arms === 'wings' ? 'wings' : o.arms === 'side' || o.arms === 'embrace' ? 'side' : 'crossed';
+  return { pose: o.pose ?? 'stride', head, crown, arms, kilt: o.kilt === undefined || o.kilt === BASALT ? GRAN : CG, kiltFront: o.kiltFront === undefined ? TEAMB : o.kiltFront };
+}
+function cleanStatue(m, cx, y0, cz, o = {}) {
+  const { pose = 'stride', head = 'nemes', arms = 'side', kiltFront = TEAMB } = o;
+  const kilt = o.kilt ?? GRAN;
+  const set = (x, y, z, c) => { m.set(cx + x, y0 + y, cz + z, c); const v = m.get(cx + x, y0 + y, cz + z); if (v) v.clean = 1; };
+  const B = (xa, xb, ya, yb, za, zb, c) => {
+    for (let x = xa; x < xb; x++) for (let y = ya; y < yb; y++) for (let z = za; z < zb; z++) set(x, y, z, typeof c === 'function' ? c(x, y, z) : c);
+  };
+  const S = (hw, ya, yb, za, zb, c) => B(-hw, hw, ya, yb, za, zb, c);
+  const M = (xa, xb, ya, yb, za, zb, c) => { B(xa, xb, ya, yb, za, zb, c); B(-xb, -xa, ya, yb, za, zb, c); };   // mirrored pair
+  const kn = pose === 'kneel' ? -16 : 0;
+  const stripe = (x, y) => ((((y - kn) % 3) + 3) % 3 === 0 ? ST_LAPIS : CG);
+
+  // ---- the lower body
+  if (pose === 'mummy') {
+    S(5, 0, 2, -3, 5, GRAN);                                   // the feet block
+    for (let y = 2; y < 33; y++) S(5 + Math.floor((y - 2) / 10), y, y + 1, -3, 4, GRAN);   // the shroud
+    // the inscribed column down the front (Retold's gold panel): a gold
+    // field framed one voxel proud, dark signs cut down it (ankh, djed, sun)
+    B(-3, 3, 5, 26, 4, 5, (x, y) => {
+      if (x === -3 || x === 2 || y === 5 || y === 25) return CG_L;
+      const k = 24 - y, n = Math.floor(k / 6), j = k % 6, g = COLUMN_GLYPHS[n % 3];
+      if (k < 1 || j === 0 || j > g.length) return CG;
+      return g[j - 1][x + 2] === 'g' ? GRAN_D : CG;
+    });
+  } else if (pose === 'dress') {
+    // a sheath dress from the bust to the ankles: one tapering granite
+    // column (feet showing under the hem), a gold hem line
+    M(1, 5, 0, 2, -2, 5, GRAN);
+    for (let y = 2; y < 26; y++) S(5 + Math.floor((y - 2) / 9), y, y + 1, -3, 3, y === 3 ? CG : GRAN);
+  } else if (pose === 'kneel') {
+    M(1, 6, 0, 3, -7, 3, GRAN);                                // shins folded back
+    M(1, 6, 3, 7, -4, 8, GRAN);                                // thighs forward to the knees
+    S(7, 5, 9, -4, 4, kilt);                                   // the kilt over the lap
+    S(7, 9, 10, -4, 4, CG);                                    // the belt
+  } else {
+    const f = pose === 'stride' ? 3 : 0;
+    for (const sx of [-1, 1]) {
+      const xa = sx < 0 ? -6 : 1, xb = xa + 5;
+      const lean = (y) => (sx < 0 ? Math.round(f * (19 - y) / 19) : 0);
+      B(xa, xb, 0, 2, -3 + lean(0), 5 + lean(0), GRAN);       // the foot
+      for (let y = 2; y < 18; y++) B(xa, xb, y, y + 1, -2 + lean(y), 3 + lean(y), y === 4 && o.anklets ? CG : GRAN);
+    }
+    for (let y = 17; y < 25; y++) S(y < 21 ? 8 : 7, y, y + 1, -4, 4, kilt);   // the kilt, stepping in at the waist
+    if (kiltFront !== null) B(-2, 2, 17, 25, 4, 5, kiltFront); // the owner's apron
+    S(7, 25, 26, -4, 4, CG);                                   // the belt
+  }
+  // ---- the torso: waist, chest, shoulders
+  if (pose !== 'mummy') {
+    S(6, 26 + kn, 29 + kn, -3, 3, GRAN);
+    S(7, 29 + kn, 33 + kn, -3, 4, GRAN);
+  }
+  S(9, 33 + kn, 35 + kn, -3, 4, GRAN);
+  S(8, 35 + kn, 36 + kn, -3, 4, GRAN);
+  // ---- the broad collar: three continuous one-voxel rings on the chest
+  for (let y = 29 + kn; y < 36 + kn; y++) for (let x = -8; x < 8; x++) {
+    const d = Math.hypot(x + 0.5, (36 + kn - y) * 1.2);
+    const c = d < 3.4 ? null : d < 4.5 ? CG : d < 5.6 ? ST_LAPIS : d < 6.7 ? CG : null;
+    if (c) set(x, y, 4, c);
+  }
+  // ---- arms
+  if (arms === 'side') {
+    M(8, 11, 19, 35, -2, 2, GRAN);                             // straight arms hanging at the sides
+    M(8, 11, 31, 32, -2, 2, CG);                               // armlets
+    M(8, 11, 23, 24, -2, 2, CG);                               // bracelets
+  } else if (arms === 'crossed') {
+    // forearms crossed on the chest as two plain blocks, the fists forward
+    if (pose !== 'mummy') M(9, 12, 28, 35, -2, 2, GRAN);       // upper arms
+    B(-5, 9, 27 + kn, 30 + kn, 4, 6, GRAN);
+    B(-9, 5, 30 + kn, 33 + kn, 4, 6, GRAN);
+    B(-8, -5, 27 + kn, 31 + kn, 4, 7, GRAN);                   // fists
+    B(5, 8, 30 + kn, 34 + kn, 4, 7, GRAN);
+    B(-4, -3, 27 + kn, 30 + kn, 4, 6, CG);                     // bracelets
+    B(3, 4, 30 + kn, 33 + kn, 4, 6, CG);
+  } else if (arms === 'wings') {
+    // Isis: arms stretched out level from the shoulders, a wing hanging
+    // under each as one flat panel: lapis coverts under the arm, a gold
+    // line, then long primaries in gold / lapis stripes two voxels wide,
+    // the lower edge sweeping down toward the hand
+    M(9, 19, 31, 34, -1, 2, GRAN);
+    M(15, 16, 31, 34, -1, 2, CG);                              // bracelets
+    for (let x = 9; x < 19; x++) {
+      const bot = 21 - Math.floor((x - 9) * 0.9);
+      for (let y = bot; y < 31; y++) {
+        const c = y >= 28 ? ST_LAPIS : y === 27 ? CG_L : (Math.floor((x - 9) / 2) & 1 ? ST_LAPIS : CG);
+        set(x, y, 0, c); set(-1 - x, y, 0, c);
+      }
+    }
+  } else if (arms === 'pots') {
+    M(9, 12, 10, 20, -2, 2, GRAN);                             // upper arms
+    M(9, 12, 7, 10, -2, 7, GRAN);                              // forearms forward
+    M(9, 12, 15, 16, -2, 2, CG);                               // armlets
+    // a round gold offering pot in each hand
+    for (const sx of [-1, 1]) {
+      const xa = sx < 0 ? -13 : 8;
+      B(xa, xa + 5, 10, 14, 4, 9, (x, y, z) => {
+        const ix = x - xa, iz = z - 4, cxn = (ix === 0 || ix === 4) && (iz === 0 || iz === 4);
+        if (cxn) return null;
+        if (y === 13 && ix > 0 && ix < 4 && iz > 0 && iz < 4) return GRAN_D;   // the mouth
+        return y === 13 ? CG_L : CG;
+      });
+      B(xa + 1, xa + 4, 14, 15, 5, 8, (x, y, z) => (x === xa + 2 && z === 6 ? null : CG_L));   // the rim
+    }
+  }
+  // ---- neck and head: a flat face
+  S(2, 36 + kn, 38 + kn, -1, 2, GRAN);
+  const human = head === 'nemes' || head === 'double' || head === 'wig';
+  if (human) {
+    S(4, 38 + kn, 46 + kn, -3, 4, GRAN);
+    B(-1, 1, 41 + kn, 44 + kn, 4, 5, GRAN);                    // the nose
+    B(-3, -1, 44 + kn, 45 + kn, 3, 4, CG); B(1, 3, 44 + kn, 45 + kn, 3, 4, CG);   // inlaid eyes
+    B(-1, 1, 40 + kn, 41 + kn, 3, 4, GRAN_D);                  // the mouth
+    if (pose !== 'dress') {
+      B(-1, 1, 34 + kn, 38 + kn, 3, 5, GRAN);                  // the false beard
+      B(-1, 1, 34 + kn, 35 + kn, 3, 5, CG);
+    }
+  }
+  // the tripartite wig of gods and queens: striped lappets down the chest, a
+  // striped mass behind and over the ears
+  if (head === 'wig' || head === 'falcon' || head === 'jackal') {
+    const Y = kn;
+    B(-5, 5, 37 + Y, 47 + Y, -4, -2, stripe);
+    B(-5, -4, 38 + Y, 47 + Y, -4, 2, stripe); B(4, 5, 38 + Y, 47 + Y, -4, 2, stripe);
+    M(4, 7, 30 + Y, 42 + Y, 1, 4, stripe);
+    M(4, 7, 30 + Y, 31 + Y, 1, 4, CG);
+    if (head === 'wig') S(5, 46 + Y, 47 + Y, -4, 4, CG);       // a gold fillet
+  }
+  if (head === 'falcon') {
+    // Horus / Ra: a gold falcon's head as one block, a dark hooked beak, dark
+    // eyes with the falcon's stripe running down under them
+    const Y = kn;
+    S(4, 38 + Y, 46 + Y, -3, 4, CG);
+    S(3, 46 + Y, 47 + Y, -2, 3, CG);
+    B(-1, 1, 41 + Y, 44 + Y, 4, 7, GRAN_D);                    // the beak
+    B(-1, 1, 40 + Y, 41 + Y, 6, 7, GRAN_D);                    // its hooked tip
+    M(1, 3, 43 + Y, 44 + Y, 3, 4, GRAN_D);                     // eyes
+    M(2, 3, 41 + Y, 43 + Y, 3, 4, GRAN_D);                     // the malar stripe
+  } else if (head === 'jackal') {
+    // a jackal's head in granite: a long square snout, tall pointed ears gilt inside
+    const Y = kn;
+    S(4, 38 + Y, 46 + Y, -3, 4, GRAN);
+    B(-2, 2, 39 + Y, 43 + Y, 4, 7, GRAN);
+    B(-1, 1, 39 + Y, 42 + Y, 7, 9, GRAN);                      // the muzzle
+    B(-1, 1, 41 + Y, 42 + Y, 9, 10, GRAN_D);                   // the nose
+    M(2, 4, 44 + Y, 45 + Y, 3, 4, CG);                         // gold eyes
+    for (let y = 46; y < 54; y++) {                            // the ears
+      const w = y < 49 ? 3 : y < 52 ? 2 : 1, xa = 1 + Math.floor((y - 46) / 4);
+      M(xa, xa + w, y + Y, y + Y + 1, -1, 1, GRAN);
+      if (w > 1 && y < 52) M(xa + (w > 2 ? 1 : 0), xa + w - (w > 2 ? 1 : 0), y + Y, y + Y + 1, 1, 2, CG);
+    }
+  }
+  if (o.crown === 'disc') {
+    // Ra's sun disc: a flat red disc with a one-voxel gold rim behind the head, a uraeus
+    const Y = kn, cy = 52.5, r = 5.2;
+    for (let x = -6; x < 6; x++) for (let y = 46; y < 59; y++) {
+      const d = Math.hypot(x + 0.5, y + 0.5 - cy);
+      if (d <= r) { set(x, y + Y, -2, d > r - 1.1 ? CG : ST_RED); set(x, y + Y, -3, d > r - 1.1 ? CG : ST_RED); }
+    }
+    B(-1, 1, 46 + Y, 49 + Y, 1, 2, CG);
+  } else if (o.crown === 'horns') {
+    // Isis: a gold modius, cow horns cupping a red sun disc
+    const Y = kn;
+    S(3, 47 + Y, 49 + Y, -3, 3, CG);
+    const H = [[3, 49], [4, 49], [5, 50], [5, 51], [5, 52], [5, 53], [4, 54]];
+    for (const [x, y] of H) { set(x, y + Y, 0, CG); set(-1 - x, y + Y, 0, CG); set(x, y + Y, -1, CG); set(-1 - x, y + Y, -1, CG); }
+    for (let x = -4; x < 4; x++) for (let y = 49; y < 57; y++) if (Math.hypot(x + 0.5, y + 0.5 - 53) <= 3.4) set(x, y + Y, -1, ST_RED);
+    B(-1, 1, 46 + Y, 48 + Y, 4, 5, CG);
+  } else if (o.crown === 'modius') {
+    const Y = kn;
+    S(4, 47 + Y, 49 + Y, -3, 3, CG);
+    S(4, 48 + Y, 49 + Y, -3, 3, (x) => ((x & 1) ? ST_LAPIS : CG));
+    B(-1, 1, 46 + Y, 48 + Y, 4, 5, CG);
+  }
+  if (head === 'nemes') {
+    const Y = kn;
+    B(-5, 5, 46 + Y, 47 + Y, -4, 5, CG);                       // the brow band
+    B(-5, 5, 47 + Y, 48 + Y, -4, 4, stripe);                   // the cap
+    B(-5, 5, 48 + Y, 49 + Y, -4, 4, CG);
+    B(-5, -4, 38 + Y, 46 + Y, -4, 3, stripe); B(4, 5, 38 + Y, 46 + Y, -4, 3, stripe);   // over the ears
+    B(-5, 5, 37 + Y, 46 + Y, -4, -3, stripe);                  // the back
+    B(-2, 2, 31 + Y, 37 + Y, -4, -2, stripe);                  // the tail
+    for (let y = 36; y < 46; y++) {                            // the wings flaring to the shoulders
+      const w = 5 + Math.floor((46 - y) / 3);
+      M(5, w, y + Y, y + Y + 1, -3, 2, stripe);
+    }
+    M(4, 7, 30 + Y, 41 + Y, 2, 5, stripe);                     // the lappets down the chest
+    M(4, 7, 30 + Y, 31 + Y, 2, 5, CG);
+    B(-1, 1, 47 + Y, 49 + Y, 5, 6, CG);                        // the uraeus
+  } else if (head === 'double') {
+    // the red crown (deshret) with its tall back plate, the white crown
+    // (hedjet) rising out of it to a knob, a gold diadem and the red crown's curl
+    const Y = kn;
+    S(5, 46 + Y, 47 + Y, -4, 5, CG);
+    S(5, 47 + Y, 50 + Y, -4, 4, ST_RED);
+    S(5, 50 + Y, 56 + Y, -4, -2, ST_RED);
+    // the white crown: a tall smooth bulb tapering to a round knob
+    for (let y = 50; y < 62; y++) {
+      const hw = y < 56 ? 3 : y < 59 ? 2 : y === 59 ? 1 : 2;
+      if (y === 61) { S(1, y + Y, y + Y + 1, -2, 0, ST_WHITE); continue; }
+      S(hw, y + Y, y + Y + 1, -1 - hw, -1 + hw, ST_WHITE);
+    }
+    B(2, 3, 47 + Y, 52 + Y, 4, 5, CG);                         // the curl
+    B(1, 2, 52 + Y, 53 + Y, 4, 5, CG);
+    B(-1, 1, 47 + Y, 49 + Y, 5, 6, CG);                        // the uraeus
+  }
 }
 function monument(kind, god = 'ra') {
   if (kind <= 3) {
     const m = lot(32, 32, EARTH);
     const py = monPlinth(m, 6, 6, 26, 26, 1, 14, { seed: kind });
-    const pd = monDie(m, 10, 10, 22, 22, py, 3);
+    const pd = monDie(m, 9, 9, 23, 23, py, 2);
     const o = [
       null,
-      { pose: 'kneel', arms: 'bowls', crown: 'nemes', kiltFront: null, h: 46 },
-      { pose: 'mummy', arms: 'crossed', crown: 'tall', h: 46 },
-      { pose: 'stride', arms: 'crossed', crown: 'nemes', kiltFront: TEAMB, h: 46 },
+      { pose: 'kneel', arms: 'pots', head: 'nemes', kiltFront: null },
+      { pose: 'mummy', arms: 'crossed', head: 'double' },
+      { pose: 'stride', arms: 'side', head: 'nemes', kilt: CG, anklets: 1 },
     ][kind];
-    figure(m, 16, pd, 15.5, { skin: BASALT, gold: GILT, kilt: GILT, ...o });
+    cleanStatue(m, 16, pd, kind === 1 ? 17 : 15, o);
     return m;
   }
   if (kind === 4) {
     const m = lot(48, 48, EARTH);
     const py = monPlinth(m, 5, 6, 43, 42, 1, 14, { faces: { '+z': 'cart2', '-z': 'cart2' }, seed: 4 });
     const pd = monDie(m, 9, 11, 39, 37, py, 3);
-    figure(m, 18, pd, 24, { h: 50, skin: BASALT, gold: GILT, kilt: GILT, kiltFront: TEAMB, crown: 'nemes', arms: 'crossed', pose: 'stand' });
-    figure(m, 30.5, pd, 23.5, { h: 44, skin: BASALT, gold: GILT, kilt: GILT, crown: 'vulture', arms: 'embrace', pose: 'dress' });
+    cleanStatue(m, 15, pd, 24, { pose: 'stand', head: 'nemes', arms: 'crossed', kilt: CG });
+    cleanStatue(m, 33, pd, 24, { pose: 'dress', head: 'wig', crown: 'modius', arms: 'side', kiltFront: null });
     return m;
   }
   const m = lot(64, 64, EARTH);
   const py = monPlinth(m, 12, 12, 52, 52, 1, 18, { faces: { '+z': 'eye', '-z': 'eye', '+x': 'eye', '-x': 'eye' }, seed: 5 });
-  const pd = monDie(m, 20, 20, 44, 44, py, 5);
+  const pd = monDie(m, 20, 20, 44, 44, py, 7);   // pd = 28: the coarse statue lands on it exactly
   const G = {
     ra: { head: 'falcon', crown: 'disc', arms: 'staff', pose: 'stride' },
     set: { head: 'jackal', crown: 'set', arms: 'staff', pose: 'stand' },
     isis: { head: 'human', crown: 'horns', arms: 'wings', pose: 'dress' },
   }[god];
-  figure(m, 32, pd, 31.5, { h: 60, skin: BASALT, gold: GILT_L, kilt: GILT, kiltFront: TEAMB, ...G });
+  // the god drawn on a coarser grid (voxels 4/3 the plinth's), so it stands
+  // over the big plinth at Retold's scale with the same clean canon
+  const k = 0.75, sub = new Rec(m.W, m.D);
+  cleanStatue(sub, 24, Math.round(pd * k), 23, toClean({ kilt: GILT, ...G, arms: G.arms === 'staff' ? 'crossed' : G.arms }));
+  (m.fine ??= []).push({ m: sub, k });
   // the sun bowls at the corners, glowing
   for (const [x, z] of [[5, 5], [58, 5], [5, 58], [58, 58]]) {
     lathe(m, x + 0.5, z + 0.5, 1, 6, (y) => (y <= 2 ? 2.8 : 4.4), SG_D, { hollow: 1.6, inner: FIRE[2] });

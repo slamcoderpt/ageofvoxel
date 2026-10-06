@@ -1158,10 +1158,11 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   pyramidion (polys over a gold voxel core); its golds `OB_GOLD*` are pure
   yellows with no blue, since AgX at exposure 2 turns pale or orange gilt
   to cream / salmon; `smallObelisk()` is the same needle at 2 x 2 voxels for
-  the temple's ramp pair and the wonder's door pair), the five **Monuments** (`monument_villagers` kneeling with bowls,
-  `monument_soldiers` mummiform with crook and flail, `monument_priests`
-  striding in a nemes, `monument_pharaohs` a king and queen, all dark basalt
-  and gold on gilt plinths with team panels; `monument_gods` 4x4 with
+  the temple's ramp pair and the wonder's door pair), the five **Monuments** (`monument_villagers` kneeling with gold pots,
+  `monument_soldiers` mummiform in the double crown, `monument_priests`
+  striding in a nemes, `monument_pharaohs` a king and queen, all clean black
+  granite and gold on granite plinths with a sunk glyph band and a cavetto
+  cornice (see "Clean statues"); `monument_gods` 4x4 with
   variants `ra` / `isis` / `set`, Eye of Horus panels and glowing sun bowls).
   Render-only (no sim type yet): `lighthouse` 3x3 (the Pharos: a battered
   tower, an octagonal storey, a columned lantern with a fire), `wonder` 8x8
@@ -1198,6 +1199,49 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   construction stages leave it out. `--preview <type>[:variant]
   --preview-out f.json` dumps one model's voxels (insets included) without
   exporting, for a quick offline look.
+- **Clean statues** (round 15, `cleanStatue()` in export-egypt.mjs; replaces
+  `figure()` for every Monument, the Town Center's Ra and the Temple's god):
+  a few large axis-aligned volumes on a fixed canon (~46 half voxels
+  standing), no sampled solids and no per-voxel noise. One flat blue-black
+  granite (`GRAN`) for the body; gold (`CG` / `CG_L`, yellow so the grade
+  keeps it gold) only as continuous one-voxel bands: diadem, the three collar
+  rings, belt, armlets, bracelets, anklets, the hem. A flat-faced head (a
+  one-voxel nose, inlaid gold eyes, a mouth line, the false beard with a gold
+  tip); a nemes whose stripes keep one rhythm (two gold rows, one lapis) over
+  cap, ears, back, flaring wings, tail and lappets, a gold brow band and
+  uraeus; the double crown (a red deshret with its back plate, a white
+  hedjet bulb to a knob, the gold curl); a striped tripartite wig for gods
+  and queens; a gold falcon head with a dark hooked beak and malar stripe
+  (Ra, with a red sun disc rimmed in gold), a granite jackal head (square
+  muzzle, tall ears gilt inside), Isis' modius, horns and disc. Poses:
+  stride / stand (legs as blocks, the striding leg leaning forward one voxel
+  per ~6 rows), kneel (shins folded, thighs forward), mummy (a tapering
+  shroud with Retold's gold inscribed column of dark ankh / djed / sun
+  signs), dress (a tapering sheath). Arms: side (hanging blocks a voxel clear
+  of the chest), crossed (two forearm blocks on the chest, fists forward),
+  pots (forearms forward holding round gold offering pots), wings (arms out
+  level, a flat wing panel under each: lapis coverts, a gold line, gold /
+  lapis primaries two voxels wide). Statue voxels are flagged `clean` so
+  `weather()` leaves them untouched. Monuments: Villagers kneeling with pots
+  in a nemes, Soldiers mummiform in the double crown with crossed arms,
+  Priests striding in a nemes and gold kilt with the team apron, Pharaohs a
+  king (nemes, crossed) and queen (wig, modius); the Monument to the Gods'
+  god is drawn on a coarser grid (`m.fine` with k 0.75: voxels 4/3 the
+  plinth's) so it keeps Retold's scale over the big plinth. `toClean()` maps
+  `figure()`'s options (the temple's per-god table, `fineStatue()`).
+  Plinths (`monPlinth`): a granite foot course one voxel proud, a smooth
+  granite body with a band of gold hieroglyphs (ankh, djed, was, sun; 3-row
+  ring / stroke signs on short plinths) on lapis sunk one voxel into every
+  face (`glyphBand`; on the Monument to the Gods short glyph panels either
+  side of the Eye of Horus), the owner's colour as one line under a gold
+  torus, a cavetto cornice flaring out one then two voxels in two fluted
+  rows (a gold flute every third voxel) to a gold-edged lip; `monDie` a plain
+  granite die with a gold top edge. `cartouche()` is no longer used.
+- **Houses** (round 15): battered every 4 rows (was 6), a bright team band
+  (`teamb`) under a two-row flared cavetto (`flare: true`) and a bright team
+  line round the roof deck (`block(..., { rimTeam })`, default `TEAM`), as on
+  Retold's blue-rimmed houses (building_04); Archaic mud houses keep the
+  dark line.
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8
