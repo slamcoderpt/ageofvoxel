@@ -21,7 +21,7 @@ const SETUPS := {
 	"vision": ["set", ["ptah", "sekhmet", "horus"], 3.2, 66.0, 56.0, 20.0],
 	"eclipse": ["ra", ["bast", "sobek", "horus"], 4.0, 30.0, 40.0, 28.0],
 	"shifting_sands": ["set", ["ptah", "sekhmet", "horus"], 2.4, 46.0, 50.0, 0.0],
-	"plague_of_serpents": ["isis", ["anubis", "nephthys", "thoth"], 8.0, 26.0, 46.0, 24.0],
+	"plague_of_serpents": ["isis", ["anubis", "nephthys", "thoth"], 3.6, 11.0, 30.0, 24.0],
 	"locust_swarm": ["ra", ["bast", "sobek", "horus"], 5.0, 34.0, 48.0, 24.0],
 	"citadel": ["ra", ["ptah", "sekhmet", "osiris"], 1.2, 34.0, 40.0, 30.0],
 	"ancestors": ["isis", ["bast", "nephthys", "osiris"], 7.0, 32.0, 44.0, 26.0],
@@ -94,8 +94,9 @@ static func scene_setup(game: Node) -> Dictionary:
 		sim.tick(1)
 		sim.order_gather(PackedInt32Array([v]), gfarms[i])
 	var army := []
+	var az := -6.0 if power == "plague_of_serpents" else 0.0   # (drawn back out of the Serpents' guard reach)
 	for i in 18:
-		army.append(u.call("hoplite" if i % 3 else "toxotes", 2, 4.0 + (i % 6) * 1.1, -2.0 + (i / 6) * 1.2, -PI * 0.5))
+		army.append(u.call("hoplite" if i % 3 else "toxotes", 2, 4.0 + (i % 6) * 1.1, az - 2.0 + (i / 6) * 1.2, -PI * 0.5))
 	var focus := Vector2(cx, cz)
 	var x2 := NAN
 	var z2 := NAN
@@ -123,9 +124,12 @@ static func scene_setup(game: Node) -> Dictionary:
 			u.call("priest", 1, 13.0, -7.0)   # (his eyes there: the destination must be visible)
 			focus = Vector2(cx - 1, cz - 4)
 		"plague_of_serpents", "ancestors":
-			if power == "plague_of_serpents":   # (on open ground south of the Greek line: they rise in the clear, then go for it)
+			if power == "plague_of_serpents":
+				# on open, level sand south of the Greek line (drawn back 6 tiles), out of the
+				# Serpents' guard reach (8.4 + 6 tiles): they rise and rear up in the clear, as in
+				# Retold's view of them (power_07)
 				tx = cx + 2
-				tz = cz + 9
+				tz = cz + 10
 			focus = Vector2(tx, tz)
 		"locust_swarm":
 			tx = cx + 2
@@ -211,6 +215,39 @@ static func scene_setup(game: Node) -> Dictionary:
 		focus += Vector2(3.5, 0.0)   # (framed between him and them)
 	var t := float(game.args.get("t", st[2]))
 	sim.tick(int(round(t * 30.0)))
+	if power == "plague_of_serpents" and t >= 0.6:
+		# framed on the two Serpents nearest each other (power_07: two cobras rearing on the
+		# sand), the camera as close as their spacing allows
+		var U: Dictionary = sim.get_units()
+		var names: PackedStringArray = sim.unit_type_names()
+		var sp := []
+		for k in U.ids.size():
+			if int(U.owner[k]) == 1 and names[U.type[k]] == "serpent":
+				sp.append(Vector2(float(U.pos[k * 2]), float(U.pos[k * 2 + 1])))
+		if sp.size() > 4:
+			# later on, the whole brood (and whoever they are fighting) in view
+			var cen := Vector2.ZERO
+			for q in sp:
+				cen += q
+			cen /= sp.size()
+			var far := 0.0
+			for q in sp:
+				far = maxf(far, cen.distance_to(q))
+			focus = cen
+			st = st.duplicate()
+			st[3] = clampf(far * 1.6 + 8.0, 12.0, 28.0)
+			st[4] = 42.0
+		elif sp.size() >= 2:
+			var best := [0, 1]
+			for i in sp.size():
+				for j in range(i + 1, sp.size()):
+					if sp[i].distance_to(sp[j]) < sp[best[0]].distance_to(sp[best[1]]):
+						best = [i, j]
+			var a: Vector2 = sp[best[0]]
+			var c: Vector2 = sp[best[1]]
+			focus = (a + c) * 0.5
+			st = st.duplicate()
+			st[3] = clampf(a.distance_to(c) * 1.2 + 6.0, 9.0, 18.0)
 	focus += Vector2(float(game.args.get("ep_ax", 0.0)), float(game.args.get("ep_az", 0.0)))
 	if not game.args.has("cam"):
 		game.args["cam"] = "%f,%f,%f,%f,%f" % [focus.x, focus.y, float(game.args.get("ep_dist", st[3])),

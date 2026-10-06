@@ -493,7 +493,18 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 				decal(I_DECAL_MIX, f.x, gy + 0.05, f.z, 3.0, sd % 314 / 100.0, 1, 1, 1, (float)(0.85 * k), 0, (float)((sd >> 6) % 1000 / 1000.0), 1.f);
 				const double pk = clamp01(1 - age / 1.2);
 				glow(false, f.x, gy + 1.8, f.z, 0.9, 4.2 * pk + 0.5, col.r, col.g, col.b, 0.9 * pk, 1);
-				puff(false, f.t0, sd, now, f.x, gy + 0.3, f.z, 14, f.kind ? 0x8a8478 : 0xc9a263, 0.8, 1.4, 2.4, 1.6, 0.6, 1.8, 0.4);
+				// the sand thrown up: soft round dust (no hard voxel squares round the serpent rearing
+				// out of it, seen close) and a spray of sand grains
+				puff(false, f.t0, sd, now, f.x, gy + 0.3, f.z, 14, f.kind ? 0x8a8478 : 0xc9a263, 0.8, 1.4, 2.4, 1.6, 0.6, 1.8, 0.4, 1.f);
+				if (age < 1.4)
+					for (int i = 0; i < 26; i++) {
+						const double a = hr(sd, i, 141) * TAU, sp = 1.2 + 2.2 * hr(sd, i, 142), vy = 3 + 3 * hr(sd, i, 143);
+						const double yy = gy + 0.2 + vy * age - 6.0 * age * age;
+						if (yy < gy) continue;
+						const Lin sc = hex_lin(i % 3 ? 0xc9a263 : 0xa8844c);
+						const double s = 0.05 + 0.05 * hr(sd, i, 144);
+						cube(I_DEBRIS, f.x + std::cos(a) * sp * age, yy, f.z + std::sin(a) * sp * age, age * 6 + i, a, i, s, s, s, sc.r, sc.g, sc.b);
+					}
 				puff(true, f.t0, sd ^ 77, now, f.x, gy + 0.6, f.z, 10, f.kind ? 0x3a70ff : 0x30d050, 0.7, 1.6, 0.6, 2.0, 0.4, 1.2, 0.3);
 				if (age < 0.6) lit(f.x, gy + 1.5, f.z, f.kind ? 0x4f90ff : 0x50ff70, 10 * (1 - age / 0.6), 8, 1.8);
 				break;

@@ -118,7 +118,8 @@ private:
 			float g, float b, float flag = 0); // flag: INSTANCE_CUSTOM.y (I_EMBER: 1 emissive)
 	void light(double x, double y, double z, uint32_t hex, double intensity, double dist, double decay);
 	void puff(bool add, double te, uint32_t seed, double now, double x, double y, double z, int count, uint32_t color,
-			double size, double life, double speed, double up, double gravity, double grow, double spread);
+			double size, double life, double speed, double up, double gravity, double grow, double spread,
+			float soft = 0); // soft: puff.gdshader's round ragged puff (I_PUFF only) instead of the voxel square
 	void spawn_strike(double x, double y, double z, uint32_t seed, double t0, bool blast);
 	void step_particles(double now);
 	void init_storm(StormVis &v, double x, double z, double t0, double radius);

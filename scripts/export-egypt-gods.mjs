@@ -2,9 +2,9 @@
 // (json + bin.gz, the format of export-egypt-units.mjs, which VoxelModels.rig() falls back to
 // after "units" and "egypt_units"):
 //   serpent      Plague of Serpents' Serpent (Retold: an animal, a desert cobra rising out of
-//                the sand), a little larger than a man: banded venom-green scales with black
-//                saddles (the power's green: it reads on the sand and in a red Greek line), a
-//                yellow belly, a hood with the army's colour, glowing red eyes and white fangs; the Wadjet's serpent pose
+//                the sand; power_07.jpg), a little larger than a man: olive grey-green scales in a
+//                dark net with blotches of the army's colour along the back, a yellow belly up the
+//                front of an S neck, a broad scaled hood, dark eyes, an open pink mouth; the Wadjet's serpent pose
 //                (anim 'medusa', pose 'serpent': coil, tailA..C, torso) without its wings
 //   phoenix_egg  the Phoenix's Rebirth egg: a gold-and-ember egg with glowing cracks and a
 //                team band, on a ring of charred nest twigs and hot coals (anim 'siege': still)
@@ -84,15 +84,25 @@ const tset = (m, x, y, z, base) => { m.set(x, y, z, TEAM); m.get(x, y, z).c = ba
 
 // ---- the Serpent (0.12) ------------------------------------------------------------------
 {
-  // banded scales: venom green with black saddles every 4 voxels along the body, dark flecks
-  const band = (i) => (Math.floor(i / 4) % 2 === 0);
-  const SC = (x, y, i) => {
+  // Retold's cobra (reference/egypt/power_07.jpg): olive grey-green scales in a dark
+  // reticulated net, big blotches of the army's colour along the back (power_07's "green and
+  // blue" cobras), a yellow belly running up the front of the neck, a broad scaled hood, a
+  // small wedge head with dark eyes and an open pink mouth; the neck rises tall in an S
+  const SCALE = (x, y, i) => {
     const h = hash3(x, y, i, 71);
-    if (band(i)) return h < 0.5 ? 0x16220c : 0x101a08;   // near-black saddle
-    return h < 0.4 ? 0x4e8e26 : h < 0.8 ? 0x447e20 : 0x5a9c2e; // venom green (the power's colour: reads on the sand and against a red army)
+    if (((x + 2 * y + i) % 3 + 3) % 3 === 0) return h < 0.5 ? 0x343a22 : 0x2c321c;   // the dark net between scales
+    return h < 0.35 ? 0x6c7848 : h < 0.7 ? 0x5e6a3e : 0x76825a;                       // olive grey-green
   };
-  const BELLY = 0xe8dc78, BELLY_SH = 0xbcae58; // a yellow belly
-  // a low coil, one and a half turns lying on the sand, the neck rising out of its middle
+  // the team blotches: 3 of every 6 voxels along the back, net-broken like the scales
+  const blot = (i) => ((i % 6) + 6) % 6 < 3;
+  const SC = (m, x, y, z, xx, yy, i) => {
+    if (blot(i) && yy >= 0 && ((xx + yy + i) % 3 + 3) % 3 !== 0) {
+      if (hash3(xx, yy, i, 72) < 0.55) m.set(x, y, z, TEAM); else tset(m, x, y, z, TEAM_SHADE);
+    } else m.set(x, y, z, SCALE(xx, yy, i));
+  };
+  const BELLY = 0xd8c45c, BELLY_SH = 0xb09c40, BELLY_BAR = 0x8a7a30; // a yellow belly in broad plates
+  const belly = (i) => (i % 3 === 0 ? BELLY_BAR : BELLY);
+  // a low coil, one and a quarter turns lying on the sand, the neck rising out of its middle
   const coil = new VoxelModel();
   for (let a = 0; a < 40; a++) {
     const th = (a / 40) * Math.PI * 2 * 1.25;
@@ -101,51 +111,61 @@ const tset = (m, x, y, z, base) => { m.set(x, y, z, TEAM); m.get(x, y, z).c = ba
     const yy = a > 28 ? 1 + (a - 28) * 0.25 : 1;
     for (let y = -2; y <= 2; y++) for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
       if (dx * dx + dz * dz + y * y > 4.2) continue;
-      const vy = Math.round(yy + y);
-      coil.set(Math.round(cx + dx), vy, Math.round(cz + dz), y <= -1 ? (y === -2 ? BELLY_SH : BELLY) : SC(dx, y, a));
+      const vx = Math.round(cx + dx), vy = Math.round(yy + y), vz = Math.round(cz + dz);
+      if (y <= -1) coil.set(vx, vy, vz, y === -2 ? BELLY_SH : belly(a));
+      else SC(coil, vx, vy, vz, dx, y, a);
     }
   }
   // the neck rising (into the torso's joint)
   for (let y = 2; y <= 7; y++) for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) {
     if (x * x + z * z > 3.2) continue;
-    coil.set(x, y, z + 1, z >= 1 ? BELLY : SC(x, z, 40 + y));
+    if (z >= 1) coil.set(x, y, z + 1, belly(y + 40)); else SC(coil, x, y, z + 1, x, z + 2, 40 + y);
   }
   // the tail: three tapering segments trailing behind (the rig sways them)
   const seg = (len, r0, r1, i0) => {
     const m = new VoxelModel();
     for (let z = 0; z < len; z++) {
       const r = r0 + (r1 - r0) * (z / len);
-      for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++)
-        if (x * x + y * y <= r * r + 0.3) m.set(x, y, -z, y < -r * 0.4 ? BELLY : SC(x, y, i0 + z));
+      for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) {
+        if (x * x + y * y > r * r + 0.3) continue;
+        if (y < -r * 0.4) m.set(x, y, -z, belly(i0 + z)); else SC(m, x, y, -z, x, y + 2, i0 + z);
+      }
     }
     return m;
   };
-  // the raised head: a slim scaled neck (a thin cream throat stripe), a cobra's hood spread
-  // wide (its front pale with dark throat bars, its back the army's colour), a small wedge
-  // head of dark olive with glowing red eyes, white fangs and a flicker of tongue
+  // the raised neck and head: the neck an S (back, then forward under the head), the yellow
+  // belly plates up its front, the hood spread wide behind the head (scaled olive with the dark
+  // net, a darker rim, the yellow throat in front with two dark bars), the head a small wedge
   const head = new VoxelModel();
-  for (let y = 0; y <= 9; y++) for (let x = -1; x <= 1; x++) for (let z = -1; z <= 1; z++) {
+  const NZ = (y) => Math.round(-1.4 * Math.sin((y / 11) * Math.PI * 1.3));   // the S
+  for (let y = 0; y <= 11; y++) for (let x = -1; x <= 1; x++) for (let z = -1; z <= 1; z++) {
     if (x * x + z * z > 1.6) continue;
-    head.set(x, y, z, z >= 1 && x === 0 ? BELLY : SC(x, z, 60 + y));
+    const vz = z + NZ(y);
+    if (z >= 1) head.set(x, y, vz, belly(60 + y)); else SC(head, x, y, vz, x, z + 2, 60 + y);
   }
-  for (let y = 3; y <= 9; y++) {
-    const w = Math.round(3.6 - Math.abs(y - 6.5) * 0.65);
+  for (let y = 4; y <= 11; y++) {
+    const w = Math.round(4.2 - Math.abs(y - 8) * 0.75);
+    if (w < 2) continue;
+    const zb = NZ(y);
     for (let x = -w; x <= w; x++) {
       const edge = Math.abs(x) >= w;
-      if (edge) head.set(x, y, -1, 0x241608);
-      else if ((x + y) % 2) head.set(x, y, -1, TEAM);   // the hood's back: the army's colour
-      else tset(head, x, y, -1, TEAM_SHADE);
-      // the hood's front: pale scales, dark bars across the throat
-      head.set(x, y, 0, edge ? 0x241608 : (y === 4 || y === 7) ? 0x2a1a0c : Math.abs(x) <= 1 ? BELLY : 0xa8c050);
+      const h = hash3(x, y, 0, 73);
+      // the hood's back: scales in the net, a darker rim
+      head.set(x, y, zb - 1, edge ? 0x2a301a : (((x + 2 * y) % 3 + 3) % 3 === 0 ? 0x30361e : h < 0.5 ? 0x6c7848 : 0x5e6a3e));
+      // its front: the yellow throat in the middle, olive scales out to the rim, two dark bars
+      if (Math.abs(x) <= 1) head.set(x, y, zb, y === 6 || y === 9 ? 0x3a3418 : BELLY);
+      else head.set(x, y, zb, edge ? 0x2a301a : h < 0.5 ? 0x8a9460 : 0x7c8652);
     }
   }
-  const HD = (x, y, z) => { const h = hash3(x, y, z, 77); return y >= 11 ? (h < 0.5 ? 0x24400e : 0x2c4a12) : (h < 0.5 ? 0x3e6a1c : 0x365e18); };
-  head.box(-1, 10, -1, 3, 2, 4, HD);
-  head.box(-1, 10, 3, 3, 1, 1, HD);
-  head.set(0, 11, 3, 0x24400e);
-  head.set(-2, 11, 1, 0xff2a10, { glow: 0.9 }).set(2, 11, 1, 0xff2a10, { glow: 0.9 });
-  head.set(-1, 9, 3, 0xfaf4e8).set(1, 9, 3, 0xfaf4e8);   // fangs
-  head.set(0, 10, 4, 0xc02020);                          // a flicker of tongue
+  const zh = NZ(11);
+  const HD = (x, y, z) => { const h = hash3(x, y, z, 77); return y >= 13 ? (h < 0.5 ? 0x4c5632 : 0x56603a) : (h < 0.5 ? 0x68744a : 0x5e6a40); };
+  head.box(-1, 12, zh - 1, 3, 2, 4, HD);      // the skull
+  head.box(-1, 12, zh + 3, 3, 1, 1, HD);      // the snout
+  head.set(0, 13, zh + 3, 0x4c5632);
+  head.set(-2, 13, zh + 1, 0x14140c).set(2, 13, zh + 1, 0x14140c);   // dark eyes
+  head.box(-1, 11, zh + 1, 3, 1, 3, () => 0xc86a78);                  // the open mouth, pink
+  head.set(-1, 11, zh + 3, 0xfaf4e8).set(1, 11, zh + 3, 0xfaf4e8);   // fangs
+  head.box(-1, 10, zh, 3, 1, 3, () => BELLY_SH);                      // the lower jaw
   rig('serpent', { voxel: 0.12, anim: 'medusa', style: 'serpent', pose: 'serpent' }, [
     part('coil', coil, [0, 0, 0], [0, 0, 0]),
     part('tailA', seg(7, 2.0, 1.6, 100), [0, 0, 0], [-3, 1, -5], 'coil'),

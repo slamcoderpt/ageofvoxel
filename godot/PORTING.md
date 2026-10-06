@@ -3101,16 +3101,25 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   custom.y = 1 draws a soft, ragged round smoke puff instead of the voxel square. (The web build's
   AgX fallback clamps the negative blue to 0: there the fire is a plain warm orange.)
 - Models (scripts/export-egypt-gods.mjs -> assets/models/egypt_gods, VoxelModels.rig()'s third
-  group after "units" and "egypt_units"): the Serpent (a venom-green cobra with black saddles
-  and a yellow belly, the power's green, at 0.12 a voxel a little taller than a man so it reads
-  on the sand and in a red Greek line; rising from a low coil, its hood's back in the army's
-  colour, red eyes; the Wadjet's serpent pose without wings) and the Phoenix Egg (a fire-coloured egg with glowing cracks and a team band on a
+  group after "units" and "egypt_units"): the Serpent (Retold's cobra, power_07.jpg: olive
+  grey-green scales in a dark net with blotches of the army's colour along the back and tail, a
+  yellow belly in plates up the front of an S-curved neck, a broad scaled hood with a darker rim
+  and a yellow throat with two dark bars, a small head with dark eyes, an open pink mouth and
+  fangs; at 0.12 a voxel a little taller than a man, rearing from a low coil; the Wadjet's
+  serpent pose without wings) and the Phoenix Egg (a fire-coloured egg with glowing cracks and a team band on a
   charred nest with coals; still). `node scripts/godot-shoot.mjs --scene egypt_units --params
   "eu_one=serpent"` / `eu_one=phoenix_egg`.
 - Capture: `node scripts/godot-shoot.mjs --scene egypt_powers --params "power=tornado&t=6"`
   (power = any key above, or rebirth (a Phoenix falls, its egg), roc (boarding), roc_unload;
-  the Tornado and Thoth's Meteor strike a grove; Plague of Serpents rises on open ground south
-  of the Greek line, default t = 8 when the serpents are at it; ep_dist / ep_pitch / ep_yaw / ep_ax / ep_az framing).
+  the Tornado and Thoth's Meteor strike a grove; Plague of Serpents rises on open, level sand
+  10 tiles south of the scene's centre with the Greek army drawn back 6 tiles, out of the
+  Serpents' guard reach, default t = 3.6: the camera frames the two Serpents nearest each other
+  (distance from their spacing, 9..18) so the shot is power_07's, cobras rearing on the sand
+  with the glyph ring and spiral round them and the next two rising; past 4 serpents it frames
+  the whole brood (t=12: the Greeks come at them); ep_dist / ep_pitch / ep_yaw / ep_ax / ep_az framing).
+  Each serpent / Minion rises in soft round dust (puff(..., soft = 1): puff.gdshader's ragged
+  puff, not the voxel square that read as pale boxes round a serpent seen close) and a spray of
+  sand grains. All fifteen keys capture (checked round 8, each power at its default t).
 - Check: `godot --headless --path godot -s res://game/core/egypt_gods_check.gd [-- --only=defs,gods,passives,model,rain,prosperity,vision,eclipse,sands,serpents,locusts,citadel,ancestors,son,tornado,meteor,myth,techs,bounds,determinism,phantom,blocks,allies,trees,split,roc,immunity,noheal,volleys,shield_preview,eclipse_abilities,ai]` (~5 min, 44 cases: eclipse.abilities_and_west_wind (`--only=eclipse_abilities`) = the Eclipse's x1.2 on the abilities (Anubite Jump 10.5 -> 12.6 on a hoplite, Wadjet venom 1.25 -> 1.5 per 0.5 s, the Mummy's curse hit + damage over time x1.2), each on the first myth unit spawned after the 30-tick ability rescan (it leaps / curses at once), and Force of the West Wind on the Sphinx's 9 crush (a blow on a House 13.8 -> 15.08); immunity = a Zeus Bolt / Lightning Storm / Meteor and an Egyptian foe's Locust Swarm / Thoth's Meteor strike the spearmen beside a Son and a Roc, never them; son.heal (`--only=noheal`) = a spearman +20 in 2 s by a Pharaoh, +30 by the Son, +45 by the Son and a Priest, the Son's hp unchanged (he heals allies 15 hp/s and is never healed); son.divine = his first bolt and chain 50.75 divine (x3 vs myth); allies.citadel_son = the Citadel's hack blow x0.9 (3.15 -> 2.835) and an ally's Son healing; volleys = Egyptian TC 2 arrows a volley, Greek 1, Citadel 3 at three men; shield.preview = cast_check refuses under a Divine Shield as the cast does).
 - **AI** (combat/enemy_ai.cpp `egypt_powers`): an Egyptian seat casts its gods' powers through
   the same cast_check / cast2 as the HUD, deterministic: Tornado / Thoth's Meteor / Plague of

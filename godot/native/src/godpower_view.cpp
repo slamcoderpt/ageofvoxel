@@ -335,7 +335,7 @@ void AovGodpowerView::light(double x, double y, double z, uint32_t hex, double i
 
 // One Particles.js emit({...}) evaluated in closed form at `now` (drag 1).
 void AovGodpowerView::puff(bool add, double te, uint32_t seed, double now, double x, double y, double z, int count, uint32_t color,
-		double size, double life, double speed, double up, double gravity, double grow, double spread) {
+		double size, double life, double speed, double up, double gravity, double grow, double spread, float soft) {
 	if (now < te) return;
 	const Lin c = hex_lin(color);
 	for (int i = 0; i < count; i++) {
@@ -359,7 +359,7 @@ void AovGodpowerView::puff(bool add, double te, uint32_t seed, double now, doubl
 		bs.rows[1] = Vector3(0, (real_t)s, 0);
 		bs.rows[2] = Vector3(0, 0, 1);
 		inst(add ? I_FLAME : I_PUFF, bs, X, Y, Z, (float)(c.r * k), (float)(c.g * k), (float)(c.b * k), (float)al,
-				(float)((seed ^ (uint32_t)i) % 997) / 997.f);
+				(float)((seed ^ (uint32_t)i) % 997) / 997.f, add ? 0.f : soft);
 	}
 }
 

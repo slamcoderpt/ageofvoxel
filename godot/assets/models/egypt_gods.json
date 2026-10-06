@@ -2,7 +2,7 @@
  "format": 2,
  "group": "egypt_gods",
  "bin": "egypt_gods.bin.gz",
- "bytes": 310384,
+ "bytes": 321328,
  "rigs": {
   "serpent": {
    "voxel": 0.12,
@@ -201,21 +201,21 @@
    "index": 134288
   },
   "serpent/torso": {
-   "vertices": 1032,
-   "indices": 1548,
+   "vertices": 1320,
+   "indices": 1980,
    "aabb": [
-    -0.36,
+    -0.48,
     0,
-    -0.12,
-    0.48,
-    1.44,
+    -0.24,
+    0.6,
+    1.68,
     0.6
    ],
    "position": 135584,
-   "normal": 147968,
-   "color": 160352,
-   "extra": 164480,
-   "index": 168608
+   "normal": 151424,
+   "color": 167264,
+   "extra": 172544,
+   "index": 177824
   },
   "phoenix_egg/frame": {
    "vertices": 1776,
@@ -228,11 +228,11 @@
     0.16,
     0.56
    ],
-   "position": 174800,
-   "normal": 196112,
-   "color": 217424,
-   "extra": 224528,
-   "index": 231632
+   "position": 185744,
+   "normal": 207056,
+   "color": 228368,
+   "extra": 235472,
+   "index": 242576
   },
   "phoenix_egg/body": {
    "vertices": 1792,
@@ -245,11 +245,11 @@
     1.28,
     0.4
    ],
-   "position": 242288,
-   "normal": 263792,
-   "color": 285296,
-   "extra": 292464,
-   "index": 299632
+   "position": 253232,
+   "normal": 274736,
+   "color": 296240,
+   "extra": 303408,
+   "index": 310576
   }
  }
 }
