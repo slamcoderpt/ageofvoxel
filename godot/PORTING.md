@@ -1199,6 +1199,39 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   construction stages leave it out. `--preview <type>[:variant]
   --preview-out f.json` dumps one model's voxels (insets included) without
   exporting, for a quick offline look.
+- **God statues, round 18** (`cleanStatue()`, Monument to the Gods, the
+  Temple's and the Town Center's gods): every arm is one continuous limb, a
+  rounded shoulder cap over the torso's corner (half-width 6..9) running into
+  the upper arm against the chest side (x 7..9), the elbow, forearm and fist
+  (no free-floating upper-arm pillars). New `arms: 'staff'` (Ra and Set on
+  the Monument): the near (right, -x) forearm level and forward, its fist
+  round an upright 2 x 2 gold was-sceptre from a forked foot on the plinth to
+  an angled, snouted head above the god's head; the far arm hanging, an ankh
+  (loop, bar, stem, foot; two voxels deep) held by its loop. `crossed`
+  (Temple / Town Center) gets the same shoulder caps and elbows turning
+  forward into the crossed forearms. `wings` (Isis): arms swept out and down
+  on the diagonal (a 3 x 3 section from the shoulder cap to clenched fists),
+  a wing hanging behind each arm along its whole length (gold leading edge,
+  lapis coverts with gold scallops, a gold line, gold primaries split by dark
+  lines, tips stepping down toward the body). Heads: the falcon (Ra) a gold
+  head (`SG` / `SG_L`, outside the polish ramp so the face stays one clean
+  plane) narrowing to the throat under a domed crown, a horn-brown beak
+  stepping three voxels out and down to a black hooked tip under an ivory
+  cere, dark eyes with a glint, gold brows, a dark malar teardrop; the jackal
+  (Set / Anubis) a narrow skull hugged by the striped wig, a muzzle six voxels
+  out (tapering, a light bridge, a dark mouth line, a black nose), gold-ringed
+  eyes, tall two-deep ears gilt inside and leaning out; the goddess (Isis)
+  two-row ivory eyes with kohl pupils under gold brows, a gold kohl line and
+  a short warm lip line. `o.god` (set by `toClean()` for falcon, jackal and
+  Isis' horns) remaps the polished granite to a lighter blue-grey slate
+  (`GOD_SLATE`: recess 0x1f2432, base 0x353d50, highlight 0x58637a, face
+  0x4b556c), a real mid-tone between the dark recesses and the gold (no green
+  in it: it turns olive under the warm light). The Monument's four sun bowls
+  are no flat discs: a gold foot, a flaring bowl, a rolled rim beaded light /
+  dark gold, a sunk bed of embers and a tapering red-orange flame (low glow;
+  orange-yellows take the shader's gilt shading and wash to cream, bright
+  reds to pink). Look at `--params
+  "egt_row=monument_gods/ra/a1,monument_gods/set/a1,monument_gods/isis/a1&egt_pitch=40&egt_lift=3&egt_dist=18"`.
 - **Statue anatomy and material, round 17** (`cleanStatue()`,
   `polishStatue()`): the standing figures (`stride`, `stand`) are taller (kn
   +6: the head about a seventh of the figure) and in the canonical pose: the

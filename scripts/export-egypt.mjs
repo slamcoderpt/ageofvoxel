@@ -2837,8 +2837,10 @@ const LAPIS_S = 0x34558c, KOHL = 0x1a2a4a, IVORY = 0xe8dcc0;
 function toClean(o) {
   const head = o.head === 'falcon' || o.head === 'jackal' ? o.head : (o.crown ?? 'nemes') === 'nemes' ? 'nemes' : o.crown === 'tall' || o.crown === 'atef' ? 'double' : 'wig';
   const crown = o.crown === 'disc' || o.crown === 'horns' ? o.crown : o.crown === 'vulture' ? 'modius' : null;
-  const arms = o.arms === 'bowls' ? 'pots' : o.arms === 'wings' ? 'wings' : o.arms === 'side' || o.arms === 'embrace' ? 'side' : 'crossed';
-  return { pose: o.pose ?? 'stride', head, crown, arms, kilt: o.kilt === undefined || o.kilt === BASALT ? GRAN : CG, kiltFront: o.kiltFront === undefined ? TEAMB : o.kiltFront };
+  const arms = o.arms === 'bowls' ? 'pots' : o.arms === 'wings' ? 'wings' : o.arms === 'staff' ? 'staff' : o.arms === 'side' || o.arms === 'embrace' ? 'side' : 'crossed';
+  // the gods (falcon, jackal, Isis' horns) in the lighter slate stone (round 18)
+  const god = head === 'falcon' || head === 'jackal' || crown === 'horns';
+  return { pose: o.pose ?? 'stride', head, crown, arms, god, kilt: o.kilt === undefined || o.kilt === BASALT ? GRAN : CG, kiltFront: o.kiltFront === undefined ? TEAMB : o.kiltFront };
 }
 function cleanStatue(m, cx, y0, cz, o = {}) {
   const { pose = 'stride', head = 'nemes', arms = 'side', kiltFront = TEAMB } = o;
@@ -3001,9 +3003,58 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     B(-12, -9, 25 + kn, 27 + kn, 2, 4, GRAN);                            // the forearm across
     B(-10, -9, 25 + kn, 27 + kn, 2, 4, CG_L);                            // the bracelet
     B(-13, -11, 24 + kn, 27 + kn, 2, 4, GRAN);                           // the hand on his arm
+  } else if (arms === 'staff') {
+    // a god (round 18): both arms one continuous limb from a rounded
+    // shoulder cap over the torso's corner, the upper arm against the chest
+    // side, the elbow, the forearm, the fist. The near (right, -x) arm bent
+    // forward, its fist holding the was-sceptre upright (a forked foot on the
+    // plinth, a gold shaft, the angled animal head above the god's head); the
+    // far (left, +x) arm hanging, the fist holding an ankh by its loop
+    M(6, 10, 32 + kn, 35 + kn, -3, 3, GRAN);                             // shoulder caps
+    M(6, 9, 35 + kn, 36 + kn, -2, 2, GRAN);
+    M(7, 10, 26 + kn, 32 + kn, -2, 2, GRAN);                             // upper arms
+    M(7, 10, 29 + kn, 30 + kn, -2, 2, CG_L);                             // armlets
+    // the far arm, hanging: the forearm, wrist, fist, bracelet
+    B(7, 10, 20 + kn, 26 + kn, -2, 2, GRAN);
+    B(7, 10, 19 + kn, 20 + kn, -1, 1, GRAN);
+    B(7, 10, 15 + kn, 19 + kn, -2, 2, GRAN);
+    B(7, 10, 17 + kn, 18 + kn, 1, 2, GRAN_D);                            // knuckles
+    B(7, 10, 20 + kn, 21 + kn, -2, 2, CG_L);
+    // the ankh hanging from it by the loop (two voxels deep, in gold)
+    for (const z of [-1, 0]) {
+      set(7, 14 + kn, z, CG_L); set(9, 14 + kn, z, CG_L);                // the loop's sides
+      set(7, 13 + kn, z, CG_L); set(9, 13 + kn, z, CG_L);
+      for (let x = 6; x < 11; x++) set(x, 12 + kn, z, CG_L);             // the bar
+      for (let y = 7; y < 12; y++) set(8, y + kn, z, CG_L);              // the stem
+      for (let x = 7; x < 10; x++) set(x, 6 + kn, z, CG_L);              // its foot
+    }
+    // the near arm, bent forward at the elbow: the forearm level, the fist
+    // forward round the sceptre, a bracelet
+    B(-10, -7, 23 + kn, 27 + kn, -2, 3, GRAN);                           // the elbow
+    B(-10, -7, 23 + kn, 26 + kn, 3, 6, GRAN);                            // the forearm
+    B(-10, -7, 23 + kn, 26 + kn, 3, 4, CG_L);                            // the bracelet
+    B(-11, -7, 22 + kn, 27 + kn, 6, 9, GRAN);                            // the fist
+    B(-11, -10, 23 + kn, 26 + kn, 8, 9, GRAN_D);                         // the knuckles' line
+    // the was-sceptre through the fist: a 2 x 2 gold shaft from the plinth
+    // to above the head, the forked foot, the head angled forward with a snout
+    const top = 53 + kn;
+    for (let y = 2; y < top; y++) if (y < 22 + kn || y >= 27 + kn) B(-10, -8, y, y + 1, 7, 9, CG);
+    B(-10, -8, 0, 2, 6, 7, CG_L); B(-10, -8, 0, 2, 9, 10, CG_L); B(-10, -8, 1, 2, 7, 9, CG_L);   // the fork
+    B(-10, -8, top, top + 2, 6, 10, CG_L);                               // the head, forward
+    B(-10, -8, top - 1, top, 10, 11, CG_L);                              // its snout, hooked down
+    B(-10, -8, top + 2, top + 3, 6, 8, CG);                              // the ears behind
   } else if (arms === 'crossed') {
-    // forearms crossed on the chest as two plain blocks, the fists forward
-    if (pose !== 'mummy') M(9, 12, 28 + kn, 35 + kn, -2, 2, GRAN);   // upper arms
+    // forearms crossed on the chest as two plain blocks, the fists forward;
+    // the upper arms join the torso under rounded shoulder caps (round 18:
+    // no gap, no floating pillars)
+    if (pose !== 'mummy') {
+      M(6, 10, 32 + kn, 35 + kn, -3, 3, GRAN);
+      M(6, 9, 35 + kn, 36 + kn, -2, 2, GRAN);
+      B(7, 10, 27 + kn, 32 + kn, -2, 2, GRAN); B(-10, -7, 30 + kn, 32 + kn, -2, 2, GRAN);
+      B(7, 10, 30 + kn, 31 + kn, -2, 2, CG_L);
+      B(7, 10, 27 + kn, 30 + kn, 2, 6, GRAN);                  // the elbows, turning forward
+      B(-10, -7, 30 + kn, 33 + kn, 2, 6, GRAN);
+    }
     B(-5, 9, 27 + kn, 30 + kn, 4, 6, GRAN);
     B(-9, 5, 30 + kn, 33 + kn, 4, 6, GRAN);
     B(-8, -5, 27 + kn, 31 + kn, 4, 7, GRAN);                   // fists
@@ -3015,13 +3066,30 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     // under each as one flat panel: lapis coverts under the arm, a gold
     // line, then long primaries in gold / lapis stripes two voxels wide,
     // the lower edge sweeping down toward the hand
-    M(9, 19, 31 + kn, 34 + kn, -1, 2, GRAN);
-    M(15, 16, 31 + kn, 34 + kn, -1, 2, CG);                              // bracelets
-    for (let x = 9; x < 19; x++) {
-      const bot = 21 - Math.floor((x - 9) * 0.9);
-      for (let y = bot; y < 31; y++) {
-        const c = y >= 28 ? ST_LAPIS : y === 27 ? CG_L : (Math.floor((x - 9) / 2) & 1 ? ST_LAPIS : CG);
-        set(x, y + kn, 0, c); set(-1 - x, y + kn, 0, c);
+    // (round 18: one continuous limb, no gap at the shoulder) a rounded
+    // shoulder cap over the torso's corner, the arm running out and down on
+    // the diagonal (a 3 x 3 section swept from the shoulder to the wrist), a
+    // gold bracelet, a clenched fist; the wing hanging behind the arm from
+    // its whole length: a gold leading edge, lapis coverts with gold
+    // scallops, a gold line, long gold primaries split by dark lines, the
+    // tips stepping down toward the body
+    const P = (x, y, z, c) => { set(x, y, z, c); set(-1 - x, y, z, c); };
+    M(5, 9, 32 + kn, 36 + kn, -3, 3, GRAN);
+    M(5, 8, 36 + kn, 37 + kn, -2, 2, GRAN);
+    const yArm = (x) => 33 - (x - 8) * 8 / 7;
+    for (let s = 0; s <= 14; s++) {
+      const t = s / 14, ax = Math.round(8 + 7 * t), ay = Math.round(33 - 8 * t), az = Math.round(2 * t);
+      for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (let k = -1; k <= 1; k++) P(ax + i, ay + j + kn, az + k, s === 11 || s === 12 ? CG_L : GRAN);
+    }
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 4; j++) for (let k = 0; k < 3; k++) P(15 + i, 22 + j + kn, 2 + k, GRAN);   // the fists
+    for (let i = 0; i < 3; i++) P(15 + i, 23 + kn, 5, GRAN_D);                                                           // knuckles
+    for (let x = 7; x < 19; x++) {
+      const top = Math.round(yArm(Math.min(x, 16))) + (x < 9 ? 1 : 2);
+      const bot = Math.round(9 + (x - 6) * 0.25) - ((x & 1) ? 0 : 1);
+      for (let y = bot; y <= top; y++) for (const z of [-2, -1]) {
+        const d = top - y;
+        const c = d === 0 ? CG_L : d <= 3 ? ((d === 2 && (x & 1)) ? CG_L : ST_LAPIS) : d === 4 ? CG_L : y === bot ? CG_D : ((x - 6) % 3 === 2 ? CG_D : CG);
+        P(x, y + kn, z, c);
       }
     }
   } else if (arms === 'pots') {
@@ -3050,11 +3118,18 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     S(4, 38 + kn, 46 + kn, -3, 4, (x, y, z) => (z === 3 ? GRAN_F : GRAN));
     B(-1, 1, 41 + kn, 45 + kn, 4, 5, GRAN_F);                  // the nose ridge
     B(-1, 1, 41 + kn, 42 + kn, 4, 5, GRAN);                    // its tip
-    M(1, 4, 45 + kn, 46 + kn, 3, 4, LAPIS_S);                  // the brows
+    M(1, 4, 45 + kn, 46 + kn, 3, 4, o.god ? CG_L : LAPIS_S);   // the brows (a goddess': gold)
     M(1, 3, 43 + kn, 44 + kn, 3, 4, IVORY);                    // the eyes
     M(1, 2, 43 + kn, 44 + kn, 3, 4, KOHL);                     // pupils
-    M(3, 4, 43 + kn, 44 + kn, 3, 4, LAPIS_S);                  // the kohl line
+    M(3, 4, 43 + kn, 44 + kn, 3, 4, o.god ? CG_L : LAPIS_S);   // the kohl line
     B(-2, 2, 39 + kn, 40 + kn, 3, 4, GRAN_D);                  // the mouth
+    if (o.god) {
+      // a goddess' face that reads at RTS zoom: the eye whites two rows
+      // deep under gold brows, the lips a short warm line
+      M(1, 3, 44 + kn, 45 + kn, 3, 4, IVORY);
+      M(1, 2, 44 + kn, 45 + kn, 3, 4, KOHL);
+      B(-1, 1, 39 + kn, 40 + kn, 3, 4, 0x4a2420);
+    }
     if (pose !== 'dress') {
       B(-1, 1, 34 + kn, 38 + kn, 3, 5, GRAN);                  // the false beard
       B(-1, 1, 34 + kn, 35 + kn, 3, 5, CG);
@@ -3082,29 +3157,55 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     }
   }
   if (head === 'falcon') {
-    // Horus / Ra: a gold falcon's head as one block, a dark hooked beak, dark
-    // eyes with the falcon's stripe running down under them
+    // Horus / Ra (round 18: a real falcon's profile): a gold head narrowing
+    // to the throat with a domed crown, a dark beak three voxels out from
+    // the face stepping down and out to a hooked tip, a pale cere
+    // at its root; large dark eyes with a glint under gold brows, the
+    // falcon's dark malar stripe running down each cheek
     const Y = kn;
-    S(4, 38 + Y, 46 + Y, -3, 4, (x, y, z) => (z === 3 ? CG_L : CG));
-    S(3, 46 + Y, 47 + Y, -2, 3, CG);                           // the rounded crown of the head
-    B(-1, 1, 41 + Y, 45 + Y, 4, 6, CG_L);                      // the beak's ridge
-    B(-1, 1, 40 + Y, 42 + Y, 6, 7, GRAN_D);                    // its dark hooked tip
-    B(-1, 1, 39 + Y, 41 + Y, 4, 5, CG_D);                      // the gape
-    M(1, 3, 43 + Y, 44 + Y, 3, 4, GRAN_D);                     // eyes
-    M(1, 2, 44 + Y, 45 + Y, 3, 4, LAPIS_S);                    // the brow over them
-    M(2, 3, 40 + Y, 43 + Y, 3, 4, GRAN_D);                     // the malar stripe
+    // (the head's golds are outside polishStatue's ramp, so the face stays
+    // one clean gold plane behind the dark beak and eyes, not shaded dark)
+    S(3, 38 + Y, 40 + Y, -3, 3, SG);                           // the throat
+    S(4, 40 + Y, 46 + Y, -3, 4, SG);                           // the head
+    S(3, 46 + Y, 47 + Y, -2, 3, SG_L);                         // the domed crown
+    S(2, 47 + Y, 48 + Y, -1, 2, SG_L);
+    // the beak: a diagonal hook, each step a voxel further out and a
+    // voxel lower, three rows deep at the root and one at the tip
+    // (horn-brown, so it reads apart from the black eyes and stripes)
+    const HORN = 0x4e3a22;
+    B(-1, 1, 42 + Y, 45 + Y, 4, 5, HORN);                      // the root
+    B(-1, 1, 44 + Y, 45 + Y, 4, 5, IVORY);                     // the cere
+    B(-1, 1, 41 + Y, 44 + Y, 5, 6, HORN);
+    B(-1, 1, 40 + Y, 42 + Y, 6, 7, GRAN_D);
+    B(-1, 1, 39 + Y, 40 + Y, 6, 7, GRAN_D);                    // the hooked tip
+    B(-1, 1, 41 + Y, 42 + Y, 4, 5, CG_D);                      // the gape under it
+    M(2, 3, 43 + Y, 45 + Y, 3, 4, GRAN_D);                     // the eyes, front
+    M(2, 3, 44 + Y, 45 + Y, 3, 4, IVORY);                      // glints
+    M(3, 4, 43 + Y, 45 + Y, 2, 3, GRAN_D);                     // and round the side
+    M(2, 4, 45 + Y, 46 + Y, 3, 4, SG_L);                       // gold brows
+    M(2, 3, 41 + Y, 43 + Y, 3, 4, GRAN_D);                     // the malar stripe, a teardrop
   } else if (head === 'jackal') {
-    // a jackal's head in granite: a long square snout, tall pointed ears gilt inside
+    // a jackal's head (round 18: Anubis' profile): a narrow skull, a long
+    // muzzle six voxels out from the face, tapering, with a lighter bridge,
+    // a dark mouth line and a black nose; gold-ringed eyes; tall pointed
+    // ears two voxels deep, gilt inside, leaning out; the wig hugging the skull
     const Y = kn;
-    S(4, 38 + Y, 46 + Y, -3, 4, GRAN);
-    B(-2, 2, 39 + Y, 43 + Y, 4, 7, GRAN);
-    B(-1, 1, 39 + Y, 42 + Y, 7, 9, GRAN);                      // the muzzle
-    B(-1, 1, 41 + Y, 42 + Y, 9, 10, GRAN_D);                   // the nose
-    M(2, 4, 44 + Y, 45 + Y, 3, 4, CG);                         // gold eyes
-    for (let y = 46; y < 54; y++) {                            // the ears
-      const w = y < 49 ? 3 : y < 52 ? 2 : 1, xa = 1 + Math.floor((y - 46) / 4);
+    S(3, 38 + Y, 47 + Y, -3, 3, GRAN);                         // the skull
+    S(2, 47 + Y, 48 + Y, -2, 2, GRAN);
+    M(3, 5, 38 + Y, 46 + Y, -4, 2, stripe);                    // the wig against it
+    B(-2, 2, 39 + Y, 44 + Y, 3, 5, GRAN);                      // the muzzle's root
+    B(-1, 1, 40 + Y, 43 + Y, 5, 9, GRAN);                      // the muzzle
+    B(-1, 1, 43 + Y, 44 + Y, 3, 7, GRAN_F);                    // the bridge, light
+    B(-1, 1, 42 + Y, 43 + Y, 7, 9, GRAN_F);
+    B(-1, 1, 41 + Y, 43 + Y, 9, 10, GRAN_D);                   // the nose
+    B(-1, 1, 40 + Y, 41 + Y, 5, 9, GRAN_D);                    // the mouth line
+    B(-1, 1, 39 + Y, 40 + Y, 3, 7, GRAN);                      // the lower jaw
+    M(1, 3, 44 + Y, 45 + Y, 2, 3, CG_L);                       // gold-ringed eyes
+    M(1, 2, 44 + Y, 45 + Y, 2, 3, KOHL);
+    for (let y = 47; y < 56; y++) {                            // the ears
+      const w = y < 53 ? 2 : 1, xa = 1 + Math.floor((y - 47) / 5);
       M(xa, xa + w, y + Y, y + Y + 1, -1, 1, GRAN);
-      if (w > 1 && y < 52) M(xa + (w > 2 ? 1 : 0), xa + w - (w > 2 ? 1 : 0), y + Y, y + Y + 1, 1, 2, CG);
+      if (y > 47 && y < 53) M(xa, xa + 1, y + Y, y + Y + 1, 1, 2, CG);
     }
   }
   if (o.crown === 'disc') {
@@ -3173,7 +3274,18 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     B(-1, 1, 47 + Y, 49 + Y, 5, 6, CG);                        // the uraeus
   }
   polishStatue(m, touched);
+  // the gods (round 18) in a lighter blue-grey slate with a real mid-tone
+  // between the near-black recesses and the gold, so their forms read
+  if (o.god) for (const [x, y, z] of touched) {
+    const v = m.get(x, y, z), c = v && GOD_SLATE.get(v.c);
+    if (c !== undefined) v.c = c;
+  }
 }
+// (blue-grey: anything with green in it turns olive under the warm light)
+const GOD_SLATE = new Map([
+  [0x1b1f26, 0x1f2432], [0x2a3039, 0x353d50], [0x30363f, 0x3d465a], [0x262b33, 0x2f3646],
+  [0x4b5563, 0x58637a], [0x343d47, 0x4b556c], [0x1c2027, 0x151820],
+]);
 // The statues' material ramp (round 17): every statue voxel takes one of
 // two or three value steps of its material from its exposure, so the black
 // granite reads as polished stone and the gold as metal: a highlight on
@@ -3270,14 +3382,28 @@ function monument(kind, god = 'ra') {
   // the god drawn on a coarser grid (voxels 4/3 the plinth's), so it stands
   // over the big plinth at Retold's scale with the same clean canon
   const k = 0.75, sub = new Rec(m.W, m.D);
-  cleanStatue(sub, 24, Math.round(pd * k), 23, toClean({ kilt: GILT, ...G, arms: G.arms === 'staff' ? 'crossed' : G.arms }));
+  cleanStatue(sub, 24, Math.round(pd * k), 23, toClean({ kilt: GILT, ...G }));
   (m.fine ??= []).push({ m: sub, k });
-  // the sun bowls at the corners, glowing
+  // the sun bowls at the corners (round 18: no flat discs): a short gold
+  // foot, a bowl flaring out, a thick rolled rim beaded light / dark gold,
+  // a bed of embers sunk a voxel inside it (orange flecks in dark red coals)
+  // and a flame rising from the middle, tapering. Deep oranges with a low
+  // glow: the emission adds the colour again, and bright yellows wash to
+  // pink / cream under the grade
+  const EMB = 0x4a1606, FL = [0x982004, 0xb83008, 0xd85410];   // saturated reds to orange (orange-yellows take the shader's gilt shading)
+  const fire = new Map([[FL[0], 0.1], [FL[1], 0.1], [FL[2], 0.12]]);
   for (const [x, z] of [[5, 5], [58, 5], [5, 58], [58, 58]]) {
-    lathe(m, x + 0.5, z + 0.5, 1, 6, (y) => (y <= 2 ? 2.8 : 4.4), SG_D, { hollow: 1.6, inner: FIRE[2] });
-    lathe(m, x + 0.5, z + 0.5, 1, 4, () => 2.4, FIRE[3], { hollow: 0 });
+    const cx = x + 0.5, cz = z + 0.5;
+    lathe(m, cx, cz, 1, 2, () => 1.8, SG_D);
+    lathe(m, cx, cz, 2, 3, () => 2.6, SG);
+    lathe(m, cx, cz, 3, 5, (y) => (y === 3 ? 3.5 : 4.2), SG, { hollow: 1.2, inner: EMB });
+    lathe(m, cx, cz, 5, 6, () => 4.8, (X, Y, Z) => (((X + Z) & 1) ? SG_L : SG_D), { hollow: 1.1 });
+    lathe(m, cx, cz, 4, 5, () => 3.3, (X, Y, Z) => (hash3(X, Y, Z, 91) < 0.4 ? FL[1] : hash3(X, Y, Z, 92) < 0.4 ? FL[0] : EMB));
+    lathe(m, cx, cz, 5, 7, () => 1.7, (X, Y, Z) => (Math.abs(X + 0.5 - cx) + Math.abs(Z + 0.5 - cz) < 1.2 ? FL[2] : FL[1]));
+    lathe(m, cx, cz, 7, 10, () => 1.0, FL[2]);
+    m.set(x, 10, z, FL[2]); m.set(x - 1, 8, z, FL[1]); m.set(x + 1, 9, z, FL[1]); m.set(x + 1, 6, z - 1, FL[0]); m.set(x - 1, 6, z + 1, FL[0]);
   }
-  for (const v of m.coords) { const p = m.get(...v); if (p && (p.c === FIRE[2] || p.c === FIRE[3])) p.glow = FG.glow; }
+  for (const v of m.coords) { const p = m.get(...v); if (p && fire.has(p.c)) p.glow = fire.get(p.c); }
   return m;
 }
 
