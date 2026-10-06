@@ -22,6 +22,7 @@ extends Node3D
 
 const VOXEL := 0.5
 const CHUNK := 32        # columns per chunk side (16 tiles), as TerrainMesh.js
+const TREE_FLAT := 100   # a tree's variant + 100: flattened (sim/godpowers TREE_FLAT)
 const RES_BUCKET := 16   # tiles per resource bucket side, as the JS: tight culling (stress: 3x fewer tree triangles)
 const DET_REGION := 1    # ground details are batched per terrain chunk: tight culling (stress: 5.2M -> ~1.8M triangles)
 const DETAIL_RANGE := 150.0  # ground details are culled past this camera distance
@@ -234,6 +235,8 @@ func _sync_resources() -> void:
 		if type != "tree" and type != "gold" and type != "berry":
 			continue  # huntable animals are resources too: game/economy draws them
 		var model: String = "tree%d" % (variants[i] % 10) if type == "tree" else type
+		if type == "tree" and variants[i] >= TREE_FLAT:
+			model += "f"   # (sim/godpowers: flattened by a Tornado / Thoth's Meteor: drawn lying, the wood kept)
 		var key := "%s|%d|%d" % [model, floori(tiles[i * 2] / float(RES_BUCKET)), floori(tiles[i * 2 + 1] / float(RES_BUCKET))]
 		if not rows.has(key):
 			rows[key] = PackedInt32Array()
@@ -259,6 +262,9 @@ func _build_bucket(key: String, model: String, rows: PackedInt32Array, R: Dictio
 	var sim: Object = game.sim
 	var tiles: PackedInt32Array = R.tile
 	var is_tree := model.begins_with("tree")
+	var flat := is_tree and model.ends_with("f")
+	if flat:
+		model = model.substr(0, model.length() - 1)
 	var size := 3.0 if model == "gold" else 1.0
 	var buf := PackedFloat32Array()
 	buf.resize(rows.size() * 16)
@@ -277,6 +283,14 @@ func _build_bucket(key: String, model: String, rows: PackedInt32Array, R: Dictio
 		var y: float = sim.height_at(x, z) - 0.05
 		var m := [co * sc, 0.0, si * sc, x, 0.0, sy, 0.0, y, -si * sc, 0.0, co * sc, z,
 			t, t * (0.97 + hash2(tx, tz, 3) * 0.06), t * 0.95, 1.0]
+		if flat:
+			# lying along a hashed heading, tipped a little short of flat so the crown rests on
+			# the ground, a shade darker (the leaves turned over)
+			# (the crown crushed: squat and narrower, sunk into the ground it fell on)
+			var fb := Basis(Vector3.UP, hash2(tx, tz, 41) * TAU) * Basis(Vector3.RIGHT, 1.5 + hash2(tx, tz, 43) * 0.06) * Basis.from_scale(Vector3(sc * 0.62, sy * 0.72, sc * 0.45))
+			var tf := t * 0.8
+			m = [fb.x.x, fb.y.x, fb.z.x, x, fb.x.y, fb.y.y, fb.z.y, y + 0.05, fb.x.z, fb.y.z, fb.z.z, z,
+				tf, tf * (0.93 + hash2(tx, tz, 3) * 0.06), tf * 0.78, 1.0]
 		for v in m:
 			buf[o] = v
 			o += 1

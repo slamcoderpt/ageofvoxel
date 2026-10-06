@@ -28,6 +28,7 @@ namespace aov {
 
 class Sim;
 struct Event;
+struct Hitter;
 
 // GP_RAIN .. GP_THOTH_METEOR: the Egyptian gods' powers (Godot-only, behind Sim::godot_rules;
 // egypt_powers.cpp, EGYPT.md 4, 5 with Retold's numbers; see PORTING.md "The Egyptian gods").
@@ -60,13 +61,13 @@ struct PowerDef {
 constexpr double RAIN_FARM = 2.5;            // Rain: the caster's farming +150 % for 50 s
 constexpr double PROSPERITY_GOLD = 1.5;      // Prosperity: gold mining +50 % for 75 s
 constexpr double VISION_R0 = 10 * 0.6, VISION_GROW = 15 * 0.6; // Vision: 10 m growing 15 m/s to 70 m
-constexpr double ECLIPSE_DAMAGE = 1.2, ECLIPSE_SPEED = 1.15, ECLIPSE_ARMOR = 0.10, ECLIPSE_FAVOR = 1.5, ECLIPSE_RECHARGE = 0.4;
+constexpr double ECLIPSE_DAMAGE = 1.2, ECLIPSE_SPEED = 1.15, ECLIPSE_VULN = 0.90, /* -10 % vulnerability: damage taken x0.9 */ ECLIPSE_FAVOR = 1.5, ECLIPSE_RECHARGE = 0.4;
 constexpr double SANDS_MIN_DIST = 40 * 0.6;  // Shifting Sands: the destination at least 40 m away
 constexpr int SERPENTS = 14, SERPENT_WAVE = 2; // Plague of Serpents: 2 at once, then 2 every 3 s
 constexpr double SERPENT_EVERY = 3, SERPENT_GUARD = 6;
 constexpr int SWARMS = 5;                    // Locust Swarm: 5 swarms at 3 m/s for 20 s,
 constexpr double SWARM_SPEED = 3 * 0.65, SWARM_DPS = 3.5, SWARM_FARM = 6, SWARM_OWN = 0.1, SWARM_TICK = 0.25; // 3.5 divine/s in 6 m
-constexpr double CITADEL_HP = 1200, CITADEL_ATTACK = 1.2, CITADEL_SIGHT = 1 * 0.6, CITADEL_WORK = 1.25;
+constexpr double CITADEL_HP = 1200, CITADEL_ATTACK = 1.2, CITADEL_SIGHT = 1 * 0.6, CITADEL_WORK = 1.25, CITADEL_HACK = 0.10;
 constexpr int CITADEL_POP = 10;
 constexpr int MINIONS = 13;                  // Ancestors: 13 Minions over 13 s, dead 60 s after the cast
 constexpr double MINION_LIFE = 60;
@@ -74,9 +75,18 @@ constexpr double TORNADO_HACK = 25, TORNADO_CRUSH = 100, TORNADO_EVERY = 0.5, TO
 	TORNADO_SLOW_TIME = 6, TORNADO_SPEED = 2.5, TORNADO_SPIRAL = 1.2, TORNADO_OWN = 0.1, TORNADO_FARM = 0.1, TORNADO_LOS = 20 * 0.6;
 constexpr int THOTH_METEORS = 12;            // Thoth's Meteor: 12 meteors in a 25 m circle,
 constexpr double THOTH_FIRST = 3, THOTH_REST = 6, THOTH_STEP = 1.0, THOTH_AREA = 8 * 0.6, THOTH_CRUSH = 580, THOTH_DIVINE = 40, THOTH_OWN = 0.1;
+constexpr double SON_REGEN = 15;              // the Son of Osiris heals himself 15 hp/s
+constexpr int TREE_FLAT = 100;                // a tree flattened by a Tornado / Thoth's Meteor: variant + 100 (the wood stays)
+constexpr double SERPENT_AGE = 0.20;          // Serpents +20 % hp and damage in the Heroic and in the Mythic Age
+// the Roc: a flying transport for 20 units; it lands (2 s) to load or unload
+constexpr int ROC_SLOTS = 20;
+constexpr double ROC_LAND = 2, ROC_REACH = 2.5, ROC_DROP = 2.8; // land / reach (tiles) / how far it comes down to land
+constexpr double SPHINX_CRUSH = 9, SCARAB_CRUSH = 100, PHOENIX_CRUSH = 65; // the myth units' crush part per blow
+// the Petsuchos' sun beam: 10 P at once (the def's attack) + 30 P over 1 s + 2 D + 8 D over 1 s
+constexpr double BEAM_P_DOT = 30, BEAM_D = 2, BEAM_D_DOT = 8, BEAM_DOT_TIME = 1, BEAM_HIT = 10;
 constexpr double UNIT_CRUSH_ARMOR = 0.99, MYTH_CRUSH_ARMOR = 0.80, SIEGE_UNIT_CRUSH_ARMOR = 0.85; // Retold's crush armor of units
 // DoTs (sim/godpowers egypt_myth.cpp): exact damage per second
-enum DotKind : uint8_t { DOT_POISON, DOT_VENOM, DOT_STING, DOT_CURSE };
+enum DotKind : uint8_t { DOT_POISON, DOT_VENOM, DOT_STING, DOT_CURSE, DOT_BEAM_P, DOT_BEAM_D };
 const PowerDef &power_def(int id);
 int power_of(const char *key); // -1 if unknown
 
@@ -94,7 +104,8 @@ struct Fire { double x, y, z, r, t0, dur; bool done = false; };
 struct CastCheck { bool ok; std::string reason; };
 
 // ---- the Egyptian powers' state (also what game/godpowers draws) ---------------------------
-struct TimedPower { int owner = 0; double t0 = 0, until = 0; };      // Rain, Prosperity, Eclipse
+// never cast: t0 / until far in the past, so no "just ended" fade-out shows at the start of a match
+struct TimedPower { int owner = 0; double t0 = -1e9, until = -1e9; }; // Rain, Prosperity, Eclipse
 struct VisionCast { int owner; double x, z, t0, dur, r; };
 struct SandsCast { int owner; double sx, sz, dx, dz, t0, delay, radius; bool done = false; int moved = 0; };
 struct SpawnCast { int owner; int id; double x, z, t0; int spawned = 0, total = 0; double die_at = -1; std::vector<int32_t> units; };
@@ -105,11 +116,23 @@ struct Tornado { int owner; double cx, cz, t0, dur, x, z, a0, next = 0; bool don
 struct ThothCast { int owner; double cx, cz, t0, radius; int launched = 0; std::vector<double> hit_x, hit_z; bool done = false; };
 struct RiseFx { uint8_t kind; double x, z, t0; int owner; int32_t unit; }; // 0 serpent, 1 minion, 2 egg, 3 hatch, 4 caustic burst, 5 son
 struct Arc { double x0, y0, z0, x1, y1, z1, t0; uint32_t seed; };    // the Son of Osiris' chain lightning
-struct Dot { int32_t target; int owner; double dps, until, acc; uint8_t kind; };
+struct Dot { int32_t target; int owner; double dps, until, acc; uint8_t kind; double from = 0; }; // burns from `from` to `until`
 struct Aura { int32_t unit; int owner; double radius, dps, until, acc; uint8_t kind; }; // 0 whirlwind, 1 spin
 struct Sting { int32_t unit; int owner; double at; int left; };
 struct AbilityFx { uint8_t kind; int32_t unit, target; double x0, z0, x1, z1, t0, dur; }; // 0 jump, 1 whirlwind, 2 spin, 3 sting, 4 curse, 5 beam
 struct Egg { int32_t egg; int owner; double hatch_at; };
+// a unit the Roc carries (out of the world until it is unloaded; its row is removed and it
+// comes back as a new unit of the same type with the same share of its hp)
+struct Cargo { uint8_t type; int owner; double hp_frac; };
+struct RocState {
+	int32_t roc;
+	std::vector<Cargo> cargo;
+	std::vector<int32_t> boarding; // units walking to it to board
+	double land_until = 0;         // landed (loading / unloading) until
+	int mode = 0;                  // 0 flying, 1 landing to load, 2 landing to unload
+	double ux = 0, uz = 0;         // where to unload
+	double land_k = 0;             // 0 flying .. 1 landed (it comes down over ROC_LAND s: air_y, drawn)
+};
 
 class GodPowers {
 public:
@@ -143,6 +166,8 @@ public:
 	std::vector<Sting> stings;
 	std::vector<AbilityFx> ability_fx;
 	std::vector<Egg> eggs;
+	std::vector<RocState> rocs;
+	int flattened[MAX_PLAYERS] = {}; // trees flattened by the caster's Tornado / Thoth's Meteor
 	std::vector<std::pair<int32_t, double>> ability_cd; // unit id -> ability ready at (sorted by id)
 	std::vector<std::pair<int32_t, double>> speed_k;    // unit id -> speed factor applied (sorted by id)
 	std::vector<std::pair<int32_t, double>> slowed;     // unit id -> slowed until (Tornado)
@@ -171,7 +196,21 @@ public:
 	// hooks (rules on)
 	double gather_mult(int urow, bool farm, int res, int node_type) const; // Rain, Prosperity
 	double damage_mult(int urow) const;   // Eclipse
-	double armor_add(int urow) const;     // Eclipse
+	double vuln_mult(int urow) const;     // Eclipse: x0.9 damage taken by the caster's myth units
+	double armor_after(int urow, double armor) const; // armor with the Eclipse's -10 % vulnerability
+	double building_hack_mult(int brow, const Hitter &a, uint8_t kind) const; // the Citadel: +10 % hack armor
+	// god powers blocked locally (a live Tornado, Thoth's Meteor): "" if (x, z) is free
+	std::string local_block(double x, double z) const;
+	// an Egyptian myth unit's crush part (Sphinx, Scarab, Phoenix) on a unit / building:
+	// the damage of a blow of `amount` (its hack part, techs included) on target row t
+	bool myth_on_building(int arow, int brow, double amount, double &dmg) const; // false: not one of them
+	double myth_unit_crush(int arow, int urow, double amount) const;             // added after the hack part
+	double myth_crush(int arow) const; // its crush per blow (Criosphinx / Hieracosphinx, West Wind)
+	double serpent_mult(int owner) const; // Serpents by the owner's age
+	// the Roc: board units (they walk to it; it lands), unload them round (x, z)
+	int roc_load(int32_t roc, const std::vector<int32_t> &units);
+	bool roc_unload(int32_t roc, double x, double z);
+	const RocState *roc_state(int32_t roc) const;
 	double favor_mult(int owner) const;   // Eclipse
 	double work_mult(int brow) const;     // the Citadel
 	double age_mult(int owner) const;     // the Citadel (the owner's age-up)
@@ -208,6 +247,10 @@ private:
 	int nearest_own(int owner, int btype_or_utype, bool building, double x, double z, double r) const;
 	void set_ability_cd(int32_t unit, double at);
 	void speeds();
+	void flatten_trees(int owner, double x, double z, double r);
+	void update_rocs(double dt);
+	int town_center_for(int owner, double x, double z) const; // own or allied, 1.5 tiles
+	int pharaoh_for(int owner, double x, double z) const;     // own or allied, 3 tiles
 	bool any_myth_ = false;
 	int myth_scan_ = 0;
 	void impact_meteor(const Meteor &m);

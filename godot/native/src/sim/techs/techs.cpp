@@ -249,10 +249,10 @@ const TechDef &tech_def(int t) {
 		// Bast (Classical)
 		{ "criosphinx", "Criosphinx", TH_TEMPLE, -1, 1, Cost(0, 150, 0, 5), 40, -1, "bast", false,
 			{ E(TE_HP, UM(U_SPHINX), false, 0.20), E(TE_ATTACK, UM(U_SPHINX), false, 0.20), N, N }, nullptr,
-			"Sphinx +20% hp, +20% hack and +50% crush damage", "the Sphinx's one attack number is its hack: +20 % (the crush part: none here)" },
+			"Sphinx +20% hp, +20% hack and +50% crush damage", "+20 % on the hack part, the 9 crush x1.5 (GodPowers::myth_crush)" },
 		{ "hieracosphinx", "Hieracosphinx", TH_TEMPLE, -1, 1, Cost(0, 150, 0, 10), 30, T_CRIOSPHINX, "bast", false,
 			{ E(TE_SPEED, UM(U_SPHINX), false, 0.10), E(TE_ATTACK, UM(U_SPHINX), false, 0.20), N, N }, nullptr,
-			"Sphinx +10% speed, a further +20% hack and +50% crush damage", "additive: +40 % attack with both" },
+			"Sphinx +10% speed, a further +20% hack and +50% crush damage", "additive: +40 % hack and crush x2 with both" },
 		{ "sacred_cats", "Sacred Cats", TH_GRANARY, -1, 1, Cost(0, 0, 55, 10), 30, -1, "bast", false,
 			{ E(TE_GATHER_FARM, UM(U_LABORER), false, 0.08), E(TE_GATHER_FOOD, UM(U_LABORER), false, 0.10), N, N }, nullptr,
 			"Laborers +8% farming, +10% other food gathering", "" },
@@ -301,9 +301,9 @@ const TechDef &tech_def(int t) {
 			{ E(TE_LIFESTEAL, M_EG_MYTH & ~UM(U_SCARAB), false, 0.25), E(TE_LIFESTEAL, UM(U_SCARAB), false, 0.75), N, N }, nullptr,
 			"Myth units regain 25% of the damage they deal as hp (Scarab 75%)", "" },
 		{ "force_of_the_west_wind", "Force of the West Wind", TH_SIEGE_WORKS, -1, 2, Cost(0, 0, 150, 25), 90, -1, "sekhmet", false,
-			{ E(TE_ATTACK, UM(U_SIEGE_TOWER) | UM(U_CATAPULT) | UM(U_SCARAB) | UM(U_PHOENIX), false, 0.15), E(TE_HEROIC_SIEGE, 0, false, 1), N, N }, nullptr,
+			{ E(TE_ATTACK, UM(U_SIEGE_TOWER) | UM(U_CATAPULT), false, 0.15), E(TE_HEROIC_SIEGE, 0, false, 1), N, N }, nullptr,
 			"Siege and myth units +15% crush damage; Catapults available in the Heroic Age",
-			"+15 % attack of the siege weapons and the crushing myth units (Scarab, Phoenix)" },
+			"+15 % attack of the siege weapons; the Scarab's and Phoenix's crush part +15 % (GodPowers::myth_crush)" },
 		// Nephthys (Heroic)
 		{ "funeral_rites", "Funeral Rites", TH_TEMPLE, B_TOWN_CENTER, 2, Cost(0, 0, 100, 15), 40, -1, "nephthys", false,
 			{ E(TE_REFUND, M_EG_HUMAN | M_HERO, false, 8), N, N, N }, nullptr,
@@ -345,7 +345,7 @@ const TechDef &tech_def(int t) {
 			"Laborers +10% gather rate", "" },
 		{ "tusks_of_apedemak", "Tusks of Apedemak", TH_MIGDOL, -1, 3, Cost(250, 0, 0, 15), 40, -1, "thoth", false,
 			{ E(TE_ATTACK, UM(U_WAR_ELEPHANT), false, 0.10), E(TE_COST, UM(U_WAR_ELEPHANT), false, -0.10), N, N }, nullptr,
-			"War Elephant +10% attack, -10% cost, -1 pop", "the -1 pop is not applied (this sim's pop is per type: 3)" },
+			"War Elephant +10% attack, -10% cost, -1 pop", "pop 3 -> 2 (Techs::unit_pop)" },
 	};
 	// clang-format on
 	return T[t >= 0 && t < T_COUNT ? t : 0];
@@ -734,6 +734,12 @@ void Techs::apply_unit(int r, const TechMods &old, const TechMods &cur) {
 	if (cur.sight[t] != old.sight[t]) U.sight[r] += cur.sight[t] - old.sight[t];
 }
 
+int Techs::unit_pop(int owner, int type) const {
+	const int p = unit_def(type).pop;
+	if (type == U_WAR_ELEPHANT && sim->godot_rules && is_done(owner, T_TUSKS_OF_APEDEMAK)) return std::max(0, p - 1);
+	return p;
+}
+
 double Techs::unit_damage(int r) const {
 	const UnitStore &U = sim->entities.units;
 	const int t = U.type[r], o = U.owner[r];
@@ -773,9 +779,9 @@ double Techs::unit_armor(int tr, const Hitter &a, uint8_t kind) const {
 	bool arrow = kind == DK_ARROW || a.kind == K_BUILDING;
 	if (!arrow && a.kind == K_UNIT && a.row >= 0 && a.row < U.size()) arrow = unit_def(U.type[a.row]).attack.projectile;
 	if (arrow && is_egypt_unit(t)) armor = sim->civs.base_pierce(tr); // (sim/civ: Egyptian units have a hack and a pierce armor)
-	const double add = (arrow ? mods[o].pierce[t] : mods[o].hack[t]) + sim->godpowers.armor_add(tr); // (sim/godpowers: Eclipse)
-	if (add == 0) return armor;
-	return std::min(ARMOR_CAP, armor + add);
+	const double add = arrow ? mods[o].pierce[t] : mods[o].hack[t];
+	if (add != 0) armor = std::min(ARMOR_CAP, armor + add);
+	return sim->godpowers.armor_after(tr, armor); // (sim/godpowers: the Eclipse's -10 % vulnerability)
 }
 
 // the extra factor on a hit from unit row ar on (kind, row): multipliers

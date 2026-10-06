@@ -8,6 +8,9 @@ extends RefCounted
 ##
 ## power = rain | prosperity | vision | eclipse | shifting_sands | plague_of_serpents |
 ##         locust_swarm | citadel | ancestors | son_of_osiris | tornado | thoth_meteor
+##         (and two that are not powers: rebirth = a Phoenix falls and leaves its egg,
+##         roc = a Roc boarding spearmen (roc_load), roc_unload = it sets them down)
+## The Tornado and Thoth's Meteor strike a grove: the trees they cross lie flattened.
 ## t = seconds into the cast (default: each power's showpiece moment), ep_dist / ep_pitch /
 ## ep_yaw / ep_ax / ep_az: framing.
 
@@ -18,13 +21,16 @@ const SETUPS := {
 	"vision": ["set", ["ptah", "sekhmet", "horus"], 3.2, 66.0, 56.0, 20.0],
 	"eclipse": ["ra", ["bast", "sobek", "horus"], 4.0, 30.0, 40.0, 28.0],
 	"shifting_sands": ["set", ["ptah", "sekhmet", "horus"], 2.4, 46.0, 50.0, 0.0],
-	"plague_of_serpents": ["isis", ["anubis", "nephthys", "thoth"], 8.0, 32.0, 46.0, 24.0],
+	"plague_of_serpents": ["isis", ["anubis", "nephthys", "thoth"], 3.2, 26.0, 46.0, 24.0],
 	"locust_swarm": ["ra", ["bast", "sobek", "horus"], 5.0, 34.0, 48.0, 24.0],
 	"citadel": ["ra", ["ptah", "sekhmet", "osiris"], 1.2, 34.0, 40.0, 30.0],
 	"ancestors": ["isis", ["bast", "nephthys", "osiris"], 7.0, 32.0, 44.0, 26.0],
 	"son_of_osiris": ["ra", ["bast", "sobek", "osiris"], 1.4, 18.0, 30.0, 24.0],
 	"tornado": ["set", ["ptah", "sekhmet", "horus"], 6.0, 40.0, 44.0, 24.0],
 	"thoth_meteor": ["isis", ["anubis", "nephthys", "thoth"], 8.6, 48.0, 50.0, 24.0],
+	"rebirth": ["isis", ["anubis", "nephthys", "thoth"], 5.0, 14.0, 36.0, 24.0],
+	"roc": ["ra", ["bast", "sobek", "horus"], 1.6, 18.0, 38.0, 24.0],
+	"roc_unload": ["ra", ["bast", "sobek", "horus"], 1.0, 20.0, 40.0, 24.0],
 }
 
 static func scene_setup(game: Node) -> Dictionary:
@@ -117,6 +123,9 @@ static func scene_setup(game: Node) -> Dictionary:
 			u.call("priest", 1, 13.0, -7.0)   # (his eyes there: the destination must be visible)
 			focus = Vector2(cx - 1, cz - 4)
 		"plague_of_serpents", "ancestors":
+			if power == "plague_of_serpents":   # (on open ground before the Greek line: they rise, then go for it)
+				tx = cx + 1
+				tz = cz + 4
 			focus = Vector2(tx, tz)
 		"locust_swarm":
 			tx = cx + 2
@@ -142,9 +151,43 @@ static func scene_setup(game: Node) -> Dictionary:
 			tx = cx + 13
 			tz = cz - 4
 			focus = Vector2(tx, tz)
+		"rebirth":
+			tx = cx - 4
+			tz = cz - 8
+			focus = Vector2(tx, tz)
+		"roc", "roc_unload":
+			tx = cx - 3
+			tz = cz - 7
+			focus = Vector2(tx, tz)
+	if power == "tornado" or power == "thoth_meteor":
+		# a grove on its path (sim/godpowers flatten_trees: they fall, the wood stays)
+		var gc := Vector2i(int(tx) + 2, int(tz) + 2) if power == "tornado" else Vector2i(int(tx) + 2, int(tz) - 2)
+		for gz in range(-5, 6):
+			for gx in range(-5, 6):
+				if gc.x + gx < int(cx) + 11:
+					continue   # (clear of the Greek army)
+				if posmod(gx * 7 + gz * 13, 5) != 0 and Vector2(gc.x + gx, gc.y + gz).distance_to(Vector2(tx, tz)) > 1.5:
+					sim.spawn_resource("tree", gc.x + gx, gc.y + gz, posmod(gx * 3 + gz * 5, 10))
 	sim.set_player_resources(1, {"favor": 400})
 	var ok: bool
-	if is_nan(x2):
+	if power == "rebirth":
+		var px: int = u.call("phoenix", 1, tx - cx, tz - cz, 0.6)
+		sim.tick(1)
+		sim.kill_unit(px)
+		ok = true
+	elif power == "roc" or power == "roc_unload":
+		var roc: int = u.call("roc", 1, tx - cx, tz - cz, 0.8)
+		var men := PackedInt32Array()
+		for i in 8:
+			men.append(u.call("spearman", 1, tx - cx - 4.0 + (i % 4) * 0.9, tz - cz + 3.0 + (i / 4) * 0.9, -0.8))
+		sim.tick(1)
+		ok = int(sim.roc_load(roc, men)) == 8
+		if power == "roc_unload":
+			sim.tick(30 * 5)
+			ok = ok and sim.roc_unload(roc, tx - 7.0, tz + 3.0)
+			focus = Vector2(tx - 6.0, tz + 3.0)
+			sim.tick(30 * 6)
+	elif is_nan(x2):
 		ok = sim.cast_power(1, power, tx, tz)
 	else:
 		ok = sim.cast_power2(1, power, tx, tz, x2, z2)

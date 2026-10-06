@@ -253,7 +253,7 @@ Result Economy::train(int b, int type) {
 	}
 	if (B.queue[b].size() >= 10) return { false, "Queue full" };
 	recount();
-	if (p.pop + def.pop > p.pop_cap) return { false, "Need more houses" };
+	if (p.pop + sim->techs.unit_pop(B.owner[b], type) > p.pop_cap) return { false, "Need more houses" };
 	// (Godot-only, sim/civ: Set's Devotees, -10 % near a Monument)
 	const double cm = rules ? sim->civs.train_cost_mult(b, type) : 1;
 	Cost cost = def.cost;
@@ -264,7 +264,7 @@ Result Economy::train(int b, int type) {
 		for (int k = 0; k < RES_COUNT; k++) sim->civs.devotee_saved[B.owner[b]] += def.cost.v[k] - cost.v[k];
 	B.queue[b].push_back({ (uint8_t)type, 0, def.train_time });
 	B.queue[b].back().cost_mult = cm;
-	p.pop += def.pop;
+	p.pop += sim->techs.unit_pop(B.owner[b], type);
 	Event e;
 	e.type = EV_RESOURCES_CHANGED;
 	e.owner = B.owner[b];
@@ -405,17 +405,20 @@ void Economy::recount() {
 	}
 	const UnitStore &U = sim->entities.units;
 	for (int r = 0; r < U.size(); r++)
-		if (!U.removed[r] && !U.dead[r]) sim->players[U.owner[r]].pop += unit_def(U.type[r]).pop;
+		if (!U.removed[r] && !U.dead[r]) sim->players[U.owner[r]].pop += sim->techs.unit_pop(U.owner[r], U.type[r]); // (sim/techs: Tusks of Apedemak)
 	const BuildingStore &B = sim->entities.buildings;
 	for (int b = 0; b < B.size(); b++) {
 		if (B.removed[b]) continue;
 		Player &p = sim->players[B.owner[b]];
 		const BuildingDef &d = building_def(B.type[b]);
 		if (B.built[b] && d.pop) p.pop_cap += sim->godot_rules ? d.pop + sim->civs.pop_bonus(B.owner[b], B.type[b]) + sim->godpowers.pop_bonus(b) : d.pop; // (sim/civ: Isis' TC +5; sim/godpowers: the Citadel +10)
-		for (const TrainItem &q : B.queue[b]) p.pop += unit_def(q.type).pop;
+		for (const TrainItem &q : B.queue[b]) p.pop += sim->techs.unit_pop(B.owner[b], q.type);
 	}
-	if (sim->godot_rules) // (Godot-only, sim/civ: Set's Pharaoh's queued summons)
+	if (sim->godot_rules) { // (Godot-only, sim/civ: Set's Pharaoh's queued summons; sim/godpowers: the Rocs' riders)
 		for (const Summon &q : sim->civs.summons) sim->players[q.owner].pop += unit_def(q.type).pop;
+		for (const RocState &s : sim->godpowers.rocs)
+			for (const Cargo &c : s.cargo) sim->players[c.owner].pop += sim->techs.unit_pop(c.owner, c.type);
+	}
 	for (auto &p : sim->players) p.pop_cap = std::min(POP_MAX, p.pop_cap);
 }
 
@@ -477,7 +480,7 @@ void Economy::update(double dt) {
 		if (q.t >= q.total) {
 			const int type = q.type;
 			B.queue[b].erase(B.queue[b].begin());
-			sim->players[B.owner[b]].pop -= unit_def(type).pop; // re-counted below
+			sim->players[B.owner[b]].pop -= sim->techs.unit_pop(B.owner[b], type); // re-counted below
 			const int u = spawn_from_building(b, type);
 			if (sim->godot_rules && u >= 0) sim->techs.on_trained(b, type, sim->entities.units.id[u]); // (Godot-only: Valley of the Kings)
 		}

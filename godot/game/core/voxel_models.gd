@@ -80,9 +80,14 @@ static func rig(unit_type: String) -> Dictionary:
 	if e and e.man.rigs.has(unit_type):
 		return e.man.rigs[unit_type]
 	var x := group(EXTRA_UNITS) if FileAccess.file_exists(DIR + EXTRA_UNITS + ".json") else {}
-	return x.man.rigs.get(unit_type, {}) if x else {}
+	if x and x.man.rigs.has(unit_type):
+		return x.man.rigs[unit_type]
+	# (then the Egyptian gods' own: scripts/export-egypt-gods.mjs, the Serpent and the Phoenix Egg)
+	var gx := group(EXTRA_GODS) if FileAccess.file_exists(DIR + EXTRA_GODS + ".json") else {}
+	return gx.man.rigs.get(unit_type, {}) if gx else {}
 
 const EXTRA_UNITS := "egypt_units"
+const EXTRA_GODS := "egypt_gods"
 
 static func mesh(g: String, model_name: String) -> ArrayMesh:
 	var key := g + "/" + model_name
@@ -90,7 +95,11 @@ static func mesh(g: String, model_name: String) -> ArrayMesh:
 		return _meshes[key]
 	var e := group(g)
 	if g == "units" and e and not e.man.models.has(model_name) and FileAccess.file_exists(DIR + EXTRA_UNITS + ".json"):
-		var m2 := mesh(EXTRA_UNITS, model_name)
+		var xg := group(EXTRA_UNITS)
+		var src := EXTRA_UNITS
+		if xg and not xg.man.models.has(model_name) and FileAccess.file_exists(DIR + EXTRA_GODS + ".json"):
+			src = EXTRA_GODS
+		var m2 := mesh(src, model_name)
 		_meshes[key] = m2
 		return m2
 	if e.is_empty() or not e.man.models.has(model_name):

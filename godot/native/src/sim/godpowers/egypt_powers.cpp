@@ -37,6 +37,7 @@ uint32_t mix(uint32_t a, uint32_t b, uint32_t c) {
 double crush_armor(int type) {
 	const UnitDef &d = unit_def(type);
 	if (d.cls == CLS_SIEGE) return SIEGE_UNIT_CRUSH_ARMOR;
+	if (type == U_PHOENIX_EGG) return 0.99; // (15 / 55 / 99)
 	if (d.cls == CLS_MYTH) return MYTH_CRUSH_ARMOR;
 	return UNIT_CRUSH_ARMOR;
 }
@@ -50,6 +51,7 @@ void GodPowers::init_egypt() {
 		teleported[o] = spawned[o] = thrown[o] = meteors_landed[o] = 0;
 		rain_food[o] = prosperity_gold[o] = 0;
 		minions_raised[o] = eggs_hatched[o] = chained[o] = 0;
+		flattened[o] = 0;
 	}
 	eclipse = TimedPower();
 	visions.clear();
@@ -69,6 +71,7 @@ void GodPowers::init_egypt() {
 	stings.clear();
 	ability_fx.clear();
 	eggs.clear();
+	rocs.clear();
 	ability_cd.clear();
 	speed_k.clear();
 	slowed.clear();
@@ -175,19 +178,67 @@ static bool in_sight(const Sim &S, int owner, double x, double z) {
 	return false;
 }
 
+int GodPowers::town_center_for(int owner, double x, double z) const {
+	const int own = nearest_own(owner, B_TOWN_CENTER, true, x, z, 1.5);
+	if (own >= 0) return own;
+	const BuildingStore &B = sim->entities.buildings;
+	int best = -1;
+	double bd = 1.5;
+	for (int b = 0; b < B.size(); b++) { // (Retold: your own or an allied Town Center)
+		if (B.removed[b] || B.dead[b] || !B.built[b] || B.type[b] != B_TOWN_CENTER || B.owner[b] == owner || !sim->is_ally(owner, B.owner[b])) continue;
+		const double dd = sim->civs.rect_dist(b, x, z);
+		if (dd <= bd) { bd = dd; best = b; }
+	}
+	return best;
+}
+
+int GodPowers::pharaoh_for(int owner, double x, double z) const {
+	const int own = nearest_own(owner, U_PHARAOH, false, x, z, 3);
+	if (own >= 0) return own;
+	const UnitStore &U = sim->entities.units;
+	int best = -1;
+	double bd = 3;
+	for (int u = 0; u < U.size(); u++) { // (Retold: one of your or an ally's Pharaohs)
+		if (U.removed[u] || U.dead[u] || U.type[u] != U_PHARAOH || U.owner[u] == owner || !sim->is_ally(owner, U.owner[u])) continue;
+		const double dd = jsm::hypot(U.x[u] - x, U.z[u] - z);
+		if (dd <= bd) { bd = dd; best = u; }
+	}
+	return best;
+}
+
+// Retold: a Tornado and Thoth's Meteor block other god powers locally (where the funnel is
+// now, within its 15 m reach; inside the meteors' 25 m circle), for everyone
+std::string GodPowers::local_block(double x, double z) const {
+	for (const Tornado &t : tornadoes)
+		if (!t.done && jsm::hypot(x - t.x, z - t.z) <= power_def(GP_TORNADO).radius) return "Blocked by a Tornado";
+	for (const ThothCast &t : thoth)
+		if (!t.done && jsm::hypot(x - t.cx, z - t.cz) <= t.radius) return "Blocked by Thoth's Meteor";
+	return "";
+}
+
 CastCheck GodPowers::cast_check(int owner, int id, double x, double z, double x2, double z2) const {
 	const CastCheck c = can_cast(owner, id);
 	if (!c.ok) return c;
-	if (!is_egypt_power(id)) return c;
 	const PowerDef &d = power_def(id);
+	if (!is_egypt_power(id)) {
+		if (sim->godot_rules && !std::isnan(x) && !std::isnan(z)) { // (a Tornado / Thoth's Meteor blocks the Greek ones too)
+			const std::string why = local_block(x, z);
+			if (!why.empty()) return { false, why };
+		}
+		return c;
+	}
 	if (d.target == PT_GLOBAL) return c;
 	if (std::isnan(x) || std::isnan(z)) return { false, "No target" };
-	if (d.target == PT_OWN_TC && nearest_own(owner, B_TOWN_CENTER, true, x, z, 1.5) < 0) return { false, "Target one of your Town Centers" };
+	{
+		const std::string why = local_block(x, z);
+		if (!why.empty()) return { false, why };
+	}
 	if (d.target == PT_OWN_TC) {
-		const int b = nearest_own(owner, B_TOWN_CENTER, true, x, z, 1.5);
+		const int b = town_center_for(owner, x, z);
+		if (b < 0) return { false, "Target your or an ally's Town Center" };
 		if (is_citadel(b)) return { false, "Already a Citadel Center" };
 	}
-	if (d.target == PT_OWN_PHARAOH && nearest_own(owner, U_PHARAOH, false, x, z, 3) < 0) return { false, "Target your Pharaoh" };
+	if (d.target == PT_OWN_PHARAOH && pharaoh_for(owner, x, z) < 0) return { false, "Target your or an ally's Pharaoh" };
 	if (id == GP_SHIFTING_SANDS) {
 		if (std::isnan(x2) || std::isnan(z2)) return { false, "Choose where the sands take your units" };
 		if (jsm::hypot(x2 - x, z2 - z) < SANDS_MIN_DIST) return { false, "The destination must be at least 40 m away" };
@@ -306,7 +357,7 @@ bool GodPowers::cast_egypt(int owner, int id, double x, double z, double x2, dou
 			break;
 		}
 		case GP_CITADEL: {
-			const int b = nearest_own(owner, B_TOWN_CENTER, true, x, z, 1.5);
+			const int b = town_center_for(owner, x, z);
 			BuildingStore &B = S.entities.buildings;
 			citadels.push_back(B.id[b]);
 			B.max_hp[b] += CITADEL_HP;
@@ -317,15 +368,18 @@ bool GodPowers::cast_egypt(int owner, int id, double x, double z, double x2, dou
 			break;
 		}
 		case GP_SON_OF_OSIRIS: {
-			const int r = nearest_own(owner, U_PHARAOH, false, x, z, 3);
+			const int r = pharaoh_for(owner, x, z);
 			UnitStore &U = S.entities.units;
 			const double ux = U.x[r], uz = U.z[r], rot = U.rot[r];
 			const int32_t pid = U.id[r];
+			const int po = U.owner[r]; // (an ally's Pharaoh stays his: the demigod is the ally's)
 			S.entities.remove(pid); // (he becomes the demigod; a new Pharaoh respawns, sim/civ)
-			const int u = S.units.spawn(U_SON_OF_OSIRIS, owner, ux, uz, rot);
+			const int u = S.units.spawn(U_SON_OF_OSIRIS, po, ux, uz, rot);
 			if (u >= 0) {
-				sons.push_back({ owner, U.id[u], ux, uz, now });
-				rises.push_back({ 5, ux, uz, now, owner, U.id[u] });
+				sons.push_back({ po, U.id[u], ux, uz, now });
+				any_myth_ = true; // (his 15 hp/s from this tick: egypt_myth.cpp)
+				myth_scan_ = 30;
+				rises.push_back({ 5, ux, uz, now, po, U.id[u] });
 			}
 			break;
 		}
@@ -383,8 +437,59 @@ static bool eclipse_unit(const GodPowers &G, const Sim &S, int r) {
 	return U.owner[r] == G.eclipse.owner && unit_def(U.type[r]).cls == CLS_MYTH;
 }
 
-double GodPowers::damage_mult(int r) const { return eclipse_unit(*this, *sim, r) ? ECLIPSE_DAMAGE : 1; }
-double GodPowers::armor_add(int r) const { return eclipse_unit(*this, *sim, r) ? ECLIPSE_ARMOR : 0; }
+double GodPowers::damage_mult(int r) const {
+	if (sim->entities.units.type[r] == U_SERPENT) return serpent_mult(sim->entities.units.owner[r]); // (Heroic / Mythic +20 %)
+	return eclipse_unit(*this, *sim, r) ? ECLIPSE_DAMAGE : 1;
+}
+double GodPowers::vuln_mult(int r) const { return eclipse_unit(*this, *sim, r) ? ECLIPSE_VULN : 1; }
+// Retold's armor is a vulnerability (damage taken = 1 - armor); -10 % vulnerability multiplies it
+double GodPowers::armor_after(int r, double armor) const {
+	if (!eclipse_unit(*this, *sim, r)) return armor;
+	return 1 - (1 - armor) * ECLIPSE_VULN;
+}
+// ---- the myth units' crush part (Retold: Sphinx 15 H + 9 C, Scarab 16 H + 100 C, Phoenix
+// 50 H + 65 C). The def's attack is the hack part; the crush part rides along each blow in the
+// same share (a splash's half blow: half the crush), through the target's crush armor.
+double GodPowers::myth_crush(int r) const {
+	const UnitStore &U = sim->entities.units;
+	const int t = U.type[r], o = U.owner[r];
+	double c = 0, k = 1;
+	if (t == U_SPHINX) { // Criosphinx / Hieracosphinx: +50 % crush each
+		c = SPHINX_CRUSH;
+		k += 0.5 * sim->techs.is_done(o, T_CRIOSPHINX) + 0.5 * sim->techs.is_done(o, T_HIERACOSPHINX);
+	} else if (t == U_SCARAB || t == U_PHOENIX) { // Force of the West Wind: +15 % crush
+		c = t == U_SCARAB ? SCARAB_CRUSH : PHOENIX_CRUSH;
+		k += 0.15 * sim->techs.is_done(o, T_FORCE_OF_THE_WEST_WIND);
+	}
+	return c * k * damage_mult(r);
+}
+
+static double blow_share(const Sim &S, int arow, double amount) {
+	const double full = S.techs.unit_damage(arow);
+	return full > 0 ? amount / full : 1;
+}
+
+bool GodPowers::myth_on_building(int arow, int b, double amount, double &dmg) const {
+	const UnitStore &U = sim->entities.units;
+	const int t = U.type[arow];
+	if (t != U_SPHINX && t != U_SCARAB && t != U_PHOENIX) return false;
+	const int bt = sim->entities.buildings.type[b];
+	const bool ret = rules_armored(bt);
+	const CivArmor ar = civ_building_armor(bt);
+	const double hv = ret ? 1 - ar.hack : 0.35, cv = ret ? 1 - ar.crush : 1 - SIEGE_CRUSH_ARMOR; // (a blow on a browser building: x0.35)
+	dmg = amount * hv + myth_crush(arow) * blow_share(*sim, arow, amount) * cv;
+	return true;
+}
+
+double GodPowers::myth_unit_crush(int arow, int ur, double amount) const {
+	const UnitStore &U = sim->entities.units;
+	const double c = myth_crush(arow);
+	if (c <= 0) return 0;
+	const UnitDef &ad = unit_def(U.type[arow]), &td = unit_def(U.type[ur]);
+	const double bonus = ad.bonus[td.cls] != 0 ? ad.bonus[td.cls] : 1;
+	return c * blow_share(*sim, arow, amount) * bonus * (1 - armor_after(ur, crush_armor(U.type[ur])));
+}
+
 double GodPowers::favor_mult(int owner) const { return eclipse.until > sim->time && eclipse.owner == owner ? ECLIPSE_FAVOR : 1; }
 
 bool GodPowers::is_citadel(int b) const {
@@ -405,6 +510,23 @@ double GodPowers::age_mult(int owner) const {
 }
 int GodPowers::pop_bonus(int b) const { return is_citadel(b) ? CITADEL_POP : 0; }
 double GodPowers::building_attack_mult(int b) const { return is_citadel(b) ? CITADEL_ATTACK : 1; }
+// the Citadel Center's +10 % hack armor: a hack blow's vulnerability v becomes v - 0.10 (the
+// Town Center's v: Retold's armor where the rules give it one, else this sim's 0.35 for a blow)
+double GodPowers::building_hack_mult(int b, const Hitter &a, uint8_t kind) const {
+	if (!is_citadel(b)) return 1;
+	const Entities &E = sim->entities;
+	bool arrow = kind == DK_ARROW || a.kind == K_BUILDING, myth = a.myth_class;
+	if (a.kind == 0) return 1; // (god powers: crush)
+	if (a.kind == K_UNIT && a.row >= 0 && a.row < E.units.size()) {
+		const UnitDef &d = unit_def(E.units.type[a.row]);
+		arrow = arrow || d.attack.projectile;
+		myth = myth || d.cls == CLS_MYTH;
+	}
+	if (arrow || myth) return 1;
+	const int bt = E.buildings.type[b];
+	const double v = rules_armored(bt) ? 1 - civ_building_armor(bt).hack : 0.35;
+	return v > 0 ? std::max(0.0, v - CITADEL_HACK) / v : 1;
+}
 
 void GodPowers::extra_arrows(int b, int target, double damage) {
 	if (!is_citadel(b)) return;
@@ -512,6 +634,11 @@ void GodPowers::update_egypt(double dt) {
 			const int u = S.units.spawn(type, c.owner, px, pz, rng.range(0, PI * 2));
 			c.spawned++;
 			if (u < 0) continue;
+			if (type == U_SERPENT) { // (Retold: +20 % hp in the Heroic and again in the Mythic Age; damage: serpent_mult)
+				const double k = serpent_mult(c.owner);
+				U.max_hp[u] *= k;
+				U.hp[u] *= k;
+			}
 			c.units.push_back(U.id[u]);
 			if (type == U_SERPENT) uncontrolled.push_back(U.id[u]);
 			rises.push_back({ (uint8_t)(type == U_SERPENT ? 0 : 1), U.x[u], U.z[u], now, c.owner, U.id[u] });
@@ -628,7 +755,7 @@ void GodPowers::update_egypt(double dt) {
 			const double f = fall(jsm::hypot(U.x[r] - nx, U.z[r] - nz));
 			if (f <= 0) continue;
 			const double hack = std::min(ARMOR_CAP, unit_def(U.type[r]).armor + S.techs.mods[U.owner[r]].hack[U.type[r]]);
-			const double dmg = f * (TORNADO_HACK * (1 - hack) + TORNADO_CRUSH * (1 - crush_armor(U.type[r])));
+			const double dmg = f * (TORNADO_HACK * (1 - hack) + TORNADO_CRUSH * (1 - crush_armor(U.type[r]))) * vuln_mult(r);
 			const int32_t id = U.id[r];
 			const bool own = S.is_ally(t.owner, U.owner[r]);
 			power_hit(t.owner, id, dmg, 1, TORNADO_OWN);
@@ -644,6 +771,7 @@ void GodPowers::update_egypt(double dt) {
 				}
 			}
 		}
+		flatten_trees(t.owner, nx, nz, TORNADO_FULL); // (the trees under the funnel go down; the wood stays)
 		for (int b = 0; b < B.size(); b++) {
 			if (B.removed[b] || B.dead[b]) continue;
 			const double dd = sim->civs.rect_dist(b, nx, nz);
@@ -744,7 +872,7 @@ void GodPowers::impact_thoth(const Meteor &m) {
 	std::sort(rows.begin(), rows.end());
 	for (int r : rows) {
 		const int32_t id = U.id[r];
-		const double dmg = THOTH_CRUSH * (1 - crush_armor(U.type[r])) + THOTH_DIVINE;
+		const double dmg = THOTH_CRUSH * (1 - crush_armor(U.type[r])) * vuln_mult(r) + THOTH_DIVINE;
 		power_hit(m.owner, id, dmg, 1, THOTH_OWN);
 		const int r2 = E.unit_slot(id);
 		if (r2 >= 0 && !U.dead[r2]) {
@@ -759,8 +887,37 @@ void GodPowers::impact_thoth(const Meteor &m) {
 		const double crush = ar.retold ? ar.crush : SIEGE_CRUSH_ARMOR;
 		power_hit(m.owner, B.id[b], THOTH_CRUSH * (1 - crush) + THOTH_DIVINE, THOTH_OWN, THOTH_OWN);
 	}
+	flatten_trees(m.owner, x, z, m.radius); // (it flattens the trees in its blast; the wood stays)
 	fires.push_back({ x, y, z, m.radius * 0.6, S.time, 12 });
 	if (m.owner > 0 && m.owner < MAX_PLAYERS) meteors_landed[m.owner]++;
+}
+
+// Tornado / Thoth's Meteor: the standing trees within r fall flat (variant + TREE_FLAT): their
+// tile no longer blocks, their wood stays to be gathered (terrain.gd draws them lying)
+void GodPowers::flatten_trees(int owner, double x, double z, double r) {
+	Sim &S = *sim;
+	ResourceStore &R = S.entities.resources;
+	GameMap &map = S.map();
+	int x0 = 1 << 30, z0 = 1 << 30, x1 = -1, z1 = -1;
+	for (int i = 0; i < R.size(); i++) {
+		if (R.removed[i] || R.type[i] != R_TREE || R.variant[i] >= TREE_FLAT) continue;
+		if (std::abs(R.x[i] - x) > r + 1 || std::abs(R.z[i] - z) > r + 1) continue;
+		if (jsm::hypot(R.x[i] - x, R.z[i] - z) > r) continue;
+		R.variant[i] += TREE_FLAT;
+		map.unblock(R.tx[i], R.tz[i], 1, 1);
+		x0 = std::min(x0, R.tx[i]);
+		z0 = std::min(z0, R.tz[i]);
+		x1 = std::max(x1, R.tx[i]);
+		z1 = std::max(z1, R.tz[i]);
+		if (owner > 0 && owner < MAX_PLAYERS) flattened[owner]++;
+	}
+	if (x1 >= 0) map.mark_dirty(x0 * map.cps, z0 * map.cps, (x1 + 1) * map.cps, (z1 + 1) * map.cps); // (the renderer re-draws them)
+}
+
+double GodPowers::serpent_mult(int owner) const {
+	if (owner <= 0 || owner >= MAX_PLAYERS) return 1;
+	const int age = sim->players[owner].age;
+	return 1 + SERPENT_AGE * std::max(0, std::min(2, age - 1));
 }
 
 // Eclipse (+15 % for the caster's myth units) and Tornado (-35 % for 6 s) change speeds: the

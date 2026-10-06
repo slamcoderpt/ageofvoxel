@@ -1,0 +1,255 @@
+{
+ "format": 2,
+ "group": "egypt_gods",
+ "bin": "egypt_gods.bin.gz",
+ "bytes": 310384,
+ "rigs": {
+  "serpent": {
+   "voxel": 0.1,
+   "anim": "medusa",
+   "style": "serpent",
+   "pose": "serpent",
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "coil",
+     "anim": "coil",
+     "joint": [
+      0,
+      0,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "serpent/coil"
+    },
+    {
+     "name": "tailA",
+     "anim": "tailA",
+     "joint": [
+      -3,
+      1,
+      -5
+     ],
+     "parent": "coil",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "serpent/tailA"
+    },
+    {
+     "name": "tailB",
+     "anim": "tailB",
+     "joint": [
+      0,
+      0,
+      -7
+     ],
+     "parent": "tailA",
+     "parentIdx": 1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "serpent/tailB"
+    },
+    {
+     "name": "tailC",
+     "anim": "tailC",
+     "joint": [
+      0,
+      0,
+      -7
+     ],
+     "parent": "tailB",
+     "parentIdx": 2,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "serpent/tailC"
+    },
+    {
+     "name": "torso",
+     "anim": "torso",
+     "joint": [
+      0,
+      7,
+      1
+     ],
+     "parent": "coil",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "serpent/torso"
+    }
+   ]
+  },
+  "phoenix_egg": {
+   "voxel": 0.08,
+   "anim": "siege",
+   "style": "egg",
+   "euler": "XYZ",
+   "parts": [
+    {
+     "name": "frame",
+     "anim": "frame",
+     "joint": [
+      0,
+      0,
+      0
+     ],
+     "parent": null,
+     "parentIdx": -1,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "phoenix_egg/frame"
+    },
+    {
+     "name": "body",
+     "anim": "body",
+     "joint": [
+      0,
+      1,
+      0
+     ],
+     "parent": "frame",
+     "parentIdx": 0,
+     "coat": false,
+     "portrait": true,
+     "conditional": false,
+     "mesh": "phoenix_egg/body"
+    }
+   ]
+  }
+ },
+ "unitTypes": [
+  "serpent",
+  "phoenix_egg"
+ ],
+ "models": {
+  "serpent/coil": {
+   "vertices": 2440,
+   "indices": 3660,
+   "aabb": [
+    -0.5,
+    -0.1,
+    -0.7,
+    0.7,
+    0.8,
+    0.7
+   ],
+   "position": 0,
+   "normal": 29280,
+   "color": 58560,
+   "extra": 68320,
+   "index": 78080
+  },
+  "serpent/tailA": {
+   "vertices": 504,
+   "indices": 756,
+   "aabb": [
+    -0.2,
+    -0.2,
+    -0.6,
+    0.3,
+    0.3,
+    0.1
+   ],
+   "position": 92720,
+   "normal": 98768,
+   "color": 104816,
+   "extra": 106832,
+   "index": 108848
+  },
+  "serpent/tailB": {
+   "vertices": 408,
+   "indices": 612,
+   "aabb": [
+    -0.1,
+    -0.1,
+    -0.6,
+    0.2,
+    0.2,
+    0.1
+   ],
+   "position": 111872,
+   "normal": 116768,
+   "color": 121664,
+   "extra": 123296,
+   "index": 124928
+  },
+  "serpent/tailC": {
+   "vertices": 216,
+   "indices": 324,
+   "aabb": [
+    -0.1,
+    -0.1,
+    -0.6,
+    0.2,
+    0.2,
+    0.1
+   ],
+   "position": 127376,
+   "normal": 129968,
+   "color": 132560,
+   "extra": 133424,
+   "index": 134288
+  },
+  "serpent/torso": {
+   "vertices": 1032,
+   "indices": 1548,
+   "aabb": [
+    -0.3,
+    0,
+    -0.1,
+    0.4,
+    1.2,
+    0.5
+   ],
+   "position": 135584,
+   "normal": 147968,
+   "color": 160352,
+   "extra": 164480,
+   "index": 168608
+  },
+  "phoenix_egg/frame": {
+   "vertices": 1776,
+   "indices": 2664,
+   "aabb": [
+    -0.48,
+    0,
+    -0.48,
+    0.56,
+    0.16,
+    0.56
+   ],
+   "position": 174800,
+   "normal": 196112,
+   "color": 217424,
+   "extra": 224528,
+   "index": 231632
+  },
+  "phoenix_egg/body": {
+   "vertices": 1792,
+   "indices": 2688,
+   "aabb": [
+    -0.32,
+    0,
+    -0.32,
+    0.4,
+    1.28,
+    0.4
+   ],
+   "position": 242288,
+   "normal": 263792,
+   "color": 285296,
+   "extra": 292464,
+   "index": 299632
+  }
+ }
+}

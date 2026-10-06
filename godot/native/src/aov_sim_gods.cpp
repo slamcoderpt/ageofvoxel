@@ -22,6 +22,9 @@ void AovSim::_bind_gods_methods() {
 	ClassDB::bind_method(D_METHOD("is_uncontrolled", "unit"), &AovSim::is_uncontrolled);
 	ClassDB::bind_method(D_METHOD("ability_ready", "unit"), &AovSim::ability_ready);
 	ClassDB::bind_method(D_METHOD("set_player_god", "owner", "god"), &AovSim::set_player_god);
+	ClassDB::bind_method(D_METHOD("roc_load", "roc", "units"), &AovSim::roc_load);
+	ClassDB::bind_method(D_METHOD("roc_unload", "roc", "x", "z"), &AovSim::roc_unload);
+	ClassDB::bind_method(D_METHOD("get_roc", "roc"), &AovSim::get_roc);
 }
 
 bool AovSim::set_player_god(int64_t owner, const String &god) {
@@ -203,6 +206,31 @@ Dictionary AovSim::get_egypt_powers() const {
 	return d;
 }
 
+int64_t AovSim::roc_load(int64_t roc, const PackedInt32Array &units) {
+	std::vector<int32_t> ids;
+	for (int64_t i = 0; i < units.size(); i++) ids.push_back(units[i]);
+	return sim_.godpowers.roc_load((int32_t)roc, ids);
+}
+
+bool AovSim::roc_unload(int64_t roc, double x, double z) { return sim_.godpowers.roc_unload((int32_t)roc, x, z); }
+
+// {cargo: [type names], boarding: [ids], mode: 0 flying / 1 loading / 2 unloading, slots}
+Dictionary AovSim::get_roc(int64_t roc) const {
+	Dictionary d;
+	Array cargo, boarding;
+	int mode = 0;
+	if (const aov::RocState *s = sim_.godpowers.roc_state((int32_t)roc)) {
+		for (const aov::Cargo &c : s->cargo) cargo.push_back(String(aov::unit_def(c.type).key));
+		for (int32_t id : s->boarding) boarding.push_back(id);
+		mode = s->mode;
+	}
+	d["cargo"] = cargo;
+	d["boarding"] = boarding;
+	d["mode"] = mode;
+	d["slots"] = aov::ROC_SLOTS;
+	return d;
+}
+
 Dictionary AovSim::get_power_stats(int64_t owner) const {
 	const aov::GodPowers &G = sim_.godpowers;
 	const aov::Techs &T = sim_.techs;
@@ -219,6 +247,7 @@ Dictionary AovSim::get_power_stats(int64_t owner) const {
 	d["minions_raised"] = G.minions_raised[o];
 	d["eggs_hatched"] = G.eggs_hatched[o];
 	d["chained"] = G.chained[o];
+	d["flattened"] = G.flattened[o];
 	d["rain_until"] = G.rain[o].until;
 	d["prosperity_until"] = G.prosperity[o].until;
 	d["eclipse_owner"] = G.eclipse.owner;

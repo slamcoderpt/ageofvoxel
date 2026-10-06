@@ -39,6 +39,7 @@ constexpr double EGG_TIME = 50;
 constexpr double CHAIN_RADIUS = 8 * 0.6;
 constexpr int CHAIN_JUMPS = 3;
 constexpr double AURA_TICK = 0.25, DOT_TICK = 0.5;
+constexpr double PI_4 = 0.7853981633974483;
 } // namespace
 
 double GodPowers::ability_ready(int32_t unit) const {
@@ -54,13 +55,17 @@ void GodPowers::set_ability_cd(int32_t unit, double at) {
 
 void GodPowers::add_dot(int32_t target, int owner, double dps, double dur, uint8_t kind) {
 	const double until = sim->time + dur;
+	if (kind == DOT_BEAM_P || kind == DOT_BEAM_D) { // (each beam burns on its own: two Petsuchoi, two burns)
+		dots.push_back({ target, owner, dps, until, 0, kind, sim->time });
+		return;
+	}
 	for (Dot &d : dots)
 		if (d.target == target && d.kind == kind && d.owner == owner) { // (a new hit restarts it)
 			d.until = std::max(d.until, until);
 			d.dps = std::max(d.dps, dps);
 			return;
 		}
-	dots.push_back({ target, owner, dps, until, 0, kind });
+	dots.push_back({ target, owner, dps, until, 0, kind, sim->time });
 }
 
 // the hack (or pierce) armor of a unit row as this sim reads it (techs included)
@@ -69,7 +74,7 @@ static double armor_of(const Sim &S, int r, bool pierce) {
 	const int t = U.type[r], o = U.owner[r];
 	const double base = pierce && is_egypt_unit(t) ? S.civs.base_pierce(r) : unit_def(t).armor;
 	const double add = pierce ? S.techs.mods[o].pierce[t] : S.techs.mods[o].hack[t];
-	return std::min(ARMOR_CAP, base + add + S.godpowers.armor_add(r));
+	return S.godpowers.armor_after(r, std::min(ARMOR_CAP, base + add));
 }
 
 static bool organic(int type) {
@@ -100,6 +105,17 @@ void GodPowers::on_myth_damaged(const Event &e) {
 			}
 		if (!merged) S.techs.reveals.push_back({ owner, U.x[v], U.z[v], ILLUMINATE_RADIUS, S.time + ILLUMINATE_TIME });
 		ability_fx.push_back({ 5, e.other, e.id, U.x[a], U.z[a], U.x[v], U.z[v], S.time, 0.6 });
+		// the rest of the sun beam (Retold: 10 P + 30 P over 1 s + 2 D + 8 D over 1 s): the 10 P was
+		// this hit; the attack upgrades / Eclipse (k) and the class multiplier (x2.5 vs myth, x0.5 vs
+		// heroes) on every part, pierce through the target's pierce armor, divine through none
+		const double k = S.techs.unit_damage(a) / BEAM_HIT;
+		const UnitDef &vd = unit_def(U.type[v]);
+		const double bonus = unit_def(at).bonus[vd.cls] != 0 ? unit_def(at).bonus[vd.cls] : 1;
+		const double pv = 1 - armor_of(S, v, true);
+		add_dot(e.id, owner, BEAM_P_DOT * k * bonus * pv / BEAM_DOT_TIME, BEAM_DOT_TIME, DOT_BEAM_P);
+		add_dot(e.id, owner, BEAM_D_DOT * k * bonus / BEAM_DOT_TIME, BEAM_DOT_TIME, DOT_BEAM_D);
+		S.combat.damage(e.id, BEAM_D * k * bonus, Hitter::pseudo(owner), DK_DIVINE);
+		if (U.dead[v]) return;
 	}
 	if (at == U_SON_OF_OSIRIS) { // chain lightning: on to the 3 nearest other enemies near the target
 		std::vector<std::pair<double, int>> c;
@@ -291,7 +307,7 @@ void GodPowers::update_myth(double dt) {
 	for (Dot &d : dots) {
 		const int r = E.unit_slot(d.target);
 		if (r < 0 || U.dead[r]) { d.until = -1; continue; }
-		const double live = std::min(dt, std::max(0.0, d.until - (now - dt)));
+		const double live = std::max(0.0, std::min(now, d.until) - std::max(now - dt, d.from)); // (exactly until - from in all)
 		d.acc += live;
 		if (d.acc + 1e-9 >= DOT_TICK || (now >= d.until && d.acc > 0)) {
 			const double amount = d.dps * d.acc;
@@ -300,6 +316,12 @@ void GodPowers::update_myth(double dt) {
 		}
 	}
 	dots.erase(std::remove_if(dots.begin(), dots.end(), [&](const Dot &d) { return d.until < now && d.acc <= 0; }), dots.end());
+	// the Son of Osiris heals himself 15 hp/s (he cannot be healed by others: Retold)
+	if (any_myth_)
+		for (int r = 0; r < U.size(); r++)
+			if (!U.removed[r] && !U.dead[r] && U.type[r] == U_SON_OF_OSIRIS && U.hp[r] < U.max_hp[r])
+				U.hp[r] = std::min(U.max_hp[r], U.hp[r] + SON_REGEN * dt);
+	update_rocs(dt);
 	// Phoenix Eggs hatch
 	for (Egg &g : eggs) {
 		const int r = E.unit_slot(g.egg);
@@ -321,6 +343,149 @@ void GodPowers::update_myth(double dt) {
 			const int r = E.unit_slot(p.first);
 			return r < 0 || U.dead[r] || p.second < now;
 		}), ability_cd.end());
+}
+
+// ---- the Roc: a flying transport for 20 units (Retold). Boarding units walk to it; it lands
+// (ROC_LAND s, still) and takes those in reach. A carried unit leaves the world (its row is
+// removed, its pop still counts: Economy::recount); unloading lands the Roc where told and
+// sets them down round it as new units of their type with the same share of their hp. A Roc
+// that falls takes its riders with it.
+const RocState *GodPowers::roc_state(int32_t roc) const {
+	for (const RocState &s : rocs)
+		if (s.roc == roc) return &s;
+	return nullptr;
+}
+
+static bool roc_carries(int type) {
+	const UnitDef &d = unit_def(type);
+	return type != U_ROC && type != U_PHOENIX && type != U_PHOENIX_EGG && type != U_SERPENT && d.cls != CLS_SIEGE;
+}
+
+int GodPowers::roc_load(int32_t roc, const std::vector<int32_t> &units) {
+	Sim &S = *sim;
+	Entities &E = S.entities;
+	UnitStore &U = E.units;
+	const int r = E.unit_slot(roc);
+	if (!S.godot_rules || r < 0 || U.dead[r] || U.type[r] != U_ROC) return 0;
+	RocState *st = nullptr;
+	for (RocState &s : rocs)
+		if (s.roc == roc) st = &s;
+	if (!st) {
+		rocs.push_back({ roc, {}, {}, 0, 0, 0, 0, 0 });
+		st = &rocs.back();
+	}
+	int n = 0;
+	for (int32_t id : units) {
+		const int u = E.unit_slot(id);
+		if (u < 0 || U.dead[u] || U.owner[u] != U.owner[r] || !roc_carries(U.type[u]) || is_uncontrolled(id)) continue;
+		if ((int)(st->cargo.size() + st->boarding.size()) >= ROC_SLOTS) break;
+		if (std::find(st->boarding.begin(), st->boarding.end(), id) != st->boarding.end()) continue;
+		st->boarding.push_back(id);
+		S.commands.order(u, Order::move(U.x[r], U.z[r]));
+		n++;
+	}
+	if (n > 0) {
+		S.commands.idle(r); // it lands where it is
+		st->mode = 1;
+		st->land_until = S.time + ROC_LAND;
+	}
+	return n;
+}
+
+bool GodPowers::roc_unload(int32_t roc, double x, double z) {
+	Sim &S = *sim;
+	Entities &E = S.entities;
+	UnitStore &U = E.units;
+	const int r = E.unit_slot(roc);
+	if (!S.godot_rules || r < 0 || U.dead[r] || U.type[r] != U_ROC) return false;
+	for (RocState &s : rocs) {
+		if (s.roc != roc || s.cargo.empty()) continue;
+		s.boarding.clear();
+		s.mode = 2;
+		if (std::isnan(x) || std::isnan(z)) { x = U.x[r]; z = U.z[r]; }
+		S.map().clamp_to_map(x, z);
+		s.ux = x;
+		s.uz = z;
+		s.land_until = 0;
+		if (jsm::hypot(U.x[r] - x, U.z[r] - z) > 1) S.commands.order(r, Order::move(x, z));
+		else S.commands.idle(r);
+		return true;
+	}
+	return false;
+}
+
+void GodPowers::update_rocs(double dt) {
+	if (rocs.empty()) return;
+	Sim &S = *sim;
+	Entities &E = S.entities;
+	UnitStore &U = E.units;
+	const double now = S.time;
+	for (RocState &s : rocs) {
+		const int r = E.unit_slot(s.roc);
+		if (r < 0 || U.dead[r]) { // it fell: its riders with it
+			s.cargo.clear();
+			s.boarding.clear();
+			s.roc = 0;
+			continue;
+		}
+		s.boarding.erase(std::remove_if(s.boarding.begin(), s.boarding.end(), [&](int32_t id) {
+			const int u = E.unit_slot(id);
+			return u < 0 || U.dead[u];
+		}), s.boarding.end());
+		const double rx = U.x[r], rz = U.z[r];
+		// it comes down while loading, or once at its unloading point; up again otherwise
+		const bool down = !U.moving[r] && (s.mode == 1 || (s.mode == 2 && s.land_until > 0));
+		s.land_k = std::max(0.0, std::min(1.0, s.land_k + (down ? dt : -dt) / ROC_LAND));
+		{
+			const double f = s.land_k * s.land_k * (3 - 2 * s.land_k);
+			U.air_y[r] = -ROC_DROP * f; // (the renderer lowers it from its hover)
+		}
+		if (s.mode == 1) {
+			if (U.moving[r]) { s.land_until = now + ROC_LAND; } // (moved off: lands again)
+			for (size_t i = 0; i < s.boarding.size();) {
+				const int u = E.unit_slot(s.boarding[i]);
+				const double d = jsm::hypot(U.x[u] - rx, U.z[u] - rz);
+				if (s.land_k >= 1 && d <= ROC_REACH + U.radius[u] + U.radius[r]) {
+					s.cargo.push_back({ U.type[u], U.owner[u], U.max_hp[u] > 0 ? U.hp[u] / U.max_hp[u] : 1 });
+					E.remove(s.boarding[i]);
+					s.boarding.erase(s.boarding.begin() + (long)i);
+					continue;
+				}
+				if (!U.moving[u] && S.tick_count % 10 == 0 && d > ROC_REACH) S.commands.order(u, Order::move(rx, rz));
+				i++;
+			}
+			if (s.boarding.empty()) s.mode = 0;
+		} else if (s.mode == 2) {
+			if (U.moving[r]) continue;
+			if (s.land_until == 0) s.land_until = now + ROC_LAND; // arrived (or stopped): land
+			if (s.land_k < 1) continue;
+			// set them down in rings round the Roc
+			int k = 0;
+			for (const Cargo &c : s.cargo) {
+				double px = rx, pz = rz;
+				for (int tries = 0; tries < 12; tries++, k++) {
+					const double ring = 1.2 + 0.9 * std::floor(k / 8.0), a = (k % 8) * (PI_4) + std::floor(k / 8.0) * 0.4;
+					px = rx + jsm::cos(a) * ring;
+					pz = rz + jsm::sin(a) * ring;
+					S.map().clamp_to_map(px, pz);
+					if (S.map().walkable_at(px, pz)) break;
+				}
+				k++;
+				const int u = S.units.spawn(c.type, c.owner, px, pz, U.rot[r]);
+				if (u >= 0) U.hp[u] = std::max(1.0, U.max_hp[u] * c.hp_frac);
+			}
+			s.cargo.clear();
+			s.mode = 0;
+		}
+	}
+	rocs.erase(std::remove_if(rocs.begin(), rocs.end(), [&](const RocState &s) {
+		const bool done = s.roc == 0 || (s.cargo.empty() && s.boarding.empty() && s.mode == 0 && s.land_k <= 0);
+		if (done && s.roc != 0) {
+			const int r = E.unit_slot(s.roc);
+			if (r >= 0) U.air_y[r] = 0;
+		}
+		return done;
+	}), rocs.end());
 }
 
 } // namespace aov

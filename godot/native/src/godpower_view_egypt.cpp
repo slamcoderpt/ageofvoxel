@@ -122,7 +122,7 @@ bool AovGodpowerView::egypt_active() const {
 	if (!egypt) return false;
 	for (int r = 0; r < S.entities.units.size(); r++) // (the Son of Osiris' ring)
 		if (S.entities.units.type[r] == aov::U_SON_OF_OSIRIS && !S.entities.units.removed[r]) return true;
-	return !G.visions.empty() || !G.sands.empty() || !G.serpents.empty() || !G.ancestors.empty() || !G.swarms.empty() ||
+	return !G.rocs.empty() || !G.visions.empty() || !G.sands.empty() || !G.serpents.empty() || !G.ancestors.empty() || !G.swarms.empty() ||
 			!G.citadel_fx.empty() || !G.sons.empty() || !G.tornadoes.empty() || !G.thoth.empty() || !G.rises.empty() || !G.arcs.empty() ||
 			!G.dots.empty() || !G.ability_fx.empty() || !drifts_.empty();
 }
@@ -669,7 +669,13 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 		double x, z;
 		upos(row, x, z);
 		const double gy = h_at(x, z) + U.air_y[row], h = type_height(U.type[row]);
-		const uint32_t col = d.kind == aov::DOT_CURSE ? 0x8a30ff : d.kind == aov::DOT_VENOM ? 0x7aff3a : d.kind == aov::DOT_STING ? 0xffd040 : 0x60e040;
+		const bool beam = d.kind == aov::DOT_BEAM_P || d.kind == aov::DOT_BEAM_D;
+		const uint32_t col = d.kind == aov::DOT_CURSE ? 0x8a30ff : d.kind == aov::DOT_VENOM ? 0x7aff3a : d.kind == aov::DOT_STING ? 0xffd040 : beam ? 0xffb030 : 0x60e040;
+		if (beam) { // the Petsuchos' sun beam still burning on him: a gold glow and sparks shed upward
+			const double bk = clamp01((d.until - now) / 0.4);
+			const Lin gc = hex_lin(0xffc040);
+			if (d.kind == aov::DOT_BEAM_D) glow(true, x, gy + h * 0.55, z, h * 1.1, h * 1.2, gc.r, gc.g, gc.b, 0.35 * bk, 0);
+		}
 		const Lin c = hex_lin(col);
 		for (int j = 0; j < 4; j++) {
 			const double f = std::fmod(now / 1.1 + hr(d.target, j, 201 + d.kind), 1.0), a = hr(d.target, j, 202) * TAU + f * 2;
@@ -683,6 +689,23 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 			bs.rows[1] = Vector3(0, (real_t)s, 0);
 			bs.rows[2] = Vector3(0, 0, 1);
 			inst(I_PUFF, bs, x, gy + h * 0.6, z, 0.06f, 0.02f, 0.1f, 0.35f, 0);
+		}
+	}
+	// the Roc coming down to load / unload: dust blown out from under its wings
+	for (const aov::RocState &st : G.rocs) {
+		const int row = E.unit_slot(st.roc);
+		if (row < 0 || U.dead[row] || st.land_k <= 0.02 || st.land_k >= 0.999) continue;
+		double x, z;
+		upos(row, x, z);
+		const double gy = h_at(x, z);
+		const double k = std::sin(st.land_k * PI);
+		decal(I_DECAL_ADD, x, gy + 0.08, z, 3.5 + 2.5 * st.land_k, now * 0.6, 0.55f, 0.45f, 0.3f, (float)(0.5 * k), 6, 0.7f, (float)(now * 0.4));
+		for (int j = 0; j < 3; j++)
+		{
+			const double te = std::floor(now * 4) / 4;
+			const uint32_t cyc = (uint32_t)(int64_t)(te * 4);
+			puff(false, te, hmix(st.roc, j + cyc * 3, 233), now, x + std::cos(j * 2.1 + te) * 1.4 * (0.5 + 0.5 * k), gy + 0.2, z + std::sin(j * 2.1 + te) * 1.4 * (0.5 + 0.5 * k),
+					6, 0xc8a878, 0.5, 0.6, 1.6, 0.6, 0.3, 1.0, 0.2);
 		}
 	}
 	for (const aov::AbilityFx &f : G.ability_fx) {

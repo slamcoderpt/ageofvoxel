@@ -32,6 +32,22 @@ extends SceneTree
 ##               Sun-dried Mud-brick, Crimson Linen, Funeral Rites, New Kingdom, Book of Thoth,
 ##               Tusks of Apedemak, Spear of Horus, Force of the West Wind)
 ##   determinism the same casts twice -> the same units hash; rules off -> the Greek powers only
+##   phantom     nothing cast: no Rain / Prosperity / Eclipse is live or fading at the start of a
+##               match (the renderer's timed list is empty at 0, 1 and 2.5 s)
+##   blocks      a live Tornado and Thoth's Meteor block other god powers locally (a Greek
+##               Lightning Storm / Meteor inside refused, outside allowed; an Egyptian power too)
+##   allies      the Citadel on an ally's Town Center and its +10 % hack armor; the Son of Osiris
+##               on an ally's Pharaoh (the demigod is the ally's) and his 15 hp/s self-heal
+##   trees       a Tornado and Thoth's Meteor flatten the trees they cross (no longer blocking,
+##               the wood kept)
+##   split       the myth units' split damage: the Sphinx's 9 crush (x1.5 Criosphinx, x2 with
+##               Hieracosphinx) and the Phoenix's 65 on buildings, the Petsuchos' beam (10 P +
+##               30 P over 1 s + 2 D + 8 D over 1 s), x0.5 vs heroes, the Serpent's Retold stats
+##               (+20 % by age), Tusks of Apedemak's -1 pop
+##   roc         the Roc boards units (they leave the world, their pop stays), flies, lands and
+##               sets them down; a Roc that falls takes its riders
+##   ai          an Egyptian AI seat casts its gods' powers (Rain on its Farms, a Tornado / Plague
+##               of Serpents / Ancestors on a cluster of foes)
 ##
 ##   godot --headless --path godot -s res://game/core/egypt_gods_check.gd [-- --only=defs,gods,... --seed=3]
 
@@ -187,7 +203,8 @@ func _damage_by(sim: Object, seconds: float, filter := Callable()) -> Dictionary
 func _run() -> void:
 	var t0 := Time.get_ticks_msec()
 	for c in ["defs", "gods", "passives", "model", "rain", "prosperity", "vision", "eclipse", "sands", "serpents", "locusts", "citadel",
-			"ancestors", "son", "tornado", "meteor", "myth", "techs", "bounds", "determinism"]:
+			"ancestors", "son", "tornado", "meteor", "myth", "techs", "bounds", "determinism",
+			"phantom", "blocks", "allies", "trees", "split", "roc", "ai"]:
 		if _want(c):
 			call("_case_" + c)
 	result["ms"] = Time.get_ticks_msec() - t0
@@ -212,7 +229,7 @@ const MYTH := {
 	"anubite": ["anubis", 1, 200, 11, 0.45, {"food": 100, "favor": 15}, 2],
 	"wadjet": ["ptah", 1, 270, 12, 0.1875, {"wood": 150, "favor": 15}, 2],
 	"sphinx": ["bast", 1, 300, 15, 0.3375, {"gold": 120, "favor": 18}, 3],
-	"petsuchos": ["sobek", 2, 400, 50, 0.30, {"gold": 200, "favor": 16}, 3],
+	"petsuchos": ["sobek", 2, 400, 10, 0.30, {"gold": 200, "favor": 16}, 3],
 	"roc": ["sobek", 2, 700, 0, 0.0, {"gold": 100, "favor": 5}, 2],
 	"scarab": ["sekhmet", 2, 1000, 16, 0.075, {"food": 240, "favor": 18}, 4],
 	"scorpion_man": ["nephthys", 2, 550, 30, 0.375, {"wood": 200, "favor": 22}, 3],
@@ -550,7 +567,7 @@ func _case_eclipse() -> void:
 	r["sphinx speed"] = speeds
 	r["hoplite blow on the sphinx"] = taken
 	var ok: bool = r.get("cast", false) and _near(hits[1] / hits[0], 1.2, 0.01) and _near(speeds[1] / speeds[0], 1.15, 0.001)
-	ok = ok and _near(taken[1], 9.0 * (1.0 - (0.3375 + 0.10)), 0.01) and _near(taken[0], 9.0 * (1.0 - 0.3375), 0.01)
+	ok = ok and _near(taken[1], 9.0 * (1.0 - 0.3375) * 0.9, 0.01) and _near(taken[0], 9.0 * (1.0 - 0.3375), 0.01)
 	# Monuments +50 % favor, one Eclipse at a time, 55 s
 	var s2 := _fresh("ra", "isis", 1, ["bast"])
 	s2.set_minor_god(2, 1, "bast")
@@ -704,7 +721,7 @@ func _case_citadel() -> void:
 			if e.type == "unit:damaged" and int(e.id) == hop:
 				arrows.append([_r(float(sim.get_time()), 2), _r(float(e.amount))])
 	r["arrows on a hoplite (4 s)"] = arrows
-	var ok: bool = not r["cast on open ground"] and r["reason"] == "Target one of your Town Centers" and r["cast on the TC"]
+	var ok: bool = not r["cast on open ground"] and r["reason"] == "Target your or an ally's Town Center" and r["cast on the TC"]
 	ok = ok and r["max hp before / after"][1] - hp0 == 1200 and r["pop cap before / after"][1] - pop0 == 10 and _near(r["laborer trained in [s]"], 11.33 / 1.25, 0.05)
 	ok = ok and arrows.size() >= 4 and arrows[0][0] == arrows[1][0] and _near(arrows[0][1], 6.0 * 1.2 * (1.0 - 0.3), 0.01)
 	_check("citadel.center", ok, r)
@@ -1121,3 +1138,362 @@ func _case_determinism() -> void:
 	sim.new_game(3, 128, "battle", 2)
 	_check("determinism.rules_off", Array(sim.player_powers(1)) == ["lightning_storm", "bolt", "meteor"] and not bool(sim.can_cast(1, "rain").ok),
 		{"powers": Array(sim.player_powers(1))})
+
+
+# round 2 ---------------------------------------------------------------------------------------
+
+## A 3-player match: P1 (g1) and P3 (g3, his ally) on team 1, P2 (Zeus) on team 2.
+func _fresh3(g1: String, g3: String, age: int, gods1: Array) -> Object:
+	var sim: Object = ClassDB.instantiate("AovSim")
+	sim.set_godot_rules(true)
+	var ps := [{"id": 1, "name": "P1", "human": true, "team": 1, "god": g1}, {"id": 2, "name": "P2", "human": true, "team": 2, "god": "zeus"},
+		{"id": 3, "name": "P3", "human": true, "team": 1, "god": g3}]
+	var r: Dictionary = sim.start_match({"seed": seed_arg, "map_size": 192, "preset": "skirmish", "resources": "deathmatch", "players": ps})
+	if not bool(r.ok):
+		push_error("start_match: %s" % r.error)
+		return null
+	sim.set_victory_enabled(false)
+	sim.set_fog_reveal_all(true)
+	sim.set_record_events(true)
+	for a in gods1.size():
+		sim.set_minor_god(1, a + 1, gods1[a])
+	for o in [1, 2, 3]:
+		sim.set_player_age(o, age)
+	C = _open_area(sim, 30, 30.0)
+	sim.set_player_resources(1, {"favor": 900})
+	sim.take_events()
+	return sim
+
+func _case_phantom() -> void:
+	var r := {}
+	var ok := true
+	for g in [["zeus", "zeus"], ["ra", "isis"]]:
+		var sim := _fresh(g[0], g[1])
+		var lists := []
+		for t in [0.0, 1.0, 1.5]:
+			_step(sim, t)
+			lists.append((sim.get_egypt_powers().timed as Array).size())
+		var st: Dictionary = sim.get_power_stats(1)
+		r["%s vs %s: timed powers at 0 / 1 / 2.5 s" % g] = lists
+		r["%s vs %s: rain / prosperity / eclipse until" % g] = [st.rain_until, st.prosperity_until, st.eclipse_until]
+		ok = ok and lists == [0, 0, 0] and float(st.rain_until) < 0 and float(st.prosperity_until) < 0 and float(st.eclipse_until) < 0
+	# a cast Rain is listed (and fades 3 s after it ends)
+	var s2 := _fresh("ra", "zeus")
+	s2.cast_power(1, "rain", 0, 0)
+	s2.tick(1)
+	r["rain cast: listed"] = (s2.get_egypt_powers().timed as Array).size()
+	ok = ok and r["rain cast: listed"] == 1
+	_check("phantom.no_power_at_start", ok, r)
+
+func _case_blocks() -> void:
+	var r := {}
+	# a Greek (P2, Zeus) in a match with Horus' Tornado
+	var sim := _fresh("ra", "zeus", 3, ["bast", "sobek", "horus"])
+	sim.set_player_resources(1, {"favor": 900})
+	sim.set_player_resources(2, {"favor": 900})
+	r["tornado"] = sim.cast_power(1, "tornado", C.x, C.y)
+	sim.tick(2)
+	var tz: Array = sim.get_egypt_powers().tornadoes
+	var tx: float = float(tz[5]) if tz.size() > 6 else C.x
+	var tzz: float = float(tz[6]) if tz.size() > 6 else C.y
+	r["reason"] = str(sim.cast_check(2, "lightning_storm", tx + 2.0, tzz).reason)
+	r["lightning storm 2 tiles from the funnel"] = sim.cast_power(2, "lightning_storm", tx + 2.0, tzz)
+	r["lightning storm 30 tiles away"] = sim.cast_power(2, "lightning_storm", C.x + 30.0, C.y + 30.0)
+	r["the caster's own vision inside"] = sim.cast_power(1, "vision", tx, tzz + 1.0)
+	_step(sim, 20.0)
+	r["meteor where the funnel was, after it ended"] = sim.cast_power(2, "meteor", tx + 2.0, tzz)
+	var ok: bool = r["tornado"] and not r["lightning storm 2 tiles from the funnel"] and r["reason"] == "Blocked by a Tornado"
+	ok = ok and r["lightning storm 30 tiles away"] and not r["the caster's own vision inside"] and r["meteor where the funnel was, after it ended"]
+	# Thoth's Meteor: a Greek Meteor inside its 25 m circle refused
+	var s2 := _fresh("isis", "zeus", 3, ["anubis", "nephthys", "thoth"])
+	s2.set_player_resources(1, {"favor": 900})
+	s2.set_player_resources(2, {"favor": 900})
+	r["thoth's meteor"] = s2.cast_power(1, "thoth_meteor", C.x, C.y)
+	s2.tick(2)
+	r["reason 2"] = str(s2.cast_check(2, "meteor", C.x + 8.0, C.y).reason)
+	r["greek meteor 8 tiles from its centre"] = s2.cast_power(2, "meteor", C.x + 8.0, C.y)
+	r["greek meteor 20 tiles from it"] = s2.cast_power(2, "meteor", C.x + 20.0, C.y)
+	ok = ok and r["thoth's meteor"] and not r["greek meteor 8 tiles from its centre"] and r["reason 2"] == "Blocked by Thoth's Meteor" and r["greek meteor 20 tiles from it"]
+	_check("blocks.tornado_thoth_local", ok, r)
+
+func _case_allies() -> void:
+	var r := {}
+	var sim := _fresh3("ra", "isis", 3, ["bast", "sekhmet", "osiris"])
+	if sim == null:
+		_check("allies.citadel_son", false, {"error": "no match"})
+		return
+	var tc3: int = _buildings_of(sim, 3, "town_center")[0]
+	var tc1: int = _buildings_of(sim, 1, "town_center")[0]
+	var b3: Dictionary = sim.get_building(tc3)
+	var hp0 := float(b3.max_hp)
+	r["citadel on the ally's TC"] = sim.cast_power(1, "citadel", float(b3.x), float(b3.z))
+	sim.tick(1)
+	r["ally TC max hp +"] = float(sim.get_building(tc3).max_hp) - hp0
+	var tc2: int = _buildings_of(sim, 2, "town_center")[0]
+	var b2: Dictionary = sim.get_building(tc2)
+	r["citadel on the enemy's TC"] = sim.cast_check(1, "citadel", float(b2.x), float(b2.z)).ok
+	# +10 % hack armor: a hoplite blow on a plain TC (P1's) vs the Citadel Center (P3's)
+	var b1: Dictionary = sim.get_building(tc1)
+	var hop := int(sim.spawn_unit("hoplite", 2, float(b1.x) + float(b1.w) * 0.5 + 0.8, float(b1.z), 0.0))
+	sim.tick(1)
+	var plain := _first_hit(sim, hop, tc1)
+	sim.kill_unit(hop)
+	var hop2 := int(sim.spawn_unit("hoplite", 2, float(b3.x) + float(b3.w) * 0.5 + 0.8, float(b3.z), 0.0))
+	sim.tick(1)
+	var cit := _first_hit(sim, hop2, tc3)
+	sim.kill_unit(hop2)
+	r["hoplite blow on a TC / on the Citadel Center"] = [_r(plain), _r(cit)]
+	var v := plain / 9.0
+	var ok: bool = r["citadel on the ally's TC"] and r["ally TC max hp +"] == 1200.0 and not r["citadel on the enemy's TC"]
+	ok = ok and plain > 0 and _near(cit, 9.0 * (v - 0.10), 0.02)
+	# the Son of Osiris on the ally's Pharaoh
+	var ph: Array = _units_of(sim, 3, "pharaoh")
+	if ph.size() > 0:
+		var pu: Dictionary = sim.get_unit(ph[0])
+		r["son on the ally's pharaoh"] = sim.cast_power(1, "son_of_osiris", float(pu.x), float(pu.z))
+		sim.tick(2)
+		var sons3: Array = _units_of(sim, 3, "son_of_osiris")
+		r["sons of P3 / P1"] = [sons3.size(), _units_of(sim, 1, "son_of_osiris").size()]
+		if sons3.size() > 0:
+			for t in ["priest", "pharaoh"]:   # (no healer of his near: his own 15 hp/s only)
+				for o in [1, 3]:
+					for id in _units_of(sim, o, t):
+						sim.kill_unit(id)
+			sim.damage(sons3[0], 300.0)
+			sim.tick(1)
+			sim.take_events()
+			var h0 := _hp(sim, sons3[0])
+			var son: int = sons3[0]
+			var hurt := _damage_by(sim, 2.0, func(e): return int(e.id) == son)   # (blows taken meanwhile added back)
+			r["son hp healed in 2 s"] = _r(_hp(sim, son) - h0 + float(hurt.get(son, 0.0)), 2)
+			r["son hp [after the blow, 2 s on, max]"] = [h0, _hp(sim, son), float(sim.get_unit(son).max_hp)]
+		ok = ok and r["son on the ally's pharaoh"] and r["sons of P3 / P1"] == [1, 0] and _near(float(r.get("son hp healed in 2 s", 0)), 30.0, 0.6)
+	else:
+		ok = false
+		r["error"] = "P3 has no Pharaoh"
+	_check("allies.citadel_son", ok, r)
+
+## the trees standing within r of (x, z): [ids, tiles]
+func _trees_near(sim: Object, x: float, z: float, r: float) -> Array:
+	var R: Dictionary = sim.get_resources()
+	var out := []
+	for i in int(R.count):
+		if R.type_names[R.type[i]] != "tree":
+			continue
+		var tx := int(R.tile[i * 2])
+		var tz := int(R.tile[i * 2 + 1])
+		if Vector2(tx + 0.5, tz + 0.5).distance_to(Vector2(x, z)) <= r:
+			out.append([int(R.ids[i]), tx, tz, int(R.variant[i]), float(R.amount[i])])
+	return out
+
+func _densest_wood(sim: Object) -> Vector2:
+	var R: Dictionary = sim.get_resources()
+	var best := Vector2.ZERO
+	var bn := -1
+	var starts: Array = sim.get_starts()
+	for i in range(0, int(R.count), 7):
+		if R.type_names[R.type[i]] != "tree":
+			continue
+		var p := Vector2(int(R.tile[i * 2]) + 0.5, int(R.tile[i * 2 + 1]) + 0.5)
+		var far := true
+		for st in starts:
+			if p.distance_to(Vector2(float(st.tx), float(st.tz))) < 25:
+				far = false
+		if not far:
+			continue
+		var n := _trees_near(sim, p.x, p.y, 3.0).size()
+		if n > bn:
+			bn = n
+			best = p
+	return best
+
+func _case_trees() -> void:
+	var r := {}
+	var ok := true
+	for k in ["tornado", "thoth_meteor"]:
+		var sim := _fresh("isis" if k == "thoth_meteor" else "ra", "zeus", 3, ["anubis", "nephthys", "thoth"] if k == "thoth_meteor" else ["bast", "sobek", "horus"])
+		sim.set_player_resources(1, {"favor": 900})
+		var w := _densest_wood(sim)
+		var n := int(sim.get_map_size())
+		r[k + " cast"] = sim.cast_power(1, k, w.x, w.y)
+		var at := w
+		var before := []
+		if k == "tornado":   # the first pulse at 0.5 s: the trees within 3 tiles (5 m) of the funnel then
+			_step(sim, 0.45)
+			var tz: Array = sim.get_egypt_powers().tornadoes
+			at = Vector2(float(tz[5]), float(tz[6])) if tz.size() > 6 else w
+			before = _trees_near(sim, at.x, at.y, 2.9)
+			_step(sim, 0.1)
+		else:                # the first meteor on the centre at 3 s: its 8 m (4.8 tiles) blast
+			before = _trees_near(sim, at.x, at.y, 2.5)
+			_step(sim, 3.2)
+		var after := _trees_near(sim, at.x, at.y, 2.9 if k == "tornado" else 2.5)
+		after = after.filter(func(t): return before.any(func(b): return int(b[0]) == int(t[0])))
+		var walk: PackedByteArray = sim.get_walkable()
+		var flat := 0
+		var open := 0
+		var wood_kept := true
+		for t in after:
+			if int(t[3]) >= 100:
+				flat += 1
+				if walk[int(t[2]) * n + int(t[1])] != 0:
+					open += 1
+			for b in before:
+				if int(b[0]) == int(t[0]) and not _near(float(b[4]), float(t[4]), 0.01):
+					wood_kept = false
+		r[k + ": trees within 2.5 tiles of the target [before, flattened, walkable now]"] = [before.size(), flat, open]
+		r[k + ": wood kept"] = wood_kept
+		r[k + ": flattened (stats)"] = int(sim.get_power_stats(1).flattened)
+		ok = ok and r[k + " cast"] and before.size() >= 3 and flat == after.size() and open == flat and wood_kept and int(sim.get_power_stats(1).flattened) >= flat
+	_check("trees.flattened", ok, r)
+
+func _case_split() -> void:
+	var r := {}
+	# the Sphinx on a Greek House: 15 hack x0.35 + 9 crush x0.95; Criosphinx: 18 x0.35 + 13.5 x0.95; both 21 / 18
+	var sim := _fresh("ra", "zeus", 1, ["bast"])
+	var hs := _b(sim, "house", 2, 6, 0)
+	var sph := _u(sim, "sphinx", 1, 4.4, 0)
+	sim.tick(1)
+	var blows := [_first_hit(sim, sph, hs)]
+	sim.grant_tech(1, "criosphinx")
+	blows.append(_first_hit(sim, sph, hs))
+	sim.grant_tech(1, "hieracosphinx")
+	blows.append(_first_hit(sim, sph, hs))
+	r["sphinx blow on a house [base, criosphinx, + hieracosphinx]"] = blows.map(func(v): return _r(v))
+	var want := [15 * 0.35 + 9 * 0.95, 18 * 0.35 + 13.5 * 0.95, 21 * 0.35 + 18 * 0.95]
+	var ok := true
+	for i in 3:
+		ok = ok and _near(blows[i], want[i], 0.02)
+	# x0.5 vs heroes: an Anubite blow on Achilles (armor 0.55?) vs a hoplite
+	var hero := _u(sim, "hero", 2, -6, 0)
+	var an := _u(sim, "anubite", 1, -4.6, 0)
+	sim.tick(1)
+	var hb := _first_hit(sim, an, hero)
+	var ha := float(sim.get_unit_stats(hero).hack_armor)
+	r["anubite blow on achilles (x0.5)"] = [_r(hb), _r(11.0 * 0.5 * (1.0 - ha))]
+	ok = ok and _near(hb, 11.0 * 0.5 * (1.0 - ha), 0.02)
+	# the Phoenix on a House: 50 x0.35 + 65 x0.95 (a blow on a hoplite: 50 x (1 - armor) + 65 x 0.01)
+	var s2 := _fresh("isis", "zeus", 3, ["anubis", "nephthys", "thoth"])
+	var hs2 := _b(s2, "house", 2, 6, 0)
+	var px := _u(s2, "phoenix", 1, 3.0, 0)
+	s2.tick(1)
+	var pb := _first_hit(s2, px, hs2)
+	r["phoenix blow on a house"] = [_r(pb), _r(50 * 0.35 + 65 * 0.95)]
+	ok = ok and _near(pb, 50 * 0.35 + 65 * 0.95, 0.05)
+	# the Petsuchos' beam on a hoplite: 10 P at once, then 30 P + 8 D over 1 s and 2 D at once
+	var s3 := _fresh("ra", "zeus", 2, ["bast", "sobek"])
+	var pt := _u(s3, "petsuchos", 1, 0, 0)
+	var hop := _u(s3, "hoplite", 2, 6, 0)
+	s3.tick(1)
+	var pa := float(s3.get_unit_stats(hop).pierce_armor)
+	var h0 := _hp(s3, hop)
+	var first := _first_hit(s3, pt, hop)
+	s3.order(pt, {"type": "idle"})
+	s3.order(hop, {"type": "idle"})
+	_step(s3, 1.4)
+	var total := h0 - _hp(s3, hop)
+	r["petsuchos beam on a hoplite [first hit, total in 1.4 s]"] = [_r(first), _r(total)]
+	r["expected [10 P, 40 P + 10 D]"] = [_r(10 * (1 - pa)), _r(40 * (1 - pa) + 10)]
+	ok = ok and _near(first, 10 * (1 - pa), 0.02) and _near(total, 40 * (1 - pa) + 10, 0.1)
+	# the Serpent: Retold's 50 hp / 5 hack, +20 % in the Heroic Age
+	var s4 := _fresh("isis", "zeus", 1, ["anubis"])
+	var d: Dictionary = s4.get_unit_def("serpent")
+	r["serpent def [hp, damage, class]"] = [d.hp, d.attack.damage, d["class"]]
+	s4.cast_power(1, "plague_of_serpents", C.x, C.y)
+	s4.tick(2)
+	var sp: Array = _units_of(s4, 1, "serpent")
+	r["classical serpent hp"] = _hp(s4, sp[0]) if sp.size() > 0 else 0.0
+	ok = ok and float(d.hp) == 50.0 and float(d.attack.damage) == 5.0 and str(d["class"]) == "animal" and _near(float(r["classical serpent hp"]), 50.0)
+	# Tusks of Apedemak: the War Elephant's pop 3 -> 2
+	var s5 := _fresh("isis", "zeus", 3, ["anubis", "nephthys", "thoth"])
+	_u(s5, "war_elephant", 1, 0, 0)
+	s5.tick(2)
+	var p0 := int(s5.get_player(1).pop)
+	s5.grant_tech(1, "tusks_of_apedemak")
+	s5.tick(2)
+	r["pop with a war elephant [before, tusks]"] = [p0, int(s5.get_player(1).pop)]
+	ok = ok and r["pop with a war elephant [before, tusks]"][0] - r["pop with a war elephant [before, tusks]"][1] == 1
+	_check("split.crush_beam_heroes_serpent_tusks", ok, r)
+
+func _case_roc() -> void:
+	var r := {}
+	var sim := _fresh("ra", "zeus", 2, ["bast", "sobek"])
+	var roc := _u(sim, "roc", 1, 0, 0)
+	var men := []
+	for i in 5:
+		men.append(_u(sim, "spearman", 1, -3.0 + i * 0.8, 3.0))
+	_u(sim, "hoplite", 2, 30, 30)   # (a foe far off)
+	sim.tick(2)
+	var pop0 := int(sim.get_player(1).pop)
+	r["boarding"] = sim.roc_load(roc, PackedInt32Array(men))
+	_step(sim, 6.0)
+	var st: Dictionary = sim.get_roc(roc)
+	var gone := 0
+	for m in men:
+		if not _alive(sim, m):
+			gone += 1
+	r["cargo after 6 s"] = (st.cargo as Array).size()
+	r["spearmen out of the world"] = gone
+	r["pop [before, carried]"] = [pop0, int(sim.get_player(1).pop)]
+	# fly 12 tiles and set them down
+	r["unload"] = sim.roc_unload(roc, C.x + 12.0, C.y)
+	_step(sim, 9.0)
+	var out: Array = _units_of(sim, 1, "spearman")
+	var near := 0
+	for id in out:
+		var u: Dictionary = sim.get_unit(id)
+		if Vector2(float(u.x), float(u.z)).distance_to(Vector2(C.x + 12.0, C.y)) < 4.0:
+			near += 1
+	r["spearmen set down near the target"] = near
+	r["cargo after unloading"] = (sim.get_roc(roc).cargo as Array).size()
+	var ok: bool = r["boarding"] == 5 and r["cargo after 6 s"] == 5 and gone == 5 and r["pop [before, carried]"][0] == r["pop [before, carried]"][1]
+	ok = ok and r["unload"] and near == 5 and r["cargo after unloading"] == 0
+	# a Roc that falls takes its riders
+	var men2 := []
+	for i in 3:
+		men2.append(_u(sim, "spearman", 1, 12.0 + i * 0.8, 3.0))
+	sim.tick(1)
+	sim.roc_load(roc, PackedInt32Array(men2))
+	_step(sim, 6.0)
+	var c2 := (sim.get_roc(roc).cargo as Array).size()
+	sim.kill_unit(roc)
+	_step(sim, 1.0)
+	r["riders when it fell / pop after"] = [c2, int(sim.get_player(1).pop)]
+	ok = ok and c2 == 3 and int(sim.get_player(1).pop) == pop0 - 2
+	_check("roc.transport", ok, r)
+
+func _case_ai() -> void:
+	var r := {}
+	var sim: Object = ClassDB.instantiate("AovSim")
+	sim.set_godot_rules(true)
+	var ps := [{"id": 1, "name": "P1", "human": true, "team": 1, "god": "zeus"}, {"id": 2, "name": "P2", "human": false, "team": 2, "god": "ra", "ai": "hard"}]
+	sim.start_match({"seed": seed_arg, "map_size": 160, "preset": "skirmish", "resources": "deathmatch", "players": ps})
+	sim.set_victory_enabled(false)
+	C = _open_area(sim, 30, 30.0)
+	for i in 4:
+		_b(sim, "farm", 2, -8 + i * 4, -8)
+	sim.set_player_resources(2, {"favor": 100})
+	_step(sim, 8.0)
+	var ai: Dictionary = sim.get_ai(2)
+	r["ra seat casts: rain"] = int(ai.casts.get("rain", 0))
+	# a Set seat in the Mythic Age (Anubis, Nephthys, Horus), a cluster of foes by its men
+	var s2: Object = ClassDB.instantiate("AovSim")
+	s2.set_godot_rules(true)
+	ps[1].god = "set"
+	s2.start_match({"seed": seed_arg, "map_size": 160, "preset": "skirmish", "resources": "deathmatch", "players": ps})
+	s2.set_victory_enabled(false)
+	s2.set_player_age(2, 3)
+	C = _open_area(s2, 30, 30.0)
+	for i in 3:
+		_u(s2, "spearman", 2, -6.0 + i, 0)
+	for i in 12:
+		_u(s2, "hoplite", 1, 2.0 + (i % 4) * 1.0, -2.0 + int(i / 4) * 1.0)
+	s2.set_player_resources(2, {"favor": 900})
+	_step(s2, 6.0)
+	var a2: Dictionary = s2.get_ai(2)
+	var big := 0
+	for k in ["tornado", "plague_of_serpents", "ancestors"]:
+		big += int(a2.casts.get(k, 0))
+		r["set seat casts: " + k] = int(a2.casts.get(k, 0))
+	var ok: bool = r["ra seat casts: rain"] >= 1 and big >= 1
+	_check("ai.casts_egyptian_powers", ok, r)

@@ -6,6 +6,7 @@
 // player (Combat::ais).
 #pragma once
 #include <array>
+#include <functional>
 #include <cstddef>
 #include <cstdint>
 #include <utility>
@@ -155,7 +156,7 @@ public:
 	double aggression = 1;
 	std::vector<WaveLog> waves; // every wave launched (AovSim.get_ai().waves)
 	double power_timer = 0;     // s until the next god power decision
-	int casts[3] = { 0, 0, 0 }; // powers cast, by PowerId (AovSim.get_ai().casts)
+	int casts[16] = {};         // powers cast, by PowerId (AovSim.get_ai().casts; >= GP_COUNT, static_assert in enemy_ai.cpp)
 	int difficulty = AI_DEFAULT;
 	AIParams par;               // ai_params(difficulty)
 	// set the difficulty (params, wave size / timing, aggression); the
@@ -188,6 +189,8 @@ private:
 	bool find_spot(int type, int tc_row, int &tx, int &tz);
 	bool gap_ok(int tx, int tz, int w, int h) const;
 	void use_powers(const std::vector<int> &army, const std::vector<int> &buildings);
+	void egypt_powers(const std::vector<int> &ready, const std::vector<int> &foes, const std::vector<int> &army,
+			const std::vector<int> &buildings, int storm_min, const std::function<int(double, double &, double &)> &cluster);
 	std::vector<uint8_t> reach_; // scratch: cells in reach of our army / base
 	void storehouses(int tc, const std::vector<int> &vills, const std::vector<int> &buildings); // Godot-only
 	// Godot-only, an Egyptian seat (sim/civ): drop sites by the nodes worked, the Monuments, the Pharaoh's empower

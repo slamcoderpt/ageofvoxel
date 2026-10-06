@@ -2653,29 +2653,54 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   | Rain (Ra) | 30 fav, 90 s, +15; 50 s, farming +150 % | caster's farmers x2.5 |
   | Prosperity (Isis) | 60, 120, +10; 75 s, gold +50 % | gold gatherers x1.5 |
   | Vision (Set) | 40, 240, +5; 10 m growing 15 m/s to 70 m, 20 s | a reveal 6 -> 42 tiles (Clairvoyance: recharge x0.5, no ramp) |
-  | Eclipse (Bast) | 90, 150, +25; 55 s; myth +20 % dmg, +15 % speed, -10 % vuln., -60 % ability recharge; Monuments +50 % favor; one at a time | as Retold (+0.10 armor) |
+  | Eclipse (Bast) | 90, 150, +25; 55 s; myth +20 % dmg, +15 % speed, -10 % vuln., -60 % ability recharge; Monuments +50 % favor; one at a time | as Retold (vulnerability x0.9: armor a -> 1 - (1 - a) x 0.9, `armor_after`) |
   | Shifting Sands (Ptah) | 40, 180, +20; after 3 s own / allied units in 10 m to a visible point >= 40 m | 6 tiles, >= 24 tiles, in sight of his or an ally's unit / building (the fog is the local player's only) |
-  | Plague of Serpents (Anubis) | 60, 180, +10; 14 serpents in 14 m, 2 then 2 every 3 s, uncontrolled guards | 8.4 tiles; AoM serpent stats (EGYPT.md has none); `is_uncontrolled` |
+  | Plague of Serpents (Anubis) | 60, 180, +10; 14 serpents in 14 m, 2 then 2 every 3 s, uncontrolled guards | 8.4 tiles; Retold's Serpent (an animal: 50 hp, 5 hack, 10 % pierce, speed 4, LOS 16, +20 % hp / damage in the Heroic and again in the Mythic Age); `is_uncontrolled` |
   | Locust Swarm (Sobek) | 75, 150, +10; 5 swarms at 3 m/s for 20 s, 3.5 divine/s in 6 m, x6 Farms / berries, x0.1 own; Mythic +20 % | 1.95 tiles/s, 3.6 tiles, applied every 8 ticks; off the map a swarm is gone |
-  | Citadel (Sekhmet) | 150, 120, +50; TC +1200 hp, +2 attack, +1 arrow, +1 LOS, +10 pop, +25 % work | arrows x1.2 and a second arrow per volley, train / research / age-up x1.25 (+10 % hack armor not applied) |
+  | Citadel (Sekhmet) | 150, 120, +50; own or allied TC +1200 hp, +2 attack, +1 arrow, +1 LOS, +10 pop, +10 % hack armor, +25 % work | arrows x1.2 and a second arrow per volley, train / research / age-up x1.25, a hack blow's vulnerability -0.10 (`building_hack_mult`) |
   | Ancestors (Nephthys) | 100, 180, +5; 13 Minions over 13 s in 16 m, dead 60 s after | 9.6 tiles (Atef Crown 120 s) |
-  | Son of Osiris (Osiris) | 350, 240, +50; Pharaoh -> demigod, chain lightning; a new Pharaoh later | 609 hp, 50.75 per bolt jumping to 3 more within 4.8 tiles; the Pharaoh respawns after 90 s |
-  | Tornado (Horus) | 350, 240, +5; 20 s spiralling out, 25 hack + 100 crush every 0.5 s, full 5 m falling to 15 m, x0.1 Farms, slow 35 % 6 s | Archimedean spiral at 2.5 tiles/s; crush armor 99 % (myth 80 %, siege 85 %); flings units within 3 tiles; own x0.1 |
-  | Meteor (Thoth) | 350, 240, +5; 12 meteors, first at 3 s, then from 6 s on the densest targets, 580 crush + 40 divine in 8 m, knockback | one a second, 4.8 tiles; the Greek meteor's visuals (sim `Meteor::kind` 1) |
+  | Son of Osiris (Osiris) | 350, 240, +50; own or ally's Pharaoh -> demigod, chain lightning, heals 15 hp/s; a new Pharaoh later | 609 hp, 50.75 per bolt jumping to 3 more within 4.8 tiles, +15 hp/s; an ally's Pharaoh becomes the ally's demigod; the Pharaoh respawns after 90 s |
+  | Tornado (Horus) | 350, 240, +5; 20 s spiralling out, 25 hack + 100 crush every 0.5 s, full 5 m falling to 15 m, x0.1 Farms, slow 35 % 6 s | Archimedean spiral at 2.5 tiles/s; crush armor 99 % (myth 80 %, siege 85 %); flings units within 3 tiles; own x0.1; flattens the trees within 3 tiles; blocks other powers within 15 m of the funnel |
+  | Meteor (Thoth) | 350, 240, +5; 12 meteors, first at 3 s, then from 6 s on the densest targets, 580 crush + 40 divine in 8 m, knockback | one a second, 4.8 tiles; flattens the trees in each blast; blocks other powers in its 25 m circle; the Greek meteor's visuals (sim `Meteor::kind` 1) |
   Their damage is exact (`DK_DIVINE` in combat: no bonus / armor / building factor; the caller
   computes Retold's armor). Counters for checks: `get_power_stats`.
+  **Local blocks**: a live Tornado (within its 15 m of the funnel) or Thoth's Meteor (inside
+  its 25 m circle) refuses every other aimed power there, the Greek ones too, for every player
+  (`GodPowers::local_block`, in `cast_check` and both `cast` paths: "Blocked by a Tornado").
+  **Flattened trees** (`flatten_trees`): a tree's variant + `TREE_FLAT` (100); its tile is
+  unblocked (Sim::remove_resource then skips the unblock), the wood stays, terrain.gd draws it
+  lying (crushed crown, a hashed heading) through a `mark_dirty` of its columns.
+  **Never cast**: `TimedPower` (Rain, Prosperity, Eclipse) starts at t0 = until = -1e9, so no
+  power is live or fading at the start of a match (round 2: the renderer drew a "just ended"
+  Rain / rainbow / Prosperity ring for the first 3 s of every match, Greek ones too).
 - **Myth units** (units/defs.h `U_ANUBITE .. U_PHOENIX`, trained at the Egyptian Temple with
   their god from his age; pop as Retold; civ.cpp `egypt_unit` holds pierce armor and each line):
   Anubite (Anubis, Jump 2.4-6.6 tiles for 15 hack), Wadjet (Ptah, venom 2.5/s 5 s), Sphinx (Bast,
-  Whirlwind 30 hack over 2 s), Petsuchos (Sobek, 50 per beam, Illuminate), Roc (Sobek, no
-  transport here), Scarab (Sekhmet, 110 crush on buildings, Causticity 70), Scorpion Man
+  15 hack + 9 crush, Whirlwind 30 hack over 2 s), Petsuchos (Sobek, the beam kept in parts: 10 P
+  at once + 30 P over 1 s through pierce armor + 2 D + 8 D over 1 s, Illuminate), Roc (Sobek, a
+  transport for 20), Scarab (Sekhmet, 16 hack + 100 crush, Causticity 70), Scorpion Man
   (Nephthys, Sting), Mummy (Osiris, curse 2 + 4/s for 15 s; a cursed unit dying rises as his
   Minion), Avenger (Horus, Spin 100 hack over 5 s), Phoenix (Thoth, Rebirth: an egg hatching
-  in 50 s); plus Serpent, Minion, Son of Osiris and Phoenix Egg. Abilities: egypt_myth.cpp.
+  in 50 s; 50 hack + 65 crush); plus Serpent, Minion, Son of Osiris and Phoenix Egg. Abilities:
+  egypt_myth.cpp. Every Egyptian myth unit deals x0.5 to heroes (`bonus[CLS_HERO]`).
+  **Crush parts** (`myth_crush`, `myth_on_building`, `myth_unit_crush`; combat.cpp calls them):
+  the def's attack is the hack part; the crush part rides each blow in the same share (a
+  splash's half blow, half the crush) through the target's crush armor (a browser building
+  0.95, Retold buildings their own; units 99 %, myth 80 %); on a building the hack part goes
+  through x0.35 (browser) or its Retold hack armor. Criosphinx / Hieracosphinx: +50 % crush
+  each; Force of the West Wind: the Scarab's / Phoenix's crush +15 % (no longer their hack).
+  **DoTs** burn exactly `until - from` (Dot::from: round 1 burnt one tick too many).
+  **The Roc** (`roc_load(roc, units)`, `roc_unload(roc, x, z)`, `get_roc(roc)`): boarding units
+  walk to it; it comes down over 2 s (air_y, drawn lowered, dust under its wings) and takes those
+  within 2.5 tiles: they leave the world (their row removed; `Cargo` keeps type, owner, hp share;
+  their pop still counts in Economy::recount). Unloading flies it there, lands it 2 s and sets
+  them down in rings round it. A Roc that falls takes its riders. Not Phoenixes, Rocs, siege,
+  Serpents. The HUD has no Roc button yet (UI piece: right-click / a "Board" command calling
+  roc_load, an "Unload" target calling roc_unload).
 - **Techs** (sim/techs `T_SKIN_OF_THE_RHINO ..`, 35): the three unique techs and every minor
   god's, at Retold's buildings (`TechHome` TC, Granary, Lumber Camp, Barracks, Migdol, Siege
   Works besides Armory / Market / Temple); Solar Barque and Funeral Barge have no ships here
-  (unavailable); Tusks of Apedemak's -1 pop is not applied. Hooks: gather (economy), train
+  (unavailable); Tusks of Apedemak's -1 pop (`Techs::unit_pop`, economy train / recount). Hooks: gather (economy), train
   speed / cost, healing, building cost / time / hp, lifesteal and melee poison (on unit:damaged),
   refunds, the second Pharaoh. `Techs::done` is a 128-bit set, `UnitMask` 64 bits.
 - **Visuals** (godpower_view_egypt.cpp + game/godpowers/egypt_fx.gd, same buffers as the
@@ -2684,15 +2709,27 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   Eclipse's blue dusk and pink halos; sand vortices; glyph rings and rising serpents / Minions;
   voxel locust clouds; the Citadel's pillar and heaving stones; the Son of Osiris' pillar, ring
   and gold chain lightning; the sand funnel, debris and drifts of the Tornado; Thoth's circle.
+- Models (scripts/export-egypt-gods.mjs -> assets/models/egypt_gods, VoxelModels.rig()'s third
+  group after "units" and "egypt_units"): the Serpent (a banded ochre desert cobra rising from a
+  low coil, its hood's back in the army's colour, red eyes; the Wadjet's serpent pose without
+  wings) and the Phoenix Egg (a fire-coloured egg with glowing cracks and a team band on a
+  charred nest with coals; still). `node scripts/godot-shoot.mjs --scene egypt_units --params
+  "eu_one=serpent"` / `eu_one=phoenix_egg`.
 - Capture: `node scripts/godot-shoot.mjs --scene egypt_powers --params "power=tornado&t=6"`
-  (power = any key above; ep_dist / ep_pitch / ep_yaw / ep_ax / ep_az framing).
-- Check: `godot --headless --path godot -s res://game/core/egypt_gods_check.gd [-- --only=defs,gods,passives,model,rain,prosperity,vision,eclipse,sands,serpents,locusts,citadel,ancestors,son,tornado,meteor,myth,techs,bounds,determinism]` (~3 min, 31 cases).
+  (power = any key above, or rebirth (a Phoenix falls, its egg), roc (boarding), roc_unload;
+  the Tornado and Thoth's Meteor strike a grove; ep_dist / ep_pitch / ep_yaw / ep_ax / ep_az framing).
+- Check: `godot --headless --path godot -s res://game/core/egypt_gods_check.gd [-- --only=defs,gods,passives,model,rain,prosperity,vision,eclipse,sands,serpents,locusts,citadel,ancestors,son,tornado,meteor,myth,techs,bounds,determinism,phantom,blocks,allies,trees,split,roc,ai]` (~4 min, 38 cases).
+- **AI** (combat/enemy_ai.cpp `egypt_powers`): an Egyptian seat casts its gods' powers through
+  the same cast_check / cast2 as the HUD, deterministic: Tornado / Thoth's Meteor / Plague of
+  Serpents / Ancestors on the densest cluster of foes in reach (Thoth's also on a clump of enemy
+  buildings), the Son of Osiris on its Pharaoh and the Citadel on its TC with foes near, the
+  Eclipse with 3+ myth units, Locust Swarm across enemy Farms, Rain with 4+ Farms, Prosperity
+  with 4+ miners, Vision on the nearest enemy TC, Shifting Sands to bring a far army (8+) next
+  to its target. `get_ai(o).casts` counts every power (EnemyAI::casts holds 16).
 - API (aov_sim_gods.cpp): `player_powers`, `get_power_info`, `cast_check`, `cast_power2`,
   `last_cast_reason`, `get_gods`, `minor_gods_of`, `get_egypt_powers`, `get_power_stats`,
-  `is_uncontrolled`, `ability_ready`, `set_player_god`.
-- Not yet: the enemy AI casting the Egyptian powers (its Greek casts fail harmlessly for an
-  Egyptian seat), Leviathan / War Turtle (no ships), dedicated Serpent / Phoenix Egg models
-  (Wadjet / Phoenix rigs stand in).
+  `is_uncontrolled`, `ability_ready`, `set_player_god`, `roc_load`, `roc_unload`, `get_roc`.
+- Not yet: Leviathan / War Turtle (no ships); the Roc's HUD command (API ready).
 
 ## Conventions
 

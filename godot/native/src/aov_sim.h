@@ -238,6 +238,9 @@ public:
 	PackedStringArray minor_gods_of(const String &major, int64_t age) const;
 	Dictionary get_egypt_powers() const;                          // the Egyptian powers' state (game/godpowers draws it)
 	Dictionary get_power_stats(int64_t owner) const;              // counters (egypt_gods_check.gd)
+	int64_t roc_load(int64_t roc, const PackedInt32Array &units); // the Roc: board units (sim/godpowers)
+	bool roc_unload(int64_t roc, double x, double z);
+	Dictionary get_roc(int64_t roc) const;
 	bool is_uncontrolled(int64_t unit) const { return sim_.godpowers.is_uncontrolled((int32_t)unit); }
 	bool set_player_god(int64_t owner, const String &god);       // the major god (and the civ it gives); scenes, checks
 	double ability_ready(int64_t unit) const { return sim_.godpowers.ability_ready((int32_t)unit); }

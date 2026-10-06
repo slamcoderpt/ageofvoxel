@@ -362,13 +362,16 @@ void Combat::damage(int32_t tid, double amount, const Hitter &a, uint8_t kind) {
 	bool siege = false; // (Godot-only, sim/civ: Egyptian siege's crush vs a building)
 	if (tk == K_BUILDING && !exact) {
 		const EgyptUnit *eu = sim->godot_rules && ad ? egypt_unit(U.type[a.row]) : nullptr;
-		if (eu && eu->crush_vs_building > 0) {
+		if (sim->godot_rules && ad && is_egypt_myth(U.type[a.row]) && sim->godpowers.myth_on_building(a.row, t, dmg, dmg)) {
+			siege = true; // (sim/godpowers: the Sphinx / Scarab / Phoenix's hack + crush parts, each through its armor)
+		} else if (eu && eu->crush_vs_building > 0) {
 			// the crush part of the attack (with the attack upgrades' factor), less the building's crush armor
 			const CivArmor ar = civ_building_armor(B.type[t]);
 			siege = true;
 			dmg = eu->crush_vs_building * (amount / ad->attack.damage) * (1 - (ar.retold ? ar.crush : SIEGE_CRUSH_ARMOR));
 		} else if (sim->godot_rules && rules_armored(B.type[t])) dmg *= sim->techs.building_armor_mult(a, kind, B.type[t]); // (Godot-only: Retold's Armory / Market / Temple armor, sim/techs; the Egyptian buildings', sim/civ)
 		else dmg *= (ad && ad->cls == CLS_MYTH) || a.myth_class ? 1.2 : 0.35;
+		if (sim->godot_rules && !siege) dmg *= sim->godpowers.building_hack_mult(t, a, kind); // (sim/godpowers: a Citadel Center's +10 % hack armor)
 		if (eu && eu->vs_buildings > 0) dmg *= eu->vs_buildings; // (War Elephant x4)
 		if (eu && U.type[a.row] == U_LABORER && B.type[t] == B_TOWER) dmg *= LABORER_VS_TOWER; // (sim/civ: Retold's Laborer x4 vs towers)
 	}
@@ -383,7 +386,9 @@ void Combat::damage(int32_t tid, double amount, const Hitter &a, uint8_t kind) {
 	} else if (sim->godot_rules) {
 		// Godot-only (sim/techs): hack / pierce armor from the Armory, then
 		// divine damage, which no armor reduces (Phobos' Spear of Panic)
+		const double pre = dmg;
 		dmg *= 1 - (td ? sim->techs.unit_armor(t, a, kind) : 0);
+		if (ad && td && is_egypt_myth(U.type[a.row])) dmg += sim->godpowers.myth_unit_crush(a.row, t, pre / (ad->bonus[td->cls] != 0 ? ad->bonus[td->cls] : 1)); // (sim/godpowers: the crush part)
 		if (ad) {
 			const double dv = sim->techs.divine(a.row);
 			if (dv != 0) dmg += dv * (tk == K_BUILDING ? 0.35 : 1);

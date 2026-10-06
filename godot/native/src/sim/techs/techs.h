@@ -304,6 +304,8 @@ public:
 	void init(Sim *s);
 	void update(double dt);
 
+	// a unit's pop for its owner (Godot-only: Tusks of Apedemak's War Elephant -1); the def's otherwise
+	int unit_pop(int owner, int type) const;
 	bool is_done(int owner, int t) const { return owner >= 0 && owner < MAX_PLAYERS && t >= 0 && t < T_COUNT && done[owner].test(t); }
 	int state(int owner, int t, std::string *reason = nullptr) const;
 	bool researches_at(int building_type, int t) const;

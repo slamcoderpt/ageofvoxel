@@ -507,7 +507,13 @@ void EnemyAI::use_powers(const std::vector<int> &army, const std::vector<int> &b
 	GodPowers &G = S.godpowers;
 	const bool storm_ok = G.can_cast(owner, GP_LIGHTNING_STORM).ok, meteor_ok = G.can_cast(owner, GP_METEOR).ok,
 			   bolt_ok = G.can_cast(owner, GP_BOLT).ok;
-	if (!storm_ok && !meteor_ok && !bolt_ok) return;
+	// (Godot-only, an Egyptian seat: his gods' powers, sim/godpowers egypt_powers.cpp)
+	const bool eg = egypt();
+	std::vector<int> ready;
+	if (eg)
+		for (int id : G.player_powers(owner))
+			if (G.can_cast(owner, id).ok) ready.push_back(id);
+	if (eg ? ready.empty() : (!storm_ok && !meteor_ok && !bolt_ok)) return;
 	const UnitStore &U = S.entities.units;
 	const BuildingStore &B = S.entities.buildings;
 	const GameMap &map = S.map();
@@ -565,6 +571,10 @@ void EnemyAI::use_powers(const std::vector<int> &army, const std::vector<int> &b
 		return best;
 	};
 	const int storm_min = difficulty == AI_DEFAULT ? STORM_MIN : par.storm_min;
+	if (eg) {
+		egypt_powers(ready, foes, army, buildings, storm_min, cluster);
+		return;
+	}
 	if (storm_ok && (int)foes.size() >= storm_min) {
 		double x = 0, z = 0;
 		// the storm strikes men within 0.78 of its radius (GodPowers::update)
@@ -619,6 +629,133 @@ void EnemyAI::use_powers(const std::vector<int> &army, const std::vector<int> &b
 		}
 		// (the bolt picks the unit nearest the point: cast right on the target)
 		if (best >= 0 && G.cast(owner, GP_BOLT, U.x[best], U.z[best])) casts[GP_BOLT]++;
+	}
+}
+
+static_assert(GP_COUNT <= 16, "EnemyAI::casts holds every power");
+
+// An Egyptian seat's powers (Godot-only), one decision per call, each through the same
+// GodPowers::cast_check / cast2 as the HUD's, deterministic (rows in order, no draws):
+//  Rain        : with 4+ of its Farms standing
+//  Prosperity  : with 4+ Laborers on gold (carrying it)
+//  Vision      : on the enemy Town Center nearest our own, once its army is out (not before 3 min)
+//  Eclipse     : with 3+ of its myth units, foes in reach
+//  Plague of Serpents / Tornado / Thoth's Meteor: on the densest cluster of foes in reach (Thoth's
+//                 Meteor also on a clump of enemy buildings, as the Greek Meteor)
+//  Ancestors   : on the densest cluster too, to raise the dead beside it
+//  Locust Swarm: at the enemy Farms in reach, heading across them
+//  Citadel     : on its Town Center with foes near it
+//  Son of Osiris: on its Pharaoh with foes in reach
+//  Shifting Sands: its army (8+) far from the target it marches on, sent next to it
+void EnemyAI::egypt_powers(const std::vector<int> &ready, const std::vector<int> &foes, const std::vector<int> &army,
+		const std::vector<int> &buildings, int storm_min, const std::function<int(double, double &, double &)> &cluster) {
+	Sim &S = *sim;
+	GodPowers &G = S.godpowers;
+	const UnitStore &U = S.entities.units;
+	const BuildingStore &B = S.entities.buildings;
+	auto has = [&](int id) { return std::find(ready.begin(), ready.end(), id) != ready.end(); };
+	auto go = [&](int id, double x, double z, double x2 = NAN, double z2 = NAN) {
+		const bool ok = std::isnan(x2) ? G.cast(owner, id, x, z) : G.cast2(owner, id, x, z, x2, z2);
+		if (ok) casts[id]++;
+		return ok;
+	};
+	int tc = -1;
+	for (int b : buildings)
+		if (B.type[b] == B_TOWN_CENTER && B.built[b]) { tc = b; break; }
+	const int nfoes = (int)foes.size();
+	// the big ones first: Tornado, Thoth's Meteor, Plague of Serpents, Ancestors on a cluster
+	for (int id : { GP_TORNADO, GP_THOTH_METEOR, GP_PLAGUE_OF_SERPENTS, GP_ANCESTORS }) {
+		if (!has(id) || nfoes < storm_min) continue;
+		const double R = std::min(power_def(id).radius, 9.0) * 0.8;
+		double x = 0, z = 0;
+		const int need = id == GP_TORNADO || id == GP_THOTH_METEOR ? storm_min + 2 : storm_min;
+		if (cluster(R, x, z) >= need && G.cast_check(owner, id, x, z).ok && go(id, x, z)) return;
+	}
+	if (has(GP_THOTH_METEOR)) { // a clump of enemy buildings in reach
+		for (int b = 0; b < B.size(); b++) {
+			if (B.removed[b] || B.dead[b] || !S.is_enemy(owner, B.owner[b]) || is_wall_piece(B.type[b])) continue;
+			bool near_army = false;
+			for (int u : army)
+				if (jsm::hypot(U.x[u] - B.x[b], U.z[u] - B.z[b]) < REACH_ARMY + 4) { near_army = true; break; }
+			if (!near_army) continue;
+			int k = 0;
+			for (int o = 0; o < B.size(); o++)
+				if (!B.removed[o] && !B.dead[o] && S.is_enemy(owner, B.owner[o]) && !is_wall_piece(B.type[o]) &&
+						jsm::hypot(B.x[o] - B.x[b], B.z[o] - B.z[b]) < power_def(GP_THOTH_METEOR).radius) k++;
+			if (k >= METEOR_BUILDINGS + 1 && G.cast_check(owner, GP_THOTH_METEOR, B.x[b], B.z[b]).ok && go(GP_THOTH_METEOR, B.x[b], B.z[b])) return;
+		}
+	}
+	if (has(GP_SON_OF_OSIRIS) && nfoes >= storm_min) {
+		for (int r = 0; r < U.size(); r++)
+			if (!U.removed[r] && !U.dead[r] && U.owner[r] == owner && U.type[r] == U_PHARAOH && go(GP_SON_OF_OSIRIS, U.x[r], U.z[r])) return;
+	}
+	if (has(GP_CITADEL) && tc >= 0) {
+		int near = 0;
+		for (int o : foes) near += jsm::hypot(U.x[o] - B.x[tc], U.z[o] - B.z[tc]) < REACH_BASE;
+		if (near >= 3 && go(GP_CITADEL, B.x[tc], B.z[tc])) return;
+	}
+	if (has(GP_ECLIPSE) && nfoes >= 4) {
+		int myth = 0;
+		for (int u : army) myth += unit_def(U.type[u]).cls == CLS_MYTH;
+		if (myth >= 3 && go(GP_ECLIPSE, 0, 0)) return;
+	}
+	if (has(GP_LOCUST_SWARM)) { // the enemy Farms (in reach of our army): across them, away from us
+		for (int b = 0; b < B.size(); b++) {
+			if (B.removed[b] || B.dead[b] || !S.is_enemy(owner, B.owner[b]) || !building_def(B.type[b]).farm) continue;
+			int k = 0;
+			for (int o = 0; o < B.size(); o++)
+				if (!B.removed[o] && !B.dead[o] && S.is_enemy(owner, B.owner[o]) && building_def(B.type[o]).farm &&
+						jsm::hypot(B.x[o] - B.x[b], B.z[o] - B.z[b]) < 10) k++;
+			if (k < 3) continue;
+			const double sx = tc >= 0 ? B.x[tc] : B.x[b] - 10, sz = tc >= 0 ? B.z[tc] : B.z[b];
+			double dx = B.x[b] - sx, dz = B.z[b] - sz;
+			const double l = std::max(1e-6, jsm::hypot(dx, dz));
+			dx /= l;
+			dz /= l;
+			const double x0 = B.x[b] - dx * 6, z0 = B.z[b] - dz * 6;
+			if (G.cast_check(owner, GP_LOCUST_SWARM, x0, z0, B.x[b], B.z[b]).ok && go(GP_LOCUST_SWARM, x0, z0, B.x[b], B.z[b])) return;
+			break;
+		}
+	}
+	if (has(GP_RAIN)) {
+		int farms = 0;
+		for (int b : buildings) farms += building_def(B.type[b]).farm && B.built[b];
+		if (farms >= 4 && go(GP_RAIN, 0, 0)) return;
+	}
+	if (has(GP_PROSPERITY)) {
+		int miners = 0;
+		for (int r = 0; r < U.size(); r++)
+			miners += !U.removed[r] && !U.dead[r] && U.owner[r] == owner && U.carry_type[r] == RES_GOLD && U.carry_amount[r] > 0;
+		if (miners >= 4 && go(GP_PROSPERITY, 0, 0)) return;
+	}
+	if (has(GP_VISION) && S.time > 180 && tc >= 0 && (int)army.size() >= 6) {
+		int best = -1;
+		double bd = 1e18;
+		for (int b = 0; b < B.size(); b++)
+			if (!B.removed[b] && !B.dead[b] && S.is_enemy(owner, B.owner[b]) && B.type[b] == B_TOWN_CENTER) {
+				const double d = jsm::hypot(B.x[b] - B.x[tc], B.z[b] - B.z[tc]);
+				if (d < bd) { bd = d; best = b; }
+			}
+		if (best >= 0 && go(GP_VISION, B.x[best], B.z[best])) return;
+	}
+	if (has(GP_SHIFTING_SANDS) && tc >= 0 && (int)army.size() >= 8) {
+		const int target = find_target(tc);
+		if (target >= 0) {
+			double cx = 0, cz = 0;
+			for (int u : army) { cx += U.x[u]; cz += U.z[u]; }
+			cx /= army.size();
+			cz /= army.size();
+			double dx = B.x[target] - cx, dz = B.z[target] - cz;
+			const double d = jsm::hypot(dx, dz);
+			if (d > 60) { // far off: the sands set them down 14 tiles short of it (where its sight reaches)
+				dx /= d;
+				dz /= d;
+				for (double back = 14; back >= 8; back -= 3) {
+					const double tx = B.x[target] - dx * back, tz = B.z[target] - dz * back;
+					if (G.cast_check(owner, GP_SHIFTING_SANDS, cx, cz, tx, tz).ok && go(GP_SHIFTING_SANDS, cx, cz, tx, tz)) return;
+				}
+			}
+		}
 	}
 }
 

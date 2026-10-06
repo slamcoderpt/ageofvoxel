@@ -114,7 +114,7 @@ void Sim::remove_resource(int32_t id) {
 	if (is_animal_type(R.type[s])) {
 		const double tx = R.x[s] - 0.5, tz = R.z[s] - 0.5;
 		if (tx == std::floor(tx) && tz == std::floor(tz)) world.map.unblock((int)tx, (int)tz, 1, 1);
-	} else world.map.unblock(R.tx[s], R.tz[s], R.w[s], R.h[s]);
+	} else if (!(R.type[s] == R_TREE && R.variant[s] >= TREE_FLAT)) world.map.unblock(R.tx[s], R.tz[s], R.w[s], R.h[s]); // (Godot-only: a flattened tree no longer blocks, sim/godpowers)
 	entities.remove(id);
 }
 
