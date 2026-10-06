@@ -1199,6 +1199,32 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   construction stages leave it out. `--preview <type>[:variant]
   --preview-out f.json` dumps one model's voxels (insets included) without
   exporting, for a quick offline look.
+- **Statue bodies, round 16** (`cleanStatue()`): golds deepened (`CG`
+  0x9c6800, `CG_L` 0xb88400, `CG_D` 0x664200: brighter yellows wash to cream /
+  tan under the scene's grade and haze) and every lapis inlay (nemes stripes,
+  collar ring, brows, apron) in one desaturated `LAPIS_S` (no pure-blue
+  stickers). The standing shendyt is a stepped trapezoid flaring from the
+  waist (6 half-width, front 4) to the hem (8, front 6) in alternating
+  two-voxel light / dark gold pleat columns over a dark hem row, under a
+  `CG_L` belt with a dark knot; the apron hangs from the belt one voxel proud,
+  tapering (2 / 3 / 4 half-width down to the hem), lapis framed in gold with
+  a dark-gold centre fold (the owner's colour stays on the plinth's team
+  line). Legs: a shin narrowing over a two-row gold ankle cuff proud of it,
+  the calf a voxel back, a dark knee cap a voxel forward, a fuller thigh.
+  `side` arms hang two voxels clear of the chest and one clear of the kilt:
+  upper arm, forearm a voxel forward from the elbow, fist with a dark finger
+  line, a gold armlet and two-row cuffs. The face: a lighter granite face
+  plane (`GRAN_F`), a nose ridge a voxel proud, lapis brows, ivory eyes with
+  dark pupils and a lapis kohl line out to the temples, a mouth line; the
+  nemes cap domed over the crown in two narrowing rows. The falcon head (Ra):
+  a lit gold face, a gold beak ridge with a dark hooked tip and gape, lapis
+  brows over dark eyes, the malar stripe. The kneeling kilt pleated the same
+  way. The Armory's yard (seen beside the Monuments in the town) cleaned to
+  one readable forge: the furnace's fire mouth cut into its base under a
+  limestone lintel with dim coals inside (nothing proud of the face), the
+  chimney's flue open at the top with a dim glow below the rim, one bold
+  two-voxel-deep gilt ankh on a limestone step, the shields that `outer()`
+  landed on the furnace front moved to the annex.
 - **Clean statues** (round 15, `cleanStatue()` in export-egypt.mjs; replaces
   `figure()` for every Monument, the Town Center's Ra and the Temple's god):
   a few large axis-aligned volumes on a fixed canon (~46 half voxels
