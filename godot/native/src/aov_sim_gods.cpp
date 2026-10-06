@@ -5,6 +5,8 @@
 
 #include <godot_cpp/core/class_db.hpp>
 
+#include <cctype>
+
 using namespace godot;
 
 void AovSim::_bind_gods_methods() {
@@ -19,6 +21,18 @@ void AovSim::_bind_gods_methods() {
 	ClassDB::bind_method(D_METHOD("get_power_stats", "owner"), &AovSim::get_power_stats);
 	ClassDB::bind_method(D_METHOD("is_uncontrolled", "unit"), &AovSim::is_uncontrolled);
 	ClassDB::bind_method(D_METHOD("ability_ready", "unit"), &AovSim::ability_ready);
+	ClassDB::bind_method(D_METHOD("set_player_god", "owner", "god"), &AovSim::set_player_god);
+}
+
+bool AovSim::set_player_god(int64_t owner, const String &god) {
+	const std::string g = god.utf8().get_data();
+	const int c = aov::civ_of_god(g);
+	if (c < 0 || owner <= 0 || owner >= aov::MAX_PLAYERS || !sim_.players[owner].exists) return false;
+	std::string n = g;
+	if (!n.empty()) n[0] = (char)std::toupper((unsigned char)n[0]);
+	sim_.players[owner].god = n;
+	sim_.players[owner].civ = (uint8_t)c;
+	return true;
 }
 
 static const char *TARGETS[] = { "point", "global", "two_points", "own_tc", "own_pharaoh" };

@@ -51,7 +51,9 @@ public:
 		bool halo;
 		int grp = -1; // ribbon group override (-1: the emit_lines group)
 	};
-	enum Group { G_BOLT, G_SKY, G_ZAP, G_BAND, G_BAND2, G_TRAIL, G_FIRE, G_SPARK, G_BLOOM, G_COUNT };
+	// G_GOLD .. G_SAND: the Egyptian powers (godpower_view_egypt.cpp): gold bolts and beams, rain
+	// streaks, sand ribbons
+	enum Group { G_BOLT, G_SKY, G_ZAP, G_BAND, G_BAND2, G_TRAIL, G_FIRE, G_SPARK, G_BLOOM, G_GOLD, G_RAIN, G_SAND, G_COUNT };
 	enum Inst { I_DEBRIS, I_EMBER, I_GLOW, I_RIM, I_DECAL_MIX, I_DECAL_ADD, I_DECAL_MUL, I_PUFF, I_FLAME, I_COUNT };
 
 	struct Ribbon {
@@ -79,6 +81,7 @@ public:
 	};
 	struct BandDef { int layer, hero; double a0, sp, span, h0, climb, dr, ya; int yf; double ph, pf, rate, w, i; };
 	struct PullDef { double a, w, rate, ph, dr, s, sy; uint32_t col; bool glow; double rx, rz; };
+	struct Drift { uint64_t key; double x, z, t0, v; }; // a tornado's sand drift
 	struct StormVis {
 		bool init = false;
 		double rb, rt, H, base;
@@ -98,6 +101,7 @@ private:
 	std::vector<Debris> debris_;
 	std::vector<Spark> sparks_;
 	std::vector<StormVis> storms_;
+	std::vector<Drift> drifts_;
 	double last_time_ = -1;
 	std::vector<float> lights_, pools_;
 
@@ -117,6 +121,9 @@ private:
 	void spawn_strike(double x, double y, double z, uint32_t seed, double t0, bool blast);
 	void step_particles(double now);
 	void init_storm(StormVis &v, double x, double z, double t0, double radius);
+	// the Egyptian powers (godpower_view_egypt.cpp)
+	bool egypt_active() const;
+	void egypt_fx(double now, double ua, const Vector3 &cam, int &li, Dictionary &eg);
 	static Array pack_ribbon(const Ribbon &r, bool spark);
 	static PackedFloat32Array pack_buf(const Buf &b);
 

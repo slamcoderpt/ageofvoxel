@@ -239,6 +239,7 @@ public:
 	Dictionary get_egypt_powers() const;                          // the Egyptian powers' state (game/godpowers draws it)
 	Dictionary get_power_stats(int64_t owner) const;              // counters (egypt_gods_check.gd)
 	bool is_uncontrolled(int64_t unit) const { return sim_.godpowers.is_uncontrolled((int32_t)unit); }
+	bool set_player_god(int64_t owner, const String &god);       // the major god (and the civ it gives); scenes, checks
 	double ability_ready(int64_t unit) const { return sim_.godpowers.ability_ready((int32_t)unit); }
 
 	// --- events: [{type: "entity:added", id, kind, other, owner, a, x, z, amount}], cleared on read

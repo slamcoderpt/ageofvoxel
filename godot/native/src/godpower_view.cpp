@@ -241,6 +241,7 @@ void AovGodpowerView::setup(const Ref<AovSim> &sim) {
 	debris_.clear();
 	sparks_.clear();
 	storms_.clear();
+	drifts_.clear();
 	last_time_ = -1;
 }
 
@@ -615,7 +616,8 @@ Dictionary AovGodpowerView::update(double alpha, bool paused, const Vector3 &cam
 	// nothing to draw: skip the whole frame (the stress scene pays nothing)
 	const bool active = !G.bolts.empty() || !debris_.empty() || !sparks_.empty() || !G.scorches.empty() || !G.meteors.empty() ||
 			!G.fires.empty() || !G.airborne.empty() || !G.zaps.empty() ||
-			std::any_of(G.storms.begin(), G.storms.end(), [](const aov::Storm &s) { return !s.done; });
+			std::any_of(G.storms.begin(), G.storms.end(), [](const aov::Storm &s) { return !s.done; }) ||
+			egypt_active(); // (the Egyptian powers, godpower_view_egypt.cpp)
 	if (!active) {
 		out["time"] = now;
 		out["active"] = false;
@@ -865,6 +867,8 @@ Dictionary AovGodpowerView::update(double alpha, bool paused, const Vector3 &cam
 			}
 		}
 	}
+	Dictionary egypt; // (the Egyptian powers: godpower_view_egypt.cpp; their state for game/godpowers/egypt_fx.gd)
+	egypt_fx(now, ua, cam, li, egypt);
 	for (; li < MAX_LIGHTS; li++) light(0, -100, 0, 0, 0, 1, 2);
 
 	// ---- zaps on struck units
@@ -1160,6 +1164,7 @@ Dictionary AovGodpowerView::update(double alpha, bool paused, const Vector3 &cam
 	out["flash"] = std::min(1.5, flash);
 	out["storm"] = storm;
 	out["storms"] = storms_out;
+	out["egypt"] = egypt;
 	out["active"] = true;
 	return out;
 }

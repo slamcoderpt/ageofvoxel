@@ -5,6 +5,12 @@
 //     custom.y = per-scorch variation.
 //   1 strike flash disc (discMat): white-hot core, hard violet rim, charred
 //     cracked collar; COLOR.a = uO, custom.y = uK (age 0..1).
+//   (the Egyptian powers, godpower_view_egypt.cpp)
+//   2 sand swirl: sand streaks spiralling into the centre (Shifting Sands, the
+//     Tornado's foot, the Sphinx's whirlwind); custom.y = phase, custom.z = 0
+//     golden sand / 1 a darker dust
+//   3 sand drift: a soft heaped patch of sand with wind ripples (left on the
+//     Tornado's track); custom.y = seed
 shader_type spatial;
 render_mode unshaded, blend_mix, depth_draw_never, cull_disabled, fog_disabled, shadows_disabled;
 
@@ -35,7 +41,27 @@ void fragment() {
 	vec2 q = UV - 0.5;           // -0.5..0.5 (the canvas centre is 0)
 	float r = length(q);
 	float ang = atan(q.y, q.x) + 3.14159265;
-	if (v_c.x < 0.5) {
+	if (v_c.x > 1.5) {
+		vec2 p = q * 2.0;
+		float d = length(p);
+		vec3 sandc = mix(lin(vec3(226.0, 196.0, 140.0)), lin(vec3(150.0, 122.0, 86.0)), v_c.z);
+		vec3 deepc = mix(lin(vec3(196.0, 156.0, 96.0)), lin(vec3(104.0, 84.0, 60.0)), v_c.z);
+		if (v_c.x < 2.5) {
+			float an = atan(p.y, p.x);
+			float sw = sin(5.0 * (an + 2.6 * log(max(d, 0.03))) + v_c.y * 6.0);
+			float streak = smoothstep(-0.2, 0.9, sw);
+			float grain = h2(floor(UV * 64.0) + floor(v_c.y * 7.0));
+			float a = (0.35 + 0.55 * streak) * (1.0 - smoothstep(0.55, 1.0, d)) * (0.85 + 0.15 * grain);
+			ALBEDO = mix(deepc, sandc, streak * 0.8 + 0.2 * grain);
+			ALPHA = clamp(a * v_col.a, 0.0, 1.0);
+		} else {
+			float seed = v_c.y * 53.0;
+			float blob = 1.0 - smoothstep(0.35 + 0.25 * h1(floor(atan(p.y, p.x) * 3.0) + seed), 1.0, d);
+			float rip = 0.5 + 0.5 * sin((p.x * 0.8 + p.y * 0.6) * 26.0 + h1(seed) * 6.0);
+			ALBEDO = mix(deepc, sandc, 0.55 + 0.35 * rip);
+			ALPHA = clamp(blob * 0.85 * v_col.a, 0.0, 1.0);
+		}
+	} else if (v_c.x < 0.5) {
 		float seed = v_c.y * 97.0;
 		vec3 P = vec3(0.0);
 		float A = 0.0;

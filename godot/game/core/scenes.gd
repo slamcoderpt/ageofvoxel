@@ -82,6 +82,11 @@ static var SCENES := {
 	# myth | battle | eco, eu_focus=<type> frames four of one type like reference/egypt/unit_05.
 	"egypt_units": {"preset": "battle", "seed": 1, "hud": false, "reveal_all": true, "fast_forward": 0.0,
 		"camera": {"distance": 30.0, "pitch": 46.0, "yaw": 28.0}},
+	# Godot-only: one Egyptian god power mid-cast (game/godpowers/egypt_powers_scene.gd):
+	# power=rain | prosperity | vision | eclipse | shifting_sands | plague_of_serpents |
+	# locust_swarm | citadel | ancestors | son_of_osiris | tornado | thoth_meteor, t=seconds in.
+	"egypt_powers": {"preset": "battle", "seed": 1, "hud": false, "reveal_all": true, "fast_forward": 0.0,
+		"camera": {"distance": 40.0, "pitch": 46.0, "yaw": 24.0}},
 	# Godot-only: the research panel (game/ui/ui.gd _techui_setup): a selected
 	# Armory with its tech buttons, the research queue and a tech tooltip open
 	# (techui_sel=market | temple, techui_tip=<slot>).

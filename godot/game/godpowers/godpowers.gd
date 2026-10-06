@@ -35,6 +35,7 @@ const DIR := "res://game/godpowers/"
 
 var game: Node = null
 var view = null   # AovGodpowerView
+var egypt = null  # egypt_fx.gd (the Egyptian powers' grade, rainbow, tornado funnels)
 var storm_k := 0.0
 
 var _ribbon_mesh := ArrayMesh.new()
@@ -111,8 +112,12 @@ func setup(g: Node) -> void:
 		_ribbon_mat(0xff5a10, 0xffe0a0, 3.0, 0xc0200a, 0.0),             # meteor trail
 		_ribbon_mat(BLUE, WHITE, 1.0, VIOLET, 1.0, true),                # sparks
 		_ribbon_mat(Vector3(0.8, 0.72, 1.0), WHITE, 1.0, Vector3(0.42, 0.26, 1.0)),  # bloom veil
+		# (the Egyptian powers, egypt_fx.gd / godpower_view_egypt.cpp)
+		_ribbon_mat(0xffb030, 0xfff4c8, 2.4, 0xff7010),                  # gold: chain lightning, sun beams, spinning blades
+		_ribbon_mat(Vector3(0.28, 0.32, 0.38), Vector3(0.75, 0.8, 0.88), 0.55, Vector3(0.18, 0.2, 0.26), 0.0),  # rain streaks
+		_ribbon_mat(0xc8a060, 0xffe2a8, 0.9, 0x8a6a3a),                  # sand ribbons
 	]
-	var prio := [30, 29, 31, 27, 27, 26, 30, 32, 29]
+	var prio := [30, 29, 31, 27, 27, 26, 30, 32, 29, 31, 24, 28]
 	for i in _ribbon_mats.size():
 		_ribbon_mats[i].render_priority = prio[i]
 	_ribbon_mesh.custom_aabb = aabb
@@ -168,6 +173,12 @@ func setup(g: Node) -> void:
 	_grade_add_mat = _mat("storm_grade_add.gdshader", 11)
 	_grade_mul = _fullscreen(fq, _grade_mat, "GP_GradeMul")
 	_grade_add = _fullscreen(fq, _grade_add_mat, "GP_GradeAdd")
+	# the Egyptian powers' own nodes: the Eclipse / Rain grade, the rainbow, tornado funnels
+	egypt = preload("res://game/godpowers/egypt_fx.gd").new()
+	egypt.name = "EgyptFX"
+	add_child(egypt)
+	egypt.setup(self)
+	AovScenes.set_setup("egypt_powers", preload("res://game/godpowers/egypt_powers_scene.gd").scene_setup)
 
 func _fullscreen(mesh: Mesh, mat: Material, node_name: String) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
@@ -196,6 +207,7 @@ func frame(_dt: float, alpha: float) -> void:
 		return
 	if not d.active:
 		if not _idle:
+			egypt.frame({}, float(d.get("time", 0.0)))
 			_clear()
 		return
 	_idle = false
@@ -288,6 +300,7 @@ func frame(_dt: float, alpha: float) -> void:
 				m.set_shader_parameter("plane_y", storm.y)
 			elif pools.size() > 0:
 				m.set_shader_parameter("plane_y", game.sim.height_at(pools[0], pools[1]))
+	egypt.frame(d.get("egypt", {}), now)
 	_storm_light(storm_k)
 
 ## Nothing active any more: hide everything, give the lighting back.
@@ -309,10 +322,19 @@ func _clear() -> void:
 
 ## The cloud deck dims the sun and sky light and darkens the grade
 ## (effects.js stormLight), through the lighting piece's public API.
+## (Godot: the Egyptian Eclipse and Rain dim it too, egypt_fx.gd light_k /
+## light_dim / light_fog: the strongest of the storm and them wins)
 func _storm_light(k: float) -> void:
 	var lp = game.pieces.get("lighting")
 	if lp == null:
 		return
+	var bars_k := k
+	var fog_col := Color.hex(0x141a2cff)
+	var dim := 1.0
+	if egypt != null and egypt.light_k > k:
+		k = egypt.light_k
+		fog_col = egypt.light_fog
+		dim = egypt.light_dim
 	var items := []
 	if lp.get("sun"):
 		items.append([lp.sun, "light_energy", 0.66])
@@ -323,11 +345,11 @@ func _storm_light(k: float) -> void:
 	if lp.get("env"):
 		items.append([lp.env, "ambient_light_energy", 0.35])
 	for it in items:
-		_ease(it[0], it[1], _base(it[0], it[1]) * (1.0 - it[2] * k))
+		_ease(it[0], it[1], _base(it[0], it[1]) * (1.0 - minf(0.95, it[2] * dim) * k))
 	if lp.get("env"):
 		var env: Environment = lp.env
 		var fb: Color = _base(env, "fog_light_color")
-		_ease(env, "fog_light_color", fb.lerp(Color.hex(0x141a2cff), k))
+		_ease(env, "fog_light_color", fb.lerp(fog_col, k))
 	var gr = lp.get("grade")
 	if gr != null:
 		_ease(gr, "vignette", lerpf(_base(gr, "vignette"), 0.55, k))
@@ -338,7 +360,7 @@ func _storm_light(k: float) -> void:
 	if combat != null:
 		var bars: Node3D = combat.get_node_or_null("HealthBars")
 		if bars != null:
-			if k > 0.0:
+			if bars_k > 0.0:
 				bars.visible = false
 				_bars_hidden = true
 			elif _bars_hidden:
