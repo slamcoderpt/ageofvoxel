@@ -12,6 +12,9 @@ uniform vec3 edge = vec3(0.15, 0.05, 1.0);
 uniform float gain = 1.35;
 uniform float screen = 1.0;
 uniform bool spark = false;
+// emissive (Thoth's Meteor's trail): a negative blue, the mark game/lighting/grade_effect.gd reads
+// to keep the trail's orange (see flame.gdshader)
+uniform bool emit = false;
 
 varying float v_side;
 varying float v_i;
@@ -55,5 +58,6 @@ void fragment() {
 		a = clamp(v_i, 0.0, 4.0);
 	}
 	ALBEDO = col * a;
+	if (emit) ALBEDO.b = -8.0 * max(ALBEDO.r, ALBEDO.g);
 	ALPHA = 1.0;
 }

@@ -27,8 +27,12 @@
 //                   ring under him while he lives; his chain lightning in gold
 //   Tornado         (funnel: egypt_fx.gd) sand and debris whirled up its sides, a dust skirt,
 //                   a sand swirl under it, sand drifts left along its spiral track
-//   Thoth's Meteor  the Greek meteor's fireballs, craters and fires (sim Meteor kind 1) under a
-//                   teal glyph ring round the target circle
+//   Thoth's Meteor  (thoth_fx) a burning rock falling on a fire trail, the blast's fireball rolling
+//                   up into black smoke, a dust ring, rocks and lava thrown out; then a glowing
+//                   crater that stays (sim Scorch kind 1, THOTH_CRATER_LIFE): a charred bowl in
+//                   cracked, baked ground, lava in its heart and cracks, flames for 12 s, smoke,
+//                   a dark lip of rocks; all under a teal glyph ring round the target circle.
+//                   Its fire and lava are emissive (a negative blue: the grade keeps their orange)
 //   abilities       venom motes, the curse's dark wisps, sting flashes, the Sphinx's whirlwind,
 //                   the Avenger's spinning blades, the Anubite's landing, the Petsuchos' sun beam
 #include "godpower_view.h"
@@ -741,13 +745,14 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 	}
 	drifts_.erase(std::remove_if(drifts_.begin(), drifts_.end(), [&](const Drift &d) { return now - d.t0 > 25 || now < d.t0 - 1; }), drifts_.end());
 
-	// ---- Thoth's Meteor: the target circle's glyph ring (the meteors: the Greek meteor's visuals) ----------
+	// ---- Thoth's Meteor: the target circle's glyph ring; its meteors, blasts and craters: thoth_fx ------------
+	thoth_fx(now, li);
 	for (const aov::ThothCast &t : G.thoth) {
 		const double k = env(now, t.t0, t.t0 + 18, 0.5, 2);
 		const double gy = h_at(t.cx, t.cz);
 		const Lin tc = hex_lin(0x40e0d0), oc = hex_lin(0xff9a40);
 		decal(I_DECAL_ADD, t.cx, gy + 0.2, t.cz, 2 * t.radius * 1.05, now * 0.06, tc.r, tc.g, tc.b, (float)(1.1 * k), 5, 0.9f, (float)(now * 0.1));
-		decal(I_DECAL_ADD, t.cx, gy + 0.22, t.cz, 2 * t.radius, 0, oc.r, oc.g, oc.b, (float)(0.9 * k), 3, 0.94f, (float)std::fmod(now, 1000.0));
+		decal(I_DECAL_ADD, t.cx, gy + 0.22, t.cz, 2 * t.radius, 0, oc.r * 0.3f, oc.g * 0.3f, 0, (float)(0.9 * k), 3, 0.94f, (float)std::fmod(now, 1000.0), -1);
 	}
 
 	// ---- abilities and afflictions -------------------------------------------------------------------------
@@ -876,3 +881,264 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 		}
 	}
 }
+
+// ---- Thoth's Meteor -------------------------------------------------------------------------------------
+// Its fire and lava are drawn emissive (I_FLAME / I_EMBER with custom.y = 1, decal_add with
+// custom.w = -1, the G_LAVA ribbons): they write a negative blue, which game/lighting/grade_effect.gd
+// reads as light that keeps its own (r, g) colour. Through the grade's warm-chroma limiter a bright
+// additive orange comes out pink; this way the fire is orange and the lava glows.
+namespace {
+// fire / lava colour by temperature (0 dark red .. 1 white-yellow), linear, before the grade's x2.1
+void fire_col(double T, float &r, float &g) {
+	static const double K[6][3] = { { 0.0, 0.10, 0.004 }, { 0.25, 0.30, 0.03 }, { 0.5, 0.55, 0.11 }, { 0.75, 0.8, 0.24 },
+		{ 0.9, 1.0, 0.42 }, { 1.0, 1.3, 0.75 } };
+	T = clamp01(T);
+	for (int i = 1; i < 6; i++)
+		if (T <= K[i][0]) {
+			const double f = (T - K[i - 1][0]) / (K[i][0] - K[i - 1][0]);
+			r = (float)(K[i - 1][1] + (K[i][1] - K[i - 1][1]) * f);
+			g = (float)(K[i - 1][2] + (K[i][2] - K[i - 1][2]) * f);
+			return;
+		}
+	r = 1.3f; g = 0.75f;
+}
+} // namespace
+
+void AovGodpowerView::thoth_fx(double now, int &li) {
+	const aov::GodPowers &G = sim_ref_->sim().godpowers;
+	const int MAX_LIGHTS = 4;
+	auto lit = [&](double x, double y, double z, uint32_t hex, double inten, double dist, double decay) {
+		if (li >= MAX_LIGHTS || inten <= 0.01) return;
+		li++;
+		light(x, y, z, hex, inten, dist, decay);
+	};
+	// camera-facing sprites: fire (additive, emissive) and soft smoke (blended)
+	auto fire = [&](double x, double y, double z, double s, double T, double a, uint32_t h, double tall = 1) {
+		if (a <= 0.01 || s <= 0.02) return;
+		float r, g;
+		fire_col(T, r, g);
+		Basis bs;
+		bs.rows[0] = Vector3((real_t)s, 0, 0);
+		bs.rows[1] = Vector3(0, (real_t)(s * tall), 0);
+		bs.rows[2] = Vector3(0, 0, 1);
+		inst(I_FLAME, bs, x, y, z, r, g, 0, (float)std::min(1.0, a), (float)((h % 997) / 997.0), 1);
+	};
+	auto smoke = [&](double x, double y, double z, double s, double v, double a, uint32_t h) {
+		if (a <= 0.01 || s <= 0.02) return;
+		Basis bs;
+		bs.rows[0] = Vector3((real_t)s, 0, 0);
+		bs.rows[1] = Vector3(0, (real_t)s, 0);
+		bs.rows[2] = Vector3(0, 0, 1);
+		// v: 0 black soot .. 1 a lighter ash grey (the smoke thins and greys as it rises)
+		const float c = (float)(0.022 + 0.06 * v);
+		inst(I_PUFF, bs, x, y, z, c * 1.06f, c, c * 0.95f, (float)std::min(1.0, a), (float)((h % 997) / 997.0), 1);
+	};
+	// a particle thrown from (x, y, z) at velocity v with drag 1 (as puff()), rising `up`
+	auto drift = [](double age, double v, double &d) { d = v * (1 - std::exp(-age)); };
+
+	// ---- falling meteors: a burning rock on a fire trail, its smoke, the warning ring under it
+	for (const aov::Meteor &m : G.meteors) {
+		if (m.done || m.kind != 1) continue;
+		const double gy = h_at(m.x, m.z);
+		double dx = m.x - m.sx, dy = gy - m.sy, dz = m.z - m.sz;
+		const double dl = std::sqrt(dx * dx + dy * dy + dz * dz);
+		dx /= dl; dy /= dl; dz /= dl;
+		const double t = clamp01((now - m.t0) / m.delay);
+		const double px = m.sx + (m.x - m.sx) * t, py = m.sy + (gy - m.sy) * t, pz = m.sz + (m.z - m.sz) * t;
+		const uint32_t ms = (uint32_t)(int64_t)(m.t0 * 1000) ^ (uint32_t)(int64_t)(m.x * 31);
+		// the rock, white-hot and tumbling, inside its fireball, a few dark crust chunks on it
+		cube(I_EMBER, px, py, pz, now * 3.1, now * 2.3, now * 1.7, 0.75, 0.7, 0.8, 1.3f, 0.7f, 0, 1);
+		const Lin rock = hex_lin(0x2a221e);
+		for (int j = 0; j < 3; j++) {
+			const double a = now * (2.5 + j) + j * 2.1;
+			cube(I_DEBRIS, px + std::cos(a) * 0.32, py + std::sin(a * 1.3) * 0.3, pz + std::sin(a) * 0.32, a, a * 0.7, j, 0.32, 0.28, 0.3,
+					rock.r, rock.g, rock.b);
+		}
+		const double fl = 0.9 + 0.1 * std::sin(now * 41);
+		fire(px, py, pz, 2.2 * fl, 1.0, 1.0, ms);
+		fire(px - dx * 0.8, py - dy * 0.8, pz - dz * 0.8, 3.8 * fl, 0.75, 0.8, ms + 1);
+		fire(px - dx * 2.0, py - dy * 2.0, pz - dz * 2.0, 5.2, 0.45, 0.55, ms + 2);
+		// the trail: a ribbon of fire behind it
+		std::vector<P> trail;
+		for (int i = 0; i <= 12; i++) trail.push_back(P{ -dx * i * 1.2, -dy * i * 1.2, -dz * i * 1.2 });
+		std::vector<Line> L;
+		line(L, trail, 0.55, 1.0, 0.9, 1);
+		line(L, trail, 1.9, 0.8, 0.85, 1, true);
+		emit_lines(G_LAVA, L, 1.0, px, py, pz);
+		// fire and black smoke shed along the fall (closed form per 1/30 s slot)
+		const int64_t t1 = (int64_t)std::floor(now * 30), t0t = (int64_t)std::ceil(m.t0 * 30);
+		for (int64_t n = std::max(t0t, t1 - 75); n <= t1; n++) {
+			const double te = n / 30.0, kk = clamp01((te - m.t0) / m.delay), age = now - te;
+			const double qx = m.sx + (m.x - m.sx) * kk, qy = m.sy + (gy - m.sy) * kk, qz = m.sz + (m.z - m.sz) * kk;
+			const uint32_t h = hmix(ms, (uint32_t)n, 7);
+			if (age < 0.9) {
+				const double f = age / 0.9;
+				const double jx = (hr(h, 1) - 0.5) * 1.4, jy = (hr(h, 2) - 0.5) * 1.0, jz = (hr(h, 3) - 0.5) * 1.4;
+				fire(qx + jx * f, qy + jy * f + 0.8 * f, qz + jz * f, 1.6 + 2.2 * f, 0.85 - 0.75 * f, 0.7 * (1 - f), h);
+			}
+			if (age < 2.5 && n % 2 == 0) {
+				const double f = age / 2.5;
+				const double jx = (hr(h, 4) - 0.5) * 1.6, jz = (hr(h, 5) - 0.5) * 1.6;
+				smoke(qx + jx * f - dx * 1.5, qy + 1.2 * f - dy * 1.5, qz + jz * f - dz * 1.5, 1.4 + 3.0 * f, f, 0.55 * std::sin(PI * std::min(1.0, f * 1.4 + 0.15)), h);
+			}
+		}
+		// the ground below: a hot ring closing in, a glow growing as it nears
+		const double R1 = (m.radius + 0.5) * (1.6 - t * 0.6);
+		const Lin wc = hex_lin(0xff7020);
+		decal(I_DECAL_ADD, m.x, gy + 0.2, m.z, 2 * R1, 0, wc.r * 0.5f, wc.g * 0.5f, 0, (float)(std::min(1.0, t * 3) * 0.8), 3,
+				(float)((m.radius - 0.5) / (m.radius + 0.5)), (float)std::fmod(now, 1000.0), -1);
+		decal(I_DECAL_ADD, m.x, gy + 0.15, m.z, 2 * m.radius * (0.4 + 0.4 * t), 0, 0.5f, 0.1f, 0, (float)(0.35 * t * t * t), 8, 0, 0, -1);
+		lit(px, py, pz, 0xff8a30, 34, 18, 2);
+	}
+
+	// ---- blasts and craters
+	for (const aov::Scorch &sc : G.scorches) {
+		if (sc.kind != 1) continue;
+		const double age = now - sc.t0;
+		if (age < 0 || age > aov::THOTH_CRATER_LIFE) continue;
+		const uint32_t sd = sc.seed;
+		const double x = sc.x, y = sc.y, z = sc.z;
+		const double life = aov::THOTH_CRATER_LIFE;
+		const double fade = clamp01((life - age) / 15.0);           // the crater's last 15 s
+		const double heat = 0.3 + 0.7 * std::exp(-age / 10.0);      // the lava cooling to a dull glow
+		const double D = sc.size;                                   // decal diameter (blast x 2.2)
+		const double Rb = 0.42 * D * 0.5;                           // the bowl's radius
+		// the crater: charred bowl, soot rays, cracked plates; the lava over it
+		decal(I_DECAL_MIX, x, y + 0.05, z, D, (sd % 628) / 100.0, 1, 1, 1, (float)(clamp01(age / 0.15) * fade), 5,
+				(float)((sd % 1000) / 1000.0), (float)clamp01(age / 40.0));
+		decal(I_DECAL_ADD, x, y + 0.08, z, D, (sd % 628) / 100.0, 1, 1, 1, (float)(clamp01(age / 0.1) * fade), 9, (float)heat,
+				(float)((sd % 1000) / 1000.0), -1);
+		// the lip: dark rocks heaved up round the bowl, a few lava blobs glowing in it
+		{
+			const Lin b0 = hex_lin(0x2b2420), b1 = hex_lin(0x40362e), b2 = hex_lin(0x5a4c3e);
+			const double up = clamp01(age / 0.25);
+			for (int i = 0; i < 18; i++) {
+				const double a = (i + 0.5) / 18.0 * TAU + (hr(sd, i, 11) - 0.5) * 0.3;
+				const double rr = Rb * (0.95 + 0.18 * hr(sd, i, 12));
+				const double s = (0.3 + 0.3 * hr(sd, i, 13)) * up;
+				const double cx = x + std::cos(a) * rr, cz = z + std::sin(a) * rr;
+				const Lin &c = i % 3 == 0 ? b2 : i % 3 == 1 ? b1 : b0;
+				cube(I_DEBRIS, cx, h_at(cx, cz) + s * 0.3, cz, 0.3 * hr(sd, i, 14), a, 0.25 * hr(sd, i, 15), s * 1.3, s * 0.8, s, c.r, c.g, c.b);
+			}
+			for (int i = 0; i < 7; i++) {
+				const double a = hr(sd, i, 21) * TAU, rr = Rb * 0.55 * std::sqrt(hr(sd, i, 22));
+				const double bub = 0.5 + 0.5 * std::sin(now * (1.3 + hr(sd, i, 23)) + i * 2.1);
+				const double s = (0.16 + 0.14 * hr(sd, i, 24)) * (0.7 + 0.3 * bub) * up;
+				const double cx = x + std::cos(a) * rr, cz = z + std::sin(a) * rr;
+				float r, g;
+				fire_col(heat * (0.7 + 0.25 * bub), r, g);
+				cube(I_EMBER, cx, y + 0.12, cz, 0, a, 0, s, s * 0.6, s, r * 0.7f, g * 0.7f, 0, 1);
+			}
+		}
+		// rocks and lava thrown out (closed-form arcs; they lie where they land)
+		for (int i = 0; i < 12; i++) {
+			const double a = hr(sd, i, 31) * TAU, sp = 1.5 + 3 * hr(sd, i, 32), vy = 4 + 6 * hr(sd, i, 33);
+			const double tl = vy / 11.0;                              // back on the ground
+			const double tt = std::min(age, tl);
+			const double ox = x + std::cos(a) * (0.4 + sp * tt), oz = z + std::sin(a) * (0.4 + sp * tt);
+			const double oy = std::max(h_at(ox, oz), y + 0.3 + vy * tt - 5.5 * tt * tt);
+			const bool hot = i % 2 == 0;
+			const double s = hot ? 0.12 + 0.1 * hr(sd, i, 34) : 0.14 + 0.14 * hr(sd, i, 34);
+			const double spin = age < tl ? age * 9 : tl * 9;
+			const double gone = clamp01((life * 0.5 - age) / 5.0);  // the thrown pieces fade before the crater
+			if (gone <= 0) continue;
+			if (hot && age < 6) {
+				float r, g;
+				fire_col(0.95 - age / 6.0 * 0.9, r, g);
+				cube(I_EMBER, ox, oy + s * 0.4, oz, spin + i, spin * 0.7, i, s, s, s, r, g, 0, 1);
+				if (age < tl) fire(ox, oy + s * 0.4, oz, 0.9, 0.8 - age, 0.6, hmix(sd, i, 35));
+			} else {
+				const Lin c = hex_lin(i % 3 == 0 ? 0x3a302a : i % 3 == 1 ? 0x6a5640 : 0x261f1b);
+				cube(I_DEBRIS, ox, oy + s * 0.4 - (1 - gone) * s, oz, spin + i, spin * 0.7, i, s, s, s, c.r, c.g, c.b);
+			}
+		}
+		// the blast: a white-hot flash, a shock ring, the fireball rolling up into black smoke, a dust ring
+		if (age < 0.6) {
+			const double k = age / 0.6;
+			fire(x, y + 1.2 + 2 * k, z, 6 + 10 * k, 1.0 - 0.4 * k, 1.2 * (1 - k) * (1 - k), sd);
+			decal(I_DECAL_ADD, x, y + 0.2, z, 2 * (2 + 5 * k), 0, 0.9f, 0.3f, 0, (float)((1 - k) * (1 - k) * 1.1), 8, 0, 0, -1);
+		}
+		if (age < 0.8) {
+			const double k = age / 0.8;
+			decal(I_DECAL_ADD, x, y + 0.22, z, 2 * (1 + 11 * (1 - std::pow(1 - k, 2))), 0, 0.9f, 0.32f, 0, (float)((1 - k) * 2.2), 2, 0.8f, 0, -1);
+		}
+		if (age < 2.2) {
+			for (int i = 0; i < 30; i++) {
+				const double L = 0.9 + 1.0 * hr(sd, i, 41);
+				const double pa = age - 0.03 * hr(sd, i, 42);
+				if (pa < 0 || pa > L) continue;
+				const double f = pa / L, a = hr(sd, i, 43) * TAU;
+				double ho, ve;
+				drift(pa, 2 + 5 * hr(sd, i, 44), ho);
+				drift(pa, 3 + 6 * hr(sd, i, 45), ve);
+				fire(x + std::cos(a) * ho, y + 0.6 + ve + 0.8 * pa, z + std::sin(a) * ho, (1.0 + 1.2 * hr(sd, i, 46)) * (1 + 1.0 * f),
+						1.0 - 0.95 * f, 0.75 * (1 - f * f), hmix(sd, i, 47));
+			}
+		}
+		if (age < 7) {
+			for (int i = 0; i < 26; i++) {
+				const double t0 = 0.2 + 0.5 * hr(sd, i, 51), L = 3.5 + 3 * hr(sd, i, 52);
+				const double pa = age - t0;
+				if (pa < 0 || pa > L) continue;
+				const double f = pa / L, a = hr(sd, i, 53) * TAU;
+				double ho, ve;
+				drift(pa, 1.5 + 3 * hr(sd, i, 54), ho);
+				drift(pa, 4 + 4 * hr(sd, i, 55), ve);
+				smoke(x + std::cos(a) * ho + 0.6 * pa, y + 1.4 + ve + 0.9 * pa, z + std::sin(a) * ho - 0.3 * pa, (2.2 + 1.8 * hr(sd, i, 56)) * (1 + 1.3 * f),
+						f * 0.8, 0.85 * std::min(1.0, pa * 4) * (1 - f), hmix(sd, i, 57));
+			}
+		}
+		if (age < 2.5) {
+			const Lin dc = hex_lin(0xb89a70);
+			for (int i = 0; i < 22; i++) {
+				const double L = 1.6 + 0.9 * hr(sd, i, 61), pa = age;
+				if (pa > L) continue;
+				const double f = pa / L, a = (i + hr(sd, i, 62)) / 22.0 * TAU;
+				double ho;
+				drift(pa, 6 + 4 * hr(sd, i, 63), ho);
+				const double px = x + std::cos(a) * (1 + ho), pz = z + std::sin(a) * (1 + ho);
+				Basis bs;
+				const double s = (1.6 + 1.2 * hr(sd, i, 64)) * (1 + 1.2 * f);
+				bs.rows[0] = Vector3((real_t)s, 0, 0);
+				bs.rows[1] = Vector3(0, (real_t)s, 0);
+				bs.rows[2] = Vector3(0, 0, 1);
+				inst(I_PUFF, bs, px, h_at(px, pz) + 0.5 + 0.5 * f, pz, dc.r, dc.g, dc.b, (float)(0.55 * (1 - f)), (float)hr(sd, i, 65), 1);
+			}
+		}
+		// the crater burning: flame tongues in the bowl for 12 s, then smoke rising thinner
+		if (age < 13) {
+			const double fk = clamp01((12.5 - age) / 3.0) * clamp01(age / 0.4);
+			const int64_t t1 = (int64_t)std::floor(now * 15), t0t = (int64_t)std::ceil((sc.t0 + 0.3) * 15);
+			for (int64_t n = std::max(t0t, t1 - 12); n <= t1; n++) {
+				const double te = n / 15.0, pa = now - te;
+				for (int j = 0; j < 3; j++) {
+					const uint32_t h = hmix(sd, (uint32_t)n, 70 + j);
+					const double L = 0.55 + 0.35 * hr(h, 1);
+					if (pa > L) continue;
+					const double f = pa / L, a = hr(h, 2) * TAU, rr = Rb * 0.7 * std::sqrt(hr(h, 3));
+					const double fx = x + std::cos(a) * rr, fz = z + std::sin(a) * rr;
+					fire(fx + 0.3 * f, y + 0.3 + 2.2 * f * (1 - 0.4 * rr / Rb), fz, (1.3 + 0.8 * hr(h, 4)) * (1 - 0.55 * f) * (0.6 + 0.4 * fk),
+							(0.8 - 0.7 * f) * (0.75 + 0.25 * fk), 0.8 * fk * std::sin(PI * std::min(1.0, f * 1.3 + 0.08)), h, 2.0);
+				}
+			}
+		}
+		if (age > 0.8 && age < 40) {
+			const double sk = clamp01((40 - age) / 25.0);
+			const int64_t t1 = (int64_t)std::floor(now * 6), t0t = (int64_t)std::ceil((sc.t0 + 0.8) * 6);
+			for (int64_t n = std::max(t0t, t1 - 30); n <= t1; n++) {
+				const double te = n / 6.0, pa = now - te;
+				const uint32_t h = hmix(sd, (uint32_t)n, 90);
+				if (hr(h, 9) > 0.35 + 0.65 * clamp01((40 - (te - sc.t0)) / 25.0)) continue;
+				const double L = 4 + 2 * hr(h, 1);
+				if (pa > L) continue;
+				const double f = pa / L, a = hr(h, 2) * TAU, rr = Rb * 0.5 * hr(h, 3);
+				smoke(x + std::cos(a) * rr + 0.9 * pa, y + 1 + 1.6 * pa, z + std::sin(a) * rr - 0.4 * pa, (1.4 + 0.8 * hr(h, 4)) * (1 + 1.6 * f),
+						0.3 + 0.6 * f, 0.35 * sk * std::min(1.0, pa * 2) * (1 - f), h);
+			}
+		}
+		// light: the blast's flash, then the crater's glow
+		if (age < 0.9) lit(x, y + 3, z, 0xff9a40, 70 * (1 - age / 0.9), 20, 2);
+		else if (age < 14) lit(x, y + 2.2, z, 0xff6a20, 12 * clamp01((14 - age) / 4) * (0.85 + 0.15 * std::sin(now * 9 + sd % 7)), 9, 2);
+	}
+}
+

@@ -317,14 +317,14 @@ void AovGodpowerView::decal(Inst k, double x, double y, double z, double size, d
 }
 
 void AovGodpowerView::cube(Inst k, double x, double y, double z, double rx, double ry, double rz, double sx, double sy, double sz, float r,
-		float g, float b) {
+		float g, float b, float flag) {
 	Basis bs = Basis::from_euler(Vector3((real_t)rx, (real_t)ry, (real_t)rz), EULER_ORDER_XYZ);
 	for (int i = 0; i < 3; i++) {
 		bs.rows[i].x *= (real_t)sx;
 		bs.rows[i].y *= (real_t)sy;
 		bs.rows[i].z *= (real_t)sz;
 	}
-	inst(k, bs, x, y, z, r, g, b, 1);
+	inst(k, bs, x, y, z, r, g, b, 1, 0, flag);
 }
 
 void AovGodpowerView::light(double x, double y, double z, uint32_t hex, double intensity, double dist, double decay) {
@@ -639,6 +639,7 @@ Dictionary AovGodpowerView::update(double alpha, bool paused, const Vector3 &cam
 	// ---- crater particles: spawn for new strikes, step to now
 	for (const aov::Scorch &sc : G.scorches) {
 		if (sc.size > 0 && !sc.blast) continue; // fork scorches throw nothing
+		if (sc.kind == 1) continue;              // (Thoth's Meteor: godpower_view_egypt.cpp thoth_fx)
 		const uint64_t k = key2(sc.seed, sc.t0) ^ (sc.blast ? 0x5a5a5a5a00000000ull : 0);
 		if (spawned_.count(k)) continue;
 		spawned_[k] = true;
@@ -724,7 +725,7 @@ Dictionary AovGodpowerView::update(double alpha, bool paused, const Vector3 &cam
 
 	// ---- meteors (falling)
 	for (const aov::Meteor &m : G.meteors) {
-		if (m.done) continue;
+		if (m.done || m.kind == 1) continue; // (Thoth's: thoth_fx)
 		const double gy = h_at(m.x, m.z);
 		double dx = m.x - m.sx, dy = gy - m.sy, dz = m.z - m.sz;
 		const double dl = hyp3(dx, dy, dz);
@@ -759,7 +760,7 @@ Dictionary AovGodpowerView::update(double alpha, bool paused, const Vector3 &cam
 	for (size_t si = 0; si < G.scorches.size(); si++) {
 		const aov::Scorch &sc = G.scorches[si];
 		const double age = now - sc.t0;
-		if (age < 0) continue;
+		if (age < 0 || sc.kind == 1) continue; // (Thoth's craters: thoth_fx)
 		const double size = sc.size > 0 ? sc.size : 5.2;
 		const double op = std::max(0.0, 1 - std::max(0.0, age - 8) / 6);
 		decal(I_DECAL_MIX, sc.x, sc.y + 0.04, sc.z, size, (sc.seed % 628) / 100.0, 1, 1, 1, (float)op, 0, (float)((sc.seed % 1000) / 1000.0),
@@ -832,7 +833,7 @@ Dictionary AovGodpowerView::update(double alpha, bool paused, const Vector3 &cam
 	for (size_t fi = 0; fi < G.fires.size(); fi++) {
 		const aov::Fire &f = G.fires[fi];
 		const double age = now - f.t0;
-		if (age < 0 || age > f.dur + 4) continue;
+		if (age < 0 || age > f.dur + 4 || f.kind == 1) continue; // (Thoth's: thoth_fx)
 		if (age <= f.dur && li < MAX_LIGHTS) {
 			li++;
 			const int32_t fl = (int32_t)std::floor(now * 14);

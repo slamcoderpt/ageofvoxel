@@ -55,6 +55,10 @@ extends SceneTree
 ##               the Son's own hp unchanged
 ##   volleys     the Egyptian Town Center shoots 2 arrows a volley, the Greek one 1 (as before),
 ##               a Citadel Center 3 at three different hoplites
+##   eclipse_abilities  the Eclipse's +20 % on the abilities (Anubite Jump 10.5 -> 12.6, the
+##               Wadjet's venom and the Mummy's curse x1.2), the first myth unit on the map
+##               using its ability at once (the Jump on a fresh spawn), Force of the West Wind on
+##               the Sphinx's 9 crush
 ##   ai          an Egyptian AI seat casts its gods' powers (Rain on its Farms, a Tornado / Plague
 ##               of Serpents / Ancestors on a cluster of foes)
 ##
@@ -213,7 +217,7 @@ func _run() -> void:
 	var t0 := Time.get_ticks_msec()
 	for c in ["defs", "gods", "passives", "model", "rain", "prosperity", "vision", "eclipse", "sands", "serpents", "locusts", "citadel",
 			"ancestors", "son", "son_divine", "tornado", "meteor", "myth", "techs", "bounds", "determinism",
-			"phantom", "blocks", "allies", "trees", "split", "roc", "immunity", "noheal", "volleys", "shield_preview", "ai"]:
+			"phantom", "blocks", "allies", "trees", "split", "roc", "immunity", "noheal", "volleys", "shield_preview", "eclipse_abilities", "ai"]:
 		if _want(c):
 			call("_case_" + c)
 	result["ms"] = Time.get_ticks_msec() - t0
@@ -408,6 +412,7 @@ func _case_passives() -> void:
 	var gr2 := _b(s2, "granary", 1, 8, 8)
 	r["flood of the nile cost isis (150 g x0.9)"] = cost.call(s2, gr2, "flood_of_the_nile")
 	ok = ok and _near(float(r["flood of the nile cost isis (150 g x0.9)"].get("gold", 0)), 135) and float(r["fortified? skin of the rhino cost ra"].get("food", 0)) == 50
+	ok = ok and _near(float(r["flood of the nile cost isis (150 g x0.9)"].get("favor", 0)), 7.2) # (EGYPT.md 4: 135 g + 7.2 favor)
 	# Set: Barracks infantry +5 % speed, -25 % gold on Barracks / Siege Works / Migdol
 	var s3 := _fresh("set", "zeus")
 	var sp3: float = float(s3.get_unit_stats(_u(s3, "spearman", 1, 0, 0)).speed)
@@ -552,6 +557,73 @@ func _first_hit(sim: Object, att: int, tgt: int, max_s := 20.0) -> float:
 			if e.type == "unit:damaged" and int(e.other) == att and int(e.id) == tgt:
 				return float(e.amount)
 	return -1.0
+
+# Bast's Eclipse: +20 % damage for the caster's myth units, abilities included (EGYPT.md 5.3):
+# the Anubite's Jump, the Wadjet's venom, the Mummy's curse (its hit and its damage over time),
+# each measured in a fresh match with and without the Eclipse. The myth units are spawned after
+# the 30-tick ability rescan has passed with none on the map, so the first one uses its ability
+# at once (an Anubite 5 tiles from his foe leaps). Force of the West Wind (+15 % crush for the
+# siege and myth units) on the Sphinx's 9 crush.
+func _case_eclipse_abilities() -> void:
+	var r := {}
+	var jump := []
+	var venom := []
+	var curse := []
+	for on in [false, true]:
+		var sim := _fresh("ra", "zeus", 1, ["bast"])
+		if on:
+			r["cast"] = sim.cast_power(1, "eclipse", 0, 0)
+		sim.tick(35)
+		# Anubite Jump onto a hoplite 5 tiles off: 15 x (1 - 0.3 hack armor)
+		var an := _u(sim, "anubite", 1, -12, 0)
+		var jh := _u(sim, "hoplite", 2, -7, 0)
+		sim.tick(1)
+		sim.order(an, {"type": "attack", "target": jh})
+		var jdm := _damage_by(sim, 1.0, func(e): return int(e.id) == jh and int(e.other) == 0)
+		jump.append(_r(float(jdm.get(jh, -1.0))))
+		sim.kill_unit(an)
+		# Wadjet venom: 2.5 / s for 5 s after a hit
+		var wj := _u(sim, "wadjet", 1, 0, 12)
+		var vh := _u(sim, "hoplite", 2, 6, 12)
+		sim.tick(1)
+		_first_hit(sim, wj, vh)
+		sim.order(wj, {"type": "move", "x": C.x - 10.0, "z": C.y + 12.0})
+		# (each 0.5 s tick of it: an Eclipse's faster Wadjet may land a second spit that restarts it)
+		var tick_max := 0.0
+		for t in int(round(5.6 * FPS)):
+			sim.tick(1)
+			for e in sim.take_events():
+				if e.type == "unit:damaged" and int(e.id) == vh and int(e.other) == 0:
+					tick_max = maxf(tick_max, float(e.amount))
+		venom.append(_r(tick_max, 4))
+		sim.kill_unit(wj)
+		# Mummy curse: its hit and its damage over time on a hoplite (the first 3 s)
+		var mm := _u(sim, "mummy", 1, 12, -12)
+		var ch := _u(sim, "hoplite", 2, 17, -12)
+		sim.tick(1)
+		sim.order(mm, {"type": "attack", "target": ch})
+		var cd := _damage_by(sim, 3.0, func(e): return int(e.id) == ch and int(e.other) == 0)
+		curse.append(_r(float(cd.get(ch, 0.0))))
+	r["anubite jump [day, eclipse]"] = jump
+	r["wadjet venom per 0.5 s tick [day, eclipse]"] = venom
+	r["mummy curse hit + dot over 3 s [day, eclipse]"] = curse
+	var ok: bool = r.get("cast", false) and _near(jump[0], 15.0 * 0.7, 0.01) and _near(jump[1], 15.0 * 0.7 * 1.2, 0.01)
+	ok = ok and _near(venom[0], 1.25, 0.001) and _near(venom[1], 1.5, 0.001)
+	ok = ok and curse[0] > 1.0 and _near(curse[1] / curse[0], 1.2, 0.01)
+	# Force of the West Wind on the Sphinx's crush part
+	var hits := []
+	for ww in [false, true]:
+		var s3 := _fresh("set", "zeus", 2, ["ptah", "sekhmet"])
+		if ww:
+			s3.grant_tech(1, "force_of_the_west_wind")
+		var hs := _b(s3, "house", 2, 6, 0)
+		var sph := _u(s3, "sphinx", 1, 4.4, 0)
+		s3.tick(1)
+		hits.append(_r(_first_hit(s3, sph, hs)))
+	# on a Greek House: 15 hack x0.35 + 9 crush x0.95 -> + 9 x1.15 crush
+	r["sphinx blow on a house [before, force of the west wind]"] = hits
+	ok = ok and _near(hits[0], 15 * 0.35 + 9 * 0.95, 0.02) and _near(hits[1], 15 * 0.35 + 9 * 1.15 * 0.95, 0.02)
+	_check("eclipse.abilities_and_west_wind", ok, r)
 
 func _case_eclipse() -> void:
 	var r := {}

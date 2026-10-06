@@ -16,6 +16,10 @@
 //     and glittering flecks inside; custom.y = the band's inner radius
 //     (fraction), custom.z = phase. Painted, not added: an additive gold on
 //     bright sand only lightens the sand (and AgX turns it salmon)
+//   5 meteor crater (Thoth's Meteor): a charred basalt bowl with radial ridges inside a raised
+//     dark lip, soot rays flung out over the ground and the ground round it baked and cracked
+//     into plates (dark crack lines); custom.y = seed, custom.z = age 0 fresh .. 1 old (the
+//     soot greys); the glowing lava is decal_add kind 9 drawn over it
 shader_type spatial;
 render_mode unshaded, blend_mix, depth_draw_never, cull_disabled, fog_disabled, shadows_disabled;
 
@@ -34,6 +38,20 @@ void vertex() {
 
 float h1(float n) { return fract(sin(n * 12.9898) * 43758.5453); }
 float h2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec2 h22(vec2 p) { return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453); }
+// distance to the nearest cell edge of a jittered grid (F2 - F1 in a cheap form)
+float plates(vec2 p, float seed) {
+	vec2 i = floor(p), f = fract(p);
+	float d1 = 8.0, d2 = 8.0;
+	for (int y = -1; y <= 1; y++)
+		for (int x = -1; x <= 1; x++) {
+			vec2 g = vec2(float(x), float(y));
+			vec2 o = 0.15 + 0.7 * h22(i + g + seed);
+			float d = length(g + o - f);
+			if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
+		}
+	return d2 - d1;
+}
 vec3 lin(vec3 c) { return pow(c / 255.0, vec3(2.2)); }
 
 // premultiplied "over"
@@ -46,7 +64,44 @@ void fragment() {
 	vec2 q = UV - 0.5;           // -0.5..0.5 (the canvas centre is 0)
 	float r = length(q);
 	float ang = atan(q.y, q.x) + 3.14159265;
-	if (v_c.x > 1.5) {
+	if (v_c.x > 4.5) {
+		vec2 p = q * 2.0;
+		float d = length(p);
+		float seed = v_c.y * 37.0, age = v_c.z;
+		float an = atan(p.y, p.x);
+		float wob = (h1(floor((an + 3.1416) * 4.0) + seed) - 0.5) * 0.05;
+		float R = 0.42 + wob;                          // the bowl's edge
+		vec3 P = vec3(0.0);
+		float A = 0.0;
+		// the baked ground: ash-grey, blotchy, thinning outward
+		vec2 cell = floor(UV * 40.0);
+		float hc = h2(cell + seed);
+		float bake = (1.0 - smoothstep(0.5, 1.0, d)) * (0.55 + 0.2 * hc);
+		over(P, A, lin(mix(vec3(58.0, 52.0, 46.0), vec3(84.0, 76.0, 66.0), hc)), bake);
+		// soot rays flung out from the lip
+		float n = 30.0;
+		float fs = (an + 3.1416) / 6.2831853 * n;
+		float ii = floor(fs), fr = fract(fs) - 0.5;
+		float rl = R + 0.15 + 0.35 * h1(ii * 3.1 + seed);
+		float rw = (0.18 + 0.25 * h1(ii * 7.3 + seed)) * (1.0 - smoothstep(R, rl, d));
+		if (d > R && abs(fr) < rw) over(P, A, lin(vec3(22.0, 19.0, 17.0)), 0.55 * (1.0 - smoothstep(R, rl, d)));
+		// the cracked plates: dark lines over the baked ground
+		float pe = plates(p * 3.0, seed);
+		float crack = (1.0 - smoothstep(0.05, 0.1, pe)) * (1.0 - smoothstep(0.7, 0.98, d)) * step(R + 0.03, d);
+		over(P, A, lin(vec3(14.0, 11.0, 10.0)), 0.9 * crack);
+		// the raised lip: a dark ring, lighter on its crest
+		float lip = exp(-pow((d - R - 0.035) / 0.06, 2.0));
+		over(P, A, lin(mix(vec3(40.0, 35.0, 31.0), vec3(92.0, 82.0, 72.0), 0.5 * h1(floor((an + 3.1416) * 18.0) + seed))), lip * 0.95);
+		// the bowl: charred basalt with radial ridges, darkest at the heart
+		if (d < R) {
+			float ridge = 0.5 + 0.5 * sin(an * 14.0 + h1(floor(d * 9.0) + seed) * 2.0 + seed);
+			vec3 bc = mix(vec3(10.0, 9.0, 9.0), vec3(34.0, 30.0, 28.0), ridge * smoothstep(0.05, R, d));
+			over(P, A, lin(bc), 1.0);
+		}
+		P = mix(P, P * vec3(1.05, 1.05, 1.08) + 0.004, age); // the soot greys as it cools
+		ALBEDO = A > 0.0 ? P / A : vec3(0.0);
+		ALPHA = clamp(A * v_col.a * (1.0 - smoothstep(0.96, 1.0, d)), 0.0, 1.0);
+	} else if (v_c.x > 1.5) {
 		vec2 p = q * 2.0;
 		float d = length(p);
 		vec3 sandc = mix(lin(vec3(226.0, 196.0, 140.0)), lin(vec3(150.0, 122.0, 86.0)), v_c.z);

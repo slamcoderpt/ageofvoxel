@@ -52,8 +52,9 @@ public:
 		int grp = -1; // ribbon group override (-1: the emit_lines group)
 	};
 	// G_GOLD .. G_ARC: the Egyptian powers (godpower_view_egypt.cpp): gold bolts and beams, rain
-	// streaks, sand ribbons, the Son of Osiris' deep-gold chain lightning, Prosperity's gold light
-	enum Group { G_BOLT, G_SKY, G_ZAP, G_BAND, G_BAND2, G_TRAIL, G_FIRE, G_SPARK, G_BLOOM, G_GOLD, G_RAIN, G_SAND, G_ARC, G_GILD, G_COUNT };
+	// streaks, sand ribbons, the Son of Osiris' deep-gold chain lightning, Prosperity's gold light,
+	// Thoth's Meteor's emissive fire trail (G_LAVA: its orange kept by the grade)
+	enum Group { G_BOLT, G_SKY, G_ZAP, G_BAND, G_BAND2, G_TRAIL, G_FIRE, G_SPARK, G_BLOOM, G_GOLD, G_RAIN, G_SAND, G_ARC, G_GILD, G_LAVA, G_COUNT };
 	enum Inst { I_DEBRIS, I_EMBER, I_GLOW, I_RIM, I_DECAL_MIX, I_DECAL_ADD, I_DECAL_MUL, I_PUFF, I_FLAME, I_COUNT };
 
 	struct Ribbon {
@@ -114,7 +115,7 @@ private:
 	void decal(Inst k, double x, double y, double z, double size, double rot, float r, float g, float b, float a, float kind,
 			float p1 = 0, float p2 = 0, float p3 = 0);
 	void cube(Inst k, double x, double y, double z, double rx, double ry, double rz, double sx, double sy, double sz, float r,
-			float g, float b);
+			float g, float b, float flag = 0); // flag: INSTANCE_CUSTOM.y (I_EMBER: 1 emissive)
 	void light(double x, double y, double z, uint32_t hex, double intensity, double dist, double decay);
 	void puff(bool add, double te, uint32_t seed, double now, double x, double y, double z, int count, uint32_t color,
 			double size, double life, double speed, double up, double gravity, double grow, double spread);
@@ -124,6 +125,7 @@ private:
 	// the Egyptian powers (godpower_view_egypt.cpp)
 	bool egypt_active() const;
 	void egypt_fx(double now, double ua, const Vector3 &cam, int &li, Dictionary &eg);
+	void thoth_fx(double now, int &li); // Thoth's Meteor: its meteors, blasts and glowing craters
 	static Array pack_ribbon(const Ribbon &r, bool spark);
 	static PackedFloat32Array pack_buf(const Buf &b);
 

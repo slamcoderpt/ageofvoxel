@@ -2983,7 +2983,7 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   | Ancestors (Nephthys) | 100, 180, +5; 13 Minions over 13 s in 16 m, dead 60 s after | 9.6 tiles (Atef Crown 120 s) |
   | Son of Osiris (Osiris) | 350, 240, +50; own or ally's Pharaoh -> demigod, chain lightning, heals 15 hp/s; a new Pharaoh later | 609 hp, 50.75 divine per bolt (his own target's hit too: no armor, combat.cpp, x3 vs myth) jumping to 3 more within 4.8 tiles; heals allies 15 hp/s (the Pharaoh's 10 raised, civ.cpp EgyptUnit.heal); an ally's Pharaoh becomes the ally's demigod; the Pharaoh respawns after 90 s; cannot be healed, immune to the aimed powers (below) |
   | Tornado (Horus) | 350, 240, +5; 20 s spiralling out, 25 hack + 100 crush every 0.5 s, full 5 m falling to 15 m, x0.1 Farms, slow 35 % 6 s | Archimedean spiral at 2.5 tiles/s; crush armor 99 % (myth 80 %, siege 85 %); flings units within 3 tiles; own x0.1; flattens the trees within 3 tiles; blocks other powers within 15 m of the funnel |
-  | Meteor (Thoth) | 350, 240, +5; 12 meteors, first at 3 s, then from 6 s on the densest targets, 580 crush + 40 divine in 8 m, knockback | one a second, 4.8 tiles; flattens the trees in each blast; blocks other powers in its 25 m circle; the Greek meteor's visuals (sim `Meteor::kind` 1) |
+  | Meteor (Thoth) | 350, 240, +5; 12 meteors, first at 3 s, then from 6 s on the densest targets, 580 crush + 40 divine in 8 m, knockback | one a second, 4.8 tiles; flattens the trees in each blast; blocks other powers in its 25 m circle; its own fire and glowing craters (sim `Meteor::kind` 1, `Scorch::kind` / `Fire::kind` 1, the craters kept `THOTH_CRATER_LIFE` 90 s; drawn by `thoth_fx`, below) |
   Their damage is exact (`DK_DIVINE` in combat: no bonus / armor / building factor; the caller
   computes Retold's armor). Counters for checks: `get_power_stats`.
   **Local blocks**: a live Tornado (within its 15 m of the funnel) or Thoth's Meteor (inside
@@ -3031,8 +3031,18 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   splash's half blow, half the crush) through the target's crush armor (a browser building
   0.95, Retold buildings their own; units 99 %, myth 80 %); on a building the hack part goes
   through x0.35 (browser) or its Retold hack armor. Criosphinx / Hieracosphinx: +50 % crush
-  each; Force of the West Wind: the Scarab's / Phoenix's crush +15 % (no longer their hack).
+  each; Force of the West Wind: the Sphinx's / Scarab's / Phoenix's crush +15 % (no longer their
+  hack; round 7 adds the Sphinx's 9 crush: a blow on a Greek House 13.8 -> 15.08).
   **DoTs** burn exactly `until - from` (Dot::from: round 1 burnt one tick too many).
+  **Eclipse on the abilities** (round 7): the Anubite's Jump, the Wadjet's venom, the Mummy's
+  curse (hit and damage over time) and the Scorpion Man's sting burn take `damage_mult` as the
+  Whirlwind, Spin and sting hits already did (x1.2 under Bast's Eclipse; Jump 10.5 -> 12.6).
+  **Ability rescan**: `any_myth_` is rescanned every 30 ticks and at once whenever
+  `Entities::next_id` moved while no myth unit was known, so the first myth unit trained,
+  spawned or summoned uses its ability on its first tick (an Anubite 5 tiles from a hoplite
+  leaps instead of walking inside JUMP_MIN while the scan waits).
+  **Flood of the Nile** costs 150 g + 7.2 favor: Isis' -10 % makes it 135 g + 7.2 favor, the
+  number EGYPT.md lists for the tech (its -10 % otherwise leaves the favor part alone).
   **The Roc** (`roc_load(roc, units)`, `roc_unload(roc, x, z)`, `get_roc(roc)`): boarding units
   walk to it; it comes down over 2 s (air_y, drawn lowered, dust under its wings) and takes those
   within 2.5 tiles: they leave the world (their row removed; `Cargo` keeps type, owner, hp share;
@@ -3067,6 +3077,29 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   burst of light, a ground flash and sparks; `egypt_powers` power=son_of_osiris spawns five
   hoplites in an arc before the capture tick and orders him on the middle one, so the default
   t=1.05 is the first bolt and its 3 jumps, the next ones at about 4.2, 7.6 and 10.7 s); the sand funnel, debris and drifts of the Tornado; Thoth's circle.
+- **Thoth's Meteor** (godpower_view_egypt.cpp `thoth_fx`, round 7): each meteor a white-hot
+  tumbling rock with crust chunks inside a fireball, on an emissive fire trail (ribbon group
+  G_LAVA) shedding fire and soft black smoke, a hot ring closing in on the ground; the blast a
+  flash, a shock ring, a fireball of 30 fire sprites rolling up into 26 soft black smoke puffs,
+  a dust ring, rocks and lava thrown out on closed-form arcs; then the **crater**, which stays
+  90 s (the sim keeps its Scorch): decal_mix kind 5 (a charred basalt bowl with radial ridges in a
+  raised dark lip, soot rays, the ground round it baked and cracked into plates) under decal_add
+  kind 9 (lava: a molten heart, jagged cracks with branches over the bowl and up the lip, the
+  plate cracks glowing near it; white-yellow and orange when fresh, cooling over ~20 s to a dull
+  red glow that stays), a ring of dark lip rocks with lava blobs bubbling in the bowl, flame
+  tongues (tall fire sprites narrowing to a tip) for 12 s, smoke thinning for 40 s, a warm light.
+  The Greek meteor's visuals are unchanged (its loops skip kind 1).
+- **Emissive light and the grade** (round 7): game/lighting/grade_effect.gd's chroma limiter,
+  saturation and curves turn any bright warm orange pink (a bright additive orange over sand came
+  out salmon blossom). An effect that must keep its colour now writes a negative blue, -8 x its
+  own brightest channel: flame.gdshader / ember.gdshader with INSTANCE_CUSTOM.y = 1
+  (`cube(..., flag 1)`, `inst(I_FLAME, ..., c1 1)`), decal_add with custom.w = -1, ribbon.gdshader
+  `emit`. The grade reads f = -b / 8 as that light's brightness and em = smoothstep(0.2, 0.75,
+  f / max(r, g)) as its share of the pixel, and mixes in (r, g, 0) tone-mapped hue-preserving
+  (PBR Neutral's peak curve, whitening to a yellow-white), skipping the warm steps. Every pixel
+  with blue >= 0 (everything else in the game) is graded exactly as before. puff.gdshader with
+  custom.y = 1 draws a soft, ragged round smoke puff instead of the voxel square. (The web build's
+  AgX fallback clamps the negative blue to 0: there the fire is a plain warm orange.)
 - Models (scripts/export-egypt-gods.mjs -> assets/models/egypt_gods, VoxelModels.rig()'s third
   group after "units" and "egypt_units"): the Serpent (a venom-green cobra with black saddles
   and a yellow belly, the power's green, at 0.12 a voxel a little taller than a man so it reads
@@ -3078,7 +3111,7 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   (power = any key above, or rebirth (a Phoenix falls, its egg), roc (boarding), roc_unload;
   the Tornado and Thoth's Meteor strike a grove; Plague of Serpents rises on open ground south
   of the Greek line, default t = 8 when the serpents are at it; ep_dist / ep_pitch / ep_yaw / ep_ax / ep_az framing).
-- Check: `godot --headless --path godot -s res://game/core/egypt_gods_check.gd [-- --only=defs,gods,passives,model,rain,prosperity,vision,eclipse,sands,serpents,locusts,citadel,ancestors,son,tornado,meteor,myth,techs,bounds,determinism,phantom,blocks,allies,trees,split,roc,immunity,noheal,volleys,ai]` (~5 min, 43 cases: immunity = a Zeus Bolt / Lightning Storm / Meteor and an Egyptian foe's Locust Swarm / Thoth's Meteor strike the spearmen beside a Son and a Roc, never them; son.heal (`--only=noheal`) = a spearman +20 in 2 s by a Pharaoh, +30 by the Son, +45 by the Son and a Priest, the Son's hp unchanged (he heals allies 15 hp/s and is never healed); son.divine = his first bolt and chain 50.75 divine (x3 vs myth); allies.citadel_son = the Citadel's hack blow x0.9 (3.15 -> 2.835) and an ally's Son healing; volleys = Egyptian TC 2 arrows a volley, Greek 1, Citadel 3 at three men; shield.preview = cast_check refuses under a Divine Shield as the cast does).
+- Check: `godot --headless --path godot -s res://game/core/egypt_gods_check.gd [-- --only=defs,gods,passives,model,rain,prosperity,vision,eclipse,sands,serpents,locusts,citadel,ancestors,son,tornado,meteor,myth,techs,bounds,determinism,phantom,blocks,allies,trees,split,roc,immunity,noheal,volleys,shield_preview,eclipse_abilities,ai]` (~5 min, 44 cases: eclipse.abilities_and_west_wind (`--only=eclipse_abilities`) = the Eclipse's x1.2 on the abilities (Anubite Jump 10.5 -> 12.6 on a hoplite, Wadjet venom 1.25 -> 1.5 per 0.5 s, the Mummy's curse hit + damage over time x1.2), each on the first myth unit spawned after the 30-tick ability rescan (it leaps / curses at once), and Force of the West Wind on the Sphinx's 9 crush (a blow on a House 13.8 -> 15.08); immunity = a Zeus Bolt / Lightning Storm / Meteor and an Egyptian foe's Locust Swarm / Thoth's Meteor strike the spearmen beside a Son and a Roc, never them; son.heal (`--only=noheal`) = a spearman +20 in 2 s by a Pharaoh, +30 by the Son, +45 by the Son and a Priest, the Son's hp unchanged (he heals allies 15 hp/s and is never healed); son.divine = his first bolt and chain 50.75 divine (x3 vs myth); allies.citadel_son = the Citadel's hack blow x0.9 (3.15 -> 2.835) and an ally's Son healing; volleys = Egyptian TC 2 arrows a volley, Greek 1, Citadel 3 at three men; shield.preview = cast_check refuses under a Divine Shield as the cast does).
 - **AI** (combat/enemy_ai.cpp `egypt_powers`): an Egyptian seat casts its gods' powers through
   the same cast_check / cast2 as the HUD, deterministic: Tornado / Thoth's Meteor / Plague of
   Serpents / Ancestors on the densest cluster of foes in reach (Thoth's also on a clump of enemy

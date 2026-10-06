@@ -93,7 +93,7 @@ void GodPowers::on_myth_damaged(const Event &e) {
 	if (!is_egypt_myth(at)) return;
 	const int v = E.unit_slot(e.id);
 	if (v < 0 || U.dead[v]) return;
-	if (at == U_WADJET && organic(U.type[v])) add_dot(e.id, owner, VENOM_DPS, VENOM_TIME, DOT_VENOM);
+	if (at == U_WADJET && organic(U.type[v])) add_dot(e.id, owner, VENOM_DPS * damage_mult(a), VENOM_TIME, DOT_VENOM); // (Eclipse: abilities too)
 	if (at == U_PETSUCHOS) { // Illuminate (merged with a live reveal of his nearby, as Sun Ray)
 		bool merged = false;
 		for (Reveal &r : S.techs.reveals)
@@ -188,8 +188,12 @@ void GodPowers::update_myth(double dt) {
 	Entities &E = S.entities;
 	UnitStore &U = E.units;
 	const double now = S.time;
-	// which units have abilities: rescanned every 30 ticks (a Greek game pays one scan a second)
-	if (myth_scan_-- <= 0) {
+	// which units have abilities: rescanned every 30 ticks (a Greek game pays one scan a second),
+	// and at once when a new entity appears while none is known (the first myth unit trained or
+	// summoned uses its ability the same tick: an Anubite 5 tiles from his foe still leaps)
+	const bool fresh = !any_myth_ && E.next_id != myth_seen_id_;
+	myth_seen_id_ = E.next_id;
+	if (myth_scan_-- <= 0 || fresh) {
 		myth_scan_ = 30;
 		any_myth_ = false;
 		for (int r = 0; r < U.size() && !any_myth_; r++)
@@ -221,7 +225,7 @@ void GodPowers::update_myth(double dt) {
 				U.x[r] = nx;
 				U.z[r] = nz;
 				U.rot[r] = jsm::atan2(U.x[v] - nx, U.z[v] - nz);
-				S.combat.damage(U.id[v], JUMP_DAMAGE * (1 - armor_of(S, v, false)), Hitter::pseudo(owner), DK_DIVINE);
+				S.combat.damage(U.id[v], JUMP_DAMAGE * damage_mult(r) * (1 - armor_of(S, v, false)), Hitter::pseudo(owner), DK_DIVINE);
 				set_ability_cd(id, now + JUMP_CD * cdk);
 				continue;
 			}
@@ -238,8 +242,8 @@ void GodPowers::update_myth(double dt) {
 				std::sort(hit.begin(), hit.end());
 				for (int32_t h : hit) {
 					const int o = E.unit_slot(h);
-					add_dot(h, owner, CURSE_DPS, CURSE_TIME, DOT_CURSE);
-					S.combat.damage(h, CURSE_HIT * (1 - armor_of(S, o, true)), Hitter::pseudo(owner), DK_DIVINE);
+					add_dot(h, owner, CURSE_DPS * damage_mult(r), CURSE_TIME, DOT_CURSE);
+					S.combat.damage(h, CURSE_HIT * damage_mult(r) * (1 - armor_of(S, o, true)), Hitter::pseudo(owner), DK_DIVINE);
 				}
 				ability_fx.push_back({ 4, id, U.id[v], U.x[r], U.z[r], cx, cz, now, 1.2 });
 				set_ability_cd(id, now + CURSE_CD * cdk);
@@ -299,7 +303,7 @@ void GodPowers::update_myth(double dt) {
 		std::sort(c.begin(), c.end());
 		for (int k = 0; k < (int)c.size() && k < STING_TARGETS; k++) {
 			S.combat.damage(c[k].second, STING_DAMAGE * damage_mult(r), Hitter::pseudo(s.owner), DK_DIVINE);
-			add_dot(c[k].second, s.owner, STING_DOT, STING_DOT_TIME, DOT_STING);
+			add_dot(c[k].second, s.owner, STING_DOT * damage_mult(r), STING_DOT_TIME, DOT_STING);
 		}
 	}
 	stings.erase(std::remove_if(stings.begin(), stings.end(), [](const Sting &s) { return s.left <= 0; }), stings.end());

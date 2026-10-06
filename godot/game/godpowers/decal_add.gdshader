@@ -18,6 +18,12 @@
 //     the curled tail, with a soft glow round its strokes
 //   8 a soft pool of light: COLOR.rgb * COLOR.a, a smooth falloff to the edge
 //     (no hard-coded hue, unlike 1)
+//   9 lava (Thoth's Meteor's craters): a molten heart, jagged cracks running out from it over
+//     the bowl and up the lip, the plate cracks round the crater glowing near it; custom.y =
+//     heat 0..1 (white-yellow heart and orange cracks when fresh, a dull red when cool),
+//     custom.z = seed (the same seed as its decal_mix kind 5)
+// custom.w < -0.5: emissive, the colour kept by the grade (a negative blue: see
+//   flame.gdshader and game/lighting/grade_effect.gd)
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled, fog_disabled, shadows_disabled;
 
@@ -37,6 +43,26 @@ void vertex() {
 
 float h1(float n) { return fract(sin(n * 12.9898) * 43758.5453); }
 float vn1(float x) { float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(h1(i), h1(i + 1.0), f); }
+float h2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec2 h22(vec2 p) { return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453); }
+float plates(vec2 p, float seed) { // as decal_mix.gdshader
+	vec2 i = floor(p), f = fract(p);
+	float d1 = 8.0, d2 = 8.0;
+	for (int y = -1; y <= 1; y++)
+		for (int x = -1; x <= 1; x++) {
+			vec2 g = vec2(float(x), float(y));
+			vec2 o = 0.15 + 0.7 * h22(i + g + seed);
+			float d = length(g + o - f);
+			if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
+		}
+	return d2 - d1;
+}
+// the lava's colour by temperature T (0 dull red .. 1 white-yellow), linear, before the grade's x2.1
+vec3 lava(float T) {
+	vec3 c = mix(vec3(0.12, 0.006, 0.0), vec3(0.3, 0.03, 0.0), smoothstep(0.0, 0.35, T));
+	c = mix(c, vec3(0.5, 0.1, 0.0), smoothstep(0.35, 0.7, T));
+	return mix(c, vec3(1.0, 0.5, 0.0), smoothstep(0.7, 1.0, T));
+}
 
 float cracks(vec2 q, float seed) {
 	float r = length(q);                  // 0..0.5
@@ -145,6 +171,45 @@ void fragment() {
 		s = max(s, 1.0 - smoothstep(0.05, 0.08, length(e - vec2(0.36 + 0.26 * cos(-2.6), -0.42 + 0.26 * sin(-2.6)))));
 		float halo = exp(-d * d * 3.0) * 0.12;
 		c = v_col.rgb * (s * 1.1 + halo) * v_col.a;
+	} else if (kind == 9) {
+		float heat = v_c.y, seed = v_c.z * 37.0;
+		float an = atan(p.y, p.x);
+		float wob = (h1(floor((an + 3.1416) * 4.0) + seed) - 0.5) * 0.05;
+		float R = 0.42 + wob;
+		float fl = 0.85 + 0.15 * vn1(time * 2.3 + seed) * vn1(an * 3.0 + time * 0.7);
+		// the molten heart
+		float heart = exp(-pow(d / (0.07 + 0.06 * heat), 2.0));
+		float T = heart * (0.55 + 0.45 * heat);
+		float g = heart * (0.6 + 0.6 * heat);
+		// jagged cracks from the heart over the bowl and up the lip
+		float cr = 0.0;
+		for (int k = 0; k < 9; k++) {
+			float fk = float(k);
+			float a0 = fk / 9.0 * 6.2831853 + (h1(fk + seed) - 0.5) * 0.5;
+			float len = R * (0.75 + 0.45 * h1(fk * 3.7 + seed));
+			float th = a0 + (vn1(d * 14.0 + fk * 5.0 + seed) - 0.5) * 0.7;
+			float da = abs(mod(an - th + 3.14159265, 6.2831853) - 3.14159265) * d;
+			float w = 0.03 * (1.0 - 0.6 * d / len) + 0.006;
+			float line = (1.0 - smoothstep(w * 0.4, w, da)) * (1.0 - smoothstep(len * 0.8, len, d));
+			// a branch off each
+			float rb = len * (0.4 + 0.25 * h1(fk * 9.1 + seed));
+			float thb = th + (h1(fk * 4.3 + seed) > 0.5 ? 0.6 : -0.6) * smoothstep(rb, rb + 0.1, d);
+			float db = abs(mod(an - thb + 3.14159265, 6.2831853) - 3.14159265) * d;
+			float lb = (1.0 - smoothstep(0.007, 0.016, db)) * step(rb, d) * (1.0 - smoothstep(rb + 0.08, rb + 0.16, d));
+			cr = max(cr, max(line, lb * 0.8));
+		}
+		float crT = cr * (1.0 - 0.75 * smoothstep(0.0, R * 1.1, d)) * (0.35 + 0.65 * heat);
+		T = max(T, crT);
+		g = max(g, cr * (0.5 + 0.5 * heat) * (1.0 - 0.5 * smoothstep(0.0, R, d)));
+		// the plate cracks near the crater still glowing while it is hot
+		float pe = plates(p * 3.0, seed);
+		float pc = (1.0 - smoothstep(0.03, 0.065, pe)) * step(R + 0.03, d) * (1.0 - smoothstep(R + 0.05, R + 0.05 + 0.3 * heat, d));
+		g = max(g, pc * 0.45 * heat);
+		T = max(T, pc * 0.25 * heat);
+		// a soft warm haze over the bowl
+		float haze = exp(-pow(d / R, 2.0) * 2.0) * 0.12 * (0.4 + 0.6 * heat);
+		c = (lava(T) * g * fl + lava(0.3) * haze) * v_col.a;
+		c *= 1.0 - smoothstep(0.9, 1.0, d);
 	} else if (kind == 8) {
 		c = v_col.rgb * v_col.a * (exp(-d * d * 3.5) - 0.03) * (1.0 - smoothstep(0.85, 1.0, d));
 		c = max(c, vec3(0.0));
@@ -161,6 +226,7 @@ void fragment() {
 			c = v_col.rgb * (edge * 0.7 + exp(-b * b * 3.0) * 0.18 + dash) * v_col.a;
 		}
 	}
+	if (v_c.w < -0.5) c.b = -8.0 * max(c.r, c.g);
 	ALBEDO = c;
 	ALPHA = 1.0;
 }

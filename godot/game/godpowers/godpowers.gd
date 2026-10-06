@@ -122,8 +122,11 @@ func setup(g: Node) -> void:
 		# Prosperity's column of gold light over the mines: the same kept-low linear gold, softer,
 		# leaning further to yellow at the fringe so the shaft over sand reads gold, not salmon
 		_ribbon_mat(Vector3(0.9, 0.55, 0.0), Vector3(1.0, 0.78, 0.12), 0.8, Vector3(0.6, 0.3, 0.0)),
+		# Thoth's Meteor's fire trail: emissive (its orange kept by the grade, see ribbon.gdshader)
+		_ribbon_mat(Vector3(0.5, 0.1, 0.0), Vector3(0.95, 0.55, 0.1), 1.1, Vector3(0.3, 0.03, 0.0)),
 	]
-	var prio := [30, 29, 31, 27, 27, 26, 30, 32, 29, 31, 24, 28, 31, 29]
+	_ribbon_mats[14].set_shader_parameter("emit", true)
+	var prio := [30, 29, 31, 27, 27, 26, 30, 32, 29, 31, 24, 28, 31, 29, 30]
 	for i in _ribbon_mats.size():
 		_ribbon_mats[i].render_priority = prio[i]
 	_ribbon_mesh.custom_aabb = aabb

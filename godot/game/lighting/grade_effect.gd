@@ -88,6 +88,25 @@ void main() {
 	if (px.x >= size.x || px.y >= size.y) return;
 	vec4 t = imageLoad(color_image, px);
 	vec2 uv = vec2((float(px.x) + 0.5) / float(size.x), 1.0 - (float(px.y) + 0.5) / float(size.y));
+	// (game/godpowers) emissive light: an effect that wants its own colour kept (fire, lava)
+	// writes a negative blue, -8 x its own brightest channel, so f is about how bright its light
+	// is here and em how much of the pixel's light is its; (r, g, 0) is then the colour, which
+	// skips the chroma limiter / saturation / curves below (they turn a saturated orange pink)
+	// and whitens to a yellow-white when very hot. Every pixel with blue >= 0 is graded as before.
+	float em = 0.0;
+	vec3 emit = vec3(0.0);
+	if (t.b < 0.0) {
+		float f = -t.b / 8.0;
+		em = smoothstep(0.2, 0.75, f / max(max(t.r, t.g), 1e-4));
+		vec3 e = vec3(max(t.r, 0.0), max(t.g, 0.0), 0.0) * p.size_exp.z;
+		float pk = max(e.r, e.g);
+		if (pk > 0.76) {
+			float np = 1.0 - 0.0576 / (pk + 0.24 - 0.76);
+			e *= np / pk;
+			e = mix(e, np * vec3(1.0, 0.86, 0.55), 1.0 - 1.0 / (0.15 * (pk - np) + 1.0));
+		}
+		emit = to_srgb(e) * p.size_exp.w;
+	}
 
 	vec3 hdr = max(t.rgb, 0.0) * p.size_exp.z;
 	// --- pale stone: pale neutral surfaces (plaza paving, marble, plaster) are
@@ -166,6 +185,7 @@ void main() {
 	float v = smoothstep(0.35, 0.85, length(d * vec2(1.25, 1.0)));
 	c *= 1.0 - v * p.c.y * vec3(0.85, 1.0, 1.15);
 
+	c = mix(c, emit, em);
 	imageStore(color_image, px, vec4(to_linear(clamp(c, 0.0, 1.0)), t.a));
 }
 """

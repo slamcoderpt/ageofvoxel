@@ -79,6 +79,7 @@ void GodPowers::init_egypt() {
 	last_reason.clear();
 	any_myth_ = false;
 	myth_scan_ = 0;
+	myth_seen_id_ = 0;
 	Sim *s = sim;
 	s->events.on(EV_UNIT_DAMAGED, [this](const Event &e) {
 		if (sim->godot_rules) on_myth_damaged(e);
@@ -464,10 +465,11 @@ double GodPowers::myth_crush(int r) const {
 	if (t == U_SPHINX) { // Criosphinx / Hieracosphinx: +50 % crush each
 		c = SPHINX_CRUSH;
 		k += 0.5 * sim->techs.is_done(o, T_CRIOSPHINX) + 0.5 * sim->techs.is_done(o, T_HIERACOSPHINX);
-	} else if (t == U_SCARAB || t == U_PHOENIX) { // Force of the West Wind: +15 % crush
+	} else if (t == U_SCARAB || t == U_PHOENIX) {
 		c = t == U_SCARAB ? SCARAB_CRUSH : PHOENIX_CRUSH;
-		k += 0.15 * sim->techs.is_done(o, T_FORCE_OF_THE_WEST_WIND);
 	}
+	// Force of the West Wind: +15 % crush for the siege and myth units (the Sphinx's 9 crush too)
+	if (c > 0) k += 0.15 * sim->techs.is_done(o, T_FORCE_OF_THE_WEST_WIND);
 	return c * k * damage_mult(r);
 }
 
@@ -886,7 +888,7 @@ void GodPowers::impact_thoth(const Meteor &m) {
 	BuildingStore &B = E.buildings;
 	const double x = m.x, z = m.z, y = S.map().height_at(x, z);
 	const uint32_t seed = (uint32_t)(int64_t)(S.tick_count * 7919 + 177 + (int64_t)(x * 31));
-	scorches.push_back({ x, y, z, S.time, seed, m.radius * 2.2, true });
+	scorches.push_back({ x, y, z, S.time, seed, m.radius * 2.2, true, 1 }); // (a glowing crater: godpower_view_egypt.cpp)
 	std::vector<int> rows;
 	S.movement.hash.for_each_near(x, z, m.radius + 1, [&](int r) {
 		if (r < U.size() && !U.removed[r] && !U.dead[r] && !power_immune(r) && jsm::hypot(U.x[r] - x, U.z[r] - z) <= m.radius) rows.push_back(r);
@@ -910,7 +912,7 @@ void GodPowers::impact_thoth(const Meteor &m) {
 		power_hit(m.owner, B.id[b], THOTH_CRUSH * (1 - crush) + THOTH_DIVINE, THOTH_OWN, THOTH_OWN);
 	}
 	flatten_trees(m.owner, x, z, m.radius); // (it flattens the trees in its blast; the wood stays)
-	fires.push_back({ x, y, z, m.radius * 0.6, S.time, 12 });
+	fires.push_back({ x, y, z, m.radius * 0.6, S.time, 12, false, 1 });
 	if (m.owner > 0 && m.owner < MAX_PLAYERS) meteors_landed[m.owner]++;
 }
 

@@ -360,7 +360,7 @@ void GodPowers::update(double dt) {
 	fires.erase(std::remove_if(fires.begin(), fires.end(), [](const Fire &f) { return f.done; }), fires.end());
 	bolts.erase(std::remove_if(bolts.begin(), bolts.end(), [&](const Bolt &b) { return !(now - b.t0 < b.life + 0.05); }), bolts.end());
 	zaps.erase(std::remove_if(zaps.begin(), zaps.end(), [&](const Zap &z) { return !(now - z.t0 < z.life); }), zaps.end());
-	scorches.erase(std::remove_if(scorches.begin(), scorches.end(), [&](const Scorch &s) { return !(now - s.t0 < 14); }), scorches.end());
+	scorches.erase(std::remove_if(scorches.begin(), scorches.end(), [&](const Scorch &s) { return !(now - s.t0 < (s.kind == 1 ? THOTH_CRATER_LIFE : 14)); }), scorches.end());
 	// storms stay in the vector (thrown units refer to them by index); drop them all once none is live or referenced
 	bool live = false;
 	for (const Storm &s : storms) live = live || !s.done;

@@ -77,6 +77,7 @@ constexpr double TORNADO_HACK = 25, TORNADO_CRUSH = 100, TORNADO_EVERY = 0.5, TO
 constexpr int THOTH_METEORS = 12;            // Thoth's Meteor: 12 meteors in a 25 m circle,
 constexpr double THOTH_FIRST = 3, THOTH_REST = 6, THOTH_STEP = 1.0, THOTH_AREA = 8 * 0.6, THOTH_CRUSH = 580, THOTH_DIVINE = 40, THOTH_OWN = 0.1;
 constexpr double SON_HEAL = 15;               // the Son of Osiris heals allies 15 hp/s (civ.cpp EgyptUnit.heal)
+constexpr double THOTH_CRATER_LIFE = 90;      // (visual only) how long its glowing craters stay drawn
 constexpr int TREE_FLAT = 100;                // a tree flattened by a Tornado / Thoth's Meteor: variant + 100 (the wood stays)
 constexpr double SERPENT_AGE = 0.20;          // Serpents +20 % hp and damage in the Heroic and in the Mythic Age
 // the Roc: a flying transport for 20 units; it lands (2 s) to load or unload
@@ -97,10 +98,10 @@ struct Storm {
 	bool done = false;
 };
 struct Bolt { double x, y, z, t0, life; uint32_t seed; bool sky; };
-struct Scorch { double x, y, z, t0; uint32_t seed; double size; bool blast; };
+struct Scorch { double x, y, z, t0; uint32_t seed; double size; bool blast; int kind = 0; /* 1: a Thoth's Meteor crater (kept THOTH_CRATER_LIFE) */ };
 struct Zap { int32_t unit; double x, y, z, t0, life; uint32_t seed; };
 struct Meteor { int owner; double x, z, t0, delay, radius, sx, sy, sz; bool done = false; int kind = 0; /* 1: Thoth's */ };
-struct Fire { double x, y, z, r, t0, dur; bool done = false; };
+struct Fire { double x, y, z, r, t0, dur; bool done = false; int kind = 0; /* 1: Thoth's */ };
 
 struct CastCheck { bool ok; std::string reason; };
 
@@ -259,6 +260,7 @@ private:
 	int pharaoh_for(int owner, double x, double z) const;     // own or allied, 3 tiles
 	bool any_myth_ = false;
 	int myth_scan_ = 0;
+	int32_t myth_seen_id_ = 0; // Entities::next_id at the last tick (a new entity: rescan)
 	void impact_meteor(const Meteor &m);
 	void vortex(int storm, double dt);
 	void update_airborne(double dt);
