@@ -1847,6 +1847,26 @@ wings flaring out 1 / 2 / 3 voxels down past the jaw, two 3-wide 2-deep
 lappets falling onto the chest with gold tips, a queue behind).
 `--params "eu_focus=sphinx"` / `"eu_one=sphinx&eu_turn=80&eu_zoom=0.9"` check it.
 
+Petsuchos sprawl (round 19, myth_04): a low crocodile. The body is flat (9
+wide, 5 tall, a superellipse section, widest behind the forelegs) with its
+belly one voxel off the ground (body joint y 1), warm browns (no olive), a
+light belly and flank row, two rows of raised spine scutes and a scute row
+on each flank, bronze girth straps. Each limb sprawls: the upper limb
+(`legXX`) runs level 4 voxels out from the flank, the forearm (`cannonXX`)
+drops from the elbow to the ground leaning out one voxel with a team anklet,
+onto a flat 4-wide, 3-deep foot in the body's dark brown with four short
+cream claws (three forward, one splayed out); no black foot block. The tail's
+three segments have flat undersides that sink to lie on the ground, and use
+the channels `tailA / tailB / tailC` (not `tail`, whose horse pitch of -0.7
+per joint hung the old tail straight down); the tip is team with a spiky
+crest. Rig flag `sprawl: true` (`Rig::sprawl`, unit_view.cpp): the walk
+sweeps the upper limbs fore / aft (yaw) and lifts them (roll) in diagonal
+pairs, the forearms plant, body / neck / tail sway in an S, almost no bob;
+idle lies still with the tail tip curling; attacking zeroes the limbs (feet
+stay planted) and rears the head; dying it slumps 0.12 rad to one flank
+instead of the horse's roll onto its side. `--params "eu_focus=petsuchos"`
+(`&eu_state=walk|die`) / `"eu_one=petsuchos&eu_turn=80&eu_pitch=12"` check it.
+
 Mounts (round 14): the camel's saddle cloth is a narrow drape over the hump
 (z 6..15 at the hem, only the seat z 8..13 on top, so the hump's tan fore and
 aft slopes, the rump, shoulders and lower flanks stay bare), one voxel proud of

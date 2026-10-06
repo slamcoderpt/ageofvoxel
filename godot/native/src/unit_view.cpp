@@ -152,6 +152,7 @@ AovUnitView::Rig AovUnitView::parse_rig(const Dictionary &R, int t) {
 	rig.hover = (float)(double)R.get("hover", 0.0);
 	rig.graze = (bool)R.get("graze", true);
 	rig.upright = (bool)R.get("upright", false);
+	rig.sprawl = (bool)R.get("sprawl", false);
 	{ const Variant sv = R.get("stance", 0.0); rig.stance = sv.get_type() == Variant::BOOL ? ((bool)sv ? 1.0f : 0.0f) : (float)(double)sv; }
 	rig.voxel = (float)(double)R.get("voxel", 0.07);
 	const Array parts = R.get("parts", Array());
@@ -454,6 +455,28 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 			set(CH_neck, 0.05 - S(p + 1.2) * 0.14);
 			set(CH_tail, -0.7 + S(p * 0.5) * 0.1, S(p) * 0.15);
 			bob = (1.2 + S(p + 2.8) * 1.3) * A;
+			if (rig.sprawl) {
+				// (the Petsuchos) a sprawling crocodile walk: each upper limb,
+				// reaching out sideways, sweeps forward and back about the
+				// vertical (yaw) and lifts its elbow (roll) as it swings forward,
+				// the forearm planting the foot; diagonal pairs move together and
+				// the body, head and tail sway in an S, with almost no bob
+				auto sleg = [&](int up, int cannon, double ph, double side) {
+					const double s = S(p + ph), c = C(p + ph);
+					set(up, 0, -side * s * 0.55 * A * 1.6, side * std::max(0.0, c) * 0.35 * A * 1.6);
+					set(cannon, -std::max(0.0, c) * 0.4 * A);
+				};
+				sleg(CH_legFL, CH_cannonFL, 0, 1);
+				sleg(CH_legBR, CH_cannonBR, 0, -1);
+				sleg(CH_legFR, CH_cannonFR, PI, -1);
+				sleg(CH_legBL, CH_cannonBL, PI, 1);
+				set(CH_body, 0, S(p) * 0.07);
+				set(CH_neck, 0.0, -S(p) * 0.1);
+				set(CH_tailA, 0, -S(p - 0.8) * 0.18);
+				set(CH_tailB, 0, -S(p - 1.6) * 0.24);
+				set(CH_tailC, 0, -S(p - 2.4) * 0.3);
+				bob = 0.15 * (1 + C(p * 2)) * A;
+			}
 			set(CH_torso, 0.12 - S(p + 1.2) * 0.1 * A);
 			set(CH_head, -0.05);
 		} else {
@@ -473,6 +496,15 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 			}
 			set(CH_tail, -0.2 + S(t * 1.3) * 0.05, S(t * 0.9) * 0.25);
 			set(CH_torso, 0.02 + S(t * 1.6) * 0.015);
+			if (rig.sprawl) {
+				// (the Petsuchos) at rest: belly down, the tail's tip curling
+				// slowly from side to side, the head now and then lifting
+				set(CH_legFL, 0); set(CH_legBR, 0); set(CH_cannonBR, 0);
+				set(CH_neck, -0.06 * smooth((S(t * 0.23 + id) - 0.6) * 4), S(t * 0.4 + id) * 0.06);
+				set(CH_tailA, 0, S(t * 0.5 + id) * 0.04);
+				set(CH_tailB, 0, S(t * 0.5 + id - 0.9) * 0.08);
+				set(CH_tailC, 0, S(t * 0.5 + id - 1.8) * 0.14);
+			}
 			set(CH_head, 0, S(t * 0.5) * 0.25);
 		}
 		if (attacking) {
@@ -499,6 +531,23 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 			set(CH_armL, -0.12, 0.1, 0.05); set(CH_foreL, -0.85);
 			if (!attacking) { set(CH_armR, moving ? -0.4 : -0.3, 0, -0.06); set(CH_foreR, -1.0); set(CH_weapon, moving ? 0.5 : 0.2); }
 			else set(CH_foreR, -0.35 - 0.4 * wind);
+		}
+		if (rig.sprawl && (attacking || st == aov::A_DIE)) {
+			// (the Petsuchos) its level sprawled limbs only lift a little (roll),
+			// never the horse's pitch, so the feet stay planted; attacking, the
+			// head rears, the jaws opening at the target; dying it sinks flat,
+			// limbs and head slack, the tail laid out on the ground
+			const double k = attacking ? wind : smooth(die_t / 0.8);
+			for (int c : { CH_cannonFL, CH_cannonFR, CH_cannonBL, CH_cannonBR }) set(c, 0);
+			if (attacking) {
+				for (int c : { CH_legFL, CH_legFR, CH_legBL, CH_legBR }) set(c, 0);
+				set(CH_body, -0.06 * k); set(CH_neck, -0.3 * k + 0.1 * extend);
+			} else {
+				set(CH_legFL, 0, 0, 0.2 * k); set(CH_legFR, 0, 0, -0.2 * k);
+				set(CH_legBL, 0, 0, 0.2 * k); set(CH_legBR, 0, 0, -0.2 * k);
+				set(CH_body, 0, 0, 0.05 * k); set(CH_neck, 0.04 * k, 0.25 * k);
+				set(CH_tailA, 0, -0.15 * k); set(CH_tailB, 0, -0.2 * k); set(CH_tailC, 0, 0.25 * k);
+			}
 		}
 		fwd_out = attacking ? (float)(0.25 * extend) : 0;
 		return bob;
@@ -1410,7 +1459,13 @@ Dictionary AovUnitView::update(double dt, double alpha, int64_t local_player, co
 		if (dead) {
 			const double sink = std::max(0.0, die_t - CORPSE_TIME + 2) * 0.5;
 			const double side = id % 2 ? 1 : -1;
-			if (rig.kind == K_HORSE) {
+			if (rig.sprawl) {
+				// (the Petsuchos) no roll onto its side: the low body only
+				// slumps a little to one flank, belly on the ground
+				const double k = std::min(1.0, die_t / 0.8);
+				const double f = k * k * (3 - 2 * k);
+				root = root * xl(0, -0.04 * f, 0) * rot_z(side * f * 0.12);
+			} else if (rig.kind == K_HORSE) {
 				const double k = std::min(1.0, die_t / 0.8);
 				const double f = k * k * (3 - 2 * k);
 				root = root * xl(0, f * 0.3, 0) * rot_z(side * f * PI / 2 * 0.92);

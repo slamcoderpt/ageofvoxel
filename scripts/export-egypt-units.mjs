@@ -2153,21 +2153,46 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
   ]);
 }
 
-// Petsuchos (four-legged rig, 0.09): a long crocodile with a jewelled gold and
-// team collar, a horned sun-disc crown, team bands and a team tail tip.
+// Petsuchos (four-legged rig, 0.09, sprawl): a long crocodile with a jewelled
+// gold and team collar, a horned sun-disc crown, bronze girth straps, team
+// anklets and a team tail tip (myth_04).
+// (round 19) a low sprawling reptile: the flat body's belly one voxel off the
+// ground; each upper limb reaches out sideways level from the body's flank,
+// the forearm angles down and a little out to a wide flat foot of the body's
+// brown with four short cream claws fanned at its front and outer edge (no
+// black foot blocks); the tail's three segments (anim tailA / tailB / tailC,
+// so they never take the horse's drooping tail pitch) have flat undersides
+// that sink gently to lie on the ground, ridged with two rows of scutes and a
+// spiky team crest on the tip.
 {
-  const CROC = (x, y, z) => { const h = hash3(x, y, z, 71); const ridge = (z & 1) && y >= 4; return ridge ? 0x4e4224 : h < 0.5 ? 0x6e5c32 : h < 0.85 ? 0x62522c : 0x7a683c; };
-  const BELLY = 0xb8a676;
+  const CROC = (x, y, z) => { const h = hash3(x, y, z, 71); const ridge = (z & 1) && y >= 4; return ridge ? 0x543a20 : h < 0.5 ? 0x7a5632 : h < 0.85 ? 0x6c4c2c : 0x86623c; };
+  const BELLY = 0xc8aa7a;
+  const SIDE = pick3(72, 0x9a744a, 0x8e6a44, 0xa47e52);   // the lighter flank above the belly
+  const SCUTE = 0x3e2a18;
+  const FOOT = pick3(73, 0x5e4228, 0x563c24, 0x66482c);
+  const CLAW = 0xd8c49a;
   const body = new VoxelModel();
+  // a flat, wide body (9 wide, 5 tall), widest behind the forelegs, narrowing
+  // to the neck and to the tail's base
+  const half = (z) => z < 5 ? 3.2 + z * 0.22 : z > 17 ? 4.3 - (z - 17) * 0.2 : 4.3;
   for (let z = 0; z <= 22; z++) {
-    const w = 4.2 - Math.abs(z - 12) * 0.08, hgt = 2.8;
-    for (let x = -5; x <= 11; x++) for (let y = 0; y <= 6; y++) {
-      const dx = (x - 3) / w, dy = (y - 3) / hgt;
-      if (dx * dx + dy * dy <= 1) body.set(x, y, z, y <= 1 ? BELLY : CROC(x, y, z));
+    const w = half(z);
+    for (let x = -5; x <= 5; x++) for (let y = 0; y <= 4; y++) {
+      const dx = Math.abs(x) / (w + 0.4), dy = Math.abs(y - 2) / 2.7;
+      if (Math.pow(dx, 2.6) + Math.pow(dy, 2.6) > 1) continue;
+      body.set(x, y, z, y === 0 ? BELLY : y === 1 && Math.abs(x) >= w - 1 ? SIDE : CROC(x, y, z));
     }
   }
-  for (let z = 1; z <= 21; z += 2) { body.set(2, 6, z, 0x4a3e20).set(4, 6, z, 0x4a3e20); }
-  for (const z of [6, 14]) band(body, 3, GOLD_DK, 24);
+  // two rows of raised dark scutes down the spine and a row along each flank's top
+  for (let z = 1; z <= 21; z += 2) {
+    body.set(-1, 5, z, SCUTE).set(1, 5, z, SCUTE);
+    for (const s of [-1, 1]) { let x = 5 * s; while (x !== 0 && !body.has(x, 4, z)) x -= s; if (x !== 0) body.set(x, 4, z, SCUTE); }
+  }
+  // bronze girth straps round the body (behind the forelegs, before the hind legs)
+  for (const zb of [11, 15]) for (let x = -6; x <= 6; x++) for (let y = 0; y <= 6; y++) {
+    if (!body.has(x, y, zb)) continue;
+    if (!body.has(x + 1, y, zb) || !body.has(x - 1, y, zb) || !body.has(x, y + 1, zb)) body.set(x, y, zb, y === 0 ? BELLY : BRONZE(x, y, zb));
+  }
   const neck = new VoxelModel();
   // a long flat head: snout, teeth, eyes up top
   for (let z = 0; z <= 13; z++) {
@@ -2188,32 +2213,68 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
   // horned crown with a sun disc
   neck.box(-1, 5, 1, 3, 1, 3, GOLD).box(-3, 6, 2, 1, 2, 1, GOLD).box(3, 6, 2, 1, 2, 1, GOLD).set(-4, 8, 2, GOLD).set(4, 8, 2, GOLD);
   neck.ellipsoid(0, 8, 2, 1.4, 1.4, 0.4, TEAM).set(0, 8, 3, GOLD);
-  const tail = (r0, r1, tip) => {
+  // a tail segment 8 long tapering r0 -> r1; its underside sinks `drop` voxels
+  // over its length (so the chain lies on the ground); returns the model and
+  // the next segment's joint
+  const tail = (r0, r1, drop, tip) => {
     const m = new VoxelModel();
+    const yc = (z) => (r0 + (r1 - r0) * (z / 8)) - r0 - drop * (z / 8);
     for (let z = 0; z < 8; z++) {
-      const r = r0 + (r1 - r0) * (z / 8);
-      for (let x = -3; x <= 3; x++) for (let y = -3; y <= 3; y++) if (x * x + y * y <= r * r + 0.3) m.set(x, y, -z, tip && z > 3 ? TEAM : y < -r * 0.5 ? BELLY : CROC(x, y, z));
-      if (z % 2 === 0) m.set(0, Math.ceil(r), -z, tip && z > 3 ? TEAM : 0x4a3e20);
+      const r = r0 + (r1 - r0) * (z / 8), c = yc(z);
+      for (let x = -3; x <= 3; x++) for (let y = -4; y <= 4; y++) {
+        const dy = y - c;
+        if (x * x * 0.8 + dy * dy > r * r + 0.3) continue;
+        m.set(x, y, -z, tip && z > 3 ? TEAM : dy < -r * 0.45 ? BELLY : CROC(x, y, z));
+      }
+      const top = Math.round(c + r);
+      if (z % 2 === 0) {
+        if (tip && z > 1) m.set(0, top + 1, -z, TEAM).set(0, top + 2, -z, TEAM);   // the tip's spiky crest
+        else if (r > 1.3) m.set(-1, top, -z, SCUTE).set(1, top, -z, SCUTE);
+        else m.set(0, top + 1, -z, SCUTE);
+      }
     }
-    if (!tip) band(m, 0, GOLD_DK, 6);
+    if (!tip && r0 > 2) {
+      // a bronze strap round the tail's root
+      for (let x = -3; x <= 3; x++) for (let y = -4; y <= 4; y++) if (m.has(x, y, -2)) m.set(x, y, -2, BRONZE(x, y, 2));
+    }
+    return { m, next: [0, yc(8), -8] };
+  };
+  const T1 = tail(2.4, 1.8, 0.6, false), T2 = tail(1.8, 1.1, 0.4, false), T3 = tail(1.1, 0.5, 0.2, true);
+  // a sprawling limb, side s (+1 = left, +x): the upper limb runs level out
+  // from the flank, 4 long; the forearm drops from the elbow to the ground,
+  // leaning out one voxel, with a team anklet; a flat foot 4 wide on the
+  // ground with four cream claws
+  const upper = (s) => {
+    const m = new VoxelModel();
+    for (let i = 0; i < 4; i++) m.box(s * i, 0, 0, 1, 2, i < 3 ? 3 : 2, CROC);
+    for (let i = 0; i < 3; i++) m.set(s * i, 0, 1, SIDE);   // the lighter underside
     return m;
   };
-  const up = new VoxelModel().box(-1, 0, 0, 3, 3, 2, CROC).box(0, 0, 0, 2, 2, 2, CROC);
-  const low = new VoxelModel().box(0, 1, 0, 2, 3, 2, CROC).box(-1, 0, -1, 4, 1, 4, 0x5a4a28).set(-1, 0, 3, DARK).set(2, 0, 3, DARK).box(0, 2, 0, 2, 1, 2, TEAM);
-  rig('petsuchos', { voxel: 0.09, anim: 'horse', style: 'croc', gait: 0.7, stride: 0.55 }, [
-    part('body', body, [3, 0, 11], [0, 4.5, 0]),
-    part('neck', neck, [0, 2, 0], [0, 1, 11], 'body'),
-    part('tail', tail(2.6, 1.8, false), [0, 0, 0], [0, 3, -11], 'body'),
-    part('tail2', tail(1.8, 1.0, false), [0, 0, 0], [0, 0, -8], 'tail', { anim: 'tail' }),
-    part('tail3', tail(1.0, 0.4, true), [0, 0, 0], [0, 0, -8], 'tail2', { anim: 'tail' }),
-    part('legFL', up, [1, 3, 1], [5.5, 1.5, 7], 'body'),
-    part('cannonFL', low, [1, 4, 1], [1.5, -2, 0.5], 'legFL'),
-    part('legFR', up, [1, 3, 1], [-5.5, 1.5, 7], 'body'),
-    part('cannonFR', low, [1, 4, 1], [-1.5, -2, 0.5], 'legFR'),
-    part('legBL', up, [1, 3, 1], [5.5, 1.5, -6], 'body'),
-    part('cannonBL', low, [1, 4, 1], [1.5, -2, 0.5], 'legBL'),
-    part('legBR', up, [1, 3, 1], [-5.5, 1.5, -6], 'body'),
-    part('cannonBR', low, [1, 4, 1], [-1.5, -2, 0.5], 'legBR'),
+  const lower = (s, front) => {
+    const m = new VoxelModel();
+    m.box(0, 3, 0, 1, 1, 2, CROC).box(s, 3, 0, 1, 1, 2, CROC);          // the elbow (under the upper limb's end)
+    tbox(m, 0, 2, 0, 1, 1, 2, TEAM_SHADE).box(s, 2, 0, 1, 1, 2, TEAM);   // the team anklet
+    m.box(s, 1, 0, 1, 1, 2, CROC).box(2 * s, 1, 0, 1, 1, 2, CROC);      // leaning out
+    // the flat foot: 4 wide (x s..4s), 3 deep (z -1..1), toes forward
+    for (let i = 1; i <= 4; i++) for (let k = front ? -1 : -1; k <= 1; k++) m.set(s * i, 0, k, FOOT);
+    // claws: three toes forward, one splayed out to the side
+    m.set(s * 1, 0, 2, CLAW).set(s * 2.0, 0, 2, FOOT).set(s * 2, 0, 3, CLAW).set(s * 3, 0, 2, CLAW).set(s * 5, 0, 1, CLAW);
+    return m;
+  };
+  rig('petsuchos', { voxel: 0.09, anim: 'horse', style: 'croc', gait: 0.7, stride: 0.55, graze: false, sprawl: true }, [
+    part('body', body, [0, 0, 11], [0, 1, 0]),
+    part('neck', neck, [0, 2, 0], [0, 1.2, 11], 'body'),
+    part('tail', T1.m, [0, 0, 0], [0, 2.4, -11], 'body', { anim: 'tailA' }),
+    part('tail2', T2.m, [0, 0, 0], T1.next, 'tail', { anim: 'tailB' }),
+    part('tail3', T3.m, [0, 0, 0], T2.next, 'tail2', { anim: 'tailC' }),
+    part('legFL', upper(1), [0, 1, 1], [3.4, 2, 7.5], 'body'),
+    part('cannonFL', lower(1, true), [0.5, 3, 1], [3.5, 0, 0], 'legFL'),
+    part('legFR', upper(-1), [1, 1, 1], [-3.4, 2, 7.5], 'body'),
+    part('cannonFR', lower(-1, true), [0.5, 3, 1], [-3.5, 0, 0], 'legFR'),
+    part('legBL', upper(1), [0, 1, 1], [3.4, 2, -6.5], 'body'),
+    part('cannonBL', lower(1, false), [0.5, 3, 1], [3.5, 0, 0], 'legBL'),
+    part('legBR', upper(-1), [1, 1, 1], [-3.4, 2, -6.5], 'body'),
+    part('cannonBR', lower(-1, false), [0.5, 3, 1], [-3.5, 0, 0], 'legBR'),
   ]);
 }
 
