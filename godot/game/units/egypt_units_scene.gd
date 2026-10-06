@@ -81,6 +81,12 @@ static func scene_setup(game: Node) -> Dictionary:
 		spawn.call(one, 1, Vector2(cx, cz), yaw + deg_to_rad(float(game.args.get("eu_turn", 0.0))))
 		cam_dist = 4.0 + float(GAP.get(one, 1.0)) * 1.5
 		cam_pitch = 40.0
+		# (round 20) a flyer hovers well above its ground point: aim past it so
+		# the bird, not the basket's shadow, sits in the frame
+		var fly_h := float({"phoenix": 2.4, "roc": 4.4}.get(one, 0.0))
+		if fly_h > 0.0:
+			cam_dist += 3.0
+			focus -= front * fly_h / tan(deg_to_rad(float(game.args.get("eu_pitch", cam_pitch))))
 	elif focus_type != "":
 		# four of one type from four sides (Retold's wiki "views"), each turned
 		# three-quarters so the side and back views still show a face edge and

@@ -80,13 +80,18 @@ void fragment() {
 	// the dead drain to a cool, pale-ish grey
 	float dl = dot(c, vec3(0.3, 0.59, 0.11));
 	c = mix(c, vec3(dl) * vec3(0.94, 0.97, 1.04), v_dead * 0.5);
-	ALBEDO = c;
+	// (round 20) Egyptian fire voxels (glow 0.75..0.85: the Phoenix's flame
+	// feathers) burn mostly with their own light (a dim lit albedo, so the
+	// emission is most of the pixel) and keep their orange through the grade
+	// (the negative-blue marker below, as egypt_building.gdshader's fire)
+	bool eg_fire = v_eg > 0.5 && v_glow > 0.75 && v_glow < 0.85;
+	ALBEDO = eg_fire ? c * 0.3 : c;
 	ROUGHNESS = roughness_value;
 	METALLIC = 0.0;
 	// team colour holds its saturation in shade, plus a lit rim on edge-on faces
 	float rim = pow(1.0 - clamp(abs(dot(normalize(NORMAL), normalize(VIEW))), 0.0, 1.0), 1.6);
 	vec3 team_sat = c * v_team * mix(v_team_col, normalize(dye + 1e-4) * 0.9, v_eg) * (1.0 - v_dead * 0.75);
-	vec3 em = c * v_glow * 2.5;
+	vec3 em = c * (eg_fire ? 1.1 : v_glow * 2.5);
 	em += c * vec3(1.0, 0.9, 0.8) * eg_fill * v_eg * (1.0 - v_team) * (1.0 - v_dead);
 	em += team_sat * (mix(team_lift, eg_team_lift, v_eg) + rim * mix(0.45, 0.2, v_eg));
 	// rim light: warm on skin, bronze and cloth, the unit's own dye on team parts
@@ -105,4 +110,5 @@ void fragment() {
 	em += (c * vec3(1.0, 0.85, 0.7) * 0.3 + hot * c.r * 0.6 + hot * 0.05) * (0.75 + 0.5 * rim) * hit_k * (1.0 - 0.9 * v_team);
 	em += vec3(1.0, 0.72, 0.4) * max(v_flash - 0.05, 0.0); // god-power blasts
 	EMISSION = em;
+	if (eg_fire) EMISSION.b = -8.0 * max(EMISSION.r, EMISSION.g);
 }

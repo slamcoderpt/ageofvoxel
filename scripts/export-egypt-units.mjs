@@ -2490,65 +2490,198 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
   ]);
 }
 
-// Phoenix (flyer, 0.1): a bird of fire: an orange body, red and yellow
-// glowing wings tipped with blue (team) flame, a long burning tail.
-{
-  const FIRE = (x, y, z) => { const h = hash3(x, y, z, 95); return h < 0.35 ? 0xc87a20 : h < 0.7 ? 0x9a3414 : 0xe0ae30; };
-  const body = new VoxelModel();
-  body.ellipsoid(0, 0, 0, 2.6, 2.6, 5, FIRE, { glow: 0.0 });
-  body.ellipsoid(0, 2, 5, 1.8, 2, 2, FIRE, { glow: 0.0 });
-  body.box(-1, 2, 7, 2, 2, 2, 0xc89a10, { glow: 0.0 }).box(0, 1, 9, 1, 1, 2, GOLD_DK);
-  body.set(-1, 3, 8, DARK).set(1, 3, 8, DARK);
-  for (let i = 0; i < 6; i++) body.set(0, 4 + i, 5 - i, i > 3 ? TEAM : 0xc89a10, { glow: 0.0 });   // flame crest
-  const wing = (s) => {
-    const m = new VoxelModel();
-    for (let i = 0; i <= 20; i++) {
-      const len = Math.round(8 - i * 0.15 + (i > 12 ? (i - 12) * 0.5 : 0));
-      for (let j = 0; j <= len; j++) {
-        const c = j > len - 2 || i > 17 ? TEAM : j < 3 ? 0xe0ae30 : j < 6 ? 0xc87a20 : 0x9a3414;
-        const wy = -Math.round(j * 0.6) + Math.round(Math.abs(i - 9) * 0.25);
-        m.set(s * i, wy, -j, c, { glow: c === TEAM ? 0.1 : 0 }).set(s * i, wy - 1, -j, c, { glow: c === TEAM ? 0.1 : 0 });
-      }
-    }
-    return m;
+// (round 20) the birds (Phoenix, Roc) share one raptor build: each wing is an
+// arm (wingL / wingR) and a hand (handL / handR, anim channels foreL / foreR,
+// so the hand lags the arm on the beat and the wing bends). The arm is cambered
+// (a two-voxel leading edge, the coverts raised one voxel, the flight feathers
+// lower) and rises toward the wrist (dihedral); the chord tapers from the root
+// to the wrist and on along the swept-back hand. The colour runs in feather
+// tracts, not bands: light marginal coverts, mottled lesser coverts, a
+// scalloped row of greater coverts, then the secondaries as two-voxel feathers
+// of alternating length (a jagged trailing edge) whose tips alone carry a pale
+// band and the team colour. Six primaries fan out from the hand as separate
+// one-voxel strips (gaps open between them toward the tips, the tips curl up),
+// again with the pale band and team colour on the tips only. Both sides are
+// mirrored voxel for voxel (x -> -x - 1), so the wings match.
+const raptorWing = (s, P) => {
+  const X = (x) => (s > 0 ? x : -x - 1);
+  const put = (m, x, y, z, c) => m.set(X(x), y, z, c, P.glow && (c === TEAM || c === P.band) ? { glow: P.glow } : undefined);
+  const tract = (m, i, j, chord, k, rise) => {
+    // one voxel column of a cambered wing section at span i, chord row j
+    const last = j === chord, tip1 = j === chord - 1;
+    let c;
+    if (j === 0) c = P.lead;
+    else if (j <= 2) c = P.lesser(i, j, 0);
+    else if (j <= 4) c = j === 4 ? ((i + 1) % 3 === 0 ? P.scallop : P.coverTip) : P.greater;
+    else if (last) c = TEAM;
+    else if (tip1) c = P.band;
+    else c = k % 2 ? P.sec : P.sec2;
+    if (j === 0) { put(m, i, rise, -j, c); put(m, i, rise + 1, -j, c); }
+    else if (j <= 4) put(m, i, rise + 1, -j, c);
+    else if (j === 5) { put(m, i, rise, -j, c); put(m, i, rise + 1, -j, P.coverTip === c ? c : P.greater); }
+    else put(m, i, rise, -j, c);
   };
-  const tail = new VoxelModel();
-  for (let i = 0; i < 14; i++) for (const x of [-2, 0, 2]) tail.set(x + Math.round(x * i * 0.08), -Math.round(i * 0.3), -i, i > 10 ? TEAM : i > 6 ? 0x9a3414 : 0xd09028, { glow: 0.0 });
-  const leg = new VoxelModel().box(0, 0, 0, 1, 3, 1, GOLD_DK).box(-1, -1, 0, 3, 1, 2, GOLD_DK);
+  const arm = new VoxelModel();
+  const ARM = P.arm;
+  for (let i = 0; i < ARM; i++) {
+    const k = i >> 1;
+    const chord = Math.round(P.root - (i * (P.root - P.wrist)) / ARM) + (k % 2 ? 0 : 1);
+    const rise = Math.floor(i * 0.2);
+    for (let j = 0; j <= chord; j++) tract(arm, i, j, chord, k, rise);
+  }
+  const armRise = Math.floor(ARM * 0.2);
+  const hand = new VoxelModel();
+  for (let i = -1; i <= 6; i++) {
+    const lz = -Math.round(Math.max(0, i) * 0.35);
+    const chord = Math.max(3, Math.round(P.wrist - 1 - Math.max(0, i) * 0.5));
+    for (let j = 0; j <= chord; j++) {
+      const jj = j;
+      let c = jj === 0 ? P.lead : jj <= 2 ? P.lesser(i, j, 1) : P.greater;
+      if (jj === 3 && i % 2 === 0) c = P.coverTip;
+      if (jj === 0) { put(hand, i, 0, lz - j, c); put(hand, i, 1, lz - j, c); }
+      else if (jj <= 3) put(hand, i, 1, lz - j, c);
+      else { put(hand, i, 0, lz - j, P.prim); put(hand, i, 1, lz - j, P.greater); }
+    }
+  }
+  // the six primaries, fanned from the tip of the hand toward the trailing edge
+  const LEN = [8, 9.5, 9.5, 9, 8, 7];
+  for (let f = 0; f < 6; f++) {
+    const th = -0.12 + f * 0.21;
+    const bx = 6 - f * 0.55, bz = -2.6 - f * 0.95;
+    const L = LEN[f] * P.primScale;
+    for (let t = 0; t <= L; t += 0.5) {
+      const u = t / L;
+      const c = u > 0.8 ? TEAM : u > 0.64 ? P.band : f % 2 ? P.prim : P.prim2;
+      const y = u > 0.72 ? 1 : 0;
+      put(hand, Math.round(bx + Math.cos(th) * t), y, Math.round(bz - Math.sin(th) * t), c);
+    }
+  }
+  return { arm, hand, armRise, armLen: ARM };
+};
+// a fanned tail of separate feathers with rounded, notched ends: dark vanes,
+// a pale band and the team colour on the tips only
+const raptorTail = (P) => {
+  const m = new VoxelModel();
+  const N = 7;
+  for (let f = 0; f < N; f++) {
+    const a = (f - (N - 1) / 2) * 0.16;
+    const L = P.tailLen - Math.abs(f - (N - 1) / 2) * 0.7 + (f % 2 ? 0 : 0.6);
+    for (let t = 0; t <= L; t += 0.5) {
+      const u = t / L;
+      const c = u > 0.86 ? TEAM : u > 0.72 ? P.band : f % 2 ? P.sec : P.sec2;
+      const x = Math.round(Math.sin(a) * t * 1.25);
+      m.set(x, Math.round(-t * 0.12), -Math.round(Math.cos(a) * t), c, P.glow && (c === TEAM) ? { glow: P.glow } : undefined);
+    }
+  }
+  // the coverts over the root of the fan
+  for (let z = 0; z >= -3; z--) for (let x = -1 - (z < -1 ? 1 : 0); x <= 1 + (z < -1 ? 1 : 0); x++) m.set(x, 1, z, P.greater);
+  return m;
+};
+// an eagle's head on a neck: a hackled neck narrower than head and body, a
+// round head with a dark brow ridge jutting over each eye (an amber eye with a
+// dark pupil under it), a yellow cere and a three-voxel hooked beak whose upper
+// mandible curves down over the lower to a dark point
+const raptorHead = (body, P, z0, y0) => {
+  for (let k = 0; k <= 3; k++) body.ellipsoid(0, y0 - 1 + k * 0.5, z0 + k * 0.7, 1.6, 1.6, 0.9, P.neck);
+  const hz = z0 + 3.4, hy = y0 + 1.4;
+  body.ellipsoid(0, hy, hz, 2.1, 1.9, 2.2, P.head);
+  body.ellipsoid(0, hy + 1, hz - 0.6, 1.6, 1, 1.7, P.crown);
+  const ez = Math.round(hz + 0.6), ey = Math.round(hy);
+  for (const x of [-2, 2]) {
+    const xo = x < 0 ? -1 : 1;
+    body.set(x, ey, ez, 0xe8a020).set(x, ey, ez + 1, DARK);          // the eye, the pupil toward the beak
+    body.set(x, ey + 1, ez - 1, P.brow).set(x, ey + 1, ez, P.brow).set(x, ey + 1, ez + 1, P.brow);   // brow ridge
+    body.set(x + xo, ey + 1, ez + 1, P.brow);                                                     // jutting out
+  }
+  const bz = Math.round(hz + 2);
+  body.box(-1, ey - 1, bz, 3, 2, 1, P.cere);                       // the cere
+  body.box(0, ey - 1, bz + 1, 1, 2, 1, P.beak).set(-1, ey - 1, bz + 1, P.beak).set(1, ey - 1, bz + 1, P.beak);
+  body.set(0, ey - 1, bz + 2, P.beak).set(0, ey, bz + 2, P.beak);  // the upper mandible running on
+  body.set(0, ey - 2, bz + 2, P.beakTip).set(0, ey - 2, bz + 1, P.beakLow);   // the hook bending down over the lower mandible
+  body.set(0, ey - 3, bz + 2, P.beakTip);
+  return { hz, hy };
+};
+const raptorRig = (type, meta, body, P, extraParts) => {
+  const L = raptorWing(1, P), R = raptorWing(-1, P);
+  const [jx, jy, jz] = P.joint;
+  rig(type, meta, [
+    part('body', body, [0, 0, 0], [0, 10, 0]),
+    part('wingL', L.arm, [0, 0, 0], [0.5 + jx, jy, jz], 'body'),
+    part('handL', L.hand, [0, 0, 0], [L.armLen, L.armRise, 0], 'wingL', { anim: 'foreL' }),
+    part('wingR', R.arm, [0, 0, 0], [0.5 - jx, jy, jz], 'body'),
+    part('handR', R.hand, [0, 0, 0], [-R.armLen, R.armRise, 0], 'wingR', { anim: 'foreR' }),
+    part('tail', raptorTail(P), [0, 0, 0], [0.5, 0.5, P.tailZ], 'body'),
+    ...extraParts,
+  ]);
+};
+const raptorLeg = (thigh, shank, claw) => {
+  const m = new VoxelModel();
+  m.ellipsoid(0, 3, 0, 1, 1.2, 1, thigh);                // the feathered "trousers"
+  m.box(0, 0, 0, 1, 2, 1, shank);
+  m.box(-1, -1, 1, 1, 1, 2, shank).box(1, -1, 1, 1, 1, 2, shank).box(0, -1, 1, 1, 1, 3, shank).box(0, -1, -1, 1, 1, 1, shank);
+  m.set(-1, -2, 2, claw).set(1, -2, 2, claw).set(0, -2, 3, claw).set(0, -2, -1, claw);
+  return m;
+};
+
+// Phoenix (flyer, 0.1): a bird of fire: a gold and orange body, the raptor
+// wings in flame colours (gold coverts, orange and red flight feathers) with
+// blue (team) flame on the feather tips, a flame crest, a long burning tail.
+{
+  const FIRE = (x, y, z) => { const h = hash3(x, y, z, 95); return h < 0.3 ? 0xd05010 : h < 0.7 ? 0xe8a018 : 0xe07810; };
+  const P = {
+    root: 9, wrist: 7, arm: 9, primScale: 1, tailLen: 14, tailZ: -5, joint: [2.5, 1.5, 2], glow: 0.12,
+    lead: 0xf0c020, lesser: pick3(97, 0xe8a818, 0xf0b820, 0xe09810), greater: 0xe07810, scallop: 0xc03008, coverTip: 0xf0b820,
+    sec: 0xd85010, sec2: 0xc03c08, prim: 0xd04810, prim2: 0xb83408, band: 0xf8d020,
+    neck: pick3(98, 0xe8a018, 0xe07810, 0xf0b820), head: pick3(99, 0xe8a018, 0xe07810, 0xf0b820), crown: 0xf0c020, brow: 0xa82806,
+    cere: 0xf0c020, beak: 0xf0d050, beakLow: 0xd0a020, beakTip: GOLD_DK,
+  };
+  const body = new VoxelModel();
+  body.ellipsoid(0, 0, 0, 2.6, 2.4, 4.8, FIRE);
+  body.ellipsoid(0, -1, 1, 2, 1.6, 3.4, 0xf0c020);              // the bright breast
+  raptorHead(body, P, 4, 1.5);
+  for (let i = 0; i < 6; i++) body.set(0, 5 + i, 6 - i, i > 3 ? TEAM : 0xf0b820, i > 3 ? { glow: 0.12 } : undefined);   // flame crest
+  for (let i = 0; i < 4; i++) body.set(0, 4 + i, 5 - i, 0xd05010);
+  // two long burning streamers trail past the tail fan
+  const tail = raptorTail(P);
+  for (let i = 0; i < 16; i++) for (const x of [-2, 2]) tail.set(x + Math.round(x * i * 0.06), -Math.round(i * 0.25), -i - 2, i > 12 ? TEAM : i > 7 ? 0xd05010 : 0xe8a018, i > 12 ? { glow: 0.12 } : undefined);
+  const L = raptorWing(1, P), R = raptorWing(-1, P);
+  const leg = raptorLeg(0xe07810, GOLD_DK, DARK);
+  // (round 20) every flame voxel carries glow 0.8, the unit shader's fire
+  // marker: it burns with its own light and keeps its orange through the
+  // grade (which bleaches a lit saturated orange to salmon); the team flame
+  // tips glow a little, the dark eyes, claws and beak tip stay unlit
+  const burn = (m) => { for (const v of m.vox.values()) if (!v.team && v.c !== DARK && v.c !== GOLD_DK) v.glow = 0.8; return m; };
+  for (const m of [body, tail, L.arm, L.hand, R.arm, R.hand, leg]) burn(m);
   rig('phoenix', { voxel: 0.1, anim: 'flyer', style: 'phoenix', hover: 16 }, [
     part('body', body, [0, 0, 0], [0, 10, 0]),
-    part('wingL', wing(1), [0, 0, 0], [2, 1.5, 2], 'body'),
-    part('wingR', wing(-1), [0, 0, 0], [-2, 1.5, 2], 'body'),
-    part('tail', tail, [0, 0, 0], [0, 0, -5], 'body'),
-    part('legL', leg, [0.5, 3, 0], [1.2, -2, 0], 'body'),
-    part('legR', leg, [0.5, 3, 0], [-1.2, -2, 0], 'body'),
+    part('wingL', L.arm, [0, 0, 0], [0.5 + P.joint[0], P.joint[1], P.joint[2]], 'body'),
+    part('handL', L.hand, [0, 0, 0], [L.armLen, L.armRise, 0], 'wingL', { anim: 'foreL' }),
+    part('wingR', R.arm, [0, 0, 0], [0.5 - P.joint[0], P.joint[1], P.joint[2]], 'body'),
+    part('handR', R.hand, [0, 0, 0], [-R.armLen, R.armRise, 0], 'wingR', { anim: 'foreR' }),
+    part('tail', tail, [0, 0, 0], [0.5, 0, P.tailZ], 'body'),
+    part('legL', leg, [0.5, 3, 0], [1.6, -2, 0], 'body'),
+    part('legR', leg, [0.5, 3, 0], [-0.6, -2, 0], 'body'),
   ]);
 }
 
-// Roc (flyer, 0.12): a giant brown eagle with team wingtips carrying a round
-// woven basket.
+// Roc (flyer, 0.12): a giant eagle (myth_06): a dark brown body under a
+// golden-tawny neck and head, broad cambered raptor wings in brown feather
+// tracts with the team colour on the covert, secondary and primary tips, a
+// fanned tail, yellow talons, carrying a round woven basket.
 {
-  const BR = pick3(96, 0x8a5a2e, 0x7a4e28, 0x9a6836);
-  const body = new VoxelModel();
-  body.ellipsoid(0, 0, 0, 3.2, 3, 6, BR);
-  body.ellipsoid(0, 0, 0, 2.4, 2.4, 5.4, 0xe8c8a0);
-  body.ellipsoid(0, 1, 0, 3.2, 2.6, 6, BR);
-  body.ellipsoid(0, 2.5, 6, 2.2, 2.2, 2.4, BR);
-  body.box(-1, 2, 8, 2, 2, 2, 0xe8d8b8).box(-1, 1, 10, 2, 2, 1, GOLD).set(0, 0, 10, GOLD_DK);
-  body.set(-2, 3, 7, DARK).set(2, 3, 7, DARK);
-  const wing = (s) => {
-    const m = new VoxelModel();
-    for (let i = 0; i <= 24; i++) {
-      const len = Math.round(9 - i * 0.12 + (i > 16 ? (i - 16) * 0.6 : 0));
-      for (let j = 0; j <= len; j++) {
-        const c = i > 18 && j > 2 ? (j % 2 ? TEAM : 0xe0d0b0) : j < 3 ? BR(i, j, 0) : j < 7 ? 0x6a4422 : 0x5a3a1e;
-        m.set(s * i, 0, -j, c);
-      }
-    }
-    return m;
+  const BR = pick3(96, 0x62401f, 0x5a3a1c, 0x6c4622);
+  const P = {
+    root: 10, wrist: 8, arm: 10, primScale: 1.1, tailLen: 10, tailZ: -5.5, joint: [3, 1.5, 2.5], glow: 0,
+    lead: 0xa47a32, lesser: pick3(97, 0x84581c, 0x7a5018, 0x8e6222), greater: 0x5a3c1a, scallop: 0x3a2412, coverTip: 0x9a7030,
+    sec: 0x4a3018, sec2: 0x402a14, prim: 0x3a2612, prim2: 0x32200f, band: 0xd8c8a0,
+    neck: pick3(98, 0x9a6c24, 0x8e621e, 0xa6782a), head: pick3(99, 0x7a5420, 0x704c1c, 0x845c24), crown: 0xa47a32,
+    brow: 0x2a1a0c, cere: 0xe0b030, beak: 0xe0d4a8, beakLow: 0xc0b088, beakTip: 0x3a3430,
   };
-  const tail = new VoxelModel();
-  for (let i = 0; i < 9; i++) for (let x = -3; x <= 3; x++) tail.set(x + Math.round(x * i * 0.1), 0, -i, i > 6 ? TEAM : 0x6a4422);
+  const body = new VoxelModel();
+  body.ellipsoid(0, 0, 0, 3.2, 2.8, 6, BR);
+  body.ellipsoid(0, -1, 1.5, 2.4, 1.8, 4, 0x7a4c26);           // the breast a step lighter
+  body.ellipsoid(0, 1.2, 0, 2.6, 2, 5.4, 0x4e3218);            // the darker mantle
+  raptorHead(body, P, 5, 2);
   const basket = new VoxelModel();
   for (let y = 0; y <= 6; y++) for (let x = -5; x <= 5; x++) for (let z = -5; z <= 5; z++) {
     const d = Math.hypot(x, z);
@@ -2556,15 +2689,11 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
     basket.set(x, y, z, y === 3 ? TEAM : (x + y + z) % 2 ? 0xc8986a : 0xb08050);
   }
   for (const [x, z] of [[-4, 0], [4, 0], [0, -4], [0, 4]]) basket.line(x, 6, z, 0, 12, 0, ROPE());
-  const leg = new VoxelModel().box(0, 0, 0, 1, 3, 1, 0xd8b060).box(-1, -1, -1, 3, 1, 3, 0xd8b060);
-  rig('roc', { voxel: 0.12, anim: 'flyer', style: 'roc', hover: 26 }, [
-    part('body', body, [0, 0, 0], [0, 10, 0]),
-    part('wingL', wing(1), [0, 0, 0], [2.5, 1.5, 2], 'body'),
-    part('wingR', wing(-1), [0, 0, 0], [-2.5, 1.5, 2], 'body'),
-    part('tail', tail, [0, 0, 0], [0, 0.5, -6], 'body'),
-    part('legL', leg, [0.5, 3, 0.5], [1.4, -2.5, 1], 'body'),
-    part('legR', leg, [0.5, 3, 0.5], [-1.4, -2.5, 1], 'body'),
-    part('basket', basket, [0, 12, 0], [0, -3, 1], 'body'),
+  const leg = raptorLeg(0x6e4624, 0xd8b060, 0x2a2018);
+  raptorRig('roc', { voxel: 0.12, anim: 'flyer', style: 'roc', hover: 26 }, body, P, [
+    part('legL', leg, [0.5, 3, 0.5], [1.9, -2.5, 1], 'body'),
+    part('legR', leg, [0.5, 3, 0.5], [-0.9, -2.5, 1], 'body'),
+    part('basket', basket, [0, 12, 0], [0.5, -3, 1], 'body'),
   ]);
 }
 

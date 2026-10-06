@@ -598,11 +598,16 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 	if (kind == K_FLYER) {
 		// (phoenix, roc) hover at rig.hover, wings beating (faster on the move),
 		// a dive with the talons forward to strike, a fall when killed
+		// (round 20) the wings are an arm and a hand (channels foreL / foreR):
+		// the arm beats from a slight dihedral, the hand follows a quarter beat
+		// late so the wing bends at the wrist; the idle is a slow soaring beat
 		const bool moving = st == aov::A_WALK;
-		const double f = moving ? 8 : 5;
-		const double fl = S(t * f);
+		const double f = moving ? 5.5 : 2.6;
+		const double fl = S(t * f), amp = moving ? 0.42 : 0.2;
+		const double hl = S(t * f - 1.1) * (moving ? 0.3 : 0.12);
 		double bob = rig.hover + S(t * f * 0.5 + 1) * 1.2;
-		set(CH_wingL, 0, 0, 0.12 + fl * 0.6); set(CH_wingR, 0, 0, -0.12 - fl * 0.6);
+		set(CH_wingL, 0, 0, 0.14 + fl * amp); set(CH_wingR, 0, 0, -0.14 - fl * amp);
+		set(CH_foreL, 0, 0, 0.06 + hl); set(CH_foreR, 0, 0, -0.06 - hl);
 		set(CH_body, moving ? 0.12 : 0.02 + S(t * 0.7) * 0.04, 0, S(t * 0.5) * 0.06);
 		set(CH_tail, -0.1 + S(t * f * 0.5) * 0.08, S(t * 0.9) * 0.15);
 		set(CH_legL, 0.7); set(CH_legR, 0.7);
@@ -610,13 +615,15 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 			set(CH_body, 0.15 + 0.45 * extend - 0.2 * wind);
 			set(CH_legL, 0.7 - 1.6 * extend); set(CH_legR, 0.7 - 1.6 * extend);
 			set(CH_wingL, 0, 0, 0.5 * wind + fl * 0.3); set(CH_wingR, 0, 0, -0.5 * wind - fl * 0.3);
+			set(CH_foreL, 0, 0, -0.25 * wind); set(CH_foreR, 0, 0, 0.25 * wind);   // the hands cupped down as it stoops
 			bob -= 5 * extend;
 			fwd_out = (float)(0.3 * extend);
 		} else if (st == aov::A_DIE) {
 			const double k = smooth(die_t / 0.9);
 			bob = rig.hover * (1 - k);
-			set(CH_wingL, 0, 0, -0.5 * k + fl * (1 - k) * 0.6); set(CH_wingR, 0, 0, 0.5 * k - fl * (1 - k) * 0.6);
-			set(CH_body, 0.4 * k, 0, 0.6 * k);
+			set(CH_wingL, 0, 0, -0.5 * k + fl * (1 - k) * amp); set(CH_wingR, 0, 0, 0.5 * k - fl * (1 - k) * amp);
+			set(CH_foreL, 0, 0, -0.3 * k); set(CH_foreR, 0, 0, 0.3 * k);
+			set(CH_body, 0.4 * k, 0, 0.3 * k);   // (round 20) a smaller roll, so both wings sag to the ground
 		}
 		bob_out = (float)bob;
 		return;

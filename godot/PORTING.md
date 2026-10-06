@@ -1884,6 +1884,40 @@ stay planted) and rears the head; dying it slumps 0.12 rad to one flank
 instead of the horse's roll onto its side. `--params "eu_focus=petsuchos"`
 (`&eu_state=walk|die`) / `"eu_one=petsuchos&eu_turn=80&eu_pitch=12"` check it.
 
+Raptors (round 20, myth_06 / myth_13): the Roc and the Phoenix share one bird
+build (`raptorWing / raptorTail / raptorHead / raptorLeg`,
+export-egypt-units.mjs). Each wing is two parts: the arm (`wingL / wingR`,
+10 voxels, chord 11 -> 9, alternating by feather) and the hand (`handL /
+handR`, anim channels `foreL / foreR`, swept back, chord 7 -> 3). The arm is
+cambered (a two-voxel leading edge, the coverts one voxel higher, the flight
+feathers lower) and rises one voxel per five toward the wrist (dihedral). The
+colours follow feather tracts: light marginal coverts, mottled lesser
+coverts, a scalloped row of greater coverts, then two-voxel secondaries of
+alternating length (a jagged trailing edge). Only the feather tips carry the
+pale band and the team colour. Six one-voxel primaries fan out from the hand
+(-0.12..0.93 rad back, 7-10 voxels long), with gaps opening toward their
+upturned tips. The tail is a fan of seven feathers with notched ends. A
+hackled neck, narrower than both head and body, carries the head: a dark brow
+ridge juts over an amber eye with a dark pupil, then a yellow cere and a
+three-voxel hooked beak whose upper mandible curves down to a dark point.
+The legs are feathered thighs with yellow toes and dark claws. Both sides
+mirror voxel for voxel (x -> -x - 1). The Roc is dark brown with a
+golden-tawny neck and head. Its browns lean yellow, because a red-orange
+brown grades to salmon pink. The Phoenix is gold and orange with red flight
+feathers and team flame tips. Every flame voxel carries glow 0.8, the
+**unit-shader fire marker** (unit.gdshader: on an Egyptian mesh, glow
+0.75..0.85 gives a dim lit albedo, emission 1.1 x the colour and the
+grade's negative-blue keep-colour marker, as in egypt_building.gdshader). The
+flame keeps its orange instead of bleaching to salmon; Greek meshes and the
+other glow values are untouched. The flyer animation (unit_view.cpp K_FLYER)
+uses a slow soaring idle beat (2.6 Hz, +-0.2) and a 5.5 Hz walk beat (+-0.42)
+from a 0.14 rad dihedral. The hand follows a quarter beat late (foreL/R), so
+the wing bends at the wrist. The hands cup down on the stoop, and on the
+death fall the body rolls only 0.3 rad, so both wings sag. `eu_one=roc` /
+`eu_one=phoenix` now aim past a hovering flyer, so the bird is framed
+(`"eu_one=roc&eu_turn=60&eu_zoom=1.7"`). Use `--params "eu_focus=roc"`
+(`&eu_state=walk|die`) and `"eu_focus=phoenix"` to check them.
+
 Mounts (round 14): the camel's saddle cloth is a narrow drape over the hump
 (z 6..15 at the hem, only the seat z 8..13 on top, so the hump's tan fore and
 aft slopes, the rump, shoulders and lower flanks stay bare), one voxel proud of
