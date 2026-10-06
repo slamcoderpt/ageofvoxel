@@ -1706,6 +1706,25 @@ node scripts/godot-shoot.mjs --scene egypt_units --out shots/godot/egypt_units.p
 node scripts/export-egypt-units.mjs   # re-export godot/assets/models/egypt_units.{json,bin.gz}
 ```
 
+Myth warriors' arms and blades (round 15): the beast-rig men (`beastManParts`:
+Anubite, Avenger, Son of Osiris) split the arm with `splitArm` like the men
+(the forearm overlaps the upper arm two rows at a rounded elbow with a knob
+behind it, joint FORE_J, BEAST_FIST [0, -4, 0.3]), so a bent elbow stays
+closed. Their blades are no longer modelled up along the forearm (where they
+read as pale sleeves): each weapon part carries a `rest` turn (x 2.0..2.15,
+z +-0.2..0.35) so it leaves the fist forward, down and a little out, a
+fighting grip in idle and walk, raised over the head in the swing. The
+Anubite's sickle-swords are dark steel (0x4e565e, a darker spine, a lighter
+honed inner curve) over a leather grip and bronze guard, at part scale 0.7;
+its armlets and anklets a mid steel grey, not white. The Avenger's long
+blades are a deep orange gold (0xd89a28, part scale 0.8), low and forward as
+in myth_12. The Anubite's head reads muzzle and ears first: a 6-voxel muzzle
+with a lighter bridge and a black nose, eyes beside the bridge, tall 2-wide
+ears with a lighter inner face; the team headcloth only wraps the skull one
+voxel thin (crown behind the ears, the sides, cheek lappets y -2..2, a short
+3-wide nape flap), never above the crown or as a slab behind it.
+`--params "eu_focus=anubite"` / `"eu_one=anubite&eu_turn=90"` check it.
+
 Mounts (round 14): the camel's saddle cloth is a narrow drape over the hump
 (z 6..15 at the hem, only the seat z 8..13 on top, so the hump's tan fore and
 aft slopes, the rump, shoulders and lower flanks stay bare), one voxel proud of

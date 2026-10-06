@@ -714,16 +714,15 @@ function manShinM({ pal = PAL_SKIN, sandal = SANDAL, band: bnd = null, wrap = nu
 // scaled down onto the neck) and split arms for the beast anim (armL / foreL:
 // the upper arm to the elbow, the forearm and fist); weapons go on the fist
 // at BEAST_FIST of the forearm
-const BEAST_FIST = [0, -3.75, 0.3];
+// (round 15) the forearm overlaps the upper arm two rows at a rounded elbow
+// with a knob behind it (splitArm, as the men's), so a bent elbow stays
+// closed; the fist centre moves with the forearm joint (y 9.5)
+const BEAST_FIST = [0, -4, 0.3];
 function beastManParts({ torso, pal = PAL_SKIN, head: hm, headPivot = [2.5, 0, 2.5], headScale = 0.62, headZ = 0.5, arm = {}, leg = {}, shin = null }) {
   const X = { scale: BODY_SCALE, jitter: 0.015, ao: false };
   const thL = manThighM({ pal, ...leg, side: 'L' }), thR = manThighM({ pal, ...leg, side: 'R' });
   const shL = shin || manShinM({ pal, ...leg, side: 'L' }), shR = shin || manShinM({ pal, ...leg, side: 'R' });
-  const split = (side) => {
-    const a = manArmM({ pal, ...arm, side }), up = new VoxelModel(), lo = new VoxelModel();
-    for (const [k, v] of a.vox) (((k >> 10) & 1023) - 512 >= 9 ? up : lo).vox.set(k, v);
-    return [up, lo];
-  };
+  const split = (side) => splitArm(manArmM({ pal, ...arm, side }), pal);
   const [uL, lL] = split('L'), [uR, lR] = split('R');
   return [
     part('legL', thL, LEG_PIVOT, [MAN.legX, MAN.hip, 0], null, X),
@@ -733,9 +732,9 @@ function beastManParts({ torso, pal = PAL_SKIN, head: hm, headPivot = [2.5, 0, 2
     part('torso', torso, [0, 0, 0], [0, MAN.hip, 0], null, X),
     part('head', hm, headPivot, [0, MAN.headY, headZ], 'torso', { scale: headScale }),
     part('armL', uL, [0.5, 18.5, 0.5], [MAN.armX, MAN.armY, 0], 'torso', X),
-    part('foreL', lL, [0.5, 9, 0.5], [0, -4.75, 0], 'armL', X),
+    part('foreL', lL, [0.5, 9.5, 0.5], FORE_J, 'armL', X),
     part('armR', uR, [0.5, 18.5, 0.5], [-MAN.armX, MAN.armY, 0], 'torso', X),
-    part('foreR', lR, [0.5, 9, 0.5], [0, -4.75, 0], 'armR', X),
+    part('foreR', lR, [0.5, 9.5, 0.5], FORE_J, 'armR', X),
   ];
 }
 // a rider's upper body on the men's torso: the kilt below its top rows is cut
@@ -1823,21 +1822,52 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
   eBelt(body, GOLD, GOLD_DK);
   eSash(body, LINEN, -5, 4, 13, 3); eSash(body, LINEN, 4, -5, 13, 3);
   eCollar(body, [TM, TM, LINEN], { r0: 2.6 });
+  // (round 15) the head reads muzzle and ears first from the RTS camera: a
+  // 5 x 5 x 5 skull, a long muzzle (3 wide, 6 forward) with a lighter bridge
+  // along its top and a black nose, tall pointed ears (2 wide at the base,
+  // a lighter inner face) standing clear above the crown; the team headcloth
+  // only wraps the skull, one voxel thin: the crown behind the ears, the
+  // sides beside the eyes, lappets down the cheeks and a short flap at the
+  // nape, never above the skull nor behind it as a slab
   const headM = new VoxelModel();
+  const SNOUT_T = 0x7a5236, EAR_IN = 0x9a6a4c;
   headM.box(0, 0, 0, 5, 5, 5, FUR);
-  // long muzzle
-  headM.box(1, 0, 5, 3, 3, 3, FUR).box(1, 0, 8, 3, 2, 2, FUR).set(2, 1, 10, DARK).box(1, -1, 5, 3, 1, 4, FUR_LT);
-  headM.set(1, 3, 5, 0xffd040, { glow: 0.6 }).set(3, 3, 5, 0xffd040, { glow: 0.6 });
-  // tall ears
-  headM.box(0, 5, 2, 1, 4, 2, FUR).box(4, 5, 2, 1, 4, 2, FUR).set(0, 9, 2, FUR).set(4, 9, 2, FUR).set(0, 6, 3, 0x8a5a40).set(4, 6, 3, 0x8a5a40);
-  // team headcloth over the skull and down the nape
-  headM.box(-1, 2, -1, 7, 3, 4, TEAM).box(-1, -3, -1, 7, 5, 2, TEAM).box(-1, -3, 1, 1, 5, 2, TEAM).box(5, -3, 1, 1, 5, 2, TEAM);
-  tbox(headM, -1, -3, -1, 7, 1, 2, TEAM_SHADE);
-  const blade = () => { const m = new VoxelModel(); m.box(0, -2, 0, 1, 3, 1, LEATHER_DK).box(0, 1, 0, 1, 6, 1, SILVER); for (const [y, z] of [[7, 1], [8, 2], [8, 3], [7, 4], [6, 5]]) m.set(0, y, z, SILVER(0, y, z)); return m; };
+  headM.box(1, 0, 5, 3, 3, 3, FUR).box(1, 0, 8, 3, 2, 3, FUR).box(1, -1, 5, 3, 1, 4, FUR_LT);   // muzzle and jaw
+  for (let z = 5; z <= 10; z++) headM.set(2, z <= 7 ? 3 : 2, z, SNOUT_T);                       // the bridge
+  headM.box(1, 1, 11, 3, 1, 1, DARK).set(2, 2, 10, DARK);                                        // the nose
+  headM.set(1, 3, 5, 0xffd040, { glow: 0.6 }).set(3, 3, 5, 0xffd040, { glow: 0.6 });               // eyes beside the bridge
+  for (const ex of [0, 3]) {                                                                     // ears, x 0..1 and 3..4
+    headM.box(ex, 5, 2, 2, 2, 2, FUR).box(ex + (ex ? 1 : 0), 7, 2, 1, 2, 2, FUR).set(ex + (ex ? 1 : 0), 9, 2, FUR);
+    headM.box(ex, 5, 3, 2, 2, 1, EAR_IN).set(ex + (ex ? 1 : 0), 7, 3, EAR_IN);
+  }
+  // the headcloth (team): the crown z -1..1 behind the ears, the sides x 0 / 4
+  // (y 1..4, z 0..3) and the back of the skull painted, then a one-voxel
+  // lappet on each cheek (x -1 / 5, y -2..2, z 1..3) and a short nape flap (z -1, 3 wide, y -2..1)
+  for (let x = 0; x <= 4; x++) for (let z = 0; z <= 1; z++) tset(headM, x, 4, z, 0xffffff);
+  for (const x of [0, 4]) for (let y = 1; y <= 4; y++) for (let z = 0; z <= 3; z++) tset(headM, x, y, z, y === 4 ? 0xffffff : TEAM_SHADE);
+  for (let x = 0; x <= 4; x++) for (let y = 0; y <= 4; y++) tset(headM, x, y, 0, TEAM_SHADE);
+  for (const x of [-1, 5]) for (let y = -2; y <= 2; y++) for (let z = 1; z <= 3; z++) if (!(y === 2 && z === 3)) tset(headM, x, y, z, y === -2 ? 0xffffff : TEAM_SHADE);
+  for (let x = 1; x <= 3; x++) for (let y = -2; y <= 1; y++) tset(headM, x, y, -1, y === -2 ? 0xffffff : TEAM_SHADE);
+  // the sickle-sword (round 15): dark steel, apart from the white linen; a
+  // leather grip in the fist and a bronze guard, a straight neck, then the
+  // hooked blade (two voxels deep along the spine, a lighter honed edge on the
+  // inner curve). The part's rest turns it forward and down out of the fist,
+  // a fighting grip, so it never lies along the arm
+  const STEEL = 0x4e565e, STEEL_D = 0x383e44, STEEL_E = 0x8a949e, BRZ = 0x8a5a24;
+  const blade = () => {
+    const m = new VoxelModel();
+    m.box(0, -2, 0, 1, 3, 1, LEATHER_DK).set(0, -3, 0, BRZ).set(0, 1, 0, BRZ).set(0, 1, 1, BRZ).set(0, 1, -1, BRZ);
+    m.box(0, 2, 0, 1, 5, 1, STEEL).set(0, 4, 1, STEEL_D);
+    const arc = [[7, 0], [8, 1], [9, 2], [9, 3], [9, 4], [8, 5], [7, 6], [6, 6], [5, 7]];
+    for (const [y, z] of arc) { m.set(0, y, z, STEEL); if (y > 5) m.set(0, y - 1, z, z >= 2 && z <= 5 ? STEEL_E : STEEL_D); }
+    m.set(0, 4, 7, STEEL_E);
+    return m;
+  };
+  const GRIP_R = { rest: [2.15, 0, -0.2], scale: 0.7 }, GRIP_L = { rest: [2.15, 0, 0.2], scale: 0.7 };
   rig('anubite', { voxel: 0.085, anim: 'beast', style: 'beast' }, [
-    ...beastManParts({ torso: body, pal: PAL_F, head: headM, headScale: 0.62, arm: { band: SILVER, bracer: TEAM }, leg: { sandal: null, foot: FUR_LT, band: SILVER, kilt: TEAM } }),
-    part('weapon', blade(), [0, 0, 0], BEAST_FIST, 'foreR'),
-    part('weapon2', blade(), [0, 0, 0], BEAST_FIST, 'foreL', { anim: 'weapon' }),
+    ...beastManParts({ torso: body, pal: PAL_F, head: headM, headScale: 0.62, arm: { band: 0x8e959c, bracer: TEAM }, leg: { sandal: null, foot: FUR_LT, band: 0x8e959c, kilt: TEAM } }),
+    part('weapon', blade(), [0, 0, 0], BEAST_FIST, 'foreR', GRIP_R),
+    part('weapon2', blade(), [0, 0, 0], BEAST_FIST, 'foreL', { anim: 'weapon', ...GRIP_L }),
   ]);
 }
 
@@ -1868,8 +1898,11 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
   headM.box(0, 1, -1, 5, 5, 1, FEATH).box(0, -3, -2, 5, 5, 2, FEATH).box(0, -4, -2, 5, 1, 2, 0xe8e8e4);
   rig('avenger', { voxel: 0.1, anim: 'beast', style: 'beast' }, [
     ...beastManParts({ torso: body, head: headM, headScale: 0.62, arm: { band: GOLD, bracer: TEAM }, leg: { kilt: TEAM, pal: { L: 0x4a5058, M: 0x3a3f48, D: 0x2e3239 } }, shin: shinA }),
-    part('weapon', longBladeM(GOLD, 13), [0, 0, 0], BEAST_FIST, 'foreR'),
-    part('weapon2', longBladeM(GOLD, 13), [0, 0, 0], BEAST_FIST, 'foreL', { anim: 'weapon' }),
+    // (round 15) the blades low in a fighting grip, forward, down and out
+    // from the fists (myth_12), never along the arms
+    // in a deep orange-leaning gold (the plain GOLD reads pale beside the linen)
+    part('weapon', longBladeM(0xd89a28, 13), [0, 0, 0], BEAST_FIST, 'foreR', { rest: [2.0, 0, -0.35], scale: 0.8 }),
+    part('weapon2', longBladeM(0xd89a28, 13), [0, 0, 0], BEAST_FIST, 'foreL', { anim: 'weapon', rest: [2.0, 0, 0.35], scale: 0.8 }),
   ]);
 }
 
