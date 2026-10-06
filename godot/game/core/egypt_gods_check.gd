@@ -778,6 +778,11 @@ func _case_eclipse() -> void:
 	# Monuments +50 % favor, one Eclipse at a time, 55 s
 	var s2 := _fresh("ra", "isis", 1, ["bast"])
 	s2.set_minor_god(2, 1, "bast")
+	# the power button's tooltip (get_power_def desc, shown by the HUD) says what the sim does:
+	# -10 % vulnerability (+10 armor points), never "10 % less damage" (a blow above is x0.849)
+	var tip := str(s2.get_power_def("eclipse").get("desc", ""))
+	r["tooltip"] = tip
+	ok = ok and tip.contains("-10% hack / pierce / crush vulnerability (+10 armor)") and not tip.contains("less damage")
 	s2.set_player_resources(1, {"favor": 0})
 	s2.set_player_resources(2, {"favor": 200})
 	_b(s2, "monument_villagers", 1, 10, 10)

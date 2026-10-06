@@ -3599,6 +3599,11 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   0.075 -> 0.225 with Leather Frame Shield, a toxotes arrow 7.77 -> 6.51 (x0.8378 = 0.775 /
   0.925) and its hoplite blow untouched (6.3); `eclipse.myth_and_favor`: a hoplite blow on a
   Sphinx 9 x (1 - 0.3375) = 5.962 -> 9 x (1 - 0.4375) = 5.063 under the Eclipse.
+- **The Eclipse's tooltip** (gods round 17): its `desc` (what `get_power_def` hands the HUD's
+  power button) said "take 10% less damage", round 15's multiplicative reading; it now says
+  "-10% hack / pierce / crush vulnerability (+10 armor)", what the sim does (a hoplite blow on a
+  Sphinx 5.962 -> 5.063, x0.849; an arrow 3.85 -> 3.15). `eclipse.myth_and_favor` asserts the
+  tooltip text and that no "less damage" wording is left in it.
 - **Locust haze** (gods round 16): the swarm's dust haze is drawn with the puff shader's soft
   round mode (`INSTANCE_CUSTOM.y` 1, as Thoth's smoke), larger and fainter, instead of hard
   camera-facing squares that read as pale tiles over a Farm.

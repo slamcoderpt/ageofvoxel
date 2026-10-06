@@ -37,7 +37,7 @@ const PowerDef &power_def(int id) {
 			"40 favor, recharge 240 s, ramp +5; reveals 70 m (from 10 m, +15 m/s) for 20 s to the caster and allies",
 			"radius 6 tiles growing 9 tiles/s to 42 tiles (x0.6)" },
 		{ "eclipse", "Eclipse", "Bast", Cost(0, 0, 0, 90), 150, 0, 55, 0, 0, 0, 0, "C",
-			"For 55 seconds the sky darkens: your myth units deal +20% damage, move 15% faster, take 10% less damage and recharge their abilities 60% faster; Monuments give +50% favor.",
+			"For 55 seconds the sky darkens: your myth units deal +20% damage, move 15% faster, get -10% hack / pierce / crush vulnerability (+10 armor) and recharge their abilities 60% faster; Monuments give +50% favor.",
 			25, 1, PT_GLOBAL,
 			"90 favor, recharge 150 s, ramp +25; 55 s, whole map; myth units +20 % damage, -60 % ability recharge, +15 % speed, -10 % vulnerability; Monuments +50 % favor; one Eclipse at a time",
 			"-10 % vulnerability: +0.10 armor; ability recharge x0.4" },
