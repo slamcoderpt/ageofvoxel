@@ -3291,6 +3291,22 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   burst of light, a ground flash and sparks; `egypt_powers` power=son_of_osiris spawns five
   hoplites in an arc before the capture tick and orders him on the middle one, so the default
   t=1.05 is the first bolt and its 3 jumps, the next ones at about 4.2, 7.6 and 10.7 s); the sand funnel, debris and drifts of the Tornado; Thoth's circle.
+- **Horus' Tornado funnel** (round 12: egypt_fx.gd `_make_funnel`, tornado.gdshader `mode`):
+  a value structure instead of a pale haze. The body (mode 1, the ring mesh's outer face;
+  the meshes wind so that is the *back* face) is fully opaque except at its silhouette (a dark
+  colour at 85 % alpha still lets the bright sand read through), dark brown-grey (core
+  0.115/0.076/0.040, kept low since the grade multiplies by its exposure 2.1), wrapped by four
+  broad spiral bands that climb 0.95 rad/m as it spins (lit dust bands with deep lanes between,
+  a finer 11-band ripple), brighter on the sun's side and thinning to bright back-lit edges;
+  its inner wall (mode 0, seen down the open top) is the deep colour; a sheath of wisps (mode 2)
+  shows only near the silhouette in broken tufts, so no veil lies over the buildings; the
+  **dust skirt** (mode 3, `_skirt_mesh`: a low dome from r 1 / 2.2 m high to r 5.4 on the
+  ground) rolls lumps round and outward, darker than the sand with a sunlit outer roll and a
+  crisp, lumpy edge; godpower_view_egypt.cpp keeps 44 soft round puffs rolling off its rim (no
+  voxel squares). 12 big **wreckage** blocks (`CHUNKS`: roof tiles, beams, mud bricks, a
+  stone; a lit MultiMesh, albedo darkened 40 % against the grade) whirl round just outside the
+  wall at spread angles and heights 1.8-13 m, tumbling. Capture:
+  `node scripts/godot-shoot.mjs --scene egypt_powers --params "power=tornado&t=6&ep_dist=24"`.
 - **Thoth's Meteor** (godpower_view_egypt.cpp `thoth_fx`, round 7): each meteor a white-hot
   tumbling rock with crust chunks inside a fireball, on an emissive fire trail (ribbon group
   G_LAVA) shedding fire and soft black smoke, a hot ring closing in on the ground; the blast a

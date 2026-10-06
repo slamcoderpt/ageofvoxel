@@ -7,8 +7,10 @@ extends Node3D
 ##     and sky through godpowers.gd _storm_light (light_k / light_dim / light_fog);
 ##   - Ra's rainbow (rainbow.gdshader) arching over the caster's Town Center, turned to the
 ##     camera;
-##   - Horus' tornado funnels (tornado.gdshader): a dust column and a darker core on a ring
-##     mesh, following the sim's spiral.
+##   - Horus' tornado funnels (tornado.gdshader): a dense brown-grey body banded by climbing
+##     spiral lanes with bright back-lit edges, its inner wall, a sheath of silhouette wisps, a
+##     dust skirt rolling out round its foot, and big wreckage (roof tiles, beams, bricks)
+##     whirled round it; following the sim's spiral.
 ##   - Sekhmet's Citadel: the fortress model (egypt_gods "citadel", export-egypt-gods.mjs:
 ##     battered curtain walls, four bastions with braziers, a pylon gate with her red banners
 ##     and a winged sun disc) over every Citadel Center, on the Egyptian buildings' shader in
@@ -101,6 +103,7 @@ func frame(eg: Dictionary, now: float) -> void:
 		for m in f.mats:
 			m.set_shader_parameter("time", now)
 			m.set_shader_parameter("k", float(t.k))
+		_chunk_frame(f.chunks, now, float(t.k))
 	for id in _funnels.keys():
 		if not seen.has(id):
 			_funnels[id].root.queue_free()
@@ -146,20 +149,101 @@ func _make_funnel() -> Dictionary:
 	root.name = "EG_Tornado"
 	add_child(root)
 	var mats := []
-	for layer in 2:
+	# [mode, mesh]: the skirt, the inner wall, the body, the silhouette wisps (drawn in that order)
+	var layers := [
+		[3, _skirt_mesh(1.0, 5.4, 2.2, 64, 10)],
+		[0, _funnel_mesh(0.7, 16.0, 72, 28)],
+		[1, _funnel_mesh(0.7, 16.0, 72, 28)],
+		[2, _funnel_mesh(0.86, 16.0, 72, 28)],
+	]
+	for li in layers.size():
 		var m := ShaderMaterial.new()
 		m.shader = load("res://game/godpowers/tornado.gdshader")
-		m.render_priority = 22 + layer
-		m.set_shader_parameter("core", layer == 0)
+		m.render_priority = 21 + li
+		m.set_shader_parameter("mode", int(layers[li][0]))
 		m.set_shader_parameter("H", 16.0)
 		var mi := MeshInstance3D.new()
-		mi.mesh = _funnel_mesh(0.7 if layer == 0 else 1.25, 16.0, 64, 24)
+		mi.mesh = layers[li][1]
 		mi.material_override = m
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mi.extra_cull_margin = 16.0
 		root.add_child(mi)
 		mats.append(m)
-	return {"root": root, "mats": mats}
+	# the big wreckage caught in it: roof tiles, beams, mud bricks (lit voxel blocks)
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	var bm := BoxMesh.new()
+	bm.size = Vector3.ONE
+	mm.mesh = bm
+	mm.instance_count = CHUNKS.size()
+	var cm := StandardMaterial3D.new()
+	cm.vertex_color_use_as_albedo = true
+	cm.roughness = 0.9
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	mmi.material_override = cm
+	mmi.extra_cull_margin = 16.0
+	root.add_child(mmi)
+	return {"root": root, "mats": mats, "chunks": mm}
+
+# the wreckage: [size, colour, height (m), angle offset (turns)]: tiles, beams, bricks, a plank
+const CHUNKS := [
+	[Vector3(0.95, 0.16, 0.62), 0x8e3f28, 2.6, 0.00],
+	[Vector3(1.9, 0.24, 0.24), 0x6e4a2c, 4.2, 0.37],
+	[Vector3(0.55, 0.38, 0.38), 0xb89468, 3.4, 0.71],
+	[Vector3(0.9, 0.15, 0.6), 0x7a3624, 5.6, 0.18],
+	[Vector3(1.6, 0.2, 0.2), 0x7a5634, 7.0, 0.55],
+	[Vector3(0.95, 0.16, 0.62), 0x9a4630, 8.3, 0.86],
+	[Vector3(0.6, 0.4, 0.4), 0x8a8074, 6.2, 0.95],
+	[Vector3(2.2, 0.26, 0.26), 0x5e3e24, 9.8, 0.30],
+	[Vector3(0.9, 0.15, 0.6), 0x8e3f28, 11.0, 0.64],
+	[Vector3(1.2, 0.12, 0.45), 0x9a7a52, 12.2, 0.08],
+	[Vector3(0.5, 0.34, 0.34), 0xb89468, 1.8, 0.45],
+	[Vector3(0.95, 0.16, 0.62), 0x7a3624, 13.2, 0.80],
+]
+
+## The wreckage's place at sim time `now` (radians round the funnel, just outside its wall).
+static func _chunk_frame(mm: MultiMesh, now: float, k: float) -> void:
+	for i in CHUNKS.size():
+		var c: Array = CHUNKS[i]
+		var h: float = float(c[2]) + sin(now * 0.8 + i * 1.7) * 0.7
+		var r := 0.7 * (0.7 + 0.05 * h + 0.012 * h * h) * 1.25 + 0.55
+		var a: float = float(c[3]) * TAU + now * (2.4 - 0.09 * h)
+		var sw := Vector2(sin(now * 0.9 + h * 0.18) * h * 0.06, cos(now * 0.7 + h * 0.15) * h * 0.05)
+		var p := Vector3(cos(a) * r + sw.x, h, sin(a) * r + sw.y)
+		# flying tangentially, tumbling
+		var b := Basis(Vector3.UP, -a) * Basis.from_euler(Vector3(now * (1.1 + 0.2 * i), 0.4 * i, now * (0.7 + 0.13 * i)))
+		var s: float = clampf(k * 1.4 - 0.2, 0.0, 1.0)
+		mm.set_instance_transform(i, Transform3D(b * Basis.from_scale(c[0] * s * 1.3), p))
+		mm.set_instance_color(i, Color.hex((int(c[1]) << 8) | 0xff).darkened(0.4))   # (the grade lifts a lit albedo: kept dark)
+
+## The skirt: a low dome of dust round the foot, from radius r0 (height h0, hugging the
+## funnel) out to r1 on the ground; UV = (0 inner .. 1 outer edge, angle).
+static func _skirt_mesh(r0: float, r1: float, h0: float, seg: int, rows: int) -> ArrayMesh:
+	var v := PackedVector3Array()
+	var uv := PackedVector2Array()
+	var idx := PackedInt32Array()
+	for j in rows + 1:
+		var u := float(j) / rows
+		var r := lerpf(r0, r1, u)
+		var h := h0 * pow(1.0 - u, 1.4) * (0.75 + 0.25 * (1.0 - u)) + 0.15 * sin(PI * u)
+		for i in seg + 1:
+			var a := float(i) / seg * TAU
+			v.append(Vector3(cos(a) * r, h, sin(a) * r))
+			uv.append(Vector2(u, a))
+			if i > 0 and j > 0:
+				var p := (j - 1) * (seg + 1) + i - 1
+				var q := j * (seg + 1) + i - 1
+				idx.append_array([p, p + 1, q, q, p + 1, q + 1])
+	var arr := []
+	arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = v
+	arr[Mesh.ARRAY_TEX_UV] = uv
+	arr[Mesh.ARRAY_INDEX] = idx
+	var m := ArrayMesh.new()
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	return m
 
 ## A funnel: rings up a flaring profile (r = s (0.7 + 0.05 h + 0.012 h^2)), UV = (h / H, angle).
 static func _funnel_mesh(s: float, H: float, seg: int, rows: int) -> ArrayMesh:

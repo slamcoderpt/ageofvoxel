@@ -740,10 +740,11 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 			const Lin cc = hex_lin(col);
 			cube(I_DEBRIS, x + std::cos(a) * rad, gy + 0.2 + h, z + std::sin(a) * rad, now * 5 + i, a, now * 3 - i, s * (i % 3 == 1 ? 2.2 : 1), s, s, cc.r, cc.g, cc.b);
 		}
-		// the dust skirt at its foot
-		for (int i = 0; i < 110; i++) {
+		// the dust skirt at its foot (egypt_fx.gd draws the skirt itself; these are soft round
+		// puffs rolling off its rim, not the voxel squares, which read as pixelated blobs)
+		for (int i = 0; i < 44; i++) {
 			const double f = std::fmod(now / (1.4 + hr(seed, i, 181)) + hr(seed, i, 182), 1.0);
-			const double a = hr(seed, i, 183) * TAU + now * 3.0 + f * 2.0, rad = 1.5 + 3.5 * f;
+			const double a = hr(seed, i, 183) * TAU + now * 3.0 + f * 2.0, rad = 3.6 + 2.6 * f;
 			const double px = x + std::cos(a) * rad, pz = z + std::sin(a) * rad;
 			Basis bs;
 			const double s = (0.45 + 0.7 * f) * k;
@@ -751,7 +752,8 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 			bs.rows[1] = Vector3(0, (real_t)s, 0);
 			bs.rows[2] = Vector3(0, 0, 1);
 			const Lin cc = hex_lin(SAND[i & 3]);
-			inst(I_PUFF, bs, px, h_at(px, pz) + 0.4 + f * 1.4, pz, cc.r * 0.9f, cc.g * 0.88f, cc.b * 0.85f, (float)(0.55 * k * (1 - f)), 0);
+			inst(I_PUFF, bs, px, h_at(px, pz) + 0.4 + f * 1.4, pz, cc.r * 0.62f, cc.g * 0.58f, cc.b * 0.54f, (float)(0.42 * k * (1 - f)),
+					(float)(i % 97) / 97.f, 1.f);
 		}
 		// sand drifts along its track (every 0.5 s of its path, fading over 25 s)
 		const int steps = (int)std::floor(age / 0.5);
