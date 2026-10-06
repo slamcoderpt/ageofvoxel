@@ -1577,6 +1577,35 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   clutter rebuilt on them (a potter's pitch on a mat, a sack pile on a
   pallet, a cart of sacks, a grain heap with its baskets in place of the
   thatch sunshade on poles).
+- **Goods on a clean grid, cavetto houses, round 28** (the goods read as
+  shapeless rust and tan blobs swallowing the houses' footprints): every
+  good is rebuilt from square voxel rows instead of `lathe()` circles (at 1-2
+  voxel radii they melted into lumps), flat-toned by row (darker foot, lit
+  shoulder), marked `clean` so `weather()` leaves its colours alone, and laid
+  out a voxel apart (`pset()`, `prow()`): `amphora()` 3 x 3 x 8 (pointed
+  foot, belly, lit shoulder, one voxel of neck, a pale square rim round a
+  dark mouth), `jar()` small 3 x 3 x 4 or big 5 x 5 x 7 with a blue band and
+  a pale rim, `sack()` a standing linen sack with a brown cord and the
+  cloth's ears over it, `lyingSack()` / `sackStack()` sacks stacked like
+  bricks on a plank pallet, `brickStack()` a neat stepped stack of mud
+  bricks (light / dark courses, stretchers then headers, dark joints),
+  `woodPile()` squared logs with end grain, `beehive()` (the potter's kiln,
+  the baker's `oven()`) stepped square courses under a pale cap,
+  `grainHeap()` two flat golds on a round mat, baskets heaped in one flat
+  tone, `goodsMat()` a clean mat under a group. Overlapping goods (sacks
+  drawn into each other, jars into amphorae) are gone from the houses, the
+  Granary, the Town Center and the street clutter. House doors and windows
+  are drawn before the goods (their rays used to land on the props in front
+  and carve doors and window lintels into them: the "mush") and lie in the
+  wall plane (`hw` / `dr` in `house()`: slits cut in, lintel, sill and the
+  owner's line over the door painted on the face, nothing proud). `hbox()`
+  now defaults to `cav: true`: a torus row (ochre red; pale on mud brick),
+  one band row, the gorge (2-voxel painted flutes, the lower row on the wall
+  plane in shade, the upper one voxel out), a pale coping with the owner's
+  line, the deck one row down; outer cornice cells are laid only where
+  nothing stands, so a wing's cornice never cuts the taller block it abuts.
+  Each house's main cube is battered a voxel in five rows (smoothed by
+  `skin()`; the potter's portico block and the low wings stand plumb).
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8

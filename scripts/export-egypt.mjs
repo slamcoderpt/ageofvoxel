@@ -205,11 +205,6 @@ function barrel(m, cx, y, cz, h = 5, r = 1.6) {
   lathe(m, cx, cz, y, y + h, (yy) => r - (yy === y || yy === y + h - 1 ? 0.35 : 0), (x, yy, z) => (yy === y + 1 || yy === y + h - 2 ? IRON : pick(hash3(x, yy >> 1, z, 51), [0xa8723e, 0x9a6836, 0xb47c46])));
   lathe(m, cx, cz, y + h, y + h + 1, () => r - 0.6, 0x8c5c32);
 }
-// a clay jar: belly, neck and lip
-function jar(m, cx, y, cz, c = 0xb8683e, big = false) {
-  const prof = big ? [1.2, 1.8, 2.2, 2.3, 2.1, 1.7, 1.1, 0.9, 1.2] : [1.1, 1.6, 1.9, 1.7, 1.2, 0.8, 1.1];
-  prof.forEach((r, i) => lathe(m, cx, cz, y + i, y + i + 1, () => r, (x, yy, z) => (i === 3 && big ? 0x2f5fa8 : shade(c, 0.9 + 0.03 * i))));
-}
 function crate(m, x, y, z, w, h, d, c = 0x9b7040) {
   for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) for (let k = 0; k < d; k++) {
     const ex = i === 0 || i === w - 1, ey = j === 0 || j === h - 1, ez = k === 0 || k === d - 1;
@@ -225,41 +220,113 @@ function goodsBox(m, x, y, z, w, d, kind, h = 2, c = 0x8a6236) {
     if (!rim && hash3(x + i, y, z + k, 47) < 0.75) m.set(x + i, y + h, z + k, PROD[kind]);
   }
 }
-// round 27 goods, each in its own colour and shape so a pile reads as what
-// it is: a linen sack (near white, slumped, tied with a brown cord, a tuft),
-// an amphora (tall red terracotta, pointed foot, two handles), a basket
-// (round, straw yellow in woven rows, heaped with its goods), a grain heap
-// (bright gold)
-const LINEN = [0xd9cfb6, 0xe7dfca, 0xf0e9d8];
-function sack(m, x, y, z, big = false) {
-  // a slumped linen sack: a full 4 x 3 (3 x 3) belly, a narrower shoulder, a
-  // brown cord round the neck and a pale tuft; lit rows lighter
-  const W = big ? 4 : 3, D = 3;
-  for (let i = 0; i < W; i++) for (let k = 0; k < D; k++) {
-    const corner = (i === 0 || i === W - 1) && (k === 0 || k === D - 1);
-    m.set(x + i, y, z + k, LINEN[0]);
-    if (!corner) m.set(x + i, y + 1, z + k, LINEN[1]);
-    if (!corner && (i > 0 && i < W - 1)) m.set(x + i, y + 2, z + k, k === 1 ? LINEN[2] : LINEN[1]);
+// round 28 goods: deliberately modelled props on a clean grid. Each is built
+// from square voxel rows (no lathe circles: at 1-2 voxel radii they melt into
+// lumps), flat-toned by row (a darker foot, the lit shoulder lighter), marked
+// clean so weather() leaves its colours alone, and laid out with a one-voxel
+// gap round it so every prop keeps its own edge.
+function pset(m, x, y, z, c) { m.set(x, y, z, c); const v = m.get(x, y, z); if (v) v.clean = 1; }
+// a square row of half-width r round (X, Z), its four corners cut when `cut`
+function prow(m, X, y, Z, r, c, cut = false) {
+  for (let i = -r; i <= r; i++) for (let k = -r; k <= r; k++) {
+    if (cut && Math.abs(i) === r && Math.abs(k) === r) continue;
+    pset(m, X + i, y, Z + k, typeof c === 'function' ? c(i, k) : c);
   }
 }
-const AMPH = [0xa2442a, 0xb5542e, 0xc4643a];
+const MOUTH = 0x1c1714;
+const JAR_RIM = 0xe9dcc0;
+// a clay jar centred on (cx, cz): small (3 x 3, 4 high: foot, belly, a
+// shoulder round its dark mouth) or a big storage jar (5 x 5, 7 high, a blue
+// band round the belly, a pale rim round the mouth)
+function jar(m, cx, y, cz, c = 0xb8683e, big = false) {
+  const X = Math.floor(cx), Z = Math.floor(cz);
+  if (big) {
+    prow(m, X, y, Z, 1, shade(c, 0.74));
+    for (let r = 1; r <= 4; r++) prow(m, X, y + r, Z, 2, r === 3 ? 0x2f5fa8 : r === 1 ? shade(c, 0.88) : r === 4 ? shade(c, 1.06) : c, true);
+    prow(m, X, y + 5, Z, 1, shade(c, 1.1), true);
+    prow(m, X, y + 6, Z, 1, (i, k) => (i === 0 && k === 0 ? MOUTH : JAR_RIM));
+  } else {
+    prow(m, X, y, Z, 1, shade(c, 0.78), true);
+    prow(m, X, y + 1, Z, 1, c);
+    prow(m, X, y + 2, Z, 1, shade(c, 1.06));
+    prow(m, X, y + 3, Z, 1, (i, k) => (i === 0 && k === 0 ? MOUTH : shade(c, 1.14)), true);
+  }
+}
+// a linen grain sack standing on its foot (3 x 3 from (x, z)): square body,
+// a gathered shoulder, a brown cord tying the neck and the cloth's two ears
+// fanned over it
+const LINEN = [0xc6baa0, 0xdcd2ba, 0xebe4d2, 0xf5f0e4];
+const CORD = 0x5e3c22;
+function sack(m, x, y, z, big = false) {
+  const X = x + 1, Z = z + 1, h = big ? 4 : 3;
+  for (let r = 0; r < h; r++) prow(m, X, y + r, Z, 1, r === 0 ? LINEN[0] : LINEN[1]);
+  prow(m, X, y + h, Z, 1, LINEN[2], true);
+  pset(m, X, y + h + 1, Z, CORD);
+  for (const i of [-1, 0, 1]) pset(m, X + i, y + h + 2, Z, LINEN[3]);
+}
+// a sack lying along +x (5 x 3, 2 high, its gathered neck and a fanned tuft
+// at the +x end; no dark cord here, which reads as a log's end grain)
+function lyingSack(m, x, y, z) {
+  for (let i = 0; i < 5; i++) for (let k = 0; k < 3; k++) {
+    pset(m, x + i, y, z + k, LINEN[1]);
+    if (!((i === 0 || i === 4) && (k === 0 || k === 2))) pset(m, x + i, y + 1, z + k, k === 1 ? LINEN[3] : LINEN[2]);
+  }
+  pset(m, x + 5, y, z + 1, LINEN[0]); pset(m, x + 6, y, z + 1, LINEN[3]); pset(m, x + 6, y, z, LINEN[2]); pset(m, x + 6, y, z + 2, LINEN[2]);
+}
+// lying sacks stacked like bricks on a plank pallet: `n` along z (a voxel
+// apart), n - 1 bridging them, n - 2 on top; the pallet one voxel wider
+function sackStack(m, x0, y, z0, n = 3) {
+  for (let x = x0 - 1; x <= x0 + 7; x++) for (let z = z0 - 1; z <= z0 + n * 4 - 1; z++) pset(m, x, y, z, (z - z0) % 2 ? 0x8e6a42 : 0x6e4e30);
+  for (let t = 0; t < n; t++) for (let i = 0; i + t < n; i++) lyingSack(m, x0, y + 1 + t * 2, z0 + t * 2 + i * 4);
+}
+// an amphora centred on (cx, cz), 8 high in red terracotta: a pointed foot,
+// a square belly, a lit shoulder, one voxel of neck and a pale square rim
+// round the dark mouth
+const AMPH_RIM = 0xd99a6a;
 function amphora(m, cx, y, cz, c = 1) {
   const base = [0xa8482a, 0xb5542e, 0xae4e2c, 0x9c4428][c % 4];
-  const prof = [0.8, 1.4, 1.7, 1.8, 1.6, 1.2, 0.7, 0.7, 1.0];
-  prof.forEach((r, i) => lathe(m, cx, cz, y + i, y + i + 1, () => r, (x, yy, z) => shade(base, i >= 7 ? 0.86 : 0.88 + 0.03 * Math.min(i, 4))));
+  const X = Math.floor(cx), Z = Math.floor(cz);
+  pset(m, X, y, Z, shade(base, 0.66));
+  prow(m, X, y + 1, Z, 1, shade(base, 0.8), true);
+  prow(m, X, y + 2, Z, 1, shade(base, 0.92));
+  prow(m, X, y + 3, Z, 1, base);
+  prow(m, X, y + 4, Z, 1, shade(base, 1.08));
+  prow(m, X, y + 5, Z, 1, shade(base, 1.16), true);
+  pset(m, X, y + 6, Z, shade(base, 0.84));
+  prow(m, X, y + 7, Z, 1, (i, k) => (i === 0 && k === 0 ? MOUTH : AMPH_RIM));
+}
+// a neat stack of sun-dried mud bricks (w along x, d along z, n courses):
+// courses alternate light and dark, bricks two voxels long with a dark joint
+// (stretchers along x, then headers along z), every second course one voxel
+// shorter at each end so the stack steps in
+const MBRICK = [0x8e5a34, 0x784a2a];
+function brickStack(m, x0, y, z0, w, d, n = 4) {
+  for (let c = 0; c < n; c++) {
+    const ins = c >> 1, tone = shade(MBRICK[c & 1], c === n - 1 ? 1.08 : 1);
+    for (let i = ins; i < w - ins; i++) for (let k = 0; k < d; k++) {
+      const u = c & 1 ? k + 1 : i - ins + ((c >> 1) & 1);
+      pset(m, x0 + i, y + c, z0 + k, u % 3 === 2 ? shade(tone, 0.72) : tone);
+    }
+  }
+}
+// a reed mat on the ground under a group of goods: one flat tone, a darker
+// border, so the group stands on a clean rectangle
+function goodsMat(m, x0, z0, x1, z1) {
+  for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) pset(m, x, 0, z, (x === x0 || x === x1 - 1 || z === z0 || z === z1 - 1) ? 0x7d6440 : 0xa88a58);
 }
 const STRAW = [0xc8922c, 0xa87622];
 function wovenBasket(m, x0, z0, w, kind, y = 1) {
   // a squat straw basket, its corners cut round, woven rows light / dark,
-  // its goods heaped over the rim in a low mound
+  // its goods heaped over the rim in a low mound (one flat tone, the crest lit)
+  const good = PROD[kind](x0, 7, z0);
   for (let i = 0; i < w; i++) for (let k = 0; k < w; k++) {
     const ei = i === 0 || i === w - 1, ek = k === 0 || k === w - 1;
     if (ei && ek) continue;
     const rim = ei || ek;
-    m.set(x0 + i, y, z0 + k, STRAW[1]);
-    m.set(x0 + i, y + 1, z0 + k, rim ? STRAW[0] : PROD[kind](x0 + i, y + 1, z0 + k));
-    if (!rim && w > 3 && !((i === 1 || i === w - 2) && (k === 1 || k === w - 2))) m.set(x0 + i, y + 2, z0 + k, PROD[kind](x0 + i, y + 2, z0 + k));
-    else if (!rim && w === 3) m.set(x0 + i, y + 2, z0 + k, PROD[kind](x0 + i, y + 2, z0 + k));
+    pset(m, x0 + i, y, z0 + k, STRAW[1]);
+    pset(m, x0 + i, y + 1, z0 + k, rim ? STRAW[0] : good);
+    if (!rim && w > 3 && !((i === 1 || i === w - 2) && (k === 1 || k === w - 2))) pset(m, x0 + i, y + 2, z0 + k, shade(good, 1.08));
+    else if (!rim && w === 3) pset(m, x0 + i, y + 2, z0 + k, shade(good, 1.08));
   }
 }
 // a pixel sprite painted on the outermost voxels of a face: rows top -> bottom
@@ -1929,14 +1996,11 @@ function mudFence(m, pts, h = 3, { gaps = [], wall = MUD } = {}) {
     }
   }
 }
-// a cluster of clay jars round (x, z)
+// a cluster of small clay jars on a grid round (x, z), a voxel apart
 function pots(m, x, z, n = 3, seed = 0) {
-  const at = [[0, 0, 1], [2.3, 0.7, 0], [0.7, 2.4, 0], [2.8, 2.8, 0], [-1.6, 1.8, 0]];
+  const at = [[0, 0], [4, 0], [2, 4], [6, 4], [-2, 4]];
   const cols = [0xb8683e, 0xc8a070, 0xa65a34, 0xd2b07c];
-  for (let i = 0; i < Math.min(n, at.length); i++) {
-    const [dx, dz, big] = at[i];
-    jar(m, x + dx, 1, z + dz, cols[(i + seed) % cols.length], big === 1 && n >= 3);
-  }
+  for (let i = 0; i < Math.min(n, at.length); i++) jar(m, x + at[i][0], 1, z + at[i][1], cols[(i + seed) % cols.length]);
 }
 // a wicker basket heaped with goods (2 x 2 or 3 x 3)
 function basket(m, x, z, kind, w = 2, y = 1) { wovenBasket(m, x, z, Math.max(3, w + 1), kind, y); }
@@ -2167,16 +2231,18 @@ function grimed(c, x, y, z, r, drips = true) {
 // voxel every `batter` rows (registered for skin()); sets m.lastTop to the
 // lip ring and the deck (roofParapet() builds on it) and returns the row
 // above the deck
-function hbox(m, x0, z0, x1, z1, y0, h, { wall = EWHITE, roof = EDECK, batter = 0, grime = true, band = 'lapis', lipC = LIP, rim = true, pRows = 1 } = {}) {
-  // round 27: a cube (no batter by default), walls in clean brick courses,
-  // grimed at the foot, the painted band (bandRows) under a flush parapet
-  // (pRows wall rows and a two-voxel limestone coping, its inner ring the
-  // owner's line), the deck sunk inside it a step darker than the walls
+function hbox(m, x0, z0, x1, z1, y0, h, { wall = EWHITE, roof = EDECK, batter = 0, grime = true, band = 'lapis', lipC = LIP, rim = true, pRows = 1, cav = true, torus = null } = {}) {
+  // round 28: a battered block (a voxel in every `batter` rows, smoothed by
+  // skin()) under an Egyptian cavetto cornice: a torus roll on the wall's
+  // top row, the gorge (two rows of 2-voxel painted flutes, the lower on the
+  // wall plane in shade, the upper one voxel out), a pale coping over it
+  // (its inner ring the owner's line) and the deck sunk inside, a step
+  // darker than the walls. cav: false keeps round 27's flush parapet.
   const top = y0 + h;
   if (y0 === 1 && m.feet) m.feet.push({ x0, z0, x1, z1, hb: 1 });
   if (batter && m.blocks) m.blocks.push({ x0, z0, x1, z1, y0, h, b: batter, base: 0 });
-  const rows = band ? bandRows(band) : [];
-  const nb = h >= 6 ? rows.length : Math.min(1, rows.length);
+  const rows = !band ? [] : cav ? [torus ?? (band === 'red' ? LIP : HACC), ...bandRows(band).slice(0, h >= 8 ? 1 : 0)] : bandRows(band);
+  const nb = cav ? rows.length : h >= 6 ? rows.length : Math.min(1, rows.length);
   let I = 0;
   for (let y = y0; y < top; y++) {
     I = batter ? Math.floor((y - y0) / batter) : 0;
@@ -2192,17 +2258,42 @@ function hbox(m, x0, z0, x1, z1, y0, h, { wall = EWHITE, roof = EDECK, batter = 
       m.set(x, y, z, c);
     }
   }
-  const c0 = x0 + I, c1 = x1 - I, d0 = z0 + I, d1 = z1 - I;
-  for (let k = 0; k <= pRows; k++) {
+  let c0 = x0 + I, c1 = x1 - I, d0 = z0 + I, d1 = z1 - I;
+  if (!cav) {
+    for (let k = 0; k <= pRows; k++) {
+      const y = top + k;
+      for (let x = c0; x < c1; x++) for (let z = d0; z < d1; z++) {
+        const e = Math.min(x - c0, c1 - 1 - x, z - d0, d1 - 1 - z);
+        if (e <= 1) m.set(x, y, z, k < pRows ? wall(x, y, z) : (e === 1 && rim ? TEAM : lipC));
+        else if (k === 0) m.set(x, y, z, roof);
+      }
+    }
+    m.lastTop = { c0, c1, d0, d1, y: top };
+    return top + 1;
+  }
+  const [gA, gB] = !band ? HGORGE_MUD.slice(1, 3) : band === 'red' ? [BAND_R, BAND_B] : band === 'ochre' ? [BAND_Y, BAND_R] : [BAND_B, BAND_R];
+  const fl = (x, z) => ((((x + z + 512) >> 1) & 1) ? gA : gB);
+  // the gorge's lower row on the wall plane (shaded), the deck's bed inside
+  for (let x = c0; x < c1; x++) for (let z = d0; z < d1; z++) {
+    const e = Math.min(x - c0, c1 - 1 - x, z - d0, d1 - 1 - z);
+    m.set(x, top, z, e === 0 ? shade(fl(x, z), 0.72) : SAND_D(x, top, z));
+  }
+  // the gorge's upper row one voxel out, the parapet and the coping on it;
+  // cells outside the wall are laid only where nothing stands (a cornice
+  // never cuts into the taller block it abuts)
+  c0--; c1++; d0--; d1++;
+  const soft = (x, y, z, c) => { if (!m.has(x, y, z)) m.set(x, y, z, c); };
+  for (let k = 1; k <= pRows + 1; k++) {
     const y = top + k;
     for (let x = c0; x < c1; x++) for (let z = d0; z < d1; z++) {
       const e = Math.min(x - c0, c1 - 1 - x, z - d0, d1 - 1 - z);
-      if (e <= 1) m.set(x, y, z, k < pRows ? wall(x, y, z) : (e === 1 && rim ? TEAM : lipC));
-      else if (k === 0) m.set(x, y, z, roof);
+      if (e > 1) { if (k === 1) m.set(x, y, z, roof); continue; }
+      const c = k === pRows + 1 ? (e === 1 && rim ? TEAM : lipC) : k === 1 && e === 0 ? fl(x, z) : wall(x, y, z);
+      if (e === 0) soft(x, y, z, c); else m.set(x, y, z, c);
     }
   }
-  m.lastTop = { c0, c1, d0, d1, y: top };
-  return top + 1;
+  m.lastTop = { c0, c1, d0, d1, y: top + 1 };
+  return top + 2;
 }
 // a slim painted papyrus column (2 x 2) from y0 to y1 - 1: white shaft with
 // red and blue rings, a green and blue flared capital, a pale abacus
@@ -2232,20 +2323,37 @@ function loom(m, x0, z, w = 7, h = 9) {
 // a heap of threshed grain on a reed mat (a cone of radius r), a winnowing
 // basket, sacks and a wooden scoop
 function grainHeap(m, cx, cz, r = 3.2, h = 5) {
+  // round 28: a clean stepped mound on a round mat, two flat golds (the lit
+  // crest of every terrace lighter), no speckle
   for (let x = Math.floor(cx - r - 1); x <= Math.ceil(cx + r + 1); x++) for (let z = Math.floor(cz - r - 1); z <= Math.ceil(cz + r + 1); z++) {
     const d = Math.hypot(x + 0.5 - cx, z + 0.5 - cz);
-    if (d > r + 1.2) continue;
-    m.set(x, 0, z, FROND_DRY(x, 0, z));
+    if (d > r + 0.7) continue;
+    pset(m, x, 0, z, d > r - 0.3 ? 0x7d6440 : 0xa88a58);
     const hh = Math.round(h * (1 - d / (r + 0.4)));
-    for (let y = 1; y <= hh; y++) m.set(x, y, z, y === hh ? shade(GRAIN(x, y, z), 1.04) : shade(GRAIN(x, y, z), 0.9));
+    for (let y = 1; y <= hh; y++) pset(m, x, y, z, y === hh ? 0xe8c96e : 0xc9a24e);
   }
 }
-// a bread oven: a small mud-brick dome with a glowing mouth on +z
-function oven(m, cx, cz, R = 2.6, H = 6) {
-  lathe(m, cx, cz, 1, 1 + H, (y) => R * Math.sqrt(Math.max(0, 1 - ((y - 1) / H) ** 2)) + 0.3, (x, y, z) => (y >= H - 1 ? shade(MUDB(x, y, z), 0.62) : MUDB(x, y, z)));
-  const mx = Math.floor(cx), mz = Math.floor(cz + R);
-  m.remove(mx, 1, mz); m.remove(mx, 2, mz);
-  m.set(mx, 1, mz - 1, FIRE[2], { glow: 0.6 }); m.set(mx, 2, mz - 1, FIRE[1], { glow: 0.5 });
+// a neat woodpile of squared palm logs along z (len long): two 2 x 2 logs a
+// voxel apart, a third on top, pale end grain at both ends, flat bark sides
+function woodPile(m, x0, z0, len) {
+  for (const [x, y] of [[x0, 1], [x0 + 3, 1], [x0 + 1, 3]]) for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) for (let k = 0; k < len; k++) {
+    const end = k === 0 || k === len - 1;
+    pset(m, x + i, y + j, z0 + k, end ? (i + j === 1 ? 0xb08a58 : ENDGRAIN) : j === 1 ? 0x86603c : 0x6c4a2c);
+  }
+}
+// a stepped mud-brick beehive (round 28: square courses, corners cut, two
+// flat mud tones by course, a pale plastered cap, a dark smoke hole), from
+// the radii of its courses bottom first; returns the top row
+function beehive(m, X, Z, radii) {
+  radii.forEach((r, i) => prow(m, X, 1 + i, Z, r, i === 0 ? 0x6e4e30 : i === radii.length - 1 ? 0xc29a6b : i & 1 ? 0x936843 : 0x9c7049, r > 1));
+  pset(m, X, radii.length, Z, 0x2a1e16);
+  return radii.length;
+}
+// a bread oven: a small beehive with a glowing mouth on +z
+function oven(m, cx, cz) {
+  const X = Math.floor(cx), Z = Math.floor(cz);
+  beehive(m, X, Z, [2, 2, 2, 2, 1, 1]);
+  for (const y of [1, 2]) { pset(m, X, y, Z + 2, MOUTH); pset(m, X, y, Z + 1, y === 1 ? FIRE[2] : FIRE[1]); m.get(X, y, Z + 1).glow = 0.6; }
 }
 function house(v, age) {
   // round 27: every house is a small cube (or two) in clean brick courses,
@@ -2255,11 +2363,26 @@ function house(v, age) {
   // plan has its own massing and its trade's goods on the ground.
   const m = lot(24, 24);
   const arch = age === 1;
-  const white = arch ? { wall: EMUD, roof: THATCH, lipC: MUDCAP, band: null } : { wall: EWHITE };
+  // round 28: the main cube battered (a voxel in five rows), every block
+  // under a cavetto cornice (hbox); the low wings stand plumb
+  const white = arch ? { wall: EMUD, roof: THATCH, lipC: MUDCAP, band: null, batter: 5 } : { wall: EWHITE, batter: 5 };
   const mud = arch ? white : { wall: EMUD, band: 'red' };
   const CAP = arch ? MUDCAP : LIME;
-  const dr = (face, u, w, h, open = false) => door(m, face, u, w, 1, h, { deep: 3, leaf: !open, leafShade: 0.45, lintelC: TEAM, frame: arch ? MUDCAP_D : HACC, proud: false });
-  const hw = (face, u, y0) => win(m, face, u, y0, { n: 3, h: 2 });
+  // round 28: doors and windows lie in the wall plane (nothing proud: on a
+  // battered wall a projecting lintel or sill pokes through the smooth
+  // skin as a pale tooth): the opening cut in, its frame, lintel and sill
+  // painted on the face; drawn before the goods so no ray lands on a prop
+  const onFace = (face, u, y, c) => { const p = outer(m, face, u, y, lim(m)); if (p) m.set(p[0], p[1], p[2], c); };
+  const fdir = (face) => (face === '+z' || face === '-x' ? 1 : -1);
+  const dr = (face, u, w, h, open = false) => {
+    door(m, face, u, w, 1, h, { deep: 3, leaf: !open, leafShade: 0.45, lintel: false, frame: arch ? MUDCAP_D : HACC, proud: false });
+    for (let i = -1; i <= w; i++) onFace(face, u + i * fdir(face), 1 + h + 1, arch ? MUDCAP_D : TEAM);
+  };
+  const hw = (face, u, y0) => {
+    const d = fdir(face);
+    for (let k = 0; k < 3; k++) slit(m, face, u + 2 * k * d, y0, 2, 1, { lintel: false, sill: false });
+    for (let i = -1; i <= 5; i++) { onFace(face, u + i * d, y0 + 2, arch ? MUDCAP_D : LIME_S); onFace(face, u + i * d, y0 - 1, arch ? MUDCAP_D : LIME_S); }
+  };
   const malqaf = (x, z, y, w, d, h, wall) => windCatcher(m, x, z, y, w, d, h, wall);
   if (v === 0) {
     // the weaver's courtyard house: a two-storey cube at the back with a
@@ -2268,21 +2391,22 @@ function house(v, age) {
     const t = hbox(m, 3, 3, 14, 12, 1, 12, white); const T = m.lastTop;
     malqaf(T.c0 + 2, T.d0 + 2, t, 4, 3, 6, white.wall);
     hbox(m, 14, 4, 21, 12, 1, 7, mud);
+    dr('+z', 7, 3, 6);
+    hw('+z', 7, 9); hw('-x', 7, 8); hw('-z', 7, 8); hw('+z', 17, 4);
     for (let x = 4; x < 21; x++) for (let z = 13; z < 21; z++) m.set(x, 0, z, PAVE);
     yardWall(m, [[3, 13], [3, 21], [21, 21], [21, 13]], 5, white.wall, CAP, [[11, 21], [12, 21], [13, 21]]);
     for (const x of [10, 14]) for (let y = 1; y <= 6; y++) m.set(x, y, 21, y === 1 ? PLINTH : HACC);
     for (let x = 10; x <= 14; x++) { m.set(x, 7, 21, TEAM); m.set(x, 8, 21, CAP); }
     palm(m, 6, 1, 17, 14, { lx: 0, lz: 1, len: 6, fronds: 8 });
-    sack(m, 15, 1, 15); sack(m, 17, 1, 17); basket(m, 9, 17, 'date', 3);
-    dr('+z', 7, 3, 6);
-    hw('+z', 7, 9); hw('-x', 7, 8); hw('-z', 7, 8); hw('+z', 17, 4);
+    goodsMat(m, 12, 14, 21, 19);
+    sack(m, 13, 1, 15); sack(m, 17, 1, 15); basket(m, 8, 16, 'date', 3);
   } else if (v === 1) {
     // the potter's workshop: one deep sandstone cube whose front is a
     // portico cut into it (three painted papyrus columns under the flush
     // band), the wheel and drying bench in its shade; the kiln, amphorae
     // and a woodpile outside
     const o = arch ? white : { wall: ESAND, band: 'lapis' };
-    hbox(m, 3, 3, 17, 17, 1, 9, o);
+    hbox(m, 3, 3, 17, 17, 1, 9, { ...o, batter: 0 });
     for (let x = 4; x < 16; x++) for (let z = 12; z < 17; z++) for (let y = 1; y < 7; y++) m.remove(x, y, z);
     for (let x = 4; x < 16; x++) for (let y = 1; y < 7; y++) m.set(x, y, 11, y > 4 ? REVEAL2 : shade(o.wall(x, y, 11), 0.62));
     for (let x = 4; x < 16; x++) for (let z = 12; z < 17; z++) m.set(x, 0, z, PAVE);
@@ -2291,16 +2415,19 @@ function house(v, age) {
       else hcolumn(m, x, 15, 1, 7);
     }
     for (let x = 5; x < 9; x++) for (let z = 12; z < 14; z++) for (let y = 1; y < 3; y++) m.set(x, y, z, PLANK(x, y, z));
-    for (const x of [5.5, 7.5]) jar(m, x, 3, 12.5, 0xc8a070);
+    jar(m, 6, 3, 13, 0xc8a070);
     lathe(m, 12, 13, 1, 3, () => 1.2, DARKWOOD); lathe(m, 12, 13, 3, 4, () => 1.8, 0x7a5634); lathe(m, 12, 13, 4, 6, (y) => (y === 4 ? 0.9 : 0.6), CLAY);
     // the kiln: a tall mud-brick beehive with a glowing stoke hole
     const kx = 20.5, kz = 7;
-    lathe(m, kx, kz, 1, 12, (y) => (y < 5 ? 3 : 3 * Math.sqrt(Math.max(0, 1 - ((y - 5) / 7) ** 2)) + 0.5), (x, y, z) => (y >= 10 ? shade(EMUD(x, y, z), 0.6) : EMUD(x, y, z)));
-    for (let y = 1; y < 4; y++) for (let x = 20; x < 22; x++) { m.remove(x, y, 10); m.set(x, y, 9, REVEAL); }
-    m.set(20, 1, 9, FIRE[2], { glow: 0.6 }); m.set(21, 1, 9, FIRE[1], { glow: 0.6 });
-    log(m, 19, 1, 13, 4, 'z'); log(m, 21, 1, 13, 4, 'z'); log(m, 20, 3, 13, 4, 'z');
-    for (let i = 0; i < 3; i++) amphora(m, 5 + i * 5, 1, 20.5, i);
-    pots(m, 19, 19.5, 3, 2);
+    beehive(m, 20, 7, [3, 3, 3, 3, 3, 3, 2, 2, 2, 1, 1]);
+    for (let y = 1; y < 4; y++) { pset(m, 20, y, 10, MOUTH); pset(m, 20, y, 9, REVEAL); }
+    pset(m, 20, 1, 9, FIRE[2]); m.get(20, 1, 9).glow = 0.6; pset(m, 20, 2, 9, FIRE[1]); m.get(20, 2, 9).glow = 0.6;
+    woodPile(m, 18, 13, 4);
+    // the day's firing on a mat: three amphorae a voxel apart, a neat
+    // stack of mud bricks for the kiln
+    goodsMat(m, 3, 18, 23, 23);
+    for (let i = 0; i < 3; i++) amphora(m, 5 + i * 4, 1, 20, i);
+    brickStack(m, 16, 1, 19, 6, 3, 4);
   } else if (v === 2) {
     // the farmer's tower house: a tall narrow cube with a wind-catcher, a
     // low mud-brick store against it with a roof terrace; the threshing
@@ -2308,11 +2435,11 @@ function house(v, age) {
     const t = hbox(m, 3, 4, 12, 13, 1, 15, white); const T = m.lastTop;
     malqaf(T.c0 + 2, T.d0 + 2, t, 4, 3, 7, white.wall);
     hbox(m, 12, 6, 20, 13, 1, 7, { ...mud, pRows: 2 });
-    grainHeap(m, 17.5, 18.5, 3.4, 5);
-    sack(m, 7, 1, 17); sack(m, 10, 1, 19); sack(m, 7, 1, 20);
-    basket(m, 12, 20, 'grain', 2);
     dr('+z', 6, 3, 7);
     hw('+z', 6, 11); hw('-x', 8, 10); hw('-x', 8, 5); hw('-z', 7, 10); hw('+x', 8, 11);
+    grainHeap(m, 19, 18.5, 3, 5);
+    sackStack(m, 3, 1, 15, 2);
+    basket(m, 12, 19, 'grain', 2);
   } else if (v === 3) {
     // the baker's house: a whitewashed cube with a roof terrace shaded by a
     // palm-frond mat on four poles, the bread oven, fuel and baskets of
@@ -2321,41 +2448,48 @@ function house(v, age) {
     // the roof room at the back of the terrace (its doorway onto the
     // terrace), dates drying on a mat in front of it
     hbox(m, T.c0 + 2, T.d0 + 2, T.c0 + 9, T.d0 + 7, t, 5, { ...white, grime: false, band: null });
-    for (const x of [T.c0 + 5, T.c0 + 6]) for (let y = t; y < t + 4; y++) { m.remove(x, y, T.d0 + 6); m.set(x, y, T.d0 + 5, REVEAL); }
-    for (let x = T.c1 - 7; x < T.c1 - 3; x++) for (let z = T.d0 + 3; z < T.d0 + 8; z++) m.set(x, t, z, (x === T.c1 - 7 || x === T.c1 - 4 || z === T.d0 + 3 || z === T.d0 + 7) ? FROND_DRY(x, t, z) : PROD.date(x, t, z));
     dr('+z', 11, 3, 6);
     hw('+z', 16, 6); hw('-x', 7, 6); hw('+x', 8, 6); hw('-z', 13, 6);
-    oven(m, 4, 8, 2.8, 6);
-    log(m, 2, 1, 13, 5, 'z'); log(m, 4, 1, 13, 5, 'z'); log(m, 3, 3, 14, 4, 'z');
-    basket(m, 3, 18, 'date', 3); basket(m, 8, 19, 'grain', 2); pots(m, 15.5, 20, 2, 3);
+    for (const x of [T.c0 + 5, T.c0 + 6]) for (let y = t; y < t + 4; y++) { m.remove(x, y, T.d0 + 6); m.set(x, y, T.d0 + 5, REVEAL); }
+    for (let x = T.c1 - 7; x < T.c1 - 3; x++) for (let z = T.d0 + 3; z < T.d0 + 8; z++) m.set(x, t, z, (x === T.c1 - 7 || x === T.c1 - 4 || z === T.d0 + 3 || z === T.d0 + 7) ? FROND_DRY(x, t, z) : PROD.date(x, t, z));
+    oven(m, 4, 8);
+    woodPile(m, 1, 12, 5);
+    goodsMat(m, 2, 18, 13, 23); basket(m, 3, 19, 'date', 3); basket(m, 8, 19, 'grain', 3);
+    goodsMat(m, 14, 18, 23, 22); pots(m, 16, 20, 2, 3);
   } else if (v === 4) {
     // the jar merchant: a wide low cube with a wind-catcher at one end, his
     // amphorae in a timber rack and a row of painted storage jars in front
     const t = hbox(m, 2, 4, 22, 13, 1, 8, white); const T = m.lastTop;
     malqaf(T.c1 - 7, T.d0 + 2, t, 4, 3, 6, white.wall);
-    for (let x = 11; x < 22; x++) for (const z of [16, 21]) m.set(x, 1, z, DARKWOOD);
-    for (let i = 0; i < 3; i++) amphora(m, 13 + i * 4, 1, 18.5, i);
-    for (const x of [11, 21]) for (let y = 1; y < 8; y++) m.set(x, y, 16, POLE(x, y, 16));
-    for (let x = 11; x <= 21; x++) m.set(x, 8, 16, DARKWOOD);
-    jar(m, 4.5, 1, 18.5, 0xd8c8a0, true); jar(m, 8, 1, 19.5, 0xc8a070, true);
     dr('+z', 6, 3, 6);
     hw('+x', 8, 4); hw('-x', 8, 4); hw('-z', 7, 4); hw('-z', 16, 4); hw('+z', 15, 4);
+    // the amphora rack: two posts and a rail behind three amphorae on a
+    // plank sill; two big blue-banded jars on a mat
+    for (let x = 12; x < 24; x++) for (const z of [17, 18, 19]) pset(m, x, 0, z, z === 18 ? 0x8e6a42 : 0x6e4e30);
+    for (let i = 0; i < 3; i++) amphora(m, 14 + i * 4, 1, 18, i);
+    for (const x of [12, 23]) for (let y = 1; y < 8; y++) m.set(x, y, 16, POLE(x, y, 16));
+    for (let x = 12; x <= 23; x++) m.set(x, 8, 16, DARKWOOD);
+    goodsMat(m, 1, 16, 12, 23);
+    jar(m, 3, 1, 19, 0xd8c8a0, true); jar(m, 9, 1, 19, 0xb8683e, true);
   } else {
     // two cubes: a tall white one with a wind-catcher, a low mud-brick one
     // whose terrace is reached by an outside stair; round mud grain bins
     const t = hbox(m, 3, 3, 12, 13, 1, 13, white); const T = m.lastTop;
     malqaf(T.c0 + 3, T.d0 + 2, t, 4, 3, 6, white.wall);
     hbox(m, 12, 5, 21, 14, 1, 7, { ...mud, pRows: 2 }); const U = m.lastTop;
-    for (let x = U.c1 - 3; x < U.c1; x++) for (let y = U.y; y <= U.y + 2; y++) m.remove(x, y, U.d1 - 1), m.remove(x, y, U.d1 - 2);
-    for (let x = U.c1 - 3; x < U.c1; x++) for (const z of [U.d1 - 1, U.d1 - 2]) m.set(x, U.y, z, EDECK(x, U.y, z));
-    outStair(m, 12, 14, 2, 8, 1, EMUD, CAP);
     dr('+z', 6, 3, 7);
     dr('+x', 9, 3, 5, true);
     hw('+z', 6, 9); hw('-x', 7, 9); hw('-z', 7, 9);
-    for (const [bx, bz] of [[4.5, 19.5], [8.5, 20]]) {
-      lathe(m, bx, bz, 1, 7, (y) => (y < 5 ? 1.9 : 1.9 - (y - 4) * 0.7), (x, y, z) => (y >= 5 ? MUDCAP(x, y, z) : EMUD(x, y, z)));
+    for (let x = U.c1 - 3; x < U.c1; x++) for (let y = U.y; y <= U.y + 2; y++) m.remove(x, y, U.d1 - 1), m.remove(x, y, U.d1 - 2);
+    for (let x = U.c1 - 3; x < U.c1; x++) for (const z of [U.d1 - 1, U.d1 - 2]) m.set(x, U.y, z, EDECK(x, U.y, z));
+    outStair(m, 12, 14, 2, 8, 1, EMUD, CAP);
+    // two square mud grain bins under plastered caps, a stack of mud
+    // bricks for the next one, an amphora: each a voxel apart
+    for (const X of [4, 10]) {
+      for (let r = 0; r < 5; r++) prow(m, X, 1 + r, 19, 2, r === 0 ? 0x7a5636 : r & 1 ? 0x9c7049 : 0x936843, true);
+      prow(m, X, 6, 19, 2, 0xc29a6b, true); prow(m, X, 7, 19, 1, 0xcfa97c, true); pset(m, X, 8, 19, 0x6a4a2c);
     }
-    sack(m, 13, 1, 19); amphora(m, 18, 1, 20.5, 3);
+    brickStack(m, 14, 1, 18, 6, 3, 4); amphora(m, 22, 1, 19, 3);
   }
   return m;
 }
@@ -2387,7 +2521,7 @@ function granary() {
   // a crate of grain and a barrel by the door
   // the day's grain: a gold heap on a mat, linen sacks, a basket
   grainHeap(m, 13.5, 21, 2.6, 4);
-  sack(m, 4, 1, 21); sack(m, 1, 1, 21);
+  sack(m, 0, 1, 21); sack(m, 5, 1, 21);
   basket(m, 9, 21, 'grain', 2);
   return m;
 }
@@ -2635,14 +2769,14 @@ function townCenter() {
   // (silo(), ladder() lay mesh polygons on m itself, so not through inner())
   silo(m, 15.5, 36.5, 1, 6, 11);
   ladder(m, [22.6, 1, 38.4], [21.4, 11.6, 37.6]);
-  sack(m, 22, 1, 31); sack(m, 24, 1, 33); sack(m, 22, 3, 31);
+  sack(m, 22, 1, 30); sack(m, 22, 1, 34);
   // the small domed silo turret on the front-right corner of the wall
   silo(m, 50.5, 50.5, 1, 3.8, 8);
   // the courtyard: a fire pit, a basin, jars, a palm
   m.box(27, 1, 34, 5, 1, 5, LIME); m.box(28, 1, 35, 3, 1, 3, DARK);
   m.set(29, 2, 36, FIRE[3], FG); m.set(28, 2, 36, FIRE[1], FG); m.set(29, 2, 35, FIRE[2], FG); m.set(30, 2, 37, FIRE[0], FG); m.set(29, 3, 36, FIRE[2], FG);
   for (let x = 31; x < 35; x++) for (let z = 21; z < 25; z++) m.set(x, 1, z, x === 31 || x === 34 || z === 21 || z === 24 ? LIME : WATER);
-  goodsBox(m, 42, 1, 38, 4, 3, 'grain'); crate(m, 46, 1, 37, 3, 3, 3); sack(m, 38, 1, 39);
+  goodsBox(m, 42, 1, 38, 4, 3, 'grain'); crate(m, 47, 1, 37, 3, 3, 3); sack(m, 38, 1, 39);
   palm(m, 8, 1, 28, 21, { lx: 0.3, lz: 1, len: 7 });
   // the Ra statue on its plinth at the front-left corner, in sandstone with
   // gold regalia and the owner's kilt (building_02)
@@ -4617,13 +4751,12 @@ function clutter(v) {
   if (v === 0) {
     // the potter's pitch: amphorae in a row, two banded jars, a basket
     mat(1, 2, 15, 14);
-    for (let i = 0; i < 3; i++) amphora(m, 3.5 + i * 4.2, 1, 5, i);
-    jar(m, 4, 1, 10.5, 0xd8c8a0, true); jar(m, 8.5, 1, 11, 0xc8a070, true);
+    for (let i = 0; i < 3; i++) amphora(m, 3 + i * 4, 1, 4, i);
+    jar(m, 4, 1, 10, 0xd8c8a0, true); jar(m, 9, 1, 9, 0xc8a070); jar(m, 9, 1, 13, 0xb8683e);
     basket(m, 11, 9, 'date', 3);
   } else if (v === 1) {
     // a sack pile on a pallet, two crates beside it
-    for (let x = 2; x < 11; x++) for (let z = 3; z < 11; z++) m.set(x, 1, z, (z & 1) ? PLANK(x, 1, z) : DARKWOOD);
-    sack(m, 2, 2, 3, true); sack(m, 6, 2, 3, true); sack(m, 2, 2, 7, true); sack(m, 6, 2, 7, true); sack(m, 4, 5, 5, true);
+    sackStack(m, 2, 1, 3, 2);
     crate(m, 11, 1, 3, 3, 3, 3, 0xb08850); crate(m, 11, 4, 3, 3, 2, 3, 0xa27c48);
     basket(m, 11, 9, 'orange', 3);
   } else if (v === 2) { mudFence(m, [[0, 7], [15, 7]], 4, { gaps: [[7, 7], [8, 7]] }); amphora(m, 3.5, 1, 10.5, 0); sack(m, 10, 1, 9); }
@@ -4632,14 +4765,14 @@ function clutter(v) {
     m.box(4, 3, 5, 8, 1, 5, PLANK); m.box(4, 4, 5, 8, 1, 1, PLANK); m.box(4, 4, 9, 8, 1, 1, PLANK);
     wheel(m, 8, 0, 4, 3, 'x'); wheel(m, 8, 0, 10, 3, 'x');
     m.line(12, 3, 7, 15, 1, 7, POLE); sack(m, 4, 4, 6); sack(m, 8, 4, 6); basket(m, 5, 12, 'melon', 3);
-  } else if (v === 4) { mudFence(m, [[1, 14], [1, 1], [14, 1]], 4); jar(m, 4.5, 1, 4.5, 0xd8c8a0, true); m.box(7, 1, 3, 3, 1, 2, THATCH); }
+  } else if (v === 4) { mudFence(m, [[1, 14], [1, 1], [14, 1]], 4); jar(m, 4, 1, 4, 0xd8c8a0, true); brickStack(m, 8, 1, 3, 5, 3, 4); }
   else if (v === 5) {
     // a heap of grain on a mat with the winnowing baskets round it
-    grainHeap(m, 8, 7, 4, 6);
+    grainHeap(m, 8, 7, 3.4, 5);
     basket(m, 1, 12, 'grain', 3); basket(m, 11, 12, 'date', 3); sack(m, 12, 1, 2);
   } else if (v === 6) {
-    for (const [row, n] of [[0, 4], [1, 3], [2, 2]]) for (let i = 0; i < n; i++) log(m, 3 + i * 2 + row, 1 + row * 2, 3, 10 - row, 'z', 1);
-    m.line(12, 1, 4, 12, 7, 6, POLE); crate(m, 12, 1, 10, 2, 2, 2);
+    woodPile(m, 1, 3, 10); woodPile(m, 7, 3, 10);
+    m.line(14, 1, 4, 14, 7, 6, POLE); crate(m, 13, 1, 10, 2, 2, 2);
   } else {
     lathe(m, 7, 7, 1, 4, () => 3.2, LIME, { hollow: 1.2, inner: WATER });
     for (const x of [3, 10]) m.box(x, 1, 6, 1, 9, 1, POLE);
