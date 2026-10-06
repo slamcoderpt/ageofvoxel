@@ -1535,6 +1535,48 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   Note: `export-egypt.mjs --only <type>` rewrites the whole `egypt*` files
   with that type alone; use `--out <scratch dir>` with it, or run the full
   export (~17 s).
+- **Parapet roofs, one silhouette per function, round 27** (every building
+  read as the same kit: a pale overhanging slab roof like a lid on a battered
+  block, a noisy red-ochre wall, rubble props): `block()` now defaults to
+  `style: 'parapet'` (`pblock()`): no overhanging lip. Under the top a clean
+  painted band (`bandRows(kind)`: two rows of the band's paint, then a row of
+  alternating 3-voxel blocks: lapis over red / yellow, red over lapis /
+  yellow, ochre over red / lapis, team over a pale fillet), the frieze under
+  it; a deep cornice (`lipOut > 1` / `flare`) is a stepped cavetto, a gorge
+  row on the wall plane and a second one voxel out (paired 2-voxel flutes,
+  no 1-voxel checker), never more; then a parapet two voxels thick (a wall
+  row when flush) under a coping in the lightest limestone (`rimC`, its inner
+  ring the owner's line when `rim`), the deck (`roofC`) sunk one row inside
+  it. `style: 'cornice'` keeps the old flared lip (only `pylon()`, whose
+  smooth cavetto now flares 2, with a two-voxel parapet round its deck). The
+  Siege Works' colonnade roof, the temple kiosk's deck and the Town Center
+  hall's reed roof are flush the same way (painted architrave, pale coping,
+  team line, deck a step darker; `EDECK`). Walls: `brick(tones)` (two or
+  three close tones by 2-row course, A B A C, faint head joints in a running
+  bond, no speckle): `EWHITE` whitewash (houses, the Mining Camp), `EMUD` mud
+  brick (the Granary, house wings), `ESAND` sandstone (Lumber Camp, the
+  potter); `coursed()`'s head joints softened (0.94). Houses (`hbox()`
+  rebuilt): vertical cubes, grimed at the foot, the painted band under a
+  flush parapet with the team line on the coping, the deck a step darker,
+  window groups with pale lintels (no wooden eyebrows), a malqaf on most
+  (`windCatcher()`: a shaft whose roof slopes back from a high front mouth
+  under a team coping; no cap overhang). Plans: 0 courtyard house (cube +
+  malqaf, mud-brick wing, walled court with a palm, sacks, a basket); 1
+  potter (one deep sandstone cube with a portico cut into its front on three
+  papyrus columns, kiln, amphorae); 2 tower house (tall cube + malqaf, a mud
+  store with a terrace parapet, a gold grain heap, sacks); 3 baker (a cube
+  with a roof room and dates drying on a mat on the terrace, the oven); 4
+  jar merchant (a wide low cube + malqaf, an amphora rack, banded jars); 5
+  two cubes (malqaf; a mud-brick terrace reached by an outside stair). The
+  Granary is a squat battered mud-brick store (h 9, batter 4) with the
+  stepped blue / red cavetto, an ochre band and a parapet, beside its silos.
+  Goods (`sack()`, `amphora()`, `wovenBasket()` / `basket()`, `grainHeap()`,
+  banded `jar()`): linen sacks near white and slumped, amphorae red
+  terracotta, baskets straw yellow heaped with dates / melons / oranges /
+  grain, grain heaps gold, big jars cream with a blue band; the street
+  clutter rebuilt on them (a potter's pitch on a mat, a sack pile on a
+  pallet, a cart of sacks, a grain heap with its baskets in place of the
+  thatch sunshade on poles).
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8
