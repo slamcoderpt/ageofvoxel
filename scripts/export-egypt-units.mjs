@@ -274,6 +274,47 @@ function nemesN(m, a = GOLD, b = TEAM, { uraeus = false, lappets = true, chest =
   if (uraeus) m.set(3, 7, 7, GOLD).set(3, 8, 7, 0xff5a2a).set(3, 6, 7, GOLD);
   return m;
 }
+// (round 23) the mummy's nemes as one flared trapezoid: a low rounded cap
+// over the skull, wide team bands broken by a thin pale line every fourth row
+// (no 1-voxel stripe noise), a gold brow band, side wings stepping out from
+// the temples to twice the skull's width at the jaw, and two broad lappets
+// falling forward onto the chest with gold tips. The face stays open.
+function nemesT(m, { line = 0xf2ead2, chest = 8, tip = GOLD } = {}) {
+  const S = (x, y, z) => ((((y + 32) % 4) === 0) ? line : TEAM);
+  const SC = (x, y, z) => (((x + 32) % 4) === 1 ? line : TEAM);        // the crown: bands front to back
+  // the cap: x -1..7, z -1..6 (open below the brow at the front), up to y 8
+  for (let y = 5; y <= 8; y++) {
+    const nar = y >= 8 ? 1 : 0;
+    for (let x = -1 + nar; x <= 7 - nar; x++) for (let z = -1 + nar; z <= 6 - nar; z++) {
+      const ex = x === -1 + nar || x === 7 - nar, ez = z === -1 + nar || z === 6 - nar;
+      if (ex && ez) continue;
+      if (y < 8 && !ex && !ez) continue;                    // hollow below the top
+      if (z === 6 && y < 6) continue;                       // the face open
+      m.set(x, y, z, y === 8 ? SC(x, y, z) : S(x, y, z));
+    }
+  }
+  for (let x = 0; x <= 6; x++) for (let z = 0; z <= 5; z++) m.set(x, 7, z, TEAM);
+  m.box(-1, 6, 6, 9, 1, 1, GOLD).set(3, 7, 7, GOLD).set(3, 8, 7, GOLD);   // brow band, gold uraeus
+  // the wings: from the temples (y 5) to the jaw (y -2), stepping out 1 voxel every 2 rows
+  for (let y = 5; y >= -2; y--) {
+    const out = Math.min(4, 1 + Math.floor((5 - y) / 2));
+    for (const s of [-1, 1]) for (let k = 1; k <= out; k++) {
+      const x = s < 0 ? -k : 6 + k;
+      for (let z = -1; z <= 4; z++) m.set(x, y, z, S(x, y, z));
+    }
+  }
+  // the lower edge of the wings, solid team
+  for (const s of [-1, 1]) for (let k = 1; k <= 4; k++) { const x = s < 0 ? -k : 6 + k; for (let z = -1; z <= 4; z++) m.set(x, -3, z, TEAM); }
+  // the lappets: 2 wide, forward over the shoulders, then down the chest
+  for (const x0 of [-3, 8]) {
+    for (let z = 2; z <= chest; z++) m.box(x0, -3 - Math.floor((z - 2) * 0.35), z, 2, 2, 1, S);
+    const yt = -3 - Math.floor((chest - 2) * 0.35);
+    for (let y = yt - 1; y >= -8; y--) m.box(x0, y, chest, 2, 1, 1, S);
+    m.box(x0, -9, chest, 2, 1, 1, tip);
+  }
+  m.box(1, -6, -2, 5, 11, 1, S);                           // the back gathered into a queue
+  return m;
+}
 function headE(style) {
   const m = new VoxelModel();
   const dark = style === 'merc' || style === 'mercCav';
@@ -391,7 +432,7 @@ function headE(style) {
     m.vox.clear();
     faceN(m, WRAP, 0x8a7c5c, { eyes: [0x60ff90, 0x60ff90], brow: 0x7a6c50, nose: 0xc6b996 });
     m.get(1, 4, 5).glow = 0.8; m.get(2, 4, 5).glow = 0.8; m.get(4, 4, 5).glow = 0.8; m.get(5, 4, 5).glow = 0.8;
-    nemesN(m, GOLD, TEAM, { chest: 8 });
+    nemesT(m, { chest: 8 });
   } else if (style === 'minion') {
     const GR = pick3(65, 0x8c8c86, 0x7e7e78, 0x9a9a92);
     m.vox.clear();
@@ -828,14 +869,28 @@ function epsilonAxeM() {
   m.set(0, 16, 0, GOLD_DK).set(0, 9, 0, GOLD_DK);
   return m;
 }
-// khopesh: a short grip, a straight neck, then the hooked sickle blade forward
-function khopeshM(col = BRONZE) {
+// (round 23) the khopesh at half a rig voxel (part scale 0.5): about 60 % of
+// the torso's length, a dark grip between a gold pommel and a gold guard, a
+// straight dark-metal neck, then the sickle blade curving forward and down,
+// its convex outer rim a bright 1-voxel cutting edge, its inner (back) rim a
+// darker spine, so the weapon reads as metal against linen, bandages or skin.
+// Two voxels thick; along +y from the fist (the part's rest swings it out).
+function khopeshFine({ metal = 0x4a525c, edge = 0xf2f6fa, spine = 0x24282e, guard = GOLD } = {}) {
   const m = new VoxelModel();
-  m.box(0, -2, 0, 1, 3, 1, LEATHER).set(0, -3, 0, GOLD(0, 0, 0)).box(-1, 1, 0, 3, 1, 1, GOLD);
-  m.box(0, 2, 0, 1, 5, 1, col);
-  const arc = [[7, 0], [8, 1], [9, 2], [9, 3], [9, 4], [8, 5], [7, 5], [6, 6]];
-  for (const [y, z] of arc) { m.set(0, y, z, col); m.set(0, y - 1, z, col); }
-  m.set(0, 5, 6, 0xf6f0d0);
+  m.box(0, -4, 0, 2, 1, 2, guard);                         // pommel
+  m.box(0, -3, 0, 2, 4, 2, LEATHER_DK);                    // grip (in the fist)
+  m.box(-1, 1, -1, 4, 1, 4, guard);                        // guard
+  m.box(0, 2, 0, 2, 4, 1, spine).box(0, 2, 1, 2, 4, 1, metal);   // the neck
+  // the blade: an arc round (y 7, z 4.5), radius 4.6, from the neck over the top to the hooked tip
+  const cy = 7, cz = 4.5, R = 4.6;
+  for (let y = 4; y <= 13; y++) for (let z = -1; z <= 11; z++) {
+    const dy = y + 0.5 - cy, dz = z + 0.5 - cz, d = Math.hypot(dy, dz);
+    const a = Math.atan2(dy, dz);                           // 0 = forward, pi/2 = up, pi = back
+    if (a < -0.55 || (a > 2.9 || a < -2.9)) continue;
+    if (d < R - 2.1 || d > R + 0.55) continue;
+    const c = d > R - 0.45 ? edge : d < R - 1.4 ? spine : metal;
+    m.set(0, y, z, c).set(1, y, z, c);
+  }
   return m;
 }
 // the camel rider's sword (round 9): one straight, solid metal-grey blade,
@@ -1927,7 +1982,7 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
   eBelt(t, TEAM, null);
   rig('mummy', { voxel: 0.08, anim: 'human', style: 'mummy', pose: 'slash', stance: true }, [
     ...manParts({ torso: t, head: 'mummy', headZ: 0.6, pal: PAL_W, leg: { sandal: null, foot: 0x6a6050 } }),
-    part('weapon', khopeshM(0x8a7a5a), [0, 0, 0], HAND_E, 'armR'),
+    part('weapon', khopeshFine(), [1, 0, 1], HAND_E, 'armR', { scale: 0.5, rest: [0.3, -1.57, 0.3] }),
   ]);
 }
 
@@ -1941,7 +1996,7 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
   eBelt(t, 0x4a4038, null);
   rig('minion', { voxel: 0.072, anim: 'human', style: 'minion', pose: 'slash', stance: true }, [
     ...manParts({ torso: t, head: 'minion', headZ: 0.6, pal: PAL_G, leg: { sandal: null, foot: PAL_G.D } }),
-    part('weapon', khopeshM(0x7a7a72), [0, 0, 0], HAND_E, 'armR'),
+    part('weapon', khopeshFine({ metal: 0x6a5a48, spine: 0x3a2e24, edge: 0xe8e2d4 }), [1, 0, 1], HAND_E, 'armR', { scale: 0.5, rest: [0.3, -1.57, 0.3] }),
   ]);
 }
 
@@ -2531,7 +2586,7 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
     ...tail,
     ...legs,
     ...manParts({ torso: t, legs: false, torsoJoint: [0, 5, 7], torsoParent: 'body', head: 'shaved', arm: { bracer: GOLD, band: TEAM } }),
-    part('weapon', khopeshM(BRONZE), [0, 0, 0], HAND_E, 'armR'),
+    part('weapon', khopeshFine({ metal: 0xa8682a, spine: 0x5a3414, edge: 0xffe8b0 }), [1, 0, 1], HAND_E, 'armR', { scale: 0.6, rest: [0.3, -1.57, 0.3] }),
   ]);
 }
 

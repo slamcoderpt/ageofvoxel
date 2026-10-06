@@ -1969,6 +1969,26 @@ new `shaved` head style (a bald skull with a lit crown, gold earrings, no wig
 or headband). `--params "eu_focus=scorpion_man"` (`&eu_state=walk|attack|die`)
 / `"eu_one=scorpion_man&eu_turn=70"` check it.
 
+Khopesh and mummy nemes (round 23, myth_09 / myth_10 / myth_08): the
+Mummy, the Minion and the Scorpion Man hold `khopeshFine()` (the old
+full-voxel `khopeshM`, as long as the torso and the colour of the bandages,
+is gone). It is authored at half a rig voxel (part `scale` 0.5, the Scorpion
+Man 0.6), so it is about 60 % of the torso: a gold pommel, a near-black grip
+in the fist, a gold guard, a dark straight neck, then the sickle blade on an
+arc (radius 4.6) curving over and forward into the hook, two voxels thick.
+The convex outer rim is a bright 1-voxel cutting edge, the inner rim a darker
+spine, the body dark iron (the Minion's a dark bronze-brown, the Scorpion
+Man's bronze). Its part `rest` [0.3, -1.57, 0.3] turns the blade's plane to
+face sideways and tilts it out from the hip, so from the RTS camera the
+hook stands clear of the arm and the torso instead of in front of them. The
+Mummy's head uses `nemesT()` in place of the striped `nemesN`: a low rounded
+cap, team bands broken by a thin pale line every fourth row (no 1-voxel
+stripes), a gold brow band and uraeus, side wings stepping out one voxel per
+two rows from the temples to the jaw (a flared trapezoid), a team hem, and
+two 2-wide lappets running forward over the shoulders and down the chest to
+gold tips. `--params "eu_focus=mummy&eu_zoom=0.7"` (`&eu_state=walk`) and
+`"eu_focus=minion"` check it.
+
 Raptors (round 20, myth_06 / myth_13): the Roc and the Phoenix share one bird
 build (`raptorWing / raptorTail / raptorHead / raptorLeg`,
 export-egypt-units.mjs). Each wing is two parts: the arm (`wingL / wingR`,
