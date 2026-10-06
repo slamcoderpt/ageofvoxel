@@ -193,13 +193,14 @@ void EnemyAI::update(double dt) {
 	UnitStore &U = E.units;
 	BuildingStore &B = E.buildings;
 	Player &p = S.players[owner];
-	std::vector<int> vills, army, buildings;
+	std::vector<int> vills, army, buildings, rocs;
 	// (Godot-only, sim/civ: an Egyptian seat plays its own civ: Laborers, drop
 	// sites, Monuments for favor, its Barracks and Migdol, the Pharaoh empowering)
 	const bool eg = egypt();
 	for (int r = 0; r < U.size(); r++) {
 		if (U.removed[r] || U.owner[r] != owner || U.dead[r]) continue;
 		if (eg && U.type[r] == U_PHARAOH) continue; // (he empowers: egypt_pharaoh)
+		if (eg && U.type[r] == U_ROC) { rocs.push_back(r); continue; } // (it carries a wave: egypt_myth)
 		(unit_def(U.type[r]).gatherer ? vills : army).push_back(r);
 	}
 	for (int b = 0; b < B.size(); b++)
@@ -403,6 +404,7 @@ void EnemyAI::update(double dt) {
 		}
 		egypt_monuments(tc, vills, buildings);
 		egypt_pharaoh(tc, buildings);
+		egypt_myth(tc, temple, army, rocs);
 	} else if (temple >= 0 && p.age >= 1 && B.queue[temple].size() < 1 && (!S.godot_rules || escrow_allows(unit_def(U_MINOTAUR).cost))) S.economy.train(temple, U_MINOTAUR);
 	// worshippers (an Egyptian's Laborers never worship: favor from its Monuments)
 	if (temple >= 0 && !eg) {
@@ -1089,6 +1091,80 @@ void EnemyAI::egypt_pharaoh(int tc, const std::vector<int> &buildings) {
 	if (U.order_type[ph] == O_EMPOWER && U.order_target[ph] == id) return;
 	S.commands.order(ph, Order::with_target(O_EMPOWER, id));
 	pharaoh_on_ = id;
+}
+
+// An Egyptian seat's myth units (Godot-only; sim/godpowers egypt_myth.cpp). Its Temple, with
+// its queue empty (the Priests first) and 100 gold to spare past the escrow, trains the myth
+// unit of its newest minor god (Retold's AI: Phoenix / Avenger / Mummy, else Scorpion Man /
+// Scarab / Petsuchos, else Sphinx / Wadjet / Anubite, whichever its gods give) up to 2 + its
+// age of them; under Sobek first one Roc once it has 6 soldiers. The Roc carries each new
+// wave: up to half its men (at least 4, at most the Roc's 20), the nearest, board it at home
+// (GodPowers::roc_load: they walk to it, it lands 2 s); once they are in (or 25 s on, with
+// those in) it flies to ROC_SHORT tiles short of the wave's target, lands and sets them down
+// (roc_unload), and they press on (the strays rule above); then it flies home. Deterministic
+// (row / id order, no draws).
+static const double ROC_SHORT = 9;      // tiles short of the wave's target where the Roc lands
+static const double ROC_WAIT = 25;      // s it waits for boarders before it flies with those in
+
+void EnemyAI::egypt_myth(int tc, int temple, const std::vector<int> &army, const std::vector<int> &rocs) {
+	Sim &S = *sim;
+	Entities &E = S.entities;
+	UnitStore &U = E.units;
+	const BuildingStore &B = E.buildings;
+	const Player &p = S.players[owner];
+	if (temple >= 0 && B.built[temple] && p.age >= 1 && B.queue[temple].empty()) {
+		int myth = 0;
+		for (int u : army) myth += unit_def(U.type[u]).cls == CLS_MYTH;
+		static const int NEWEST_FIRST[] = { U_PHOENIX, U_AVENGER, U_MUMMY, U_SCORPION_MAN, U_SCARAB, U_PETSUCHOS, U_SPHINX, U_WADJET, U_ANUBITE, -1 };
+		int pick = -1;
+		for (const int *t = NEWEST_FIRST; *t >= 0 && pick < 0; t++)
+			if (S.techs.min_age_for(owner, *t) <= p.age && S.techs.god_allows_unit(owner, *t)) pick = *t;
+		const bool want_roc = rocs.empty() && (int)army.size() >= 6 && S.techs.min_age_for(owner, U_ROC) <= p.age && S.techs.god_allows_unit(owner, U_ROC);
+		const int t = want_roc ? U_ROC : myth < 2 + p.age ? pick : -1;
+		if (t >= 0) {
+			const Cost &c = unit_def(t).cost;
+			if (escrow_allows(c) && p.res[RES_GOLD] >= c.v[RES_GOLD] + 100 && p.res[RES_FAVOR] >= c.v[RES_FAVOR] && S.economy.train(temple, t).ok) myth_trained++;
+		}
+	}
+	if (rocs.empty()) {
+		roc_wave_seen_ = waves.size();
+		return;
+	}
+	const int r = rocs[0];
+	const int32_t rid = U.id[r];
+	const RocState *st = S.godpowers.roc_state(rid);
+	if (waves.size() > roc_wave_seen_) {
+		roc_wave_seen_ = waves.size();
+		const WaveLog &w = waves.back();
+		if (!st && jsm::hypot(U.x[r] - B.x[tc], U.z[r] - B.z[tc]) < STRAY_DIST) {
+			std::vector<std::pair<double, int32_t>> near;
+			for (int32_t id : w.units) {
+				const int u = E.unit_slot(id);
+				if (u >= 0 && !U.dead[u] && unit_def(U.type[u]).cls != CLS_SIEGE) near.push_back({ jsm::hypot(U.x[u] - U.x[r], U.z[u] - U.z[r]), id });
+			}
+			std::sort(near.begin(), near.end());
+			const size_t n = std::min<size_t>(ROC_SLOTS, std::max<size_t>(4, near.size() / 2));
+			std::vector<int32_t> ids;
+			for (size_t i = 0; i < near.size() && i < n; i++) ids.push_back(near[i].second);
+			if (ids.size() >= 4 && S.godpowers.roc_load(rid, ids) > 0) {
+				roc_tx_ = w.tx;
+				roc_tz_ = w.tz;
+				roc_load_at_ = S.time;
+				st = S.godpowers.roc_state(rid);
+			}
+		}
+	}
+	if (st && !st->cargo.empty() && st->mode != 2 && (st->boarding.empty() || S.time - roc_load_at_ > ROC_WAIT)) {
+		const double dx = U.x[r] - roc_tx_, dz = U.z[r] - roc_tz_, d = jsm::hypot(dx, dz);
+		const double k = d > ROC_SHORT ? ROC_SHORT / d : 0;
+		const int riders = (int)st->cargo.size();
+		if (S.godpowers.roc_unload(rid, roc_tx_ + dx * k, roc_tz_ + dz * k)) {
+			roc_lifts++;
+			roc_riders += riders;
+		}
+	} else if (!st && !U.moving[r] && jsm::hypot(U.x[r] - B.x[tc], U.z[r] - B.z[tc]) > 12) {
+		S.commands.order(r, Order::move(B.x[tc] + 4, B.z[tc] + 4)); // home, to carry the next wave
+	}
 }
 
 } // namespace aov

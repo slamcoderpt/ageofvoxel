@@ -131,10 +131,24 @@ void Commands::smart(const std::vector<int> &rows, double x, double z, int32_t t
 		return true;
 	};
 	if (!sim->map().clamp_to_map(x, z)) return; // (bounds: NaN is no command; off-map goes onto the edge)
+	// (Godot-only, sim/godpowers: right-clicking one's own Roc boards it, Retold; the Roc
+	// itself, if selected, stays to land; what it cannot carry moves there)
+	std::vector<int32_t> boarded;
+	if (sim->godot_rules && tk == K_UNIT && ts >= 0 && !tdead && U.type[ts] == U_ROC) {
+		std::vector<int32_t> ids;
+		for (int r : rows)
+			if (r >= 0 && r != ts && !U.removed[r] && !U.dead[r] && U.owner[r] == towner) ids.push_back(U.id[r]);
+		if (!ids.empty() && sim->godpowers.roc_load(target_id, ids) > 0)
+			if (const RocState *st = sim->godpowers.roc_state(target_id)) {
+				boarded = st->boarding;
+				boarded.push_back(target_id);
+			}
+	}
 	int owner = -1;
 	for (int r : rows) {
 		if (r < 0 || U.removed[r] || U.dead[r]) continue;
 		if (owner < 0) owner = U.owner[r];
+		if (!boarded.empty() && std::find(boarded.begin(), boarded.end(), U.id[r]) != boarded.end()) continue;
 		const UnitDef &d = unit_def(U.type[r]);
 		if (ts >= 0 && !tdead && target_id != U.id[r]) {
 			// (Godot-only, sim/civ: a Priest of Set converts a live wild animal)

@@ -429,11 +429,15 @@ void GodPowers::update_rocs(double dt) {
 			s.roc = 0;
 			continue;
 		}
+		const double rx = U.x[r], rz = U.z[r];
+		// (a boarder its player sent elsewhere, to fight, gather, build or walk off, stays out)
 		s.boarding.erase(std::remove_if(s.boarding.begin(), s.boarding.end(), [&](int32_t id) {
 			const int u = E.unit_slot(id);
-			return u < 0 || U.dead[u];
+			if (u < 0 || U.dead[u]) return true;
+			if (U.order_type[u] == O_ATTACK && (U.order_b[u] & ATK_AUTO)) return false; // (it hit back at a foe beside it: still boarding)
+			if (U.order_type[u] != O_IDLE && U.order_type[u] != O_MOVE) return true;
+			return U.order_type[u] == O_MOVE && U.has_goal[u] && !U.moving[r] && jsm::hypot(U.goal_x[u] - rx, U.goal_z[u] - rz) > ROC_REACH + 4;
 		}), s.boarding.end());
-		const double rx = U.x[r], rz = U.z[r];
 		// it comes down while loading, or once at its unloading point; up again otherwise
 		const bool down = !U.moving[r] && (s.mode == 1 || (s.mode == 2 && s.land_until > 0));
 		s.land_k = std::max(0.0, std::min(1.0, s.land_k + (down ? dt : -dt) / ROC_LAND));

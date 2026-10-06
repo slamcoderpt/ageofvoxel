@@ -157,6 +157,7 @@ public:
 	std::vector<WaveLog> waves; // every wave launched (AovSim.get_ai().waves)
 	double power_timer = 0;     // s until the next god power decision
 	int casts[16] = {};         // powers cast, by PowerId (AovSim.get_ai().casts; >= GP_COUNT, static_assert in enemy_ai.cpp)
+	int myth_trained = 0, roc_lifts = 0, roc_riders = 0; // Godot-only, an Egyptian seat: myth units queued, Roc lifts, men carried (AovSim.get_ai().myth)
 	int difficulty = AI_DEFAULT;
 	AIParams par;               // ai_params(difficulty)
 	// set the difficulty (params, wave size / timing, aggression); the
@@ -199,6 +200,9 @@ private:
 	void egypt_camps(int tc, const std::vector<int> &vills, const std::vector<int> &buildings);
 	void egypt_monuments(int tc, const std::vector<int> &vills, const std::vector<int> &buildings);
 	void egypt_pharaoh(int tc, const std::vector<int> &buildings);
+	void egypt_myth(int tc, int temple, const std::vector<int> &army, const std::vector<int> &rocs); // its Temple's myth units, the Roc's lifts
+	size_t roc_wave_seen_ = 0;  // waves the Roc has seen (a new one: some of its men board)
+	double roc_tx_ = 0, roc_tz_ = 0, roc_load_at_ = -1; // the lifted wave's target, when they boarded
 	int32_t pharaoh_on_ = 0;    // the building the Pharaoh was last sent to empower
 	double monument_t_ = 0;     // s until the next Monument check
 	void finish_sites(const std::vector<int> &vills, const std::vector<int> &buildings); // Godot-only

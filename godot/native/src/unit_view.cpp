@@ -1498,7 +1498,9 @@ Dictionary AovUnitView::update(double dt, double alpha, int64_t local_player, co
 		double flash = std::max(pop, dead ? 0.0 : std::min(1.0, U.flash_t[i] / 0.12) * 0.012);
 		const double gph = now - U.gp_hit_t[i];
 		if (!std::isnan(gph) && gph >= 0 && gph < 0.3) flash = std::max(flash, 0.9 * (1 - gph / 0.3));
-		const double fade = dead ? 1 - clamp01((die_t - FADE_START) / (CORPSE_TIME - 0.3 - FADE_START)) : 1;
+		// (gods piece: a fallen Phoenix burns up into its egg, Rebirth: no corpse lies beside it)
+		const double fade = !dead ? 1 : type == aov::U_PHOENIX ? 1 - clamp01((die_t - 0.5) / 0.7)
+				: 1 - clamp01((die_t - FADE_START) / (CORPSE_TIME - 0.3 - FADE_START));
 		const float packed = (float)(std::floor(dk * 100) + std::min(0.99, flash));
 		const double *coat = COATS[id % 6];
 		const Gear gear = (type == aov::U_HOPLITE || type == aov::U_TOXOTES) ? gear_of(id, type, U.kit[i]) : Gear{ 0, 0, 0, 0, 0, 0 };

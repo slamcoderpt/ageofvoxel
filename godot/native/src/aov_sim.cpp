@@ -1826,6 +1826,11 @@ Dictionary AovSim::get_ai(int64_t owner) const {
 		Dictionary casts;
 		for (int k = 0; k < aov::GP_COUNT; k++) casts[aov::power_def(k).key] = ai.casts[k];
 		d["casts"] = casts;
+		Dictionary myth; // Godot-only, an Egyptian seat (combat/enemy_ai.cpp egypt_myth)
+		myth["trained"] = ai.myth_trained;
+		myth["roc_lifts"] = ai.roc_lifts;
+		myth["roc_riders"] = ai.roc_riders;
+		d["myth"] = myth;
 		// Godot-only: what it researched (combat/enemy_ai_techs.cpp)
 		Dictionary tk;
 		tk["armories"] = ai.techs.armories;

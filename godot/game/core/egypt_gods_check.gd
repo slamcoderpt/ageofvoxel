@@ -47,6 +47,11 @@ extends SceneTree
 ##               (+20 % by age), Tusks of Apedemak's -1 pop
 ##   roc         the Roc boards units (they leave the world, their pop stays), flies, lands and
 ##               sets them down; a Roc that falls takes its riders
+##   roc_smart   (roc.right_click) the HUD's right-click on one's own Roc (AovSim.smart) boards
+##               the selected men (not a catapult, never a foe's man; the Roc stays to land); a
+##               boarder sent off drops out; Unload sets the rest down at the click
+##   roc_ai      (roc.ai_lifts) an Egyptian AI with Sobek trains a Roc and its gods' myth units
+##               at its Temple and flies part of a wave to its target
 ##   immunity    Retold's immunities: a Zeus player's Bolt, Lightning Storm and Meteor and an
 ##               Egyptian foe's Locust Swarm and Thoth's Meteor strike the spearmen beside a Son
 ##               of Osiris and a Roc and never them (0 damage events, hp 609 / 700 kept)
@@ -217,7 +222,7 @@ func _run() -> void:
 	var t0 := Time.get_ticks_msec()
 	for c in ["defs", "gods", "passives", "model", "rain", "prosperity", "vision", "eclipse", "sands", "serpents", "locusts", "citadel",
 			"ancestors", "son", "son_divine", "tornado", "meteor", "myth", "techs", "bounds", "determinism",
-			"phantom", "blocks", "allies", "trees", "split", "roc", "immunity", "noheal", "volleys", "shield_preview", "eclipse_abilities", "ai"]:
+			"phantom", "blocks", "allies", "trees", "split", "roc", "roc_smart", "roc_ai", "immunity", "noheal", "volleys", "shield_preview", "eclipse_abilities", "ai"]:
 		if _want(c):
 			call("_case_" + c)
 	result["ms"] = Time.get_ticks_msec() - t0
@@ -1609,6 +1614,102 @@ func _case_roc() -> void:
 	r["riders when it fell / pop after"] = [c2, int(sim.get_player(1).pop)]
 	ok = ok and c2 == 3 and int(sim.get_player(1).pop) == pop0 - 2
 	_check("roc.transport", ok, r)
+
+# The Roc in play (round 9): a right-click on one's own Roc (AovSim.smart, the HUD's
+# right-click order) boards the selected men; the Roc itself stays to land, a catapult (siege:
+# not carried) walks there instead, a foe's man is never taken; a boarder sent elsewhere drops
+# out; the HUD's Unload (roc_unload) sets them down where clicked
+func _case_roc_smart() -> void:
+	var r := {}
+	var sim := _fresh("isis", "zeus", 2, ["anubis", "sobek"])
+	var roc := _u(sim, "roc", 1, 0, 0)
+	var men := []
+	for i in 6:
+		men.append(_u(sim, "spearman", 1, -4.0 + i * 0.8, 4.0))
+	var cat := _u(sim, "catapult", 1, 4.0, 4.0)
+	var foe := _u(sim, "hoplite", 2, 9.0, 9.0)
+	sim.tick(2)
+	var sel := PackedInt32Array(men + [cat, roc, foe])
+	var R: Dictionary = sim.get_unit(roc)
+	sim.smart(sel, float(R.x), float(R.z), roc)
+	sim.tick(1)
+	var st: Dictionary = sim.get_roc(roc)
+	r["boarding after the right-click"] = (st.boarding as Array).size()
+	var cu: Dictionary = sim.get_unit(cat)
+	r["catapult order"] = str(cu.get("order", cu.get("order_type", "")))
+	# one boarder sent off to the far side: it drops out
+	sim.order_move(PackedInt32Array([men[5]]), C.x - 12.0, C.y - 12.0)
+	_step(sim, 7.0)
+	st = sim.get_roc(roc)
+	var gone := 0
+	for m in men:
+		gone += 0 if _alive(sim, m) else 1
+	r["cargo after 7 s / men gone / the one sent off still out"] = [(st.cargo as Array).size(), gone, _alive(sim, men[5])]
+	r["catapult / foe still in the world"] = [_alive(sim, cat), _alive(sim, foe)]
+	var ok: bool = r["boarding after the right-click"] == 6 and (st.cargo as Array).size() == 5 and gone == 5 and _alive(sim, men[5])
+	ok = ok and _alive(sim, cat) and _alive(sim, foe)
+	r["unload"] = sim.roc_unload(roc, C.x - 10.0, C.y)
+	_step(sim, 9.0)
+	var RU: Dictionary = sim.get_unit(roc)
+	var rp := Vector2(float(RU.x), float(RU.z))
+	var down := 0
+	for id in _units_of(sim, 1, "spearman"):
+		var u: Dictionary = sim.get_unit(id)
+		if Vector2(float(u.x), float(u.z)).distance_to(rp) < 5.0:
+			down += 1
+	r["roc's landing spot from the click (tiles)"] = _r(rp.distance_to(Vector2(C.x - 10.0, C.y)), 2)
+	r["spearmen set down round it"] = down
+	ok = ok and r["unload"] and down == 5 and rp.distance_to(Vector2(C.x - 10.0, C.y)) < 4.0 and (sim.get_roc(roc).cargo as Array).is_empty()
+	_check("roc.right_click", ok, r)
+
+# An Egyptian AI with Sobek (Ra, Heroic: Bast, Sobek) trains a Roc at its Temple and lifts
+# part of its wave to a drop point short of the target (EnemyAI::egypt_myth), and trains its
+# minor gods' myth units (the Petsuchos)
+func _case_roc_ai() -> void:
+	var r := {}
+	var sim: Object = ClassDB.instantiate("AovSim")
+	sim.set_godot_rules(true)
+	var ps := [{"id": 1, "name": "P1", "human": true, "team": 1, "god": "zeus"}, {"id": 2, "name": "P2", "human": false, "team": 2, "god": "ra", "ai": "hard"}]
+	sim.start_match({"seed": seed_arg, "map_size": 160, "preset": "skirmish", "resources": "deathmatch", "players": ps})
+	sim.set_victory_enabled(false)
+	sim.set_player_age(2, 2)
+	var s2: Dictionary = sim.get_starts()[1]
+	var hx := float(s2.tx) + 0.5
+	var hz := float(s2.tz) + 0.5
+	sim.set_player_resources(2, {"food": 6000, "wood": 6000, "gold": 6000, "favor": 150})
+	var tb := -1
+	for k in 16:
+		var a := TAU * k / 16.0
+		tb = int(sim.spawn_building("temple", 2, hx + cos(a) * 12.0, hz + sin(a) * 12.0, true, true))
+		if tb > 0:
+			break
+	for i in 10:
+		sim.spawn_unit("spearman", 2, hx + 5.0 + (i % 5) * 0.8, hz + 5.0 + int(i / 5) * 0.8, 0.0)
+	sim.set_ai(2, {"next_wave_at": 0.0, "wave_size": 6})
+	var gods: Dictionary = sim.get_gods(2) if sim.has_method("get_gods") else {}
+	r["temple placed"] = tb > 0
+	var t := 0.0
+	var ai: Dictionary = {}
+	while t < 480.0:
+		_step(sim, 5.0)
+		t += 5.0
+		ai = sim.get_ai(2)
+		if int(ai.myth.roc_lifts) >= 1 and t > 20.0:
+			break
+	r["seconds"] = t
+	r["myth trained / roc lifts / riders"] = [int(ai.myth.trained), int(ai.myth.roc_lifts), int(ai.myth.roc_riders)]
+	r["rocs"] = _units_of(sim, 2, "roc").size()
+	r["petsuchos"] = _units_of(sim, 2, "petsuchos").size()
+	# where the riders came down: the spearmen far from home (out at the target)
+	_step(sim, 30.0)
+	var far := 0
+	for id in _units_of(sim, 2, "spearman") + _units_of(sim, 2, "axeman") + _units_of(sim, 2, "slinger"):
+		var u: Dictionary = sim.get_unit(id)
+		if Vector2(float(u.x), float(u.z)).distance_to(Vector2(hx, hz)) > 40.0:
+			far += 1
+	r["soldiers out past 40 tiles 30 s later"] = far
+	var ok: bool = tb > 0 and int(ai.myth.roc_lifts) >= 1 and int(ai.myth.roc_riders) >= 4 and int(ai.myth.trained) >= 2
+	_check("roc.ai_lifts", ok, r)
 
 # Retold's immunities: the Roc is immune to god powers, the Son of Osiris to targeted ones
 # (EGYPT.md 5.2 / 3.1): the Greek Bolt, Lightning Storm and Meteor and an Egyptian enemy's
