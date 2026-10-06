@@ -1757,6 +1757,27 @@ voxel thin (crown behind the ears, the sides, cheek lappets y -2..2, a short
 3-wide nape flap), never above the crown or as a slab behind it.
 `--params "eu_focus=anubite"` / `"eu_one=anubite&eu_turn=90"` check it.
 
+Wadjet and Scorpion Man surfaces (round 16): no per-voxel alternation on any
+creature body any more. The Wadjet is painted in broad zones by one `zone(u,
+q, spine)` rule shared by the coils, neck and tail (a light tan belly and
+lower flank along the whole tube, a mid-tan back, dark brown saddle bands 3
+voxels long every 7 along the spine only), and a second, smaller coil rides on
+the ground coil so the overlap reads. The hood is a 2-deep flare 17 wide (its
+outer columns cup forward): behind, dark slate (myth_02) in a gold rim with a
+light spectacle eye-spot and a row of dots; in front, a dark brown rim round a
+mid-brown face and a one-voxel pale throat with dark bars. The head has a
+light jaw, a 2x2 dark eye with a 1-voxel glint each side, brow ridges, a
+mouth line, a light snout tip with nostrils and fangs. The wings start behind
+the hood (joints [+-2, 6, -4]) so its top half stands clear; tan coverts in
+two rows by feather and a dark edge row (thick only along the inner arm), a
+red chevron per 3-column feather, feathers alternating team / team shade,
+darker tips, each feather pointed and the outer four primaries 2 voxels
+longer than the one before, so the trailing edge is jagged. The Scorpion
+Man's back (myth_08) is team plates 3 voxels long with a dark chitin seam,
+their rear row a shade darker, white lower flanks (was a team / white
+checker). `--params "eu_focus=wadjet"` (+ `eu_state=walk` for the backs),
+`"eu_one=wadjet&eu_turn=250"`, `"eu_focus=scorpion_man"` check it.
+
 Mounts (round 14): the camel's saddle cloth is a narrow drape over the hump
 (z 6..15 at the hem, only the seat z 8..13 on top, so the hump's tan fore and
 aft slopes, the rump, shoulders and lower flanks stay bare), one voxel proud of

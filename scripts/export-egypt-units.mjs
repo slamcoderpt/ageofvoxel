@@ -2148,7 +2148,9 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
 // collar, a shaved head) on a scorpion's body of team and white plates, eight
 // black legs, black pincers and a tail arching over the back.
 {
-  const PLATE = (x, y, z) => ((z >> 1) & 1 ? TEAM : 0xeceae2);
+  // (round 16) myth_08: team plates across the back, each 3 voxels long with a dark chitin seam and
+  // its rear row a shade darker (the plates overlap), the lower flanks white; no per-voxel checker
+  const PLATE = (x, y, z) => (y <= 2 ? 0xeceae2 : z % 3 === 0 && y >= 3 ? 0x24222a : TEAM);
   const CHIT = pick3(82, 0x1e1c22, 0x2a2830, 0x16141a);
   const body = new VoxelModel();
   for (let z = 0; z <= 16; z++) {
@@ -2158,7 +2160,7 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
       if (dx * dx + dy * dy <= 1) body.set(x, y, z, y <= 1 ? CHIT(x, y, z) : PLATE(x, y, z));
     }
   }
-  for (let z = 0; z <= 16; z++) for (let x = -4; x <= 10; x++) for (let y = 2; y <= 6; y++) { const v = body.get(x, y, z); if (v && v.team && (x + z) % 2 === 0) v.c = 0xc8c8c8; }
+  for (let z = 0; z <= 16; z++) for (let x = -4; x <= 10; x++) for (let y = 2; y <= 6; y++) { const v = body.get(x, y, z); if (v && v.team && z % 3 === 1) v.c = TEAM_SHADE; }
   // the pincers at the front (they move with the "neck" channel)
   const pin = new VoxelModel();
   for (const s of [-1, 1]) {
@@ -2210,56 +2212,107 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
   ]);
 }
 
-// Wadjet (serpent rig, 0.09): a winged cobra: a coiled gold-scaled body, a
-// hood in gold with dark scales, great wings in the army's colour with red
-// bars and dark coverts.
+// Wadjet (serpent rig, 0.09): a winged cobra (myth_02). Round 16: no per-voxel
+// alternation anywhere: the body is painted in broad zones (a light tan belly
+// and lower flank along the whole coil, a mid-tan back, dark brown saddle bands
+// 3 voxels long every 7 along the spine only) so each coil reads as one tube; a
+// second, smaller coil rides on the first; the hood a dark brown flare with a
+// darker rim and a light spectacle eye-spot behind, a pale throat in front;
+// the head with a light jaw, a 2x2 dark eye with a 1-voxel glint each side, a
+// brow ridge and a light snout tip; the wings: tan coverts with one dark edge
+// row, a red chevron per feather, team feathers alternating in 3-wide quills,
+// darker tips, and stepped primaries (each feather pointed and the outer four
+// 2 voxels longer than the one before) so the trailing edge is jagged.
 {
-  const SC = (x, y, z) => { const h = hash3(x, y, z, 91); return ((x + y + z) & 1) ? (h < 0.5 ? 0xd8b05a : 0xc8a04a) : (h < 0.5 ? 0x4a3e2a : 0x3a3222); };
-  const BELLY = 0xe8d8a0;
+  const W_BELLY = 0xe8d49a, W_SIDE = 0xc89c4c, W_BACK = 0xa47434, W_BAND = 0x4e3420, W_BAND_D = 0x3a2616;
+  const W_HOOD = 0x2e3248, W_HOOD_D = 0xc8963e, W_HOOD_F = 0x7a5428, W_HOOD_FD = 0x34241a, W_SPOT = 0xecd06a, W_THROAT = 0xf2e4b8;
+  // a tube voxel's zone: u = the voxel's height in the tube (-1 belly .. 1 spine),
+  // q = the distance along the tube (voxels), spine = on the top line
+  const zone = (u, q, spine) => (u < -0.3 ? W_BELLY : u < 0.25 ? W_SIDE : (spine && ((Math.floor(q) % 7) + 7) % 7 < 3) ? W_BAND : W_BACK);
   const coil = new VoxelModel();
-  for (let a = 0; a < 26; a++) {
-    const th = (a / 26) * Math.PI * 2 * 0.85;
-    const cx = Math.sin(th) * 4.5, cz = Math.cos(th) * 4.5 - 1;
-    for (let y = -2; y <= 2; y++) for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
-      if (dx * dx + dz * dz + y * y > 5) continue;
-      coil.set(Math.round(cx + dx), Math.round(2 + y), Math.round(cz + dz), y <= -1 ? BELLY : SC(dx, y, a));
+  const ring = (R, yc, r, turns, a0, n) => {
+    for (let a = 0; a < n; a++) {
+      const th = a0 + (a / n) * Math.PI * 2 * turns;
+      const cx = Math.sin(th) * R, cz = Math.cos(th) * R - 1;
+      const q = (a / n) * Math.PI * 2 * turns * R;
+      const ri = Math.ceil(r);
+      for (let y = -ri; y <= ri; y++) for (let dx = -ri; dx <= ri; dx++) for (let dz = -ri; dz <= ri; dz++) {
+        if (dx * dx + dz * dz + y * y > r * r + 0.5) continue;
+        const spine = y >= ri - 1 && dx * dx + dz * dz <= 2;
+        coil.set(Math.round(cx + dx), Math.round(yc + y), Math.round(cz + dz), zone(y / r, q, spine));
+      }
     }
-  }
-  for (let y = 2; y <= 9; y++) { const r = 2.6 - (y - 2) * 0.1; for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) if (x * x + z * z <= r * r) coil.set(x, y, z + 1, z >= 2 ? BELLY : SC(x, y, z)); }
-  const seg = (len, r0, r1) => { const m = new VoxelModel(); for (let z = 0; z < len; z++) { const r = r0 + (r1 - r0) * (z / len); for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) if (x * x + y * y <= r * r + 0.3) m.set(x, y, -z, y < -r * 0.4 ? BELLY : SC(x, y, z)); } return m; };
-  // the raised neck and hood: a broad flat shield of scales with a team spot pattern
+  };
+  ring(4.5, 2, 2.2, 0.85, 0, 40);          // the ground coil
+  ring(3.2, 4.6, 1.7, 0.55, 2.2, 28);      // a smaller coil riding on it (the overlap reads)
+  // the rising neck base: a light front, a mid back with spine bands behind
+  for (let y = 2; y <= 9; y++) { const r = 2.6 - (y - 2) * 0.1; for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) if (x * x + z * z <= r * r) coil.set(x, y, z + 1, z >= 1 ? W_BELLY : z >= 0 ? W_SIDE : (Math.abs(x) <= 1 && z <= -1 && y % 7 < 3) ? W_BAND : W_BACK); }
+  const seg = (len, r0, r1, q0) => { const m = new VoxelModel(); for (let z = 0; z < len; z++) { const r = r0 + (r1 - r0) * (z / len); for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) if (x * x + y * y <= r * r + 0.3) m.set(x, y, -z, zone(y / Math.max(r, 1), q0 + z, Math.abs(x) <= 1 && y >= r * 0.4)); } return m; };
+  // the neck and hood: the throat pale in front (+z), the back mid-tan with spine bands
   const hood = new VoxelModel();
-  for (let y = 0; y <= 12; y++) { const r = 2.2; for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) if (x * x + z * z <= r * r) hood.set(x + 4, y, z + 2, z >= 1 ? BELLY : SC(x, y, z)); }
-  for (let y = 5; y <= 13; y++) {
-    const w = Math.round(5.5 - Math.abs(y - 9.5) * 0.9);
+  for (let y = 0; y <= 14; y++) for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) if (x * x + z * z <= 2.2 * 2.2) {
+    hood.set(x + 4, y, z + 2, (z >= 1 && x === 0) ? (y % 5 === 2 ? W_BAND : W_THROAT) : z >= 0 ? W_SIDE : (Math.abs(x) <= 1 && y % 7 < 3) ? W_BAND : W_BACK);
+  }
+  // the flare: a broad shield two voxels deep: behind, dark slate (myth_02) in a gold rim with a light
+  // spectacle mark; in front, a dark brown rim round a mid-brown face and the pale throat
+  for (let y = 3; y <= 15; y++) {
+    const w = Math.round(8.2 - Math.abs(y - 10.5) * 1.05);
     for (let x = -w; x <= w; x++) {
-      hood.set(x + 4, y, 0, Math.abs(x) >= w - 1 ? 0x2a2418 : ((x + y) % 3 === 0 ? TEAM : SC(x, y, 0)));
-      hood.set(x + 4, y, 1, (Math.abs(x) <= 1) ? BELLY : 0xd8b05a);
+      const rim = Math.abs(x) >= w || y === 3 || y === 15;
+      const spot = (y >= 9 && y <= 11 && Math.abs(x) >= 2 && Math.abs(x) <= 4) || (y === 12 && Math.abs(x) <= 3) || (y === 6 && Math.abs(x) % 3 === 1 && Math.abs(x) < 6);
+      const cup = Math.abs(x) >= 6 ? 2 : Math.abs(x) >= 4 ? 1 : 0;   // the flare's wings cup forward round the neck
+      hood.set(x + 4, y, cup, rim ? W_HOOD_D : spot ? W_SPOT : W_HOOD);
+      // the front face: a pale throat down the middle, the flare's inner face a darker tan with two dark throat bars
+      hood.set(x + 4, y, 1 + cup, rim ? W_HOOD_FD : Math.abs(x) <= 1 ? ((y === 6 || y === 7) ? W_BAND : W_THROAT) : W_HOOD_F);
     }
   }
+  // the head: x 0..4, a light jaw, mid sides, a narrower crown with a dark scale cap, brow ridges
   const sh = new VoxelModel();
-  sh.box(0, 0, 0, 4, 3, 5, SC).box(1, 0, 5, 2, 2, 2, SC).set(0, 2, 3, 0xff3020, { glow: 0.7 }).set(3, 2, 3, 0xff3020, { glow: 0.7 }).set(1, -1, 6, 0xf0e8d0).set(2, -1, 6, 0xf0e8d0);
-  hood.merge(sh, 2, 13, 1);
+  for (let x = 0; x <= 4; x++) for (let z = 0; z <= 5; z++) {
+    sh.set(x, 0, z, W_BELLY);
+    for (let y = 1; y <= 2; y++) sh.set(x, y, z, W_SIDE);
+  }
+  for (let x = 1; x <= 3; x++) for (let z = 0; z <= 5; z++) sh.set(x, 3, z, z <= 2 ? W_BAND : W_BACK);
+  sh.set(0, 3, 3, W_BAND_D).set(0, 3, 4, W_BAND_D).set(4, 3, 3, W_BAND_D).set(4, 3, 4, W_BAND_D);   // brows
+  for (const x of [0, 4]) {
+    sh.set(x, 1, 3, DARK).set(x, 1, 4, DARK).set(x, 2, 3, DARK).set(x, 2, 4, 0xfaf4e0);   // the eye and its glint
+    sh.set(x, 1, 5, W_BAND_D);   // the mouth line
+  }
+  for (let x = 1; x <= 3; x++) for (let z = 6; z <= 7; z++) { sh.set(x, 0, z, W_THROAT); sh.set(x, 1, z, z === 7 ? W_THROAT : W_SIDE); }
+  sh.set(1, 1, 7, DARK).set(3, 1, 7, DARK);                 // nostrils on the light snout tip
+  sh.set(1, -1, 6, 0xf8f4e8).set(3, -1, 6, 0xf8f4e8);       // fangs
+  hood.merge(sh, 2, 15, 1);
+  const W_COV = 0x6a4a26, W_COV_L = 0x8e6834;   // the coverts a mid golden brown (no pale sticks)
   const wing = (s) => {
     const m = new VoxelModel();
-    for (let i = 0; i <= 22; i++) {   // along the wing (outward)
-      const len = Math.round(9 - i * 0.18 + (i > 14 ? (i - 14) * 0.6 : 0));
+    for (let i = 0; i <= 23; i++) {   // along the wing (outward), feathers 3 columns wide
+      const f = Math.floor(i / 3), k = i % 3;
+      const len = 9 + (f >= 4 ? (f - 3) * 2 + 1 : 0) - (2 - k);   // pointed feathers, stepped primaries
       for (let j = 0; j <= len; j++) {   // feather length (down / back)
-        const c = j < 3 ? SC(i, j, 0) : (j === 4 || j === 9) ? RED : (j > len - 2 ? 0x1c2a6a : TEAM);
-        m.set(s * i, -Math.round(j * 0.55), -j, c);
-        if (c === TEAM && j % 3 === 0) tset(m, s * i, -Math.round(j * 0.55), -j, TEAM_SHADE);
+        const wy = -Math.round(j * 0.55), wz = -j;
+        if (j < 3) {   // the coverts: two scaled rows and a dark edge, thick only along the inner arm
+          const c = j === 2 ? W_BAND : (f % 2 ? W_COV : W_COV_L);
+          m.set(s * i, wy, wz, c);
+          if (i < 12 && j < 2) m.set(s * i, wy + 1, wz, f % 2 ? W_COV : W_COV_L);
+          continue;
+        }
+        if ((j === 4 && k !== 0) || (j === 5 && k === 1)) { m.set(s * i, wy, wz, RED); continue; }   // a red chevron per feather
+        const tip = j > len - 2;
+        if (tip) tset(m, s * i, wy, wz, 0x7a7a7a);
+        else if (f % 2) tset(m, s * i, wy, wz, TEAM_SHADE);
+        else m.set(s * i, wy, wz, TEAM);
       }
     }
     return m;
   };
   rig('wadjet', { voxel: 0.09, anim: 'medusa', style: 'wadjet', pose: 'serpent' }, [
     part('coil', coil, [0, 0, 0], [0, 0, 0]),
-    part('tailA', seg(8, 2.2, 1.8), [0, 0, 0], [-2, 2, -4], 'coil'),
-    part('tailB', seg(8, 1.8, 1.2), [0, 0, 0], [0, 0, -8], 'tailA'),
-    part('tailC', seg(8, 1.2, 0.4), [0, 0, 0], [0, 0, -8], 'tailB'),
+    part('tailA', seg(8, 2.2, 1.8, 0), [0, 0, 0], [-2, 2, -4], 'coil'),
+    part('tailB', seg(8, 1.8, 1.2, 8), [0, 0, 0], [0, 0, -8], 'tailA'),
+    part('tailC', seg(8, 1.2, 0.4, 16), [0, 0, 0], [0, 0, -8], 'tailB'),
     part('torso', hood, [4, 0, 2], [0, 9, 1], 'coil'),
-    part('wingL', wing(1), [0, 0, 0], [2.5, 9, -1], 'torso'),
-    part('wingR', wing(-1), [0, 0, 0], [-2.5, 9, -1], 'torso'),
+    part('wingL', wing(1), [0, 0, 0], [2, 6, -4], 'torso'),
+    part('wingR', wing(-1), [0, 0, 0], [-2, 6, -4], 'torso'),
   ]);
 }
 
