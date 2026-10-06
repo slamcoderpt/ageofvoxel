@@ -2172,6 +2172,25 @@ the left low and forward in guard, a slow breathing bob. Walk, attack and
 die are the beast rig's. Check with `--params "eu_focus=avenger"`,
 `"eu_one=avenger&eu_turn=20&eu_zoom=1.2&eu_pitch=30"` and `eu_group=myth`.
 
+The Avenger's head, chest, arms and swords (round 26, myth_12): the
+round-25 nemes, collar and lappets put one team / gold stripe on head and
+chest at one voxel scale, so no face came through, and the raised sword
+crossed the body. `headE('falcon')` now has no nemes: a dark slate
+feathered head (one flat tone, a crown one row over the skull, the nape
+falling behind to the shoulders with a darker row every third row) round a
+flat cream face plane (x 1..5, y 1..5) set off by a near-black outline row
+along the brow and down both sides, two 1-voxel black eyes with a white
+glint outside each, a yellow beak two voxels proud with a dark hooked tip.
+The collar is four rows (gold, team, team, gold) on the shoulders over a
+plain bare chest. `manArmM({ slim: true })` (`ARM_ROWS_SLIM`, a 3 x 3 fist
+in `handVox`) cuts the Avenger's arms about 30 % (5-wide plus deltoid, 3 x 3
+upper arm, 3-wide plus forearm), so they read thinner than the legs. The
+`idles` stance holds both swords low at the sides like myth_12, the arms a
+little out, forearms forward, each blade pointing forward, down and out,
+clear of the torso (none raised over the head). The Mummy's hood
+(`nemesH({ plain: true })`) is one solid team dome and back curtain, the
+stripes kept on the side wings and lappets only.
+
 Raptors (round 20, myth_06 / myth_13): the Roc and the Phoenix share one bird
 build (`raptorWing / raptorTail / raptorHead / raptorLeg`,
 export-egypt-units.mjs). Each wing is two parts: the arm (`wingL / wingR`,

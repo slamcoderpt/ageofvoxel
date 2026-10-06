@@ -699,7 +699,7 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 			set(CH_weapon, 0.15 + S(p) * 0.2);
 		}
 		if (archer && pose != P_SLING) { set(CH_armL, -0.25 + S(p) * 0.3, 0, 0.08); set(CH_weapon, 0.2); }
-		if (beast) { set(CH_armL, S(p) * 0.4, 0, 0.15); set(CH_armR, -S(p) * 0.4 - 0.2, 0, -0.15); set(CH_weapon, 0.6); }
+		if (beast) { set(CH_armL, S(p) * 0.4, 0, 0.15); set(CH_armR, -S(p) * 0.4 - 0.2, 0, -0.15); set(CH_weapon, 0.3); }
 		// (round 12, Egyptian men) the elbows soft on the walk, the forward
 		// swinging forearm bending more, so the arms are not stiff sticks
 		if (rig.stance > 0 && !beast) {
@@ -1029,11 +1029,14 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 				const double h = uhash(id, 91) * 0.25;
 				set(CH_legL, -0.42, 0.15, 0.24); set(CH_shinL, 0.45);
 				set(CH_legR, 0.2, -0.1, -0.24); set(CH_shinR, 0.25);
-				set(CH_torso, 0.14 + b * 0.02, 0.42 + h * 0.4, -0.04);
-				set(CH_head, -0.05 + b * 0.02, -0.38, 0.04);
-				set(CH_armR, -2.45 - h + b * 0.04, 0.25, -0.45); set(CH_foreR, -0.75);
-				set(CH_armL, -0.75, -0.2, 0.3 + b * 0.03); set(CH_foreL, -0.95);
-				set(CH_weapon, -0.25);
+				// (round 26) both swords low at the sides (myth_12): the arms hang
+				// a little out from the body, the forearms forward, each blade
+				// pointing forward, down and out, clear of the torso and legs
+				set(CH_torso, 0.14 + b * 0.02, 0.2 + h * 0.3, -0.04);
+				set(CH_head, -0.05 + b * 0.02, -0.18, 0.04);
+				set(CH_armR, -0.3 - h * 0.3 + b * 0.03, 0.1, -0.4); set(CH_foreR, -0.55);
+				set(CH_armL, -0.3 + b * 0.03, -0.1, 0.4); set(CH_foreL, -0.55);
+				set(CH_weapon, 0.3);
 				bob = -1.5 + b * 0.15;
 			}
 		}

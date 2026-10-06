@@ -325,7 +325,9 @@ function nemesT(m, { line = 0xf2ead2, chest = 8, tip = GOLD } = {}) {
 // the cheeks (z <= 3, the face stays clear) and flare a voxel out every
 // three or four rows down to the shoulders, joined by a back curtain, the lowest row a dark
 // shaded hem. Two lappets come forward over the shoulders onto the chest.
-function nemesH(m, { line = 0xf2ead2, chest = 8, tip = GOLD } = {}) {
+// (round 26) plain: the dome and the back curtain one solid team colour, the
+// stripes kept on the side wings and the lappets only (no striped beehive)
+function nemesH(m, { line = 0xf2ead2, chest = 8, tip = GOLD, plain = false } = {}) {
   const S = (y) => ((((y + 33) % 3) === 0) ? line : TEAM);
   const put = (x, y, z, c) => { if (c === TEAM) tset(m, x, y, z, 0xffffff); else if (c === 'sh') tset(m, x, y, z, TEAM_SHADE); else if (c === 'dk') tset(m, x, y, z, 0x8a8a8a); else m.set(x, y, z, c); };
   // the dome: y 5..10, the shell 1-1.4 voxels thick round the skull's centre
@@ -339,7 +341,7 @@ function nemesH(m, { line = 0xf2ead2, chest = 8, tip = GOLD } = {}) {
       const inner = ((x - 3) / (rx - 1.3)) ** 2 + ((z - 2.5) / (rz - 1.3)) ** 2;
       if (y < 11 && rx > 2.6 && inner < 1 && (m.has(x, y, z) || y >= 8)) continue;   // the skull inside (hollow under the crown)
       if (y < 7 && z >= 5) continue;                                       // the face open below the band
-      put(x, y, z, y >= 10 ? (((x + 33) % 3) === 1 ? line : TEAM) : S(y));
+      put(x, y, z, plain ? TEAM : y >= 10 ? (((x + 33) % 3) === 1 ? line : TEAM) : S(y));
     }
   }
   for (let x = 0; x <= 6; x++) m.set(x, 6, 6, GOLD);
@@ -355,7 +357,7 @@ function nemesH(m, { line = 0xf2ead2, chest = 8, tip = GOLD } = {}) {
       if (side && x > -1 - k && x < 7 + k && z > zb && z < 3 && m.has(x, y, z)) continue;
       const hem = y === -4;
       const edge = z === 3 && side;                                      // the front edge behind the cheek, shaded
-      put(x, y, z, hem ? 'dk' : edge ? (S(y) === TEAM ? 'sh' : line) : S(y));
+      put(x, y, z, hem ? 'dk' : plain && !side ? TEAM : edge ? (S(y) === TEAM ? 'sh' : line) : S(y));
     }
   }
   // the lappets: 2 wide, forward over the shoulders, then down the chest
@@ -488,27 +490,42 @@ function headE(style) {
     m.set(2, 3, 5, MU_FACE_D).set(4, 3, 5, MU_FACE_D).set(3, 1, 5, 0x3a2216);
     for (let x = 0; x <= 6; x++) for (let z = 0; z <= 5; z++) if (m.has(x, 0, z)) m.set(x, 0, z, z === 5 || x === 0 || x === 6 ? 0xd2c4a2 : 0xb4a482);
     m.set(0, 1, 3, 0xb4a482).set(6, 1, 3, 0xb4a482);
-    nemesH(m, { chest: 6 });
+    nemesH(m, { chest: 6, plain: true });
   } else if (style === 'falcon') {
-    // (round 25, the Avenger, myth_12) a falcon's face, not a black slab: a
-    // slate crown and nape, a cream face disc from throat to brow with
-    // 1-voxel black eyes under slate brows, a dark malar stripe under each
-    // eye, a dark hooked beak over a yellow cere standing out of the face
-    // (orange or gold beaks graded to pink); framed
-    // by the hood-shaped nemes in team and gold stripes with gold lappets
+    // (round 26, the Avenger, myth_12) Retold's falcon head, no nemes: the
+    // round-25 team / gold striped nemes, the striped collar and lappets put
+    // the same stripe on the head and the chest, and no face came through.
+    // Now a dark slate feathered head and nape (one flat tone, a darker
+    // scallop row every third row on the nape only) round one flat cream face
+    // plane (x 1..5, y 1..5) set off by a near-black outline row along the
+    // brow and down both sides; two 1-voxel black eyes with a white glint
+    // voxel outside each, a yellow beak standing two voxels out of the face
+    // with one dark hooked tip. Nothing striped on the head.
     m.vox.clear();
-    const SL = 0x4a515c, SL_D = 0x30353d, CR = 0xeee6d2, CR_D = 0xc8bea6, EYE = 0x050403;
-    faceN(m, SL, SL_D, { eyes: [CR, EYE], brow: SL_D, nose: SL, face: CR });
-    for (let x = 1; x <= 5; x++) for (let y = 0; y <= 5; y++) m.set(x, y, 5, y === 0 ? CR_D : CR);   // the cream face disc, throat to brow
-    for (const x of [0, 6]) for (let y = 1; y <= 3; y++) if (m.has(x, y, 4)) m.set(x, y, 4, CR_D);
-    m.set(2, 4, 5, EYE).set(4, 4, 5, EYE);                                                       // 1-voxel black eyes
-    m.set(1, 5, 5, SL_D).set(2, 5, 5, SL_D).set(4, 5, 5, SL_D).set(5, 5, 5, SL_D);               // a slate brow over each
-    m.set(1, 3, 5, SL_D).set(1, 2, 5, SL_D).set(5, 3, 5, SL_D).set(5, 2, 5, SL_D);               // the malar stripes
-    m.set(3, 5, 5, SL).set(3, 4, 5, SL);                                                         // the bridge
-    m.box(2, 3, 6, 3, 1, 1, 0xe8c800).set(3, 4, 6, 0xe8c800);                                    // the yellow cere
-    m.set(3, 3, 7, 0x4a4440).set(3, 2, 7, 0x3a3430).set(3, 2, 8, 0x2a2420).set(3, 1, 8, 0x141210).set(3, 1, 7, 0x141210);   // the dark hooked beak
-    m.set(2, 2, 6, 0x3a3430).set(4, 2, 6, 0x3a3430).set(3, 2, 6, 0x3a3430);
-    nemesH(m, { line: 0xd0a800, chest: 6 });
+    const SL = 0x3e444e, SL_D = 0x2a2e35, SL_L = 0x56606c, OUT = 0x121418;
+    const CR = 0xf0e8d4, CR_D = 0xd2c8b0, EYE = 0x050403, BK = 0xf0c800, BK_D = 0xb08a00;
+    faceN(m, SL, SL_D, { eyes: [CR, EYE], brow: null, nose: SL, face: SL });
+    for (let x = 1; x <= 5; x++) for (let y = 1; y <= 5; y++) m.set(x, y, 5, y === 1 ? CR_D : CR);   // the cream face plane
+    for (let y = 1; y <= 6; y++) m.set(0, y, 5, OUT).set(6, y, 5, OUT);                            // the outline down both sides
+    for (let x = 0; x <= 6; x++) m.set(x, 6, 5, OUT);                                               // and along the brow
+    m.set(1, 0, 5, OUT).set(5, 0, 5, OUT).set(2, 0, 5, CR_D).set(3, 0, 5, CR_D).set(4, 0, 5, CR_D);   // the throat
+    m.set(2, 4, 5, EYE).set(4, 4, 5, EYE).set(1, 4, 5, 0xffffff).set(5, 4, 5, 0xffffff);         // eyes, a white glint outside each
+    m.set(3, 4, 5, CR).set(3, 3, 5, BK).set(3, 2, 5, BK);                                           // the beak's root
+    m.set(3, 3, 6, BK).set(2, 3, 6, BK_D).set(4, 3, 6, BK_D).set(3, 2, 6, BK).set(3, 2, 7, BK).set(3, 1, 7, OUT).set(3, 1, 6, BK_D);   // the beak, a dark hooked tip
+    // the crown: one dark dome over the skull, a voxel proud of the brow
+    for (let x = 0; x <= 6; x++) for (let z = -1; z <= 5; z++) {
+      if ((x === 0 || x === 6) && (z === -1 || z === 5)) continue;
+      m.set(x, 8, z, z === 5 ? SL_D : SL);
+    }
+    for (let x = 0; x <= 6; x++) m.set(x, 7, 5, SL_D).set(x, 7, 6, OUT);   // the brow ridge over the outline
+    for (let y = 1; y <= 7; y++) m.set(-1, y, 1, SL).set(-1, y, 2, SL).set(-1, y, 3, SL_D).set(7, y, 1, SL).set(7, y, 2, SL).set(7, y, 3, SL_D);   // the cheeks behind the face
+    // the nape: feathers falling from the crown down the back to the shoulders, widening a little
+    for (let y = 7; y >= -3; y--) {
+      for (let x = (y < 2 ? -1 : 0); x <= (y < 2 ? 7 : 6); x++) {
+        m.set(x, y, -1, ((y + 30) % 3 === 0 && y < 4) ? SL_D : SL);
+        if (y < 2) m.set(x, y, -2, y === -3 ? OUT : SL_D);
+      }
+    }
   } else if (style === 'minion') {
     const GR = pick3(65, 0x8c8c86, 0x7e7e78, 0x9a9a92);
     m.vox.clear();
@@ -726,8 +743,17 @@ const ARM_ROWS = [
 // (x 0, z 0..1, rows 0..2) a haft passes through, the fingers wrapped round
 // it in front (z 2) and the palm behind (z -1): GRIP_C is its centre (rig
 // voxels from the shoulder joint, straight arm)
-function handVox(m, pal, out, { grip = false, fist = null } = {}) {
+function handVox(m, pal, out, { grip = false, fist = null, slim = false } = {}) {
   const H = palH(pal);
+  if (slim) {
+    // a 3 x 3 fist, the knuckles a lit row in front, the corners rounded
+    for (let y = 0; y <= 2; y++) for (let x = -1; x <= 1; x++) for (let z = -1; z <= 1; z++) {
+      if (Math.abs(x) === 1 && Math.abs(z) === 1 && y !== 1) continue;
+      const inner = x * out < 0, front = z === 1;
+      m.set(x, y, z, fist || (front ? (y === 1 ? H : pal.L) : inner ? pal.D : pal.M));
+    }
+    return m;
+  }
   for (let y = 0; y <= 2; y++) for (let x = -1; x <= 1; x++) for (let z = -1; z <= 2; z++) {
     if (y === 0 && z === -1) continue;                    // the fingertips curl under the front
     if (y === 2 && z === 2 && !grip) continue;            // the back of the hand slopes to the knuckles
@@ -744,10 +770,19 @@ function handVox(m, pal, out, { grip = false, fist = null } = {}) {
   return m;
 }
 const GRIP_C = [0, -8.5, 0.25];
-function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, sleeve = null, fist = null, bend = 0, grip = false } = {}) {
+// (round 26) a slim arm (the Avenger, myth_12): a 5-wide plus at the
+// deltoid, a 3 x 3 upper arm, a 3-wide plus forearm and wrist and a 3 x 3
+// fist (no fourth knuckle row), about 30 % less than the men's, so the arms
+// read thinner than the legs, not as a gorilla's
+const ARM_ROWS_SLIM = [
+  [18, 1.4, 1.4], [17, 2.0, 1.6], [16, 2.0, 1.7], [15, 2.0, 1.7], [14, 1.7, 1.6], [13, 1.6, 1.6],
+  [12, 1.5, 1.5], [11, 1.5, 1.5], [10, 1.4, 1.4], [9, 1.25, 1.25],
+  [8, 1.25, 1.25], [7, 1.25, 1.25], [6, 1.25, 1.25], [5, 1.2, 1.2], [4, 1.1, 1.1], [3, 1.0, 1.0],
+];
+function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, sleeve = null, fist = null, bend = 0, grip = false, slim = false } = {}) {
   const m = new VoxelModel();
   const out = side === 'L' ? 1 : -1, H = palH(pal);
-  limbRows(m, ARM_ROWS, (x, y, z, nx, nz) => {
+  limbRows(m, slim ? ARM_ROWS_SLIM : ARM_ROWS, (x, y, z, nx, nz) => {
     const inner = nx * out < -0.55, front = nz > 0.45;
     let c = front ? pal.L : inner ? pal.D : pal.M;
     if (y >= 16 && nz > -0.6 && !inner) c = H;            // the lit shoulder cap
@@ -758,7 +793,7 @@ function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, 
     if (sleeve && y >= 13) c = y === 13 ? (typeof sleeve === 'number' ? shadeC(sleeve, 0.86) : sleeve) : sleeve;
     return c;
   });
-  handVox(m, pal, out, { grip, fist });
+  handVox(m, pal, out, { grip, fist, slim });
   return bendArm(m, bend);
 }
 const shadeC = (c, k) => { const r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255; return (Math.round(r * k) << 16) | (Math.round(g * k) << 8) | Math.round(b * k); };
@@ -2051,7 +2086,9 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
   const body = manTorso();
   eKilt(body, { len: 8, hem: GOLD });
   eBelt(body, GOLD, GOLD_DK);
-  eCollar(body, [GOLD, TM, TM, GOLD, TM_SH, GOLD], { r0: 2.4 });
+  // (round 26) a narrow broad collar (gold, two team rows, gold) on the
+  // shoulders and a plain bare chest under it: no stripes below the collar
+  eCollar(body, [GOLD, TM, TM, GOLD], { r0: 2.4 });
   for (let y = -2; y <= 14; y++) for (let x = -7; x <= 6; x++) {
     let zb = 9; for (let z = -6; z <= 4; z++) if (body.has(x, y, z)) { zb = z; break; }
     if (zb === 9 || (y < 1 && Math.abs(x + 0.5) > 5)) continue;
@@ -2061,7 +2098,7 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
   const shinA = manShinM({ pal: PAL_SC, sandal: null, foot: 0xd8b060 });
   shinA.set(-2, 0, 5, DARK).set(1, 0, 5, DARK).set(-1, 0, -3, DARK);   // talons
   rig('avenger', { voxel: 0.1, anim: 'beast', style: 'beast', idles: true }, [
-    ...beastManParts({ torso: body, head: headE('falcon'), headPivot: HEAD_PIVOT, headScale: HEAD_SCALE, headZ: 0.4, arm: { band: GOLD, bracer: TEAM }, leg: { kilt: TEAM, pal: { L: 0x4a5058, M: 0x3a3f48, D: 0x2e3239 } }, shin: shinA }),
+    ...beastManParts({ torso: body, head: headE('falcon'), headPivot: HEAD_PIVOT, headScale: HEAD_SCALE, headZ: 0.4, arm: { band: GOLD, bracer: TEAM, slim: true }, leg: { kilt: TEAM, pal: { L: 0x4a5058, M: 0x3a3f48, D: 0x2e3239 } }, shin: shinA }),
     // (round 15) the blades low in a fighting grip, forward, down and out
     // from the fists (myth_12), never along the arms
     // in a deep orange-leaning gold (the plain GOLD reads pale beside the linen)
