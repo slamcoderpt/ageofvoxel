@@ -318,6 +318,15 @@ function headE(style) {
     for (let x = 0; x <= 6; x++) m.set(x, 6, 5, HAIR);
     ringN(m, 7, TEAM);
     m.box(-2, 1, 1, 1, 5, 2, HAIR).box(-2, -3, 1, 1, 4, 1, HAIR).set(-2, -4, 1, GOLD(0, 0, 0));
+  } else if (style === 'shaved') {
+    // (round 22, the Scorpion Man, myth_08) a shaved head: a smooth skull a
+    // step darker than the face with one lit row on the crown, no wig or
+    // headband; gold earrings
+    const SK = 0x9a5632, SK_L = 0xbc7848;
+    // no cap round the skull (it read as a hat brim): the face block's own
+    // crown with a low dome on top, the lit row along its middle
+    for (let x = 1; x <= 5; x++) for (let z = 0; z <= 4; z++) m.set(x, 8, z, x >= 2 && x <= 4 && z >= 1 && z <= 3 ? SK_L : SK);
+    m.set(-1, 3, 3, GOLD(0, 0, 0)).set(7, 3, 3, GOLD(0, 0, 0));
   } else if (style === 'axe') {
     nemesN(m, GOLD, BLACK);
   } else if (style === 'sling') {
@@ -2403,68 +2412,125 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
 
 // Scorpion Man (four-legged rig, 0.09): a man's torso (bronze skin, a gold
 // collar, a shaved head) on a scorpion's body of team and white plates, eight
-// black legs, black pincers and a tail arching over the back.
+// long dark legs, two big chelae and a tail curled over the back (myth_08).
+// Round 22: the tail is six team plates that taper (radius 1.9 -> 0.95, length
+// 4.6 -> 2.8) along a C-arc up from the rump and forward over the back, each a
+// solid plate with one pale line along the arc's outer edge and a darker rim
+// where it meets the next, ending in a maroon bulb with a dark barb hooking
+// down; its joints use the tailA/B/C channels (the rig's `sting` flag sways and
+// strikes with them), never the horse's tail channel, which bent all six joints
+// down and sideways at once (the "broken pipe"). Each leg is a femur rising out
+// to a high knee and a long tibia angled out and down to a point on the ground,
+// near-black with a slate highlight line on top; the chelae are a palm with a
+// fixed and a movable finger round a gap, slate with a lighter top and dark tips;
+// the rider is shaved (no wig or headband: myth_08).
 {
   // (round 16) myth_08: team plates across the back, each 3 voxels long with a dark chitin seam and
-  // its rear row a shade darker (the plates overlap), the lower flanks white; no per-voxel checker
+  // its rear row a shade darker (the plates overlap), the lower flanks white
   const PLATE = (x, y, z) => (y <= 2 ? 0xeceae2 : z % 3 === 0 && y >= 3 ? 0x24222a : TEAM);
-  const CHIT = pick3(82, 0x1e1c22, 0x2a2830, 0x16141a);
+  const BELLY = 0xbdb8ac;
   const body = new VoxelModel();
   for (let z = 0; z <= 16; z++) {
     const w = 3.6 - Math.abs(z - 8) * 0.06;
     for (let x = -4; x <= 10; x++) for (let y = 0; y <= 6; y++) {
       const dx = (x - 3) / w, dy = (y - 3) / 2.6;
-      if (dx * dx + dy * dy <= 1) body.set(x, y, z, y <= 1 ? CHIT(x, y, z) : PLATE(x, y, z));
+      if (dx * dx + dy * dy <= 1) body.set(x, y, z, y <= 1 ? BELLY : PLATE(x, y, z));
     }
   }
   for (let z = 0; z <= 16; z++) for (let x = -4; x <= 10; x++) for (let y = 2; y <= 6; y++) { const v = body.get(x, y, z); if (v && v.team && z % 3 === 1) v.c = TEAM_SHADE; }
-  // the pincers at the front (they move with the "neck" channel)
+  // the chelae (they move with the "neck" channel): a two-part arm out and
+  // forward, a swollen palm, a fixed outer finger and a movable inner one
+  // curving towards each other round a clear gap
+  const CL = 0x2a2630, CL_L = 0x4e4858, CL_D = 0x100c12;
+  const clawC = (cy) => (x, y) => (y >= cy + 1 ? CL_L : CL);
   const pin = new VoxelModel();
   for (const s of [-1, 1]) {
-    const x0 = s < 0 ? -4 : 4;
-    tube(pin, [x0, 1, 0], [x0 + s * 2, 1, 5], 1.0, 1.0, CHIT);
-    tube(pin, [x0 + s * 2, 1, 5], [x0 + s * 1, 2, 9], 1.6, 1.8, CHIT);
-    pin.box(x0 + s * 1 - 1, 1, 10, 3, 2, 3, CHIT).carve(x0 + s * 1, 2, 11, 1, 1, 2);
-    pin.set(x0 + s * 1, 3, 9, 0x8a4a52);
+    tube(pin, [s * 3, 2, 0], [s * 6, 3, 3.5], 0.9, 0.9, clawC(3));
+    tube(pin, [s * 6, 3, 3.5], [s * 5.5, 3, 7.5], 0.95, 1.2, clawC(3));
+    for (let x = -8; x <= 8; x++) for (let y = 0; y <= 6; y++) for (let z = 7; z <= 14; z++) {
+      const dx = (x + 0.5 - s * 5.4) / 2.1, dy = (y + 0.5 - 3.3) / 1.9, dz = (z + 0.5 - 10.3) / 2.4;
+      if (dx * dx + dy * dy + dz * dz <= 1) pin.set(x, y, z, y >= 4 ? CL_L : CL);
+    }
+    // the fixed finger (outer) and the movable finger (inner), tips dark and turned in
+    tube(pin, [s * 6.6, 3.5, 11.8], [s * 6.8, 3.5, 15.2], 1.0, 0.6, (x, y, z, t) => (t > 0.75 ? CL_D : y >= 4 ? CL_L : CL));
+    tube(pin, [s * 6.8, 3.5, 15.2], [s * 5.6, 3.5, 16.4], 0.6, 0.45, CL_D);
+    tube(pin, [s * 3.4, 3, 11.8], [s * 2.6, 3, 14.6], 0.9, 0.5, (x, y, z, t) => (t > 0.75 ? CL_D : CL));
+    tube(pin, [s * 2.6, 3, 14.6], [s * 3.4, 3, 15.8], 0.5, 0.45, CL_D);
   }
-  // the tail arches up from the rump and over the back, the sting forward
-  const ANG = [0.35, 0.9, 1.4, 1.9, 2.4, 2.85];
-  const dirOf = (a) => [0, Math.sin(a) * 4.5, -Math.cos(a) * 4.5];
+  // the tail: six tapering plates on a C-arc, angle a measured from straight
+  // back (0) through up (pi/2) to forward (pi); the pale line runs along the
+  // arc's outer side (-cos a, -sin a in y, z)
+  const ANG = [1.05, 1.6, 2.15, 2.65, 3.15, 3.7];
+  const LEN = [4.6, 4.3, 3.9, 3.5, 3.1, 2.8];
+  const RAD = [1.9, 1.7, 1.5, 1.3, 1.12, 0.95];
+  const T_RIM = TEAM_SHADE, T_LINE = 0xe6e8ee;
+  const dirOf = (i) => [0, Math.sin(ANG[i]) * LEN[i], -Math.cos(ANG[i]) * LEN[i]];
   const tseg = (i) => {
     const m = new VoxelModel();
-    const d = dirOf(ANG[i]), r = 2 - i * 0.15;
-    tube(m, [0, 0, 0], d, r, r - 0.15, (x, y, z, t) => (t < 0.25 ? CHIT(x, y, z) : (y - d[1] * t > 0 ? 0xeceae2 : TEAM)));
-    if (i === 5) { tube(m, d, [0, d[1] - 2, d[2] + 2.5], 1.2, 0.4, 0x8a3a3a); m.set(0, Math.round(d[1] - 2), Math.round(d[2] + 3), 0xffd0a0, { glow: 0.3 }); }
+    const d = dirOf(i), a = ANG[i], r = RAD[i], r1 = RAD[i + 1] || r * 0.85;
+    const ou = [0, -Math.cos(a), -Math.sin(a)];
+    const back = [0, -d[1] / LEN[i] * 0.7, -d[2] / LEN[i] * 0.7];   // overlap the joint so a bend stays closed
+    const shade = [];   // team voxels a step darker (tset after the tube)
+    const SH = (x, y, z) => { shade.push([x, y, z]); return TEAM; };
+    tube(m, back, d, r, r1 + 0.05, (x, y, z, t) => {
+      const py = y + 0.5, pz = z + 0.5;
+      const along = (py * d[1] + pz * d[2]) / (LEN[i] * LEN[i]);
+      const cy = d[1] * along, cz = d[2] * along;
+      const o = (py - cy) * ou[1] + (pz - cz) * ou[2];
+      if (along > 0.84) return SH(x, y, z);                              // the plate's rim, under the next plate
+      if ((x === 0 || x === -1) && o > r * 0.7) return T_LINE;                         // one light line along the outer edge
+      if (o < -r * 0.4) return SH(x, y, z);                              // the inner (shaded) side a step darker
+      return TEAM;
+    });
+    for (const [x, y, z] of shade) if (m.get(x, y, z)?.team) m.get(x, y, z).c = T_RIM;
+    if (i === 5) {
+      // the venom bulb, maroon with a lighter top, and a dark barb hooking down and back
+      const bc = [d[0], d[1] - 1.2, d[2] + 0.6];
+      for (let x = -3; x <= 3; x++) for (let y = -6; y <= 4; y++) for (let z = -3; z <= 6; z++) {
+        const dx = (x + 0.5 - bc[0]) / 1.55, dy = (y + 0.5 - bc[1]) / 1.7, dz = (z + 0.5 - bc[2]) / 1.75;
+        if (dx * dx + dy * dy + dz * dz <= 1) m.set(x, y, z, y + 0.5 > bc[1] + 0.6 ? 0x9a4440 : 0x6e2426);
+      }
+      const b0 = [0, Math.round(bc[1] - 2), Math.round(bc[2] + 0.4)];
+      for (const x of [-1, 0]) m.set(x, b0[1], b0[2], 0x241418).set(x, b0[1], b0[2] - 1, 0x241418);   // the barb's base
+      m.set(0, b0[1] - 1, b0[2], 0x160c10).set(-1, b0[1] - 1, b0[2], 0x160c10).set(0, b0[1] - 2, b0[2] - 1, 0x0e080a).set(0, b0[1] - 3, b0[2] - 2, 0x0e080a);
+    }
     return m;
   };
   const tail = [];
   let prev = 'body';
+  const TCH = ['tailA', 'tailA', 'tailB', 'tailB', 'tailC', 'tailC'];
   for (let i = 0; i < 6; i++) {
     const nm = i ? `tail${i + 1}` : 'tail';
-    tail.push(part(nm, tseg(i), [0, 0, 0], i ? dirOf(ANG[i - 1]) : [0, 4, -8], prev, { anim: 'tail' }));
+    tail.push(part(nm, tseg(i), [0, 0, 0], i ? dirOf(i - 1) : [0, 4, -7.5], prev, { anim: TCH[i] }));
     prev = nm;
   }
-  const legUp = new VoxelModel().box(0, 0, 0, 1, 1, 1, CHIT).line(0, 0, 0, 0, 3, 0, CHIT);
-  const legLow = new VoxelModel().line(0, 6, 0, 0, 0, 1, CHIT).set(0, 0, 2, CHIT);
+  // the legs: a femur rising out to a high knee, a long tibia angled out and
+  // down to a point on the ground; near-black, a slate line along the top
+  const LG = 0x1c1a22, LG_L = 0x4a4858, LG_D = 0x0e0c10;
   const legs = [];
   const LCH = [['FL', 'FR'], ['BR', 'BL'], ['FL', 'FR'], ['BR', 'BL']];
+  const SPREAD = [1.8, 0.6, -0.6, -1.8];   // the front legs reach forward, the back ones back
   [5, 1.5, -2, -5.5].forEach((z, i) => {
     for (const s of [1, -1]) {
       const ch = s > 0 ? LCH[i][0] : LCH[i][1];
       const nm = `${s > 0 ? 'L' : 'R'}${i}`;
-      const up = new VoxelModel(); tube(up, [0, 0, 0], [s * 4, 3, 0], 0.7, 0.6, CHIT);
+      const knee = [s * 4.2, 4.2, SPREAD[i]];
+      const up = new VoxelModel(); tube(up, [0, 0, 0], knee, 0.95, 0.8, (x, y, z, t) => (y + 0.5 > t * knee[1] + 0.45 ? LG_L : LG));
+      const foot = [s * 3.4, -11.6, SPREAD[i] * 1.2];
+      const low = new VoxelModel();
+      tube(low, [0, 0, 0], foot, 0.95, 0.7, (x, y, z, t) => (t > 0.76 ? LG_D : t < 0.12 ? LG_L : (s * (x + 0.5) > s * foot[0] * t + 0.3 ? LG_L : LG)));
       legs.push(part(`leg${nm}`, up, [0, 0, 0], [s * 3, 2, z], 'body', { anim: `leg${ch}` }));
-      legs.push(part(`cannon${nm}`, legLow, [0.5, 6, 0.5], [s * 4, 3, 0], `leg${nm}`, { anim: `cannon${ch}` }));
+      legs.push(part(`cannon${nm}`, low, [0, 0, 0], knee, `leg${nm}`, { anim: `cannon${ch}` }));
     }
   });
   const t = manTorso();
   eKilt(t, { color: OCHRE, side: 0xa87424, hem: GOLD, len: 3, fold: false }); eBelt(t, GOLD, GOLD_DK); eCollar(t, [GOLD, TM, TM, GOLD], { r0: 2.6 });
-  rig('scorpion_man', { voxel: 0.09, anim: 'horse', style: 'scorpion', gait: 1.0, stride: 0.5 }, [
+  rig('scorpion_man', { voxel: 0.09, anim: 'horse', style: 'scorpion', gait: 1.0, stride: 0.5, sting: true, graze: false }, [
     part('body', body, [3, 0, 8], [0, 6, -1]),
     part('neck', pin, [0, 0, 0], [0, 0, 7], 'body'),
     ...tail,
     ...legs,
-    ...manParts({ torso: t, legs: false, torsoJoint: [0, 5, 7], torsoParent: 'body', head: 'spear', arm: { bracer: GOLD, band: TEAM } }),
+    ...manParts({ torso: t, legs: false, torsoJoint: [0, 5, 7], torsoParent: 'body', head: 'shaved', arm: { bracer: GOLD, band: TEAM } }),
     part('weapon', khopeshM(BRONZE), [0, 0, 0], HAND_E, 'armR'),
   ]);
 }

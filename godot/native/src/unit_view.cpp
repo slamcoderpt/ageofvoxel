@@ -153,6 +153,7 @@ AovUnitView::Rig AovUnitView::parse_rig(const Dictionary &R, int t) {
 	rig.graze = (bool)R.get("graze", true);
 	rig.upright = (bool)R.get("upright", false);
 	rig.sprawl = (bool)R.get("sprawl", false);
+	rig.sting = (bool)R.get("sting", false);
 	{ const Variant sv = R.get("stance", 0.0); rig.stance = sv.get_type() == Variant::BOOL ? ((bool)sv ? 1.0f : 0.0f) : (float)(double)sv; }
 	rig.voxel = (float)(double)R.get("voxel", 0.07);
 	const Array parts = R.get("parts", Array());
@@ -524,6 +525,40 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 			set(CH_weapon, moving ? 0.9 : 0.25);
 		}
 		if (st != aov::A_DIE) { set(CH_armL, -0.75, 0.2, 0.25); set(CH_shield, 0.1, 1.1, 0); }
+		if (rig.sting) {
+			// (the Scorpion Man) its legs splay sideways: the left four (FL, BR)
+			// and right four (FR, BL) channels sweep fore / aft (yaw) and lift
+			// (roll) in alternating fours, the knees (cannons) never pitch; the
+			// tail sways a little and, attacking, cocks back then strikes forward
+			const double p = t * 12 * rig.gait, A = rig.stride;
+			auto sleg = [&](int up, int cannon, double ph, double side) {
+				const double s = moving ? S(p + ph) : 0, c = moving ? C(p + ph) : 0;
+				set(up, 0, -side * s * 0.5 * A * 1.6, side * std::max(0.0, c) * 0.3 * A * 1.6);
+				set(cannon, 0);
+			};
+			sleg(CH_legFL, CH_cannonFL, 0, 1);
+			sleg(CH_legBR, CH_cannonBR, PI, 1);
+			sleg(CH_legFR, CH_cannonFR, PI, -1);
+			sleg(CH_legBL, CH_cannonBL, 0, -1);
+			const double sw = moving ? S(p * 0.5) : S(t * 0.7 + id);
+			set(CH_tailA, 0.02 * sw, 0.04 * sw);
+			set(CH_tailB, 0.03 * sw, 0.05 * sw);
+			set(CH_tailC, 0.05 * sw, 0.06 * sw);
+			set(CH_body, moving ? S(p * 2) * 0.02 : 0);
+			if (attacking) {
+				set(CH_tailA, -0.12 * wind + 0.2 * extend); set(CH_tailB, -0.15 * wind + 0.3 * extend); set(CH_tailC, -0.2 * wind + 0.45 * extend);
+				set(CH_neck, -0.1 * wind + 0.15 * extend);
+			} else if (st == aov::A_DIE) {
+				const double k = smooth(die_t / 0.8);
+				for (int ch : { CH_legFL, CH_legBR }) set(ch, 0, 0, -0.5 * k);
+				for (int ch : { CH_legFR, CH_legBL }) set(ch, 0, 0, 0.5 * k);
+				for (int ch : { CH_cannonFL, CH_cannonBR }) set(ch, 0, 0, -0.6 * k);
+				for (int ch : { CH_cannonFR, CH_cannonBL }) set(ch, 0, 0, 0.6 * k);
+				set(CH_tailA, -0.35 * k); set(CH_tailB, -0.3 * k); set(CH_tailC, -0.25 * k);
+				set(CH_neck, 0.2 * k);
+			}
+			bob = moving ? 0.1 * (1 + C(p * 2)) * A : 0;
+		}
 		if (pose == P_MOUNT && st != aov::A_DIE) {
 			// (Egyptian riders, "mount") elbows in at the sides, both forearms
 			// bent forward: the left fist on the reins before the lap, the right

@@ -1947,6 +1947,28 @@ forward, the middle out, the hind pair back. The middle legs ride the
 `BR / BL` channels (horse anim). `--params "eu_focus=scarab"`
 (`&eu_state=walk|die`) / `"eu_one=scarab&eu_turn=60"` check it.
 
+Scorpion Man (round 22, myth_08): the tail is six team plates on a C-arc
+(`ANG` 1.05 -> 3.7 rad from straight back through up to forward-down) that
+taper (radius 1.9 -> 0.95, length 4.6 -> 2.8). Each plate is solid team with
+one two-voxel pale line along the arc's outer edge, its inner side and its
+rim (where it slides under the next plate) a team shade darker, and starts
+0.7 voxel back so a bend stays closed. The last plate ends in a maroon venom
+bulb (lighter top) with a near-black barb hooking down and back. The tail
+joints ride `tailA / tailB / tailC` (two plates each), not the horse's
+`tail` channel, which bent all six joints down and sideways at once (the
+broken-pipe pose). Rig flag `sting` (unit_view.cpp / .h): the eight legs
+sweep fore / aft (yaw) and lift (roll) in alternating fours (FL / BR on the
+left, FR / BL on the right), the knees never pitch; the tail sways a little,
+cocks back and strikes forward when attacking, uncurls and the legs fold
+in when dying. Each leg is a femur rising out to a high knee and a long
+tibia angled out and down to a point on the ground, near-black with a slate
+line along the top; the belly under the plates is pale, not black. The
+chelae are a swollen palm with a fixed outer and a movable inner finger round
+a gap (slate, lighter top, near-black tips), no red pixel. The rider has the
+new `shaved` head style (a bald skull with a lit crown, gold earrings, no wig
+or headband). `--params "eu_focus=scorpion_man"` (`&eu_state=walk|attack|die`)
+/ `"eu_one=scorpion_man&eu_turn=70"` check it.
+
 Raptors (round 20, myth_06 / myth_13): the Roc and the Phoenix share one bird
 build (`raptorWing / raptorTail / raptorHead / raptorLeg`,
 export-egypt-units.mjs). Each wing is two parts: the arm (`wingL / wingR`,
