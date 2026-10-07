@@ -5225,54 +5225,108 @@ function armory() {
   return m;
 }
 
-// Market (4 x 4; building_19): a long battered hall with an ochre band and a
-// projecting door portal, a stone pier, and the market's colour: three stalls
-// of bright team / white striped awnings over counters of produce, with
-// baskets, jars, crates and sacks spilling into the street.
+// Market (4 x 4; building_19), round 43: ONE building at half voxels
+// (`fine: 2` in TYPES, 1/16 tile). A solid, slightly battered mud-brick hall
+// (MKT_MUD, big brick courses) under a cavetto cornice that flares three
+// voxels out in steps over a lapis band and a painted frieze; on the front
+// axis a taller limestone entrance block with the owner's band, its porch cut
+// into it: two lotus columns (plain pale shafts, paint only at the base and
+// the neck, a capital flaring to a five-wide lotus in green and lapis petals)
+// before the single doorway. Along the east side ONE row of three stalls under
+// one shared cloth (blue / white stripes, the reference's), posts at the
+// stall ends, a counter of produce under each, crates and pots between them.
+const MKT_MUD = masonry([0xc28a52, 0xb8804a, 0xca935a], [0xad7843, 0xb7824c, 0xa4723f], { len: 10, course: 3, bed: 0.84, head: 0.9, grime: 3, seed: 43 });
+const MKT_AW = [0x2f5aa8, 0x2c56a2, 0x3460ae], MKT_AWW = [0xe9e6dc, 0xe2dfd4, 0xeeebe2];
+const MKT_COL = 0xeee3c9, MKT_COL_S = 0xd6c8a6, MKT_PET = 0x4f8a5a, MKT_PET_L = 0x67a46e;
+function lotusColumn(m, cx, cz, y0, top) {
+  // cx, cz: the shaft's centre cell; a 3 x 3 shaft from y0 + 2 to the neck
+  const neck = top - 6;
+  for (let i = -2; i <= 2; i++) for (let k = -2; k <= 2; k++) {
+    const corner = Math.abs(i) === 2 && Math.abs(k) === 2;
+    if (!corner) pset(m, cx + i, y0, cz + k, MKT_COL_S);                     // the round base disc
+  }
+  for (let y = y0 + 1; y < neck; y++) for (let i = -1; i <= 1; i++) for (let k = -1; k <= 1; k++) {
+    // paint only at the foot: a red and a lapis ring; the shaft plain, its
+    // corners a shade darker so it reads round
+    let c = y === y0 + 1 ? RED : y === y0 + 2 ? BLUEP : (Math.abs(i) + Math.abs(k) === 2 ? MKT_COL_S : MKT_COL);
+    pset(m, cx + i, y, cz + k, c);
+  }
+  // the neck: three tied bands (lapis, red, lapis)
+  [BLUEP, RED, BLUEP].forEach((c, j) => { for (let i = -1; i <= 1; i++) for (let k = -1; k <= 1; k++) pset(m, cx + i, neck + j, cz + k, c); });
+  // the lotus: sepals out on the four faces, then the open bell five wide,
+  // petals alternating green and lapis round its rim, pale inside
+  const yb = neck + 3;
+  for (let i = -1; i <= 1; i++) for (let k = -1; k <= 1; k++) pset(m, cx + i, yb, cz + k, MKT_COL);
+  for (const [i, k] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) pset(m, cx + i, yb, cz + k, MKT_PET);
+  for (let y = yb + 1; y <= yb + 2; y++) for (let i = -2; i <= 2; i++) for (let k = -2; k <= 2; k++) {
+    const rim = Math.abs(i) === 2 || Math.abs(k) === 2;
+    if (y === yb + 1 && Math.abs(i) === 2 && Math.abs(k) === 2) continue;
+    const u = i + k + 8;
+    pset(m, cx + i, y, cz + k, !rim ? MKT_COL : y === yb + 2 ? ((u & 1) ? MKT_PET_L : 0xe0c070) : ((u & 1) ? MKT_PET : BLUEP));
+  }
+  return yb + 3;   // the abacus row
+}
 function market() {
-  const m = lot(32, 32);
-  patch(m, 1, 16, 31, 31, PAVE, { seed: 2 });
-  block(m, 2, 2, 24, 15, 1, 14, { wall: LIME, roofC: HROOF_C, rimC: LIME, gorge: [GORGE, GORGE_L], lipOut: 2, flare: true, batter: 6, band: 'red', frieze: 1 });
-  door(m, '+z', 11, 3, 1, 8);
-  // the market's tall element: a columned portico before the door, two
-  // painted papyrus columns carrying a roof that stands above the hall's
-  const py = 19;
-  for (const cx of [8, 15]) for (let y = 1; y < py; y++) for (let i = 0; i < 3; i++) for (let k = 0; k < 3; k++) {
-    const r = y - 1, capital = y >= py - 3;
-    let c = r === 0 ? SAND_D(cx + i, y, 18 + k) : r <= 2 ? OCHRE : capital ? (y === py - 1 ? LIME(cx + i, y, 18 + k) : y === py - 2 ? RED : ((i + k) & 1 ? GREENP : BLUEP)) : r % 5 === 0 ? BLUEP : r % 5 === 1 ? RED : LIME(cx + i, y, 18 + k);
-    m.set(cx + i, y, 18 + k, c);
-    if (capital && y === py - 1) for (const [a, b] of [[-1, 1], [3, 1], [1, -1], [1, 3]]) m.set(cx + a, y, 18 + b, GREENP);
+  const m = lot(64, 64, EARTH);
+  m.stageStep = 12;
+  // the street before the door, paved
+  patch(m, 12, 44, 38, 64, PAVE, { seed: 2, rag: 3 });
+  // the hall: one battered mud-brick block, a deep stepped cavetto (three
+  // voxels out) over a lapis band and a painted frieze, a pale lip
+  block(m, 4, 6, 44, 40, 1, 24, { wall: MKT_MUD, batter: 10, band: 'lapis', frieze: 2, style: 'cornice', lipOut: 3, flare: true, rimC: LIME, roofC: PLASTER, rim: true });
+  let T = m.lastTop;
+  // a pale parapet ring on the lip, the deck inside it laid in slabs
+  for (let x = T.c0; x < T.c1; x++) for (let z = T.d0; z < T.d1; z++) {
+    const e = Math.min(x - T.c0, T.c1 - 1 - x, z - T.d0, T.d1 - 1 - z);
+    if (e === 1) pset(m, x, T.y + 1, z, LIME(x, T.y + 1, z));
   }
-  for (let x = 6; x < 20; x++) for (let z = 14; z < 22; z++) {
-    const e = Math.min(x - 6, 19 - x, z - 14, 21 - z);
-    m.set(x, py, z, e === 0 ? LIME_S : (((x + z) % 6) < 3 ? RED : BLUEP));
-    m.set(x, py + 1, z, e === 0 ? LIME(x, py + 1, z) : PLASTER(x, py + 1, z));
-    if (e === 0) m.set(x, py + 2, z, LIME(x, py + 2, z));
+  roofField(m, T.c0 + 2, T.d0 + 2, T.c1 - 2, T.d1 - 2, T.y, { g: 4 });
+  // high slit windows on the front and the east face
+  for (const u of [9, 38]) slit(m, '+z', u, 12, 5, 2);
+  for (const u of [33, 13]) slit(m, '+x', u, 14, 4, 2);
+  // the entrance block on the front axis: limestone, taller than the hall,
+  // the owner's band under its own cavetto
+  block(m, 13, 34, 35, 47, 1, 31, { wall: LIME, batter: 0, band: 'team', frieze: 1, lipOut: 2, flare: true, rimC: LIME, roofC: PLASTER });
+  T = m.lastTop;
+  roofField(m, T.c0, T.d0, T.c1, T.d1, T.y, { g: 3 });
+  // the porch cut into it: open on the front, painted inside (a dado and a
+  // register band), the doorway in its back wall, the lintel over it
+  const P0 = 16, P1 = 32, PZ0 = 40, PT = 21;
+  for (let x = P0; x < P1; x++) for (let z = PZ0; z < 47; z++) for (let y = 1; y < PT; y++) m.remove(x, y, z);
+  for (let x = P0; x < P1; x++) for (let z = PZ0; z < 47; z++) pset(m, x, 0, z, (x + z) & 1 ? 0xd8cbb0 : 0xcdbf9f);
+  const inner = (x, y, z) => (y <= 3 ? 0xa8462e : y >= PT - 4 && y <= PT - 3 ? ((Math.floor((x + z) / 2) & 1) ? BLUEP : 0xe0b048) : y === PT - 2 ? RED : 0xefe4cb);
+  for (let y = 1; y < PT; y++) {
+    for (let x = P0; x < P1; x++) pset(m, x, y, PZ0 - 1, inner(x, y, PZ0 - 1));
+    for (let z = PZ0; z < 47; z++) { pset(m, P0 - 1, y, z, inner(P0 - 1, y, z)); pset(m, P1, y, z, inner(P1, y, z)); }
   }
-  slit(m, '+x', 5, 9, 3, 1); slit(m, '+x', 10, 9, 3, 1);
-  block(m, 24, 15, 29, 21, 1, 12, { wall: OCHRE_W, batter: 0, band: 'lapis', rim: false, rimC: LIME, roofC: HROOF_C, gorge: [0x963f2a, 0xa5492f] });
-  banner(m, 18, 22, 20, 8, "+z");   // the owner's pennant on the portico roof
+  door(m, '+z', 22, 4, 1, 13, { frame: LIME, proud: false, lintelC: GILT });
+  // the two lotus columns in the porch mouth, the lintel resting on them
+  for (const cx of [20, 27]) lotusColumn(m, cx, 44, 1, PT);
+  // the stalls: one row along the east side under one shared blue / white
+  // cloth from a batten on the hall's wall, posts at the stall ends
+  const f = 42, yTop = 17, depth = 15, drop = 6;
+  const posts = [8, 18, 28, 38];
+  clothAwning(m, '+x', f, 7, 40, yTop, depth, drop, { posts, sw: 2, sag: 0.5, belly: 0.3, stripes: [MKT_AW, MKT_AWW], hem: 0x1f3c78 });
+  // a counter of produce under each stall, its front at the cloth's edge
   const counter = (x0, x1, z0, z1, goods) => {
-    for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) for (let y = 1; y < 4; y++) m.set(x, y, z, (x === x0 || x === x1 - 1 || z === z0 || z === z1 - 1) ? PLANK(x, y, z) : DARKWOOD);
+    for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) for (let y = 1; y < 4; y++) pset(m, x, y, z, (x === x0 || x === x1 - 1 || z === z0 || z === z1 - 1) ? PLANK(x, y, z) : DARKWOOD);
     const n = goods.length;
-    goods.forEach((g, i) => { const a = x0 + Math.round(((x1 - x0) * i) / n), b = x0 + Math.round(((x1 - x0) * (i + 1)) / n); goodsBox(m, a, 4, z0, b - a, z1 - z0, g, 1, 0x7a5430); });
+    goods.forEach((g, i) => { const a = z0 + Math.round(((z1 - z0) * i) / n), b = z0 + Math.round(((z1 - z0) * (i + 1)) / n); goodsBox(m, x0, 4, a, x1 - x0, b - a, g, 1, 0x7a5430); });
   };
-  // the stalls' canopies: flat cloths on thin poles at chest height (a
-  // voxel of sag, a hem along the front), the goods under them in view;
-  // each stall its own dyed linen (madder red, a woad green, saffron), so
-  // no stall repeats the next and none is the houses' or the owner's blue
-  const MRED = [0xb0482e, 0xa8432a, 0xb84f33], MGRN = [0x4f8a5a, 0x4a8455, 0x56925f], MSAF = [0xd69a36, 0xce9230, 0xdca23e];
-  const canopy = { stripes: [MRED, CANVAS], sw: 2, sag: 0.6, belly: 0.3, hem: 0x7e3020 };
-  // stall 1: the front left, from the hall's front wall
-  clothAwning(m, '+z', 13, 1, 8, 8, 13, 1.5, { ...canopy, posts: [1, 7] });
-  counter(2, 9, 23, 27, ['orange', 'melon']);
-  // stall 2: the front right, from the pier
-  clothAwning(m, '+z', 20, 16, 30, 8, 9, 1.5, { ...canopy, stripes: [MGRN, CANVAS], hem: 0x2f5a38, posts: [16, 22, 29] });
-  counter(17, 28, 25, 28, ['green', 'date', 'fish']);
-  // stall 3: on the east side, from the hall's east wall
-  clothAwning(m, '+x', 22, 3, 14, 8, 9, 1.5, { ...canopy, stripes: [MSAF, CANVAS], hem: 0x9a6a20, posts: [3, 13] });
-  counter(25, 30, 4, 13, ['grain', 'date']);
-  jar(m, 14.5, 1, 21.5, 0xc8a070, true); basket(m, 0, 21, 'orange');
+  counter(53, 62, 10, 17, ['orange', 'melon']);
+  counter(53, 62, 20, 27, ['green', 'date']);
+  counter(53, 62, 30, 37, ['grain', 'fish']);
+  // pots and crates behind the counters, by the wall
+  jar(m, 47.5, 1, 11.5, 0xb8683e, true); jar(m, 49.5, 1, 15.5, 0xc8a070, false);
+  crate(m, 45, 1, 21, 5, 5, 5); jar(m, 49.5, 1, 25.5, 0xb8683e, false);
+  sack(m, 46, 1, 31); jar(m, 48.5, 1, 35.5, 0xb8683e, true);
+  // in front of the stalls, between the posts: baskets and big jars
+  jar(m, 61.5, 1, 18.5, 0xc8a070, false); basket(m, 59, 38, 'orange');
+  // a stack of crates at the row's back end, a crate and a sack at its
+  // front end; a big jar by the porch, amphorae on its west side
+  crate(m, 50, 1, 1, 6, 6, 6); crate(m, 57, 1, 1, 5, 5, 5); crate(m, 51, 7, 2, 4, 4, 4);
+  crate(m, 54, 1, 42, 4, 4, 4); sack(m, 59, 1, 42);
+  jar(m, 37.5, 1, 50.5, 0xb8683e, true); amphora(m, 11.5, 1, 49.5, 1); amphora(m, 8.5, 1, 52.5, 2);
   return m;
 }
 
@@ -5905,7 +5959,7 @@ const TYPES = {
   migdol: { w: 7, h: 7, variants: ['0'], ages: [1], build: () => migdol() },
   siege_works: { w: 7, h: 7, variants: ['0'], ages: [1], build: () => siegeWorks() },
   armory: { w: 4, h: 4, variants: ['0'], ages: [1], build: () => armory(), fine: 2 },
-  market: { w: 4, h: 4, variants: ['0'], ages: [1], build: () => market() },
+  market: { w: 4, h: 4, variants: ['0'], ages: [1], build: () => market(), fine: 2 },
   obelisk: { w: 1, h: 1, variants: ['0'], ages: [1], build: () => obelisk(), draw: 1.5, fine: 3 },
   monument_villagers: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(1), fine: 2 },
   monument_soldiers: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(2), fine: 2 },

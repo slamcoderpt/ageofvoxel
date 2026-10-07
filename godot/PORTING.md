@@ -1899,6 +1899,30 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   Framing: `egt_focus=armory&egt_dist=9&egt_pitch=40&egt_lift=1.5` (the whole
   smithy with its smoke), `egt_focus=armory&egt_dist=7&egt_pitch=36&egt_lift=0.8`
   (the work area close).
+- **A market that reads as one building, round 43** (building_19; the
+  Market read as a pile of parts: a slab on four candy-striped pillars, a
+  pole through it, four clashing canopies wedged round it). `market()` is
+  rebuilt at half voxels (`fine: 2` in TYPES, a 64 x 64 lot, `stageStep`
+  12): ONE solid mud-brick hall (`MKT_MUD`, big warm brick courses,
+  battered a voxel per 10 rows) under a deep cavetto that steps three voxels
+  out (`style: 'cornice', lipOut: 3, flare`) over a lapis band and a
+  two-row painted frieze, a pale parapet ring and a slab-laid deck
+  (`roofField`), high slit windows on the front and east. On the front axis
+  a taller limestone entrance block (the owner's band, its own cavetto) with
+  a porch cut into it: painted inside (a red dado, a lapis / yellow register,
+  a red line), ONE doorway in its back wall under a gilt lintel, and two
+  lotus columns (`lotusColumn()`) carrying the lintel: plain pale shafts
+  (darker corners so they read round), paint only at the foot (a red and a
+  lapis ring) and the neck (three tied bands), the capital flaring from
+  green sepals to a five-wide bell of green / lapis petals with yellow and
+  pale green tips. Along the east side ONE row of three stalls under one
+  shared blue / white cloth (`MKT_AW` / `MKT_AWW`, a navy hem, posts at the
+  stall ends), a plank counter of produce under each running out past the
+  hem, big jars, a crate and a sack by the wall under the cloth, a jar and a
+  basket between the posts; a crate stack at the row's back end, a crate and
+  a sack at its front end; a big jar and two amphorae by the porch on a
+  paved forecourt. No banner. Framing: `egt_focus=market` (the town view),
+  `egt_focus=market&egt_dist=7&egt_pitch=34&egt_lift=0.6` (close).
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8
