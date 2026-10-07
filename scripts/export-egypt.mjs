@@ -4708,51 +4708,216 @@ function pharaohStatue(m, cx, y0, cz, o = {}) {
   }
   // ---- the neck
   S(2, 48, 50, -2, 2, GRAN);
-  // ---- the nemes: one trapezoid from the brow flaring to the shoulders,
-  // behind the face, then the cap over the crown, the queue behind
-  for (let y = 48; y < 60; y++) {
-    const hw = 5 + Math.floor((60 - y) / 5);
-    B(-hw, hw, y, y + 1, -5, 2, stripe);
-  }
-  S(5, 60, 61, -5, 3, stripe);
-  S(4, 61, 62, -5, 2, stripe);
-  S(3, 62, 63, -4, 1, CG_L);                                  // a gold crown, no slab of lapis on top
-  B(-2, 2, 38, 47, -6, -4, stripe);                           // the queue
-  // ---- the face: a lighter front plane, a narrow chin
-  S(4, 50, 59, -3, 4, (x, y, z) => (z === 3 ? GRAN_F : GRAN));
-  S(3, 49, 50, -2, 4, (x, y, z) => (z === 3 ? GRAN_F : GRAN));
-  S(5, 59, 60, -3, 4, CG_L);                                  // the gold brow band
-  S(4, 56, 57, 4, 5, GRAN_F);                                 // the brow ridge, proud
-  M(1, 3, 54, 56, 3, 4, GRAN_D);                              // the eyes: dark sockets, two rows under the brow
-  M(3, 4, 55, 56, 3, 4, CG);                                  // kohl tails to the temples
-  B(-1, 1, 52, 56, 4, 5, GRAN_F);                             // the nose, proud
-  B(-1, 1, 52, 53, 4, 5, GRAN_H);                             // its lit tip
-  S(2, 50, 51, 3, 4, GRAN_D);                                 // the mouth
-  S(2, 51, 52, 3, 4, GRAN_F);                                 // the upper lip
-  // ---- the lappets: straight striped columns in front of the shoulders
-  M(4, 6, 40, 58, 2, 5, (x, y) => (y < 42 ? CG_L : stripe(x, y)));
-  // ---- the false beard: a separate narrow block a voxel in front of the
-  // chin, ribbed, tied up to it
-  B(-1, 1, 48, 49, 3, 5, CG_D);
-  for (let y = 43; y < 48; y++) B(-1, 1, y, y + 1, 4, 5, y === 43 ? CG_L : (y & 1 ? CG_L : CG));
-  // ---- the uraeus at the brow: a gold coil, a lapis hood, the gold head
-  B(-1, 1, 59, 61, 4, 5, CG_L);
-  B(-2, 2, 61, 62, 4, 5, (x) => (x === -2 || x === 1 ? CG_L : LAPIS_S));
-  B(-1, 1, 62, 63, 4, 6, CG_L);
-  if (o.crown === 'hedjet') {
-    // the white crown in gilt: a tall bulb tapering from the cap to a knob,
-    // a lapis band at its foot
-    for (let y = 61; y < 77; y++) {
-      const rr = y < 66 ? 3.6 : y < 74 ? 3.6 - (y - 65) * 0.24 : 1.5;   // a smooth taper to the knob
-      for (let x = -5; x < 5; x++) for (let z = -5; z < 4; z++) {
-        if (Math.hypot(x + 0.5, (z + 1) * 0.9) > rr) continue;
-        set(x, y, z, y === 63 ? LAPIS_S : CG_L);
+  B(-2, 2, 38, 47, -6, -4, stripe);                           // the nemes' queue behind
+  // ---- the head (round 40): the face, the nemes and its lappets, the
+  // uraeus, the false beard and the crown at double density (fineHead)
+  fineHead(m, cx, y0, cz, { kind: 'king', crown: o.crown });
+  basaltFinish(m, touched);
+}
+// The heads of the striding king and the queen (round 40, building_15 /
+// building_16): drawn at double density (a k = 2 inset on m.fine, so a head
+// voxel is 1/32 tile) with final colours, since the statue's polish passes
+// run on the parent voxels only. Local coordinates are the statue's own x2
+// (x a corner at the body's centre, facing +z); the chin's bottom row is
+// y = 98 (the parent's row 49), the face's front plane z = 7.
+// The face: a polished basalt ramp, lighter towards the brow and a top-light
+// step on every face open to the sky, a dark step under every overhang; a
+// brow ridge a voxel proud (lit top, shadow under), almond eyes recessed a
+// voxel in black kohl lids with ivory whites and a dark iris and a kohl tail
+// to the temple, a narrow nose (two voxels wide, a lit tip), a mouth line
+// between lit lips, lit cheekbones. The king: the nemes in three gold rows
+// to one lapis, flaring from a gold brow band to the shoulders, a rounded
+// striped cap, the uraeus (gold coil, lapis hood in gold, gold head), two
+// striped lappets to gold tips, a plaited gold false beard on a tie a voxel
+// in front of the collar; o.crown 'hedjet': the white crown in fluted gilt
+// with a lapis band at its foot and a knob. The queen: a tripartite gold wig
+// in vertical strands of two golds, its two front locks to the collar ending
+// in a lapis and gold band, a lapis diadem studded with gold, the uraeus.
+const HF = { D: 0x343b47, B: 0x5c6676, M: 0x687384, L: 0x8692a2, H: 0xa2aebc };
+const KOHL_B = 0x0e1014, IRIS = 0x1a1612, EYE_W = 0xe4dccb;
+const HG = { D: 0x7a5a00, M: 0xb08800, L: 0xcca400, H: 0xe0b810 };
+function headSub(m) {
+  let f = (m.fine ??= []).find((e) => e.k === 2 && e.head);
+  if (!f) { f = { m: new Rec(m.W * 2, m.D * 2), k: 2, head: 1, jitter: 0.006 }; m.fine.push(f); }   // polished: almost no per-voxel tint
+  return f.m;
+}
+function fineHead(m, cx, y0, cz, o = {}) {
+  const sub = headSub(m), queen = o.kind === 'queen';
+  const OX = cx * 2, OY = y0 * 2 + (o.dy ?? 0), OZ = cz * 2;
+  const set = (x, y, z, c) => { if (c != null) sub.set(OX + x, OY + y, OZ + z, c); };
+  const B = (xa, xb, ya, yb, za, zb, c) => {
+    for (let x = xa; x < xb; x++) for (let y = ya; y < yb; y++) for (let z = za; z < zb; z++) set(x, y, z, typeof c === 'function' ? c(x, y, z) : c);
+  };
+  const M = (xa, xb, ya, yb, za, zb, c) => { B(xa, xb, ya, yb, za, zb, c); B(-xb, -xa, ya, yb, za, zb, typeof c === 'function' ? (x, y, z) => c(-1 - x, y, z) : c); };
+  const ax = (x) => Math.abs(x + 0.5);
+  // ---- the headdress behind the face
+  if (!queen) {
+    const band = (y) => ((y - 96) & 3) === 3 ? LAPIS_S : HG.L;            // three gold rows, one lapis
+    for (let y = 92; y < 118; y++) {
+      const hw = Math.round(10 + Math.max(0, 118 - y) * 5 / 24);
+      B(-hw, hw, y, y + 1, -10, 5, (x) => (ax(x) > hw - 1 ? (band(y) === LAPIS_S ? LAPIS_R : HG.M) : band(y)));
+    }
+    for (let y = 118; y < 128; y++) {                                 // the cap, rounded over the crown
+      const i = y - 118, hw = [10, 10, 10, 10, 9, 9, 8, 8, 6, 4][i], zf = 8 - (i >> 1), zb = -10 + (i >> 1);
+      B(-hw, hw, y, y + 1, zb, i < 2 ? 8 : zf, i < 2 ? (i === 0 ? HG.M : HG.L) : band(y));   // the brow band, then stripes
+    }
+    // the lappets: straight striped columns in front of the shoulders to gold tips
+    M(8, 13, 80, 116, 1, 7, (x, y, z) => (y < 84 ? (y === 80 ? HG.M : HG.H) : x === 12 || z === 1 ? (band(y) === LAPIS_S ? LAPIS_R : HG.M) : band(y)));
+    // the false beard: a plaited gold block on a tie a voxel in front of the collar
+    B(-2, 2, 95, 98, 5, 9, HG.M);
+    for (let y = 84; y < 96; y++) B(-2, 2, y, y + 1, 8, 10, (x, yy, z) => (y === 84 ? HG.D : (y >> 1) & 1 ? HG.L : HG.M));
+    B(-2, 2, 84, 85, 8, 10, HG.M);
+    // the uraeus: a gold coil up the band, a lapis hood edged in gold, a gold head
+    B(-1, 1, 116, 121, 8, 10, HG.H);
+    B(-3, 3, 121, 125, 8, 10, (x, y) => (x === -3 || x === 2 || y === 124 ? HG.H : LAPIS_S));
+    B(-1, 1, 125, 128, 8, 11, HG.H);
+    if (o.crown === 'hedjet') {
+      // the white crown in fluted gilt: a tall bulb tapering to a knob, a lapis band at its foot
+      for (let y = 124; y < 156; y++) {
+        const rr = y < 132 ? 7.6 : y < 146 ? 7.6 - (y - 132) * 0.2 : y < 151 ? 4.8 * Math.sqrt(Math.max(0, 1 - ((y - 146) / 6) ** 2)) + 0.6 : 2.6 - Math.abs(y - 153) * 0.5;
+        for (let x = -9; x < 9; x++) for (let z = -11; z < 8; z++) {
+          if (Math.hypot(x + 0.5, (z + 1.5) * 0.92) > rr) continue;
+          const a = Math.atan2(z + 1.5, x + 0.5);
+          set(x, y, z, y < 128 ? (y === 127 ? HG.L : LAPIS_S) : y >= 149 ? HG.H : (Math.floor((a + Math.PI) / (Math.PI / 9)) & 1 ? HG.L : HG.M));
+        }
       }
     }
+  } else {
+    // the tripartite wig: strands of two golds behind the face, rounded over the crown
+    const strand = (x) => ((x + 64) & 1 ? HG.L : HG.M);
+    for (let y = 88; y < 128; y++) {
+      const hw = y >= 127 ? 4 : y >= 126 ? 6 : y >= 125 ? 7 : y >= 123 ? 8 : y >= 104 ? 9 : 9 + Math.round((104 - y) / 8);   // a dome over the crown, flaring to the shoulders
+      const zf = y < 118 ? 3 : y < 120 ? 8 : 7 - ((y - 120) >> 1), zb = y >= 121 ? -9 + ((y - 120) >> 1) : -9;
+      B(-hw, hw, y, y + 1, zb, zf, (x) => (y >= 118 && y < 120 ? (y === 118 ? HG.L : (x + 64) % 3 === 1 ? HG.H : LAPIS_S) : strand(x)));
+    }
+    // the two front locks, to the collar, ending in a lapis and gold band
+    M(7, 11, 76, 118, 0, 5, (x, y) => (y < 78 ? HG.H : y < 80 ? LAPIS_S : y < 81 ? HG.H : strand(x)));
+    // the uraeus at the brow
+    B(-1, 1, 118, 122, 9, 10, HG.H);
+    B(-2, 2, 122, 125, 9, 10, (x, y) => (x === -2 || x === 1 || y === 124 ? HG.H : LAPIS_S));
+    B(-1, 1, 125, 127, 9, 11, HG.H);
   }
-  // the plain stone: one mid basalt, a lit step on faces open to the sky
-  // (polishStatue's grain and its per-row cylinder shading read as checker
-  // noise on the bare torso and legs); the gold and the face plane polished
+  // the neck in the face's stone (the parent's dark neck read as a hole under the chin)
+  B(-4, 4, 86, 100, -4, 4, HF.B);
+  // ---- the face: a front map (z, colour) per (x, y), filled back to z = -6
+  const hwOf = queen ? (y) => (y < 100 ? 0 : y < 101 ? 4 : y < 103 ? 5 : y < 105 ? 6 : 7)
+    : (y) => (y < 100 ? 4 : y < 102 ? 5 : y < 104 ? 6 : y < 108 ? 7 : 8);
+  const TOP = 118, F = new Map(), k = (x, y) => `${x},${y}`;
+  for (let y = 98; y < TOP; y++) {
+    const hw = hwOf(y);
+    for (let x = -hw; x < hw; x++) F.set(k(x, y), { z: 7 - (ax(x) >= hw - 1.5 ? 1 : 0) - (ax(x) >= hw - 0.5 ? 1 : 0), c: 'skin' });
+  }
+  const at = (xr, y, z, c) => {                                  // mirrored about the centre
+    for (const x of [xr, -1 - xr]) { const e = F.get(k(x, y)); if (e) { if (z != null) e.z = z; if (c) e.c = c; } }
+  };
+  const ey = 110, e0 = queen ? 1 : 2;
+  // the brow ridge, proud
+  if (!queen) for (let xr = 0; xr < e0 + 5; xr++) at(xr, ey + 3, 8);
+  else for (let xr = e0 + 1; xr < e0 + 5; xr++) at(xr, ey + 3 - (xr === e0 + 4 ? 1 : 0), null, 'lid');   // her brows painted, arched down to the temple
+  // the eyes, almond: a black kohl upper lid running out to a tail at the
+  // temple, one row of ivory white with the dark iris rising into the lid, a
+  // shaded lower lid; a lid fold of plain stone up to the brow
+  for (let i = 0; i < 6; i++) at(e0 + i, ey + 1, null, KOHL_B);
+  ['W', 'W', 'I', 'W', 'K', 'K'].forEach((t, i) => at(e0 + i, ey, null, t === 'K' ? KOHL_B : t === 'I' ? IRIS : EYE_W));
+  for (let i = 1; i < 4; i++) at(e0 + i, ey - 1, null, 'lid');
+  // the nose, narrow: a bridge between the eyes, a lit tip, the wings
+  for (let y = queen ? ey - 4 : ey - 5; y <= ey + 2; y++) at(0, y, 8);
+  if (!queen) { at(0, ey - 6, 9); at(0, ey - 5, 9); at(1, ey - 6, 8, 'shade'); } else at(1, ey - 4, null, 'lid');
+  // the mouth: a dark line between lit lips; lit cheekbones
+  const mw = queen ? 2 : 3;
+  for (let xr = 0; xr < mw; xr++) { at(xr, ey - 8, queen ? null : 6, queen ? 0x3a2a2e : HF.D); at(xr, ey - 7, null, 'lit'); }   // her mouth a fine line, lips not cut
+  for (let xr = 0; xr < mw - 1; xr++) at(xr, ey - 9, null, 'lit');
+  const skin = [];
+  for (const [key, e] of F) {
+    const [x, y] = key.split(',').map(Number);
+    for (let z = -6; z <= e.z; z++) {
+      const c = z === e.z ? e.c : 'skin';
+      if (typeof c === 'number') set(x, y, z, c);
+      else { set(x, y, z, HF.B); skin.push([OX + x, OY + y, OZ + z, c]); }
+    }
+  }
+  // the polished ramp: lighter towards the brow, a top light, shade under overhangs
+  for (const [X, Y, Z, tag] of skin) {
+    const v = sub.get(X, Y, Z);
+    if (!v) continue;
+    const up = !sub.has(X, Y + 1, Z), dn = !sub.has(X, Y - 1, Z), fr = !sub.has(X, Y, Z + 1);
+    const sd = !sub.has(X + 1, Y, Z) || !sub.has(X - 1, Y, Z);
+    let c = sd && !fr ? HF.B : HF.M;                               // the front planes one value, the turned sides a step down
+    if (tag === 'lit') c = HF.L;
+    if (tag === 'shade') c = HF.D;
+    if (tag === 'lid') c = HF.B;
+    if (up && fr) c = Z - OZ >= 9 ? HF.H : HF.L;                   // a top light; the nose tip the brightest
+    else if (dn && fr && !up && tag !== 'lit') c = Z - OZ >= 8 ? HF.D : sub.has(X, Y + 1, Z + 1) ? HF.B : c;   // under the nose dark, under the brow a step
+    v.c = c;
+  }
+}
+// The queen of the Monument to Pharaohs (round 40, building_16): a slim
+// basalt figure in a gold sheath dress pleated in vertical stripes of two
+// golds (a darker hem), a lapis and gold belt band with a knot and two lapis
+// sash ends, a gold bodice over the bust, a wesekh of lapis and gold, bare
+// basalt shoulders and arms with gold armlets and bracelets; the far arm at
+// her side, the near arm bent so her hand rests on the king's upper arm;
+// the head by fineHead() (the queen's wig, face and uraeus).
+function queenStatue(m, cx, y0, cz) {
+  const touched = [];
+  const set = (x, y, z, c) => {
+    if (c == null) return;
+    m.set(cx + x, y0 + y, cz + z, c);
+    const v = m.get(cx + x, y0 + y, cz + z);
+    if (v) { v.clean = 1; touched.push([cx + x, y0 + y, cz + z]); }
+  };
+  const B = (xa, xb, ya, yb, za, zb, c) => {
+    for (let x = xa; x < xb; x++) for (let y = ya; y < yb; y++) for (let z = za; z < zb; z++) set(x, y, z, typeof c === 'function' ? c(x, y, z) : c);
+  };
+  const S = (hw, ya, yb, za, zb, c) => B(-hw, hw, ya, yb, za, zb, c);
+  // ---- the feet and shins, the left foot (+x) a little forward
+  B(-3, -1, 0, 1, -2, 4, GRAN); B(1, 3, 0, 1, -1, 5, GRAN);
+  for (let y = 1; y < 11; y++) { B(-3, -1, y, y + 1, -2, 1, y === 3 ? CG_L : GRAN); B(1, 3, y, y + 1, -1, 2, y === 3 ? CG_L : GRAN); }
+  // ---- the sheath dress: vertical pleats in two golds, a darker hem
+  const pleat = (hw, zb, zf) => (x, y, z) => {
+    if (y === 10) return CG;
+    const side = x === -hw || x === hw - 1;
+    return ((side ? z : x) + 64) % 3 === 2 ? CG_D : CG_L;          // a dark pleat line every third column (CG_D: the polish keeps it)
+  };
+  for (let y = 10; y < 29; y++) {
+    const hw = y < 17 ? 4 : 5, zf = y < 17 ? 3 : 4;
+    B(-hw, hw, y, y + 1, -3, zf, pleat(hw, -3, zf));
+  }
+  // the sash ends hanging from the knot
+  B(-1, 1, 20, 29, 4, 5, (x, y) => (y < 21 ? CG_L : LAPIS_S));
+  // ---- the belt: gold, lapis studded with gold, gold; a knot proud at the front
+  for (let y = 29; y < 32; y++) S(5, y, y + 1, -4, 5, (x) => (y === 30 ? ((x + 64) % 3 === 1 ? CG_L : LAPIS_S) : CG_L));
+  B(-1, 1, 29, 32, 5, 6, CG_L);
+  // ---- the bodice over the bust, then bare shoulders
+  for (let y = 32; y < 37; y++) S(5, y, y + 1, -3, 4, pleat(5, -3, 4));
+  S(5, 37, 42, -3, 3, GRAN);
+  S(6, 42, 44, -3, 3, GRAN);
+  // ---- the wesekh: lapis and gold bands round the neck, a fringe of drops
+  const COL = [LAPIS_S, CG_L, LAPIS_S, CG_L];
+  for (let y = 36; y < 44; y++) for (let x = -6; x < 6; x++) {
+    const r = Math.hypot((x + 0.5) * 0.85, 44 - y);
+    if (r < 2.2 || r >= 7.0) continue;
+    if (Math.abs(x + 0.5) > (y < 42 ? 5 : 6)) continue;
+    const b = Math.floor((r - 2.2) / 1.1);
+    set(x, y, 3, b < 4 ? COL[b] : ((x + 64) & 1 ? CG_L : null));
+  }
+  // ---- the neck
+  S(2, 44, 47, -2, 2, GRAN);
+  // ---- the arms: the far one at her side, the near one bent to the king's arm
+  B(5, 7, 23, 42, -2, 1, GRAN); B(5, 7, 21, 23, -2, 1, GRAN);
+  B(5, 7, 26, 27, -3, 2, CG_L); B(5, 7, 38, 39, -3, 2, CG_L);
+  B(-7, -5, 34, 42, -2, 1, GRAN); B(-7, -5, 38, 39, -3, 2, CG_L);
+  B(-10, -7, 33, 35, -2, 1, GRAN); B(-8, -7, 33, 35, -3, 2, CG_L);
+  B(-12, -9, 32, 36, 1, 2, GRAN);                                   // the hand on his arm
+  // ---- the head, at double density
+  fineHead(m, cx, y0, cz, { kind: 'queen', dy: -6 });
+  basaltFinish(m, touched);
+}
+// The statues' plain stone (round 39): one mid basalt, a lit step on faces
+// open to the sky (polishStatue's grain and its per-row cylinder shading read
+// as checker noise on the bare torso and legs); the gold and the face plane
+// polished, then mapped to BASALT_STONE / OS_GOLD.
+function basaltFinish(m, touched) {
   const plain = touched.filter(([x, y, z]) => m.get(x, y, z)?.c === GRAN);
   polishStatue(m, touched);
   for (const [x, y, z] of plain) {
@@ -4807,7 +4972,7 @@ function monument(kind, god = 'ra') {
     // round 39: the king in pharaohStatue()'s clean build (nemes, wesekh,
     // pleated shendyt), with the gilt white crown
     pharaohStatue(m, 15, pd, 24, { crown: 'hedjet' });
-    cleanStatue(m, 34, pd, 24, { pose: 'dress', head: 'wig', wig: 'gold', arms: 'embrace', kiltFront: null, basalt: 1 });
+    queenStatue(m, 34, pd, 24);                               // round 40: her own build, the heads at double density
     m.keep = [[2, pd, 4, 46, pd + 82, 44]];
     return m;
   }
@@ -5702,7 +5867,7 @@ const geo = (m, seed = 7, vox = VOX) => {
   const pivot = [m.W / 2, 0.8, m.D / 2];   // the ground row sinks to 0.025 above the terrain: a decal, no plinth
   let out = withSkin(S.withExtras(buildVoxelGeometry(m, { size: vox, pivot, jitter: 0.012, seed }), m, vox, pivot, { maxY: m.extraMaxY ?? Infinity }), m, vox, pivot);
   // half-voxel insets (fineFigure): sub-voxel u lands at parent voxel u / k
-  for (const f of m.fine || []) out = mergeGeo(out, buildVoxelGeometry(f.m, { size: vox / f.k, pivot: pivot.map((v) => v * f.k), jitter: 0.03, seed }));
+  for (const f of m.fine || []) out = mergeGeo(out, buildVoxelGeometry(f.m, { size: vox / f.k, pivot: pivot.map((v) => v * f.k), jitter: f.jitter ?? 0.03, seed }));
   // round 36: true gilt (m.keep: voxel-space boxes, e.g. the Obelisk's cap):
   // the gold vertices inside are flagged (extra byte 3), and
   // egypt_building.gdshader lets them skip the display grade's chroma

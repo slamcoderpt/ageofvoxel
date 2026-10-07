@@ -1789,6 +1789,63 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   (Villagers, Priests, the Pharaoh pair) now take `OS_GOLD` and `m.keep` too,
   and `BASALT_STONE` is a step darker and blue-grey (the grey-green came out
   olive). Framing: `egt_row=monument_soldiers/0/a1&egt_pitch=18&egt_lift=3.6&egt_dist=7.5&egt_yaw=24`.
+- **The striding king of the Monument to Priests, round 39** (building_15;
+  the head read as a jumbled yellow helmet: a boxy gold cap with a slate
+  slab on top, lappets scattered at different depths, a flat grey face whose
+  nose and beard merged, a checker collar bleeding into the chin, a blocky
+  kilt). Its own builder, `pharaohStatue()` in export-egypt.mjs, in place of
+  `cleanStatue()`'s stride (the Pharaoh pair's king uses it too, with
+  `crown: 'hedjet'`: a tall gilt white crown tapering smoothly from the nemes
+  cap to a knob, a lapis band at its foot). The nemes is one trapezoid behind
+  the face, flaring from the brow (half-width 5) to the shoulders (7), striped
+  in alternating single rows of gold and lapis, on a plain gold brow band
+  with the uraeus (gold coil, lapis hood, gold head), a gold crown row on top
+  (no lapis slab); the two lappets hang straight down in front of the
+  shoulders as 2 x 3 striped columns ending in gold tips; a striped queue
+  behind. The face is a lighter plane: a brow ridge a voxel proud, 2 x 2 dark
+  eye sockets with gold kohl tails, a proud nose with a lit tip, a lip over a
+  dark mouth line, a narrower chin; the false beard is a separate 2-wide
+  ribbed gold block a voxel in front of the face, tied up to the chin. The
+  wesekh is a plate a voxel proud on the chest in four concentric bands round
+  the neck (gold, lapis, gold, carnelian red, so it reads apart from the
+  nemes) and a fringe of drops. The shendyt: an A-line kilt with a dark gold
+  pleat line every third column (on the sides too), a darker hem, a
+  gold / lapis / gold belt with a buckle, a team apron in a gold frame. The
+  left foot forward, the arms free at the sides with closed fists, proud gold
+  armlets, bracelets and anklets. The bare stone is one mid basalt with lit
+  tops and lit vertical arrises (no grain, no per-row cylinder shading:
+  they read as checker noise); the gold is `OS_GOLD` under `m.keep`.
+  Framing: `egt_row=monument_priests/0/a1&egt_pitch=18&egt_lift=3.6&egt_dist=7.5&egt_yaw=24`
+  (the pair: `egt_row=monument_pharaohs/0/a1&egt_pitch=24&egt_lift=3.6&egt_dist=9`).
+- **Double-density heads and the queen, round 40** (building_16; both
+  faces were crude grey blocks: the king's an unlit box under the nemes, the
+  queen's a flat mask with a block nose and white pixel eyes, her dress one
+  flat gold slab). `fineHead()` in export-egypt.mjs draws everything above the
+  neck at twice the density (a k = 2 inset on `m.fine`, flagged `head`, with
+  its own near-zero colour jitter, `f.jitter`, read by `geo()`), in final
+  colours (the polish passes run on parent voxels only). The face is built
+  from a front map per (x, y): a polished basalt ramp (`HF`: front planes one
+  mid value, turned sides a step down, a top-light step on every face open
+  to the sky, the nose tip brightest, a dark step under the nose, a lighter
+  neck so the chin does not sit over a hole); a brow ridge a voxel proud
+  (painted arched brows on the queen), almond eyes (a black kohl upper lid
+  running out to a tail at the temple, one ivory row with a dark iris rising
+  into the lid, a shaded lower lid), a narrow two-voxel nose (the king's with
+  a proud tip), a mouth line between lit lips. The king: the nemes in three
+  gold rows to one lapis, flaring from a gold brow band to the shoulders, a
+  rounded striped cap, a larger uraeus (gold coil, lapis hood edged in gold,
+  gold head), striped lappets kept behind the face plane, a plaited gold
+  false beard on a tie; his hedjet is now a fluted gilt bulb that rounds to
+  a knob. The queen has her own builder, `queenStatue()` (no longer
+  `cleanStatue()`'s dress pose): a gold sheath dress with vertical pleats (a
+  dark gold line every third column, which the polish keeps), a darker hem,
+  a lapis and gold belt band with a knot and two lapis sash ends, a gold
+  bodice, a lapis and gold wesekh, bare basalt arms with gold armlets and
+  bracelets, her near hand resting on the king's upper arm; the head is a
+  domed tripartite gold wig in strands of two golds, two front locks to the
+  collar ending in a lapis and gold band, a lapis diadem studded with gold,
+  the uraeus. The Monument to Priests' king shares the new head.
+  Close framing: `egt_row=monument_pharaohs/0/a1&egt_pitch=12&egt_lift=4.2&egt_dist=3.2&egt_dx=0.4&egt_yaw=10`.
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8
