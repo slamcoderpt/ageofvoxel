@@ -3039,120 +3039,123 @@ function temple(god) {
   return m;
 }
 
-// Barracks (5 x 5; building_09): thick, steeply battered ranges round an open
-// drill yard, a raised two-step gatehouse with a latticed door, and the
-// barracks' colour: tall team banners on poles at the yard piers and on the
-// gatehouse, two weapon racks of spears, cowhide shields on the walls, a
-// practice dummy, an archery butt, barrels.
+// Barracks (5 x 5; building_09; round 33): ONE dominant form, a battered
+// sandstone barrack hall across the back of the lot under a single cavetto
+// cornice band and one flat roof, a lower attic step on that roof (the only
+// two pale copings on the building, as Retold's two-step gatehouse); in
+// front of it a low drill yard closed by plain thin walls with no cornice,
+// entered between two gate piers carrying the team banners. The walls are
+// regular horizontal ashlar courses in close sandstone tones (no relief
+// panels, no blotches); the strong colour is kept for one painted lintel
+// band (a winged sun on lapis over a red / blue / green frieze) over the
+// hall's door, so the entrance is the focal point. In the yard: a spear rack
+// with cowhide shields, a practice dummy, a straw archery butt, barrels.
+const BK_WALL = coursed([0xd8b27c, 0xcfa872, 0xd4ad77], { course: 3, len: 7, bed: 0.87, head: 0.93, seed: 141 });
+const BK_BASE = 0x8e6c48, BK_TOP = 0xe2c38f;
+const BK_FLUTE = [0xd9ba86, 0xc29c66];
+const BK_DECK = (x, y, z) => (hash3(x >> 2, y, z >> 2, 143) < 0.5 ? 0xcdb48a : 0xc8ae84);
+// a battered ashlar mass on [X0, X1) x [Z0, Z1) from Y0, H rows, a voxel in
+// every B rows (smoothed by skin()), a dark base course; returns the top ring
+function bkMass(m, X0, Z0, X1, Z1, Y0, H, B, { top: topC = null } = {}) {
+  if (Y0 === 1 && m.feet) m.feet.push({ x0: X0, z0: Z0, x1: X1, z1: Z1, hb: 1 });
+  if (B) m.blocks.push({ x0: X0, z0: Z0, x1: X1, z1: Z1, y0: Y0, h: H, b: B, base: 0 });
+  const top = Y0 + H;
+  let I = 0;
+  for (let y = Y0; y < top; y++) {
+    I = B ? Math.floor((y - Y0) / B) : 0;
+    const a0 = X0 + I, a1 = X1 - I, b0 = Z0 + I, b1 = Z1 - I;
+    for (let x = a0; x < a1; x++) for (let z = b0; z < b1; z++) {
+      const edge = x === a0 || x === a1 - 1 || z === b0 || z === b1 - 1;
+      let c;
+      if (y === top - 1 && topC) c = topC;                      // a plain lighter top row (the yard walls)
+      else if (!edge) c = shade(BK_WALL(x, y, z), 0.9);
+      else if (y === 1) c = BK_BASE;                            // the dark base course
+      else {
+        c = BK_WALL(x, y, z);
+        if (hash3(x >> 3, y >> 2, z >> 3, 147) < 0.05) c = shade(c, 0.96);   // sparse, low-contrast block wobble
+        c = grimed(c, x, y, z, y - 2, false);
+      }
+      m.set(x, y, z, c);
+    }
+  }
+  return { c0: X0 + I, c1: X1 - I, d0: Z0 + I, d1: Z1 - I, top };
+}
+// a hooped barrel (square rows, corners cut): staves, dark hoops, a pale lid
+function bkBarrel(m, X, Z) {
+  for (let y = 1; y <= 5; y++) for (let i = -1; i <= 1; i++) for (let k = -1; k <= 1; k++) {
+    if (i !== 0 && k !== 0 && y !== 3) continue;
+    pset(m, X + i, y, Z + k, y === 2 || y === 4 ? 0x2e2a26 : y === 5 ? (i === 0 && k === 0 ? 0xd2a66c : 0xa8743e) : 0x8e5c30);
+  }
+}
 function barracks() {
   const W = 40;
   const m = lot(W, W, EARTH);
-  patch(m, 11, 15, 33, 38, EARTH, { seed: 5 });
-  // back range, west range, a lower east range
-  const RNG = { wall: OCHRE_P, rimC: LIME, gorge: [0x34588a, 0x3f6596], torus: false, lipOut: 2, batter: 5, band: null };
-  const tb = block(m, 2, 2, 38, 14, 1, 12, RNG);
-  const tw = block(m, 2, 13, 12, 36, 1, 11, RNG);
-  const te = block(m, 30, 13, 38, 28, 1, 9, RNG);
-  barracksRoofs(m, tb, tw, te);
-  // the raised gatehouse in the middle of the back range
-  const tg = block(m, 14, 6, 27, 17, 1, 16, { wall: LIME, roofC: ROOFTILE, rimC: LIME, gorge: [0x34588a, 0x3f6596], lipOut: 2, batter: 5, band: 'lapis', frieze: 1 });
-  block(m, 17, 8, 24, 14, tg - 1, 4, { batter: 0, band: null });
-  door(m, '+z', 18, 5, 1, 9, { lattice: true, sun: false, deep: 3 });
-  // the yard's front: a pylon gateway (two battered pylons, a gate block
-  // between them under a lintel with a cavetto cornice and a gilt winged sun,
-  // heavy cedar double doors with bronze straps set in the doorway)
-  const PY = { wall: OCHRE_P, rimC: LIME, gorge: [0x34588a, 0x3f6596], torus: false, lipOut: 2, batter: 7, band: 'red' };
-  for (const [x0, x1] of [[5, 16], [25, 36]]) {
-    block(m, x0, 28, x1, 38, 1, 21, PY);
-    // two vertical flagpole niches cut into the front face (a shadowed slot
-    // following the batter), the team banner's pole standing in the outer one
-    for (const u of [x0 + 2, x1 - 3]) {
-      for (let y = 2; y < 17; y++) {
-        const q = outer(m, '+z', u, y, lim(m));
-        if (!q) continue;
-        m.remove(q[0], q[1], q[2]);
-        m.set(q[0], q[1], q[2] - 1, y === 2 ? 0x6e5236 : 0x86643e);
-      }
-      if (u === (x0 < 20 ? x0 + 2 : x1 - 3)) banner(m, u, 1, 38, 31);
-    }
-    // an incised relief between the niches: a striding figure with a raised
-    // arm (a king smiting) cut in a darker sand, a white crown and a red kilt
-    const mid = Math.floor((x0 + x1) / 2) - 2;
-    // a dressed panel (smooth pale sandstone inside a dark incised frame) so
-    // the figure reads as a carved relief, not a stain in the masonry
-    const fig = ['.L...', '.LL.D', '.DD.D', 'DDDDD', '.DD..', '.DD..', '.RR..', '.RRR.', '.D.D.', 'D...D', 'D...D'];
-    const panel = ['FFFFFFF'];
-    for (const r of fig) panel.push('F' + r.replace(/\./g, 'P') + 'F');
-    panel.push('FFFFFFF');
-    paint(m, '+z', mid - 1, 17, panel, { L: 0xf1e8d2, D: 0x7a4a2a, R: RED_M, P: 0xddb37c, F: 0x9a6a3a });
+  patch(m, 7, 20, 33, 35, SANDGROUND, { seed: 5 });
+  // the hall: one battered mass, one cavetto, one slab
+  const R = bkMass(m, 4, 3, 36, 21, 1, 16, 6);
+  const { c0, c1, d0, d1, top } = R;
+  const ring = (x, z, p) => Math.min(x - (c0 - p), (c1 - 1 + p) - x, z - (d0 - p), (d1 - 1 + p) - z);
+  const fl = (x, z) => BK_FLUTE[((x + z + 512) >> 1) & 1];
+  for (let x = c0; x < c1; x++) for (let z = d0; z < d1; z++) m.set(x, top, z, ring(x, z, 0) === 0 ? shade(fl(x, z), 0.74) : BK_DECK(x, top, z));
+  for (let x = c0 - 1; x <= c1; x++) for (let z = d0 - 1; z <= d1; z++) m.set(x, top + 1, z, ring(x, z, 1) === 0 ? fl(x, z) : BK_DECK(x, top + 1, z));
+  // the roof slab: a limestone coping ring (the owner's line on its inner
+  // edge) round a sunk plaster deck
+  for (let x = c0 - 1; x <= c1; x++) for (let z = d0 - 1; z <= d1; z++) {
+    const e = ring(x, z, 1);
+    m.set(x, top + 2, z, e <= 1 ? LIME(x, top + 2, z) : BK_DECK(x, top + 2, z));
+    if (e <= 2) m.set(x, top + 3, z, e === 2 ? TEAM : LIP(x, top + 3, z));
   }
-  // link walls from the pylons back to the ranges
-  block(m, 30, 27, 38, 32, 1, 9, { wall: OCHRE_P, rimC: LIME, gorge: [0x34588a, 0x3f6596], torus: false, lipOut: 2, batter: 5, band: null });
-  // the gate block: limestone, its own cornice (the lintel's cavetto) a step
-  // below the pylons' tops
-  block(m, 15, 32, 26, 38, 1, 18, { wall: LIME, roofC: ROOFTILE, rimC: LIME, gorge: [0x34588a, 0x3f6596], lipOut: 2, batter: 0, band: 'lapis' });
-  // close the slot the pylons' batter opens beside the gate block (their
-  // inner faces stand flush against it up to its cornice), so no dark wedge
-  // of stepped voxels shows between a pylon and the gate
-  for (let y = 1; y < 20; y++) for (const x of [13, 14, 26, 27]) for (let z = 30; z < 38; z++) {
-    const ins = Math.floor((y - 1) / 7);
-    if (z > 37 - ins || m.get(x, y, z)) continue;
-    if ((x < 20 ? m.get(x - 1, y, z) || m.get(x + 1, y, z) : m.get(x + 1, y, z) || m.get(x - 1, y, z))) m.set(x, y, z, OCHRE_P(x, y, z));
+  // the attic step: a plain block on the deck towards the back, its own thin
+  // coping with the owner's line (the second and last coping)
+  const ay = top + 3, A0 = 12, A1 = 28, B0 = 6, B1 = 15, AH = 5;
+  for (let y = ay; y < ay + AH; y++) for (let x = A0; x < A1; x++) for (let z = B0; z < B1; z++) {
+    const edge = x === A0 || x === A1 - 1 || z === B0 || z === B1 - 1;
+    m.set(x, y, z, edge ? BK_WALL(x, y, z) : shade(BK_WALL(x, y, z), 0.9));
   }
-  door(m, '+z', 17, 7, 1, 9, { deep: 1, frame: LIME, sun: false });
-  // the cedar leaves: vertical planks, a dark meeting seam, bronze straps
-  // with rivets every third course
-  const CEDAR = [0x9c5a32, 0x8a4c2a];
-  for (let x = 17; x < 24; x++) for (let y = 1; y < 10; y++) {
-    const q = outer(m, '+z', x, y, lim(m));
-    if (!q) continue;
-    let c = CEDAR[x & 1];
-    if (x === 20) c = REVEAL2;
-    else if (y === 2 || y === 3 || y === 6 || y === 7) c = (x === 18 || x === 22) && (y === 3 || y === 7) ? 0x8f6a2c : 0xe0b452;
-    m.set(q[0], q[1], q[2], c);
+  for (let x = A0 - 1; x <= A1; x++) for (let z = B0 - 1; z <= B1; z++) {
+    const e = Math.min(x - A0 + 1, A1 - x, z - B0 + 1, B1 - z);
+    m.set(x, ay + AH, z, e === 0 ? LIP(x, ay + AH, z) : e === 1 ? TEAM : BK_DECK(x, ay + AH, z));
   }
-  // the winged sun disc on the lintel face, spanning the gate
-  paint(m, '+z', 15, 15, ['GLLLRRRLLLG', 'TTLLRRRLLTT', '.TTTGGGTTT.', '...TTGTT...'], { G: GILT, L: LAPIS, T: TURQ, R: RED });
-  // in the yard: barrels and a shield stand by the walls, a practice dummy,
-  // an archery butt
-  barrel(m, 14.5, 1, 20.5, 5, 1.7); barrel(m, 14.5, 1, 24.5, 5, 1.7);
-  crate(m, 26, 1, 18, 3, 3, 3);
-  dummy(m, 18, 26);
-  lathe(m, 27.5, 23.5, 1, 6, () => 2.2, (x, y, z) => (y === 3 ? RED : THATCH(x, y, z)));
+  // two small light slots in the attic's front (one pair, high and dark)
+  for (const x of [16, 23]) for (let y = ay + 1; y < ay + 4; y++) { m.remove(x, y, B1 - 1); m.set(x, y, B1 - 2, REVEAL); }
+  // the door: centred, deep, dark cedar leaves in a sandstone frame, the
+  // painted lintel band over it (the only strong colour on the walls)
+  door(m, '+z', 17, 6, 1, 10, { deep: 3, frame: shade(0xd2aa76, 0.86), lintel: false, proud: true });
+  paint(m, '+z', 13, 16, [
+    'RRRRRRRRRRRRRR',
+    'LLLLLLLLLLLLLL',
+    'LGGGGGRRGGGGGL',
+    'LLLGGGRRGGGLLL',
+    'GBRGBRGBRGBRGB',
+  ], { R: RED_M, L: LAPIS, G: GILT, B: 0x3f7a5a });
+  for (let x = 13; x < 27; x++) { const p = outer(m, '+z', x, 17, lim(m)); if (p) m.set(p[0], p[1], p[2], LIME(p[0], p[1], p[2])); }
+  // a paved way from the gate to the door
+  patch(m, 15, 21, 25, 40, PAVE, { rag: 1, seed: 9 });
+  // a row of three high slits in the back face, one in each end face
+  for (const u of [14, 20, 26]) slit(m, '-z', u, 9, 4, 1);
+  slit(m, '-x', 11, 9, 4, 1); slit(m, '+x', 11, 9, 4, 1);
+  // the yard: thin plain walls (a lighter top row, no cornice, no paint)
+  const YH = 6;
+  bkMass(m, 4, 20, 7, 38, 1, YH, 0, { top: BK_TOP });
+  bkMass(m, 33, 20, 36, 38, 1, YH, 0, { top: BK_TOP });
+  bkMass(m, 7, 35, 14, 38, 1, YH, 0, { top: BK_TOP });
+  bkMass(m, 26, 35, 33, 38, 1, YH, 0, { top: BK_TOP });
+  // the gate piers: the walls' ends two rows taller, the same plain top
+  for (const x0 of [13, 24]) bkMass(m, x0, 35, x0 + 3, 38, 1, YH + 2, 0, { top: BK_TOP });
+  // the team banners on poles at the yard's two front corners, clear of the door
+  banner(m, 5, YH + 1, 37, 20, '+z');
+  banner(m, 34, YH + 1, 37, 20, '+z');
+  // the spear rack along the west wall's inner face with two cowhide shields
+  rack(m, 8, 31, 8);
+  for (const sx of [9, 13]) for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+    const c = i === 1 && j === 1 ? 0xb08a3c : (i + j) % 3 === 0 ? 0x6a4428 : 0xeee2c8;
+    pset(m, sx + i, 2 + j, 33, c);
+  }
+  // a practice dummy, a straw archery butt with a red ring, barrels by the hall
+  dummy(m, 21, 28);
+  lathe(m, 29.5, 27.5, 1, 6, () => 2.2, (x, y, z) => (y === 3 ? RED : THATCH(x, y, z)));
+  bkBarrel(m, 9, 23); bkBarrel(m, 31, 23);
   return m;
-}
-
-// The Barracks' roof decks are not empty tile grids: a raised clerestory
-// strip on the back range either side of the gatehouse (a pale-lipped
-// ochre clerestory with dark light slots between piers), a stairwell hut with
-// a dark doorway on the west range, a striped sunshade on poles over jars
-// and a basket on the east range, storage jars by the clerestory.
-function barracksRoofs(m, tb, tw, te) {
-  const CL = { wall: OCHRE_P, rimC: LIME, gorge: [0x34588a, 0x3f6596], torus: false, band: null, plinth: false, socle: 0, rim: false, cornice: false };
-  // the clerestory: a long narrow raised strip down the back range's spine,
-  // dark light slots between piers along both long faces
-  for (const [x0, x1] of [[4, 14], [27, 37]]) {
-    block(m, x0, 6, x1, 10, tb, 3, CL);
-    for (let x = x0 + 1; x < x1 - 1; x += 2) for (let y = tb; y < tb + 2; y++) {
-      m.set(x, y, 9, REVEAL); m.set(x, y, 6, REVEAL);
-    }
-  }
-  sack(m, 6, tb, 11); goodsBox(m, 31, tb, 11, 3, 2, 'grain', 2);
-  // the stairwell hut on the west range, its dark doorway to the yard
-  block(m, 4, 19, 9, 24, tw, 5, CL);
-  for (let z = 20; z < 22; z++) for (let y = tw; y < tw + 4; y++) { m.set(8, y, z, REVEAL); m.set(7, y, z, REVEAL2); }
-  for (let z = 19; z < 23; z++) m.set(9, tw + 4, z, LIME(9, tw + 4, z));
-  crate(m, 6, tw, 28, 3, 3, 3); sack(m, 5, tw, 32);
-  // a striped sunshade on four poles over the east range's deck, goods under it
-  const sy = te + 5;
-  for (const [px, pz] of [[31, 16], [36, 16], [31, 25], [36, 25]]) for (let y = te; y < sy + (pz === 16 ? 1 : 0); y++) m.set(px, y, pz, POLE(px, y, pz));
-  for (let x = 30; x < 38; x++) for (let z = 15; z < 27; z++) {
-    const y = sy + (z < 21 ? 1 : 0);
-    const st = (x >> 1) & 1 ? CANVAS_T : CANVAS;
-    m.set(x, y, z, st[(x + z) % st.length]);
-  }
-  for (let x = 30; x < 38; x++) if (x & 1) m.set(x, sy - 1, 26, CANVAS_HEM);
-  goodsBox(m, 32, te, 18, 3, 3, 'grain', 2); sack(m, 32, te, 22); crate(m, 34, te, 22, 2, 2, 2);
 }
 
 // Migdol Stronghold (6 x 6; building_10): a tall battered square limestone

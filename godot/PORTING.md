@@ -1133,29 +1133,8 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   `isis` winged with horns and disc, `set` the Set animal; in egypt_town the
   two Obelisk buildings stand at the processional way's foot by the Town
   Center, not beside the temple), `eg_barracks`
-  5x5 (thick battered ranges round a drill yard, a raised gatehouse with a
-  latticed door (no painted sun over it: it read as a face); the yard's
-  front is a pylon gateway, no loose spear racks: two battered ochre
-  pylons (batter 7, h 21, a red band under the gorge) each with two
-  vertical flagpole niches cut a voxel into the face along the batter (a
-  team banner's pole stands in the outer one) and an incised relief of a
-  king smiting (dark sand, white crown, red kilt) between them; between the
-  pylons a limestone gate block a step lower (the slot the pylons' batter
-  opens beside it is closed: their inner faces stand flush against it up to
-  its cornice, so no dark wedge of stepped voxels shows), its cavetto cornice the lintel
-  bridging them, a lapis band, a winged sun disc (lapis / turquoise wings,
-  a red disc) over the door, and heavy cedar double doors one voxel inside
-  proud jambs and a lintel (vertical planks, a dark meeting seam, two
-  2-row bronze straps with rivets); barrels, a crate, a dummy and an
-  archery butt in the yard; the ranges and pylons in `OCHRE_P`, calm
-  horizontal ochre courses with low joint contrast, so a battered pylon face
-  reads as one tapering stone surface; the relief sits in a dressed panel
-  (smooth pale sandstone in a dark incised frame); the roof decks dressed
-  (`barracksRoofs`): a raised clerestory strip with dark light slots between
-  piers down the back range's spine either side of the gatehouse, a
-  stairwell hut with a dark doorway to the yard on the west range, a striped
-  sunshade on four poles over grain, a sack and a crate on the east range,
-  sacks and crates by the clerestory),
+  5x5 (one dominant battered hall with a painted lintel over its door and a
+  low drill yard in front; see "One-form Barracks, round 33"),
   `migdol` 7x7 (a tall battered limestone keep with a tiled roof, four taller
   corner turrets whose team rim runs only along their two outer sides, slit
   windows in threes, a projecting gate front with a deep gate and a gilt
@@ -1672,6 +1651,29 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   back against tier 1, and the Obelisk buildings moved to the processional
   way's foot (egypt_town_scene.gd LAYOUT). `egt_focus=temple&egt_dx=-1.9&
   egt_dz=1.6&egt_dist=7&egt_lift=3&egt_pitch=28&egt_yaw=-20` frames the god.
+- **One-form Barracks, round 33** (`barracks()`, `bkMass()`, building_09):
+  the old barracks (ranges, gatehouse, pylon gateway, clerestories, a
+  stairwell hut and a sunshade, each under its own cream coping and the same
+  blue cornice, the pylons carrying big brown relief panels) read as a pile
+  of near-identical boxes with blotchy walls. Now one form: a battered
+  sandstone hall across the back (32 x 18 voxels, 16 rows, a voxel in every
+  6, skin()-smoothed) under a single sandstone-fluted cavetto band and one
+  flat roof (a limestone coping ring with the owner's line round a sunk
+  plaster deck), one plain attic step on the roof with its own thin coping
+  (the only two copings on the building, Retold's two-step gatehouse), two
+  dark light slots in it. Walls are `BK_WALL`: regular horizontal ashlar
+  courses in three close sandstone tones (bed 0.87, head 0.93), a sparse
+  4 % low-contrast block wobble, a dark base course; no relief panels. The
+  only strong colour on the walls is one painted lintel band over the
+  centred deep door (a red rule, a lapis field with gilt wings round a red
+  disc, a green / blue / red frieze) under a limestone rule, so the entrance
+  is the focal point. In front, a low drill yard (thin 6-row walls with a
+  plain lighter top row: no cornice, no paint), entered between two wall
+  ends two rows taller, a paved way to the door; the team banners on poles
+  at the yard's two front corners, clear of the door; in the yard a spear
+  rack with two cowhide shields, a practice dummy, a straw archery butt and
+  two hooped barrels. Three high slits in the back face, one in each end.
+  `egt_focus=eg_barracks` frames it (`egt_yaw=208&egt_pitch=36` the back).
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8
