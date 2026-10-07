@@ -56,9 +56,10 @@ const PALMS := [[-17, -12], [-5, -16], [11, -12], [4, -17], [-15, 12], [12, 13],
 	[-16, 4], [20, 13], [-19, -12], [19, -3], [-17, 13], [2, 21]]
 ## street clutter between the buildings, sparse: [tile x, tile z (centre), variant, yaw]
 ## (clutter variants, export-egypt.mjs: 0 jars, 1 crates + sacks, 2 mud-brick
-## wall run, 3 hand cart, 4 pen corner, 5 reed sunshade stall, 6 woodpile, 7 well)
+## wall run, 3 hand cart, 4 pen corner, 5 reed sunshade stall, 6 woodpile, 7 well,
+## 8 quarry blocks)
 const CLUTTER := [
-	[-5.5, -4.0, 3, 0.0], [-7.0, 6.5, 5, 0.0], [3.5, 7.2, 3, 1.57], [-21.0, 0.3, 7, 0.0],
+	[-5.5, -4.0, 8, 0.0], [-7.0, 6.5, 5, 0.0], [3.5, 7.2, 3, 1.57], [-21.0, 0.3, 7, 0.0],
 	[6.0, -10.0, 2, 0.0], [-11.0, 13.0, 2, 1.57], [3.5, 13.2, 4, 1.57], [16.5, 10.5, 3, 0.0],
 ]
 ## paved lanes (tile rects relative to the centre: x, z, w, h), the rest worn earth
@@ -187,6 +188,10 @@ static func scene_setup(game: Node) -> Dictionary:
 	if focus_size > 0.0 and not game.args.has("cam"):
 		# frame one building like Retold's building views (high, close)
 		game.args["cam"] = "%f,%f,%f,%f,%f" % [focus.x, focus.y, float(game.args.get("egt_dist", maxf(14.0, 5.0 + focus_size * 2.0))), float(game.args.get("egt_pitch", 44.0)), float(game.args.get("egt_yaw", 28.0))]
+	# the Obelisk's needle stands ~5.7 tiles tall on a 1-tile lot (round 36):
+	# its framing aims at mid-height so the gilt tip stays in the shot
+	if focus_type == "obelisk" and focus_size > 0.0 and not game.args.has("egt_lift"):
+		game.args["egt_lift"] = "2.6"
 	if (game.args.has("egt_lift") or game.args.has("egt_dx") or game.args.has("egt_dz")) and game.args.has("cam"):
 		game.args["cam"] = _lift_cam(str(game.args.cam), float(game.args.get("egt_lift", 0.0)), float(game.args.get("egt_dx", 0.0)), float(game.args.get("egt_dz", 0.0)))
 	print("egypt_town: %d buildings (%s), age %d, god %s, focus %s, sand %s" % [lots.size(), "sim" if use_sim else "render-only", age, god, focus_type if focus_type != "" else "town", sim.has_method("paint_ground")])

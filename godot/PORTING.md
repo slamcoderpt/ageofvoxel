@@ -1719,6 +1719,35 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   colonnaded hall (`TC_MAT`: reed mats in a basket weave between dark
   palm-trunk beams). A tier's field is sunk before the next tier is built on
   it, so no tier loses its foot.
+- **A slim inscribed needle, round 36** (`obelisk()`, clutter variant 8 in
+  export-egypt.mjs; `fine: 3` in TYPES): the Obelisk read as a squat 1:5
+  pillar with a dark slot of noisy glyph voxels down each face and a cap that
+  greyed to sand. It is now modelled at third voxels (1/24 tile): one
+  monolith 12 fine voxels across at the foot, tapering a voxel each side
+  every 50 rows (skin() smooths it) to ~7.5 under the tip, 114 rows tall
+  (1 : 9.5), on a lower stepped plinth (dark base course, a sandstone tier
+  with a limestone tread, a painted tier of lapis / ochre / red panels under
+  a lapis fluted cavetto, a limestone lip with the owner's line, a die). The
+  shaft is warm sandstone in tall faint courses; down each face runs a FLUSH
+  inscription column (pale limestone between two ochre rules) of ordered
+  glyphs from `OB_GLYPHS`, one per register with a row of stone between
+  (cartouche on its shen bar, falcon, ankh, sun disc, reed, water, eye,
+  seated god) in one lapis + ochre (+ a little red) palette. A gold collar
+  under the tip and an electrum pyramidion. The obelisk's scaffolding uses
+  `m.stageStep` 16 (poles and decks 2/3 tile apart at fine voxels; stage()
+  falls back to 6 / 8). Its `egt_focus=obelisk` framing aims 2.6 tiles up
+  (an `egt_lift` default) so the tip stays in the shot. The hand cart by it
+  in egypt_town is replaced by clutter variant 8, a quarry pile: dressed
+  blocks stacked 3-2-1 in alternating pale limestone and warm sandstone
+  (one flat tone each, a lit top, darker arrises), a block on two log
+  rollers before it and a mallet.
+- **True gilt keeps its colour** (round 36): a model may list voxel-space
+  boxes in `m.keep`; geo() flags the gold vertices inside them (extra byte 3,
+  `CUSTOM1.a`), and egypt_building.gdshader writes a large negative emission
+  blue for them, the same escape the Lighthouse fire uses, so the display
+  grade keeps their lit (r, g) instead of its chroma limiter greying the
+  gold to sand. Only the Obelisk's cap and collar use it (`OB_CAP*`, a
+  yellower leaf than OB_GOLD since it is no longer desaturated).
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8

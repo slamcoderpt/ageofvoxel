@@ -1861,7 +1861,7 @@ function stage(full, k) {
   } else {
     const sTop = Math.min(top + 2, cut + 4);
     const xs = [], zs = [];
-    const step = small ? 6 : 8;
+    const step = full.stageStep ?? (small ? 6 : 8);   // (a fine model sets its own pole and deck spacing)
     for (let x = x0; x < x1 - 3; x += step) xs.push(x);
     xs.push(x1);
     for (let z = z0; z < z1 - 3; z += step) zs.push(z);
@@ -1870,7 +1870,7 @@ function stage(full, k) {
     for (const z of zs) for (const x of [x0, x1]) m.box(x, 1, z, 1, sTop, 1, POLE);
     const walk = Math.max(3, cut - 1);
     const levels = new Set([walk]);
-    for (let y = 8; y < walk - 3; y += 8) levels.add(y);
+    for (let y = full.stageStep ?? 8; y < walk - 3; y += full.stageStep ?? 8) levels.add(y);
     for (const y of levels) {
       for (let x = x0; x <= x1; x++) { m.set(x, y, z0, PLANK); m.set(x, y, z1, PLANK); }
       for (let z = z0; z <= z1; z++) { m.set(x0, y, z, PLANK); m.set(x1, y, z, PLANK); }
@@ -3505,71 +3505,110 @@ function siegeWorks() {
   return m;
 }
 
-// Obelisk (1 x 1, drawn over 1.5 x 1.5 like the sentry tower; building_12):
-// a landmark read at a glance. A stepped plinth: a dark base course and a
-// 10-wide sandstone tier with a limestone tread, an 8-wide tier carrying a
-// painted hieroglyph band, a fluted cavetto row and a limestone cornice lip
-// overhanging it by a voxel (a team line round its top), a limestone die.
-// On it the shaft: one smoothly tapering square needle (a battered block
-// under skin(), 6 voxels wide at the foot, ~3 at the top) in coursed
-// sandstone, a team ring at its foot, a deep gold recessed panel down each
-// face carved with registers of lapis / dark gold hieroglyphs, a gilt trim
-// band where the panels stop, a second under the tip, and a clean smooth
-// electrum pyramidion.
+// Obelisk (1 x 1, drawn over 1.5 x 1.5 like the sentry tower; building_12).
+// Round 36: modelled at third voxels (`fine: 3` in TYPES, 1/24 tile) so the
+// needle can be slim: one monolith 12 fine voxels across at the foot,
+// tapering steadily (a voxel each side every 50 rows, smoothed by skin()) to
+// ~7.5 under the tip, 114 rows tall (1 : 9.5), on a low stepped plinth (a
+// dark base course, a sandstone tier with a limestone tread, a tier with
+// painted lapis / ochre / red panels under a lapis-and-ochre fluted cavetto
+// and a limestone lip with the owner's line, a limestone die). The shaft is
+// warm sandstone in tall faint courses; down the middle of every face runs a
+// flush inscription column on pale limestone between two ochre rules:
+// ordered glyphs, one per register, in one lapis + ochre palette (a
+// cartouche, a falcon, an ankh, a sun disc, a reed, water, an eye, a seated
+// god...). A gold collar under the tip and an electrum pyramidion, its sunlit
+// faces a pale gilt, the shaded ones a deep gold, so the cap catches the
+// light. The owner's colour rings the shaft's foot.
 // deep golds: under the sun's tonemapping a pale gilt washes out to sand, so
 // the obelisk's gold is a saturated, darker leaf (lit faces still read gold)
 const OB_GOLD = 0xd6aa00, OB_GOLD_L = 0xf4cc00, OB_GOLD_D = 0x8e6800, OB_PANEL = 0xe6b800, OB_INK = 0x3a2606;
+const OB_CAP = 0xd8b400, OB_CAP_L = 0xe6c400, OB_CAP_D = 0xa88a00;   // the cap's leaf: darker still, so egypt_building.gdshader's gilt highlight stays gold, not cream
+const OBS = 0xd9bc8a, OBS_J = 0xc9ab79, OBF = 0xf2e7cf, OBG_B = 0x2c4f8c, OBG_O = 0xa8621a, OBG_R = 0xa8452c;
+// the glyphs, 4 wide (b lapis, o ochre, r red), top row first
+const OB_GLYPHS = [
+  ['.oo.', 'o..o', 'obbo', 'o..o', 'orro', 'o..o', '.oo.', 'oooo'],   // a cartouche on its shen bar
+  ['.b..', 'bbb.', 'obbb', '.bbb', '..bb', '.o.o'],                   // a falcon
+  ['.bb.', 'b..b', '.bb.', 'bbbb', '.bb.', '.bb.'],                   // an ankh
+  ['.rr.', 'rrrr', 'rrrr', '.rr.'],                                    // the sun disc
+  ['..b.', '.bb.', '..b.', '.bb.', '..b.', '..b.'],                   // a reed
+  ['bbbb', '....', 'bbbb'],                                            // water
+  ['.bb.', 'bobb', '.bb.', '..b.', '.bb.'],                            // the eye
+  ['.oo.', '.o..', 'oooo', 'oo..', 'oooo'],                            // a seated god
+];
 function obelisk() {
-  const m = lot(12, 12, SANDGROUND);
-  const ring = (y, a, b, f) => { for (let x = a; x < b; x++) for (let z = a; z < b; z++) m.set(x, y, z, f(x, z, Math.min(x - a, b - 1 - x, z - a, b - 1 - z))); };
-  // the plinth: two tiers and a cornice lip
-  ring(1, 1, 11, (x, z) => PLINTH(x, 1, z));
-  ring(2, 1, 11, (x, z) => SAND(x, 2, z));
-  ring(3, 1, 11, (x, z, e) => (e === 0 ? LIME(x, 3, z) : SAND_D(x, 3, z)));
-  ring(4, 2, 10, (x, z) => SAND(x, 4, z));
-  // the hieroglyph band: cartouche-like panels of lapis and red signs on ochre between pale frames
-  const HB = [LIME_S, OCHRE_M, LAPIS, OCHRE_M, RED_M, OCHRE_M, LAPIS, LIME_S];
-  ring(5, 2, 10, (x, z, e) => (e === 0 ? HB[(x === 2 || x === 9) ? z - 2 : x - 2] : SAND_D(x, 5, z)));
-  ring(6, 2, 10, (x, z, e) => (e === 0 ? (((x + z) & 1) ? GORGE : GORGE_L) : SAND_D(x, 6, z)));
-  ring(7, 1, 11, (x, z, e) => (e === 1 ? TEAM : LIP(x, 7, z)));
-  ring(8, 3, 9, (x, z) => LIME(x, 8, z));
-  // the shaft: voxels x/z 4..8 to y 28, 5..7 above, skinned as one taper
-  const Y0 = 9, H = 28, B = 20, TOP = Y0 + H;
-  m.blocks.push({ x0: 4, z0: 4, x1: 8, z1: 8, y0: Y0, h: H, b: B, base: 0 });
-  const P0 = 11, P1 = 27;           // the recessed panels' rows
-  const glyph = (x, y, z) => {
-    const r = (y - P0) % 4;
-    if (r === 0) return OB_GOLD_D;                                      // the register rule
-    const g = Math.floor((y - P0) / 4), s = (x + z) & 1;
-    const sign = [[1, 1, 0], [0, 1, 1], [1, 0, 1], [1, 1, 1]][g % 4];
-    return sign[r - 1] && ((r + s + g) & 1) ? (g & 1 ? LAPIS : OB_INK) : OB_PANEL;
+  const m = lot(36, 36, SANDGROUND);
+  const ring = (y, a, b, f) => { for (let x = a; x < b; x++) for (let z = a; z < b; z++) pset(m, x, y, z, f(x, z, Math.min(x - a, b - 1 - x, z - a, b - 1 - z))); };
+  // the plinth: base course, a sandstone tier with a limestone tread, the
+  // painted tier under a cavetto and a lip, a limestone die
+  const PB = 0x6e5840, ST = 0xd8b985, ST_D = 0xc4a271, LM = 0xeee3c9, LM_D = 0xdccfb2;
+  ring(1, 5, 31, () => PB);
+  for (let y = 2; y <= 4; y++) ring(y, 6, 30, (x, z, e) => (e > 0 ? ST_D : y === 3 && ((x + z) % 9 === 0) ? ST_D : ST));
+  ring(5, 6, 30, (x, z, e) => (e === 0 ? LM : ST_D));
+  // the painted tier: on each face a row of panels (lapis, ochre, red) between limestone frames
+  const PAN = [LM_D, OBG_B, OBG_B, LM_D, OBG_O, OBG_O, LM_D, OBG_R, OBG_R, LM_D, OBG_O, OBG_O, LM_D, OBG_B, OBG_B, LM_D, OBG_O, OBG_O, LM_D, OBG_B];
+  for (let y = 6; y <= 10; y++) ring(y, 8, 28, (x, z, e) => {
+    if (e > 0) return ST_D;
+    if (y === 6 || y === 10) return LM;
+    const a = (x === 8 || x === 27) ? z - 8 : x - 8;
+    return y === 7 && PAN[a] !== LM_D ? shade(PAN[a], 0.85) : PAN[a];
+  });
+  // the fluted cavetto (lapis and ochre flutes) and the lip with the owner's line
+  for (let y = 11; y <= 12; y++) ring(y, 8 - (y - 11), 28 + (y - 11), (x, z, e) => (e > 0 ? ST_D : (((x + z) >> 1) & 1) ? OBG_B : 0x3d65a0));
+  ring(13, 6, 30, (x, z, e) => (e === 2 ? TEAM : e === 0 ? LM : LM_D));
+  ring(14, 9, 27, (x, z, e) => (e === 0 ? LM : LM_D));
+  ring(15, 10, 26, (x, z, e) => (e === 0 ? LM : LM_D));
+  // the shaft: voxels 13..23 from y 16, 114 rows, a voxel in each 50 rows
+  const Y0 = 16, H = 114, B = 50, TOP = Y0 + H;
+  m.blocks.push({ x0: 13, z0: 13, x1: 23, z1: 23, y0: Y0, h: H, b: B, base: 0 });
+  // the inscription: rows G0 .. G1 on columns 16..19 (ochre rules on 15 and 20)
+  const G0 = Y0 + 7, G1 = Y0 + 96;
+  const glyphAt = new Map();   // row -> [glyph index, row in glyph]
+  for (let y = G1 - 2, g = 0; ; g++) {
+    const G = OB_GLYPHS[g % OB_GLYPHS.length];
+    if (y - G.length + 1 < G0 + 1) break;
+    for (let r = 0; r < G.length; r++) glyphAt.set(y - r, G[r]);
+    y -= G.length + 2;
+  }
+  const faceCol = (c, y) => {
+    if (y < G0 || y > G1) return null;
+    if (c === 15 || c === 20) return OBG_O;
+    if (c < 16 || c > 19) return null;
+    if (y === G0 || y === G1) return OBG_O;
+    const row = glyphAt.get(y);
+    const ch = row ? row[c - 16] : '.';
+    return ch === 'b' ? OBG_B : ch === 'o' ? OBG_O : ch === 'r' ? OBG_R : OBF;
   };
   for (let y = Y0; y < TOP; y++) {
-    const k = y - Y0 >= B ? 1 : 0;
-    const a = 4 + k, b = 8 - k;
+    const k = Math.floor((y - Y0) / B);
+    const a = 13 + k, b = 23 - k;
+    const joint = (y - Y0) % 19 === 18;
     for (let x = a; x < b; x++) for (let z = a; z < b; z++) {
-      const core = x > a && x < b - 1 && z > a && z < b - 1;
-      const panel = k === 0 && y >= P0 && y < P1;
-      if (panel && !core && !((x === a || x === b - 1) && (z === a || z === b - 1))) continue;   // cut: the recess
-      let c;
-      if (core) c = panel ? glyph(x, y, z) : SAND_D(x, y, z);
-      else if (y === Y0) c = TEAM;
-      else if (y === P1 || y === TOP - 2) c = OB_GOLD;
-      else c = SAND(x, y, z);
-      m.set(x, y, z, c);
+      let c = joint ? OBS_J : OBS;
+      if (y === Y0) c = TEAM;
+      else if (y >= TOP - 4) c = y === TOP - 4 || y === TOP - 1 ? OB_CAP_D : OB_CAP;
+      else {
+        const onZ = z === a || z === b - 1, onX = x === a || x === b - 1;
+        const fc = onZ && !onX ? faceCol(x, y) : onX && !onZ ? faceCol(z, y) : null;
+        if (fc !== null) c = fc;
+      }
+      pset(m, x, y, z, c);
     }
   }
-  // the pyramidion: an electrum voxel core under a smooth four-sided cap
-  for (let x = 5; x < 7; x++) for (let z = 5; z < 7; z++) m.set(x, TOP, z, OB_GOLD);
-  const hw = 2 + 1 - H / B, cx = 6, cz = 6, ap = [cx, TOP + 3.4, cz];   // hw: the skin's half-width at TOP
+  // the pyramidion: a stepped gold core under a smooth four-sided cap
+  const hw = 6 - H / B, cx = 18, cz = 18, ap = [cx, TOP + 8.5, cz];   // hw: the skin's half-width at TOP
+  for (let i = 0; i < 4; i++) for (let x = 15 + i; x < 21 - i; x++) for (let z = 15 + i; z < 21 - i; z++) pset(m, x, TOP + 2 * i, z, OB_CAP);
   const sq = [[cx - hw, cz - hw], [cx + hw, cz - hw], [cx + hw, cz + hw], [cx - hw, cz + hw]];
-  const lit = [OB_GOLD_L, OB_GOLD, OB_GOLD, OB_GOLD_L];
+  // faces -z, +x, +z, -x: the sun is from the south-east of the default view
+  const lit = [OB_CAP, OB_CAP_L, OB_CAP_L, OB_CAP];
   for (let i = 0; i < 4; i++) {
     const [ax, az] = sq[i], [bx, bz] = sq[(i + 1) % 4];
     const mx = (ax + bx) / 2 - cx, mz = (az + bz) / 2 - cz;
     poly(m, [[ax, TOP, az], [bx, TOP, bz], ap], lit[i], { out: [mx, 0.6, mz] });
   }
   poly(m, sq.map(([x, z]) => [x, TOP, z]), OB_GOLD_D, { out: [0, -1, 0] });
+  m.keep = [[10, TOP - 4, 10, 26, TOP + 9, 26]];   // the collar and the cap keep their gold (geo())
+  m.stageStep = 16;   // scaffolding at fine voxels: poles and decks 2 / 3 tile apart
   return m;
 }
 
@@ -5129,6 +5168,26 @@ function clutter(v) {
   } else if (v === 6) {
     woodPile(m, 1, 3, 10); woodPile(m, 7, 3, 10);
     m.line(14, 1, 4, 14, 7, 6, POLE); crate(m, 13, 1, 10, 2, 2, 2);
+  } else if (v === 8) {
+    // round 36: a quarry pile by the obelisk: dressed blocks stacked in a
+    // clear stepped pyramid (pale limestone and warm sandstone alternating,
+    // each block one flat tone with a lit top and darker arrises), one more
+    // block on two log rollers before it, a mallet leaning on it
+    const blk = (x0, y0, z0, w, h, d, c) => {
+      for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) for (let k = 0; k < d; k++) {
+        const ex = i === 0 || i === w - 1, ey = j === h - 1, ez = k === 0 || k === d - 1;
+        pset(m, x0 + i, y0 + j, z0 + k, ey ? ((ex || ez) ? shade(c, 0.94) : shade(c, 1.06)) : (ex && ez) ? shade(c, 0.8) : c);
+      }
+    };
+    const QL = 0xe6d6b0, QS = 0xb98450;
+    blk(1, 1, 2, 4, 3, 6, QL); blk(6, 1, 2, 4, 3, 6, QS); blk(11, 1, 2, 4, 3, 6, QL);
+    blk(3, 4, 3, 4, 3, 5, QS); blk(8, 4, 3, 4, 3, 5, QL);
+    blk(5, 7, 4, 5, 3, 4, QS);
+    // the block on its rollers, the rollers' pale cut ends
+    for (const x of [4, 10]) for (let z = 10; z < 15; z++) pset(m, x, 1, z, z === 10 || z === 14 ? ENDGRAIN : 0x5e3f24);
+    blk(3, 2, 11, 9, 3, 3, QL);
+    // a mallet against it
+    m.line(13, 1, 12, 13, 4, 12, POLE); pset(m, 12, 4, 12, 0x6c4a2c); pset(m, 13, 5, 12, 0x6c4a2c); pset(m, 14, 4, 12, 0x6c4a2c);
   } else {
     lathe(m, 7, 7, 1, 4, () => 3.2, LIME, { hollow: 1.2, inner: WATER });
     for (const x of [3, 10]) m.box(x, 1, 6, 1, 9, 1, POLE);
@@ -5163,6 +5222,7 @@ class Group {
       col[i * 4 + 3] = 255;
       ext[i * 4] = u8(a.team.getX(i));
       ext[i * 4 + 1] = u8(a.glow.getX(i));
+      if (a.keep) ext[i * 4 + 3] = u8(a.keep.getX(i));
     }
     const idx = Int32Array.from(geo.index.array);
     for (let i = 0; i < idx.length; i += 3) { const t = idx[i + 1]; idx[i + 1] = idx[i + 2]; idx[i + 2] = t; }
@@ -5200,7 +5260,7 @@ const TYPES = {
   siege_works: { w: 7, h: 7, variants: ['0'], ages: [1], build: () => siegeWorks() },
   armory: { w: 4, h: 4, variants: ['0'], ages: [1], build: () => armory() },
   market: { w: 4, h: 4, variants: ['0'], ages: [1], build: () => market() },
-  obelisk: { w: 1, h: 1, variants: ['0'], ages: [1], build: () => obelisk(), draw: 1.5 },
+  obelisk: { w: 1, h: 1, variants: ['0'], ages: [1], build: () => obelisk(), draw: 1.5, fine: 3 },
   monument_villagers: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(1), fine: 2 },
   monument_soldiers: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(2), fine: 2 },
   monument_priests: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(3), fine: 2 },
@@ -5210,7 +5270,7 @@ const TYPES = {
   sentry_tower: { w: 1, h: 1, variants: ['0'], ages: [1], build: () => tower(), draw: 1.5 },
   wonder: { w: 8, h: 8, variants: ['0'], ages: [1], build: () => wonder() },
   palm: { w: 1, h: 1, variants: ['0', '1', '2'], ages: [1], build: (v) => palmProp(v), stages: false, settle: false },
-  clutter: { w: 2, h: 2, variants: ['0', '1', '2', '3', '4', '5', '6', '7'], ages: [1], build: (v) => clutter(v), stages: false },
+  clutter: { w: 2, h: 2, variants: ['0', '1', '2', '3', '4', '5', '6', '7', '8'], ages: [1], build: (v) => clutter(v), stages: false },
 };
 
 // --preview <type>[:variant] --preview-out <file.json>: dump one model's
@@ -5260,6 +5320,19 @@ const geo = (m, seed = 7, vox = VOX) => {
   let out = withSkin(S.withExtras(buildVoxelGeometry(m, { size: vox, pivot, jitter: 0.012, seed }), m, vox, pivot, { maxY: m.extraMaxY ?? Infinity }), m, vox, pivot);
   // half-voxel insets (fineFigure): sub-voxel u lands at parent voxel u / k
   for (const f of m.fine || []) out = mergeGeo(out, buildVoxelGeometry(f.m, { size: vox / f.k, pivot: pivot.map((v) => v * f.k), jitter: 0.03, seed }));
+  // round 36: true gilt (m.keep: voxel-space boxes, e.g. the Obelisk's cap):
+  // the gold vertices inside are flagged (extra byte 3), and
+  // egypt_building.gdshader lets them skip the display grade's chroma
+  // limiter, which otherwise greys any saturated gold to sand
+  if (m.keep) {
+    const P = out.attributes.position, C = out.attributes.color, keep = new Float32Array(P.count);
+    for (let i = 0; i < P.count; i++) {
+      const vx = P.getX(i) / vox + pivot[0], vy = P.getY(i) / vox + pivot[1], vz = P.getZ(i) / vox + pivot[2];
+      const gold = C.getZ(i) < C.getX(i) * 0.06 && C.getY(i) < C.getX(i) * 0.8;
+      if (gold && m.keep.some((b) => vx >= b[0] - 0.01 && vx <= b[3] + 0.01 && vy >= b[1] - 0.01 && vy <= b[4] + 0.01 && vz >= b[2] - 0.01 && vz <= b[5] + 0.01)) keep[i] = 1;
+    }
+    out.setAttribute('keep', new THREE_BufferAttribute(keep, 1));
+  }
   return out;
 };
 const t0 = Date.now();

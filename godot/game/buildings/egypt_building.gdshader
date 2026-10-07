@@ -46,6 +46,7 @@ varying float v_flash;
 varying float v_ao;
 varying float v_low;
 varying float v_gold;
+varying float v_keep;
 
 vec3 srgb_to_linear(vec3 c) {
 	return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
@@ -70,6 +71,7 @@ void vertex() {
 	vec3 a = v_albedo;
 	v_gold = step(a.b, a.r * 0.06) * step(a.r * 0.3, a.g) * step(a.g, a.r * 0.8) * step(0.03, a.r) * (1.0 - step(0.01, CUSTOM1.r));
 	v_glow = CUSTOM1.g;
+	v_keep = CUSTOM1.a;
 	v_ao = 1.0 - ao_strength * mix(1.0, ao_up, max(NORMAL.y, 0.0)) * pow(clamp(CUSTOM1.b, 0.0, 1.0), ao_power);
 	// sand bounce: low on the model, on faces turned sideways or down
 	v_low = (1.0 - smoothstep(0.0, bounce_h, VERTEX.y)) * (1.0 - max(NORMAL.y, 0.0));
@@ -97,6 +99,11 @@ void fragment() {
 	// orange through the grade (grade_effect.gd: a negative blue, -8 x the
 	// brightest channel, skips the chroma limiter that turns orange pink)
 	if (v_glow > 0.85) EMISSION.b = -8.0 * max(EMISSION.r, EMISSION.g);
+	// true gilt (export-egypt.mjs m.keep: the Obelisk's cap and collar) keeps
+	// its lit gold through the grade the same way: a negative blue far beyond
+	// the pixel's own light (its albedo has no blue), so the grade takes the
+	// pixel's lit (r, g) as is instead of greying it to sand
+	if (v_keep > 0.5) EMISSION.b = -80.0;
 }
 
 void light() {
