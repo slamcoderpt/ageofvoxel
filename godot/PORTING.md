@@ -3129,6 +3129,36 @@ sides (`egypt_units_scene.gd`). Check: `eu_focus=anubite&eu_zoom=0.75` (also
 `eu_state=walk|attack|die`), `eu_focus=avenger&eu_zoom=0.7`,
 `eu_group=myth&eu_zoom=0.45&eu_az=2.4&eu_ax=-2`.
 
+The Wadjet, round 43 (myth_02; the wings read as stacks of flat slats hung
+off one brown spar with no root at the body, slices floating in the air and
+neighbours' wings clipping, and the head read as a meerkat: round brown hood
+lobes, a blunt snout band, googly eyes). The hood, head and wings are rebuilt
+on the fine grid (part scale 0.5, greedy) in `export-egypt-units.mjs`.
+**Hood and head** (part `torso`): a round neck column (pale throat banded dark
+in front, gold sides, a dark scale lattice down the back), then one flat, wide
+teardrop shield three fine voxels deep whose edges curve slightly forward:
+behind, a navy field under rows of cream scale spots inside a gold scaled
+rim; in front, gold scales round the pale throat with two dark bars. The head
+is a flat wedge on the hood's crown, wide behind the jaws and narrowing to a
+pointed snout, a gold crown with a darker stripe, a pale jaw with a dark lip
+line, a small dark slit eye under a bright brow scale on each side, nostrils
+and a forked red tongue. **Wings** (`wingF`, parts `wingL` / `wingR`, joint
+[±1.5, 9.5, -3] on the torso, in rig voxels: the part scale does not apply to
+joints): each one continuous mass sampled along span and chord at half-voxel
+steps: a gold scaled shoulder bedded into the back of the neck behind the
+hood, the leading edge sweeping back (0.4 rad) and rising, bowed forward at
+the wrist, the chord curving down behind it; tiers stepping back in pointed
+scallops (5-voxel feathers): a dark leading edge, two gold scale covert rows
+with darker hems, a red mark at each flight feather's root, short team
+secondaries over long team primaries that fan outward to a pointed tip with
+dark ends; 2-5 fine voxels thick (under layers written first so no top face is
+overwritten). The model is built rolled down 0.6 rad because `unit_view.cpp`
+(P_SERPENT) raises the wings ~0.55 rad at rest, so they spread wide and show
+their upper face. The coil is regraded to gold with navy saddle bands. In
+`egypt_units_scene.gd` the Wadjet focus spacing (`GAP`) is 5.2, so the four
+wings no longer touch. Captures: `--params "eu_focus=wadjet"` (idle / walk /
+attack / die), `eu_one=wadjet&eu_turn=0|90|120|150`, `eu_group=myth`.
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower

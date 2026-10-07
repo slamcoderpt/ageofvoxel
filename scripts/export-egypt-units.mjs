@@ -4479,19 +4479,13 @@ function khopeshM(s = 1) {
   ]);
 }
 
-// Wadjet (serpent rig, 0.09): a winged cobra (myth_02). Round 16: no per-voxel
-// alternation anywhere: the body is painted in broad zones (a light tan belly
-// and lower flank along the whole coil, a mid-tan back, dark brown saddle bands
-// 3 voxels long every 7 along the spine only) so each coil reads as one tube; a
-// second, smaller coil rides on the first; the hood a dark brown flare with a
-// darker rim and a light spectacle eye-spot behind, a pale throat in front;
-// the head with a light jaw, a 2x2 dark eye with a 1-voxel glint each side, a
-// brow ridge and a light snout tip; the wings: tan coverts with one dark edge
-// row, a red chevron per feather, team feathers alternating in 3-wide quills,
-// darker tips, and stepped primaries (each feather pointed and the outer four
-// 2 voxels longer than the one before) so the trailing edge is jagged.
+// Wadjet (serpent rig, 0.09): a winged cobra (myth_02). The coil is painted
+// in broad zones (a light belly and lower flank, a gold back, navy saddle
+// bands every 7 voxels along the spine) so each coil reads as one tube, a
+// second, smaller coil riding on the first; (round 43) the hood, head and
+// wings are fine-grid parts, described where they are built below.
 {
-  const W_BELLY = 0xe8d49a, W_SIDE = 0xc89c4c, W_BACK = 0xa47434, W_BAND = 0x4e3420, W_BAND_D = 0x3a2616;
+  const W_BELLY = 0xecd496, W_SIDE = 0xcc9630, W_BACK = 0x9a661c, W_BAND = 0x262234, W_BAND_D = 0x1a1824;
   const W_HOOD = 0x2e3248, W_HOOD_D = 0xc8963e, W_HOOD_F = 0x7a5428, W_HOOD_FD = 0x34241a, W_SPOT = 0xecd06a, W_THROAT = 0xf2e4b8;
   // a tube voxel's zone: u = the voxel's height in the tube (-1 belly .. 1 spine),
   // q = the distance along the tube (voxels), spine = on the top line
@@ -4515,60 +4509,121 @@ function khopeshM(s = 1) {
   // the rising neck base: a light front, a mid back with spine bands behind
   for (let y = 2; y <= 9; y++) { const r = 2.6 - (y - 2) * 0.1; for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) if (x * x + z * z <= r * r) coil.set(x, y, z + 1, z >= 1 ? W_BELLY : z >= 0 ? W_SIDE : (Math.abs(x) <= 1 && z <= -1 && y % 7 < 3) ? W_BAND : W_BACK); }
   const seg = (len, r0, r1, q0) => { const m = new VoxelModel(); for (let z = 0; z < len; z++) { const r = r0 + (r1 - r0) * (z / len); for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) if (x * x + y * y <= r * r + 0.3) m.set(x, y, -z, zone(y / Math.max(r, 1), q0 + z, Math.abs(x) <= 1 && y >= r * 0.4)); } return m; };
-  // the neck and hood: the throat pale in front (+z), the back mid-tan with spine bands
+  // (round 43) the hood, head and wings on the fine grid (part scale 0.5):
+  // the neck a round column (pale banded throat in front, gold sides, a dark
+  // scale lattice down the back); the hood one flat, wide teardrop shield three
+  // fine voxels deep, its edges curving slightly forward: behind, a navy field
+  // under rows of cream scale spots inside a gold scaled rim (myth_02); in
+  // front, gold scales round a pale throat with two dark bars; the head a flat
+  // wedge on top of the hood, wide behind the jaws and narrowing to a pointed
+  // snout, a gold crown, a pale jaw with a dark lip line, small dark slit eyes
+  // under a bright brow, nostrils and a forked red tongue.
+  const H_NAVY = 0x1c2238, H_NAVY_D = 0x141828, H_SPOT = 0xf0d890, H_RIM = 0xd8a830, H_RIM_D = 0x8a5e18;
+  const H_GOLD = 0xc8962e, H_GOLD_L = 0xe4b848, H_GOLD_D = 0x7a5418, H_THROAT = 0xf0e2b0, H_BAR = 0x3a2614;
   const hood = new VoxelModel();
-  for (let y = 0; y <= 14; y++) for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) if (x * x + z * z <= 2.2 * 2.2) {
-    hood.set(x + 4, y, z + 2, (z >= 1 && x === 0) ? (y % 5 === 2 ? W_BAND : W_THROAT) : z >= 0 ? W_SIDE : (Math.abs(x) <= 1 && y % 7 < 3) ? W_BAND : W_BACK);
-  }
-  // the flare: a broad shield two voxels deep: behind, dark slate (myth_02) in a gold rim with a light
-  // spectacle mark; in front, a dark brown rim round a mid-brown face and the pale throat
-  for (let y = 3; y <= 15; y++) {
-    const w = Math.round(8.2 - Math.abs(y - 10.5) * 1.05);
-    for (let x = -w; x <= w; x++) {
-      const rim = Math.abs(x) >= w || y === 3 || y === 15;
-      const spot = (y >= 9 && y <= 11 && Math.abs(x) >= 2 && Math.abs(x) <= 4) || (y === 12 && Math.abs(x) <= 3) || (y === 6 && Math.abs(x) % 3 === 1 && Math.abs(x) < 6);
-      const cup = Math.abs(x) >= 6 ? 2 : Math.abs(x) >= 4 ? 1 : 0;   // the flare's wings cup forward round the neck
-      hood.set(x + 4, y, cup, rim ? W_HOOD_D : spot ? W_SPOT : W_HOOD);
-      // the front face: a pale throat down the middle, the flare's inner face a darker tan with two dark throat bars
-      hood.set(x + 4, y, 1 + cup, rim ? W_HOOD_FD : Math.abs(x) <= 1 ? ((y === 6 || y === 7) ? W_BAND : W_THROAT) : W_HOOD_F);
+  const NECK_R = 4.6;
+  for (let y = 0; y <= 26; y++) {
+    const r = NECK_R - y * 0.03;
+    for (let x = -5; x <= 5; x++) for (let z = -5; z <= 5; z++) {
+      if (x * x + z * z > r * r + 0.4) continue;
+      const c = z >= 2 ? (Math.abs(x) <= 2 ? ((y % 9) < 2 ? H_BAR : H_THROAT) : H_GOLD_L)
+        : z >= -1 ? H_GOLD
+        : (((x + 20 + (Math.floor(y / 2) % 2) * 2) % 4 === 0 && y % 2 === 0) ? H_GOLD_D : H_RIM_D);
+      hood.set(x, y, z, c);
     }
   }
-  // the head: x 0..4, a light jaw, mid sides, a narrower crown with a dark scale cap, brow ridges
-  const sh = new VoxelModel();
-  for (let x = 0; x <= 4; x++) for (let z = 0; z <= 5; z++) {
-    sh.set(x, 0, z, W_BELLY);
-    for (let y = 1; y <= 2; y++) sh.set(x, y, z, W_SIDE);
+  const HY0 = 5, HY1 = 33;
+  const hoodW = (y) => { const t = Math.min(1, Math.max(0, (y - HY0) / (HY1 - HY0))); return 4.4 + 11 * Math.sin(Math.PI * Math.pow(t, 1.25)); };
+  for (let y = HY0; y <= HY1; y++) {
+    const w = hoodW(y), wi = Math.floor(w);
+    for (let x = -wi; x <= wi; x++) {
+      const e = Math.abs(x) / w;
+      const zo = Math.round(1.8 * e * e);           // the edges curve forward round the neck
+      const rim = Math.abs(x) >= wi - 1 || y === HY0 || y >= HY1 - 1;
+      const row = Math.floor(y / 2), sp = (x + 40 + (row % 2) * 2) % 4 === 0 && y % 2 === 0;
+      // the back face (z -1 + zo): navy under cream scale spots, a gold scaled rim
+      const back = rim ? ((x + y) % 3 === 0 ? H_RIM_D : H_RIM) : sp ? H_SPOT : (y % 2 ? H_NAVY : H_NAVY_D);
+      hood.set(x, y, zo - 2, back);
+      hood.set(x, y, zo - 1, rim ? H_RIM : H_NAVY);
+      // the front face: gold scales, the pale throat down the middle with two dark bars
+      const front = Math.abs(x) <= 2 ? ((y === 13 || y === 14 || y === 18) ? H_BAR : H_THROAT)
+        : rim ? H_GOLD_D : (sp ? H_GOLD_D : H_GOLD);
+      hood.set(x, y, zo, front);
+    }
   }
-  for (let x = 1; x <= 3; x++) for (let z = 0; z <= 5; z++) sh.set(x, 3, z, z <= 2 ? W_BAND : W_BACK);
-  sh.set(0, 3, 3, W_BAND_D).set(0, 3, 4, W_BAND_D).set(4, 3, 3, W_BAND_D).set(4, 3, 4, W_BAND_D);   // brows
-  for (const x of [0, 4]) {
-    sh.set(x, 1, 3, DARK).set(x, 1, 4, DARK).set(x, 2, 3, DARK).set(x, 2, 4, 0xfaf4e0);   // the eye and its glint
-    sh.set(x, 1, 5, W_BAND_D);   // the mouth line
+  // the head: a flat wedge from the hood's crown (y 31) forward to a pointed snout
+  const HZ0 = -4, HZ1 = 15;
+  for (let z = HZ0; z <= HZ1; z++) {
+    const t = (z - HZ0) / (HZ1 - HZ0);
+    const hw = 4.8 * (1 - 0.82 * Math.pow(t, 1.5));
+    const top = Math.round(38 - 3.2 * Math.pow(t, 1.2)), bot = Math.round(32 + 1.2 * t);
+    const hwi = Math.max(0, Math.round(hw));
+    for (let x = -hwi; x <= hwi; x++) for (let y = bot; y <= top; y++) {
+      const side = Math.abs(x) === hwi;
+      let c = y === bot ? H_THROAT : y >= top ? ((x + z + 40) % 3 === 0 ? H_GOLD_D : H_GOLD) : side ? H_GOLD_L : H_GOLD;
+      if (y === bot + 1 && side && z >= 2) c = H_BAR;                         // the lip line
+      if (y === top && Math.abs(x) <= 1 && z < 6) c = H_GOLD_D;               // a darker crown stripe
+      hood.set(x, y, z, c);
+    }
+    // the eyes: a small dark slit on each side under a bright brow scale
+    if (z >= 4 && z <= 6) for (const sx of [-1, 1]) {
+      hood.set(sx * hwi, top - 1, z, DARK);
+      hood.set(sx * hwi, top, z, H_GOLD_L);
+    }
   }
-  for (let x = 1; x <= 3; x++) for (let z = 6; z <= 7; z++) { sh.set(x, 0, z, W_THROAT); sh.set(x, 1, z, z === 7 ? W_THROAT : W_SIDE); }
-  sh.set(1, 1, 7, DARK).set(3, 1, 7, DARK);                 // nostrils on the light snout tip
-  sh.set(1, -1, 6, 0xf8f4e8).set(3, -1, 6, 0xf8f4e8);       // fangs
-  hood.merge(sh, 2, 15, 1);
-  const W_COV = 0x6a4a26, W_COV_L = 0x8e6834;   // the coverts a mid golden brown (no pale sticks)
-  const wing = (s) => {
+  hood.set(-1, 34, HZ1, DARK).set(1, 34, HZ1, DARK);                         // nostrils
+  hood.set(0, 33, HZ1 + 1, RED).set(0, 33, HZ1 + 2, RED).set(-1, 33, HZ1 + 3, RED).set(1, 33, HZ1 + 3, RED);   // the forked tongue
+  // the wings (fine grid): one continuous cambered mass per side. A gold
+  // scaled shoulder sits behind the hood and runs into the leading edge; the
+  // span sweeps back and rises, bowing forward at the wrist; the chord falls
+  // away behind the leading edge in a curve; three tiers step back in pointed
+  // scallops: a dark leading edge, two rows of gold scale coverts (each a
+  // lighter field and a darker scalloped hem), a red mark at the root of each
+  // flight feather, short team secondaries lying over long team primaries with
+  // darker tips; each feather a lighter vane and a darker edge column. Two to
+  // five fine voxels thick (the shoulder thickest), never a single slab.
+  const WG_LE = 0x1e1620, WG_C1 = 0xd08c08, WG_C1D = 0x5a3606, WG_C2 = 0xb07010, WG_C2D = 0x3e2408;
+  const wingF = (s) => {
     const m = new VoxelModel();
-    for (let i = 0; i <= 23; i++) {   // along the wing (outward), feathers 3 columns wide
-      const f = Math.floor(i / 3), k = i % 3;
-      const len = 9 + (f >= 4 ? (f - 3) * 2 + 1 : 0) - (2 - k);   // pointed feathers, stepped primaries
-      for (let j = 0; j <= len; j++) {   // feather length (down / back)
-        const wy = -Math.round(j * 0.55), wz = -j;
-        if (j < 3) {   // the coverts: two scaled rows and a dark edge, thick only along the inner arm
-          const c = j === 2 ? W_BAND : (f % 2 ? W_COV : W_COV_L);
-          m.set(s * i, wy, wz, c);
-          if (i < 12 && j < 2) m.set(s * i, wy + 1, wz, f % 2 ? W_COV : W_COV_L);
-          continue;
-        }
-        if ((j === 4 && k !== 0) || (j === 5 && k === 1)) { m.set(s * i, wy, wz, RED); continue; }   // a red chevron per feather
-        const tip = j > len - 2;
-        if (tip) tset(m, s * i, wy, wz, 0x7a7a7a);
-        else if (f % 2) tset(m, s * i, wy, wz, TEAM_SHADE);
-        else m.set(s * i, wy, wz, TEAM);
+    const A = 48, SW = 0.4;   // span (fine voxels), sweep back (radians)
+    const chord = (a) => { const u = a / A; const c = 23 + 15 * u; return u < 0.78 ? c : c * Math.sqrt(Math.max(0, 1 - (u - 0.78) / 0.22)) + 4 * (1 - (1 - u) / 0.22); };
+    // the beat raises the wing ~0.55 rad (unit_view.cpp, P_SERPENT): the model is built rolled
+    // down by ROLL so at rest it spreads wide and shows its upper face, not its edge
+    const ROLL = 0.6, cr = Math.cos(ROLL), sr = Math.sin(ROLL);
+    const put = (x0, y0, z, c, team) => {
+      const x = Math.round(x0 * cr + y0 * sr), y = Math.round(-x0 * sr + y0 * cr);
+      if (team) tset(m, s * x, y, z, c); else m.set(s * x, y, z, c);
+    };
+    const ops = [];   // [layer, x, y, z, colour, team]: the under layers first, so no top face is overwritten
+    for (let a = 0; a <= A; a += 0.5) {
+      const u = a / A;
+      // the leading edge: out and back, rising, bowed forward at the wrist
+      const lx = a * Math.cos(SW), lz = -a * Math.sin(SW) + 5 * Math.sin(Math.PI * u), ly = 0.12 * a;
+      const fw = 5, fk = ((a % fw) + fw) % fw, fc = Math.abs(fk - (fw - 1) / 2);   // feather column, distance from its centre
+      const feather = Math.floor(a / fw);
+      const C = chord(a) - fc * 1.8;                    // pointed feather tips: the trailing scallop
+      const cv1 = 5 - fc * 0.9, cv2 = 10.5 - fc * 1.1 - 3 * u, sec = 18 + 3 * u - fc * 1.5;   // tier hems (scalloped)
+      const splay = -0.15 + 0.7 * u * u;                       // the primaries fan outward towards the tip
+      const thick = 2 + Math.round(3 * Math.max(0, 1 - u * 1.6));
+      for (let b = 0; b <= C; b += 0.5) {
+        const x = lx + b * Math.sin(splay), z = Math.round(lz - b * Math.cos(splay));
+        const y0 = ly - 0.08 * b - 0.005 * b * b;   // the chord curves down behind the leading edge
+        let c, team = false, up = 0, th = 2;
+        if (b < 1.5) { c = WG_LE; th = thick + 1; up = 1; }
+        else if (b < cv1) { c = b > cv1 - 1.2 ? WG_C1D : WG_C1; th = thick; up = 1; }
+        else if (b < cv2) { c = b > cv2 - 1.2 ? WG_C2D : WG_C2; th = Math.max(2, thick - 1); up = 1; }
+        else if (b < cv2 + 1.6 && fc < 1.2) { c = RED; up = 1; }
+        else if (b < sec) { team = true; c = fk < 0.6 ? 0x9a9a9a : feather % 2 ? 0xe8e8e8 : 0xffffff; up = 1; }
+        else { team = true; c = b > C - 2.5 ? 0x6a6a6a : fk < 0.6 ? 0x8a8a8a : feather % 2 ? TEAM_SHADE : 0xd4d4d4; }
+        for (let k = 0; k < th; k++) ops.push([k, x, y0 + up - k, z, k === 0 ? c : (team ? 0x7a7a7a : WG_C2D), team]);
       }
+    }
+    ops.sort((p, q) => q[0] - p[0]);
+    for (const o of ops) put(o[1], o[2], o[3], o[4], o[5]);
+    // the shoulder: a scaled gold mass bedding the wing root into the hood's back
+    for (let x = -3; x <= 5; x++) for (let y = -4; y <= 4; y++) for (let z = -4; z <= 4; z++) {
+      if ((x - 1) * (x - 1) / 16 + y * y / 14 + z * z / 14 > 1) continue;
+      m.set(s * x, y, z, (x + y + z + 30) % 3 === 0 ? WG_C1D : WG_C1);
     }
     return m;
   };
@@ -4577,9 +4632,9 @@ function khopeshM(s = 1) {
     part('tailA', seg(8, 2.2, 1.8, 0), [0, 0, 0], [-2, 2, -4], 'coil'),
     part('tailB', seg(8, 1.8, 1.2, 8), [0, 0, 0], [0, 0, -8], 'tailA'),
     part('tailC', seg(8, 1.2, 0.4, 16), [0, 0, 0], [0, 0, -8], 'tailB'),
-    part('torso', hood, [4, 0, 2], [0, 9, 1], 'coil'),
-    part('wingL', wing(1), [0, 0, 0], [2, 6, -4], 'torso'),
-    part('wingR', wing(-1), [0, 0, 0], [-2, 6, -4], 'torso'),
+    part('torso', hood, [0, 0, 0], [0, 9, 1], 'coil', { scale: 0.5, greedy: true, outline: 0.15 }),
+    part('wingL', wingF(1), [0, 0, 0], [1.5, 9.5, -3], 'torso', { scale: 0.5, greedy: true, outline: 0.12 }),
+    part('wingR', wingF(-1), [0, 0, 0], [-1.5, 9.5, -3], 'torso', { scale: 0.5, greedy: true, outline: 0.12 }),
   ]);
 }
 

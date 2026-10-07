@@ -31,7 +31,7 @@ const STAND_IN := {"anubite": "minotaur", "avenger": "minotaur", "mummy": "medus
 	"phoenix": "centaur", "roc": "centaur"}
 ## lineup spacing (world units) by size
 const GAP := {"war_elephant": 4.2, "siege_tower": 3.4, "catapult": 3.4, "chariot_archer": 3.6, "camel_rider": 2.8, "mercenary_cavalry": 2.6,
-	"sphinx": 3.6, "petsuchos": 3.8, "scarab": 3.2, "scorpion_man": 3.4, "wadjet": 3.6, "phoenix": 3.6, "roc": 4.6, "son_of_osiris": 2.4,
+	"sphinx": 3.6, "petsuchos": 3.8, "scarab": 3.2, "scorpion_man": 3.4, "wadjet": 5.2, "phoenix": 3.6, "roc": 4.6, "son_of_osiris": 2.4,
 	"avenger": 2.2, "anubite": 2.0, "serpent": 2.4,  # (the Serpent rears its head high: eu_one frames it whole)
 	# men with long hafts stand a spear's length apart, so in a focus view no
 	# man's spear or shield crosses his neighbour's body
