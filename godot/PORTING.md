@@ -2427,6 +2427,34 @@ wider on the outer side (rows 13..16), the biceps a voxel deeper in front, and
 an elbow knob sits behind, so the shoulders carry mass. Check:
 `--params "eu_focus=axeman"`, `eu_one=axeman&eu_turn=20`, `eu_group=foot`.
 
+Chariot Archer driver and horse, round 31 (unit_03; the driver was a brown
+cube-noise torso with arms melting into it, a brown bow, pink legs in the car,
+no face; the horse a bloated white block with a red pad cube and a brick
+head): the driver wears a silver scale corslet (`scaleArmour`: offset scale
+rows, a lit cap row over a mid row, the gap a shade down, the sides a tone
+darker, a gold hem row) with a one-voxel near-black outline (`ARMOUR_OL`)
+round the arm holes, across the shoulders' outer tops and as the belt at the
+waist, so his bare bronze arms read apart from the body. His legs in the car
+are `chariotLegsM` (half voxels): a white linen kilt tapering to the waist,
+pleats, a team hem, reaching below the car's rim, so only linen shows over the
+breastwork. Head `charioteer`: the ribbed gold / team helmet sits a row higher
+and flush with the brow, so a lit forehead row, a near-black brow line a voxel
+proud, dark eyes with white corners, a two-voxel nose ridge and a mouth read
+from the camera (`headScale` 1.2). The bow is `chariotBowM`: one half-voxel
+wide, pale honey wood with dark bands, ivory tips, held upright out in front.
+The horse is rebuilt at half the rig voxel (`chHorseBody / Neck / Tail / Legs`,
+part scale 0.5, joints in rig voxels): a long slim barrel (24 rig voxels long,
+5 wide, 7 deep) on legs as long as the body is deep, a deep chest, rounded
+quarters, withers, a tucked belly; a slender arched neck, a wedge head
+tapering to a grey muzzle, pricked ears, an eye each side, a roached mane, a
+thin bridle with a team browband. Retold's tack is painted flush on the body:
+a cream blanket with red / ochre / red borders and a leather-and-ochre fringe,
+one thin dark girth strap, a team breast band with gold studs, a team and gold
+collar. The car's shafts are 1 x 1 to small yoke saddles under a thin yoke.
+Mercenary Cavalry keeps the old `horseBody`. Check:
+`--params "eu_focus=chariot_archer"`, `eu_one=chariot_archer&eu_turn=100&eu_zoom=0.8`,
+`eu_group=mounted`.
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower
