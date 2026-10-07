@@ -22,7 +22,7 @@ const SETUPS := {
 	"eclipse": ["ra", ["bast", "sobek", "horus"], 4.0, 30.0, 40.0, 28.0],
 	"shifting_sands": ["set", ["ptah", "sekhmet", "horus"], 2.4, 46.0, 50.0, 0.0],
 	"plague_of_serpents": ["isis", ["anubis", "nephthys", "thoth"], 3.6, 11.0, 30.0, 24.0],
-	"locust_swarm": ["ra", ["bast", "sobek", "horus"], 5.0, 34.0, 48.0, 24.0],
+	"locust_swarm": ["ra", ["bast", "sobek", "horus"], 6.0, 34.0, 48.0, 24.0],
 	"citadel": ["ra", ["ptah", "sekhmet", "osiris"], 1.2, 34.0, 40.0, 30.0],
 	"ancestors": ["isis", ["bast", "nephthys", "osiris"], 7.0, 32.0, 44.0, 26.0],
 	"son_of_osiris": ["ra", ["bast", "sobek", "osiris"], 1.05, 24.0, 36.0, 24.0],
@@ -137,11 +137,13 @@ static func scene_setup(game: Node) -> Dictionary:
 				tz = cz + 10
 			focus = Vector2(tx, tz)
 		"locust_swarm":
-			tx = cx + 2
+			# (round 23) the swarm comes in from the west and is caught as it reaches the Greek
+			# Farms, their crops still standing under it, not on the bare plots it leaves
+			tx = cx - 5
 			tz = cz - 14
 			x2 = cx + 20
 			z2 = cz - 14
-			focus = Vector2(cx + 9, cz - 12)
+			focus = Vector2(cx + 3, cz - 13)
 		"citadel":
 			var t: Dictionary = sim.get_building(tc)
 			tx = float(t.x)

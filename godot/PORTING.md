@@ -4849,6 +4849,25 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   is now `varying flat` in decal_mix and decal_add (the value is per instance anyway; the
   scorch, crater and lava kinds, seeded the same way, are cleaner for it). The cracks are now
   solid near-black clefts ((10,7,4) by the hole to (34,23,12) out) with a dark ochre shoulder.
+- **The Locust Swarm is a living cloud** (gods round 23, godpower_view_egypt.cpp): the critic saw
+  a hard-edged slab under the swarm (the 2x2 Greek Farms, eaten bare at the old t=5 framing and
+  washed in one even translucent haze, over a single big dark blot) and one-size, one-tone cubes
+  spread evenly. Now each of the five swarms is drawn from its own noise field, with no volume or
+  ground primitive: its centre wobbles on its track, and an angular footprint `rim(a, t)` (three
+  sine lobes, 2 / 3 / 5 per turn, seeded per swarm, drifting with time) shapes everything. 460
+  locusts at full strength with `rn = 1.3 u^2` (half inside 0.33 R, stragglers out to 1.3 R),
+  angular speed `1.6 / (0.25 + rn)` (the core spins fastest, the swarm's own direction), taller
+  in the core; four sizes (0.032 / 0.05 / 0.075 / 0.11, 40 / 35 / 19 / 6 %) and four tones (dark
+  brown 2e2418, olive 4e4228, ochre 8a6c3a and a light sand tier e2c991, 20 %); the two bigger
+  sizes beat dun wings (9a8660); each fast one (> 2 tiles/s on its orbit) trails a thin streak
+  from where it was 0.09 s ago. Dust: 52 soft puffs (puff.gdshader round mode) dense and dark in
+  the core (7a6446 / 5e5040 / grey 8c8478, alpha 0.34) feathering to a sand fringe (c4a878 /
+  a89070, alpha 0.14) past 0.65 R, plus 18 trail puffs shed on the track that lag, grow and
+  fade over 2.4 s (loose dust behind it). The shadow is 16 small soft decal_mul blots scattered
+  by the same footprint, darker in the core. The egypt_powers "locust_swarm" setup now casts from
+  cx - 5 and captures at t = 6 (focus cx + 3): the swarm reaching the Farms with their crops still
+  standing (a Farm it destroys leaves its bare plot, the building view's, not the power's).
+
 - **Horus' Tornado funnel** (round 12: egypt_fx.gd `_make_funnel`, tornado.gdshader `mode`):
   a value structure instead of a pale haze. The body (mode 1, the ring mesh's outer face;
   the meshes wind so that is the *back* face) is fully opaque except at its silhouette (a dark

@@ -23,8 +23,9 @@
 //                   jagged cracks glowing green, a raised ring of dark ochre sand voxels round
 //                   its coils, a plume of tan dust and voxel chunks up to its head that fall
 //                   back and lie round the hole, a low dust skirt (serpent_burst)
-//   Locust Swarm    five clouds of voxel locusts boiling along their track over a dusty brown
-//                   haze, a shadow under each
+//   Locust Swarm    five living clouds, each a noise-shaped footprint: a dense swirling core of
+//                   locusts in four sizes and tones (a light sand tier) thinning into stragglers,
+//                   motion streaks, dust feathering out and lagging behind, a broken shadow
 //   Citadel         a gold pillar of light on the Town Center, a shock ring, sandstone blocks
 //                   rising round it; a gold ring and motes on every Citadel Center
 //   Ancestors       a blue glyph ring and cold mist; a blue pillar, cracks and wisps where each
@@ -864,42 +865,132 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 		}
 	}
 
-	// ---- Locust Swarm: boiling clouds of voxel locusts over a dust haze --------------------------------
+	// ---- Locust Swarm: a living cloud, no volume primitive --------------------------------------------
+	// (gods round 23) Each swarm is drawn from its own noise field: an irregular footprint (a radius
+	// that wanders with the angle and the time) holds a dense, swirling core of locusts in four sizes
+	// and four tones (dark brown, olive, ochre and a light sand tier whose wings catch the sun) that
+	// thins out into stragglers past the edge; the bigger ones beat dun wings, each fast one trails
+	// a thin pale streak back along its path (where it was 0.09 s ago). Under it, soft dust puffs in two tones, dense in the core and feathering
+	// into loose dust that lags behind the swarm; on the ground, a broken shadow of small soft blots.
 	for (int si = 0; si < (int)G.swarms.size(); si++) {
 		const aov::Swarm &w = G.swarms[si];
-		const double age = now - w.t0;
 		const double k = env(now, w.t0, w.t0 + w.dur, 0.8, 1.5);
-		const double x = w.x0 + w.dx * aov::SWARM_SPEED * age, z = w.z0 + w.dz * aov::SWARM_SPEED * age;
-		const double gy = h_at(x, z);
+		if (k <= 0.001) continue;
 		const double R = w.radius;
-		decal(I_DECAL_MUL, x, gy + 0.06, z, R * 2.6, 0, 1, 1, 1, (float)(0.55 * k), 0);
-		// the haze (power_09: a dusty brown cloud)
-		for (int i = 0; i < 46; i++) {
-			const double a = hr(w.seed, i, 111) * TAU + now * (0.3 + 0.2 * hr(w.seed, i, 112)), rr = R * 0.75 * std::sqrt(hr(w.seed, i, 113));
+		const double hd = std::atan2(w.dz, w.dx); // (the heading)
+		const double spin = (w.seed & 1) ? 1 : -1;
+		// the swarm's centre at time t (its own wobble on top of the drift: never a rigid disc)
+		auto centre = [&](double t, double &cx, double &cz) {
+			const double a = t - w.t0;
+			cx = w.x0 + w.dx * aov::SWARM_SPEED * a + 0.5 * std::sin(t * 0.7 + w.seed % 97) + 0.3 * std::sin(t * 1.9 + 3);
+			cz = w.z0 + w.dz * aov::SWARM_SPEED * a + 0.5 * std::cos(t * 0.6 + w.seed % 89) + 0.3 * std::cos(t * 1.7 + 1);
+		};
+		// the footprint: a radius that wanders with the angle (three lobes beating against each other)
+		auto rim = [&](double a, double t) {
+			const uint32_t s = w.seed;
+			return 0.72 + 0.16 * std::sin(a * 2 + 6.28 * hr(s, 1, 151) + t * 0.45) + 0.11 * std::sin(a * 3 + 6.28 * hr(s, 2, 151) - t * 0.6) +
+					0.07 * std::sin(a * 5 + 6.28 * hr(s, 3, 151) + t * 1.1);
+		};
+		double x, z;
+		centre(now, x, z);
+		const double gy = h_at(x, z);
+		// the shadow: small soft blots scattered by the same footprint, darker in the core
+		for (int i = 0; i < 16; i++) {
+			const double a = hr(w.seed, i, 161) * TAU + now * 0.25 * spin;
+			const double rr = R * rim(a, now) * std::pow(hr(w.seed, i, 162), 0.8) * 0.9;
 			const double px = x + std::cos(a) * rr, pz = z + std::sin(a) * rr;
+			const double sz = R * (0.55 + 0.6 * hr(w.seed, i, 163)) * (1.1 - 0.5 * rr / R);
+			decal(I_DECAL_MUL, px, h_at(px, pz) + 0.06, pz, sz, 0, 1, 1, 1, (float)(0.16 * k * (1.1 - 0.6 * rr / R)), 0);
+		}
+		// the dust: a dense core of dusty brown, a lighter sand fringe feathering out, and loose dust
+		// left behind the swarm (puffs born at the swarm and fading as they lag back on its track)
+		for (int i = 0; i < 52; i++) {
+			const double u = hr(w.seed, i, 171);
+			const double a = hr(w.seed, i, 172) * TAU + now * (0.35 + 0.3 * hr(w.seed, i, 173)) * spin;
+			const double rr = R * rim(a, now) * (0.15 + 1.05 * std::pow(u, 0.9));
+			const double px = x + std::cos(a) * rr, pz = z + std::sin(a) * rr;
+			const double edge = clamp01(rr / R);
+			const double s = (1.6 + 1.8 * hr(w.seed, i, 174)) * (1.15 - 0.35 * edge) + 0.25 * std::sin(now * 1.3 + i);
 			Basis bs;
-			const double s = 1.7 + 1.3 * hr(w.seed, i, 114) + 0.25 * std::sin(now * 1.3 + i); // (soft round puffs: the hard squares read as pale tiles over a Farm)
 			bs.rows[0] = Vector3((real_t)s, 0, 0);
 			bs.rows[1] = Vector3(0, (real_t)s, 0);
 			bs.rows[2] = Vector3(0, 0, 1);
-			const Lin hc = hex_lin(i % 3 ? 0x8a7656 : 0x6e604a);
-			inst(I_PUFF, bs, px, h_at(px, pz) + 0.6 + 2.2 * hr(w.seed, i, 115), pz, hc.r, hc.g, hc.b, (float)(0.2 * k), (float)hr(w.seed, i, 116), 1);
+			const Lin hc = hex_lin(edge > 0.65 ? (i & 1 ? 0xc4a878 : 0xa89070) : (i % 3 ? 0x7a6446 : i % 2 ? 0x5e5040 : 0x8c8478));
+			inst(I_PUFF, bs, px, h_at(px, pz) + 0.5 + (2.4 - 1.4 * edge) * hr(w.seed, i, 175), pz, hc.r, hc.g, hc.b,
+					(float)((0.34 - 0.2 * edge) * k), (float)hr(w.seed, i, 176), 1);
 		}
-		// the locusts: 260 dark voxel bodies, each on its own looping path inside the cloud
-		const Lin c0 = hex_lin(0x3a3424), c1 = hex_lin(0x5a5030), c2 = hex_lin(0x24201a);
-		const int N = (int)(420 * k);
+		for (int i = 0; i < 18; i++) { // the trail: puffs shed every ~0.3 s, each living 2.4 s
+			const double per = 2.4, ph = hr(w.seed, i, 181) * per;
+			const double t = std::fmod(now - w.t0 + ph, per);
+			const double tb = now - t; // born
+			if (tb < w.t0) continue;
+			double bx, bz;
+			centre(tb, bx, bz);
+			const double a = hr(w.seed, i, 182) * TAU;
+			const double rr = R * rim(a, tb) * (0.4 + 0.6 * hr(w.seed, i, 183));
+			const double px = bx + std::cos(a) * rr + std::cos(a) * t * 0.5, pz = bz + std::sin(a) * rr + std::sin(a) * t * 0.5;
+			const double life = t / per;
+			const double s = (1.2 + 1.2 * hr(w.seed, i, 184)) * (1 + 0.8 * life);
+			Basis bs;
+			bs.rows[0] = Vector3((real_t)s, 0, 0);
+			bs.rows[1] = Vector3(0, (real_t)s, 0);
+			bs.rows[2] = Vector3(0, 0, 1);
+			const Lin hc = hex_lin(i & 1 ? 0xc9b083 : 0xa48c64);
+			const double kb = env(tb, w.t0, w.t0 + w.dur, 0.8, 1.5);
+			inst(I_PUFF, bs, px, h_at(px, pz) + 0.4 + 0.6 * life + hr(w.seed, i, 185), pz, hc.r, hc.g, hc.b,
+					(float)(0.2 * kb * std::sin(PI * std::min(1.0, life * 1.15))), (float)hr(w.seed, i, 186), 1);
+		}
+		// the locusts: each on its own orbit; the core packed and spinning fast, stragglers slow and far
+		static const uint32_t TONES[4] = { 0x2e2418, 0x4e4228, 0x8a6c3a, 0xe2c991 };
+		Lin tone[4];
+		for (int c = 0; c < 4; c++) tone[c] = hex_lin(TONES[c]);
+		static const double SIZES[4] = { 0.032, 0.05, 0.075, 0.11 };
+		const Lin wing = hex_lin(0x9a8660);
+		const int N = (int)(460 * k);
 		for (int i = 0; i < N; i++) {
-			const double fa = 0.8 + 1.8 * hr(w.seed, i, 121), fb = 0.6 + 1.5 * hr(w.seed, i, 122), fc = 1.1 + 2.2 * hr(w.seed, i, 123);
-			const double pa = hr(w.seed, i, 124) * TAU, pb = hr(w.seed, i, 125) * TAU, pc = hr(w.seed, i, 126) * TAU;
-			const double rr = R * (0.15 + 0.85 * std::sqrt(hr(w.seed, i, 127)));
-			const double a = pa + now * fa * (i % 2 ? 1 : -1);
-			const double px = x + std::cos(a) * rr + 0.6 * std::sin(now * fb + pb), pz = z + std::sin(a) * rr * 0.85 + 0.6 * std::cos(now * fb * 1.3 + pc);
-			const double py = gy + 0.6 + 2.6 * hr(w.seed, i, 128) + 0.7 * std::sin(now * fc + pc);
-			const double yaw = a + PI / 2 * (i % 2 ? 1 : -1);
-			const double s = 0.05 + 0.035 * hr(w.seed, i, 129);
+			const double u = hr(w.seed, i, 121);
+			const double rn = 1.3 * std::pow(u, 2.0); // (dense core: half of them inside 0.33 R)
+			const double a0 = hr(w.seed, i, 124) * TAU;
+			const double om = (0.5 + 0.5 * hr(w.seed, i, 122)) * 1.6 / (0.25 + rn) * spin; // (the core spins fastest)
+			const double fb = 0.6 + 1.5 * hr(w.seed, i, 123), fc = 1.1 + 2.2 * hr(w.seed, i, 125);
+			const double pb = hr(w.seed, i, 126) * TAU, pc = hr(w.seed, i, 127) * TAU;
+			const double hbase = (0.5 + 3.2 * hr(w.seed, i, 128)) * (1.15 - 0.55 * std::min(1.0, rn));
+			const int ti = hr(w.seed, i, 129) < 0.2 ? 3 : hr(w.seed, i, 130) < 0.5 ? 0 : hr(w.seed, i, 131) < 0.6 ? 1 : 2;
+			const double sv = hr(w.seed, i, 132);
+			const int zi = sv < 0.4 ? 0 : sv < 0.75 ? 1 : sv < 0.94 ? 2 : 3;
+			auto pos = [&](double t, double &px, double &py, double &pz, double &a) {
+				double cx, cz;
+				centre(t, cx, cz);
+				a = a0 + t * om;
+				const double rr = R * rn * rim(a, t);
+				px = cx + std::cos(a) * rr + 0.45 * std::sin(t * fb + pb);
+				pz = cz + std::sin(a) * rr * 0.9 + 0.45 * std::cos(t * fb * 1.3 + pc);
+				py = h_at(px, pz) + hbase + 0.6 * std::sin(t * fc + pc);
+			};
+			double px, py, pz, a;
+			pos(now, px, py, pz, a);
+			const double s = SIZES[zi] * (0.85 + 0.3 * hr(w.seed, i, 133));
+			const double yaw = -(a + PI / 2 * spin);
 			const double flap = std::abs(std::sin(now * 38 + i));
-			const Lin &c = (i % 3) == 0 ? c0 : (i % 3) == 1 ? c1 : c2;
-			cube(I_DEBRIS, px, py, pz, 0.3 * std::sin(now * 5 + i), yaw, 0, s * 2.2, s * (0.6 + 0.6 * flap), s, c.r, c.g, c.b);
+			const Lin &c = tone[ti];
+			const double roll = 0.3 * std::sin(now * 5 + i);
+			cube(I_DEBRIS, px, py, pz, roll, yaw, 0, s * 2.2, s * 0.8, s * 0.8, c.r, c.g, c.b);
+			// the wings: a flat dun pair beating over the two bigger sizes
+			if (zi >= 2) {
+				const double span = s * (1.0 + 0.8 * flap);
+				cube(I_DEBRIS, px, py + s * 0.45, pz, roll, yaw, 0, s * 1.1, s * 0.15, span, wing.r, wing.g, wing.b);
+			}
+			// the streak: a thin pale dash from where it was 0.09 s ago (the fast ones only)
+			if (std::abs(om) * R * rn < 2.0 || (i % 3) == 2) continue;
+			double qx, qy, qz, qa;
+			pos(now - 0.09, qx, qy, qz, qa);
+			const double ddx = px - qx, ddy = py - qy, ddz = pz - qz;
+			const double len = std::sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
+			if (len < 0.08) continue;
+			const double hl = std::sqrt(ddx * ddx + ddz * ddz);
+			const Lin &gc = tone[ti == 0 ? 2 : 3];
+			cube(I_DEBRIS, (px + qx) / 2, (py + qy) / 2, (pz + qz) / 2, 0, std::atan2(-ddz, ddx), std::atan2(ddy, hl), len, s * 0.3,
+					s * 0.3, gc.r * 0.85f, gc.g * 0.85f, gc.b * 0.85f);
 		}
 	}
 
