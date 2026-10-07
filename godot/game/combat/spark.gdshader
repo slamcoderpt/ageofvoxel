@@ -4,7 +4,7 @@
 // curved slash. Instance: origin = position, COLOR = rgb * brightness,
 // alpha; INSTANCE_CUSTOM = (size, velocity xyz).
 // Burst mode (INSTANCE_CUSTOM.x < 0, an impact where a blow lands):
-// INSTANCE_CUSTOM = (-scale, age 0..1, ray seed, 0): a 20-30 px (at 1080p)
+// INSTANCE_CUSTOM = (-scale, age 0..1, ray seed, 0): a small (8 px and up at 1080p)
 // star that pops open, a white-hot core in an orange-yellow glow with 5 rays.
 shader_type spatial;
 render_mode unshaded, fog_disabled, blend_premul_alpha, depth_test_disabled, depth_draw_never, cull_disabled, shadows_disabled, skip_vertex_transform;
@@ -29,9 +29,11 @@ void vertex() {
 		v_burst = max(t, 1e-3);
 		v_seed = INSTANCE_CUSTOM.z;
 		// pops open over the first 15%, then holds and fades; at least
-		// 22 px radius at 1080p however far the camera sits
+		// 8 px radius at 1080p however far the camera sits. (round 46: a
+		// third of its old size, 0.9 -> 0.3 and 22 -> 8 px, so the star
+		// marks the blade's tip and no longer covers the struck torso)
 		float pop = mix(0.55, 1.0, smoothstep(0.0, 0.15, t)) * (1.0 + 0.15 * t);
-		float r = max(-INSTANCE_CUSTOM.x * 0.9, 22.0 * VIEWPORT_SIZE.y / 1080.0 * wpp) * pop;
+		float r = max(-INSTANCE_CUSTOM.x * 0.3, 8.0 * VIEWPORT_SIZE.y / 1080.0 * wpp) * pop;
 		VERTEX = c + vec3(VERTEX.xy * r * 2.0, 0.05);
 		NORMAL = vec3(0.0, 0.0, 1.0);
 		v_len = 0.0;

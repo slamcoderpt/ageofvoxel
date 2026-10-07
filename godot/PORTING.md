@@ -3285,6 +3285,25 @@ grade.) The focus spacing (`GAP`) is 4.8 so the tails never cross, the camera
 4.5 closer. Captures: `eu_focus=petsuchos` (idle / walk / attack / die),
 `eu_one=petsuchos&eu_turn=60&eu_zoom=0.5`, `eu_one=petsuchos&eu_turn=-50&eu_zoom=0.6`.
 
+Nothing stands on a croc, round 46 (the critic read the Petsuchos as a pile: a
+Greek horseman stood inside it in the attack captures and a Priest on it in the
+battle, under a hit flare covering the struck chest). In `egypt_units_scene.gd`
+the attack state's dummy foe is a leashed Greek **hoplite** (`set_unit_combat`
+leash 0.3, it holds its ground), never a hippikon a croc could seem to carry;
+in a focus / one view it stands off the group's outside and a little back
+(the attacker turns side-on to the camera) at `1 + GAP x 0.45` (x 0.75 for
+the long beasts, GAP >= 3.4, so it stands past the snout), in a lineup behind
+and aside at `1.6 + GAP x 0.25` (x 0.45 for the long beasts); a close attack
+view follows the fighters' mean position. The `battle` group places every
+Egyptian on its own ground by size (spear / axe front, myth warriors and a
+camel, the elephant and the chariot, slingers, the Petsuchos, Priest and
+Pharaoh at the back) and frames 2 units left of the centre. The impact star
+(spark.gdshader burst mode) is a third of its old size (0.9 -> 0.3 x the
+scale, 22 -> 8 px floor) and `unit_view.cpp` `emit_fx` sets it at the weapon's
+tip, a third of the way back towards the attacker and lower, not on the chest.
+Captures: `eu_focus=petsuchos&eu_state=attack`, `eu_one=petsuchos&eu_turn=70&eu_zoom=0.5&eu_state=attack`,
+`eu_group=battle`, `eu_group=myth&eu_state=attack`.
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower

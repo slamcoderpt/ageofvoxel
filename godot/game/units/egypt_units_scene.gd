@@ -127,14 +127,21 @@ static func scene_setup(game: Node) -> Dictionary:
 		cam_dist = 26.0
 	elif group == "battle":
 		# an Egyptian army (left) charges a Greek one (right)
-		var eg := ["spearman", "spearman", "spearman", "axeman", "axeman", "axeman", "slinger", "slinger", "camel_rider", "chariot_archer",
-			"war_elephant", "anubite", "avenger", "petsuchos", "scorpion_man", "priest", "pharaoh"]
+		# (round 46) every Egyptian on its own ground, spaced by its size: a
+		# front of spearmen and axemen, the myth warriors and camels behind,
+		# the elephant and chariot in the third rank, the slingers, the
+		# Petsuchos (a long croc, ranged) and the priests and Pharaoh at the
+		# back, well clear of each other (a priest never stands on the croc)
+		var eg := [["spearman", -4.0, -4.6], ["spearman", -4.0, -2.8], ["spearman", -4.0, -1.0], ["axeman", -4.0, 0.8],
+			["axeman", -4.0, 2.6], ["axeman", -4.0, 4.4], ["anubite", -5.8, -4.0], ["avenger", -5.8, -1.8],
+			["scorpion_man", -6.2, 0.8], ["camel_rider", -6.0, 3.8], ["war_elephant", -9.0, -3.4], ["chariot_archer", -9.0, 1.4],
+			["slinger", -7.4, 6.2], ["slinger", -8.8, 6.2], ["petsuchos", -12.2, 4.8], ["priest", -12.0, -1.4], ["pharaoh", -12.2, 0.8]]
 		var gr := ["hoplite", "hoplite", "hoplite", "hoplite", "hoplite", "hoplite", "toxotes", "toxotes", "toxotes", "hippikon", "hippikon",
 			"minotaur"]
 		var ids_eg := PackedInt32Array()
 		var ids_gr := PackedInt32Array()
-		for k in eg.size():
-			var id: int = spawn.call(eg[k], 1, at.call(-5.0 - float(k % 4) * 1.6, float(k / 4) * 1.8 - 3.5), yaw + PI * 0.5)
+		for e in eg:
+			var id: int = spawn.call(str(e[0]), 1, at.call(float(e[1]), float(e[2])), yaw + PI * 0.5)
 			if id > 0: ids_eg.append(id)
 		for k in gr.size():
 			var id: int = spawn.call(gr[k], 2, at.call(5.0 + float(k % 4) * 1.5, float(k / 4) * 1.8 - 3.0), yaw - PI * 0.5)
@@ -142,7 +149,8 @@ static func scene_setup(game: Node) -> Dictionary:
 		var c: Vector2 = at.call(0.0, 0.0)
 		sim.order_attack_move(ids_eg, c.x + lat.x * 6.0, c.y + lat.y * 6.0)
 		sim.order_attack_move(ids_gr, c.x - lat.x * 6.0, c.y - lat.y * 6.0)
-		cam_dist = 22.0
+		focus -= lat * 2.0
+		cam_dist = 24.0
 		if not game.args.has("eu_t"):
 			game.args["eu_t"] = 5.0
 	elif group == "eco":
@@ -188,18 +196,42 @@ static func scene_setup(game: Node) -> Dictionary:
 					var u: Dictionary = sim.get_unit(int(e[0]))
 					sim.order_move(PackedInt32Array([int(e[0])]), float(u.x) - front.x * 40.0, float(u.z) - front.y * 40.0)
 			"attack":
+				# (round 46) the dummy foe stands clear of the attacker, never
+				# between it and the camera: in a focus / one view off to the
+				# group's outside and a little back (the attacker turns side-on),
+				# in a lineup behind and to the side; a Greek hoplite (a man, not
+				# a horse and rider a croc could be mistaken to carry), leashed
+				# so he holds his ground instead of walking into the beast
+				var close := focus_type != "" or one != ""
 				for e in spawned:
 					var u: Dictionary = sim.get_unit(int(e[0]))
-					var tgt := int(sim.spawn_unit("hippikon", 2, float(u.x) + front.x * 1.6, float(u.z) + front.y * 1.6, yaw + PI))
+					var p := Vector2(float(u.x), float(u.z))
+					var size := float(GAP.get(str(e[1]), 1.6))
+					var dir: Vector2
+					var dist: float
+					if close:
+						var side := 1.0 if (p - Vector2(cx, cz)).dot(lat) >= 0.0 else -1.0
+						dir = (lat * side - front * 0.35).normalized()
+						# a long beast (a croc, a sphinx) reaches far past its
+						# centre: the foe stands clear of its snout
+						dist = 1.0 + size * (0.75 if size >= 3.4 else 0.45)
+					else:
+						dir = (-front + lat * 0.45).normalized()
+						dist = 1.6 + size * (0.45 if size >= 3.4 else 0.25)
+					var q := p + dir * dist
+					var tgt := int(sim.spawn_unit("hoplite", 2, q.x, q.y, atan2(-dir.x, -dir.y)))
 					if tgt > 0:
+						if sim.has_method("set_unit_combat"):
+							sim.set_unit_combat(tgt, {"leash": 0.3})
 						sim.order(int(e[0]), {"type": "attack", "target": tgt})
 			"die":
 				for e in spawned:
 					sim.kill_unit(int(e[0]), 0)
 	var t := float(game.args.get("eu_t", 2.0 if state != "idle" else 0.5))
 	sim.tick(int(round(t * 30.0)))
-	if state == "walk":
-		# keep the walkers framed: the camera follows their mean position
+	if state == "walk" or (state == "attack" and (focus_type != "" or one != "")):
+		# keep the walkers (and in a close view the fighters, who leap or ride
+		# at their foes) framed: the camera follows their mean position
 		var m := Vector2()
 		for e in spawned:
 			var u: Dictionary = sim.get_unit(int(e[0]))

@@ -1374,7 +1374,9 @@ void AovUnitView::emit_fx(const HitRec &h, double now) {
 			const float rays = (float)r.next();
 			if (age < fl && o.sparks->n < (int)MAX_SPARK) {
 				const double t = age / fl;
-				o.sparks->push(xl(px, y + 0.05, pz), 0.7f, 0.17f, 0.012f, (float)(1.0 - t * t),
+				// (round 46) at the weapon's tip, half a step out of the struck
+				// man towards the attacker and a little low, not on his chest
+				o.sparks->push(xl(px - bx * 0.35, y - 0.12, pz - bz * 0.35), 0.7f, 0.17f, 0.012f, (float)(1.0 - t * t),
 						(float)(-(big ? 1.3 : 1.0) * (0.85 + 0.25 * k)), (float)t, rays, 0);
 			}
 		}
