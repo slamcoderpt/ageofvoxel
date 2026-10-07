@@ -4162,128 +4162,293 @@ function khopeshM(s = 1) {
   ]);
 }
 
-// Petsuchos (four-legged rig, 0.09, sprawl): a long crocodile with a jewelled
-// gold and team collar, a horned sun-disc crown, bronze girth straps, team
-// anklets and a team tail tip (myth_04).
-// (round 19) a low sprawling reptile: the flat body's belly one voxel off the
-// ground; each upper limb reaches out sideways level from the body's flank,
-// the forearm angles down and a little out to a wide flat foot of the body's
-// brown with four short cream claws fanned at its front and outer edge (no
-// black foot blocks); the tail's three segments (anim tailA / tailB / tailC,
-// so they never take the horse's drooping tail pitch) have flat undersides
-// that sink gently to lie on the ground, ridged with two rows of scutes and a
-// spiky team crest on the tip.
+// Petsuchos (four-legged rig, 0.09, sprawl; round 45 rebuild after myth_04):
+// every part is authored on a grid twice as fine (part scale 0.5, joints in
+// rig voxels), so the crocodile has an animal's shape instead of a plank's.
+// The spine runs in a gentle S (the body's centre line swings out under the
+// shoulders and back under the hips, the head turns on and the tail curves
+// back the other way through rest yaws on the neck and the three tail parts);
+// the torso is widest over the shoulders and the hips and narrows into the
+// neck, at the waist and into the tail's root; the belly is lifted clear of
+// the ground (Retold's "high walk") on bent limbs: each upper limb drops out
+// and back from a round shoulder / haunch to an elbow / knee at about two
+// thirds of the body's height, the forearm / shin stands down from it to a
+// splayed five-toed foot with dark claws flat on the ground. The tail is
+// laterally flattened, tapers from the hips to a point and sinks to lie on
+// the ground; a double row of keeled scutes runs from the neck down the back
+// into the tail's single crest. Hide in flat tones: an umber back with a
+// darker seam between each transverse row of scutes, an olive-brown flank
+// paling down to a cream belly and throat. The head: a long flat tapering
+// snout with a nostril knob on its tip, a dark jaw line from the tip to the
+// gape with white teeth standing over and under it, raised bony eye ridges
+// over amber slit eyes. Egyptian dress, built from a few large deliberate
+// shapes: a broad wesekh collar flaring back over the nape in team and gold
+// rays inside a gold rim, a gold diadem with a team stone across the skull
+// and two bronze lyre horns rising from behind the eyes to team tips; a
+// copper girth band round the barrel, team bands at the wrists, a copper band
+// and a team sheath with a spiked crest on the tail's last third.
 {
-  const CROC = (x, y, z) => { const h = hash3(x, y, z, 71); const ridge = (z & 1) && y >= 4; return ridge ? 0x543a20 : h < 0.5 ? 0x7a5632 : h < 0.85 ? 0x6c4c2c : 0x86623c; };
-  const BELLY = 0xc8aa7a;
-  const SIDE = pick3(72, 0x9a744a, 0x8e6a44, 0xa47e52);   // the lighter flank above the belly
-  const SCUTE = 0x3e2a18;
-  const FOOT = pick3(73, 0x5e4228, 0x563c24, 0x66482c);
-  const CLAW = 0xd8c49a;
+  const FS = 2;   // fine cells per rig voxel
+  const inE = (p, c, r, e) => { let s = 0; for (let i = 0; i < 3; i++) s += Math.abs((p[i] - c[i]) / r[i]) ** e; return s <= 1; };
+  const fillE = (m, c, r, col, e = 2) => {
+    for (let x = Math.floor(c[0] - r[0]) - 1; x <= Math.ceil(c[0] + r[0]); x++)
+      for (let y = Math.floor(c[1] - r[1]) - 1; y <= Math.ceil(c[1] + r[1]); y++)
+        for (let z = Math.floor(c[2] - r[2]) - 1; z <= Math.ceil(c[2] + r[2]); z++)
+          if (inE([x + 0.5, y + 0.5, z + 0.5], c, r, e)) m.set(x, y, z, typeof col === 'function' ? col(x, y, z) : col);
+  };
+  const cellsOf = (m) => [...m.vox.keys()].map((k) => [((k >> 20) & 1023) - 512, ((k >> 10) & 1023) - 512, (k & 1023) - 512]);
+  const f = (v) => v.map((q) => q * FS);   // rig voxels -> fine cells
+  // hide (flat tones: the renderer's light shapes the masses)
+  const HIDE = 0x6a4a28, SEAM = 0x523820, KNOB = 0x4a321c;
+  const FLANK = 0x7c5c34, FLANK_LT = 0x88683c, BELLY = 0xcaae78;
+  const CLAW = 0x241a12, TOOTH = 0xf4eedc, GUM = 0x2a1810;
+  // (gold with no red in it: any orange copper or deep gold turns peach under the grade)
+  const COPPER = 0xb09200, COPPER_LT = 0xd8b800;
+  const CGOLD = GOLD, CGOLD_DK = 0xa88c00;
+  const isHide = (c) => c === HIDE || c === FLANK;
+  // paint a croc mass: the back where nothing is above (with a seam every
+  // third row across the spine), cream where it faces down, the flank paling
+  // towards the belly below `mid` (fine y)
+  const shade = (m, md, { seams = true, axis = null } = {}) => {
+    for (const [x, y, z] of cellsOf(m)) {
+      const v = m.get(x, y, z);
+      if (v.team || !isHide(v.c)) continue;
+      const mid = typeof md === 'function' ? md(z) : md;
+      const up = !m.has(x, y + 1, z), down = !m.has(x, y - 1, z);
+      if (down || y < mid - 2) v.c = BELLY;
+      else if (y < mid) v.c = FLANK_LT;
+      else if (up && y > mid + 1) v.c = seams && ((z % 3) + 3) % 3 === 0 && (!axis || Math.abs(x - axis(z)) < 5) ? SEAM : HIDE;
+      else v.c = FLANK;
+    }
+  };
+
+  // ---- the body (origin at the body joint, rig [0, 4.6, 0]) ----------------
+  const BY = 4.6;
+  const sx = (z) => 1.2 * Math.sin(Math.PI * z / 12);    // the spine's S (rig x at rig z)
+  const KZ = [-11.5, -7, -5.5, -1, 1.5, 6.5, 8.5, 11.5];
+  const KW = [2.3, 3.3, 3.5, 2.9, 2.9, 3.5, 3.3, 2.3];   // half-width: hips, waist, shoulders, neck
+  const KT = [6.0, 6.8, 7.0, 6.5, 6.5, 7.0, 6.8, 6.1];   // the back
+  const KB = [4.0, 3.3, 3.1, 2.8, 2.8, 3.1, 3.4, 4.0];   // the belly (sags at the waist, clear of the ground)
+  const lerpK = (K, z) => {
+    if (z <= KZ[0]) return K[0];
+    for (let i = 1; i < KZ.length; i++) if (z <= KZ[i]) { const t = (z - KZ[i - 1]) / (KZ[i] - KZ[i - 1]); const s = t * t * (3 - 2 * t); return K[i - 1] + (K[i] - K[i - 1]) * s; }
+    return K[K.length - 1];
+  };
   const body = new VoxelModel();
-  // a flat, wide body (9 wide, 5 tall), widest behind the forelegs, narrowing
-  // to the neck and to the tail's base
-  const half = (z) => z < 5 ? 3.2 + z * 0.22 : z > 17 ? 4.3 - (z - 17) * 0.2 : 4.3;
-  for (let z = 0; z <= 22; z++) {
-    const w = half(z);
-    for (let x = -5; x <= 5; x++) for (let y = 0; y <= 4; y++) {
-      const dx = Math.abs(x) / (w + 0.4), dy = Math.abs(y - 2) / 2.7;
-      if (Math.pow(dx, 2.6) + Math.pow(dy, 2.6) > 1) continue;
-      body.set(x, y, z, y === 0 ? BELLY : y === 1 && Math.abs(x) >= w - 1 ? SIDE : CROC(x, y, z));
+  for (let zf = -11.5 * FS; zf < 11.5 * FS; zf++) {
+    const z = (zf + 0.5) / FS, cx = sx(z), w = lerpK(KW, z), top = lerpK(KT, z), bot = lerpK(KB, z);
+    const cy = (top + bot) / 2, h = (top - bot) / 2;
+    for (let xf = -6 * FS; xf <= 6 * FS; xf++) for (let yf = -4 * FS; yf <= 4 * FS; yf++) {
+      const x = (xf + 0.5) / FS, y = (yf + 0.5) / FS + BY;
+      const dx = Math.abs(x - cx) / w, dy = (y - cy) / h;
+      if (dx ** 2.3 + Math.abs(dy) ** (dy < 0 ? 3 : 2.2) > 1) continue;
+      body.set(xf, yf, zf, HIDE);
     }
   }
-  // two rows of raised dark scutes down the spine and a row along each flank's top
-  for (let z = 1; z <= 21; z += 2) {
-    body.set(-1, 5, z, SCUTE).set(1, 5, z, SCUTE);
-    for (const s of [-1, 1]) { let x = 5 * s; while (x !== 0 && !body.has(x, 4, z)) x -= s; if (x !== 0) body.set(x, 4, z, SCUTE); }
+  // the round shoulders and haunches over the limbs
+  const SH = [[1, 6.6], [-1, 6.6]].map(([s, z]) => [sx(z) + s * 2.7, 4.5, z]);
+  const HP = [[1, -6.4], [-1, -6.4]].map(([s, z]) => [sx(z) + s * 2.8, 4.6, z]);
+  for (const c of SH) fillE(body, f([c[0], c[1] - BY, c[2]]), f([1.4, 1.5, 1.9]), HIDE);
+  for (const c of HP) fillE(body, f([c[0], c[1] - BY, c[2]]), f([1.6, 1.7, 2.2]), HIDE);
+  shade(body, Math.round((4.9 - BY) * FS), { axis: (zf) => sx((zf + 0.5) / FS) * FS });
+  // the keeled scutes: two rows either side of the spine, one on each flank's
+  // shoulder, each keel a raised knob on every third row (between the seams)
+  const topOf = (m, x, z) => { for (let y = 12; y >= -12; y--) if (m.has(x, y, z)) return y; return null; };
+  for (let zf = -11 * FS; zf < 11 * FS; zf++) {
+    if (((zf % 3) + 3) % 3 !== 2) continue;
+    const c = sx((zf + 0.5) / FS) * FS;
+    const rows = [-1.6, 1.6];
+    if (zf > -9 * FS && zf < 9 * FS) rows.push(-4.4, 4.4);
+    for (const o of rows) {
+      const x = Math.round(c + o - 0.5), y = topOf(body, x, zf);
+      if (y !== null && y > 0) body.set(x, y + 1, zf, KNOB);
+    }
   }
-  // bronze girth straps round the body (behind the forelegs, before the hind legs)
-  for (const zb of [11, 15]) for (let x = -6; x <= 6; x++) for (let y = 0; y <= 6; y++) {
-    if (!body.has(x, y, zb)) continue;
-    if (!body.has(x + 1, y, zb) || !body.has(x - 1, y, zb) || !body.has(x, y + 1, zb)) body.set(x, y, zb, y === 0 ? BELLY : BRONZE(x, y, zb));
+  // a copper girth band round the barrel, behind the shoulders
+  for (const [x, y, z] of cellsOf(body)) {
+    if (z !== Math.round(2 * FS) && z !== Math.round(2 * FS) + 1) continue;
+    if (!surfaceOf(body, x, y, z) || body.get(x, y, z).c === BELLY) continue;
+    body.set(x, y, z, body.has(x, y + 1, z) ? COPPER : COPPER_LT);
   }
+
+  // ---- the neck and head (origin at the neck joint, rig [sx(11.5), 5.0, 11.5])
+  const NY = 5.0;
   const neck = new VoxelModel();
-  // a long flat head: snout, teeth, eyes up top
-  for (let z = 0; z <= 13; z++) {
-    const w = z < 5 ? 3.4 : 2.6 - (z - 5) * 0.08, h = z < 5 ? 2.6 : 1.8;
-    for (let x = -4; x <= 4; x++) for (let y = 0; y <= 5; y++) {
-      const dx = x / w, dy = (y - 2) / h;
-      if (dx * dx + dy * dy <= 1) neck.set(x, y, z, y <= 1 ? BELLY : CROC(x, y, z));
+  tube(neck, f([0, -0.1, -1.5]), f([0, 0.1, 3]), 2.3 * FS, 2.0 * FS, HIDE);                     // the neck, flattening
+  for (const [x, y, z] of cellsOf(neck)) if (Math.abs(y + 0.5) > 1.7 * FS) neck.remove(x, y, z);
+  // the skull: broad behind the eyes, the jaw muscles bulging at the gape
+  fillE(neck, f([0, 0.1, 4.2]), f([2.3, 1.6, 2.4]), HIDE, 2.4);
+  // the snout: long and flat, tapering to the tip; the upper jaw over the mouth line
+  const MOUTH = -0.5;                                   // the mouth line (rig y, from the neck joint)
+  const snW = (z) => 2.0 - (z - 5) * 0.12;             // half-width at rig z 5..13
+  for (let zf = 5 * FS; zf < 13.4 * FS; zf++) {
+    const z = (zf + 0.5) / FS, w = snW(z);
+    const top = 1.0 - (z - 5) * 0.06, bot = -1.35 + (z - 5) * 0.03;
+    for (let xf = -3 * FS; xf <= 3 * FS; xf++) for (let yf = -2 * FS; yf <= 2 * FS; yf++) {
+      const x = (xf + 0.5) / FS, y = (yf + 0.5) / FS;
+      if (y > top || y < bot) continue;
+      const lim = y > MOUTH ? w : w - 0.25;              // the lower jaw a little inside the upper
+      if (Math.abs(x) > lim - (y > top - 0.5 ? 0.35 : 0)) continue;   // the snout's rounded top edges
+      neck.set(xf, yf, zf, HIDE);
     }
   }
-  for (let z = 6; z <= 13; z += 2) { neck.set(-2, 1, z, 0xf2ead4).set(2, 1, z, 0xf2ead4); }
-  neck.set(-2, 4, 4, 0xffd020, { glow: 0.6 }).set(2, 4, 4, 0xffd020, { glow: 0.6 });
-  // the jewelled collar (gold rim, team stones) round the neck
-  for (let y = -1; y <= 6; y++) for (let x = -5; x <= 5; x++) {
-    const d = Math.hypot(x / 4.6, (y - 2.5) / 3.6);
-    if (d > 1.05 || d < 0.62) continue;
-    neck.set(x, y, -1, d > 0.92 ? GOLD(x, y, 0) : ((x + y) % 2 ? TEAM : GOLD(x, y, 1)));
+  fillE(neck, f([0, 0.55, 12.6]), f([1.5, 0.75, 1.0]), HIDE, 2.2);     // the nostril knob on the tip
+  shade(neck, Math.round(MOUTH * FS), { seams: false });
+  for (const [x, y, z] of cellsOf(neck)) if (z > 4.5 * FS && y >= Math.round(MOUTH * FS) && neck.get(x, y, z).c === BELLY) neck.get(x, y, z).c = FLANK;
+  // the nostrils, the scutes on the neck's top
+  neck.set(-1, Math.round(1.2 * FS), Math.round(12.8 * FS), GUM).set(0, Math.round(1.2 * FS), Math.round(12.8 * FS), GUM);
+  for (let zf = -1 * FS; zf < 2 * FS; zf += 3) for (const xo of [-2, 1]) { const y = topOf(neck, xo, zf); if (y !== null) neck.set(xo, y + 1, zf, KNOB); }
+  // the jaw line: a dark gape from the tip back to the cheek, white teeth
+  // standing out of it over and under, alternate rows (seen from above and side)
+  const my = Math.round(MOUTH * FS);
+  for (let zf = 4 * FS; zf < 13.4 * FS; zf++) {
+    const z = (zf + 0.5) / FS, w = snW(Math.max(5, z));
+    for (const s of [-1, 1]) {
+      const xe = s > 0 ? Math.floor(w * FS) - 1 : -Math.floor(w * FS);
+      if (neck.has(xe, my, zf)) neck.set(xe, my, zf, GUM);
+      if (zf >= 5.5 * FS && zf % 2 === 0) {
+        const xo = xe + s;
+        neck.set(xo, my, zf, TOOTH);
+        neck.set(xo, zf % 4 === 0 ? my + 1 : my - 1, zf, TOOTH);
+      }
+    }
   }
-  // horned crown with a sun disc
-  neck.box(-1, 5, 1, 3, 1, 3, GOLD).box(-3, 6, 2, 1, 2, 1, GOLD).box(3, 6, 2, 1, 2, 1, GOLD).set(-4, 8, 2, GOLD).set(4, 8, 2, GOLD);
-  neck.ellipsoid(0, 8, 2, 1.4, 1.4, 0.4, TEAM).set(0, 8, 3, GOLD);
-  // a tail segment 8 long tapering r0 -> r1; its underside sinks `drop` voxels
-  // over its length (so the chain lies on the ground); returns the model and
-  // the next segment's joint
-  const tail = (r0, r1, drop, tip) => {
+  // raised bony eye ridges over amber slit eyes
+  for (const s of [-1, 1]) {
+    const ex = s > 0 ? Math.round(1.3 * FS) : -Math.round(1.3 * FS) - 1;
+    fillE(neck, [ex + 0.5, 1.75 * FS, 4.6 * FS], [1.0 * FS, 0.6 * FS, 1.1 * FS], HIDE, 2);
+    for (let zf = Math.round(4.0 * FS); zf <= Math.round(5.6 * FS); zf++) neck.set(ex, Math.round(2.2 * FS), zf, KNOB);   // the ridge's crest
+    neck.set(ex + s, Math.round(1.75 * FS), Math.round(5.2 * FS), 0xd8d020, { glow: 0.3 });
+    neck.set(ex + s, Math.round(1.75 * FS), Math.round(5.2 * FS) - 1, 0xd8d020, { glow: 0.3 });
+    neck.set(ex + s, Math.round(1.75 * FS) + 1, Math.round(5.2 * FS), 0x1a1008);   // the slit's top
+  }
+  // the gold diadem across the skull behind the eyes, a team stone in front
+  for (const [x, y, z] of cellsOf(neck)) {
+    if (z !== Math.round(3.2 * FS) && z !== Math.round(3.2 * FS) + 1) continue;
+    if (y < Math.round(0.4 * FS) || !surfaceOf(neck, x, y, z)) continue;
+    neck.set(x, y, z, CGOLD(x, y, z));
+  }
+  { const y = topOf(neck, 0, Math.round(3.2 * FS) + 1); tbox(neck, -1, y + 1, Math.round(3.2 * FS), 2, 2, 2, 0xffffff); neck.box(-2, y + 1, Math.round(3.2 * FS), 1, 1, 2, CGOLD).box(1, y + 1, Math.round(3.2 * FS), 1, 1, 2, CGOLD); }
+  // two bronze lyre horns from behind the eyes: out, up and in, team tips
+  for (const s of [-1, 1]) {
+    const P = [[1.5, 1.4, 3.0], [3.0, 2.6, 2.5], [3.7, 4.4, 2.8], [3.3, 6.0, 3.6], [2.5, 6.8, 4.4]].map(([x, y, z]) => f([s * x, y, z]));
+    const R = [0.85, 0.75, 0.62, 0.5, 0.38].map((r) => r * FS);
+    for (let i = 0; i < P.length - 1; i++) tube(neck, P[i], P[i + 1], R[i], R[i + 1], i >= 3 ? TEAM : (x, y, z) => (y > P[i][1] ? CGOLD(x, y, z) : CGOLD_DK));
+  }
+  // the wesekh collar: a cone flaring back over the nape and down the
+  // shoulders, two bands of team segments parted by thin gold dividers inside
+  // gold bands at the throat, between them and at the back rim, open under the throat
+  for (let zf = Math.round(-1.8 * FS); zf <= Math.round(1.0 * FS); zf++) {
+    const t = (zf - 1.0 * FS) / (-2.8 * FS);           // 0 at the front, 1 at the back
+    const ro = (2.5 + t * 1.6) * FS, ri = ro - 2.6;
+    for (let xf = -6 * FS; xf <= 6 * FS; xf++) for (let yf = -4 * FS; yf <= 6 * FS; yf++) {
+      const x = xf + 0.5, y = yf + 0.5 - 0.2 * FS;
+      const d = Math.hypot(x, y * 1.08);
+      if (d > ro || d < ri) continue;
+      const a = Math.atan2(x, y);                         // 0 straight up
+      if (Math.abs(a) > 1.95) continue;                   // open under the throat
+      // two team bands of segments in a gold frame (myth_04's blue and gold collar)
+      const seg = Math.abs(((a + 1.95) / 0.5) % 1 - 0.5) > 0.4;   // a thin gold divider between segments
+      const blue = (t > 0.16 && t < 0.42) || (t > 0.52 && t < 0.8);
+      if (!blue || seg || Math.abs(a) > 1.75) neck.set(xf, yf, zf, d > ro - 1 ? CGOLD(xf, yf, zf) : CGOLD_DK);
+      else tset(neck, xf, yf, zf, d > ro - 1 ? 0xffffff : TEAM_SHADE);
+    }
+  }
+
+  // ---- the tail: three laterally flattened, tapering segments sinking to the
+  // ground; a double crest running into one; the last third a team sheath
+  const tail = (r0, r1, drop, len, tip) => {
     const m = new VoxelModel();
-    const yc = (z) => (r0 + (r1 - r0) * (z / 8)) - r0 - drop * (z / 8);
-    for (let z = 0; z < 8; z++) {
-      const r = r0 + (r1 - r0) * (z / 8), c = yc(z);
-      for (let x = -3; x <= 3; x++) for (let y = -4; y <= 4; y++) {
-        const dy = y - c;
-        if (x * x * 0.8 + dy * dy > r * r + 0.3) continue;
-        m.set(x, y, -z, tip && z > 3 ? TEAM : dy < -r * 0.45 ? BELLY : CROC(x, y, z));
-      }
-      const top = Math.round(c + r);
-      if (z % 2 === 0) {
-        if (tip && z > 1) m.set(0, top + 1, -z, TEAM).set(0, top + 2, -z, TEAM);   // the tip's spiky crest
-        else if (r > 1.3) m.set(-1, top, -z, SCUTE).set(1, top, -z, SCUTE);
-        else m.set(0, top + 1, -z, SCUTE);
+    const L = len * FS;
+    const yc = (zf) => -drop * FS * (zf / L) * (zf / L) * 0.5 - drop * FS * (zf / L) * 0.5;
+    for (let zf = 0; zf < L; zf++) {
+      const t = zf / L, r = (r0 + (r1 - r0) * t) * FS, c = yc(zf);
+      for (let xf = -4 * FS; xf <= 4 * FS; xf++) for (let yf = -4 * FS; yf <= 4 * FS; yf++) {
+        const x = xf + 0.5, dy = yf + 0.5 - c;
+        if ((x / (r * 0.78)) ** 2 + (dy / r) ** 2 > 1) continue;
+        m.set(xf, yf, -zf - 1, HIDE);
       }
     }
-    if (!tip && r0 > 2) {
-      // a bronze strap round the tail's root
-      for (let x = -3; x <= 3; x++) for (let y = -4; y <= 4; y++) if (m.has(x, y, -2)) m.set(x, y, -2, BRONZE(x, y, 2));
+    shade(m, (z) => Math.round(yc(-z - 1)), { seams: true });
+    for (let zf = 0; zf < L; zf++) {
+      if (zf % 3 !== 1) continue;
+      const t = zf / L, r = (r0 + (r1 - r0) * t);
+      const xs = r > 1.5 ? [-1, 0] : [Math.round(zf / 2) % 2 ? -1 : 0];
+      for (const x of xs) { const y = topOf(m, x, -zf - 1); if (y !== null) m.set(x, y + 1, -zf - 1, KNOB); }
     }
-    return { m, next: [0, yc(8), -8] };
+    if (tip) {
+      // the copper band, then the team sheath with its spiked crest
+      const z0 = Math.round(L * 0.32);
+      for (const [x, y, z] of cellsOf(m)) {
+        const zf = -z - 1;
+        if (zf === z0 || zf === z0 + 1) m.set(x, y, z, y > yc(zf) ? COPPER_LT : COPPER);
+        else if (zf > z0 + 1) tset(m, x, y, z, y > yc(zf) + 1 ? 0xffffff : TEAM_SHADE);
+      }
+      for (let zf = z0 + 2; zf < L - 1; zf += 2) {
+        const y = topOf(m, 0, -zf - 1) ?? topOf(m, -1, -zf - 1);
+        if (y === null) continue;
+        const hgt = Math.max(1, Math.round(3 - (zf - z0) / (L - z0) * 2));
+        for (let k = 1; k <= hgt; k++) { tset(m, 0, y + k, -zf - 1, 0xffffff); tset(m, -1, y + k, -zf - 1, 0xffffff); }
+      }
+    }
+    return { m, next: [0, yc(L) / FS, -len] };
   };
-  const T1 = tail(2.4, 1.8, 0.6, false), T2 = tail(1.8, 1.1, 0.4, false), T3 = tail(1.1, 0.5, 0.2, true);
-  // a sprawling limb, side s (+1 = left, +x): the upper limb runs level out
-  // from the flank, 4 long; the forearm drops from the elbow to the ground,
-  // leaning out one voxel, with a team anklet; a flat foot 4 wide on the
-  // ground with four cream claws
-  const upper = (s) => {
+  const T1 = tail(2.6, 1.9, 1.2, 8, false), T2 = tail(1.9, 1.2, 1.4, 8, false), T3 = tail(1.2, 0.35, 0.9, 8, true);
+
+  // ---- the limbs: an upper limb dropping out and back from the shoulder /
+  // hip to an elbow / knee (rig y 3.0); the forearm / shin standing down from
+  // it to a splayed foot flat on the ground (rig y 0)
+  const upper = (s, hind) => {
     const m = new VoxelModel();
-    for (let i = 0; i < 4; i++) m.box(s * i, 0, 0, 1, 2, i < 3 ? 3 : 2, CROC);
-    for (let i = 0; i < 3; i++) m.set(s * i, 0, 1, SIDE);   // the lighter underside
+    const e = hind ? [3.0, -1.0, -0.9] : [2.8, -1.0, -0.5];
+    fillE(m, [0, 0, 0], f(hind ? [1.5, 1.5, 1.8] : [1.3, 1.3, 1.5]), HIDE);
+    tube(m, [0, 0, 0], f([s * e[0], e[1], e[2]]), (hind ? 1.5 : 1.25) * FS, (hind ? 1.0 : 0.9) * FS, HIDE);
+    fillE(m, f([s * e[0], e[1], e[2]]), f([0.95, 0.95, 1.0]), HIDE);   // the elbow / knee
+    shade(m, -1, { seams: false });
     return m;
   };
-  const lower = (s, front) => {
+  const lower = (s, hind) => {
     const m = new VoxelModel();
-    m.box(0, 3, 0, 1, 1, 2, CROC).box(s, 3, 0, 1, 1, 2, CROC);          // the elbow (under the upper limb's end)
-    tbox(m, 0, 2, 0, 1, 1, 2, TEAM_SHADE).box(s, 2, 0, 1, 1, 2, TEAM);   // the team anklet
-    m.box(s, 1, 0, 1, 1, 2, CROC).box(2 * s, 1, 0, 1, 1, 2, CROC);      // leaning out
-    // the flat foot: 4 wide (x s..4s), 3 deep (z -1..1), toes forward
-    for (let i = 1; i <= 4; i++) for (let k = front ? -1 : -1; k <= 1; k++) m.set(s * i, 0, k, FOOT);
-    // claws: three toes forward, one splayed out to the side
-    m.set(s * 1, 0, 2, CLAW).set(s * 2.0, 0, 2, FOOT).set(s * 2, 0, 3, CLAW).set(s * 3, 0, 2, CLAW).set(s * 5, 0, 1, CLAW);
+    const wr = [s * 0.45, -2.3, 0.35];
+    tube(m, [0, 0, 0], f(wr), 0.9 * FS, 0.65 * FS, HIDE);
+    shade(m, -2 * FS, { seams: false });
+    // the team wrist band (forelimbs) / a scute band (hind)
+    for (const [x, y, z] of cellsOf(m)) if (y >= Math.round(-1.9 * FS) && y <= Math.round(-1.5 * FS) && surfaceOf(m, x, y, z)) {
+      if (hind) m.set(x, y, z, KNOB); else tset(m, x, y, z, y === Math.round(-1.5 * FS) ? 0xffffff : TEAM_SHADE);
+    }
+    // the foot: a flat palm on the ground, five toes splayed forward and out, dark claws
+    const fy = -3 * FS;                                    // the ground (fine), 3.0 rig under the elbow
+    const pc = [wr[0] * FS, fy + 1, wr[2] * FS + (hind ? 1 : 0.5)];
+    fillE(m, pc, [1.4 * FS, 0.8 * FS, (hind ? 1.4 : 1.1) * FS], FLANK, 2);
+    for (const [x, y, z] of cellsOf(m)) if (y < fy) m.remove(x, y, z);
+    const toes = hind ? [-0.5, -0.2, 0.15, 0.5] : [-0.7, -0.35, 0, 0.35, 0.7];
+    const tl = hind ? 2.4 : 1.9;
+    for (const a of toes) {
+      const ang = a + s * 0.25;                           // splayed out on the limb's side
+      const a0 = [pc[0], fy + 1.2, pc[2]], a1 = [pc[0] + Math.sin(ang) * tl * FS, fy + 0.6, pc[2] + Math.cos(ang) * tl * FS];
+      tube(m, a0, a1, 0.55 * FS, 0.4 * FS, FLANK);
+      m.set(Math.floor(a1[0] + Math.sin(ang) * 1.2), fy, Math.floor(a1[2] + Math.cos(ang) * 1.2), CLAW);
+      m.set(Math.floor(a1[0] + Math.sin(ang) * 0.4), fy, Math.floor(a1[2] + Math.cos(ang) * 0.4), CLAW);
+    }
+    for (const [x, y, z] of cellsOf(m)) if (y < fy) m.remove(x, y, z);
     return m;
   };
+  const F = { scale: 0.5, greedy: true, outline: 0.12 };
+  const NJ = [sx(11.5), NY - BY, 11.5];
   rig('petsuchos', { voxel: 0.09, anim: 'horse', style: 'croc', gait: 0.7, stride: 0.55, graze: false, sprawl: true }, [
-    part('body', body, [0, 0, 11], [0, 1, 0]),
-    part('neck', neck, [0, 2, 0], [0, 1.2, 11], 'body'),
-    part('tail', T1.m, [0, 0, 0], [0, 2.4, -11], 'body', { anim: 'tailA' }),
-    part('tail2', T2.m, [0, 0, 0], T1.next, 'tail', { anim: 'tailB' }),
-    part('tail3', T3.m, [0, 0, 0], T2.next, 'tail2', { anim: 'tailC' }),
-    part('legFL', upper(1), [0, 1, 1], [3.4, 2, 7.5], 'body'),
-    part('cannonFL', lower(1, true), [0.5, 3, 1], [3.5, 0, 0], 'legFL'),
-    part('legFR', upper(-1), [1, 1, 1], [-3.4, 2, 7.5], 'body'),
-    part('cannonFR', lower(-1, true), [0.5, 3, 1], [-3.5, 0, 0], 'legFR'),
-    part('legBL', upper(1), [0, 1, 1], [3.4, 2, -6.5], 'body'),
-    part('cannonBL', lower(1, false), [0.5, 3, 1], [3.5, 0, 0], 'legBL'),
-    part('legBR', upper(-1), [1, 1, 1], [-3.4, 2, -6.5], 'body'),
-    part('cannonBR', lower(-1, false), [0.5, 3, 1], [-3.5, 0, 0], 'legBR'),
+    part('body', body, [0, 0, 0], [0, BY, 0], null, F),
+    part('neck', neck, [0, 0, 0], NJ, 'body', { ...F, rest: [0.04, -0.22, 0] }),
+    part('tail', T1.m, [0, 0, 0], [sx(-11.5), 5.0 - BY, -11.3], 'body', { ...F, anim: 'tailA', rest: [0.06, -0.2, 0] }),
+    part('tail2', T2.m, [0, 0, 0], T1.next, 'tail', { ...F, anim: 'tailB', rest: [0.04, 0.2, 0] }),
+    part('tail3', T3.m, [0, 0, 0], T2.next, 'tail2', { ...F, anim: 'tailC', rest: [0, 0.42, 0] }),
+    part('legFL', upper(1, false), [0, 0, 0], [SH[0][0], SH[0][1] - BY - 0.5, SH[0][2]], 'body', F),
+    part('cannonFL', lower(1, false), [0, 0, 0], [2.8, -1.0, -0.5], 'legFL', F),
+    part('legFR', upper(-1, false), [0, 0, 0], [SH[1][0], SH[1][1] - BY - 0.5, SH[1][2]], 'body', F),
+    part('cannonFR', lower(-1, false), [0, 0, 0], [-2.8, -1.0, -0.5], 'legFR', F),
+    part('legBL', upper(1, true), [0, 0, 0], [HP[0][0], HP[0][1] - BY - 0.6, HP[0][2]], 'body', F),
+    part('cannonBL', lower(1, true), [0, 0, 0], [3.0, -1.0, -0.9], 'legBL', F),
+    part('legBR', upper(-1, true), [0, 0, 0], [HP[1][0], HP[1][1] - BY - 0.6, HP[1][2]], 'body', F),
+    part('cannonBR', lower(-1, true), [0, 0, 0], [-3.0, -1.0, -0.9], 'legBR', F),
   ]);
 }
 

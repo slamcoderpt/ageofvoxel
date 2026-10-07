@@ -3257,6 +3257,34 @@ stand on the ground (y 0). Rig `graze: false`. Captures: `eu_focus=sphinx`
 (idle / walk / attack / die), `eu_one=sphinx&eu_turn=40&eu_zoom=0.8&eu_pitch=32`,
 `eu_one=sphinx&eu_turn=80&eu_zoom=0.8&eu_pitch=30`.
 
+The Petsuchos, round 45 (myth_04; the croc was a straight plank of even width
+lying on the ground, stiff 90-degree legs, a dead-straight tail, a checkerboard
+back with pink straps, loose blue cubes for its dress). Every part is rebuilt on
+the fine grid (part scale 0.5, greedy, outline 0.12, joints in rig voxels) in
+`export-egypt-units.mjs`, flat tones. **Spine**: the body's centre line runs in
+an S (`sx(z) = 1.2 sin(pi z / 12)`: out under the shoulders, back under the
+hips) and the S carries on through part rests: neck yaw -0.22, tail -0.2,
+tail2 +0.2, tail3 +0.42 (the walk's sway adds on top). **Body** (joint
+[0, 4.6, 0]): half-width 3.5 over the shoulders and hips, 2.9 at the waist,
+2.3 at the neck and the tail's root; round shoulder and haunch masses; the
+belly lifted to rig y 2.8-4 (clear of the ground); umber back with a darker
+seam every third row, keeled scute knobs in two rows by the spine and one on
+each flank, an olive flank paling to a cream belly, one gold girth band.
+**Limbs**: shoulder / hip joints at rig y 4, the upper limb drops out and back
+to an elbow / knee at y 3, the forearm / shin stands down to a five- (four-)
+toed foot flat on y 0 with dark claws; team wrist bands. **Tail**: three
+laterally flattened segments tapering 2.6 -> 0.35 and sinking to the ground,
+a crest of knobs; the last third a team sheath with a spiked crest behind a
+gold band. **Head**: a flat snout tapering to a nostril knob, a dark gape from
+tip to cheek with white teeth standing over and under it, raised bony eye
+ridges over yellow slit eyes; a gold diadem with a team stone, two gold lyre
+horns (out, up and in) with team tips; a wesekh collar flaring back over the
+nape, two bands of team segments split by thin gold dividers in gold bands.
+(Gold is GOLD itself: an orange copper or a deep gold reads peach under the
+grade.) The focus spacing (`GAP`) is 4.8 so the tails never cross, the camera
+4.5 closer. Captures: `eu_focus=petsuchos` (idle / walk / attack / die),
+`eu_one=petsuchos&eu_turn=60&eu_zoom=0.5`, `eu_one=petsuchos&eu_turn=-50&eu_zoom=0.6`.
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower

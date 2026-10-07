@@ -31,7 +31,7 @@ const STAND_IN := {"anubite": "minotaur", "avenger": "minotaur", "mummy": "medus
 	"phoenix": "centaur", "roc": "centaur"}
 ## lineup spacing (world units) by size
 const GAP := {"war_elephant": 4.2, "siege_tower": 3.4, "catapult": 3.4, "chariot_archer": 3.6, "camel_rider": 2.8, "mercenary_cavalry": 2.6,
-	"sphinx": 3.6, "petsuchos": 3.8, "scarab": 3.2, "scorpion_man": 3.4, "wadjet": 5.2, "phoenix": 3.6, "roc": 4.6, "son_of_osiris": 2.4,
+	"sphinx": 3.6, "petsuchos": 4.8, "scarab": 3.2, "scorpion_man": 3.4, "wadjet": 5.2, "phoenix": 3.6, "roc": 4.6, "son_of_osiris": 2.4,
 	"avenger": 2.2, "anubite": 2.0, "serpent": 2.4,  # (the Serpent rears its head high: eu_one frames it whole)
 	# men with long hafts stand a spear's length apart, so in a focus view no
 	# man's spear or shield crosses his neighbour's body
@@ -99,6 +99,8 @@ static func scene_setup(game: Node) -> Dictionary:
 			var p: Vector2 = at.call(float([-1.0, 1.0, 0.42, -0.42][k]) * size * 0.9, float([0.1, -0.1, -1.0, 1.0][k]) * size * 0.75)
 			spawn.call(focus_type, 1, p, ang)
 		cam_dist = 5.5 + size * 3.2
+		if focus_type == "petsuchos":
+			cam_dist -= 4.5   # (long, low beasts: spaced wide so the tails never cross, framed as close as at GAP 3.4)
 		cam_pitch = 40.0
 	elif group == "foot":
 		var rows := [["axeman", "axeman", "axeman", "axeman"], ["spearman", "spearman", "spearman", "spearman", "spearman"],
