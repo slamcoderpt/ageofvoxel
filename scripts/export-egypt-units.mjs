@@ -3896,153 +3896,225 @@ function khopeshM(s = 1) {
   ]);
 }
 
-// Sphinx (four-legged rig, 0.11; round 17 rebuild after myth_03): a lion's
-// body with a deep chest tapering to a narrow waist and a low haunch, a flat
-// back, thick forelegs on wide clawed paws with team wrist bands, bent hind
-// legs (thigh forward to the stifle, gaskin back to the hock, a sloped
-// metatarsus), a tail curling up into a team tuft. On a raised chest and a
-// thick neck an upright man's head at body scale (1.4x the old one): a face
-// with a brow ridge, kohl eyes, a standing nose, a mouth, a chin and a
-// braided false beard, framed by a symmetric striped nemes (gold brow band
-// and uraeus, a striped crown, side wings flaring out past the jaw, two wide
-// lappets falling onto the chest, a queue behind).
+// Sphinx (four-legged rig, 0.11; round 44 rebuild after myth_03): every part
+// is authored on a grid twice as fine (part scale 0.5, joints in rig voxels),
+// so the lion can have mass where a lion has it: a broad, deep chest with
+// shoulders bulging over the forelegs, a waist that tucks up under a level
+// back, round haunches over bent hind legs, each leg ending in a wide paw
+// split into three toes with dark claws, a team band at each wrist and hock,
+// a tail curling up to a team tuft. The man's head (chin to crown about nine
+// rig voxels with its lappets, ~60 % of round 43's) sits forward and low on a
+// short thick neck, the chin just over the chest: a light face that stands
+// out of the cloth (a lit brow ridge over two dark eye sockets with kohl
+// pupils, a nose ridge and tip a voxel proud, shaded cheeks, a mouth, a
+// braided beard), framed by a striped nemes (gold brow band and uraeus, a
+// domed striped crown, side wings flaring to the jaw, two lappets lying on
+// the chest, a queue down the nape). Grazing is off: a sphinx holds its head.
 {
-  const LION = pick3(51, 0x9e6826, 0x966222, 0xa66e2c, 0.5, 0.85);   // a red-brown lion (myth_03), not sand
-  const LION_LT = pick3(53, 0xc08c4a, 0xb88444, 0xc69250, 0.5, 0.85);   // belly, throat, inner legs
-  const LION_DK = 0x6e3e1c;                                             // creases, toe splits
-  const CLAW = 0x2a2420;
-  const UK = (k) => [((k >> 20) & 1023) - 512, ((k >> 10) & 1023) - 512, (k & 1023) - 512];
-  // body (y = height above the ground; the pivot sits at the rig's y 10)
+  const inE = (p, c, r, e) => { let s = 0; for (let i = 0; i < 3; i++) s += Math.abs((p[i] - c[i]) / r[i]) ** e; return s <= 1; };
+  const fillE = (m, c, r, col, e = 2, keep = false) => {
+    for (let x = Math.floor(c[0] - r[0]) - 1; x <= Math.ceil(c[0] + r[0]); x++)
+      for (let y = Math.floor(c[1] - r[1]) - 1; y <= Math.ceil(c[1] + r[1]); y++)
+        for (let z = Math.floor(c[2] - r[2]) - 1; z <= Math.ceil(c[2] + r[2]); z++)
+          if (inE([x + 0.5, y + 0.5, z + 0.5], c, r, e) && !(keep && m.has(x, y, z))) m.set(x, y, z, typeof col === 'function' ? col(x, y, z) : col);
+  };
+  const cellsOf = (m) => [...m.vox.keys()].map((k) => [((k >> 20) & 1023) - 512, ((k >> 10) & 1023) - 512, (k & 1023) - 512]);
+  // a red-brown lion (myth_03): a sunlit back, the flank, a paler belly and
+  // throat, dark creases
+  // (flat tones: the renderer's light shades the masses, so no per-voxel noise)
+  const LION = () => 0xa06a28;
+  const LION_HI = 0xa06a28;   // (no lit top: the steps of a curved back would speckle)
+  const LION_LT = () => 0xc0904e;
+  const LION_DK = 0x6e3e1c;
+  const CLAW = 0x1c1614;
+  const CREASE = 0x8a5420;
+  const FS = 2;   // fine cells per rig voxel
+  // shade a lion mass: lit where nothing is above, pale where nothing is below
+  const shadeLion = (m, { belly = -99, keepTop = false } = {}) => {
+    for (const [x, y, z] of cellsOf(m)) {
+      const v = m.get(x, y, z);
+      if (v.team || (v.c !== LION(x, y, z) && v.c !== LION_HI)) continue;
+      if (y < belly && (!m.has(x, y - 1, z) || !m.has(x + 1, y, z) || !m.has(x - 1, y, z))) v.c = LION_LT(x, y, z);
+      else if (!keepTop && !m.has(x, y + 1, z)) v.c = LION_HI;
+    }
+  };
+
+  // ---- the body (origin at the body joint, rig [0, 10, 0]; in rig voxels:
+  // the back at 16, the chest floor at 9, the belly tucked up to 11.6)
   const body = new VoxelModel();
-  // swept from a side profile (z, back, belly, half width) through a boxy
-  // round section, so the outline steps evenly: a deep chest under high
-  // withers, a narrow tucked-up waist, a low haunch, a flat back
-  const PROF = [[-1, 14, 11.6, 2.0], [0, 15, 10.6, 2.8], [2, 15.6, 9.8, 3.3], [5, 15.6, 10, 3.2], [7, 15.4, 11.2, 2.7],
-    [10, 15.4, 11.6, 2.6], [12, 15.8, 10.4, 3.0], [14, 16.6, 8.8, 3.8], [17, 17, 8, 4.1], [19, 16.6, 8.4, 3.9], [21, 15.4, 9.6, 3.2], [22, 14, 11, 2.2]];
-  for (let z = -1; z <= 22; z++) {
-    let i = 0;
-    while (i < PROF.length - 2 && PROF[i + 1][0] < z) i++;
-    const [z0, t0, b0, w0] = PROF[i], [z1, t1, b1, w1] = PROF[i + 1];
-    const f = Math.max(0, Math.min(1, (z - z0) / (z1 - z0)));
-    const top = t0 + (t1 - t0) * f, bot = b0 + (b1 - b0) * f, hw = w0 + (w1 - w0) * f + 0.3;
-    const cy = (top + bot) / 2, ry = (top - bot) / 2 + 0.3;
-    for (let y = Math.floor(bot); y <= Math.ceil(top); y++) for (let x = -3; x <= 9; x++) {
-      const dx = Math.abs(x - 3) / hw, dy = Math.abs(y - cy) / ry;
-      if (dx ** 2.5 + dy ** 2.5 <= 1) body.set(x, y, z, LION);
-    }
+  const B = (c, r, e = 2.2) => fillE(body, [c[0] * FS, (c[1] - 10) * FS, c[2] * FS], r.map((v) => v * FS), LION, e);
+  const BT = (a, b, r0, r1) => tube(body, [a[0] * FS, (a[1] - 10) * FS, a[2] * FS], [b[0] * FS, (b[1] - 10) * FS, b[2] * FS], r0 * FS, r1 * FS, LION);
+  B([0, 12.7, 7.4], [3.7, 3.6, 4.3]);                   // the deep, broad chest
+  B([0, 14.9, 5.8], [3.0, 1.5, 3.8]);                   // the withers
+  const SHO = [[2.5, 12.6, 6.8], [-2.5, 12.6, 6.8]], SHO_R = [1.9, 3.1, 2.7];
+  for (const c of SHO) B(c, SHO_R, 2.1);                // the shoulders bulging over the forelegs
+  B([0, 13.3, 1.8], [3.3, 3.1, 3.6]);                   // the ribcage, tapering back from the chest
+  BT([0, 13.6, 2], [0, 13.9, -2.4], 2.9, 2.15);          // the barrel, tucking in to the waist
+  BT([0, 13.9, -2.4], [0, 13.8, -6], 2.15, 2.7);         // and out again into the flank
+  const HAU = [[2.1, 13.7, -7.4], [-2.1, 13.7, -7.4]], HAU_R = [2.3, 2.9, 3.1];
+  for (const c of HAU) B(c, HAU_R, 2.1);                // the round haunches
+  B([0, 14.6, -7.8], [2.6, 1.9, 3.0]);                  // the rump between them
+  // the crease ringing each shoulder blade and haunch (where its mass leaves the barrel)
+  const inPart = (list, r, x, y, z) => list.some((c) => inE([(x + 0.5) / FS, (y + 0.5) / FS + 10, (z + 0.5) / FS], c, r, 2.1));
+  for (const [x, y, z] of cellsOf(body)) {
+    if (!surfaceOf(body, x, y, z) || y > (14.6 - 10) * FS) continue;
+    const sho = inPart(SHO, SHO_R, x, y, z), hau = inPart(HAU, HAU_R, x, y, z);
+    if (sho && !inPart(SHO, SHO_R, x, y, z - 1) && z < 6.8 * FS) body.set(x, y, z, CREASE);
+    if (hau && !inPart(HAU, HAU_R, x, y, z + 1) && z > -7.4 * FS) body.set(x, y, z, CREASE);
   }
-  // light underside: throat, chest floor and belly
-  for (const [k, v] of body.vox) {
-    const [x, y, z] = UK(k);
-    if (y < 13 && (!body.has(x, y - 1, z) || !body.has(x, y - 2, z))) v.c = LION_LT(x, y, z);
-    if (z >= 19 && y >= 11 && y <= 15 && Math.abs(x - 3) <= 2) v.c = LION_LT(x, y, z);   // the bib under the lappets
+  shadeLion(body, { belly: (11.8 - 10) * FS });
+  // the pale bib down the chest's front, under the lappets
+  for (const [x, y, z] of cellsOf(body)) if (!body.has(x, y, z + 1) && z > 8.5 * FS && y < (14.2 - 10) * FS && Math.abs(x + 0.5) < 2.6 * FS) body.set(x, y, z, LION_LT(x, y, z));
+  // a gold-and-team collar round the chest's top where the neck leaves it
+  for (const [x, y, z] of cellsOf(body)) {
+    if (!surfaceOf(body, x, y, z)) continue;
+    const dz = z / FS - 9.3, dy = y / FS + 10 - 14.6;
+    if (Math.abs(dz + dy * 0.9) < 0.55 && y / FS + 10 > 12.6) body.set(x, y, z, GOLD(x, y, z));
   }
-  // the neck: thick, rising up and a little forward from the withers, a gold
-  // and team collar where it meets the chest
+
+  // ---- the neck (origin at the neck joint, rig [0, 15, 8]): short, thick,
+  // rising forward out of the chest; a pale throat
   const neck = new VoxelModel();
-  capsuleYZ(neck, 0, 5, 0, 0, 2.6, 5, 1.2, 2.2, LION);
-  for (let z = -3; z <= 4; z++) for (let x = 0; x <= 4; x++) for (const y of [1]) if (neck.has(x, y, z) && (!neck.has(x, y, z + 1) || !neck.has(x, y, z - 1) || x === 0 || x === 4)) neck.set(x, y, z, GOLD(x, y, z));
-  for (let x = 1; x <= 3; x++) for (let y = 2; y <= 6; y++) { let z = 6; while (z > -2 && !neck.has(x, y, z)) z--; if (z > -2) neck.set(x, y, z, LION_LT(x, y, z)); }   // the throat
-  // the head, authored at body scale: face x 1..7 (centre x 4), y 0..7, the
-  // face plane z 4, the nose at z 5
-  const SK = pick3(54, 0xd09464, 0xc88c5c, 0xd49a6a, 0.5, 0.85);   // the face a step lighter than the lion
-  const SK_SH = 0x9c6038;
-  const BROW = 0x7a4020;
+  tube(neck, [0, -3, -3], [0, 4, 4.6], 5.2, 4.4, LION);
+  shadeLion(neck, { keepTop: true });
+  for (const [x, y, z] of cellsOf(neck)) if (!neck.has(x, y, z + 1) && Math.abs(x + 0.5) < 3) neck.set(x, y, z, LION_LT(x, y, z));
+
+  // ---- the head (origin at the head joint, rig [0, 17, 10.5]; pivot y 1
+  // puts the chin's foot (y 0) at rig 16.5): face x -3..2 round centre -0.5,
+  // the face plane z 4, the brow and nose a voxel proud at z 5
+  const SK = pick3(54, 0xe2ae7a, 0xdca674, 0xe6b482, 0.5, 0.85);   // two steps lighter than the lion
+  const SK_HI = 0xf0c494, SK_SH = 0xb47a4c, SOCKET = 0x6a3a22;
   const h = new VoxelModel();
-  for (let y = 0; y <= 8; y++) for (let x = 1; x <= 7; x++) for (let z = -2; z <= 4; z++) {
-    if (y <= 1 && (x <= 1 || x >= 7)) continue;                  // the jaw narrows
-    if (y === 0 && (x <= 2 || x >= 6)) continue;                 // to a chin
-    h.set(x, y, z, z === 4 ? SK(x, y, z) : SK_SH);
+  const WX = (x) => Math.abs(x + 0.5);                  // distance from the face's centre line
+  for (let y = 0; y <= 9; y++) for (let x = -4; x <= 3; x++) for (let z = -3; z <= 4; z++) {
+    const w = WX(x);
+    if (y === 0 && w > 1) continue;                     // the chin
+    if (y === 1 && w > 2) continue;                     // the jaw narrowing
+    if (z === 4 && w > 3) continue;                     // the face's rounded sides
+    h.set(x, y, z, z === 4 ? SK(x, y, z) : z >= 2 ? SK_SH : SK_SH);
   }
-  // brow ridge: a dark line a voxel proud over the eyes, broken by the bridge
-  for (const x of [2, 3, 5, 6]) h.set(x, 5, 4, BROW);
-  for (const x of [1, 7]) h.set(x, 5, 4, SK_SH);
-  // eyes: a white and a dark pupil each, either side of the nose bridge
-  h.set(1, 4, 4, SK_SH).set(2, 4, 4, EYE_WHITE).set(3, 4, 4, DARK);
-  h.set(7, 4, 4, SK_SH).set(6, 4, 4, EYE_WHITE).set(5, 4, 4, DARK);
-  // the nose standing out: bridge, ridge and tip, nostril shade either side
-  h.set(4, 4, 5, SK(4, 4, 5)).set(4, 3, 5, 0xd08e5a).set(4, 2, 5, 0xd08e5a).set(4, 2, 6, 0xc88654);
-  h.set(3, 2, 4, SK_SH).set(5, 2, 4, SK_SH);
-  h.set(2, 3, 4, SK_SH).set(6, 3, 4, SK_SH);                    // cheekbones' shade
-  h.set(3, 1, 4, SK_SH).set(4, 1, 4, LIP).set(5, 1, 4, SK_SH);   // the mouth
-  h.set(4, 0, 5, SK(4, 0, 5));                                   // the chin stands out
-  // the braided false beard: a gold-banded dark plait under the chin
-  for (let y = -4; y <= -1; y++) h.box(4, y, 3, 1, 1, 2, y & 1 ? 0x7a4a22 : 0xa87038);
-  h.box(4, -5, 3, 1, 1, 2, GOLD);
-  // the nemes (team / linen stripes by height, 1 voxel each)
-  const ST = (x, y, z) => (y & 1 ? TEAM : LINEN(x, y, z));
-  // crown: over the skull from the brow band up, domed; stripes run front to back on top
-  for (let y = 8; y <= 9; y++) for (let x = 0; x <= 8; x++) for (let z = -3; z <= 5; z++) {
-    if (y === 9 && (x === 0 || x === 8 || z === 5 || z === -3)) continue;
-    h.set(x, y, z, y === 9 ? ((x & 1) ? LINEN(x, y, z) : TEAM) : ST(x, y, z));
+  // the brow ridge: lit, a voxel proud, across both eyes and the bridge
+  for (let x = -3; x <= 2; x++) h.set(x, 6, 5, SK_HI);
+  // the eye sockets under it: shade round a dark kohl pupil
+  for (const s of [-1, 1]) {
+    const xo = (d) => (s < 0 ? -1 - d : d);           // x d steps out from the centre line on side s
+    h.set(xo(1), 5, 4, SOCKET).set(xo(2), 5, 4, DARK).set(xo(3), 5, 4, SOCKET);
+    h.set(xo(2), 4, 4, SK_SH);                          // the lower lid's shade
+    h.set(xo(3), 3, 4, SK_SH).set(xo(3), 2, 4, SK_SH);  // the cheek turning away
   }
-  h.box(0, 7, 5, 9, 1, 1, GOLD).box(0, 7, -3, 1, 1, 8, GOLD).box(8, 7, -3, 1, 1, 8, GOLD);   // the gold brow band
-  h.set(4, 8, 6, GOLD).set(4, 9, 6, 0xd8b400).set(4, 8, 5, GOLD);          // the uraeus
-  // side wings: from the temples down past the jaw, flaring out (a trapezoid
-  // round the face), set back from the face plane so the face reads first
-  for (let y = 7; y >= -1; y--) {
-    const out = y >= 6 ? 1 : y >= 3 ? 2 : 3;
-    for (let k = 1; k <= out; k++) for (const x of [1 - k, 7 + k]) for (let z = k >= 2 ? -1 : -3; z <= 3; z++) {
-      if (y === 7 && x !== 0 && x !== 8) continue;
-      h.set(x, y, z, ST(x, y, z));
+  // the nose: a lit ridge down from the brow and a tip standing out
+  h.set(-1, 5, 5, SK_HI).set(0, 5, 5, SK_HI).set(-1, 4, 5, SK(-1, 4, 5)).set(0, 4, 5, SK(0, 4, 5));
+  h.set(-1, 3, 5, SK_HI).set(0, 3, 5, SK_HI).set(-1, 3, 6, SK(-1, 3, 6)).set(0, 3, 6, SK(0, 3, 6));
+  h.set(-2, 3, 4, SK_SH).set(1, 3, 4, SK_SH);          // the nostrils' shade
+  for (let x = -2; x <= 1; x++) h.set(x, 2, 4, x === -2 || x === 1 ? SK_SH : LIP);   // the mouth
+  h.set(-1, 0, 5, SK(-1, 0, 5)).set(0, 0, 5, SK(0, 0, 5));   // the chin stands out
+  // the braided false beard under the chin, gold-tipped
+  for (let y = -4; y <= -1; y++) h.box(-1, y, 3, 2, 1, 2, y & 1 ? 0x6a3e1c : 0x9c6630);
+  h.box(-1, -5, 3, 2, 1, 2, GOLD);
+  // the nemes: team / linen stripes a voxel each
+  const ST = (m, x, y, z, k) => { if (k & 1) tset(m, x, y, z, 0xffffff); else m.set(x, y, z, LINEN(x, y, z)); };
+  // the gold brow band over the forehead, round the temples
+  for (let x = -5; x <= 4; x++) for (let z = -3; z <= 5; z++) {
+    if (WX(x) < 4.5 && z < 5 && z > -3) continue;
+    if (z === 5 && WX(x) > 4) continue;
+    h.set(x, 9, z, GOLD(x, 9, z));
+  }
+  // the domed crown: three rows rising over the skull, stripes running front to back
+  for (let y = 10; y <= 12; y++) {
+    const rx = y === 10 ? 5 : y === 11 ? 4.5 : 3.5, z0 = y === 12 ? -2 : -4, z1 = y === 10 ? 5 : y === 11 ? 4 : 3;
+    for (let x = -6; x <= 5; x++) for (let z = z0; z <= z1; z++) if (WX(x) <= rx) ST(h, x, y, z, x + 6);
+  }
+  h.set(-1, 10, 6, GOLD).set(0, 10, 6, GOLD).set(-1, 11, 6, 0xd8b400).set(-1, 12, 5, GOLD);   // the uraeus
+  // the side wings: from the band down past the jaw, flaring outward, set
+  // back from the face plane so the face reads first
+  for (let y = 8; y >= -1; y--) {
+    const out = y >= 7 ? 1 : y >= 4 ? 2 : 3;
+    for (let k = 1; k <= out; k++) for (const x of [-4 - k, 3 + k])
+      for (let z = k >= 2 ? 0 : -2; z <= 3; z++) ST(h, x, y, z, y);
+  }
+  // two lappets falling from the wings' feet onto the chest
+  for (const x0 of [-6, 3]) for (let y = -2; y >= -7; y--) {
+    const z0 = y >= -4 ? 1 : 2;
+    for (let x = x0; x < x0 + 3; x++) for (let z = z0; z <= z0 + 1; z++) {
+      if (y === -7) h.set(x, y, z, GOLD(x, y, z)); else ST(h, x, y, z, y);
     }
   }
-  // two wide lappets (3 wide, 2 deep) from the wings' feet down onto the chest,
-  // leaning forward with the chest, gold-tipped
-  for (const x0 of [-2, 8]) {
-    for (let y = -2; y >= -9; y--) {
-      const z0 = y >= -4 ? 1 : y >= -7 ? 2 : 3;
-      h.box(x0, y, z0, 3, 1, 2, y === -9 ? GOLD : ST(x0, y, z0));
-    }
-  }
-  // the back of the nemes gathered into a queue
-  h.box(2, 0, -4, 5, 8, 1, ST).box(3, -4, -4, 3, 4, 1, ST);
-  // tail: up and back from the rump, curving out, a team tuft
+  // the back gathered into a queue down the nape
+  for (let y = -3; y <= 9; y++) for (let x = -2; x <= 1; x++) ST(h, x, y, -4, y);
+  for (let y = -6; y <= -4; y++) for (let x = -1; x <= 0; x++) ST(h, x, y, -4, y);
+
+  // ---- the tail: back and down off the rump, curling up to a team tuft
   const tail = new VoxelModel();
-  tube(tail, [0.5, 0.5, 0.5], [0.5, -2.5, -3], 0.95, 0.85, LION);
-  tube(tail, [0.5, -2.5, -3], [0.5, -2.5, -6.5], 0.85, 0.8, LION);
-  tube(tail, [0.5, -2.5, -6.5], [0.5, 0, -9], 0.8, 0.75, LION);
-  tail.ellipsoid(0, 1, -10, 1, 1.6, 1.2, TEAM).set(0, 2, -9, TEAM_SHADE).set(0, 0, -11, TEAM);
-  // legs. forelegs: a thick upper with the elbow behind, a lower with a team
-  // wrist band and a wide clawed paw (4 wide, toes split, dark claws)
-  const foreUp = () => new VoxelModel().box(0, 0, 0, 3, 6, 3, LION).box(0, 1, -1, 3, 3, 1, LION).box(0, 3, 3, 3, 3, 1, LION);
-  const paw = (m, z0) => {
-    m.box(-1, 0, z0, 5, 2, 4, LION).box(0, 2, z0 + 1, 3, 1, 2, LION);
-    for (const x of [-1, 0, 2, 3]) m.set(x, 0, z0 + 4, CLAW);   // four dark claws, split in pairs
-    for (const x of [-1, 0, 1, 2, 3]) m.set(x, 0, z0 + 3, LION_LT);
-    m.set(1, 1, z0 + 3, LION_DK).set(1, 0, z0 + 3, LION_DK);   // the toe split
+  tube(tail, [0, 0, 0], [0, -5, -5], 1.6, 1.4, LION);
+  tube(tail, [0, -5, -5], [0, -5, -12], 1.4, 1.2, LION);
+  tube(tail, [0, -5, -12], [0, 0, -16], 1.2, 1.1, LION);
+  fillE(tail, [0, 2, -17.5], [2, 3, 2.2], (x, y, z) => 0xffffff);
+  for (const [x, y, z] of cellsOf(tail)) if (tail.get(x, y, z).c === 0xffffff) tset(tail, x, y, z, y > 3 ? 0xffffff : TEAM_SHADE);
+
+  // ---- legs (origin at each joint). A wide paw split into three toes, each
+  // with a dark claw in front; the paw's foot at the cannon's y -9 (the ground)
+  const paw = (m, zc) => {
+    for (let x = -4; x <= 3; x++) for (let y = -9; y <= -7; y++) for (let z = zc - 2; z <= zc + 4; z++) {
+      if (y === -7 && (WX(x) > 3 || z < zc - 1 || z > zc + 2)) continue;   // the paw's rounded top
+      if (y === -8 && z === zc + 4 && WX(x) > 3) continue;
+      const split = (x === -2 || x === 1) && z >= zc + 1;
+      m.set(x, y, z, split ? (y === -9 ? LION_DK : LION_DK) : y === -9 && z >= zc + 3 ? LION_LT(x, y, z) : LION(x, y, z));
+    }
+    // the toes' front pads cut apart, a dark claw on each toe
+    for (const x of [-2, 1]) for (let y = -9; y <= -8; y++) m.remove(x, y, zc + 4);
+    for (const [a, b] of [[-4, -3], [-1, 0], [2, 3]]) for (const x of [a, b]) m.set(x, -9, zc + 5, CLAW);
+  };
+  const band2 = (m, y0) => { for (const [x, y, z] of cellsOf(m)) if ((y === y0 || y === y0 - 1) && surfaceOf(m, x, y, z)) tset(m, x, y, z, y === y0 ? 0xffffff : TEAM_SHADE); };
+  // forelegs: the elbow mass under the shoulder, a thick forearm down to the wrist
+  const foreUp = () => {
+    const m = new VoxelModel();
+    fillE(m, [0, -4, -0.5], [3.8, 6.5, 4.6], LION, 2.2);   // the upper arm and elbow, into the shoulder
+    tube(m, [0, -7, 0.4], [0, -13.5, 0.8], 3.1, 2.5, LION);  // the forearm
+    fillE(m, [0, -9.5, -3.2], [2.0, 2.0, 1.4], LION, 2.2);  // the elbow's point behind
+    shadeLion(m, { keepTop: true });
     return m;
   };
-  const foreLow = () => { const m = new VoxelModel().box(0, 2, 0, 3, 6, 3, LION); for (let x = 0; x < 3; x++) for (let z = 0; z < 3; z++) { if (x === 1 && z === 1) continue; tset(m, x, 4, z, TEAM_SHADE); m.set(x, 5, z, TEAM); } m.box(0, 4, -1, 3, 2, 1, TEAM); paw(m, -1); return m; };
-  // hind legs: the thigh forward to the stifle, the gaskin back to the hock
+  const foreLow = () => {
+    const m = new VoxelModel();
+    tube(m, [0, 1, 0.8], [0, -7, 1.6], 2.6, 2.5, LION);    // the wrist and the short pastern
+    band2(m, -1);
+    paw(m, 0);
+    shadeLion(m, { keepTop: true });
+    return m;
+  };
+  // hind legs: the thigh's mass under the haunch, the gaskin back to the hock;
+  // the hock's point, the metatarsus sloping forward to the paw
   const hindUp = () => {
     const m = new VoxelModel();
-    m.box(0, 4, -1, 3, 4, 4, LION).box(0, 3, 0, 3, 1, 3, LION);    // the thigh, broad, forward to the stifle
-    m.box(0, 1, -1, 3, 2, 3, LION).box(0, 0, -2, 3, 1, 3, LION);   // the gaskin, back and down to the hock
+    fillE(m, [0, -4.5, 1], [4.0, 7, 5.6], LION, 2.2);      // the thigh
+    tube(m, [0, -8, 0], [0, -15.5, -4.2], 3.0, 2.2, LION);  // the gaskin
+    shadeLion(m, { keepTop: true });
     return m;
   };
   const hindLow = () => {
     const m = new VoxelModel();
-    m.box(0, 6, -2, 3, 2, 3, LION).set(1, 7, -3, LION_DK).set(1, 6, -3, LION_DK);   // the hock and its point
-    m.box(0, 2, -1, 3, 4, 2, LION);                                                // the metatarsus, sloping to the paw
-    for (let x = 0; x < 3; x++) for (const z of [-2, 1]) m.set(x, 3, z, TEAM);     // the ankle band
-    m.box(0, 3, -2, 3, 1, 1, TEAM).box(0, 3, 1, 3, 1, 1, TEAM);
-    paw(m, -1);
+    fillE(m, [0, 0.4, -0.6], [2.3, 2.2, 2.3], LION, 2.2);  // the hock
+    m.set(-1, 1, -3, LION_DK).set(0, 1, -3, LION_DK);      // its point
+    tube(m, [0, 0, 0], [0, -7, 1.8], 2.3, 2.4, LION);      // the metatarsus
+    band2(m, -2);
+    paw(m, 1);
+    shadeLion(m, { keepTop: true });
     return m;
   };
-  rig('sphinx', { voxel: 0.11, anim: 'horse', style: 'sphinx', gait: 0.8, stride: 0.8 }, [
-    part('body', body, [3.5, 10, 10.5], [0, 10, 0]),
-    part('neck', neck, [2.5, 0, 0.5], [0, 5.5, 8.2], 'body'),
-    part('head', h, [4.5, 0, 0.5], [0, 5.5, 1.6], 'neck', { scale: 0.82, rest: [-0.12, 0, 0] }),
-    part('tail', tail, [0.5, 0, 0], [0, 3.5, -10], 'body'),
-    part('legFL', foreUp(), [1.5, 6, 1.5], [2.3, 1.5, 7], 'body'),
-    part('cannonFL', foreLow(), [1.5, 7.5, 1.5], [0, -5.5, 0], 'legFL'),
-    part('legFR', foreUp(), [1.5, 6, 1.5], [-2.3, 1.5, 7], 'body'),
-    part('cannonFR', foreLow(), [1.5, 7.5, 1.5], [0, -5.5, 0], 'legFR'),
-    part('legBL', hindUp(), [1.5, 6, 1], [2.5, 1.5, -7], 'body'),
-    part('cannonBL', hindLow(), [1.5, 7.5, -1], [0, -5.5, -0.5], 'legBL'),
-    part('legBR', hindUp(), [1.5, 6, 1], [-2.5, 1.5, -7], 'body'),
-    part('cannonBR', hindLow(), [1.5, 7.5, -1], [0, -5.5, -0.5], 'legBR'),
+  const F = { scale: 0.5, greedy: true, outline: 0.15 };
+  rig('sphinx', { voxel: 0.11, anim: 'horse', style: 'sphinx', gait: 0.8, stride: 0.8, graze: false }, [
+    part('body', body, [0, 0, 0], [0, 10, 0], null, F),
+    part('neck', neck, [0, 0, 0], [0, 5, 8], 'body', F),
+    part('head', h, [0, 1, 0], [0, 2, 2.5], 'neck', { ...F, rest: [-0.1, 0, 0] }),
+    part('tail', tail, [0, 0, 0], [0, 5.4, -10.4], 'body', F),
+    part('legFL', foreUp(), [0, 0, 0], [2.4, 1, 7], 'body', F),
+    part('cannonFL', foreLow(), [0, 0, 0], [0, -6.5, 0.4], 'legFL', F),
+    part('legFR', foreUp(), [0, 0, 0], [-2.4, 1, 7], 'body', F),
+    part('cannonFR', foreLow(), [0, 0, 0], [0, -6.5, 0.4], 'legFR', F),
+    part('legBL', hindUp(), [0, 0, 0], [2.2, 2.5, -7.4], 'body', F),
+    part('cannonBL', hindLow(), [0, 0, 0], [0, -8, -2.2], 'legBL', F),
+    part('legBR', hindUp(), [0, 0, 0], [-2.2, 2.5, -7.4], 'body', F),
+    part('cannonBR', hindLow(), [0, 0, 0], [0, -8, -2.2], 'legBR', F),
   ]);
 }
 

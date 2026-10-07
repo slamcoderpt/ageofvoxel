@@ -3185,6 +3185,31 @@ their upper face. The coil is regraded to gold with navy saddle bands. In
 wings no longer touch. Captures: `--params "eu_focus=wadjet"` (idle / walk /
 attack / die), `eu_one=wadjet&eu_turn=0|90|120|150`, `eu_group=myth`.
 
+The Sphinx, round 44 (myth_03; the head and nemes stood up off the chest as a
+block as tall as the body, the face a muddy patch under the cloth, the torso a
+plank, the legs square posts sunk 1.5 voxels into the ground, gaps at neck and
+hip). Every part is rebuilt on the fine grid (part scale 0.5, greedy, joints in
+rig voxels) in `export-egypt-units.mjs`, flat tones (no per-voxel noise).
+**Body**: a deep broad chest (floor at rig y 9), shoulders bulging over the
+forelegs, a ribcage tapering back to a waist tucked up to y 11.7 under the
+back, out again into round haunches and a rump; a darker crease where each
+shoulder blade and haunch leaves the barrel, a pale belly and chest bib, a
+gold collar where the neck leaves the chest. **Neck** (joint [0, 5, 8] on the
+body): short and thick, rising forward. **Head** (joint [0, 2, 2.5], pivot
+y 1): chin to crown with lappets ~9 rig voxels (~60 % of round 43's), set
+forward and low so the chin sits just over the chest; a face two steps lighter
+than the lion and the linen (a lit brow ridge a voxel proud, dark sockets
+round kohl pupils, a nose ridge and tip standing out, shaded cheeks and
+nostrils, a mouth, a braided beard), a gold brow band and uraeus, a domed
+striped crown, side wings flaring to the jaw set back from the face, two
+lappets on the chest, a queue down the nape. **Legs**: an elbow mass and a
+thick forearm; a thigh under the haunch, the gaskin back to the hock, the
+metatarsus sloping forward; each ends in a wide paw (4 rig voxels) split into
+three toes with a dark claw each, a team band at wrist and hock; the paws now
+stand on the ground (y 0). Rig `graze: false`. Captures: `eu_focus=sphinx`
+(idle / walk / attack / die), `eu_one=sphinx&eu_turn=40&eu_zoom=0.8&eu_pitch=32`,
+`eu_one=sphinx&eu_turn=80&eu_zoom=0.8&eu_pitch=30`.
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower
