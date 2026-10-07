@@ -773,6 +773,22 @@ func _temple_step(lots: Array) -> void:
 	_check("hovering the Sphinx: its tooltip names Bast, its stats (300 hp, attack, armor, pop) and Whirlwind", str(ui.tooltip.get("title", "")) == "Train Sphinx"
 		and sphl.contains("Bast") and sphl.contains("300 hp") and sphl.contains("attack") and sphl.contains("Armor") and sphl.contains("pop")
 		and sphl.contains("Whirlwind"), "%s %s" % [ui.tooltip.get("title", ""), ui.tooltip.get("lines", [])])
+	# the Siege Works' train tooltips (the lines its Q / W buttons show; this match
+	# never reaches one): a siege unit's two attacks, its crush per hit on a building
+	# (sim/civ crush_vs_building) and its damage on a unit, and Retold's attack
+	var stw: Dictionary = sim.get_unit_def("siege_tower")
+	var cat: Dictionary = sim.get_unit_def("catapult")
+	var stl := str(ui._train_stat_lines("siege_tower", 3))
+	var cal := str(ui._train_stat_lines("catapult", 3))
+	_check("the Siege Tower / Catapult tooltips: crush per hit on buildings, their damage on units, Retold's attack (180 crush ram + 3 x 3 pierce arrows; 200 crush + 40 pierce, area 8)",
+		stl.contains("vs buildings: %s crush per hit" % ui._num(snappedf(float(stw.get("crush_vs_buildings", -1.0)), 0.1))) and stl.contains("vs units: 9 hack")
+		and stl.contains("Retold attack: 180 crush ram vs buildings") and stl.contains("3 arrows × 3 pierce vs units")
+		and cal.contains("vs buildings: 200 crush per hit") and cal.contains("vs units: %s pierce" % ui._num(snappedf(float(cat.attack.damage), 0.1)))
+		and cal.contains("Retold attack: 200 crush + 40 pierce, area 8, range 10–28") and not stl.contains("crush attack") and not cal.contains("crush attack"),
+		"%s / %s" % [stl, cal])
+	# an Animal of Set's summon tooltip: Retold's speed / armor beside ours (Hyena: speed 4)
+	var hyl := str(ui._summon_lines({"type": "hyena_of_set", "pop": 1, "time": 4.0, "age": 1}))
+	_check("the Hyena of Set's summon tooltip: Retold's speed 4 beside ours", hyl.contains("Retold: speed 4"), hyl)
 	# the Temple's tech buttons: each Egyptian tech its own rendered 3D icon
 	# (egypt_tech_models.gd), not the generic scroll; and every one of the 36
 	var TI = load("res://game/ui/tech_icons.gd")

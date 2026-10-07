@@ -4497,6 +4497,31 @@ Owner: the ui piece. Reference: `reference/egypt/ui_01..05.jpg`.
   armor 15 % / 30 %" (his line gives no speed). egypt_playtest's Spearman
   hover asserts the Retold line. Verified (ui round 9): egypt_playtest
   54/54 (closest bust pair Spearman / Axeman 0.52), playtest 34/34.
+  Siege tooltips (ui round 10): a unit with sim/civ's `crush_vs_building`
+  (`get_unit_def` "crush_vs_buildings": the Siege Tower, the Catapult) has
+  two attacks in one, so `ui._train_stat_lines` gives them apart: "vs
+  buildings: 59.1 crush per hit, reach 1.8" / "vs units: 9 hack per hit"
+  (the Catapult: 200 crush per hit, range 16.8 / 42 pierce); the kind on a
+  unit is the armor it goes through (a projectile pierce, a blow hack), no
+  longer "crush" for any siege. `ui._retold_attack_note` adds Retold's
+  attack (the Retold line's part between hp and armor): always for siege
+  ("Retold attack: 180 crush ram vs buildings (ROF 3.5, range 3) + 3 arrows
+  × 3 pierce vs units (range 12)", "Retold attack: 200 crush + 40 pierce,
+  area 8, range 10–28, ROF 4"), for another unit only when its first
+  damage differs from ours (none today; not for the Pharaoh / Priests'
+  per-age numbers). A selected siege unit's card adds "59.1 crush per hit
+  on buildings" and the short Retold attack (no asides); the card's notes
+  wrap to it and a note that does not fit whole is left out (the tooltip
+  has it). The Animals of Set's summon tooltips carry the Retold line too
+  (Hyena "Retold: speed 4 · armor 20 % / 30 %"). The `egypt` scene's Ra
+  player gets his minor gods for the ages it set (`Techs::auto_minor`:
+  Bast, Sobek, Horus), so his Temple shows their myth units; the UI counts
+  a minor god as chosen only for an age the player has reached
+  (`ui._god_chosen`, the HUD's minor-gods list), so egyptui, which puts that
+  scene back to the Classical Age, still shows Bast's alone. The Camel
+  Rider's bust view is pitched 30 deg (the slimmer look round 41 rider
+  covered 29 % at 22 deg, 31 % now). egypt_playtest asserts the siege and
+  Hyena lines. Verified (ui round 10): egypt_playtest 56/56.
 - **Real-input playtest** (`game/core/egypt_playtest.gd`), launched with no
   scene argument like a player:
   ```

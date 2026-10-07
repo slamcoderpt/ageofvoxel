@@ -924,9 +924,16 @@ func _draw_info() -> void:
 					dx += 21 + wnm + 10
 				ty += 22
 			for t in info.get("notes", []):
-				# (an Egyptian unit's Retold numbers, ui._retold_note)
-				S.text(self, sans, Vector2(sx, ty + 14), str(t), 13, S.MUTED)
-				ty += 18
+				# (an Egyptian unit's Retold numbers, ui._retold_note / _retold_attack_note,
+				# a siege unit's crush on buildings), wrapped to the card
+				# (clipped at the panel's foot: the train tooltip has them in full)
+				# (a note whole or not at all, the task lines kept)
+				var wls := _wrap(sans, str(t).replace(" %", "\u00a0%"), 13, maxf(120.0, r.end.x - 14 - sx))
+				if ty + 17 * wls.size() > r.end.y - 4 - 20 * (info.get("tasks", []) as Array).size():
+					break
+				for wl in wls:
+					S.text(self, sans, Vector2(sx, ty + 14), str(wl), 13, S.MUTED)
+					ty += 17
 			for t in info.get("tasks", []):
 				S.text(self, title, Vector2(sx, ty + 14), str(t).to_upper(), 13, S.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, 0.85, 0.8)
 				ty += 20

@@ -24,6 +24,7 @@ SceneCtx egypt_scene_setup(Sim &sim) {
 	p.res[RES_FAVOR] = 0;
 	const CivStart st = sim.civs.egypt_start(PLAYER, starts[0], 5);
 	scenes::standard_start(sim, ENEMY, starts[1], 5);
+	sim.techs.auto_minor(PLAYER); // (his minor gods for the ages set above: Bast, Sobek, Horus; their myth units at the Temple)
 	const int tcb = sim.entities.building_slot(st.tc);
 	const BuildingStore &B = sim.entities.buildings;
 	const double tx = B.x[tcb], tz = B.z[tcb];

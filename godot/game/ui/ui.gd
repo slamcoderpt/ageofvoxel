@@ -1067,7 +1067,7 @@ func _egypt_hud_state() -> void:
 	var picked := []
 	for a in [1, 2, 3]:
 		var g := str(gods.get("minor", {}).get(a, ""))
-		if g != "":
+		if g != "" and a <= int(player.get("age", 0)):
 			picked.append("%s (%s)" % [str(EgyptIcons.MINOR.get(g, {}).get("name", g.capitalize())), AGES[a]])
 	hud_state["minor_gods"] = picked
 
@@ -1170,7 +1170,8 @@ func _summon_lines(m: Dictionary) -> Array:
 		"%d hp · %s hack attack · speed %s" % [int(round(float(d.get("hp", 0)))), _num(dmg), _num(float(d.get("speed", 0.0)))],
 		"Armor %d %% hack, %d %% pierce · %d pop · %s food" % [int(round(float(d.get("hack_armor", 0.0)) * 100)), int(round(float(d.get("pierce_armor", 0.0)) * 100)),
 			int(m.pop), _num(float(d.get("food", 0.0)))],
-		"Summoned in %s s · %s Age" % [_num(float(m.time)), AGES[clampi(int(m.age), 0, 3)]]]
+		"Summoned in %s s · %s Age" % [_num(float(m.time)), AGES[clampi(int(m.age), 0, 3)]]] \
+		+ ([_retold_note(d, float(d.get("speed", 0.0)))] if _retold_note(d, float(d.get("speed", 0.0))) != "" else [])
 
 ## The Roc (gods piece, sim/godpowers egypt_myth.cpp; EGYPT.md 5.2: a flying transport for
 ## 20, it lands 2 s to load or unload): with a Roc selected, Board (E) sends the other
@@ -1285,10 +1286,26 @@ func _train_stat_lines(t: String, age: int) -> Array:
 		hp = float(ba.hp[a])
 		dmg = float(ba.damage[a])
 		rng = float(ba.range[a])
-	var kind := "crush" if str(d.get("class", "")) == "siege" else "pierce" if str(atk.get("projectile", "")) != "" or rng > 2.0 else "hack"
-	var a_s := "no attack" if dmg <= 0.0 else "%s %s attack%s" % [_num(snappedf(dmg, 0.1)), kind, (", range %s" % _num(snappedf(rng, 0.1))) if rng > 2.0 else ""]
-	var out := ["%d hp · %s · speed %s" % [int(round(hp)), a_s, _num(snappedf(float(d.get("speed", 0.0)), 0.1))],
-		"Armor %d %% hack, %d %% pierce · %d pop" % [int(round(float(d.get("hack_armor", 0.0)) * 100)), int(round(float(d.get("pierce_armor", 0.0)) * 100)), int(d.get("pop", 1))]]
+	# (the kind this sim's armor takes it through: a projectile pierce, a blow hack;
+	# a siege unit's crush is its separate per-hit damage on a building, below)
+	var kind := "pierce" if str(atk.get("projectile", "")) != "" or rng > 2.0 else "hack"
+	var spd := _num(snappedf(float(d.get("speed", 0.0)), 0.1))
+	var out := []
+	var cvb := float(d.get("crush_vs_buildings", 0.0))
+	if cvb > 0.0:
+		# Siege Tower / Catapult: two attacks in one (sim/civ crush_vs_building):
+		# crush per hit on a building, its def damage on a unit
+		out.append("%d hp · speed %s" % [int(round(hp)), spd])
+		var reach := ("range %s" if rng > 2.0 else "reach %s") % _num(snappedf(rng, 0.1))
+		out.append("vs buildings: %s crush per hit, %s" % [_num(snappedf(cvb, 0.1)), reach])
+		out.append("vs units: %s %s per hit" % [_num(snappedf(dmg, 0.1)), kind])
+	else:
+		var a_s := "no attack" if dmg <= 0.0 else "%s %s attack%s" % [_num(snappedf(dmg, 0.1)), kind, (", range %s" % _num(snappedf(rng, 0.1))) if rng > 2.0 else ""]
+		out.append("%d hp · %s · speed %s" % [int(round(hp)), a_s, spd])
+	out.append("Armor %d %% hack, %d %% pierce · %d pop" % [int(round(float(d.get("hack_armor", 0.0)) * 100)), int(round(float(d.get("pierce_armor", 0.0)) * 100)), int(d.get("pop", 1))])
+	var ra := _retold_attack_note(d, dmg if not d.has("by_age") else -1.0)
+	if ra != "":
+		out.append(ra)
 	var rn := _retold_note(d, float(d.get("speed", 0.0)))
 	if rn != "":
 		out.append(rn)
@@ -1325,13 +1342,40 @@ func _retold_note(d: Dictionary, speed: float) -> String:
 		return ""
 	return "Retold: " + " · ".join(PackedStringArray(bits.map(func(b): return str(b))))
 
+## Retold's attack of an Egyptian unit where this sim's differs (sim/civ's
+## "retold" line, the part between its hp and its armor): a siege unit's
+## always (Retold's ram / arrows or crush + pierce, which this sim folds into
+## one attack: "Retold attack: 200 crush + 40 pierce, area 8, range 10–28,
+## ROF 4"), another unit's when its first damage number is not `dmg` (-1:
+## don't compare, the Pharaoh's / Priests' per-age numbers). "" otherwise.
+func _retold_attack_note(d: Dictionary, dmg: float) -> String:
+	var rt := str(d.get("retold", ""))
+	if rt == "":
+		return ""
+	var m := RegEx.create_from_string("\\d+(?:\\.\\d+)? hp[^,]*, (.+?), armor ").search(rt)
+	if not m:
+		return ""
+	var seg := m.get_string(1)
+	var siege := float(d.get("crush_vs_buildings", 0.0)) > 0.0 or str(d.get("class", "")) == "siege"
+	if not siege:
+		if dmg < 0.0:
+			return ""
+		var n := RegEx.create_from_string("^(\\d+(?:\\.\\d+)?) (hack|pierce|crush)").search(seg)
+		if not n or absf(float(n.get_string(1)) - dmg) < 0.05:
+			return ""
+		seg = n.get_string(0)
+	seg = seg.replace(" x ", " × ").replace("-", "–")
+	return "Retold attack: " + seg
+
 ## Is `god` one of the minor gods the player has chosen?
 func _god_chosen(god: String) -> bool:
 	if not sim.has_method("get_gods"):
 		return false
 	var minor: Dictionary = sim.get_gods(me).get("minor", {})
+	# (an age he has reached: a scene / harness that set a later age's god, then
+	# put him back, has not chosen it yet; in play he picks it at the age-up)
 	for k in minor:
-		if str(minor[k]) == god:
+		if str(minor[k]) == god and int(k) <= int(player.get("age", 0)):
 			return true
 	return false
 
@@ -1800,9 +1844,20 @@ func _info_for() -> Dictionary:
 		if los > 0:
 			d.stats.append(["eye", _num(snappedf(los, 0.1)), "LOS"])
 		# an Egyptian unit: Retold's numbers where this sim's scaled ones differ
+		var notes := []
+		if float(ud.get("crush_vs_buildings", 0.0)) > 0.0:
+			# (a Siege Tower / Catapult: the sword above is its damage on a unit)
+			var cvb := float(ud.crush_vs_buildings) * (dmg / maxf(0.001, float(atk.get("damage", 1.0))))
+			notes.append("%s crush per hit on buildings" % _num(snappedf(cvb, 0.1)))
+		var anote := _retold_attack_note(ud, -1.0 if ud.has("by_age") else float(atk.get("damage", 0.0)))
+		if anote != "":
+			# (the card's short form: no "(ROF 3.5, range 3)" asides; the train tooltip has them)
+			notes.append(RegEx.create_from_string(" \\([^)]*\\)").sub(anote, "", true))
 		var rnote := _retold_note(ud, float(ud.get("speed", 0)))
 		if rnote != "":
-			d["notes"] = [rnote]
+			notes.append(rnote)
+		if not notes.is_empty():
+			d["notes"] = notes
 		# carried goods and the current task, from the unit arrays
 		var u := units()
 		var ids: PackedInt32Array = u.ids

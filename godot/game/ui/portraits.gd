@@ -40,7 +40,7 @@ const BUST_VIEW := {
 	"rhino_of_set": [62.0, 12.0, "whole"],
 	"elephant_of_set": [78.0, 10.0, "whole"],
 	"mercenary_cavalry": [62.0, 12.0, "fore"],
-	"camel_rider": [60.0, 22.0, "neck"],
+	"camel_rider": [60.0, 30.0, "neck"],  # (pitch 30: the look round 41 rider, slimmer, fills 31 % of the tile, 29 % at 22)
 }
 
 ## Parts a bust also frames (and shows, when the card portrait hides them): the
