@@ -12,9 +12,9 @@
 //   Vision          an Eye of Horus and a column of cyan light at its heart; the reveal's edge a
 //                   thick band under swirling rings and streaks racing out to 42 tiles, kicking up
 //                   sand; everything it passes flashes, the revealed enemy keeps a cyan rim
-//   Eclipse         the world sunk in a deep blue dusk (egypt_fx.gd); one hard-edged magenta disc
-//                   where it lands with rings running out from it; each of the caster's myth units
-//                   lit as a ring reaches it: a magenta ring under it, a pink glow on its head,
+//   Eclipse         whole-map: the world turned to blue moonlight (egypt_fx.gd); every one of the
+//                   caster's myth units lights at once with a ring pulsing out from under it, then
+//                   wears a magenta ring under it, a pink glow on its head,
 //                   streaks rising up it, an eclipse corona over its health bar
 //   Shifting Sands  sand vortices at both ends: a sand swirl on the ground, sand spiralling
 //                   up, grains whirling, a burst at the destination when the units arrive
@@ -526,15 +526,15 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 		if (!L.empty()) emit_lines(vg, L, 1);
 	}
 
-	// ---- Eclipse: one mark where it lands, rings out from it, a sign on every empowered myth unit ----
-	// (round 19) One strong shape with a clear centre, edge and job, apart from the melee's hit
-	// sparks: a single hard-edged magenta disc with a bright rim on the ground at its centre (the
-	// caster's densest myth group, sim TimedPower x / z), 7 tiles across its radius; rings travelling
-	// out from it for the first 8 s; one core flash at the centre at the cast. Each of the caster's
-	// myth units lights as the first ring reaches it and then wears, for the whole 55 s, the
-	// empowered side's marker: a magenta ring under it, a soft pink glow on its head (power_05), a
-	// few magenta streaks rising up its body (all one way: up, a buff) and a magenta eclipse corona
-	// (a ring with eight rays) over its health bar. Nothing is drawn on the enemy.
+	// ---- Eclipse: a whole-map power: the light itself is the sign, then every empowered myth unit ----
+	// (round 20) Retold's Eclipse is whole-map, so nothing local marks a centre: the frame turns to
+	// blue moonlight everywhere (egypt_fx.gd / egypt_grade*.gdshader, eased in over 2.5 s) and, as the
+	// light goes, every one of the caster's myth units across the map lights at once (a small hashed
+	// stagger, 0..0.4 s): one moonlit ring pulsing out from under it. It then wears, for the whole
+	// 55 s, the empowered side's marker: a magenta ring under it, a soft pink glow on its head
+	// (power_05), a few magenta streaks rising up its body (all one way: up, a buff) and a magenta
+	// eclipse corona (a ring with eight rays) over its health bar. Nothing is drawn on the enemy.
+	// (The sim's TimedPower x / z, the caster's densest myth group, is kept for the capture framing.)
 	double ecl_k = 0;
 	if (G.eclipse.until > now - 3) {
 		ecl_k = clamp01((now - G.eclipse.t0) / 2.5) * clamp01((G.eclipse.until + 3 - now) / 3.0);
@@ -542,27 +542,6 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 		const int o = G.eclipse.owner;
 		const double age = now - G.eclipse.t0;
 		const Lin mg = hex_lin(0xff28c8), pk = hex_lin(0xff6ad8);
-		const double ex = G.eclipse.x, ez = G.eclipse.z, eg0 = h_at(ex, ez);
-		constexpr double R = 7.0, RING_V = 9.0, RING_LIFE = 3.2;
-		// the mark: in hard over 0.35 s, held 8 s, gone by 12 s
-		const double mk = sstep(0, 0.35, age) * (1 - sstep(8, 12, age)) * end_k;
-		if (mk > 0.005) {
-			decal(I_DECAL_ADD, ex, eg0 + 0.1, ez, 2 * R, now * 0.12, mg.r, mg.g, mg.b, (float)(1.0 * mk), 10, 0.035f, (float)now);
-			lit(ex, eg0 + 2.5, ez, 0xff40d0, 5 * mk, 12, 1.5);
-		}
-		// rings travelling out from the centre: one every 1 s for the first 8 s
-		for (int i = 0; i < 8; i++) {
-			const double ra = age - i * 1.0;
-			if (ra < 0 || ra > RING_LIFE) continue;
-			const double r = R * 0.35 + ra * RING_V, f = 1 - ra / RING_LIFE;
-			decal(I_DECAL_ADD, ex, eg0 + 0.12, ez, 2 * r, 0, mg.r, mg.g, mg.b, (float)(2.2 * f * f * end_k), 2, (float)std::max(0.0, 1 - 0.9 / r));
-		}
-		// one core flash at the centre as it lands
-		if (age < 1.2) {
-			const double fk = (1 - age / 1.2) * (1 - age / 1.2);
-			glow(false, ex, eg0 + 1.0, ez, 4.5, 4.5, pk.r, pk.g, pk.b, 1.2 * fk, 0);
-			lit(ex, eg0 + 3, ez, 0xffa0ec, 40 * fk, 22, 1.5);
-		}
 		// the empowered: every myth unit of the caster
 		std::vector<Line> L;
 		int n = 0;
@@ -572,11 +551,17 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 			double x, z;
 			upos(u, x, z);
 			const double h = type_height(U.type[u]), g0 = h_at(x, z), gy = g0 + U.air_y[u];
-			// lit when the first ring reaches it
-			const double ton = std::max(0.0, std::hypot(x - ex, z - ez) - R * 0.35) / RING_V;
+			// lit all at once across the map as the light goes (a small hashed stagger)
+			const double ton = 0.6 + 0.4 * hr(u, 0, 50);
 			const double kk = sstep(ton, ton + 0.25, age) * end_k;
 			if (kk <= 0.005) continue;
 			const double fl = age > ton && age < ton + 0.7 ? 1 - (age - ton) / 0.7 : 0;
+			// the moonlit ring pulsing out from under it as it lights
+			const double pa = age - ton;
+			if (pa >= 0 && pa < 1.4) {
+				const double pr = 1.3 + pa * 2.2, pf = 1 - pa / 1.4;
+				decal(I_DECAL_ADD, x, g0 + 0.12, z, 2 * pr, 0, mg.r, mg.g, mg.b, (float)(1.6 * pf * pf * end_k), 2, (float)std::max(0.0, 1 - 0.5 / pr));
+			}
 			// the ring under it (hard edge, bright rim, faint fill)
 			decal(I_DECAL_ADD, x, g0 + 0.13, z, 2.6, now * 0.5 + u, mg.r, mg.g, mg.b, (float)(0.8 * kk + 1.2 * fl), 10, 0.04f, (float)now);
 			// the soft pink glow on its head (power_05), kept small: a tint, not a flare

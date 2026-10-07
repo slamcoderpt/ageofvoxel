@@ -347,10 +347,19 @@ func _storm_light(k: float) -> void:
 	var bars_k := k
 	var fog_col := Color.hex(0x141a2cff)
 	var dim := 1.0
+	var vig := 0.55
+	var sand_to := -1.0
+	var sat_to := -1.0
+	var expo := 1.0
 	if egypt != null and egypt.light_k > k:
 		k = egypt.light_k
 		fog_col = egypt.light_fog
 		dim = egypt.light_dim
+		if egypt.light_vignette >= 0.0:
+			vig = egypt.light_vignette
+		sand_to = egypt.light_sand
+		sat_to = egypt.light_sat
+		expo = egypt.light_exposure
 	var items := []
 	if lp.get("sun"):
 		items.append([lp.sun, "light_energy", 0.66])
@@ -368,10 +377,15 @@ func _storm_light(k: float) -> void:
 		_ease(env, "fog_light_color", fb.lerp(fog_col, k))
 	var gr = lp.get("grade")
 	if gr != null:
-		_ease(gr, "vignette", lerpf(_base(gr, "vignette"), 0.55, k))
+		_ease(gr, "vignette", lerpf(_base(gr, "vignette"), vig, k))
 		_ease(gr, "top_haze", lerpf(_base(gr, "top_haze"), 0.0, k))
 		_ease(gr, "floor_value", lerpf(_base(gr, "floor_value"), 0.0, k))
-		_ease(gr, "saturation", lerpf(_base(gr, "saturation"), _base(gr, "saturation") * 1.08, k))
+		var sat_b: float = _base(gr, "saturation")
+		_ease(gr, "saturation", lerpf(sat_b, sat_b * 1.08 if sat_to < 0.0 else sat_to, k))
+		var sand_b: float = _base(gr, "sand_amt")
+		_ease(gr, "sand_amt", lerpf(sand_b, sand_b if sand_to < 0.0 else sand_to, k))
+		var exp_b: float = _base(gr, "grade_exposure")
+		_ease(gr, "grade_exposure", lerpf(exp_b, exp_b * expo, k))
 	var combat = game.pieces.get("combat")
 	if combat != null:
 		var bars: Node3D = combat.get_node_or_null("HealthBars")

@@ -2,8 +2,8 @@ extends Node3D
 ## The Egyptian powers' own nodes (child of godpowers.gd, which draws everything else of
 ## theirs from AovGodpowerView: godpower_view_egypt.cpp). Fed once a frame with the view's
 ## "egypt" state:
-##   - the full-frame grade (egypt_grade.gdshader): Bast's Eclipse sinks the world in a deep
-##     blue dusk, Ra's Rain washes it cool grey with drifting cloud shadows; both dim the sun
+##   - the full-frame grade (egypt_grade.gdshader + its additive half egypt_grade_add): Bast's
+##     Eclipse turns the world to blue moonlight (power_05), Ra's Rain washes it cool grey with drifting cloud shadows; both dim the sun
 ##     and sky through godpowers.gd _storm_light (light_k / light_dim / light_fog);
 ##   - Ra's rainbow (rainbow.gdshader) arching over the caster's Town Center, turned to the
 ##     camera;
@@ -22,13 +22,22 @@ var gp: Node = null
 var light_k := 0.0           # how much the Egyptian powers dim the lights (0..1)
 var light_dim := 1.0         # the dimming's strength factor (godpowers.gd _storm_light)
 var light_fog := Color.hex(0x141a2cff)
+## (the Eclipse) the lighting grade's vignette / sand-tint / saturation targets while it
+## dominates the light (godpowers.gd _storm_light); -1 = the storm's own (vignette 0.55)
+var light_vignette := -1.0
+var light_sand := -1.0
+var light_sat := -1.0
+var light_exposure := 1.0    # x the lighting grade's display exposure (moonlight: lifted)
 
 var _grade: MeshInstance3D
 var _grade_mat: ShaderMaterial
+var _grade_add: MeshInstance3D
+var _grade_add_mat: ShaderMaterial
 var _rainbow: MeshInstance3D
 var _rainbow_mat: ShaderMaterial
 var _funnels := {}           # tornado id -> {root, mats}
 var _citadels := {}          # Town Center id -> MeshInstance3D (the Citadel's fortress)
+const ECLIPSE_DIM := 0.1    # light_dim under the Eclipse: sun x0.93, sky / ambient x0.97
 const CITADEL_MODEL_W := 7.0 # the model's footprint (tiles): the Egyptian Town Center's
 
 func setup(godpowers: Node) -> void:
@@ -46,6 +55,17 @@ func setup(godpowers: Node) -> void:
 	_grade.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_grade.visible = false
 	add_child(_grade)
+	_grade_add_mat = ShaderMaterial.new()
+	_grade_add_mat.shader = load("res://game/godpowers/egypt_grade_add.gdshader")
+	_grade_add_mat.render_priority = 10
+	_grade_add = MeshInstance3D.new()
+	_grade_add.name = "EG_GradeAdd"
+	_grade_add.mesh = fq
+	_grade_add.material_override = _grade_add_mat
+	_grade_add.extra_cull_margin = 16384.0
+	_grade_add.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_grade_add.visible = false
+	add_child(_grade_add)
 	_rainbow_mat = ShaderMaterial.new()
 	_rainbow_mat.shader = load("res://game/godpowers/rainbow.gdshader")
 	_rainbow_mat.render_priority = 20
@@ -70,14 +90,27 @@ func frame(eg: Dictionary, now: float) -> void:
 		_grade_mat.set_shader_parameter("time", now)
 		if rk > 0.0:
 			_grade_mat.set_shader_parameter("plane_y", float(rain.get("y", 0.0)))
+	_grade_add.visible = ecl > 0.0
+	if ecl > 0.0:
+		_grade_add_mat.set_shader_parameter("eclipse_k", ecl)
 	if ecl >= rk * 0.55:
+		# moonlight, not night: the sun only dimmed by about a third (the grade's blue
+		# multiply does the rest), a blue-grey fog, a soft vignette, no warm sand tint
 		light_k = ecl
-		light_dim = 1.15
-		light_fog = Color.hex(0x1a1c3cff)
+		light_dim = ECLIPSE_DIM
+		light_fog = Color.hex(0x5a6c8cff)
+		light_vignette = 0.22
+		light_sand = 0.0
+		light_sat = 0.8
+		light_exposure = 1.18
 	else:
 		light_k = rk * 0.55
 		light_dim = 0.7
 		light_fog = Color.hex(0x5a646eff)
+		light_vignette = -1.0
+		light_sand = -1.0
+		light_sat = -1.0
+		light_exposure = 1.0
 	# the rainbow: over the caster's home, turned to face the camera
 	_rainbow.visible = rk > 0.02
 	if _rainbow.visible:

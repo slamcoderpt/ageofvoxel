@@ -3755,7 +3755,7 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   earlier 0xff9a10 / 0xffc040 added at HDR strength came out as a pinkish lighter sand. A soft
   light pool (decal_add kind 8, no built-in hue) replaces the strike-flash disc (kind 1, which has
   a violet rim) under the mines and under the chain lightning's hits; Vision's swirling white edge and Eye of Horus; the
-  Eclipse's blue dusk and its mark (below); sand vortices; glyph rings and rising serpents / Minions;
+  Eclipse's blue moonlight and its empowered myth units (below); sand vortices; glyph rings and rising serpents / Minions;
   voxel locust clouds; the Citadel's pillar and heaving stones; the Son of Osiris' pillar, ring
   and gold chain lightning (its own ribbon group G_ARC, a linear gold kept below where AgX
   bleaches a saturated orange to pink, layered like the Lightning Storm's bolts: a tapering
@@ -3779,6 +3779,26 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   power=eclipse draws the Greek line 7 tiles further east, so at the default t=4 the Sphinxes
   stand in the mark clear of the melee. egypt_gods_check `eclipse.myth_and_favor` asserts the
   mark lands on the Sphinx (cast at 0, 0).
+- **The Eclipse is blue moonlight, whole-map** (gods round 20; supersedes round 19's mark):
+  the old grade multiplied the frame by (0.30, 0.34, 0.62) on top of a near-black sun
+  (light_dim 1.15, fog 0x1a1c3c), so warm sand came out a dark brown (t=20 mean RGB 36,28,23).
+  Now, as Retold's power_05 (blue moonlit ground, mean about 105,124,149): egypt_grade.gdshader
+  multiplies by MOON (0.20, 0.50, 1.00) (red cut, blue kept: sand turns blue-grey instead of
+  darker), a soft 22 % vignette and a faint rose band low on the frame;
+  egypt_grade_add.gdshader (new, blend_add, priority 10) lifts the shade by (0.012, 0.04, 0.12)
+  linear so shadows read blue-grey, not black; egypt_fx.gd dims the lights only a little
+  (ECLIPSE_DIM 0.1), a blue-grey fog 0x5a6c8c, and through godpowers.gd `_storm_light` eases the
+  lighting grade's vignette to 0.22, `sand_amt` to 0 (its warm pale-stone tint would undo the
+  moonlight), saturation to 0.8 and `grade_exposure` x1.18 (egypt_fx `light_vignette /
+  light_sand / light_sat / light_exposure`; -1 / 1 keep the storm's own easing, so the Lightning
+  Storm and Ra's Rain are unchanged). Measured on `--scene egypt_powers --params
+  "power=eclipse&t=20"` 1280x720: mean RGB 98,120,147 (t=4: 100,121,147), open sand
+  112,135,157 / 96,121,146 / 120,142,171, blue the highest channel; t=60 (faded) back to day
+  (160,134,104). The 7-tile disc, its travelling rings and the core flash are gone (Retold's
+  Eclipse has no centre): as the light goes every one of the caster's myth units anywhere on the
+  map lights at once (0.6..1.0 s, hashed) with a moonlit ring pulsing out from under it, then wears
+  the round 19 marker (ground ring, head glow, rising streaks, corona). `TimedPower::x / z` is
+  still filled (the capture framing; egypt_gods_check `eclipse.myth_and_favor`).
 - **Horus' Tornado funnel** (round 12: egypt_fx.gd `_make_funnel`, tornado.gdshader `mode`):
   a value structure instead of a pale haze. The body (mode 1, the ring mesh's outer face;
   the meshes wind so that is the *back* face) is fully opaque except at its silhouette (a dark

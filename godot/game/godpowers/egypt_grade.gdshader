@@ -1,7 +1,11 @@
 // The Egyptian powers' full-frame grade, multiplicative (dst * m), drawn after the opaque
 // world like the storm grade (game/godpowers/egypt_fx.gd):
-//   eclipse_k  Bast's Eclipse: the world sunk in a deep blue dusk, darker towards the frame's
-//              edges, a faint rose band low on the frame where the corona's light spills
+//   eclipse_k  Bast's Eclipse: blue moonlight. A per-channel multiply that keeps the green and
+//              lifts the blue while it cuts the red (warm sand turns a pale moonlit blue-grey
+//              instead of a dark brown; nothing is crushed: the sun is only dimmed a little,
+//              egypt_fx.gd light_dim), a soft vignette and a faint rose band low on the frame
+//              where the corona's light spills. Its additive half, a blue lift of the shade so
+//              shadows read blue-grey and not black, is egypt_grade_add.gdshader.
 //   rain_k     Ra's Rain: a cool grey-green wash with cloud shadows drifting over the ground
 //              (world space: each pixel's view ray meets the ground plane plane_y)
 shader_type spatial;
@@ -9,6 +13,9 @@ render_mode unshaded, blend_mul, depth_draw_never, depth_test_disabled, cull_dis
 #include "res://game/godpowers/storm_common.gdshaderinc"
 
 uniform float eclipse_k = 0.0;
+const float MOON_R = 0.2;
+const float MOON_G = 0.5;
+const float MOON_B = 1.0;
 uniform float rain_k = 0.0;
 uniform float plane_y = 0.0;
 uniform float time = 0.0;
@@ -33,9 +40,9 @@ void fragment() {
 		m *= mix(vec3(1.0), wet, rain_k);
 	}
 	if (eclipse_k > 0.0) {
-		vec3 dusk = vec3(0.30, 0.34, 0.62) * (1.0 - 0.5 * smoothstep(0.45, 1.35, vg));
-		float rose = exp(-pow((suv.y - 0.08) / 0.18, 2.0)) * 0.25;
-		dusk += vec3(0.32, 0.08, 0.22) * rose;
+		vec3 dusk = vec3(MOON_R, MOON_G, MOON_B) * (1.0 - 0.22 * smoothstep(0.55, 1.4, vg));
+		float rose = exp(-pow((suv.y - 0.08) / 0.18, 2.0)) * 0.18;
+		dusk += vec3(0.30, 0.04, 0.16) * rose;
 		m *= mix(vec3(1.0), dusk, eclipse_k);
 	}
 	ALBEDO = m;
