@@ -1021,6 +1021,10 @@ func egypt() -> bool:
 
 ## A building's def with my civ's cost, trains, min age and hotkey (cached per match).
 ## The Egyptian buildings with no Greek counterpart (sim/civ: Retold's hp x1.25).
+## Retold's hp of the Egyptian grid's shared-type buildings (EGYPT.md 2), said
+## next to this sim's number on the build tooltip when the two differ
+const EGYPT_RETOLD_HP := {"town_center": "2400, Fortified 3000", "house": "450", "farm": "200", "temple": "1200",
+	"armory": "1200", "market": "1200", "tower": "600"}
 const EGYPT_ONLY_BUILDINGS := ["granary", "lumber_camp", "mining_camp", "obelisk", "eg_barracks", "migdol", "siege_works",
 	"monument_villagers", "monument_soldiers", "monument_priests", "monument_pharaohs", "monument_gods"]
 
@@ -1088,11 +1092,17 @@ func _egypt_build_cmd(t: String, key: String, slot: int) -> Dictionary:
 			"Empowered: more favor (%s: +%d %%)." % [str(cs.get("god", "ra")).capitalize(), int(round(float(cs.get("empower_favor", 0.2)) * 100))]]
 	var bt := float(d.get("build_time_one", 0.0))
 	var hp_s := "%d hp" % int(round(float(d.get("hp", 0))))
-	if real in EGYPT_ONLY_BUILDINGS:
+	if EGYPT_RETOLD_HP.has(real):
+		# this sim's hp where it differs from Retold's (EGYPT.md 2: the Town Center's
+		# 3000 is Retold's Fortified one, x1.25 its 2,400)
+		if int(round(float(d.get("hp", 0)))) != str(EGYPT_RETOLD_HP[real]).get_slice(",", 0).to_int():
+			hp_s += " (Retold %s)" % str(EGYPT_RETOLD_HP[real])
+	elif real in EGYPT_ONLY_BUILDINGS:
 		# this sim's buildings are Retold's hp x1.25 (sim/civ civ.h: the Town
 		# Center's 3000 / 2400); the Egyptian-only ones say Retold's number too
 		hp_s += " (Retold %d)" % int(round(float(d.get("hp", 0)) / 1.25))
-	lines.append("%s · %s Age%s" % [hp_s, AGES[clampi(int(d.get("min_age", 0)), 0, 3)], " · %d s for one builder" % int(round(bt)) if bt > 0.0 else ""])
+	var bt_s := " · %d s for one builder" % int(round(bt)) if bt > 0.0 else ""
+	lines.append("%s · %s Age%s" % [hp_s, AGES[clampi(int(d.get("min_age", 0)), 0, 3)], bt_s])
 	c["lines"] = lines
 	if real == "wall":
 		c.title = "Build Wall"
@@ -1103,8 +1113,9 @@ func _egypt_build_cmd(t: String, key: String, slot: int) -> Dictionary:
 	elif real == "tower":
 		var tw: Dictionary = _fort.get("tower", {})
 		c.title = "Build %s" % str(_fort.get("tower_name", d.get("name", "Tower")))
+		var thp := int(tw.get("hp", d.get("hp", 0)))
 		c.lines = ["Shoots arrows at enemies in range %s." % _num(tw.get("range", 10)),
-			"%d hp · %s Age" % [int(tw.get("hp", d.get("hp", 0))), AGES[clampi(int(d.get("min_age", 0)), 0, 3)]]]
+			"%d hp%s · %s Age%s" % [thp, " (Retold 600)" if thp != 600 else "", AGES[clampi(int(d.get("min_age", 0)), 0, 3)], bt_s]]
 	return c
 
 ## The Egyptian units' commands: the Laborers' build grid, a Priest's Obelisk,

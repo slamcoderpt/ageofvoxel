@@ -638,17 +638,27 @@ func _set_match() -> void:
 	for c in sums:
 		var t := str(c.arg[1])
 		var img: Image = (c.tex as Texture2D).get_image() if c.get("tex") != null else null
-		var cover := 0
-		if img != null:
-			for y in range(0, img.get_height(), 4):
-				for x in range(0, img.get_width(), 4):
-					if img.get_pixel(x, y).a > 0.5:
-						cover += 1
+		var fl := _bust_fill(img)
 		var hsh: int = hash(img.get_data()) if img != null else 0
-		if VoxelModels.rig(t).is_empty() or img == null or cover < 20 or seen.has(hsh):
-			bad.append("%s (cover %d)" % [t, cover])
+		var fills: bool = fl.ok
+		if VoxelModels.rig(t).is_empty() or img == null or not fills or seen.has(hsh):
+			bad.append("%s (%s)" % [t, fl.desc])
 		seen[hsh] = t
-	_check("Set: each summon has its own rendered icon (8 distinct voxel portraits)", bad.is_empty() and sums.size() == 8, str(bad))
+	_check("Set: each summon has its own rendered icon (8 distinct voxel busts, each filling its tile)", bad.is_empty() and sums.size() == 8, str(bad))
+	# every Egyptian unit's and myth unit's button bust (portraits.gd bust()) fills its tile
+	var names: PackedStringArray = sim.unit_type_names()
+	var eg_types := []
+	for i in range(maxi(names.find("laborer"), 0), names.size()):
+		eg_types.append(names[i])
+	var texs := eg_types.map(func(t): return ui._portraits.bust(t, 1))
+	await _frames(12)
+	var loose := []
+	for i in eg_types.size():
+		var bt: Texture2D = texs[i]
+		var fb := _bust_fill(bt.get_image() if bt != null else null)
+		if not fb.ok:
+			loose.append("%s (%s)" % [eg_types[i], fb.desc])
+	_check("every Egyptian unit's button bust fills its tile (%d busts)" % eg_types.size(), loose.is_empty() and eg_types.size() >= 30, str(loose))
 	var keys_seen := {}
 	var dup := []
 	for c in ui.commands:
@@ -780,3 +790,28 @@ func _finish() -> void:
 	print("EGYPTPLAY clicks %d, keys %d" % [clicks, keys])
 	print("EGYPTPLAY_RESULT %s" % JSON.stringify({"passed": passes, "failed": fails, "steps": result}))
 	quit(fails.size())
+
+## (ui round 7) a button bust fills its tile: >= 30 % of the samples (every 4th
+## pixel) opaque and the opaque pixels spanning >= 80 % of its width and of its
+## height, so a full-body model shrunk to a sliver (round 6's crocodile: 11 %,
+## a thin streak) fails.
+func _bust_fill(img: Image) -> Dictionary:
+	if img == null:
+		return {"ok": false, "desc": "no image"}
+	var cover := 0
+	var n := 0
+	var bx0 := 9999
+	var bx1 := -1
+	var by0 := 9999
+	var by1 := -1
+	for y in range(0, img.get_height(), 4):
+		for x in range(0, img.get_width(), 4):
+			n += 1
+			if img.get_pixel(x, y).a > 0.5:
+				cover += 1
+				bx0 = mini(bx0, x)
+				bx1 = maxi(bx1, x)
+				by0 = mini(by0, y)
+				by1 = maxi(by1, y)
+	var ok := cover >= n * 0.3 and (bx1 - bx0 + 4) >= img.get_width() * 0.8 and (by1 - by0 + 4) >= img.get_height() * 0.8
+	return {"ok": ok, "desc": "cover %d/%d, span %dx%d" % [cover, n, bx1 - bx0 + 4, by1 - by0 + 4]}

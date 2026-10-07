@@ -33,7 +33,12 @@ func unit(type: String, owner: int) -> Texture2D:
 func bust(type: String, owner: int) -> Texture2D:
 	var key := "ub:%s:%d" % [type, owner]
 	if not _cache.has(key):
-		_cache[key] = _render(_unit_object(type, owner), true)
+		var obj := _unit_object(type, owner)
+		# the hired Mercenaries are seen from their left (shield side), so their busts
+		# do not repeat the Spearman's / the cavalry's from the same angle
+		if type.begins_with("mercenary"):
+			obj.set_meta("bust_mirror", true)
+		_cache[key] = _render(obj, true)
 	return _cache[key]
 
 func building(type: String, owner: int) -> Texture2D:
@@ -153,6 +158,7 @@ func _unit_object(type: String, owner: int) -> Node3D:
 		mi.transform = t
 		if str(p.name) == "weapon":
 			mi.set_meta("weapon", true)
+		mi.set_meta("part", str(p.name))
 		root.add_child(mi)
 	return root
 
@@ -181,9 +187,12 @@ func _render(obj: Node3D, bust := false) -> Texture2D:
 	var body := AABB()
 	var first := true
 	var first_body := true
+	var parts := {}  # part name -> its AABB (the bust's focus, _bust_focus)
 	for c in obj.get_children():
 		if c is MeshInstance3D and c.mesh:
 			var b: AABB = c.transform * c.mesh.get_aabb()
+			if c.has_meta("part"):
+				parts[str(c.get_meta("part"))] = b
 			box = b if first else box.merge(b)
 			first = false
 			if not c.has_meta("weapon"):
@@ -199,8 +208,10 @@ func _render(obj: Node3D, bust := false) -> Texture2D:
 	cam.near = 0.01
 	cam.far = 100.0
 	vp.add_child(cam)
+	if obj.has_meta("bust_mirror"):
+		parts["_mirror"] = AABB()
 	if bust and not first_body:
-		_frame_bust(cam, body)
+		_frame_bust(cam, obj, body, parts)
 		cam.current = true
 		return vp.get_texture()
 	var ctr := box.get_center()
@@ -210,34 +221,182 @@ func _render(obj: Node3D, bust := false) -> Texture2D:
 	cam.current = true
 	return vp.get_texture()
 
-## The bust framing (bust()): a standing figure (taller than wide) cropped to
-## its top 40 % (head and shoulders, the head high in the frame), a beast, a
-## rider or a machine to its front 70 %; seen from the front-right, a little
-## above eye level, the crop filling ~95 % of the frame.
-func _frame_bust(cam: Camera3D, body: AABB) -> void:
+## The bust framing (bust()): a FOCUS box (_bust_focus: a man's head and
+## shoulders, a beast's head, a rider's head and chest over his mount's head, a
+## bird's head and breast, a machine's working top) is fitted to the frame from
+## the model's real voxels, not from boxes: every vertex inside the focus is
+## projected on the view plane and an orthographic camera is sized to their 2D
+## bounds (~94 % of the frame). A long subject (a crocodile's snout, a bird's
+## spread wings) may run out of the frame on its long side (at most a quarter of
+## it), the window kept on the head (ANCHOR). Beasts and machines try a few 3/4
+## views (yaw 25-65 deg, pitch 18-34 deg from the front-right) and keep the one
+## whose subject fills the tile most; men keep the classic front-right 3/4. The
+## rest of the model renders and runs out of the frame behind (a bust, not a
+## shrunken full figure).
+func _frame_bust(cam: Camera3D, obj: Node3D, body: AABB, parts := {}) -> void:
 	var tall := body.size.y > maxf(body.size.x, body.size.z) * 1.2
-	var crop := body
-	var dir := Vector3(0.62, 0.3, 1.0).normalized()
-	if tall:
-		var h := body.size.y * 0.4
-		crop = AABB(Vector3(body.position.x, body.end.y - h, body.position.z), Vector3(body.size.x, h, body.size.z))
+	var crop := _bust_focus(body, parts)
+	var anchor: AABB = crop
+	if parts.has("head"):
+		anchor = parts.head
+	elif parts.has("neck"):
+		anchor = parts.neck
+	var grow := crop.grow(maxf(crop.size.length() * 0.02, 0.01))
+	# the voxels inside the focus (world space)
+	var pts := PackedVector3Array()
+	for c in obj.get_children():
+		if not (c is MeshInstance3D) or c.mesh == null:
+			continue
+		var xf: Transform3D = c.transform
+		for si in c.mesh.get_surface_count():
+			var arr: Array = c.mesh.surface_get_arrays(si)
+			var vs: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+			for v in vs:
+				var w: Vector3 = xf * v
+				if grow.has_point(w):
+					pts.append(w)
+	if pts.is_empty():
+		for k in 8:
+			pts.append(crop.get_endpoint(k))
+	var man := parts.has("head") and parts.has("torso") and not parts.has("body") and not parts.has("coil")
+	var dirs: Array[Vector3] = []
+	if man:
+		dirs.append(Vector3(0.62, 0.3, 1.0).normalized())
 	else:
-		# the front of a long body (+z: where the unit looks) and its upper part
-		var d := body.size.z * 0.7
-		var h2 := body.size.y * 0.8
-		crop = AABB(Vector3(body.position.x, body.end.y - h2, body.end.z - d), Vector3(body.size.x, h2, d))
-		dir = Vector3(0.85, 0.42, 1.0).normalized()
-	var ctr := crop.get_center()
-	# the crop's extent across the view: its widest projected half-size
-	var half := 0.0
+		for pitch in [18.0, 26.0, 34.0]:
+			# (a machine also from nearer the side, so a throwing arm reads in profile)
+			for yaw in ([55.0, 65.0, 75.0] if parts.has("frame") and parts.has("weapon") else [25.0, 35.0, 45.0, 55.0, 65.0]):
+				var py := deg_to_rad(pitch)
+				var yw := deg_to_rad(yaw)
+				dirs.append(Vector3(sin(yw) * cos(py), sin(py), cos(yw) * cos(py)))
+	var mirror := parts.has("_mirror")
+	var best := {}
+	for d0 in dirs:
+		var dir: Vector3 = d0
+		if mirror:
+			dir.x = -dir.x
+		var f := _fit_view(dir, pts, anchor)
+		# a little preference for the classic 40-deg 3/4 (yaw 35-45, pitch 26)
+		var score: float = f.fill + (0.03 if absf(d0.y - sin(deg_to_rad(26.0))) < 0.01 and d0.x > 0.55 and d0.x < 0.7 else 0.0)
+		if best.is_empty() or score > float(best.score):
+			best = f
+			best.score = score
+			best.dir = dir
+	var bd: Vector3 = best.dir
+	var right := Vector3.UP.cross(bd).normalized()
+	var up := bd.cross(right).normalized()
+	var ctr: Vector3 = right * float(best.cx) + up * float(best.cy)
+	var depth := 0.0
+	for p in pts:
+		depth = maxf(depth, p.dot(bd))
+	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+	cam.keep_aspect = Camera3D.KEEP_HEIGHT
+	cam.size = float(best.size)
+	var dist := body.size.length() * 2.0 + 2.0
+	cam.position = ctr + bd * (depth + dist) - bd * ctr.dot(bd)
+	cam.near = 0.01
+	cam.far = dist * 2.0 + body.size.length() * 2.0 + 10.0
+	cam.look_at(cam.position - bd, Vector3.UP)
+
+## One bust view (_frame_bust): the focus points' 2D bounds seen along dir, the
+## orthographic frame size and its centre (right / up coordinates), and how much
+## of the frame the subject's bounds fill.
+func _fit_view(dir: Vector3, pts: PackedVector3Array, anchor: AABB) -> Dictionary:
 	var right := Vector3.UP.cross(dir).normalized()
 	var up := dir.cross(right).normalized()
-	for k in 8:
-		var c := crop.get_endpoint(k) - ctr
-		half = maxf(half, maxf(absf(c.dot(right)), absf(c.dot(up))))
-	var dist := half / tan(deg_to_rad(cam.fov * 0.5)) / 0.95 + half * 0.5
-	cam.position = ctr + dir * dist
-	cam.look_at(ctr, Vector3.UP)
-	# a standing figure's head a little above the centre
+	var x0 := INF
+	var x1 := -INF
+	var y0 := INF
+	var y1 := -INF
+	for p in pts:
+		var x := p.dot(right)
+		var y := p.dot(up)
+		x0 = minf(x0, x)
+		x1 = maxf(x1, x)
+		y0 = minf(y0, y)
+		y1 = maxf(y1, y)
+	var w := maxf(x1 - x0, 0.001)
+	var h := maxf(y1 - y0, 0.001)
+	var size := maxf(minf(w, h) / 0.94, maxf(w, h) * 0.8)
+	size = minf(size, maxf(w, h) / 0.94)
+	var ac := anchor.get_center()
+	var cx := (x0 + x1) * 0.5
+	var cy := (y0 + y1) * 0.5
+	if w > size * 0.94:
+		cx = clampf(ac.dot(right), x0 + size * 0.47, x1 - size * 0.47)
+	if h > size * 0.94:
+		cy = clampf(ac.dot(up), y0 + size * 0.47, y1 - size * 0.47)
+	var fill := (minf(w, size) * minf(h, size)) / (size * size)
+	return {"size": size, "cx": cx, "cy": cy, "fill": fill}
+
+## The box a bust frames (see _frame_bust), from the rig's part boxes.
+func _bust_focus(body: AABB, parts: Dictionary) -> AABB:
+	var top := func(b: AABB, f: float) -> AABB:
+		return AABB(Vector3(b.position.x, b.end.y - b.size.y * f, b.position.z), Vector3(b.size.x, b.size.y * f, b.size.z))
+	var front := func(b: AABB, f: float) -> AABB:
+		return AABB(Vector3(b.position.x, b.position.y, b.end.z - b.size.z * f), Vector3(b.size.x, b.size.y, b.size.z * f))
+	var tall := body.size.y > maxf(body.size.x, body.size.z) * 1.2
+	if parts.has("head") and parts.has("torso") and (parts.has("riderLegs") or parts.has("chariot")):
+		# a rider (cavalry, chariot): his head and chest
+		var f: AABB = parts.head.merge(top.call(parts.torso, 0.7))
+		if parts.has("chariot"):
+			# the archer in his chariot: head and chest, the rail at the frame foot
+			return parts.head.merge(top.call(parts.torso, 0.85))
+		if parts.has("howdah") and parts.has("neck"):
+			# the War Elephant: the elephant's head, ears and tusks (the howdah behind)
+			var eh: AABB = parts.neck
+			for e in ["earL", "earR"]:
+				if parts.has(e):
+					eh = eh.merge(parts[e])
+			return eh
+		# (the mount's head then shows at the frame's edge; a camel's tall neck in
+		# the focus would shrink the rider to a figurine)
+		return f
+	if parts.has("head") and parts.has("torso") and parts.has("body"):
+		# a man's upper body on a beast's (Scorpion Man): his head and chest
+		return parts.head.merge(top.call(parts.torso, 0.6))
+	if parts.has("head") and parts.has("body") and parts.has("neck"):
+		# a beast with its own head (gazelle, hyena, giraffe, sphinx, baboon): head and
+		# throat, a little of the neck and chest behind
+		var hd: AABB = parts.head
+		return hd.merge(top.call(parts.neck, 0.15))
+	if parts.has("head") and parts.has("torso") and parts.has("_mirror"):
+		# the Mercenary: a close head-and-collar portrait from his left, so his
+		# face and headdress, not a shield and spear, fill the button (the
+		# Spearman's bust is the shielded figure)
+		return parts.head.merge(top.call(parts.torso, 0.3))
+	if parts.has("head") and tall:
+		# a standing man / myth figure: head and shoulders (the top 40 %)
+		return top.call(body, 0.4)
+	if parts.has("head") and parts.has("torso"):
+		return parts.head.merge(top.call(parts.torso, 0.5))
+	if parts.has("wingL") and parts.has("body"):
+		# a bird (Phoenix, Roc): head and breast, the wings run out of the frame
+		var bb: AABB = parts.body
+		return bb.grow(bb.size.length() * 0.3)
+	if parts.has("wingL") and parts.has("torso"):
+		# the Wadjet: the reared hood and head
+		return top.call(parts.torso, 0.65)
+	if parts.has("neck") and parts.has("body"):
+		# a beast whose head is its "neck" mesh (crocodile, petsuchos, hippo, rhino,
+		# elephant, boar, scarab): the head and the front of the body
+		var nk: AABB = parts.neck
+		if parts.has("legML"):
+			# the Scarab: its head and mandibles and the front of the domed shell
+			return nk.merge(front.call(parts.body, 0.7))
+		return nk.merge(top.call(front.call(parts.body, 0.25), 0.9))
+	if parts.has("torso") and parts.has("coil"):
+		return top.call(parts.torso, 0.65)
+	if parts.has("frame") and parts.has("body"):
+		# the Phoenix Egg on its nest: the whole egg
+		return body
+	if parts.has("frame") and parts.has("weapon"):
+		# the catapult: the whole machine nearly in profile (its throwing arm over the
+		# frame is the silhouette that reads; a crop of the frame's timbers did not)
+		return parts.weapon.merge(parts.frame)
+	if parts.has("frame"):
+		# a machine (the siege tower): its upper storeys
+		return top.call(parts.frame, 0.45 if tall else 0.6)
 	if tall:
-		cam.position -= up * half * 0.06
+		return top.call(body, 0.4)
+	return top.call(front.call(body, 0.7), 0.8)

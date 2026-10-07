@@ -3497,9 +3497,7 @@ Owner: the ui piece. Reference: `reference/egypt/ui_01..05.jpg`.
   brackets are gone). Empty slots are faint recessed sockets 7 px smaller
   than a button (`_socket`), not blank buttons. Train and summon buttons
   show **bust portraits** (`portraits.gd bust()`, `"bust": true` on the
-  command): a standing figure cropped to its top 40 % (head and
-  shoulders), a beast / rider / machine to its front 70 %, a 3/4 view from
-  the front-right filling ~95 % of the cell; the card keeps the full
+  command; framing rebuilt in ui round 7, below); the card keeps the full
   figure. The Egyptian age-up buttons show the **minor gods' busts**
   (`game/ui/egypt_god_models.gd`, icon names `g_<god>`: Anubis' jackal,
   Bast's cat, Ptah's green face and lapis skullcap, Hathor's horns and sun,
@@ -3518,6 +3516,33 @@ Owner: the ui piece. Reference: `reference/egypt/ui_01..05.jpg`.
   `TechIcons.bake("g_bast", 96)`.
   Verified (ui round 6): egypt_playtest 51/51, playtest 34/34,
   techs_playtest 34/34, walls_playtest 38/38.
+- **Bust framing fitted to the voxels** (ui round 7, `portraits.gd
+  _frame_bust / _fit_view / _bust_focus`): round 6 framed an AABB crop, so a
+  long, flat or winged model (crocodile, Petsuchos, Wadjet, Phoenix, Roc,
+  Scarab) came out a full body shrunk to a 10-14 % sliver. Now a FOCUS box
+  per rig shape (`_bust_focus`, from the rig's part boxes: a man's top 40 %;
+  a rider's head and chest (camel, chariot, cavalry); the War Elephant's
+  head, ears and tusks; a beast's head and throat; a head-in-`neck` beast's
+  head and the front of its body (the Scarab with its domed shell); a
+  bird's whole body, wings running out; the Wadjet's hood; the Scorpion
+  Man's head and chest; the Siege Tower's top storeys; the catapult whole,
+  near profile; the Mercenary a close head-and-collar from his left, so
+  he no longer repeats the Spearman's shielded figure) selects the model's
+  real vertices, which are projected on the view plane; an orthographic
+  camera is sized to their 2D bounds (94 % of the frame), a long subject may
+  run out on its long side by up to a quarter, the window kept on the head.
+  Beasts and machines try 15 3/4 views (yaw 25-65 deg, pitch 18-34 deg;
+  machines 55-75 deg) and keep the one whose subject fills the tile most;
+  men keep the front-right 3/4. Every Egyptian bust now covers 42-87 % of
+  its 128 px tile (crocodile 11 % -> 59 %, Wadjet 10 -> 77 %, Petsuchos
+  10 -> 66 %, Phoenix 10 -> 48 %, Scarab 14 -> 57 %, Roc 14 -> 49 %).
+  egypt_playtest asserts it: each Animal of Set's summon icon and every
+  Egyptian unit's bust (laborer .. phoenix_egg) >= 30 % opaque and spanning
+  >= 80 % of the tile's width and height (`_bust_fill`). Build tooltips
+  of the shared-type buildings give Retold's hp where this sim's differs
+  (`EGYPT_RETOLD_HP`: "3000 hp (Retold 2400, Fortified 3000)", the Sentry
+  Tower's "750 hp (Retold 600)" and its build time). Verified (ui round 7):
+  egypt_playtest 52/52, playtest 34/34, techs_playtest all ok.
 - **Real-input playtest** (`game/core/egypt_playtest.gd`), launched with no
   scene argument like a player:
   ```
