@@ -2478,6 +2478,35 @@ Mercenary Cavalry keeps the old `horseBody`. Check:
 `--params "eu_focus=chariot_archer"`, `eu_one=chariot_archer&eu_turn=100&eu_zoom=0.8`,
 `eu_group=mounted`.
 
+Pharaoh face, hands, crook and robe, round 32 (unit_04; the head read as a
+screaming peasant, the fists as lumps, the crook as a stick, the robe as
+speckle). The face (`headE('pharaoh')`) is a calm mask in flat tones: a kohl
+line over each eye, an ivory outer corner and a near-black pupil, a kohl tail
+on each side of the head, one straight nose ridge a voxel proud in a lighter
+tone, plain cheeks (no dark nostrils), a short closed mouth in a muted lip
+tone, and a narrow false beard (1 wide, 2 deep, 4 rows) banded gold / team
+under the chin. The head's line is thinner (part `outline: 0.12`) so the hull
+round the nose draws no moustache. Arms `clean` (`manArmM` / `handVox`): two
+flat tones, one step from the deltoid to a 3 x 3 arm (`ARM_ROWS_CLEAN`, no
+round-30 deltoid / biceps / elbow lumps), no lit cap or gold armlet, a clean
+3 x 3 x 4 fist (thumb row, a shade crease, finger row in front) closed round
+the haft's hole. `crookM()` is banded flat gold / team and its hook curls in
+the shaft's own x-y plane (a 2-thick half ring, radius 4.5, then a 4-row drop
+to a gold tip), the plane the raised arm shows the camera (it curled towards
++z and was seen edge-on); held at `rest [0, 0, 1.35]` it rises from the fist
+up past the crown with the hook curling over at the top, as in unit_04. The
+robe's A-line skirt is four solid tiers (12 / 14 / 16 / 18 wide, a voxel
+deeper front and back each tier), one team dye, flat gold apron and hem; the
+legs are sheathed in the dye (a stride's back leg kicked out bare past the
+hem); the khepresh's gold studs are two clean rows instead of a diagonal
+speckle. The pale halo round every limb was the Egyptian outline hull drawn
+at 0.24 of a pale surface's own colour (unshaded, so a light olive line round
+gold and skin): `unit_outline.gdshader` `eg_line_k` is now 0.1, a dark contact
+line of the surface's shade on every Egyptian unit. Check:
+`eu_one=pharaoh&eu_turn=30&eu_zoom=1.4&eu_ax=-0.3&eu_az=-0.6` (the whole crook),
+`eu_one=pharaoh&eu_turn=30&eu_zoom=0.62&eu_ax=-0.45&eu_az=-0.9` (face and
+fists), `eu_focus=pharaoh&eu_state=walk`, `eu_group=eco`.
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower

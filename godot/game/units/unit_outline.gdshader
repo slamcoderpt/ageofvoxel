@@ -15,7 +15,7 @@ uniform vec3 eg_line_color : source_color = vec3(0.29, 0.14, 0.06);
 // voxels in their dye, over a little of the sienna), a contact shade rather
 // than a drawn edge: deep brown round skin, a warm grey round white linen,
 // so a priest's robe and face get the same clean, thin line as a bare worker
-uniform float eg_line_k = 0.24;
+uniform float eg_line_k = 0.1;
 uniform float eg_line_sienna = 0.35;
 varying float v_fade;
 varying float v_eg;

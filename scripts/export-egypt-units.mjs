@@ -373,16 +373,21 @@ function headE(style) {
   const m = new VoxelModel();
   const dark = style === 'merc' || style === 'mercCav';
   if (style === 'pharaoh') {
-    // a clear tan face block: no brow line, two dark kohl eyes, the nose ridge
-    // (a step lighter than his arms: the face turns from the sun and must still read tan)
-    const FACE = pick3(34, 0xc89060, 0xc08858, 0xd0986a);
-    faceN(m, FACE, 0xa87046, { eyes: [DARK, DARK], brow: null, nose: 0xc08858 });
-    m.set(1, 4, 5, DARK).set(2, 4, 5, DARK).set(4, 4, 5, DARK).set(5, 4, 5, DARK);
-    m.set(2, 3, 5, FACE(2, 3, 5)).set(4, 3, 5, FACE(4, 3, 5)).set(3, 1, 5, 0x7a3a24);
-    // (round 13) kohl-lined eyes with white corners under a brow ridge, nostril shadows
-    m.set(1, 4, 5, 0xf6eee2).set(5, 4, 5, 0xf6eee2);
-    for (const x of [1, 2, 4, 5]) m.set(x, 5, 6, 0x4a2412);
-    m.set(2, 2, 5, 0x7a4424).set(4, 2, 5, 0x7a4424).set(2, 1, 5, 0x6a3020).set(4, 1, 5, 0x6a3020);
+    // (round 32) a calm, regal mask in flat tones (no per-voxel jitter): two
+    // kohl-lined eyes (a dark brown kohl line over each, an ivory outer corner
+    // and a near-black pupil, a kohl tail on each side of the head), one
+    // straight nose ridge standing a voxel proud in a lighter tone, the
+    // cheeks and the nostrils plain face (the dark nostrils and lip read as a
+    // gaping mouth), a short closed mouth in a muted lip tone; the narrow
+    // braided false beard is hung under the chin by the crown below
+    const F = 0xc68e5e, FS = 0xa87048, FL = 0xdaa676, KOHL = 0x2e1a10, PUP = 0x0c0806, LIPS = 0xa25e40, EYE_W = 0xeadfcc;
+    faceN(m, F, FS, { eyes: [KOHL, PUP], brow: null, nose: F, face: F });
+    for (const x of [1, 2, 4, 5]) m.set(x, 5, 5, KOHL).set(x, 3, 5, F).set(x, 2, 5, F);   // the kohl line over each eye
+    m.set(1, 4, 5, EYE_W).set(2, 4, 5, PUP).set(4, 4, 5, PUP).set(5, 4, 5, EYE_W);
+    m.set(0, 4, 4, KOHL).set(6, 4, 4, KOHL);                                       // the kohl tails
+    m.set(3, 5, 5, F).set(3, 4, 5, F).set(3, 4, 6, FL).set(3, 3, 6, FL).set(3, 2, 6, F);   // the nose ridge
+    m.set(2, 0, 5, F).set(3, 0, 5, F).set(4, 0, 5, F).set(3, 1, 5, LIPS);
+    m.set(2, 1, 5, LIPS).set(4, 1, 5, LIPS);                                       // the closed mouth: one short line
   } else if (dark) faceN(m, SKIN_DK, SKIN_DK_SH, { nose: 0x6e4632, face: 0x6c4632 });
   else {
     // the light face plane: two dark kohl eyes (a voxel of the body each), a
@@ -478,14 +483,17 @@ function headE(style) {
         if (z >= 5 && y < 6) continue;
         const ex = x === -1 + nar || x === 7 - nar, ez = z === -1 - back || z === 6 - Math.floor(back / 2);
         if (ex && ez) continue;
-        if ((x + y * 2 + z) % 5 === 0 && y > 6) m.set(x, y, z, PH_GOLD); else m.set(x, y, z, TEAM);
+        // (round 32) gold discs in two clean rows (every third voxel round the
+        // crown, the upper row offset), not a diagonal speckle
+        if ((y === 8 || y === 11) && (x + z + (y === 11 ? 1 : 0)) % 3 === 0) m.set(x, y, z, PH_GOLD_L); else m.set(x, y, z, TEAM);
       }
     }
     m.box(-1, 6, 6, 9, 1, 1, PH_GOLD).carve(-1, 6, 6, 1, 1, 1).carve(7, 6, 6, 1, 1, 1);
     m.set(3, 7, 7, PH_GOLD_L).set(3, 8, 7, PH_GOLD_L).set(3, 9, 7, PH_GOLD_L);   // uraeus
     m.box(-1, 1, -1, 9, 4, 1, TEAM).box(-1, 1, 0, 1, 4, 3, TEAM).box(7, 1, 0, 1, 4, 3, TEAM);
-    // the braided false beard: dark, banded gold, standing out under the chin
-    m.box(2, -3, 5, 3, 3, 2, HAIR).box(2, -2, 6, 3, 1, 1, PH_GOLD_L).set(3, -4, 5, PH_GOLD_L);
+    // (round 32) the narrow false beard: one voxel wide, two deep, hung under
+    // the chin and banded gold / the army's colour like a plaited royal beard
+    for (let y = -1; y >= -4; y--) for (const z of [4, 5]) { if (y & 1) m.set(3, y, z, PH_GOLD_L); else tset(m, 3, y, z, 0xffffff); }
   } else if (style === 'merc') {
     capN(m, HAIR, { y0: 5, front: 6, top: 8 });
     for (let x = -1; x <= 7; x += 2) m.set(x, 9, 2, HAIR);
@@ -555,7 +563,9 @@ function headE(style) {
   return m;
 }
 function headPart(style, joint = [0, 10, 0.2], parent = 'torso', s = 1) {
-  return part('head', headE(style), HEAD_PIVOT, joint, parent, { scale: HEAD_SCALE * s, rest: HEAD_TILT });
+  // (round 32) the Pharaoh's head a thinner line: at 0.3 the hull round his
+  // nose ridge drew a dark moustache across the calm face
+  return part('head', headE(style), HEAD_PIVOT, joint, parent, { scale: HEAD_SCALE * s, rest: HEAD_TILT, ...(style === 'pharaoh' ? { outline: 0.12 } : {}) });
 }
 // ---- the Egyptian man (round 7): Retold's proportions, not a walking crate ----
 // The men's bodies are authored at half the rig voxel (BODY_SCALE, like the
@@ -760,8 +770,23 @@ const ARM_ROWS = [
 // (x 0, z 0..1, rows 0..2) a haft passes through, the fingers wrapped round
 // it in front (z 2) and the palm behind (z -1): GRIP_C is its centre (rig
 // voxels from the shoulder joint, straight arm)
-function handVox(m, pal, out, { grip = false, fist = null, slim = false } = {}) {
+function handVox(m, pal, out, { grip = false, fist = null, slim = false, clean = false } = {}) {
   const H = palH(pal);
+  if (clean) {
+    // (round 32, the Pharaoh) a clean fist in two tones: a 3-wide, 4-deep
+    // block (corners at the back rounded off), its front the thumb laid
+    // across the top row and the curled fingers in the bottom row, both lit,
+    // a shade crease between them, the palm and sides a tone down; grip: the
+    // haft's hole through its middle (x 0, z 0..1), the fingers and thumb
+    // closed round it in front
+    for (let y = 0; y <= 2; y++) for (let x = -1; x <= 1; x++) for (let z = -1; z <= 2; z++) {
+      if (z === -1 && x !== 0 && y !== 1) continue;           // the rounded heel of the hand
+      if (grip && x === 0 && (z === 0 || z === 1)) continue;   // the haft's hole
+      const front = z === 2;
+      m.set(x, y, z, fist || (front && y !== 1 ? pal.L : pal.M));   // the thumb row, a crease, the finger row
+    }
+    return m;
+  }
   if (slim) {
     // a 3 x 3 fist, the knuckles a lit row in front, the corners rounded
     for (let y = 0; y <= 2; y++) for (let x = -1; x <= 1; x++) for (let z = -1; z <= 1; z++) {
@@ -796,22 +821,31 @@ const ARM_ROWS_SLIM = [
   [12, 1.5, 1.5], [11, 1.5, 1.5], [10, 1.4, 1.4], [9, 1.25, 1.25],
   [8, 1.25, 1.25], [7, 1.25, 1.25], [6, 1.25, 1.25], [5, 1.2, 1.2], [4, 1.1, 1.1], [3, 1.0, 1.0],
 ];
-function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, sleeve = null, fist = null, bend = 0, grip = false, slim = false } = {}) {
+// (round 32, the Pharaoh) one step from the deltoid to the arm, no lumps
+const ARM_ROWS_CLEAN = [
+  [18, 1.6, 1.6], [17, 2.2, 2.0], [16, 2.2, 2.0], [15, 2.2, 2.0], [14, 2.2, 2.0],
+  [13, 1.6, 1.6], [12, 1.6, 1.6], [11, 1.6, 1.6], [10, 1.6, 1.6], [9, 1.6, 1.6],
+  [8, 1.6, 1.6], [7, 1.6, 1.6], [6, 1.6, 1.6], [5, 1.6, 1.6], [4, 1.6, 1.6], [3, 1.25, 1.25],
+];
+function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, sleeve = null, fist = null, bend = 0, grip = false, slim = false, clean = false } = {}) {
   const m = new VoxelModel();
   const out = side === 'L' ? 1 : -1, H = palH(pal);
   const tone = (x, y, z, nx, nz) => {
     const inner = nx * out < -0.55, front = nz > 0.45;
     let c = front ? pal.L : inner ? pal.D : pal.M;
-    if (y >= 16 && nz > -0.6 && !inner) c = H;            // the lit shoulder cap
-    if (y >= 17) c = inner ? pal.M : H;
-    if (y === 3) c = front ? pal.M : pal.D;               // the wrist, a tone down
+    if (clean) c = front ? pal.L : pal.M;                 // (round 32) two flat tones, no lit cap or wrist ring
+    else {
+      if (y >= 16 && nz > -0.6 && !inner) c = H;          // the lit shoulder cap
+      if (y >= 17) c = inner ? pal.M : H;
+      if (y === 3) c = front ? pal.M : pal.D;             // the wrist, a tone down
+    }
     if (bracer && y >= 4 && y <= 7) c = bracer;
     if (bnd && y >= 12 && y <= 13) c = bnd;
     if (sleeve && y >= 13) c = y === 13 ? (typeof sleeve === 'number' ? shadeC(sleeve, 0.86) : sleeve) : sleeve;
     return c;
   };
-  limbRows(m, slim ? ARM_ROWS_SLIM : ARM_ROWS, tone);
-  if (!slim) {
+  limbRows(m, slim ? ARM_ROWS_SLIM : clean ? ARM_ROWS_CLEAN : ARM_ROWS, tone);
+  if (!slim && !clean) {
     // (round 30) shoulder and elbow mass: the deltoid a voxel wider on the
     // outer side (rows 13..16, a rounded 3-deep column, its top lit), the
     // biceps a voxel deeper in front, and an elbow knob behind
@@ -826,7 +860,7 @@ function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, 
     for (let y = 11; y <= 13; y++) put(0, y, 3, 0, 1);    // the biceps in front
     put(0, 10, -2, 0, -1); m.set(0, 9, -2, pal.M);          // the elbow behind
   }
-  handVox(m, pal, out, { grip, fist, slim });
+  handVox(m, pal, out, { grip, fist, slim, clean });
   return bendArm(m, bend);
 }
 const shadeC = (c, k) => { const r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255; return (Math.round(r * k) << 16) | (Math.round(g * k) << 8) | Math.round(b * k); };
@@ -1251,21 +1285,32 @@ const ANKH_PIVOT = [1, 0, 1];
 // below the fist and, at the top, a wide hook curling over and down (outer
 // radius 5, a clear gap inside) with a gold tip: Retold's heqa sceptre, held
 // overhead it reads as a crook, not a stick
-function crookM() {
+function crookM(hx = 1) {
+  // (round 32) flat banded tones (no jitter speckle) and the hook curled in
+  // the shaft's own x-y plane, the plane the raised arm shows the camera
+  // (curling towards +z it was seen edge-on, a straight stick): from the
+  // shaft's top the crook bends over in a thick half ring (radius 4.5 to its
+  // middle, 2 voxels thick) to the outside (hx = +1 / -1 along x), then drops
+  // four rows to a gold tip; the bands run on round the hook
   const m = new VoxelModel();
-  const S = (x, y, z) => (Math.floor((y + 30) / 3) & 1 ? PH_GOLD(x, y, z) : TEAM);
-  for (let y = -7; y <= 30; y++) for (let x = 0; x <= 1; x++) for (let z = 0; z <= 1; z++)
-    m.set(x, y, z, y <= -5 ? PH_GOLD_L : S(x, y, z));
-  // the hook: a half ring of radius 4.5 centred above the shaft's top, opening
-  // forward (+z) and down
-  const cy = 30, cz = 5;
-  for (let k = 0; k <= 20; k++) {
-    const a = Math.PI * k / 20;                         // 0 = the shaft side, PI = the far side
-    const y = Math.round(cy + Math.sin(a) * 4.5), z = Math.round(cz - Math.cos(a) * 4.5);
-    for (const [dy, dz] of [[0, 0], [0, 1], [1, 0], [1, 1]]) for (let x = 0; x <= 1; x++) m.set(x, y + dy - (dy && Math.sin(a) > 0.7 ? 1 : 0), z + dz, S(x, y + dy, z + dz));
+  const G = 0xf0c400, GL = PH_GOLD_L;
+  const band = (k) => ((k & 1) ? G : TEAM);
+  const put = (x, y, z, c) => { if (c === TEAM) tset(m, x, y, z, 0xffffff); else m.set(x, y, z, c); };
+  const TOP = 28;
+  for (let y = -7; y <= TOP; y++) for (let x = 0; x <= 1; x++) for (let z = 0; z <= 1; z++)
+    put(x, y, z, y <= -5 ? GL : band(Math.floor((y + 30) / 3)));
+  // the hook: voxel centres within 3.5..5.5 of (cx, TOP) above the shaft's top
+  const cx = 1 + hx * 4.5, cy = TOP + 0.5;
+  for (let x = -12; x <= 13; x++) for (let y = TOP + 1; y <= TOP + 7; y++) {
+    const dx = x + 0.5 - cx, dy = y + 0.5 - cy, r = Math.hypot(dx, dy);
+    if (r < 3.5 || r > 5.5) continue;
+    const a = Math.atan2(dy, -dx * hx);                       // 0 = the shaft side .. PI = the far side
+    const k = Math.floor(a / (Math.PI / 5));
+    for (let z = 0; z <= 1; z++) put(x, y, z, band(k + 1));
   }
-  for (let y = cy - 3; y <= cy; y++) for (let x = 0; x <= 1; x++) for (let z = 9; z <= 10; z++) m.set(x, y, z, S(x, y, z));
-  for (let x = 0; x <= 1; x++) m.set(x, cy - 4, 9, PH_GOLD_L).set(x, cy - 4, 10, PH_GOLD_L);
+  // the drop on the far side, a gold tip
+  const fx = hx > 0 ? 9 : -9;
+  for (let y = TOP - 3; y <= TOP; y++) for (let x = fx; x <= fx + 1; x++) for (let z = 0; z <= 1; z++) put(x, y, z, y === TOP - 3 ? GL : band(1));
   return m;
 }
 // tools (built along +z like the Greek villager's)
@@ -1548,28 +1593,37 @@ const sc = (j, s) => j.map((v) => v * s);
   }
   for (let x = -3; x <= 2; x++) for (let z = -3; z <= 2; z++) if (Math.abs(x + 0.5) > 1.5 || z < -2 || z > 1) t.set(x, 15, z, PH_GOLD_L);   // the collar ring
   // the A-line skirt: a shell from the sash flaring to the ankles
-  const LEN = 23;
+  // (round 32) in four clean tiers (12, 14, 16, 18 wide, flaring forward a
+  // voxel a tier front and back) instead of a stair every two or three rows, the team
+  // sides one solid dye (the shader shades each face by its turn; the old
+  // white / shade patchwork and the stepped corners broke into speckle at
+  // the hem), the apron and hem one flat gold with a lit edge
+  const LEN = 23, PG = 0xecc000;
   for (let i = 0; i <= LEN; i++) {
-    const y = 1 - i;
-    const w = 2 * Math.round((10 + i * 8 / LEN) / 2), z0 = -3 - Math.round(i * 2 / LEN), z1 = 2 + Math.round(i * 2 / LEN);
-    const aw = 1.5 + i * 0.12;
+    const y = 1 - i, tier = Math.min(3, Math.floor(i / 6));
+    const w = 12 + tier * 2, z0 = -3 - tier, z1 = 2 + tier;   // (wide and deep enough that no thigh or shin breaks through, standing or walking)
+    const aw = 1.5 + tier * 0.75;
     for (let x = -w / 2; x < w / 2; x++) for (let z = z0; z <= z1; z++) {
       const ex = x === -w / 2 || x === w / 2 - 1;
       if (ex && (z === z0 || z === z1)) continue;
       const ax = Math.abs(x + 0.5);
-      if (i >= LEN - 1) t.set(x, y, z, PH_GOLD);                                     // the gold hem band
-      else if (z === z1 && ax <= aw && i <= LEN - 3) t.set(x, y, z, ax > aw - 1 ? PH_GOLD_L : PH_GOLD);   // the gold apron
-      else tset(t, x, y, z, ex || z === z0 || (z === z1 && ax > aw + 2) ? TEAM_SHADE : 0xffffff);
+      if (i >= LEN - 1) t.set(x, y, z, PG);                                          // the gold hem band
+      else if (z === z1 && ax <= aw && i <= LEN - 3) t.set(x, y, z, ax > aw - 1 ? PH_GOLD_L : PG);   // the gold apron
+      else tset(t, x, y, z, 0xffffff);
     }
   }
   eBelt(t, PH_GOLD, PH_GOLD_L);
   rig('pharaoh', { voxel: 0.08, anim: 'human', style: 'pharaoh', pose: 'staff', stance: 0.3 }, [
-    ...manParts({ torso: t, head: 'pharaoh', headScale: 1.1, pal: PAL_PH, arm: { bracer: TEAM, band: PH_GOLD_L }, armR: { grip: true }, leg: { sandal: SANDAL },
+    ...manParts({ torso: t, head: 'pharaoh', headScale: 1.1, pal: PAL_PH, arm: { bracer: TEAM, clean: true }, armR: { grip: true },
+      // (round 32) the legs sheathed in the robe's dye down to the ankle: a
+      // stride swings the back leg out past any hem, and a bare brown leg
+      // kicking out behind the robe read as a stray stick
+      leg: { sandal: SANDAL, pal: { L: TEAM, M: TEAM, D: TEAM }, foot: PAL_PH.M },
       restL: [-0.35, 0, 0.42], restR: [-0.25, 0, -2.25] }),
     // (round 13) the crook through the raised fist (the fingers round the
     // shaft), laid across over the crown with the hook out past his left
     // shoulder, as Retold's Pharaoh holds it (unit_04)
-    part('weapon', crookM(), [1, 0, 1], GRIP_C, 'armR', { scale: 0.5, rest: [0, 0, 0.95] }),
+    part('weapon', crookM(), [1, 0, 1], GRIP_C, 'armR', { scale: 0.5, rest: [0, 0, 1.35] }),
   ]);
 }
 
