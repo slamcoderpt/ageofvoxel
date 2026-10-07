@@ -2615,50 +2615,123 @@ function lumberCamp() {
   return m;
 }
 
-// Mining Camp (3 x 3; building_07): a flat-roofed battered block under a
-// flared cavetto with a team rim, pale limestone corner piers, a painted
-// frieze of lapis / red / ochre panels between pale fillets under the
-// cornice and a turquoise dado over the base course, a framed door (proud
-// jambs, lintel, a small cornice, the gilt winged sun) on the front; two
-// canvas awnings on light palm-log posts, the west one over a timber bin of
-// gold ore built against the wall, the east one over a stone water trough on
-// a footing course against the wall; crates, barrels and lumps of gold ore
-// in front. No tall frame: the block is the silhouette, as in Retold.
-const MINE_PAT = (x, y, z) => { const u = (x + z) % 7; return u === 0 || u === 4 ? FRIEZE_SEP : u < 4 ? (u === 2 ? OCHRE_M : LAPIS) : RED_M; };
-const MINE_FRIEZE = [FRIEZE_SEP, MINE_PAT, MINE_PAT, FRIEZE_SEP, (x, y, z) => ((x + z) % 5 === 0 ? shade(RED_M, 0.82) : RED_M)];
-const PALMPOST = (x, y, z) => ((y & 1) ? 0xb08a5c : 0xa07c50);
-function oreLump(m, x, z, s = 0) {
-  const R = [0x8c7a5a, 0x7d6c50, 0x96845f];
-  m.box(x, 1, z, 2, 1, 2, (xx, yy, zz) => (hash3(xx, yy, zz, 90 + s) < 0.45 ? GOLDORE(xx, yy, zz) : pick(hash3(xx, yy, zz, 91), R)));
-  m.set(x + (s & 1), 2, z + ((s >> 1) & 1), GOLDORE);
+// Mining Camp (3 x 3; building_07; round 31): one solid stone house, not a
+// stack of slabs: a slightly battered sandstone block (a voxel in 7 rows,
+// smoothed by skin()) in strong block courses (dark bed and head joints)
+// from a dark base course to a single thin lapis stripe at its top, then the
+// Egyptian cavetto (two rows of paired sandstone flutes, the lower in shade
+// on the wall plane, the upper a voxel out) carrying one thick limestone
+// roof slab flush with the upper flutes, two rows deep, its coping ring
+// round a sunk cream deck with the owner's line on the coping's inner edge
+// (Retold's blue inset). Two flat, taut canvas awnings (no belly, no sag: a
+// straight slope from a batten on the wall to the front edge) on dark posts
+// at their outer corners, the front-left one over a dark timber ore bin
+// heaped with gold ore, the east one over a stone water trough. The props
+// each in their own colour and value, flat voxels (pset, never weathered):
+// gold-yellow nuggets (a little self-lit so the grade keeps them yellow),
+// dark crates with light / dark plank rows, round terracotta pots, a hooped
+// barrel; the door's path left clear.
+const MC_FLUTE = [0xd9ba86, 0xc29c66];
+const MC_BIN = 0x6a4426, MC_BIN_L = 0x7d5432, MC_BIN_D = 0x3a2414;
+const MC_GOLD = [0xe8c400, 0xd8b000, 0xf6dc00], MC_GOLD_S = 0xae8a00, MC_GOLD_D = 0x6e5200;
+const MC_CRATE = 0x50301a, MC_CRATE_L = 0x845a32, MC_CRATE_E = 0x2e1a0c;
+// the camp's sandstone: warm blocks in strong courses (dark bed joints,
+// darker head joints) so every course reads from the RTS camera
+const MC_WALL = coursed([0xc8945a, 0xae7c48, 0xd2a068], { course: 3, len: 6, bed: 0.6, head: 0.7, seed: 133 });
+// gold: a light yellow with no blue (lit as metal by egypt_building.gdshader,
+// read by value against the dark bin)
+const gset = pset;
+// a terracotta pot (5 x 5 belly, corners cut): a dark foot, the belly, a lit
+// shoulder, a narrow neck round a dark mouth
+function mcPot(m, X, Z, c = 0xb5552e) {
+  prow(m, X, 1, Z, 1, shade(c, 0.7));
+  prow(m, X, 2, Z, 2, shade(c, 0.86), true);
+  prow(m, X, 3, Z, 2, c, true);
+  prow(m, X, 4, Z, 2, shade(c, 1.12), true);
+  prow(m, X, 5, Z, 1, (i, k) => (i === 0 && k === 0 ? MOUTH : shade(c, 1.2)), true);
+}
+const MC_DECK = (x, y, z) => (hash3(x >> 2, y, z >> 2, 131) < 0.5 ? 0xd8c39a : 0xd2bc92);
+// a dark crate (w x h x d): every edge a near-black frame, the faces light and
+// dark plank rows in turn, the lid's boards the other way
+function mcCrate(m, x, y, z, w, h, d) {
+  for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) for (let k = 0; k < d; k++) {
+    const ex = i === 0 || i === w - 1, ey = j === 0 || j === h - 1, ez = k === 0 || k === d - 1;
+    if (!ex && !ey && !ez) continue;
+    let c = (ex && ey) || (ey && ez) || (ex && ez) ? MC_CRATE_E : (j & 1) ? MC_CRATE_L : MC_CRATE;
+    if (j === h - 1 && !ex && !ez) c = (i & 1) ? MC_CRATE_L : MC_CRATE;   // the lid's boards
+    pset(m, x + i, y + j, z + k, c);
+  }
+}
+// a gold nugget (2 x 2 x 2 from (x, z), a knob on top): bright yellow tops,
+// an ochre side, a dark foot
+function mcNugget(m, x, z, s = 0) {
+  for (let i = 0; i < 2; i++) for (let k = 0; k < 2; k++) {
+    gset(m, x + i, 1, z + k, (i + k + s) & 1 ? MC_GOLD_S : MC_GOLD_D);
+    gset(m, x + i, 2, z + k, MC_GOLD[(i + 2 * k + s) % 2]);
+  }
+  gset(m, x + (s & 1), 3, z + ((s >> 1) & 1), MC_GOLD[2]);
 }
 function miningCamp() {
   const m = lot(24, 24);
-  block(m, 5, 3, 17, 13, 1, 12, { wall: EWHITE, roofC: EDECK, rimC: LIME, gorge: [0x963f2a, 0xa5492f], torus: true, lipOut: 2, batter: 6, band: null, flare: true });
-  // the painted frieze under the cornice (rows 11..8), the dado over the base
-  // (round 27: the block's own painted band under the parapet)
-  bands(m, 0, 0, 24, 24, 3, [(x, y, z) => ((x + z) % 4 === 0 ? FRIEZE_SEP : TURQ)]);
-  door(m, '+z', 11, 4, 1, 5, { deep: 3 });
-  slit(m, '-z', 13, 6, 3, 1); slit(m, '-z', 9, 6, 3, 1); slit(m, '-x', 8, 6, 3, 1);
-  // the front-left awning over the ore bin, the east one over the trough,
-  // on light palm-log posts
-  const yTop = 10, inset = Math.floor((yTop - 1) / 6);
-  clothAwning(m, '+z', 12 - inset, 1, 10, yTop, 5, 3, { sw: 2, sag: 0.9, post: PALMPOST });
-  clothAwning(m, '+x', 16 - inset, 4, 12, yTop, 6, 4, { sw: 2, sag: 0.8, post: PALMPOST });
-  // the ore bin against the front wall: a dark timber sill, plank sides with
-  // corner posts, heaped gold ore
+  const X0 = 5, Z0 = 3, X1 = 17, Z1 = 13, Y0 = 1, H = 12, B = 7, top = Y0 + H;
+  if (m.feet) m.feet.push({ x0: X0, z0: Z0, x1: X1, z1: Z1, hb: 1 });
+  m.blocks.push({ x0: X0, z0: Z0, x1: X1, z1: Z1, y0: Y0, h: H, b: B, base: 0 });
+  let I = 0;
+  for (let y = Y0; y < top; y++) {
+    I = Math.floor((y - Y0) / B);
+    const a0 = X0 + I, a1 = X1 - I, b0 = Z0 + I, b1 = Z1 - I, t = top - 1 - y;
+    for (let x = a0; x < a1; x++) for (let z = b0; z < b1; z++) {
+      const edge = x === a0 || x === a1 - 1 || z === b0 || z === b1 - 1;
+      if (!edge) { m.set(x, y, z, SAND_D(x, y, z)); continue; }
+      let c;
+      if (y === Y0) c = SAND_D(x, y, z);                                   // the dark base course
+      else if (t === 0) c = (x + z) % 6 === 0 ? shade(LAPIS, 0.8) : LAPIS;  // the thin painted stripe
+      else c = grimed(MC_WALL(x, y, z), x, y, z, y - Y0, false);
+      m.set(x, y, z, c);
+    }
+  }
+  const c0 = X0 + I, c1 = X1 - I, d0 = Z0 + I, d1 = Z1 - I;
+  const fl = (x, z) => MC_FLUTE[((x + z + 512) >> 1) & 1];
+  const ring = (x, z, p) => Math.min(x - (c0 - p), (c1 - 1 + p) - x, z - (d0 - p), (d1 - 1 + p) - z);
+  // the cavetto: the lower row on the wall plane in shade, the upper a voxel out
+  for (let x = c0; x < c1; x++) for (let z = d0; z < d1; z++) m.set(x, top, z, ring(x, z, 0) === 0 ? shade(fl(x, z), 0.74) : SAND_D(x, top, z));
+  for (let x = c0 - 1; x <= c1; x++) for (let z = d0 - 1; z <= d1; z++) {
+    const e = ring(x, z, 1);
+    m.set(x, top + 1, z, e === 0 ? fl(x, z) : SAND_D(x, top + 1, z));
+  }
+  // the roof slab flush with the cavetto's upper row (so the flutes read as
+  // its flared underside), two rows deep: the deck sunk inside the coping
+  // ring, the owner's line on the ring's inner edge
+  for (let x = c0 - 1; x <= c1; x++) for (let z = d0 - 1; z <= d1; z++) {
+    const e = ring(x, z, 1);
+    m.set(x, top + 2, z, e <= 1 ? LIME(x, top + 2, z) : MC_DECK(x, top + 2, z));
+    if (e <= 2) m.set(x, top + 3, z, e === 2 ? TEAM : LIP(x, top + 3, z));
+  }
+  m.lastTop = { c0: c0 - 1, c1: c1 + 1, d0: d0 - 1, d1: d1 + 1, y: top + 2 };
+  // the door: a dark sandstone frame under a timber lintel (no pale
+  // limestone frame to break the wall's courses)
+  door(m, '+z', 11, 4, 1, 5, { deep: 3, frame: SAND_D, lintel: false });
+  for (let x = 9; x <= 16; x++) pset(m, x, 6, Z1, x === 9 || x === 16 ? MC_BIN : MC_BIN_D);
+  slit(m, '-z', 11, 6, 3, 1); slit(m, '-x', 8, 6, 3, 1);   // one slit a face (a pair reads as eyes)
+  // the awnings: flat taut canvas (belly 0, sag 0) under the stripe, on dark
+  // posts at the outer corners
+  const yTop = 8, inset = Math.floor((yTop - Y0) / B);
+  const AW = { sw: 2, sag: 0, belly: 0, post: MC_BIN_D };
+  clothAwning(m, '+z', Z1 - 1 - inset, 1, 10, yTop, 6, 2, AW);
+  clothAwning(m, '+x', X1 - 1 - inset, 4, 12, yTop, 6, 2, AW);
+  // the ore bin against the front wall: dark planks (two boards a side split
+  // by a darker line), near-black corner posts, heaped bright gold ore
   for (let x = 2; x < 9; x++) for (let z = 13; z < 19; z++) {
-    m.set(x, 1, z, DARKWOOD);
+    pset(m, x, 1, z, MC_BIN_D);
     const rim = x === 2 || x === 8 || z === 13 || z === 18, corner = (x === 2 || x === 8) && (z === 13 || z === 18);
     for (let y = 2; y < 5; y++) {
-      if (corner) m.set(x, y, z, DARKWOOD);
-      else if (rim) m.set(x, y, z, y === 4 ? shade(PLANK(x, y, z), 1.08) : PLANK(x, y, z));
-      else if (y === 4) m.set(x, y, z, GOLDORE);
-      else m.set(x, y, z, 0x5a4630);
+      if (corner) pset(m, x, y, z, MC_BIN_D);
+      else if (rim) pset(m, x, y, z, y === 3 ? MC_BIN_D : y === 4 ? MC_BIN_L : MC_BIN);
+      else if (y === 4) gset(m, x, y, z, MC_GOLD_S); else pset(m, x, y, z, MC_BIN_D);
     }
-    if (!rim && hash3(x, 5, z, 5) < 0.65) m.set(x, 5, z, GOLDORE);
+    if (!rim) gset(m, x, 5, z, MC_GOLD[(x * 3 + z) % 2]);
   }
-  for (let x = 4; x < 7; x++) for (let z = 15; z < 18; z++) if (hash3(x, 6, z, 8) < 0.6) m.set(x, 6, z, GOLDORE);
+  for (let x = 4; x < 7; x++) for (let z = 15; z < 17; z++) gset(m, x, 6, z, (x + z) % 3 === 0 ? MC_GOLD[2] : MC_GOLD[0]);
   // the water trough against the east wall: a darker footing course a voxel
   // proud, sandstone sides, a limestone coping, the water a voxel down
   for (let x = 17; x < 22; x++) for (let z = 4; z < 12; z++) m.set(x, 1, z, SAND_D);
@@ -2667,14 +2740,19 @@ function miningCamp() {
     m.set(x, 2, z, rim ? SAND(x, 2, z) : WATER);
     if (rim) m.set(x, 3, z, LIME(x, 3, z));
   }
-  barrel(m, 22, 1, 6.5, 5, 1.9);
-  // crates right of the door, one stacked, a barrel, a crate of ore
-  crate(m, 17, 1, 14, 3, 3, 3, 0xb08850);
-  crate(m, 17, 4, 14, 3, 2, 3, 0xa27c48);
-  barrel(m, 21.5, 1, 15.5, 5, 1.9);
-  goodsBox(m, 16, 1, 18, 4, 4, 'gold', 2, 0x8a6236);
-  // lumps of gold ore on the ground in front of the bin
-  oreLump(m, 3, 20, 0); oreLump(m, 9, 19, 1); oreLump(m, 6, 21, 2); oreLump(m, 11, 21, 3);
+  // a hooped barrel by the trough (square rows, corners cut: staves, two dark
+  // iron hoops, a pale lid)
+  for (let y = 1; y <= 5; y++) for (let i = -1; i <= 1; i++) for (let k = -1; k <= 1; k++) {
+    if (i !== 0 && k !== 0 && y !== 3) continue;
+    pset(m, 22 + i, y, 13 + k, y === 2 || y === 4 ? 0x2e2a26 : y === 5 ? (i === 0 && k === 0 ? 0xd2a66c : 0xa8743e) : 0x8e5c30);
+  }
+  // dark crates right of the door; terracotta pots at the front
+  // right; gold nuggets on the sand in front of the bin
+  mcCrate(m, 15, 1, 15, 3, 4, 4);
+  mcCrate(m, 15, 1, 20, 5, 3, 3);
+  mcPot(m, 21, 17, 0xb5552e);
+  jar(m, 21, 1, 22, 0xa84a26);
+  mcNugget(m, 3, 20, 0); mcNugget(m, 7, 20, 1); mcNugget(m, 5, 22, 2);
   return m;
 }
 

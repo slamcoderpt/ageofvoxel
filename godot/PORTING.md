@@ -1112,16 +1112,9 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   canvas awning over the work yard: the Lumber Camp's over a 3-2 stack of
   round logs (`cleanLog`, see "Clean Lumber Camp props, round 30"), a
   sawhorse, a stump with an axe, a barrel and crates; the
-  Mining Camp after building_07: a 12x10 block under a flared cavetto with
-  the team rim, limestone corner piers, a painted frieze under the cornice
-  (`MINE_FRIEZE`: pale fillets round a band of lapis / ochre / red panels,
-  a red rule), a turquoise dado over the dark base course, a framed door
-  (proud jambs, lintel, small cornice); two canvas awnings on pale palm-log
-  posts (`clothAwning(..., { post })`), the front-left one over a timber ore
-  bin built against the wall (a dark sill, corner posts, heaped gold), the
-  east one over a stone water trough on a footing course against the wall;
-  crates, barrels, a crate of ore and lumps of ore (`oreLump`) in front, so
-  every prop touches the block or the ground apron, none floats), `farm` 4x4 (a mud border, an irrigation channel and a shaduf; the
+  Mining Camp after building_07: one solid sandstone house under a single
+  roof slab, two flat awnings over an ore bin and a water trough, see
+  "Solid Mining Camp, round 31"), `farm` 4x4 (a mud border, an irrigation channel and a shaduf; the
   crops are the economy piece's), `temple` 5x6 (a two-tier platform with a
   ramp; a square kiosk after building_08: twelve clean sandstone papyrus
   columns, 3x3 voxels on a 6-voxel pitch so every gap is an even 3-voxel
@@ -1631,6 +1624,31 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   pale lid) at the front right corner, the crates (`cleanCrate`: flat
   boards, darker frame, a brace) behind the stock.
   `egt_focus=lumber_camp&egt_dist=7&egt_pitch=38` frames it close.
+- **Solid Mining Camp, round 31** (`miningCamp()`, building_07): the core
+  is drawn in the function itself, not by `block()`, so it reads as one
+  stone house instead of a stack of slabs (a cream frame, a red strip, a
+  saturated blue band and a red / cream wedge before): a 12x10 block 12
+  rows high, battered one voxel in seven rows (registered for `skin()`), in
+  `MC_WALL` sandstone, strong courses (`coursed`, bed joints x0.6, head
+  joints x0.7) over a dark base course, up to a single thin lapis stripe
+  (one row) at the wall's top; the cavetto as two rows of paired sandstone
+  flutes (the lower in shade on the wall plane, the upper a voxel out); on
+  it one limestone roof slab flush with the upper flutes, two rows deep,
+  its coping ring round a sunk cream deck (`MC_DECK`), the owner's line on
+  the ring's inner edge (Retold's blue inset). The door has a dark
+  sandstone frame and a timber lintel (no pale limestone frame), one slit a
+  face (a pair reads as eyes). Both awnings are `clothAwning(..., { belly:
+  0, sag: 0 })`: flat taut sheets sloping two voxels from the batten to the
+  front edge, under the stripe, on near-black posts. The props are flat
+  voxels (`pset`) apart in colour and value: the ore bin in dark planks
+  (two boards a side split by a near-black line, near-black corner posts)
+  heaped with blue-free gold (`MC_GOLD`, lit as metal by the shader), gold
+  nuggets (`mcNugget`: yellow tops, ochre sides, a dark foot), dark crates
+  (`mcCrate`: near-black frame, light / dark plank rows, the lid's boards
+  the other way), a round terracotta pot (`mcPot`, 5x5 belly) and a jar, a
+  hooped barrel by the trough; the door's path clear. `MINE_FRIEZE`,
+  `PALMPOST`, `oreLump` and the turquoise dado are gone.
+  `egt_focus=mining_camp&egt_dist=7` frames it close (`egt_yaw=208` the back).
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8
