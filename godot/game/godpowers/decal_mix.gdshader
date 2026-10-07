@@ -29,7 +29,9 @@ shader_type spatial;
 render_mode unshaded, blend_mix, depth_draw_never, cull_disabled, fog_disabled, shadows_disabled;
 
 varying vec4 v_col;
-varying vec4 v_c;
+// (flat: INSTANCE_CUSTOM is per instance; interpolated, it picks up 1-ulp jitter that the sin hashes
+// below blow up into a per-pixel dither over everything seeded by custom.y)
+varying flat vec4 v_c;
 
 void vertex() {
 	v_col = COLOR;
@@ -132,14 +134,30 @@ void fragment() {
 		over(P, A, lin(mix(vec3(118.0, 82.0, 44.0), vec3(150.0, 108.0, 60.0), hc)), churn * (0.62 + 0.3 * hc));
 		float scuff = (1.0 - smoothstep(0.5, 0.85, d)) * smoothstep(0.38, 0.52, d) * (0.6 + 0.4 * vn1(an * 7.0 + seed * 2.0));
 		over(P, A, lin(vec3(150.0, 110.0, 64.0)), scuff * 0.4);
-		// the cracks, darkest near the hole
+		// the cracks: solid near-black clefts with a dark ochre shoulder, darkest near the hole
 		float cr = emerge_cracks(p, seed, grow);
-		over(P, A, lin(mix(vec3(22.0, 14.0, 8.0), vec3(58.0, 40.0, 22.0), smoothstep(0.2, 0.9, d))), cr * 0.95);
-		// the hole: a near-black pit with a dark lip
-		float hole = 1.0 - smoothstep(0.1, 0.15, d + 0.02 * (vn1(an * 4.0 + seed) - 0.5));
-		over(P, A, lin(vec3(14.0, 10.0, 6.0)), hole);
-		float lip = exp(-pow((d - 0.15) / 0.03, 2.0));
-		over(P, A, lin(vec3(70.0, 48.0, 26.0)), lip * 0.8);
+		float crc = smoothstep(0.5, 0.9, cr);                       // the cleft itself (hard-edged)
+		over(P, A, lin(vec3(92.0, 62.0, 32.0)), smoothstep(0.05, 0.5, cr) * 0.75);
+		over(P, A, lin(mix(vec3(10.0, 7.0, 4.0), vec3(34.0, 23.0, 12.0), smoothstep(0.25, 0.9, d))), crc);
+		// the pit: it fills everything inside the heap of sand (d < 0.27, the heap's inner slope
+		// lies at 0.8 of 3.1), opaque, so neither the vortex under it nor the ground shows through.
+		// A funnel: the bare dark ochre lip, sloping walls in shadow, the near-black throat. The quad
+		// is yawed so +x points away from the camera: the far wall faces the eye and catches a
+		// little light, the near wall is hidden under its own lip (darker, narrower)
+		float edgeR = 0.27 + 0.022 * (vn1(an * 5.0 + seed) - 0.5) + 0.012 * (vn1(an * 17.0 + seed * 3.0) - 0.5);
+		float far = 0.5 + 0.5 * cos(an);                            // 1 the far wall .. 0 the near one
+		float pit = 1.0 - smoothstep(edgeR - 0.012, edgeR, d);
+		const float throatR = 0.1;
+		vec2 tc = p + vec2(0.04, 0.0);                              // the throat sits nearer the camera
+		float u = clamp((length(tc) - throatR) / max(edgeR - throatR, 0.01), 0.0, 1.0); // 0 throat .. 1 lip
+		float streak = vn1(an * 22.0 + seed * 1.7) * 0.6 + 0.4 * h2(floor(vec2(an * 9.0, d * 30.0)) + seed);
+		vec3 wall = mix(vec3(16.0, 11.0, 6.0), mix(vec3(36.0, 24.0, 13.0), vec3(96.0, 66.0, 34.0), far * far), pow(u, 1.2));
+		wall *= 0.82 + 0.3 * streak;
+		vec3 pc = mix(vec3(4.0, 3.0, 2.0), wall, smoothstep(throatR * 0.5, throatR * 1.4, length(tc)));
+		over(P, A, lin(pc), pit);
+		// a broken rim of darker crumbs round the lip, and a lit crest on the far side
+		float lip = exp(-pow((d - edgeR) / 0.022, 2.0));
+		over(P, A, lin(mix(vec3(52.0, 34.0, 18.0), vec3(120.0, 86.0, 46.0), far * 0.8)), lip * (0.7 + 0.3 * h2(floor(vec2(an * 14.0, 0.0)) + seed)));
 		ALBEDO = A > 0.0 ? P / A : vec3(0.0);
 		ALPHA = clamp(A * v_col.a * (1.0 - smoothstep(0.92, 1.0, d)), 0.0, 1.0);
 	} else if (v_c.x > 4.5) {

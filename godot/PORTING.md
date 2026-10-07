@@ -3925,6 +3925,25 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   in front of the ground marks. Capture: `node scripts/godot-shoot.mjs --scene egypt_powers
   --params "power=plague_of_serpents"` (t = 3.6: the first pair's heaps and cracks, the second
   pair mid-burst; t=1 the first plume, t=9 the heaps left round empty holes).
+- **The serpent's hole is a dark pit** (gods round 22, fixing round 21): at t=9 the hole read as
+  a green puddle, for two reasons. (1) The black pit of decal_mix kind 6 was only 0.15 of the
+  quad's half-width (0.47 tiles) while the heap's inner slope stands at 0.8 tiles, so the ring
+  between them was half-transparent churn over the emerald vortex; and decal_add kind 11 added a
+  green "heart" gaussian right over the pit. Now the pit fills everything inside the heap
+  (d < 0.27 with a ragged edge), fully opaque: a funnel from a near-black throat (shifted toward
+  the camera) up sloping, radially streaked walls in shadow to a dark ochre lip; the quad is yawed
+  so its +x points away from the camera (`yaw = atan2(cdz, -cdx)`), so the far wall, which faces
+  the eye, is the lit one (up to (96,66,34)) and the near wall stays dark. Kind 11 no longer
+  lights the pit at all: it glows only a thin seam down the middle of each cleft
+  (smoothstep(0.8, 1, cracks)), only just past the heap (fading out by d 0.72), and only while the
+  hole is fresh (strength 0.95 x (1 - age / 4) + 0.05: an old hole's cracks go dark). Measured
+  at t=9: the pit centre (23..35, 29..31, 20..23), the far wall (103,82,51). (2) The "stippled,
+  dithered" cracks were a shader bug, not depth fighting: `v_c` (INSTANCE_CUSTOM) was a smooth
+  varying, so the interpolator's 1-ulp jitter in custom.y (the seed) went through the
+  `fract(sin(x) * 43758.5)` hashes in `emerge_cracks()` and came out as per-pixel noise. `v_c`
+  is now `varying flat` in decal_mix and decal_add (the value is per instance anyway; the
+  scorch, crater and lava kinds, seeded the same way, are cleaner for it). The cracks are now
+  solid near-black clefts ((10,7,4) by the hole to (34,23,12) out) with a dark ochre shoulder.
 - **Horus' Tornado funnel** (round 12: egypt_fx.gd `_make_funnel`, tornado.gdshader `mode`):
   a value structure instead of a pale haze. The body (mode 1, the ring mesh's outer face;
   the meshes wind so that is the *back* face) is fully opaque except at its silhouette (a dark

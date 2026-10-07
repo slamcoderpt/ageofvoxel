@@ -701,11 +701,14 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 		const double cl = std::max(1e-6, std::hypot(cdx, cdz));
 		cdx /= cl; cdz /= cl;
 		auto smoothstep_ = [](double e0, double e1, double v) { return sstep(e0, e1, v); };
-		// the broken ground, and its glow while the god's power is in it
-		decal(I_DECAL_MIX, x, gy + 0.05, z, 6.2, rot, 1, 1, 1, (float)(0.97 * fade), 6, (float)((sd >> 5) % 997 / 997.0), (float)grow);
-		const double gk = clamp01(1 - age / 5.0) * 0.85 + 0.15 * fade;
+		// the broken ground, and its glow while the god's power is in it. (The quad is yawed so its
+		// +x points away from the camera: the pit's far wall, which faces the eye, is the lit one;
+		// the seed alone varies the cracks.)
+		const double yaw = std::atan2(cdz, -cdx);
+		decal(I_DECAL_MIX, x, gy + 0.05, z, 6.2, yaw, 1, 1, 1, (float)fade, 6, (float)((sd >> 5) % 997 / 997.0), (float)grow);
+		const double gk = clamp01(1 - age / 4.0) * 0.95 + 0.05 * fade;   // (an old hole's cracks go dark)
 		const Lin gc = hex_lin(0x5cff6a);
-		decal(I_DECAL_ADD, x, gy + 0.07, z, 6.2, rot, gc.r, gc.g, gc.b, (float)(1.3 * gk * (0.85 + 0.15 * std::sin(now * 5 + sd % 7))), 11,
+		decal(I_DECAL_ADD, x, gy + 0.07, z, 6.2, yaw, gc.r, gc.g, gc.b, (float)(1.3 * gk * (0.85 + 0.15 * std::sin(now * 5 + sd % 7))), 11,
 				(float)((sd >> 5) % 997 / 997.0), (float)grow);
 		// the raised ring of displaced sand: voxels heaped round the hole, highest on its crest
 		static const uint32_t OCHRE[5] = { 0x7c5226, 0x6a431c, 0x8a5c2a, 0x5a3816, 0x94683a };

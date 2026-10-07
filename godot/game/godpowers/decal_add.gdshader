@@ -34,7 +34,9 @@ render_mode unshaded, blend_add, depth_draw_never, cull_disabled, fog_disabled, 
 
 uniform float time = 0.0;
 varying vec4 v_col;
-varying vec4 v_c;
+// (flat: INSTANCE_CUSTOM is per instance; interpolated, it picks up 1-ulp jitter that the sin hashes
+// below blow up into a per-pixel dither over everything seeded by custom.y)
+varying flat vec4 v_c;
 
 void vertex() {
 	v_col = COLOR;
@@ -254,10 +256,15 @@ void fragment() {
 		c += vec3(1.0) * core * 0.35 * v_col.a;
 		c *= 1.0 - smoothstep(0.99, 1.0, d);
 	} else if (kind == 11) {
-		// a serpent's emergence cracks glowing (the same cracks as decal_mix kind 6)
+		// a serpent's emergence cracks glowing (the same cracks as decal_mix kind 6): only a thin
+		// seam down the middle of each cleft, and only near the hole (it dies out by d 0.72); the
+		// pit itself stays black (no glow over it: an additive green there turned the hole into a
+		// green puddle)
 		float cr = emerge_cracks(p, v_c.y * 41.0, v_c.z);
-		float hole = exp(-pow(d / 0.16, 2.0));
-		c = v_col.rgb * (cr * (1.0 - smoothstep(0.08, 0.8, d)) + hole * 0.8) * v_col.a;   // (the outer cracks stay dark)
+		float seam = smoothstep(0.8, 1.0, cr);
+		float near = 1.0 - smoothstep(0.36, 0.72, d);              // past the heap of sand (0.26..0.42)
+		float lipglow = exp(-pow((d - 0.27) / 0.025, 2.0)) * seam;
+		c = v_col.rgb * (seam * near * step(0.27, d) + lipglow * 0.5) * v_col.a;
 		c *= 1.0 - smoothstep(0.9, 1.0, d);
 	} else if (kind == 8) {
 		c = v_col.rgb * v_col.a * (exp(-d * d * 3.5) - 0.03) * (1.0 - smoothstep(0.85, 1.0, d));
