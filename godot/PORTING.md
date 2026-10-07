@@ -2785,6 +2785,37 @@ the knees. Check: `eu_focus=priest&eu_zoom=0.7` (and `eu_state=walk`),
 `eu_one=priest&eu_turn=20&eu_zoom=0.9`, `eu_group=eco`,
 `eu_focus=son_of_osiris`.
 
+Pharaoh pose, skirt, crook and flail, round 38 (unit_04; he stood like a
+mannequin: straight box arms, the free arm out at 45 degrees with a fist in the
+air, the crook gripped at its very end and longer than the body, a skirt of
+four hard tiers, both feet planted). `manParts` takes `restFL` / `restFR`, a
+standing elbow bend on the forearm part (its `rest`, applied after the
+animation's own forearm turn). The crook arm: `restR` [-0.3, 0, -2.0] with
+`restFR` [-0.25, 0, -0.5] (the elbow bent about 30 degrees, the fist in over
+the crown); `crookM(hx, { top, butt })` gives him a crook a quarter shorter
+(top 17, butt -10) held a third of the way up the shaft, its rest
+[0.3, 0, 1.75] tipping it up past the crown with the hook behind the head.
+The other arm hangs close (`restL` [-0.12, 0, 0.16]) with the elbow bent
+forward (`restFL` [-0.95, 0, -0.12]) and the fist at the hip holds a **flail**
+(`flailM`, part `flail` on armL, part scale 0.25, rest [0, 0.9, 0]: a banded
+gold / team handle tipped out to the side, three bead strands hanging from its
+top, the gold self-lit so it does not grade to skin-tone cream). The tiered
+skirt and the pelvis under it are cut from the torso; the skirt is its own
+fine part (`pharaohSkirtM`, part `skirt` on the torso, scale BODY_SCALE / 2,
+greedy): one A-line from under the sash to the ankles, grown row by row from a
+rounded section by whole cells (out to the sides, forward, back) so every step
+is one clean line, 16 knife pleats in the dye fanning with the flare, a flared
+gold apron and a gold hem. It is shaded as a smooth cone: `greedyGeometry`
+uses a model's `smoothN(x, y, z)` for the normals when it has one, so the
+flare's one-cell steps catch no light of their own (tested against a curve per
+row they read as speckle, grown as rings they read as ribs). The stride:
+unit_view.cpp gives pose "staff" without "upright" (the Pharaoh only, not the
+Priest) its own idle stance, the free foot stepped forward out of the hem
+(thigh -0.25, knee 0.06), the weight on the back leg. The bust/portrait path
+ignores part rests, as before. Check: `eu_one=pharaoh&eu_turn=20` (and
+`eu_zoom=0.6`), `eu_focus=pharaoh` with `eu_state=walk|attack|die`,
+`eu_group=eco`.
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower

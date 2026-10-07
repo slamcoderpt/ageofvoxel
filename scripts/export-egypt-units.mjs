@@ -1204,7 +1204,7 @@ function eSash(m, color, x0 = -5, x1 = 4, y0 = 13, y1 = 3) {
 }
 // the parts of a standing Egyptian man; s scales a rider (joints and voxels)
 function manParts({ torso, head: hs, headScale = 0.9, headZ = MAN.headZ, pal = PAL_SKIN, arm = {}, armL = {}, armR = {}, leg = {}, s = 1,
-  armX = MAN.armX, legs = true, torsoJoint = null, torsoParent = null, restL = null, restR = null, liftL = 0, liftR = 0, fine = true } = {}) {
+  armX = MAN.armX, legs = true, torsoJoint = null, torsoParent = null, restL = null, restR = null, restFL = null, restFR = null, liftL = 0, liftR = 0, fine = true } = {}) {
   // (round 12) no baked corner AO on the men's bodies: on the rounded limb
   // sections it drew dark grooves down every arm and leg (a stick-built doll);
   // the scene's light shades the round forms instead
@@ -1228,14 +1228,16 @@ function manParts({ torso, head: hs, headScale = 0.9, headZ = MAN.headZ, pal = P
   // rounded elbow, channels foreL / foreR), so a work or fighting pose can
   // bend it instead of swinging a stiff stick from the shoulder; gear held in
   // that hand is re-parented to the forearm by rig()
-  for (const [sd, o, lift, rest] of [['L', armL, liftL, restL], ['R', armR, liftR, restR]]) {
+  // (round 38) restFL / restFR: a standing elbow bend on the forearm (part
+  // "rest", applied after the animation's own forearm turn)
+  for (const [sd, o, lift, rest, restF] of [['L', armL, liftL, restL, restFL], ['R', armR, liftR, restR, restFR]]) {
     const a = manArmM({ pal, ...arm, ...o, side: sd });
     const sx = sd === 'L' ? armX : -armX, R = rest ? { rest } : {};
     if ({ ...arm, ...o }.bend) { P.push(part(`arm${sd}`, a, [0.5, 18.5, 0.5], sc([sx, MAN.armY + lift, 0], s), 'torso', { ...X, ...R })); continue; }
     const [up, lo] = splitArm(a, pal);
     const fk = { fineK: { ...arm, ...o }.slim ? 0.8 : 1 };
     P.push(part(`arm${sd}`, up, [0.5, 18.5, 0.5], sc([sx, MAN.armY + lift, 0], s), 'torso', { ...X, ...R, ...F('upper', sd, pal, fk) }));
-    P.push(part(`fore${sd}`, lo, [0.5, 9.5, 0.5], sc(FORE_J, s), `arm${sd}`, { ...X, forearm: true, ...F('fore', sd, pal, fk) }));
+    P.push(part(`fore${sd}`, lo, [0.5, 9.5, 0.5], sc(FORE_J, s), `arm${sd}`, { ...X, forearm: true, ...(restF ? { rest: restF } : {}), ...F('fore', sd, pal, fk) }));
   }
   return P;
 }
@@ -1543,7 +1545,7 @@ const ANKH_PIVOT = [2, 0, 2];
 // below the fist and, at the top, a wide hook curling over and down (outer
 // radius 5, a clear gap inside) with a gold tip: Retold's heqa sceptre, held
 // overhead it reads as a crook, not a stick
-function crookM(hx = 1) {
+function crookM(hx = 1, { top = 28, butt = -7 } = {}) {
   // (round 32) flat banded tones (no jitter speckle) and the hook curled in
   // the shaft's own x-y plane, the plane the raised arm shows the camera
   // (curling towards +z it was seen edge-on, a straight stick): from the
@@ -1554,9 +1556,11 @@ function crookM(hx = 1) {
   const G = 0xf0c400, GL = PH_GOLD_L;
   const band = (k) => ((k & 1) ? G : TEAM);
   const put = (x, y, z, c) => { if (c === TEAM) tset(m, x, y, z, 0xffffff); else m.set(x, y, z, c); };
-  const TOP = 28;
-  for (let y = -7; y <= TOP; y++) for (let x = 0; x <= 1; x++) for (let z = 0; z <= 1; z++)
-    put(x, y, z, y <= -5 ? GL : band(Math.floor((y + 30) / 3)));
+  // (round 38) top / butt: the Pharaoh holds a shorter crook a third of the
+  // way up the shaft (top 17, butt -10), the old one in the fist at its end
+  const TOP = top;
+  for (let y = butt; y <= TOP; y++) for (let x = 0; x <= 1; x++) for (let z = 0; z <= 1; z++)
+    put(x, y, z, y <= butt + 2 ? GL : band(Math.floor((y + 30) / 3)));
   // the hook: voxel centres within 3.5..5.5 of (cx, TOP) above the shaft's top
   const cx = 1 + hx * 4.5, cy = TOP + 0.5;
   for (let x = -12; x <= 13; x++) for (let y = TOP + 1; y <= TOP + 7; y++) {
@@ -1964,6 +1968,100 @@ const sc = (j, s) => j.map((v) => v * s);
   ]);
 }
 
+// (round 38) the Pharaoh's skirt, on a grid twice the torso's (part scale
+// BODY_SCALE / 2, fine voxels, model y 0 = the hip): one smooth A-line from
+// under the gold sash to the ankles, no tiers. Each row a rounded section
+// (superellipse, power 2.6) whose half-width grows smoothly from 4.4 to 9
+// torso voxels and whose depth from 3.1 to 5.9, the front a little ahead
+// of the back. Knife pleats fan round it with the flare (the angle round the
+// section, 26 pleats, each a lit, a mid and a shaded strip of the team dye),
+// a flared gold apron down the front with a lit edge and two pleat lines,
+// and a gold hem band.
+function pharaohSkirtM() {
+  // Built as a stack of row masks (fine x, z cells): the top row a rounded
+  // section, and each row below it the row above grown by whole cells
+  // (out to the sides, to the front, to the back) on a smooth schedule. A
+  // flare drawn by testing each row against a growing curve stepped at
+  // scattered cells, and their lit tops read as speckle; grown this way,
+  // every step is one clean line of cells along the face.
+  const m = new VoxelModel();
+  const Y0 = 3, Y1 = -45, PG = 0xecc000, PGD = 0xc49400, PW = 2.6, N = 16;
+  const AX0 = 8.8, AZ0 = 6.4, GX = 9.2, GF = 8, GB = 4.8;   // fine cells
+  let mask = new Set();
+  for (let x = -12; x <= 12; x++) for (let z = -12; z <= 12; z++)
+    if (Math.abs((x + 0.5) / AX0) ** PW + Math.abs((z + 0.5) / AZ0) ** PW <= 1) mask.add(`${x},${z}`);
+  let gx = 0, gf = 0, gb = 0;
+  const rowsN = new Map();
+  for (let yf = Y0; yf >= Y1; yf--) {
+    const t = (Y0 - yf) / (Y0 - Y1), e = Math.pow(t, 0.85);
+    const grow = (dx, dz) => { const n = new Set(mask); for (const k of mask) { const [x, z] = k.split(',').map(Number); n.add(`${x + dx},${z + dz}`); } mask = n; };
+    while (gx < Math.round(GX * e)) { grow(1, 0); grow(-1, 0); gx++; }
+    while (gf < Math.round(GF * e)) { grow(0, 1); gf++; }
+    while (gb < Math.round(GB * e)) { grow(0, -1); gb++; }
+    let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+    const cells = [...mask].map((k) => k.split(',').map(Number));
+    for (const [x, z] of cells) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    const ax = (x1 - x0 + 1) / 2, az = (z1 - z0 + 1) / 2, cz = (z0 + z1 + 1) / 2;
+    for (const [xf, zf] of cells) {
+      const dx = (xf + 0.5) / ax, dz = (zf + 0.5 - cz) / az;
+      if (yf <= Y1 + 2) { m.set(xf, yf, zf, yf === Y1 + 2 ? PH_GOLD_L : PG); continue; }   // the gold hem
+      // the apron: on the front, narrow under the sash, flaring to 2/3 of the hem's width
+      const aw = 1.3 + 2.6 * e, ux = Math.abs((xf + 0.5) / 2);
+      if (dz > 0.2 && ux <= aw && yf >= Y1 + 7) {
+        const edge = ux > aw - 0.55 || yf === Y1 + 7;
+        const pl = !edge && Math.abs(ux - aw * 0.5) < 0.3;
+        m.set(xf, yf, zf, edge ? PH_GOLD_L : pl ? PGD : PG);
+        continue;
+      }
+      // knife pleats: a lit ridge, the dye and a shaded fold in each, from
+      // the sash to the hem, fanning out with the flare
+      const phi = Math.atan2(dx, dz), k = ((phi / (2 * Math.PI)) * N % 1 + 1) % 1;
+      const valley = k >= 0.7;
+      tset(m, xf, yf, zf, valley ? 0xa4a4a4 : k < 0.2 ? 0xdedede : 0xffffff);
+    }
+    rowsN.set(yf, { ax, az, cz });
+  }
+  // shaded as the smooth cone it stands for: every face of the skirt takes
+  // the section's outward normal at its corner (greedyGeometry smoothN), so
+  // the one-cell steps of the flare catch no light of their own and the
+  // skirt shades as one A-line; the pleats are drawn in the dye
+  m.smoothN = (x, y, z) => {
+    const r = rowsN.get(Math.max(Y1, Math.min(Y0, Math.round(y)))) || rowsN.get(Y0);
+    const nx = x / (r.ax * r.ax), nz = (z - r.cz) / (r.az * r.az);
+    const h = Math.hypot(nx, nz) || 1;
+    const l = Math.hypot(1, 0.18);
+    return [nx / h / l, 0.18 / l, nz / h / l];
+  };
+  return m;
+}
+// (round 38) the flail (nekhakha) in the Pharaoh's other fist, at the rig
+// voxel (part scale 0.5, pivot [1, 1, 0]): a short handle banded gold and
+// the army's colour along +z out of the front of the fist, a gold knob at
+// each end, and three bead strands from its top hanging back down beside
+// it, fanned out to the side (the forearm held forward tips the handle up
+// and the strands hang)
+function flailM() {
+  // (at part scale 0.25: half the body voxel, so the strands stay thin)
+  const m = new VoxelModel();
+  const G = 0xf0c400, GD = 0xc49400;
+  // (the gold self-lit, as the axe's bronze: the grade turns plain gold
+  // this small into skin-tone cream, and the flail read as a glove)
+  const put = (x, y, z, c) => { if (c === TEAM) tset(m, x, y, z, 0xffffff); else m.set(x, y, z, c, { glow: c === G ? 0.7 : 0.5 }); };
+  for (let z = -4; z <= 17; z++) for (let x = 0; x <= 1; x++) for (let y = 0; y <= 1; y++)
+    put(x, y, z, z <= -3 ? GD : Math.floor((z + 30) / 3) & 1 ? G : TEAM);
+  for (let x = -1; x <= 2; x++) for (let y = -1; y <= 2; y++) if (!((x === -1 || x === 2) && (y === -1 || y === 2))) put(x, y, 18, GD);
+  // three bead strands from the top, hanging back and down beside the handle, fanned
+  for (const [sx, n] of [[-2, 13], [0.5, 15], [3, 13]]) {
+    for (let i = 0; i <= n; i++) {
+      // the strands' fall: world down seen from the handle as it is held
+      // (the forearm forward, the handle tipped out: part rest)
+      const y = -1 - i * 0.48, z = 18 - i * 0.55, x = sx + i * 0.69 + (sx - 0.5) * i * 0.05;
+      put(Math.round(x), Math.round(y), Math.round(z), i >= n - 1 ? GD : (i % 3 === 2 ? G : TEAM));
+    }
+  }
+  return m;
+}
+
 // Pharaoh (unit_04), on the men's body (rig voxel 0.08): a narrow waist under a
 // gold sash, a team chest under a gold corselet with a team V, squared gold
 // shoulder pads standing out past the deltoids, a light gold collar ring round
@@ -1991,26 +2089,9 @@ const sc = (j, s) => j.map((v) => v * s);
     if (x >= 7) { if (z === 2 || z === -3) tset(t, X, 12, z, 0xffffff); else t.set(X, 12, z, PH_GOLD); }
   }
   for (let x = -3; x <= 2; x++) for (let z = -3; z <= 2; z++) if (Math.abs(x + 0.5) > 1.5 || z < -2 || z > 1) t.set(x, 15, z, PH_GOLD_L);   // the collar ring
-  // the A-line skirt: a shell from the sash flaring to the ankles
-  // (round 32) in four clean tiers (12, 14, 16, 18 wide, flaring forward a
-  // voxel a tier front and back) instead of a stair every two or three rows, the team
-  // sides one solid dye (the shader shades each face by its turn; the old
-  // white / shade patchwork and the stepped corners broke into speckle at
-  // the hem), the apron and hem one flat gold with a lit edge
-  const LEN = 23, PG = 0xecc000;
-  for (let i = 0; i <= LEN; i++) {
-    const y = 1 - i, tier = Math.min(3, Math.floor(i / 6));
-    const w = 12 + tier * 2, z0 = -3 - tier, z1 = 2 + tier;   // (wide and deep enough that no thigh or shin breaks through, standing or walking)
-    const aw = 1.5 + tier * 0.75;
-    for (let x = -w / 2; x < w / 2; x++) for (let z = z0; z <= z1; z++) {
-      const ex = x === -w / 2 || x === w / 2 - 1;
-      if (ex && (z === z0 || z === z1)) continue;
-      const ax = Math.abs(x + 0.5);
-      if (i >= LEN - 1) t.set(x, y, z, PG);                                          // the gold hem band
-      else if (z === z1 && ax <= aw && i <= LEN - 3) t.set(x, y, z, ax > aw - 1 ? PH_GOLD_L : PG);   // the gold apron
-      else tset(t, x, y, z, 0xffffff);
-    }
-  }
+  // (round 38) the tiered skirt is gone from the torso (its own fine part,
+  // pharaohSkirtM): the pelvis under it cut away so nothing pokes through
+  t.carve(-9, -30, -8, 18, 32, 16);
   eBelt(t, PH_GOLD, PH_GOLD_L);
   rig('pharaoh', { voxel: 0.08, anim: 'human', style: 'pharaoh', pose: 'staff', stance: 0.3 }, [
     ...manParts({ torso: t, head: 'pharaoh', headScale: 1.1, pal: PAL_PH, arm: { bracer: TEAM, clean: true }, armR: { grip: true },
@@ -2018,11 +2099,22 @@ const sc = (j, s) => j.map((v) => v * s);
       // stride swings the back leg out past any hem, and a bare brown leg
       // kicking out behind the robe read as a stray stick
       leg: { sandal: SANDAL, pal: { L: TEAM, M: TEAM, D: TEAM }, foot: PAL_PH.M },
-      restL: [-0.35, 0, 0.42], restR: [-0.25, 0, -2.25] }),
+      // (round 38) no mannequin arms: the crook arm raised out to the side
+      // with the elbow bent 30 degrees so the fist comes in over the crown;
+      // the flail arm close to the side, the elbow bent forward so the fist
+      // holds the flail in front of the hip
+      armL: { grip: true },
+      restL: [-0.12, 0, 0.16], restFL: [-0.95, 0, -0.12],
+      restR: [-0.3, 0, -2.0], restFR: [-0.25, 0, -0.5] }),
     // (round 13) the crook through the raised fist (the fingers round the
     // shaft), laid across over the crown with the hook out past his left
     // shoulder, as Retold's Pharaoh holds it (unit_04)
-    part('weapon', crookM(), [1, 0, 1], GRIP_C, 'armR', { scale: 0.5, rest: [0, 0, 1.35] }),
+    // (round 38) a quarter shorter, held a third of the way up the shaft,
+    // the wrist turned back so the hook rides behind the crown
+    part('weapon', crookM(1, { top: 17, butt: -10 }), [1, 0, 1], GRIP_C, 'armR', { scale: 0.5, rest: [0.3, 0, 1.75] }),
+    part('flail', flailM(), [1, 1, 0], GRIP_C, 'armL', { scale: 0.25, jitter: 0, rest: [0, 0.9, 0] }),
+    // (round 38) one smooth A-line skirt on a fine grid (pharaohSkirtM)
+    part('skirt', pharaohSkirtM(), [0, 0, 0], [0, 0, 0], 'torso', { scale: BODY_SCALE * 0.5, greedy: true, jitter: 0 }),
   ]);
 }
 
@@ -4174,7 +4266,9 @@ function greedyGeometry(model, { size, pivot }) {
         const n = [0, 0, 0]; n[a] = sgn;
         for (const p of cs4) {
           pos.push((p[0] - pivot[0]) * size, (p[1] - pivot[1]) * size, (p[2] - pivot[2]) * size);
-          nor.push(...n); col.push(_gc.r, _gc.g, _gc.b); team.push(+ts); glow.push(+gs);
+          // (round 38) a model may shade as the smooth form it stands for
+          // (smoothN(x, y, z) at the corner; the Pharaoh's skirt)
+          nor.push(...(model.smoothN ? model.smoothN(p[0], p[1] - 0.5, p[2]) : n)); col.push(_gc.r, _gc.g, _gc.b); team.push(+ts); glow.push(+gs);
         }
         idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
         i += wd;

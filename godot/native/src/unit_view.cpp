@@ -977,6 +977,10 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 			else if (sv == 1) { ts = 0.12; ss = 0.42; rs = 0.1; tf = -0.3; sf = 0.5; rf = 0.12; }
 			else { ts = -0.14; ss = 0.3; rs = 0.03; tf = 0.26; sf = 0.55; rf = 0.06; }
 			ts *= k; ss *= k; rs *= k; tf *= k; sf *= k; rf *= k;
+			// (round 38, the Pharaoh: pose "staff", not "upright") a stride, not
+			// attention: the free foot stepped well forward out of the robe's
+			// hem, its knee soft, the weight on the back leg
+			if (pose == P_STAFF && !rig.upright) { ts = 0.12; ss = 0.1; rs = 0.03; tf = -0.25; sf = 0.06; rf = 0.08; }
 			const double reach_s = (7 * std::cos(ts) + 7 * std::cos(ts + ss)) * std::cos(rs);
 			const double reach_f = (7 * std::cos(tf) + 7 * std::cos(tf + sf)) * std::cos(rf);
 			// the right leg supports when mr
