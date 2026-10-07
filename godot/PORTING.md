@@ -1110,9 +1110,8 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   (battered blocks under a flared cavetto (`block(..., { flare: true })`)
   with the painted `CAMP_FRIEZE` (lapis, a pale fillet, red) under it; a
   canvas awning over the work yard: the Lumber Camp's over a 3-2 stack of
-  big logs (`bigLog`: 3x3 section, pale sapwood ring caps round a dark
-  heart, ends to the open side), crates, a barrel and a saw-pit in front (a
-  dark pit in a timber kerb, a log on bearers, the pit saw through it); the
+  round logs (`cleanLog`, see "Clean Lumber Camp props, round 30"), a
+  sawhorse, a stump with an axe, a barrel and crates; the
   Mining Camp after building_07: a 12x10 block under a flared cavetto with
   the team rim, limestone corner piers, a painted frieze under the cornice
   (`MINE_FRIEZE`: pale fillets round a band of lapis / ochre / red panels,
@@ -1616,6 +1615,22 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   open crate of grain by the door and a square-row clay jar at each front
   corner (the lathe barrel and the loose sacks are gone).
   `egt_focus=granary` (and `egt_yaw=208` for the ladder side) frames it.
+- **Clean Lumber Camp props, round 30** (`lumberCamp()`, building_06): the
+  props are a few clean primitives, every voxel one flat colour (`pset`, so
+  `weather()` leaves them alone), dark bark against pale cut ends and pale
+  sand, a voxel of sand round each and the door (now 4 wide, centred) and
+  its path left clear. The stock is `cleanLog` (4x4 section, corners cut so
+  it reads round; bark dark below, lit on top; each end a pale disc round a
+  warm 2x2 heart): two logs below, two bedded above, a voxel apart so every
+  end reads as its own disc, the lower ends out past the canvas into the
+  sun. The saw-pit, the low beam across it and the dithered `bigLog` stack
+  are gone; west of the door a sawhorse (splayed dark legs at each end, a
+  pale two-board plank, a saw lying on it: grey blade, bright toothed edge,
+  dark haft); between the door's path and the stock a stump (bark sides, a
+  pale cut top) with an axe planted in it; a square-row barrel (iron hoop,
+  pale lid) at the front right corner, the crates (`cleanCrate`: flat
+  boards, darker frame, a brace) behind the stock.
+  `egt_focus=lumber_camp&egt_dist=7&egt_pitch=38` frames it close.
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8

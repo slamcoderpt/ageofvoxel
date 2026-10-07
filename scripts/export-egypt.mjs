@@ -2536,42 +2536,82 @@ const CAMP_FRIEZE = [(x, y, z) => ((x + z) % 5 === 0 ? shade(LAPIS, 0.8) : LAPIS
 // the camp's stock: a stack of big logs showing their pale ring ends, a
 // saw-pit in front with a log on trestles and a pit saw through it, crates,
 // a barrel, a spare log behind (no tall frame: the block is the silhouette).
+// round 30 props: a few clean primitives, each voxel one flat colour (pset,
+// so weather() leaves them alone), dark bark against pale cut ends and pale
+// sand, a voxel of sand round every prop and the door's path left clear.
+const LC_BARK = 0x5a3920, LC_BARK_D = 0x432a17, LC_BARK_L = 0x6e4829;
+const LC_END = 0xf2e0b4, LC_RING = 0xdcb67a, LC_HEART = 0xb07a40;
+const LC_LEG = 0x3a2414, LC_PLANK = 0xc29058, LC_PLANK_L = 0xd6a96c;
+const LC_STEEL = 0x4f565d, LC_EDGE = 0xe8ecf0, LC_HAFT = 0x7a4c24;
+// a round log of 4 x 4 section with its corners cut (so the silhouette and
+// the cut end read round) along x or z: the bark darker on the lower side,
+// lit along the top; both ends a pale cut disc round a warm 2 x 2 heart
+function cleanLog(m, x0, y, z0, len, along = 'z') {
+  for (let s = 0; s < len; s++) for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) {
+    if ((a === 0 || a === 3) && (b === 0 || b === 3)) continue;
+    const end = s === 0 || s === len - 1, heart = a > 0 && a < 3 && b > 0 && b < 3;
+    const c = end ? (heart ? LC_HEART : LC_END) : b === 3 ? LC_BARK_L : b === 0 ? LC_BARK_D : LC_BARK;
+    if (along === 'z') pset(m, x0 + a, y + b, z0 + s, c); else pset(m, x0 + s, y + b, z0 + a, c);
+  }
+}
+// a clean crate (n >= 4): flat boards inside a darker frame on every edge,
+// a dark diagonal brace across the front (+z) face
+function cleanCrate(m, x, y, z, n, c = 0xb48a52) {
+  const e = shade(c, 0.66), br = shade(c, 0.8);
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) for (let k = 0; k < n; k++) {
+    const ex = i === 0 || i === n - 1, ey = j === 0 || j === n - 1, ez = k === 0 || k === n - 1;
+    let col = (ex && ey) || (ey && ez) || (ex && ez) ? e : c;
+    if (col === c && k === n - 1 && i === j) col = br;
+    pset(m, x + i, y + j, z + k, col);
+  }
+}
 function lumberCamp() {
   const m = lot(24, 24);
   block(m, 2, 3, 13, 15, 1, 13, { wall: ESAND, roofC: EDECK, rimC: LIME, gorge: [0x963f2a, 0xa5492f], torus: false, lipOut: 2, batter: 5, band: null, flare: true });
-  // the painted frieze under the cornice: lapis, a pale fillet, red, pale
-  // (round 27: the block's own painted band under the parapet)
-  door(m, '+z', 6, 3, 1, 6);
+  // the door, centred on the front and clear of every prop (its worn path
+  // runs straight out to the lot edge)
+  door(m, '+z', 6, 4, 1, 6);
   slit(m, '+x', 7, 6, 2, 1);
   // the canvas from the block's east face over the stock
   const yTop = 10, f = 12 - Math.floor((yTop - 1) / 5);
   clothAwning(m, '+x', f, 4, 19, yTop, 22 - f, 2.5, { posts: [4, 11, 18], sw: 2, belly: 0.5, sag: 1.2 });
-  // the stock: big logs stacked 3-2 along z under the canvas, their pale
-  // ring ends out at the open side, facing the street
-  for (const [row, xs] of [[0, [13, 16, 19]], [1, [14, 17]]]) for (const x of xs) bigLog(m, x, 1 + row * 3, 6 + row, 10 - row, 'z');
-  // chocks at the stack's foot
-  for (const x of [12, 22]) m.set(x, 1, 14, DARKWOOD);
-  // crates by the door
-  crate(m, 10, 1, 18, 3, 3, 3, 0xb08850);
-  crate(m, 10, 4, 18, 3, 2, 3, 0xa27c48);
-  crate(m, 1, 1, 18, 3, 3, 3, 0xb08850);
-  barrel(m, 4.5, 1, 22, 4, 1.4);
-  // the saw-pit in front: a dark pit in a timber kerb, a trimmed log on
-  // bearers across it, the pit saw standing through the log, a tiller handle
-  // across its top, sawdust by the pit
-  for (let x = 14; x < 23; x++) for (let z = 18; z < 24; z++) {
-    const rim = x === 14 || x === 22 || z === 18 || z === 23;
-    m.set(x, 0, z, rim ? PLANK(x, 0, z) : (x === 15 || x === 21 || z === 19 || z === 22) ? 0x2e241c : DARK);
+  // the stock (building_06): round logs stacked 3 over 2 along z under the
+  // canvas, a voxel of shade between neighbours so every pale cut end reads
+  // as its own disc, the upper logs bedded in the gaps
+  // (the lower ends out past the canvas's edge into the sun)
+  for (const x of [13, 18]) cleanLog(m, x, 1, 6, 14, 'z');
+  cleanLog(m, 15, 4, 7, 12, 'z');
+  cleanLog(m, 20, 4, 8, 10, 'z');
+  // the sawhorse (front left, west of the door's path): splayed dark legs
+  // at each end, a pale two-board plank along the top, the saw lying on it
+  // (a grey blade with a bright toothed edge, a dark haft across its end)
+  for (const z of [18, 22]) {
+    pset(m, 0, 1, z, LC_LEG); pset(m, 3, 1, z, LC_LEG);
+    for (const y of [2, 3]) { pset(m, 1, y, z, LC_LEG); pset(m, 2, y, z, LC_LEG); }
   }
-  for (const x of [15, 21]) for (let z = 19; z < 23; z++) m.set(x, 1, z, DARKWOOD);
-  log(m, 13, 2, 20, 11, 'x', 1);
-  for (const x of [17, 18]) for (let y = 1; y < 8; y++) m.set(x, y, 20, (y === 1 || x === 18) ? 0x4e4a45 : 0x77726a);
-  for (let z = 19; z < 22; z++) m.set(17, 8, z, POLE);
-  for (const [x, z] of [[17, 23], [19, 23], [13, 21], [23, 20]]) if (!m.has(x, 0, z)) m.set(x, 0, z, 0xd9c08a);
-  // no tall frame (Retold's camp has none): a spare log on chocks behind
-  // the stack, under the block's height
-  log(m, 13, 2, 1, 10, 'x', 1);
-  for (const x of [14, 21]) m.set(x, 1, 1, DARKWOOD);
+  for (let z = 17; z <= 23; z++) for (const x of [1, 2]) pset(m, x, 4, z, z === 17 || z === 23 ? LC_PLANK : LC_PLANK_L);
+  for (let z = 19; z <= 22; z++) { pset(m, 1, 5, z, LC_STEEL); pset(m, 2, 5, z, LC_EDGE); }
+  pset(m, 1, 5, 23, LC_HAFT); pset(m, 2, 5, 23, LC_HAFT); pset(m, 1, 6, 23, LC_HAFT);
+  // the stump (between the door's path and the stock's ends, low):
+  // bark sides, a pale cut top round a warm heart, an axe planted in it (a
+  // dark steel head with a bright edge biting the top, the haft rising and
+  // leaning back)
+  const SX = 11, SZ = 22;
+  for (let i = -1; i <= 1; i++) for (let k = -1; k <= 1; k++) {
+    const corner = i !== 0 && k !== 0;
+    for (let y = 1; y <= 2; y++) pset(m, SX + i, y, SZ + k, corner ? LC_BARK_D : LC_BARK);
+    pset(m, SX + i, 3, SZ + k, i === 0 && k === 0 ? LC_HEART : corner ? LC_RING : LC_END);
+  }
+  pset(m, SX, 4, SZ + 1, LC_EDGE); pset(m, SX, 4, SZ, LC_STEEL); pset(m, SX, 5, SZ, LC_STEEL); pset(m, SX, 5, SZ + 1, LC_STEEL);
+  for (let y = 5; y <= 8; y++) pset(m, SX, y, y < 7 ? SZ - 1 : SZ - 2, LC_HAFT);
+  // a clean barrel at the front right corner (square rows, corners cut:
+  // staves, a dark iron hoop, a pale lid) and the crates at the back
+  for (let y = 1; y <= 4; y++) for (let i = -1; i <= 1; i++) for (let k = -1; k <= 1; k++) {
+    if (i !== 0 && k !== 0) continue;
+    pset(m, 22 + i, y, 22 + k, y === 2 ? 0x3e3a36 : y === 4 && i === 0 && k === 0 ? 0xd2a66c : y === 4 ? 0xa8743e : 0x8e5c30);
+  }
+  cleanCrate(m, 18, 1, 0, 4);
+  for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) for (let k = 0; k < 2; k++) pset(m, 19 + i, 5 + j, 1 + k, j === 1 ? 0xc49a60 : 0xae8450);
   return m;
 }
 
