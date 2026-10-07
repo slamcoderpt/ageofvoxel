@@ -578,7 +578,200 @@ function headE(style) {
   }
   return m;
 }
+// ---- fine heads (round 34) ---------------------------------------------------
+// The critic read every soldier's hair as one black cube a third wider than
+// the shoulders (a bucket helmet), the face a few smeared pixels under a heavy
+// fringe. The bare-headed / wigged men (Laborer, Spearman, Axeman, Slinger,
+// the Mercenaries) now get a head modelled on a grid twice as fine as the old
+// head (part scale HEAD_SCALE / 2), from shapes rather than boxes, about 0.85
+// of the old size with the hair:
+// - the skull a cranium ellipsoid (centre y 8.6, radii 5.9 / 6 / 5.5) united
+//   with a jaw that narrows row by row to the chin (a rounded section), so
+//   the head tapers to the crown and to the chin with no flat top or corner;
+// - skin shaded from each voxel's surface normal (a lit face plane, a scalp
+//   tone on top, the sides and the back a step down, the jaw's underside and
+//   the jaw line in shade);
+// - the face carved into it: eye sockets recessed a voxel (a dark lid row
+//   over an ivory / near-black / ivory eye), a dark brow over each, a light
+//   nose ridge from the bridge to a tip standing a voxel proud with its
+//   shadow under it, lit cheekbones, a mouth line, a lit chin, ears;
+// - hair as a shell round the cranium (fhShell), never a box: the Slinger's
+//   Egyptian bob in stepped tiers that taper to the crown and flare a little
+//   at the shoulders (each tier's lowest row stands out and has its shadow
+//   under it), the fringe above the brows, the face left open between the
+//   side locks; the Laborer's close crop and the Mercenaries' tight curls
+//   follow the skull; the Spearman shaved with Retold's long lock from the
+//   crown; the Axeman's gold and black striped headcloth a rounded hood with
+//   side falls to the shoulders. Hair carries lighter brown-black strand
+//   voxels so the mass has value variation.
+const FH = {
+  skin: { L: 0xca8452, H: 0xdc9a68, S: 0xa8643a, B: 0x8e4e2c, T: 0xb87240, D: 0x74401f, SOCK: 0x4a2414, BROW: 0x4a2414, LIP: 0x6a2c18, LIPL: 0xb06a42 },
+  dark: { L: 0x7a5038, H: 0x96664a, S: 0x5e3a26, B: 0x4a2c1c, T: 0x6a4430, D: 0x3a2216, SOCK: 0x1e100a, BROW: 0x120806, LIP: 0x3a1a10, LIPL: 0x7a4a34 },
+};
+const FH_HAIR = { D: 0x18120e, M: 0x2a1e16, L: 0x45322a, S: 0x0a0605 };
+const FH_C = { y: 8.6, z: -0.5, rx: 5.9, ry: 6.0, rz: 5.5 };
+const fhCranium = (x, y, z, d = 0) => {
+  const px = x + 0.5, py = y + 0.5 - FH_C.y, pz = z + 0.5 - FH_C.z;
+  return (px / (FH_C.rx + d)) ** 2 + (py / (FH_C.ry + d)) ** 2 + (pz / (FH_C.rz + d)) ** 2 <= 1;
+};
+const fhJaw = (x, y, z) => {
+  if (y < 0 || y > 8) return false;
+  const hw = Math.min(5.5, 2.5 + y * 0.45), zf = y <= 1 ? 4.2 : 4.7, zb = -2.6;
+  const cz = (zf + zb) / 2, az = (zf - zb) / 2;
+  return Math.abs((x + 0.5) / hw) ** 3 + Math.abs((z + 0.5 - cz) / az) ** 3 <= 1;
+};
+const fhInHead = (x, y, z) => fhCranium(x, y, z) || fhJaw(x, y, z);
+function fineHead(style) {
+  const m = new VoxelModel();
+  const dark = style === 'merc' || style === 'mercCav';
+  const P = dark ? FH.dark : FH.skin;
+  // the skull, shaded from the surface normal (empty neighbours within 2)
+  for (let y = -3; y <= 16; y++) for (let x = -8; x <= 7; x++) for (let z = -8; z <= 7; z++) {
+    const neck = y < 1 && Math.hypot(x + 0.5, (z + 0.5 + 0.8) * 1.1) <= 2.7;
+    if (!(fhInHead(x, y, z) || (y >= -3 && neck))) continue;
+    let nx = 0, ny = 0, nz = 0;
+    for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) for (let dz = -2; dz <= 2; dz++) {
+      if (!fhInHead(x + dx, y + dy, z + dz) && !(y + dy < 1 && Math.hypot(x + dx + 0.5, (z + dz + 0.5 + 0.8) * 1.1) <= 2.7)) { nx += dx; ny += dy; nz += dz; }
+    }
+    const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+    const c = y < 0 ? P.D : ny < -0.45 ? P.D : nz > 0.55 ? P.L : ny > 0.6 ? P.T : nz < -0.35 ? P.B : P.S;
+    m.set(x, y, z, c);
+  }
+  // the face, on the front surface (mirror pairs x / -1 - x)
+  const front = (x, y) => { for (let z = 8; z >= -8; z--) if (m.has(x, y, z)) return z; return null; };
+  const paintF = (x, y, c, dz = 0) => { const z = front(x, y); if (z !== null) m.set(x, y, z + dz, c); };
+  const both = (fn) => { for (const s of [0, 1]) fn((x) => (s ? -1 - x : x)); };
+  both((X) => {
+    // the jaw line: the lower sides of the face a step darker
+    for (let y = 0; y <= 3; y++) { const hw = Math.ceil(2.5 + y * 0.45) - 1; paintF(X(-hw - 1), y, P.D); }
+    for (const x of [-5, -4, -3]) paintF(X(x), 6, P.H);                   // the cheekbones
+    for (const x of [-4, -3, -2]) paintF(X(x), 9, P.BROW);                 // the brows
+    // the eye sockets: recessed a voxel, a dark lid row over the eye
+    for (const x of [-4, -3, -2]) for (const y of [7, 8]) { const z = front(X(x), y); if (z !== null) m.remove(X(x), y, z); }
+    for (const x of [-4, -3, -2]) paintF(X(x), 8, P.SOCK);
+    paintF(X(-4), 7, 0xeee2d0); paintF(X(-3), 7, 0x0e0806); paintF(X(-2), 7, 0xd6c8b4);
+    paintF(X(-5), 7, P.D);                                                // the socket's outer edge
+    paintF(X(-2), 5, P.S); paintF(X(-2), 6, P.S);                         // the nose's sides
+    for (const x of [-2, -1]) paintF(X(x), 2, P.LIP);                     // the mouth
+  });
+  for (const x of [-1, 0]) {
+    paintF(x, 8, P.H); paintF(x, 7, P.H);                                 // the bridge
+    for (const y of [5, 6]) paintF(x, y, P.H, 1);                         // the tip, a voxel proud
+    paintF(x, 4, P.D);                                                    // its shadow
+    paintF(x, 1, P.LIPL); paintF(x, 0, P.H);                              // the lower lip, the chin
+    paintF(x, 10, P.H);                                                   // the forehead's light
+  }
+  for (const s of [-1, 1]) {                                              // ears
+    const ex = s < 0 ? -7 : 6;
+    for (let y = 5; y <= 8; y++) for (const z of [-1, 0]) m.set(ex, y, z, y === 5 || y === 8 ? P.D : P.S);
+    m.set(ex, 6, 0, P.SOCK).set(ex, 7, 0, P.D);
+  }
+  const H = FH_HAIR;
+  const strand = (x, z, seed) => { const h = hash3(x, 0, z, seed); return h < 0.18 ? H.L : h < 0.5 ? H.M : H.D; };
+  if (style === 'sling') {
+    // the Egyptian bob: a shell 1..2.2 voxels over the cranium, its lower half
+    // a column that falls to the jaw (y -2), in tiers of three rows: each
+    // tier flares out row by row and the next starts narrower again, the
+    // lowest row its shadow; the crown tapers with the cranium; the fringe
+    // ends at y 11 (the brows at 9 and the forehead at 10 stay clear); below
+    // it the face is open between the side locks, which fall behind the cheeks
+    for (let y = -2; y <= 16; y++) {
+      const ti = ((16 - y) % 3 + 3) % 3, tierD = 0.3 + ti * 0.32;       // 0 top row of a tier .. 2 bottom row
+      const flare = y < 4 ? (4 - y) * 0.16 : 0;
+      for (let x = -9; x <= 8; x++) for (let z = -9; z <= 8; z++) {
+        if (fhInHead(x, y, z) || m.has(x, y, z)) continue;
+        const py = y + 0.5 - FH_C.y, px = x + 0.5, pz = z + 0.5 - FH_C.z;
+        const d = 1 + tierD + flare;
+        let inside;
+        if (py > 0) inside = (px / (FH_C.rx + d)) ** 2 + (py / (FH_C.ry + d)) ** 2 + (pz / (FH_C.rz + d)) ** 2 <= 1;
+        else inside = (px / (FH_C.rx + d)) ** 2 + (pz / (FH_C.rz + d)) ** 2 <= 1;
+        if (!inside) continue;
+        if (y <= 10 && z + 0.5 > 0.5 && Math.abs(px) < 6.4) continue;     // the face and the cheeks open
+        if (y <= 10 && z + 0.5 > 2.6) continue;                           // the locks end behind the cheekbones
+        if (y < 3 && z + 0.5 > -0.5 && Math.abs(px) < 6.4) continue;      // the jaw and the neck free
+        // tiers read by value, not by noise: the top row of each tier lit, the
+        // middle row dark with a lighter strand every few columns, the lowest
+        // row the shadow under the tier
+        const sc = hash3(x, 0, z, 143);
+        const c = ti === 2 && y > -2 ? H.S : ti === 0 ? (sc < 0.3 ? H.L : H.M) : (sc < 0.22 ? H.M : H.D);
+        m.set(x, y, z, c);
+      }
+    }
+    // the fringe: one straight edge across the forehead, a lit row on top
+    for (let x = -6; x <= 5; x++) { const z = front(x, 11); if (z !== null) m.set(x, 11, z + 1, (x & 1) ? H.M : H.L); }
+  } else if (style === 'laborer' || style === 'merc' || style === 'mercCav') {
+    // close-cropped hair hugging the cranium: from a hairline at the brow
+    // (y 11 in front, falling to the ears at the sides) down to the nape (y 5),
+    // a shell 0.9 thick; the Mercenaries' tight curls a voxel more with a
+    // bumpy outer layer and rows running front to back
+    const curls = style !== 'laborer';
+    for (let y = 4; y <= 17; y++) for (let x = -9; x <= 8; x++) for (let z = -9; z <= 8; z++) {
+      if (fhInHead(x, y, z) || m.has(x, y, z)) continue;
+      const d = curls ? 1.5 : 0.95;
+      if (!fhCranium(x, y, z, d)) continue;
+      const pz = z + 0.5, px = Math.abs(x + 0.5);
+      const hairline = pz > 2 ? 11 : pz > -1 ? 9 - (px > 5 ? 2 : 0) : 5;  // the front, the temples, the back
+      if (y < hairline) continue;
+      if (curls && !fhCranium(x, y, z, d - 0.7) && hash3(x, y, z, 151) < 0.4) continue;   // the curls' bumpy outside
+      const row = curls && ((x + 16) % 3 === 0);
+      m.set(x, y, z, row ? H.S : curls ? strand(x, y + z, 152) : strand(x, z + y, 153));
+    }
+    if (curls) both((X) => m.set(X(-7), 4, 0, GOLD(0, 0, 0)).set(X(-7), 3, 0, GOLD(1, 0, 0)));   // gold earrings
+  } else if (style === 'spear') {
+    // shaved: the scalp a shade cooler than the face with a stubble tone on
+    // the crown; Retold's lock: a gold-bound tuft on the crown and a long
+    // braid falling back and down the nape to the shoulders
+    for (const [k, v] of m.vox) { const y = ((k >> 10) & 1023) - 512; if (y >= 11 && (v.c === P.T || v.c === P.S || v.c === P.B)) v.c = v.c === P.T ? 0x9a6040 : 0x86502e; }
+    const pts = [[0, 15.5, -1.5], [0, 16.2, -3.5], [0, 15, -5.8], [0, 12, -7.2], [0, 8, -7.6], [0, 4, -7.4], [0, 0.5, -6.8]];
+    let q = 0;
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const [a, b] = [pts[i], pts[i + 1]];
+      const n = Math.ceil(Math.hypot(b[1] - a[1], b[2] - a[2]) * 2);
+      for (let j = 0; j <= n; j++, q++) {
+        const t = j / n, y = a[1] + (b[1] - a[1]) * t, z = a[2] + (b[2] - a[2]) * t, r = i === 0 ? 1.4 : i < 3 ? 1.1 : 0.9;
+        for (let dx = -2; dx <= 1; dx++) for (let dy = -2; dy <= 2; dy++) for (let dz = -2; dz <= 2; dz++) {
+          const vx = dx, vy = Math.round(y) + dy, vz = Math.round(z) + dz;
+          if (Math.hypot(vx + 0.5, vy - y, vz - z) > r + 0.35 || fhInHead(vx, vy, vz)) continue;
+          const band = i <= 1 ? (i === 0 && vy <= 15 ? GOLD(vx, vy, vz) : H.M) : (Math.floor(q / 3) % 2 ? H.L : H.D);
+          m.set(vx, vy, vz, band);
+        }
+      }
+    }
+    for (const x of [-1, 0]) m.set(x, 0, -7, GOLD(x, 0, -7)).set(x, -1, -7, H.M);   // the braid's gold tip
+  } else if (style === 'axe') {
+    // the gold and black striped headcloth: a rounded hood a voxel and a half
+    // over the cranium, its stripes round the head (horizontal, two gold rows
+    // to one black), front to back on the crown; a gold brow band at y 11;
+    // side falls behind the cheeks to the shoulders (y -3), flaring a voxel,
+    // and a back curtain to the nape
+    for (let y = -3; y <= 17; y++) for (let x = -10; x <= 9; x++) for (let z = -9; z <= 8; z++) {
+      if (fhInHead(x, y, z) || m.has(x, y, z)) continue;
+      const py = y + 0.5 - FH_C.y, px = x + 0.5, pz = z + 0.5 - FH_C.z;
+      const flare = y < 6 ? (6 - y) * 0.14 : 0, d = 1.4 + flare;
+      const inside = py > 0 ? (px / (FH_C.rx + d)) ** 2 + (py / (FH_C.ry + d)) ** 2 + (pz / (FH_C.rz + d)) ** 2 <= 1
+        : (px / (FH_C.rx + d)) ** 2 + (pz / (FH_C.rz + d)) ** 2 <= 1;
+      if (!inside) continue;
+      if (y <= 10 && z + 0.5 > 0 && Math.abs(px) < 6.6) continue;         // the face open
+      if (y <= 10 && z + 0.5 > 2) continue;
+      if (y < 3 && z + 0.5 > -1.5 && Math.abs(px) < 6.6) continue;        // the neck free
+      const top = py > 4.2;
+      const blk = top ? ((x + 20) % 3 === 0) : ((y + 30) % 3 === 0);
+      const edge = y === -3 || (y <= 10 && z + 0.5 > 1);
+      // (the gold self-lit in the unit shader's eg_fire band, as the epsilon
+      // axe's bronze: a lit saturated gold grades to cream)
+      if (blk) m.set(x, y, z, BLACK);
+      else m.set(x, y, z, edge ? 0x7a4a08 : ((x + y + z) & 3) === 0 ? 0xc89410 : 0xb07a0e, { glow: edge ? 0 : 0.78 });
+    }
+    for (let x = -6; x <= 5; x++) { const z = front(x, 11); if (z !== null) m.set(x, 11, z + 1, 0xd8a420, { glow: 0.78 }); }   // the brow band
+  }
+  return m;
+}
+const FINE_HEADS = new Set(['laborer', 'spear', 'axe', 'sling', 'merc', 'mercCav']);
 function headPart(style, joint = [0, 10, 0.2], parent = 'torso', s = 1) {
+  // (round 34) the fine heads: twice the grid, centred on the neck
+  // (the chin sits half a rig voxel lower than the old head's, so the fine
+  // neck stub covers the torso's neck block instead of a gap under the jaw)
+  if (FINE_HEADS.has(style)) return part('head', fineHead(style), [0, 0, 0], [joint[0], joint[1] - 0.5 * s, joint[2]], parent, { scale: HEAD_SCALE * 0.5 * s, rest: HEAD_TILT, greedy: true, outline: 0.22 });
   // (round 32) the Pharaoh's head a thinner line: at 0.3 the hull round his
   // nose ridge drew a dark moustache across the calm face
   return part('head', headE(style), HEAD_PIVOT, joint, parent, { scale: HEAD_SCALE * s, rest: HEAD_TILT, ...(style === 'pharaoh' ? { outline: 0.12 } : {}) });
@@ -3866,7 +4059,9 @@ for (const [type, R] of Object.entries(RIGS)) {
     // (round 33) a fine part's line at about half the width: at the full
     // width the hull of a narrower row poked through the steps of the fine
     // surface as dark ticks along every limb
-    g.add(`${type}/${p.name}`, p.fine ? greedyGeometry(model, { size, pivot }) : buildVoxelGeometry(model, { size, pivot, jitter: p.jitter ?? 0.05, ao: p.ao ?? true }), { outline: p.fine ? ol * 0.55 : ol, outlineAt, flatY: !!p.fine });
+    // (round 34) a fine head (fineHead, authored on its fine grid) meshed the same way
+    const greedy = p.fine || p.greedy;
+    g.add(`${type}/${p.name}`, greedy ? greedyGeometry(model, { size, pivot }) : buildVoxelGeometry(model, { size, pivot, jitter: p.jitter ?? 0.05, ao: p.ao ?? true }), { outline: p.fine ? ol * 0.55 : ol, outlineAt, flatY: !!greedy });
   }
 }
 g.extra.unitTypes = Object.keys(RIGS);

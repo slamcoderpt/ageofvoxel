@@ -2569,6 +2569,46 @@ brow, one lit cheekbone row under them, no nostril shadows. Check:
 `eu_one=spearman&eu_turn=30&eu_zoom=0.62&eu_az=-0.6`, `eu_group=foot`,
 `eu_group=eco`.
 
+Heads and stances, round 34 (every soldier's hair read as one black cube a
+third wider than the shoulders, a bucket helmet, the face a few smeared
+pixels under a heavy fringe; every man stood in one stiff A-pose). **Fine
+heads** (`fineHead(style)`, `FINE_HEADS`: Laborer, Spearman, Axeman,
+Slinger, Mercenary, Mercenary Cavalry): authored on a grid twice as fine as
+the old head (part scale `HEAD_SCALE / 2`, pivot at the neck, flag `greedy`:
+meshed by `greedyGeometry` with the fine parts' flat outline), about 0.85 of
+the old size with the hair, the chin half a rig voxel lower so the head's
+neck stub covers the torso's neck block. The skull is a cranium ellipsoid
+(`FH_C`) united with a jaw that narrows row by row to the chin (`fhJaw`), so
+it tapers to the crown and the chin with no flat top or corner; skin is
+shaded from each voxel's surface normal (lit face plane, scalp tone on top,
+sides and back a step down, the jaw's underside in shade; `FH.skin` /
+`FH.dark` for the Nubians). The face is carved into it: eye sockets recessed a
+voxel (a dark lid row over an ivory / near-black / ivory eye), a brow over
+each, a light nose ridge from the bridge to a tip a voxel proud with its
+shadow under it, lit cheekbones, a darker jaw line, a mouth line, a lit chin,
+ears. Hair is a shell round the cranium, never a box: the Slinger's
+Egyptian bob (unit_06) in stepped tiers of three rows that taper to the crown
+and flare at the shoulders, each tier's top row lit, its middle row dark with
+lighter strands, its lowest row the shadow; the fringe ends above the brows
+and the face is open between the side locks. The Laborer's close crop and the
+Mercenaries' tight curls (bumpy outer layer, rows front to back, gold
+earrings) follow the skull. The Spearman (unit_05) is shaved with Retold's
+long lock: a gold-bound tuft on the crown and a braid down the nape (the old
+team headband is gone). The Axeman's striped headcloth (unit_02) is a rounded
+hood with side falls to the shoulders, one black row to two gold, its gold
+self-lit (glow 0.78, the epsilon axe's `eg_fire` band; a lit gold grades to
+cream). The other heads (Priest, Pharaoh, charioteer, camel rider, mahout,
+Mummy, myth men) keep `headE`. **Stances** (`unit_view.cpp`, idle of rigs
+with `stance`): three stances by unit id, mirrored by id parity, each with
+soft knees and the weight on one leg: 0 contrapposto (weight on the back leg,
+the free knee bent forward and turned out), 1 feet apart with both knees
+bent, 2 weight on the front leg, the back knee bent; the shoulders tilt
+against the hips and the head against the shoulders, and the body sinks to
+the supporting leg's reach (bob = reach - 14, thigh and shin 7 rig voxels).
+Scaled by the rig's `stance` (Priest / Pharaoh 0.3). Check:
+`eu_focus=slinger&eu_zoom=0.45&eu_pitch=34&eu_az=-1.2&eu_ax=-0.6` (and
+`spearman`, `axeman`, `laborer`), `eu_group=foot`, `eu_group=eco`.
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower

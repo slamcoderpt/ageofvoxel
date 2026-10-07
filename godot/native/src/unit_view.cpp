@@ -933,10 +933,29 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 			// the sling hang and sway from a fist held off the hip
 			const bool mr = (id & 1) != 0;
 			const double k = rig.stance;
-			set(CH_legL, (mr ? -0.22 : 0.14) * k, 0, 0.04); set(CH_shinL, (mr ? 0.2 : 0.05) * k);
-			set(CH_legR, (mr ? 0.14 : -0.22) * k, 0, -0.04); set(CH_shinR, (mr ? 0.05 : 0.2) * k);
-			add(CH_torso, 0, (mr ? 0.1 : -0.1) * k, 0);
-			bob = -0.2 * k;
+			// (round 34) no planted straight legs: three stances by the unit id,
+			// each with soft knees and the weight on one leg (mirrored by id):
+			// 0 contrapposto, the weight on the back leg, the free knee bent
+			// forward and turned out; 1 feet apart, both knees bent, ready;
+			// 2 the weight on the front leg, the back knee bent, heel up. The
+			// shoulders tilt against the hips and the head against the
+			// shoulders; the body sinks to the supporting leg's reach
+			// (thigh and shin 7 rig voxels each)
+			const int sv = (int)((id * 7 + 2) % 3);
+			double ts, ss, rs, tf, sf, rf;   // support / free leg: thigh pitch (- forward), knee bend, roll out
+			if (sv == 0) { ts = 0.1; ss = 0.32; rs = 0.03; tf = -0.38; sf = 0.6; rf = 0.14; }
+			else if (sv == 1) { ts = 0.12; ss = 0.42; rs = 0.1; tf = -0.3; sf = 0.5; rf = 0.12; }
+			else { ts = -0.14; ss = 0.3; rs = 0.03; tf = 0.26; sf = 0.55; rf = 0.06; }
+			ts *= k; ss *= k; rs *= k; tf *= k; sf *= k; rf *= k;
+			const double reach_s = (7 * std::cos(ts) + 7 * std::cos(ts + ss)) * std::cos(rs);
+			const double reach_f = (7 * std::cos(tf) + 7 * std::cos(tf + sf)) * std::cos(rf);
+			// the right leg supports when mr
+			if (mr) { set(CH_legR, ts, 0, -rs); set(CH_shinR, ss); set(CH_legL, tf, 0, rf); set(CH_shinL, sf); }
+			else { set(CH_legL, ts, 0, rs); set(CH_shinL, ss); set(CH_legR, tf, 0, -rf); set(CH_shinR, sf); }
+			const double side = mr ? 1 : -1;
+			add(CH_torso, 0.03 * k, side * 0.12 * k, side * 0.06 * k);
+			add(CH_head, 0, -side * 0.1 * k, -side * 0.07 * k);
+			bob = std::max(reach_s, reach_f) - 14.0;
 			if (pose == P_SLING) { set(CH_armR, -0.35 + b * 0.03, 0, -0.26); set(CH_weapon, 0.6 + S(t * 1.6) * 0.25, 0, -0.4); set(CH_armL, -0.12, 0, 0.16); }
 			else if (!hoplite) { add(CH_armL, -0.08, 0, 0.07); add(CH_armR, 0.06, 0, -0.07); }
 		}
