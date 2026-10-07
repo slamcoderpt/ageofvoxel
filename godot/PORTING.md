@@ -1846,6 +1846,33 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   collar ending in a lapis and gold band, a lapis diadem studded with gold,
   the uraeus. The Monument to Priests' king shares the new head.
   Close framing: `egt_row=monument_pharaohs/0/a1&egt_pitch=12&egt_lift=4.2&egt_dist=3.2&egt_dx=0.4&egt_yaw=10`.
+- **Readable gods, round 41** (building_17; the three gods were charcoal
+  figures whose falcon and jackal heads shrank to dark blobs, their feet lost
+  on a near-black die, Isis' wings a flat tan sheet, the plinth's Eye of
+  Horus a fuzzy white smear). `cleanStatue()` takes `o.lite` (set only by
+  `monument(5)`): the body's granite ramp is mapped to a light cool slate
+  (`GOD_LITE`: recess 0x2e3546, base 0x4a5570, face 0x5e6c8a, a blue-white
+  highlight 0x7a8cae), near-black only on the line accents (knuckles, eyes,
+  nose, beak tip); the gilt goes on the Osiris' yellower ramp (`OS_GOLD`)
+  and the whole lot is in `m.keep`, so the gold stays gold through the
+  grade. The gods' wigs are mostly lapis (a gold row in three), so the gilt
+  falcon head and the jackal head stand out against them. A one-voxel gold
+  outline steps round the head silhouettes: the jackal's ear edges and tips,
+  skull top and muzzle bridge; the falcon's beak edge and crown back; the
+  sun disc's rim; Isis' horns and modius. Isis' wings (every `wings` statue,
+  the Temple's sandstone Isis too) are four horizontal feather rows under a
+  gold leading edge, each row's lower edge scalloped by feather: lapis
+  coverts tipped gold, white secondaries, gold tertials, long lapis
+  primaries split by gold quills; her mouth is a short lip line, not a dark
+  gap. `monDie(..., { lite: true })` (the gods only) gilds the die (gold
+  sides, a bright top course, a dark foot) and lays its top in pale
+  limestone inside a gold rim and a ring of dark / gold ticks, so the feet
+  stand out. `eyePanel()` is a clean one-voxel gold line drawing on the dark
+  panel, a row lower (clear of the cornice's shadow): the brow, the almond
+  lids with a round pupil, the cosmetic line to the temple, the drop and the
+  spiral tail. Framing: the row `egt_row=monument_gods/ra/a1,monument_gods/set/a1,monument_gods/isis/a1&egt_pitch=40&egt_lift=3&egt_dist=18`,
+  a head `egt_row=monument_gods/set/a1&egt_pitch=18&egt_lift=6&egt_dist=6&egt_yaw=40`,
+  the Eye panel `egt_row=monument_gods/set/a1&egt_pitch=8&egt_lift=0.4&egt_dist=6&egt_yaw=0`.
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8

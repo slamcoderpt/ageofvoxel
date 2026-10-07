@@ -3696,24 +3696,32 @@ function cartouche(m, f, x0, z0, x1, z1, y0, a0, r0, cw, ch, seed = 0) {
 }
 // the Eye of Horus in gold inside a framed panel, flush on the face
 function eyePanel(m, f, x0, z0, x1, z1, y0, a0, r0) {
+  // (round 41) a clean one-voxel gold line drawing on the dark panel (no
+  // white fill): the brow, the almond eye with the pupil touching both lids
+  // and lapis whites, the cosmetic line running out to the temple, the
+  // straight drop and the spiral tail under it
   const EYE = [
-    '....GGGGGGGG....',
-    '..GG........GG..',
-    '.G...LLLLL....G.',
-    'GGGGGLLKKLLGGGGG',
-    '.....LLLLL......',
-    '......G...G.....',
-    '.....G.....G....',
-    '....G.......GG..',
+    '...GGGGGGGGGGGG...',
+    '..................',
+    '......GGGGGG......',
+    '....GG..GG..GG....',
+    '..GG...GGGG...GGGG',
+    '....GG..GG..GG....',
+    '......GGGGGG......',
+    '.....G......G.....',
+    '.....G.......G.GG.',
+    '....GG........GG.G',
   ];
+  // a gold frame, one dark column either side of the drawing and a dark row
+  // over it (ten rows fit under the owner's line)
   const at = (a, r, c) => { const [x, z] = faceXZ(f, x0, z0, x1, z1, a, 0); m.set(x, y0 + r, z, c); };
-  const W = EYE[0].length + 4, H = EYE.length + 4;
+  const W = EYE[0].length + 4, H = EYE.length + 3;
   for (let i = 0; i < W; i++) for (let j = 0; j < H; j++) {
     const a = a0 - W / 2 + i;
     const edge = i === 0 || j === 0 || i === W - 1 || j === H - 1;
-    let c = edge ? SG : 0x1e242c;
+    let c = edge ? SG_L : 0x1e242c;
     const ch = (EYE[H - 3 - j] || '')[i - 2];
-    if (!edge && ch && ch !== '.') c = ch === 'K' ? 0x141414 : ch === 'L' ? ST_WHITE : SG_L;
+    if (!edge && ch && ch !== '.') c = SG_L;
     at(Math.round(a), r0 + j, c);
   }
 }
@@ -3777,7 +3785,7 @@ function monPlinth(m, x0, z0, x1, z1, y0, h, { faces = {}, seed = 0 } = {}) {
     const L = f === '+z' || f === '-z' ? x1 - x0 : z1 - z0;
     const kind = faces[f] ?? 'band';
     if (kind === 'eye') {
-      eyePanel(m, f, x0, z0, x1, z1, y0, L / 2, 2);
+      eyePanel(m, f, x0, z0, x1, z1, y0, L / 2, 1);   // (round 41: a row lower, clear of the cornice's shadow)
       if (L >= 40) for (const k of [-1, 1]) {
         // short glyph bands either side of the eye
         const a = Math.round((L - 1) / 2 + k * 15);
@@ -3808,9 +3816,24 @@ function glyphBandAt(m, f, x0, z0, x1, z1, y0, a0, a1, r0, r1, seed) {
   }
 }
 // a die on the deck: a plain granite block with a 1-voxel gold edge on top
-function monDie(m, x0, z0, x1, z1, y0, h) {
+function monDie(m, x0, z0, x1, z1, y0, h, { lite = false } = {}) {
   for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) m.set(x, y, z, PL_GRAN);
   for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) m.set(x, y0 + h, z, x === x0 || z === z0 || x === x1 - 1 || z === z1 - 1 ? SG : PL_GRAN);
+  if (lite) {
+    // (round 41, the Monument to the Gods) the die in gilt: gold sides under a
+    // bright gold top course, a dark foot line; its top a pale limestone deck
+    // inside a gold rim and a ring of dark / gold ticks (Retold's die), so
+    // the statue's feet stand out against it
+    for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) {
+      const edge = x === x0 || x === x1 - 1 || z === z0 || z === z1 - 1;
+      if (edge) m.set(x, y, z, y === y0 ? PL_GRAN_D : y === y0 + h - 1 ? SG_L : SG);
+    }
+    for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) {
+      const e = Math.min(x - x0, x1 - 1 - x, z - z0, z1 - 1 - z);
+      const along = (x - x0 + z - z0) & 1;
+      m.set(x, y0 + h, z, e === 0 ? SG_L : e === 1 ? (along ? SG : PL_GRAN_D) : 0xd8cbac);
+    }
+  }
   return y0 + h + 1;
 }
 // A Monument statue built from a few large clean volumes (the Monuments to
@@ -3877,7 +3900,9 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
   // one-voxel stripes)
   // (o.basalt, round 37: wide bands, three gold rows and two lapis, so the
   // nemes frames the face instead of swallowing it)
-  const stripe = o.wig === 'gold' ? (x, y) => ((y - kn) & 1 ? CG_D : CG) : o.basalt ? (x, y) => ((y - kn + 60) % 5 < 3 ? CG : LAPIS_S) : o.sand ? (x, y) => ((y - kn + 60) % 3 === 0 ? CG : LAPIS_S) : (x, y) => ((y - kn) & 1 ? LAPIS_S : CG);
+  // (o.lite, round 41: the gods' wigs mostly lapis, a gold row in three, so
+  // the gilt falcon head and the gold-edged jackal head stand out against them)
+  const stripe = o.wig === 'gold' ? (x, y) => ((y - kn) & 1 ? CG_D : CG) : o.lite ? (x, y) => ((y - kn + 60) % 3 === 0 ? CG : LAPIS_S) : o.basalt ? (x, y) => ((y - kn + 60) % 5 < 3 ? CG : LAPIS_S) : o.sand ? (x, y) => ((y - kn + 60) % 3 === 0 ? CG : LAPIS_S) : (x, y) => ((y - kn) & 1 ? LAPIS_S : CG);
 
   // ---- the lower body
   if (pose === 'mummy') {
@@ -4092,12 +4117,23 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     }
     for (let i = 0; i < 3; i++) for (let j = 0; j < 4; j++) for (let k = 0; k < 3; k++) P(15 + i, 22 + j + kn, 2 + k, GRAN);   // the fists
     for (let i = 0; i < 3; i++) P(15 + i, 23 + kn, 5, GRAN_D);                                                           // knuckles
+    // (round 41) the wing in four horizontal rows of feathers under a gold
+    // leading edge: lapis coverts, white secondaries, gold tertials, then the
+    // long lapis primaries split by gold quills; each row's lower edge
+    // scalloped (the feathers two voxels wide, alternate ones a voxel longer)
+    // so the rows read as feathers, not one hanging cloth
     for (let x = 7; x < 19; x++) {
       const top = Math.round(yArm(Math.min(x, 16))) + (x < 9 ? 1 : 2);
       const bot = Math.round(9 + (x - 6) * 0.25) - ((x & 1) ? 0 : 1);
+      const sc = (x >> 1) & 1;                                   // the scallop: every other feather a voxel longer
       for (let y = bot; y <= top; y++) for (const z of [-2, -1]) {
-        const d = top - y;
-        const c = d === 0 ? CG_L : d <= 3 ? ((d === 2 && (x & 1)) ? CG_L : ST_LAPIS) : d === 4 ? CG_L : y === bot ? CG_D : ((x - 6) % 3 === 2 ? CG_D : CG);
+        const d = top - y - sc;
+        let c;
+        if (top - y === 0) c = CG_L;                              // the leading edge
+        else if (d < 3) c = d === 2 ? ((x & 1) ? CG_L : ST_LAPIS) : ST_LAPIS;   // coverts, gold-tipped
+        else if (d < 6) c = d === 5 ? CG_L : ST_WHITE;            // white secondaries
+        else if (d < 9) c = d === 8 ? CG_D : ((x & 1) ? CG_L : CG);   // gold tertials
+        else c = y === bot ? CG_L : (x % 3 === 0 ? CG_L : ST_LAPIS);   // lapis primaries, gold quills and tips
         P(x, y + kn, z, c);
       }
     }
@@ -4164,13 +4200,13 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     M(1, 3, 43 + kn, 44 + kn, 3, 4, IVORY);                    // the eyes
     M(1, 2, 43 + kn, 44 + kn, 3, 4, KOHL);                     // pupils
     M(3, 4, 43 + kn, 44 + kn, 3, 4, o.god ? CG_L : LAPIS_S);   // the kohl line
-    B(-2, 2, 39 + kn, 40 + kn, 3, 4, GRAN_D);                  // the mouth
+    if (!o.lite) B(-2, 2, 39 + kn, 40 + kn, 3, 4, GRAN_D);     // the mouth (o.lite: the lips alone)
     if (o.god) {
       // a goddess' face that reads at RTS zoom: the eye whites two rows
       // deep under gold brows, the lips a short warm line
       M(1, 3, 44 + kn, 45 + kn, 3, 4, IVORY);
       M(1, 2, 44 + kn, 45 + kn, 3, 4, KOHL);
-      B(-1, 1, 39 + kn, 40 + kn, 3, 4, 0x4a2420);
+      B(-1, 1, 39 + kn, 40 + kn, 3, 4, o.lite ? 0x7a3c30 : 0x4a2420);
     }
     if (pose !== 'dress') {
       B(-1, 1, 34 + kn, 38 + kn, 3, 5, GRAN);                  // the false beard
@@ -4244,6 +4280,12 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
       M(3, 4, 43 + Y, 45 + Y, 2, 3, DK);                     // and round the side
       M(2, 4, 45 + Y, 46 + Y, 3, 4, HD_L);                       // gold brows
       M(2, 3, 41 + Y, 43 + Y, 3, 4, DK);                     // the malar stripe, a teardrop
+      if (o.lite) {
+        // (round 41) the beak's upper edge stepped in gold to the dark tip
+        B(-1, 1, 43 + Y, 44 + Y, 5, 6, CG_L);
+        B(-1, 1, 41 + Y, 42 + Y, 6, 7, CG_L);
+        S(4, 46 + Y, 47 + Y, -3, -2, CG_L);                      // the crown's back edge
+      }
     }
   } else if (head === 'jackal') {
     // a jackal's head (round 18: Anubis' profile): a narrow skull, a long
@@ -4267,6 +4309,14 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
       const w = y < 53 ? 2 : 1, xa = 1 + Math.floor((y - 47) / 5);
       M(xa, xa + w, y + Y, y + Y + 1, -1, 1, GRAN);
       if (y > 47 && y < 53) M(xa, xa + 1, y + Y, y + Y + 1, 1, 2, CG);
+      // (round 41, o.lite) a one-voxel gold step on the ears' outer edge and tips
+      if (o.lite) M(xa + w - 1, xa + w, y + Y, y + Y + 1, -1, 1, CG_L);
+    }
+    if (o.lite) {
+      // the gold outline over the skull and along the muzzle's bridge to the nose
+      S(2, 47 + Y, 48 + Y, -2, 2, CG_L);
+      B(-1, 1, 43 + Y, 44 + Y, 3, 7, CG_L);
+      B(-1, 1, 42 + Y, 43 + Y, 7, 9, CG_L);
     }
   }
   if (o.crown === 'disc') {
@@ -4275,7 +4325,8 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     for (let x = -6; x < 6; x++) for (let y = 46; y < 59; y++) {
       const d = Math.hypot(x + 0.5, y + 0.5 - cy);
       const red = o.sand ? SAND_DISC : ST_RED;
-      if (d <= r) { set(x, y + Y, -2, d > r - 1.1 ? CG : red); set(x, y + Y, -3, d > r - 1.1 ? CG : red); }
+      const rim = o.lite ? CG_L : CG;
+      if (d <= r) { set(x, y + Y, -2, d > r - 1.1 ? rim : red); set(x, y + Y, -3, d > r - 1.1 ? rim : red); }
     }
     if (!o.sand) B(-1, 1, 46 + Y, 49 + Y, 1, 2, CG);
     else {
@@ -4293,7 +4344,9 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     const Y = kn;
     S(3, 47 + Y, 49 + Y, -3, 3, CG);
     const H = [[3, 49], [4, 49], [5, 50], [5, 51], [5, 52], [5, 53], [4, 54]];
-    for (const [x, y] of H) { set(x, y + Y, 0, CG); set(-1 - x, y + Y, 0, CG); set(x, y + Y, -1, CG); set(-1 - x, y + Y, -1, CG); }
+    const HC = o.lite ? CG_L : CG;
+    for (const [x, y] of H) { set(x, y + Y, 0, HC); set(-1 - x, y + Y, 0, HC); set(x, y + Y, -1, HC); set(-1 - x, y + Y, -1, HC); }
+    if (o.lite) S(3, 48 + Y, 49 + Y, -3, 3, CG_L);
     for (let x = -4; x < 4; x++) for (let y = 49; y < 57; y++) if (Math.hypot(x + 0.5, y + 0.5 - 53) <= 3.4) set(x, y + Y, -1, ST_RED);
     B(-1, 1, 46 + Y, 48 + Y, 4, 5, CG);
   } else if (o.crown === 'modius') {
@@ -4360,7 +4413,16 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
   }
   // the gods (round 18) in a lighter blue-grey slate with a real mid-tone
   // between the near-black recesses and the gold, so their forms read
-  if (o.god && !o.sand) for (const [x, y, z] of touched) {
+  // (round 41, o.lite: the Monument to the Gods) a light cool slate with a
+  // blue-white highlight, the near-black kept to the line accents; the gilt
+  // on the Osiris' yellower ramp (kept through the grade by m.keep)
+  if (o.lite) for (const [x, y, z] of touched) {
+    const v = m.get(x, y, z);
+    if (!v || v.team) continue;
+    const c = OS_GOLD.get(v.c) ?? GOD_LITE.get(v.c);
+    if (c !== undefined) v.c = c;
+  }
+  if (o.god && !o.sand && !o.lite) for (const [x, y, z] of touched) {
     const v = m.get(x, y, z), c = v && GOD_SLATE.get(v.c);
     if (c !== undefined) v.c = c;
   }
@@ -4399,6 +4461,10 @@ const SAND_STONE = new Map([
 const GOD_SLATE = new Map([
   [0x1b1f26, 0x1f2432], [0x2a3039, 0x353d50], [0x30363f, 0x3d465a], [0x262b33, 0x2f3646],
   [0x4b5563, 0x58637a], [0x343d47, 0x4b556c], [0x1c2027, 0x151820],
+]);
+const GOD_LITE = new Map([
+  [0x1b1f26, 0x2e3546], [0x2a3039, 0x4a5570], [0x30363f, 0x505c78], [0x262b33, 0x45506a],
+  [0x4b5563, 0x7a8cae], [0x343d47, 0x5e6c8a], [0x1c2027, 0x161a24],
 ]);
 // The statues' material ramp (round 17): every statue voxel takes one of
 // two or three value steps of its material from its exposure, so the black
@@ -4978,7 +5044,7 @@ function monument(kind, god = 'ra') {
   }
   const m = lot(64, 64, EARTH);
   const py = monPlinth(m, 12, 12, 52, 52, 1, 18, { faces: { '+z': 'eye', '-z': 'eye', '+x': 'eye', '-x': 'eye' }, seed: 5 });
-  const pd = monDie(m, 20, 20, 44, 44, py, 7);   // pd = 28: the coarse statue lands on it exactly
+  const pd = monDie(m, 20, 20, 44, 44, py, 7, { lite: true });   // pd = 28: the coarse statue lands on it exactly
   const G = {
     ra: { head: 'falcon', crown: 'disc', arms: 'staff', pose: 'stride' },
     set: { head: 'jackal', crown: 'set', arms: 'staff', pose: 'stand' },
@@ -4987,7 +5053,8 @@ function monument(kind, god = 'ra') {
   // the god drawn on a coarser grid (voxels 4/3 the plinth's), so it stands
   // over the big plinth at Retold's scale with the same clean canon
   const k = 0.75, sub = new Rec(m.W, m.D);
-  cleanStatue(sub, 24, Math.round(pd * k), 23, toClean({ kilt: GILT, ...G }));
+  cleanStatue(sub, 24, Math.round(pd * k), 23, { ...toClean({ kilt: GILT, ...G }), lite: 1 });
+  m.keep = [[0, 0, 0, 64, 120, 64]];             // round 41: the statue's and the plinth's gilt stay gold
   (m.fine ??= []).push({ m: sub, k });
   // the sun bowls at the corners (round 18: no flat discs): a short gold
   // foot, a bowl flaring out, a thick rolled rim beaded light / dark gold,
