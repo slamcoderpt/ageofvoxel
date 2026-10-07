@@ -4623,6 +4623,151 @@ function osirisStatue(m, cx, y0, cz) {
     if (c !== undefined) v.c = c;
   }
 }
+// The Monument to Priests' striding king (round 39, building_15): its own
+// figure, not cleanStatue()'s stride, built in clean readable parts so the
+// pharaoh reads at thumbnail size. Dark basalt body (the granite ramp mapped
+// to BASALT_STONE after polishStatue), true gilt regalia (OS_GOLD, m.keep in
+// monument()), lapis only inside the gold. The left foot forward, the arms
+// hanging free at the sides with gold armlets and bracelets, the fists
+// closed. A pleated shendyt: an A-line kilt of vertical pleat lines (a dark
+// gold line every third column) under a gold / lapis / gold belt with a
+// buckle, a team-colour apron down the front in a gold frame. A broad wesekh
+// collar: a plate a voxel proud on the chest in four concentric bands round
+// the neck (gold, lapis, gold, lapis) and a fringe of alternating drops. The
+// nemes: one trapezoid flaring from the brow to the shoulders behind the
+// face, striped in alternating single rows of gold and lapis, on a plain
+// gold brow band with the uraeus rearing at its centre (a gold coil, a lapis
+// hood, a gold head); two lappets hanging straight down in front of the
+// shoulders as clean striped columns to gold tips; a striped queue behind.
+// The face, a lighter plane: a brow ridge a voxel proud over dark eye
+// sockets with gold kohl tails, a proud nose with a lit tip, a lip over a dark
+// mouth line, a narrow chin; under it the false beard, a separate narrow
+// gold block a voxel in front of the face, ribbed, tied to the chin.
+// (cx, cz): the body's centre (a voxel corner in x), facing +z, on y0.
+// o.crown 'hedjet' (the Monument to Pharaohs' king, building_16): a tall
+// gilt white crown rising from the nemes cap to a knob.
+function pharaohStatue(m, cx, y0, cz, o = {}) {
+  const touched = [];
+  const set = (x, y, z, c) => {
+    if (c == null) return;
+    m.set(cx + x, y0 + y, cz + z, c);
+    const v = m.get(cx + x, y0 + y, cz + z);
+    if (v) { v.clean = 1; touched.push([cx + x, y0 + y, cz + z]); }
+  };
+  const B = (xa, xb, ya, yb, za, zb, c) => {
+    for (let x = xa; x < xb; x++) for (let y = ya; y < yb; y++) for (let z = za; z < zb; z++) set(x, y, z, typeof c === 'function' ? c(x, y, z) : c);
+  };
+  const S = (hw, ya, yb, za, zb, c) => B(-hw, hw, ya, yb, za, zb, c);
+  const M = (xa, xb, ya, yb, za, zb, c) => { B(xa, xb, ya, yb, za, zb, c); B(-xb, -xa, ya, yb, za, zb, c); };
+  const stripe = (x, y) => ((y + 64) & 1 ? CG_L : LAPIS_S);   // the nemes: one gold row, one lapis row
+
+  // ---- the feet and legs: the left foot (+x) forward
+  B(1, 4, 0, 1, 0, 8, GRAN); B(1, 4, 1, 2, 0, 5, GRAN);     // the forward foot, toes lower
+  B(-4, -1, 0, 1, -5, 2, GRAN); B(-4, -1, 1, 2, -5, -1, GRAN);
+  for (let y = 2; y < 21; y++) {
+    const t = (21 - y) / 19, w = y >= 12 ? 1 : 0;            // the thighs a voxel wider
+    const zf = Math.round(0.5 + 2 * t - 1.5), zb = Math.round(0.5 - 3 * t - 1.5);
+    const c = y === 3 ? CG_L : GRAN;                          // anklets
+    B(1, 4 + w, y, y + 1, zf, zf + 3, c);
+    B(-4 - w, -1, y, y + 1, zb, zb + 3, c);
+  }
+  // ---- the shendyt: an A-line kilt, vertical pleats, a framed team apron
+  for (let y = 19; y < 29; y++) {
+    const hw = y < 24 ? 7 : 6, zf = y < 24 ? 5 : 4;
+    B(-hw, hw, y, y + 1, -4, zf, (x, yy, z) => {
+      if (yy === 19) return CG;                                // the hem
+      const side = x === -hw || x === hw - 1;
+      const k = side ? z : x;
+      return (k + 64) % 3 === 2 ? CG_D : CG_L;                // a pleat line every third column
+    });
+    B(-2, 2, y, y + 1, zf, zf + 1, (x) => (x === -2 || x === 1 || y === 19 ? CG_L : TEAMB));
+  }
+  // the belt: gold, lapis, gold, a buckle proud at the front
+  for (let y = 29; y < 32; y++) S(6, y, y + 1, -4, 4, y === 30 ? LAPIS_S : CG_L);
+  B(-1, 1, 29, 32, 4, 5, CG_L);
+  // ---- the torso: a narrow waist, the chest, square shoulders
+  S(5, 32, 37, -3, 3, GRAN);
+  S(6, 37, 43, -3, 3, GRAN);
+  S(7, 43, 45, -3, 3, GRAN);
+  S(9, 45, 48, -3, 3, GRAN);
+  // ---- the arms hanging free at the sides, closed fists, gold armlets and bracelets
+  M(7, 10, 28, 45, -2, 1, GRAN);
+  M(7, 10, 22, 28, -2, 2, GRAN);                              // the fists
+  M(7, 10, 23, 24, 1, 2, GRAN_D);                             // the knuckles' line
+  M(7, 11, 40, 42, -3, 2, CG_L);                              // armlets, proud
+  M(7, 11, 29, 31, -3, 2, CG_L);                              // bracelets
+  // ---- the wesekh: concentric bands round the neck on a plate a voxel proud
+  const COL = [CG_L, LAPIS_S, CG_L, ST_RED];                  // gold, lapis, gold, carnelian: apart from the nemes
+  for (let y = 37; y < 48; y++) for (let x = -9; x < 9; x++) {
+    const r = Math.hypot((x + 0.5) * 0.8, 48 - y);
+    if (r < 2.6 || r >= 8.6) continue;
+    const hw = y < 43 ? 6 : y < 45 ? 7 : 9;
+    if (Math.abs(x + 0.5) > hw) continue;
+    const b = Math.floor((r - 2.6) / 1.2);
+    set(x, y, 3, b < 4 ? COL[b] : ((x + 64) & 1 ? CG_L : null));   // a fringe of drops
+  }
+  // ---- the neck
+  S(2, 48, 50, -2, 2, GRAN);
+  // ---- the nemes: one trapezoid from the brow flaring to the shoulders,
+  // behind the face, then the cap over the crown, the queue behind
+  for (let y = 48; y < 60; y++) {
+    const hw = 5 + Math.floor((60 - y) / 5);
+    B(-hw, hw, y, y + 1, -5, 2, stripe);
+  }
+  S(5, 60, 61, -5, 3, stripe);
+  S(4, 61, 62, -5, 2, stripe);
+  S(3, 62, 63, -4, 1, CG_L);                                  // a gold crown, no slab of lapis on top
+  B(-2, 2, 38, 47, -6, -4, stripe);                           // the queue
+  // ---- the face: a lighter front plane, a narrow chin
+  S(4, 50, 59, -3, 4, (x, y, z) => (z === 3 ? GRAN_F : GRAN));
+  S(3, 49, 50, -2, 4, (x, y, z) => (z === 3 ? GRAN_F : GRAN));
+  S(5, 59, 60, -3, 4, CG_L);                                  // the gold brow band
+  S(4, 56, 57, 4, 5, GRAN_F);                                 // the brow ridge, proud
+  M(1, 3, 54, 56, 3, 4, GRAN_D);                              // the eyes: dark sockets, two rows under the brow
+  M(3, 4, 55, 56, 3, 4, CG);                                  // kohl tails to the temples
+  B(-1, 1, 52, 56, 4, 5, GRAN_F);                             // the nose, proud
+  B(-1, 1, 52, 53, 4, 5, GRAN_H);                             // its lit tip
+  S(2, 50, 51, 3, 4, GRAN_D);                                 // the mouth
+  S(2, 51, 52, 3, 4, GRAN_F);                                 // the upper lip
+  // ---- the lappets: straight striped columns in front of the shoulders
+  M(4, 6, 40, 58, 2, 5, (x, y) => (y < 42 ? CG_L : stripe(x, y)));
+  // ---- the false beard: a separate narrow block a voxel in front of the
+  // chin, ribbed, tied up to it
+  B(-1, 1, 48, 49, 3, 5, CG_D);
+  for (let y = 43; y < 48; y++) B(-1, 1, y, y + 1, 4, 5, y === 43 ? CG_L : (y & 1 ? CG_L : CG));
+  // ---- the uraeus at the brow: a gold coil, a lapis hood, the gold head
+  B(-1, 1, 59, 61, 4, 5, CG_L);
+  B(-2, 2, 61, 62, 4, 5, (x) => (x === -2 || x === 1 ? CG_L : LAPIS_S));
+  B(-1, 1, 62, 63, 4, 6, CG_L);
+  if (o.crown === 'hedjet') {
+    // the white crown in gilt: a tall bulb tapering from the cap to a knob,
+    // a lapis band at its foot
+    for (let y = 61; y < 77; y++) {
+      const rr = y < 66 ? 3.6 : y < 74 ? 3.6 - (y - 65) * 0.24 : 1.5;   // a smooth taper to the knob
+      for (let x = -5; x < 5; x++) for (let z = -5; z < 4; z++) {
+        if (Math.hypot(x + 0.5, (z + 1) * 0.9) > rr) continue;
+        set(x, y, z, y === 63 ? LAPIS_S : CG_L);
+      }
+    }
+  }
+  // the plain stone: one mid basalt, a lit step on faces open to the sky
+  // (polishStatue's grain and its per-row cylinder shading read as checker
+  // noise on the bare torso and legs); the gold and the face plane polished
+  const plain = touched.filter(([x, y, z]) => m.get(x, y, z)?.c === GRAN);
+  polishStatue(m, touched);
+  for (const [x, y, z] of plain) {
+    const v = m.get(x, y, z);
+    if (!v) continue;
+    const ox = !m.has(x + 1, y, z) || !m.has(x - 1, y, z), oz = !m.has(x, y, z + 1) || !m.has(x, y, z - 1);
+    v.c = !m.has(x, y + 1, z) ? 0x5c6674 : ox && oz ? 0x4e5765 : 0x404855;   // lit tops, lit vertical arrises, a mid basalt
+  }
+  for (const [x, y, z] of touched) {
+    const v = m.get(x, y, z);
+    if (!v || v.team) continue;
+    const c = BASALT_STONE.get(v.c) ?? OS_GOLD.get(v.c);
+    if (c !== undefined) v.c = c;
+  }
+}
 function monument(kind, god = 'ra') {
   if (kind <= 3) {
     const m = lot(32, 32, EARTH);
@@ -4641,6 +4786,13 @@ function monument(kind, god = 'ra') {
       m.keep = [[3, pd, 6, 29, pd + 68, 27]];
       return m;
     }
+    if (kind === 3) {
+      // round 39: the striding king in its own clean build (nemes, wesekh,
+      // pleated shendyt, a carved face and a separate false beard)
+      pharaohStatue(m, 16, pd, 15);
+      m.keep = [[3, pd, 3, 29, pd + 68, 29]];
+      return m;
+    }
     cleanStatue(m, 16, pd, kind === 1 ? 17 : 15, o);
     m.keep = [[3, pd, 3, 29, pd + 68, 29]];                   // the regalia keep their gold (round 38)
     return m;
@@ -4652,9 +4804,11 @@ function monument(kind, god = 'ra') {
     // building_16: the king striding, fists at his sides, in the nemes and a
     // gold white crown; the queen in a gold sheath dress and vulture wig, her
     // near hand on his arm; one back pillar joining them
-    cleanStatue(m, 15, pd, 24, { pose: 'stride', head: 'nemes', crown: 'hedjet', arms: 'side', kilt: CG, anklets: 1, pillar: [-6, 25, 38], basalt: 1 });
+    // round 39: the king in pharaohStatue()'s clean build (nemes, wesekh,
+    // pleated shendyt), with the gilt white crown
+    pharaohStatue(m, 15, pd, 24, { crown: 'hedjet' });
     cleanStatue(m, 34, pd, 24, { pose: 'dress', head: 'wig', wig: 'gold', arms: 'embrace', kiltFront: null, basalt: 1 });
-    m.keep = [[2, pd, 4, 46, pd + 70, 44]];
+    m.keep = [[2, pd, 4, 46, pd + 82, 44]];
     return m;
   }
   const m = lot(64, 64, EARTH);

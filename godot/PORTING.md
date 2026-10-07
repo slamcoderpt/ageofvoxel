@@ -1789,6 +1789,34 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   (Villagers, Priests, the Pharaoh pair) now take `OS_GOLD` and `m.keep` too,
   and `BASALT_STONE` is a step darker and blue-grey (the grey-green came out
   olive). Framing: `egt_row=monument_soldiers/0/a1&egt_pitch=18&egt_lift=3.6&egt_dist=7.5&egt_yaw=24`.
+- **The striding king of the Monument to Priests, round 39** (building_15;
+  the head read as a jumbled yellow helmet: a boxy gold cap with a slate
+  slab on top, lappets scattered at different depths, a flat grey face whose
+  nose and beard merged, a checker collar bleeding into the chin, a blocky
+  kilt). Its own builder, `pharaohStatue()` in export-egypt.mjs, in place of
+  `cleanStatue()`'s stride (the Pharaoh pair's king uses it too, with
+  `crown: 'hedjet'`: a tall gilt white crown tapering smoothly from the nemes
+  cap to a knob, a lapis band at its foot). The nemes is one trapezoid behind
+  the face, flaring from the brow (half-width 5) to the shoulders (7), striped
+  in alternating single rows of gold and lapis, on a plain gold brow band
+  with the uraeus (gold coil, lapis hood, gold head), a gold crown row on top
+  (no lapis slab); the two lappets hang straight down in front of the
+  shoulders as 2 x 3 striped columns ending in gold tips; a striped queue
+  behind. The face is a lighter plane: a brow ridge a voxel proud, 2 x 2 dark
+  eye sockets with gold kohl tails, a proud nose with a lit tip, a lip over a
+  dark mouth line, a narrower chin; the false beard is a separate 2-wide
+  ribbed gold block a voxel in front of the face, tied up to the chin. The
+  wesekh is a plate a voxel proud on the chest in four concentric bands round
+  the neck (gold, lapis, gold, carnelian red, so it reads apart from the
+  nemes) and a fringe of drops. The shendyt: an A-line kilt with a dark gold
+  pleat line every third column (on the sides too), a darker hem, a
+  gold / lapis / gold belt with a buckle, a team apron in a gold frame. The
+  left foot forward, the arms free at the sides with closed fists, proud gold
+  armlets, bracelets and anklets. The bare stone is one mid basalt with lit
+  tops and lit vertical arrises (no grain, no per-row cylinder shading:
+  they read as checker noise); the gold is `OS_GOLD` under `m.keep`.
+  Framing: `egt_row=monument_priests/0/a1&egt_pitch=18&egt_lift=3.6&egt_dist=7.5&egt_yaw=24`
+  (the pair: `egt_row=monument_pharaohs/0/a1&egt_pitch=24&egt_lift=3.6&egt_dist=9`).
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8
