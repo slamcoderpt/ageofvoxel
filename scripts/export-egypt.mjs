@@ -5330,167 +5330,253 @@ function market() {
   return m;
 }
 
-// Lighthouse (3 x 3; building_20, Mythic; round 21): the Pharos in three
-// crisp stages on a dark plinth course. The square shaft tapers all the way
-// up in four 7-row tiers (a voxel in per side each tier, a pale limestone
-// string course on every ledge), each face framed by pale corner piers and
-// a centre pilaster with warm sandstone panels between them, the masonry
-// banded in courses of four tones (every three rows a lighter or darker
-// course), slit windows framed by a lintel and sill in every panel, two team
-// bands at the foot, a stair to a framed door. On top a gallery slab with a
-// crenellated parapet and corner posts; the octagonal stage (true diagonal
-// facets, pale arrises, a team band, a window on each flat face) under its
-// own overhanging slab and crenellated parapet; a round drum, then the
-// colonnaded lantern: eight slim columns round a bright emissive fire on a
-// pale floor, an entablature and one ribbed pointed cap with a gilt finial.
-// Every part rests on the one below (no stubs). Fire bowls at the foot.
-const PHAROS_T = [0xe6cd9c, 0xd2b482, 0xdcc190, 0xc6a672];
-const PHAROS = (x, y, z) => {
-  const row = Math.floor(Math.max(0, y - 1) / 3);
-  const seq = [0, 1, 2, 1, 0, 3];
-  const u = x + z + (row & 1) * 3 + 256;
-  let c = PHAROS_T[seq[row % seq.length]];
-  c = shade(c, 0.975 + 0.05 * hash3(Math.floor(u / 6), row, (x - z) >> 3, 211));
-  if ((y - 1) % 3 === 0) c = shade(c, 0.9);
-  else if (u % 6 === 0) c = shade(c, 0.92);
-  return c;
-};
-const PIER = (x, y, z) => { const c = LIME(x, y, z); return (y - 1) % 3 === 0 ? shade(c, 0.95) : c; };
-// the beacon: glow 0.95 marks a fire voxel, which egypt_building.gdshader
-// passes through the grade in its own colour (yellow core, orange, embers)
+// Lighthouse (3 x 3; building_20, Mythic), round 44: the Pharos as three
+// DIFFERENT stages at half voxels (`fine: 2` in TYPES, 1/16 tile), each
+// parted from the next by a projecting cavetto cornice (a dark fluted gorge
+// row, a lit gorge row a voxel further out, a pale lip slab over them):
+//  - the base: a wide square shaft battered in a voxel every 13 rows, pale
+//    limestone ashlar in 4-row courses (a dark bed joint under every course,
+//    staggered head joints, one tone per block plus a faint per-voxel drift),
+//    long / short quoins on the corners, two team bands at the foot, framed
+//    slit windows, the door with its gilt winged sun over a stair, and a
+//    painted band (lapis, a red / gold block row, lapis) under its cornice;
+//    four small gilt Tritons on the gallery's corners;
+//  - the middle: a narrower octagon in a warmer honey sandstone, pale
+//    arrises on its eight corners, a team band, a window on each flat face,
+//    its own painted band and an octagonal cavetto;
+//  - the top: a round drum (lapis and gold rings), the colonnaded lantern
+//    (eight columns round an emissive fire), an entablature and a ribbed
+//    dome with a gilt finial.
+// A baked sun split (sunPass) darkens the stone of the faces turned from
+// the scene's sun (+x, -z) and lifts the lit ones (-x, +z), so the tower
+// reads as a solid with a light and a shadow side, not one flat cream value.
+const PH_BASE = [0xeee0c2, 0xe6d6b4, 0xf2e6cc, 0xe2d0aa];
+const PH_MID = [0xdcb47a, 0xd2a96e, 0xe2bc84, 0xcca268];
+const PH_DRUM = [0xece0c6, 0xe4d6b8, 0xf0e6d0];
+const PH_QUOIN = [0xf8f0de, 0xf4ead4];
+// one ashlar voxel: u runs along the face, so the bond follows each face
+function phStone(tones, x, y, z, u, { course = 4, len = 8, seed = 0 } = {}) {
+  const row = Math.floor(y / course), k = ((y % course) + course) % course;
+  const uu = u + (row & 1) * (len >> 1) + 1024;
+  const blk = Math.floor(uu / len);
+  const c = tones[Math.min(tones.length - 1, Math.floor(hash3(blk, row, seed, 301) * tones.length))];
+  let f = (0.975 + 0.05 * hash3(blk, row, seed, 302)) * (0.985 + 0.03 * hash3(x, y, z, 303));
+  if (k === 0) f *= 0.8;                 // the bed joint: a dark course line all round
+  else if (uu % len === 0) f *= 0.87;    // the head joint
+  else if (k === course - 1) f *= 1.03;  // the course's lit upper arris
+  return shade(c, f);
+}
+const PH_GOLD = 0xd6aa00, PH_GOLD_L = 0xf4cc00, PH_GOLD_D = 0x8e6800;
 const BEACON = [0xffd040, 0xffa020, 0xf07010, 0xc84808];
 function lighthouse() {
-  const m = lot(24, 24);
-  const C = 12;
-  // the plinth course: three rows of dark stone, a voxel out from the shaft
-  for (let x = C - 9; x < C + 9; x++) for (let z = C - 9; z < C + 9; z++) for (let y = 1; y < 4; y++) m.set(x, y, z, PLINTH);
-  // the shaft: tiers of 7 rows, half-width 7, 6, 5, 4 (+1 for the piers)
-  const T0 = 4, TH = 7, tiers = [7, 6, 5, 4];
-  const top = T0 + TH * tiers.length;          // the gallery slab row
-  const isPier = (a, hw) => a < -hw + 2 || a >= hw - 2;
-  const isPil = (a, hw, y, front) => (a === -1 || a === 0) && !(front && y < T0 + 9);
-  const slits = [];
-  tiers.forEach((hw, ti) => {
-    const y0 = T0 + ti * TH;
-    for (let y = y0; y < y0 + TH; y++) {
-      const coping = y === y0 + TH - 1;
-      const team = y === 5 || y === 7;
-      for (let x = C - hw - 1; x < C + hw + 1; x++) for (let z = C - hw - 1; z < C + hw + 1; z++) {
-        const ox = x < C - hw || x >= C + hw, oz = z < C - hw || z >= C + hw;
-        const ax = x - C, az = z - C;
-        let c = null;
-        if (!ox && !oz) {
-          const e = Math.min(x - (C - hw), C + hw - 1 - x, z - (C - hw), C + hw - 1 - z);
-          c = e > 0 ? SAND_D : PHAROS;
-        } else if (ox && oz) c = PIER;                                       // the corner arris of the pier
-        else {
-          const a = ox ? az : ax;                                            // along the face
-          const front = oz && z >= C + hw;
-          if (isPier(a, hw)) c = PIER;
-          else if (isPil(a, hw, y, front)) c = PIER;
-          else continue;                                                     // the panel stays recessed
-        }
-        if (coping) c = LIME;
-        if (team && (ox || oz || Math.min(x - (C - hw), C + hw - 1 - x, z - (C - hw), C + hw - 1 - z) === 0)) c = TEAM;
-        m.set(x, y, z, c);
+  const m = lot(48, 48);
+  m.stageStep = 16;
+  const C = 24;
+  const stone = new Map();   // key -> colour of every voxel the sun pass may shade
+  const key = (x, y, z) => `${x},${y},${z}`;
+  const st = (x, y, z, c) => { m.set(x, y, z, c); stone.set(key(x, y, z), c); };
+  const ring = (x, z, h) => Math.min(x - (C - h), C + h - 1 - x, z - (C - h), C + h - 1 - z);
+  // the podium: three rows of dark plinth stone, then a pale step course
+  for (let x = C - 20; x < C + 20; x++) for (let z = C - 20; z < C + 20; z++) for (let y = 1; y < 4; y++) m.set(x, y, z, PLINTH(x, y, z));
+  for (let x = C - 19; x < C + 19; x++) for (let z = C - 19; z < C + 19; z++) for (let y = 4; y < 6; y++) {
+    const e = ring(x, z, 19);
+    if (e > 0) { m.set(x, y, z, SAND_D(x, y, z)); continue; }
+    st(x, y, z, y === 5 ? shade(LIME(x, y, z), 1.02) : LIME_S);
+  }
+  // ---- the base: a wide battered square shaft --------------------------
+  const B0 = 6, B1 = 58;                       // rows B0 .. B1 - 1
+  const bhw = (y) => 17 - Math.floor((y - 4) / 8);    // a voxel in on every second bed joint
+  for (let y = B0; y < B1; y++) {
+    const hw = bhw(y), t = B1 - 1 - y;
+    for (let x = C - hw; x < C + hw; x++) for (let z = C - hw; z < C + hw; z++) {
+      const e = ring(x, z, hw);
+      if (e > 0) { m.set(x, y, z, SAND_D(x, y, z)); continue; }
+      const onX = x === C - hw || x === C + hw - 1, onZ = z === C - hw || z === C + hw - 1;
+      const u = onZ && !onX ? x : z;
+      const a = Math.abs((onZ && !onX ? x : z) + 0.5 - C);       // distance from the face's axis
+      // the quoins: long / short blocks alternating course by course
+      const qrow = Math.floor(y / 4) & 1;
+      const quoin = a > hw - (qrow ? 4 : 2.5);
+      let c = quoin ? phStone(PH_QUOIN, x, y, z, u, { len: 5, seed: 7 }) : phStone(PH_BASE, x, y, z, u, { seed: 3 });
+      // two team bands at the foot, a pale string course between them
+      if (y === B0 + 2 || y === B0 + 4) c = TEAM;
+      else if (y === B0 + 3) c = shade(LIME(x, y, z), 1.02);
+      // the painted band under the cornice: lapis, red / gold blocks, lapis
+      else if (t === 0) c = (Math.floor((u + 512) / 2) & 1) ? LAPIS : shade(LAPIS, 0.84);
+      else if (t === 1) c = (Math.floor((u + 512) / 3) & 1) ? BAND_R : BAND_Y;
+      else if (t === 2) c = LAPIS;
+      else if (t === 3) c = FRIEZE_SEP;
+      if (typeof c === 'number' && c >= 0 && t > 3 && !(y >= B0 + 2 && y <= B0 + 4)) st(x, y, z, c); else m.set(x, y, z, c);
+    }
+  }
+  // windows: two columns of slits on every face, the front's low ones left
+  // to the door
+  for (const face of ['+z', '-z', '+x', '-x']) {
+    const dir = face === '+z' || face === '-x' ? 1 : -1;
+    for (const off of [-8, 6]) {
+      const u = dir > 0 ? C + off : C - off - 1;
+      for (const y0 of [19, 39, 47]) {
+        if (face === '+z' && y0 === 19) continue;
+        slit(m, face, u, y0, 6, 2);
       }
     }
-    // a slit window in each panel, mid-tier
-    const sa = hw >= 5 ? [-3, 2] : [-2, 1];
-    for (const a of sa) slits.push([hw, a, y0 + 2]);
-  });
-  for (const [hw, a, y0] of slits) for (const face of ['+z', '-z', '+x', '-x']) {
-    if (face === '+z' && y0 < T0 + 9) continue;          // the door's tier
-    const n = OUT_N[face];
-    const cell = (k) => face[1] === 'z' ? [C + a, C + (n[2] > 0 ? hw - 1 - k : -hw + k)] : [C + (n[0] > 0 ? hw - 1 - k : -hw + k), C + a];
-    const [fx, fz] = cell(0), [bx, bz] = cell(1);
-    for (let y = y0; y < y0 + 3; y++) { m.remove(fx, y, fz); m.set(bx, y, bz, y === y0 + 2 ? REVEAL2 : REVEAL); }
-    m.set(fx, y0 + 3, fz, LIME); m.set(fx, y0 - 1, fz, LIME_S);
   }
-  door(m, '+z', 10, 4, T0, 6);
-  for (let s = 0; s < 3; s++) m.box(10, 1, 21 + s, 4, 3 - s, 1, LIME);
-  // the gallery: a slab a voxel over the top tier's piers, a crenellated
-  // parapet on its edge (a low wall, merlons on alternate voxels), corner posts
-  const G = 6;
+  door(m, '+z', C - 4, 8, B0, 13, { frame: LIME, sun: true, deep: 3 });
+  // the stair down from the podium to the ground
+  for (let s = 0; s < 5; s++) for (let x = C - 5; x < C + 5; x++) for (let y = 1; y < 6 - s; y++) m.set(x, y, C + 19 + s, x === C - 5 || x === C + 4 ? LIME_S : (y === 5 - s ? LIME(x, y, C + 19 + s) : SAND_D(x, y, C + 19 + s)));
+  // ---- cornice 1: a square cavetto, the gallery deck and its rail -----
+  const top0 = bhw(B1 - 1);                   // 12
+  const flute = (x, z) => ((Math.floor((x + z + 512) / 2) & 1) ? GORGE : GORGE_L);
+  for (let x = C - top0 - 1; x < C + top0 + 1; x++) for (let z = C - top0 - 1; z < C + top0 + 1; z++) {
+    const e = ring(x, z, top0 + 1);
+    m.set(x, B1, z, e === 0 ? shade(flute(x, z), 0.72) : SAND_D(x, B1, z));
+  }
+  for (let x = C - top0 - 2; x < C + top0 + 2; x++) for (let z = C - top0 - 2; z < C + top0 + 2; z++) {
+    const e = ring(x, z, top0 + 2);
+    m.set(x, B1 + 1, z, e === 0 ? flute(x, z) : e === 1 ? shade(flute(x, z), 0.85) : SAND_D(x, B1 + 1, z));
+  }
+  const G = top0 + 3, gy = B1 + 2;           // the gallery deck, a voxel past the gorge
   for (let x = C - G; x < C + G; x++) for (let z = C - G; z < C + G; z++) {
-    const e = Math.min(x - (C - G), C + G - 1 - x, z - (C - G), C + G - 1 - z);
-    m.set(x, top, z, e === 0 ? LIME_S : e === 1 ? TEAM : LIME);
-    if (e !== 0) continue;
-    m.set(x, top + 1, z, PIER);
-    const corner = (x === C - G || x === C + G - 1) && (z === C - G || z === C + G - 1);
-    if (corner) { m.box(x, top + 2, z, 1, 3, 1, PIER); m.set(x, top + 5, z, GILT); }
-    else if (((x + z) & 1) === 0) m.set(x, top + 2, z, PIER);
+    const e = ring(x, z, G);
+    m.set(x, gy, z, e === 0 ? 0xfaf3e2 : e === 1 ? 0xf2e8d2 : e === 2 ? TEAM : PLASTER(x, gy, z));
+    if (e === 0) m.set(x, gy + 1, z, (x + z) & 1 ? 0xf0e6cf : 0xe8dcc2);    // a low solid rail (no merlons)
   }
-  // the octagonal stage: half-width 4, the corners cut on the diagonal
-  const inOct = (x, z, R, L) => { const dx = Math.abs(x + 0.5 - C), dz = Math.abs(z + 0.5 - C); return dx < R && dz < R && dx + dz <= L; };
-  const o0 = top + 1, OH = 8, o1 = o0 + OH;
-  for (let y = o0; y < o1; y++) for (let x = C - 4; x < C + 4; x++) for (let z = C - 4; z < C + 4; z++) {
-    if (!inOct(x, z, 4, 5.5)) continue;
-    const edge = !inOct(x + 1, z, 4, 5.5) || !inOct(x - 1, z, 4, 5.5) || !inOct(x, z + 1, 4, 5.5) || !inOct(x, z - 1, 4, 5.5);
-    const diag = Math.abs(x + 0.5 - C) + Math.abs(z + 0.5 - C) === 5;   // the diagonal facets' arrises
-    let c = !edge ? SAND_D : diag ? PIER : PHAROS;
-    if (y === o0 + 1 && edge) c = TEAM;
-    if (y === o1 - 1 && edge) c = LIME;
-    m.set(x, y, z, c);
+  // the gilt Tritons on the gallery's corners: a pale socle, a gilt figure
+  // (body, shoulders, a head) raising a conch
+  m.keep = [];
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const x0 = sx < 0 ? C - G + 1 : C + G - 3, z0 = sz < 0 ? C - G + 1 : C + G - 3;
+    m.box(x0, gy + 1, z0, 2, 2, 2, LIME);
+    m.box(x0, gy + 3, z0, 2, 4, 2, PH_GOLD);
+    m.box(x0, gy + 7, z0, 2, 1, 2, PH_GOLD_L);
+    m.set(x0 + (sx < 0 ? 0 : 1), gy + 8, z0 + (sz < 0 ? 0 : 1), PH_GOLD_D);
+    m.set(x0 + (sx < 0 ? 1 : 0), gy + 8, z0 + (sz < 0 ? 1 : 0), PH_GOLD_L);
+    m.set(x0 + (sx < 0 ? 1 : 0), gy + 9, z0 + (sz < 0 ? 1 : 0), PH_GOLD_L);
+    m.keep.push([x0, gy + 3, z0, x0 + 2, gy + 10, z0 + 2]);
   }
-  // a window on each flat face of the octagon (two voxels wide, four tall, under a lintel)
-  for (const face of ['+z', '-z', '+x', '-x']) {
-    const n = OUT_N[face];
-    for (const a of [-1, 0]) {
-      const at = (k) => face[1] === 'z' ? [C + a, C + (n[2] > 0 ? 3 - k : -4 + k)] : [C + (n[0] > 0 ? 3 - k : -4 + k), C + a];
-      const [fx, fz] = at(0), [bx, bz] = at(1);
-      for (let y = o0 + 2; y < o0 + 6; y++) { m.remove(fx, y, fz); m.set(bx, y, bz, y === o0 + 5 ? REVEAL2 : REVEAL); }
-      m.set(fx, o0 + 6, fz, LIME);
+  // ---- the middle: an octagon in honey sandstone ------------------------
+  const inOct = (x, z, R) => { const dx = Math.abs(x + 0.5 - C), dz = Math.abs(z + 0.5 - C); return dx < R && dz < R && dx + dz <= R * 1.42; };
+  const O0 = gy + 1, O1 = O0 + 26;
+  const oR = () => 9;
+  for (let y = O0; y < O1; y++) {
+    const R = oR(y), t = O1 - 1 - y;
+    for (let x = C - R; x < C + R; x++) for (let z = C - R; z < C + R; z++) {
+      if (!inOct(x, z, R)) continue;
+      const edge = !inOct(x + 1, z, R) || !inOct(x - 1, z, R) || !inOct(x, z + 1, R) || !inOct(x, z - 1, R);
+      if (!edge) { m.set(x, y, z, SAND_D(x, y, z)); continue; }
+      const dx = Math.abs(x + 0.5 - C), dz = Math.abs(z + 0.5 - C);
+      const diagF = dx + dz > R * 1.42 - 1.6;
+      const flatX = dx > R - 1, flatZ = dz > R - 1;
+      const arris = diagF && (flatX || flatZ);
+      const u = flatZ && !diagF ? x : flatX && !diagF ? z : x - z * Math.sign(x + 0.5 - C) * Math.sign(z + 0.5 - C);
+      let c = arris ? phStone(PH_QUOIN, x, y, z, u, { len: 4, seed: 8 }) : phStone(PH_MID, x, y, z, u, { len: 7, seed: 5 });
+      if (y === O0 + 2) c = TEAM;
+      else if (y === O0 + 1 || y === O0 + 3) c = shade(LIME(x, y, z), 1.02);
+      else if (t === 0) c = (Math.floor((u + 512) / 2) & 1) ? LAPIS : shade(LAPIS, 0.84);
+      else if (t === 1) c = (Math.floor((u + 512) / 3) & 1) ? BAND_Y : BAND_R;
+      else if (t === 2) c = LAPIS;
+      if (y > O0 + 3 && t > 2) st(x, y, z, c); else m.set(x, y, z, c);
     }
   }
-  // its slab (a voxel out, the same octagon) and crenellated parapet
-  const inO5 = (x, z) => inOct(x, z, 5, 7.5);
-  for (let x = C - 5; x < C + 5; x++) for (let z = C - 5; z < C + 5; z++) {
-    if (!inO5(x, z)) continue;
-    const edge = !inO5(x + 1, z) || !inO5(x - 1, z) || !inO5(x, z + 1) || !inO5(x, z - 1);
-    m.set(x, o1, z, edge ? LIME_S : LIME);
-    if (!edge) continue;
-    m.set(x, o1 + 1, z, PIER);
-    if (((x + z) & 1) === 0) m.set(x, o1 + 2, z, PIER);
+  // a window on each flat face of the octagon (two wide, six tall, a lintel)
+  for (const face of ['+z', '-z', '+x', '-x']) {
+    const dir = face === '+z' || face === '-x' ? 1 : -1;
+    slit(m, face, dir > 0 ? C - 1 : C, O0 + 8, 7, 2);
   }
-  // the drum, the lantern floor
-  const d0 = o1 + 1;
-  lathe(m, C, C, d0, d0 + 2, () => 2.9, (x, y, z) => (y === d0 ? TEAM : PHAROS(x, y, z)));
-  lathe(m, C, C, d0 + 2, d0 + 3, () => 3.4, (x, y, z) => { const d = Math.hypot(x + 0.5 - C, z + 0.5 - C); return d > 2.9 ? LIME_S : LIME; });
-  // the colonnade: eight slim columns (base, shaft, capital) round the fire
-  const L0 = d0 + 3, LH = 6;
-  const cols = [];
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) cols.push([sx * 2.5, sz * 1.5], [sx * 1.5, sz * 2.5]);
-  for (const [dx, dz] of cols) {
-    const x = Math.floor(C + dx), z = Math.floor(C + dz);
-    for (let y = L0; y < L0 + LH; y++) m.set(x, y, z, y === L0 + LH - 1 ? GILT_D : y === L0 ? LIME_S : 0xf3ead6);
+  // ---- cornice 2: the octagonal cavetto and upper deck ------------------
+  const Rt = oR(O1 - 1);
+  for (const [dy, R, f] of [[0, Rt + 1, 0.72], [1, Rt + 2, 1]]) {
+    for (let x = C - R; x < C + R; x++) for (let z = C - R; z < C + R; z++) {
+      if (!inOct(x, z, R)) continue;
+      const edge = !inOct(x + 1, z, R) || !inOct(x - 1, z, R) || !inOct(x, z + 1, R) || !inOct(x, z - 1, R);
+      m.set(x, O1 + dy, z, edge ? shade(flute(x, z), f) : SAND_D(x, O1 + dy, z));
+    }
+  }
+  const R3 = Rt + 3, uy = O1 + 2;
+  for (let x = C - R3; x < C + R3; x++) for (let z = C - R3; z < C + R3; z++) {
+    if (!inOct(x, z, R3)) continue;
+    const edge = !inOct(x + 1, z, R3) || !inOct(x - 1, z, R3) || !inOct(x, z + 1, R3) || !inOct(x, z - 1, R3);
+    m.set(x, uy, z, edge ? 0xfaf3e2 : PLASTER(x, uy, z));
+    if (edge) m.set(x, uy + 1, z, (x + z) & 1 ? 0xf0e6cf : 0xe8dcc2);
+  }
+  // ---- the top: a round drum, the lantern, the dome --------------------
+  const D0 = uy + 1, D1 = D0 + 8;
+  lathe(m, C, C, D0, D1, () => 6.6, (x, y, z) => {
+    if (y === D0 + 1) return LAPIS;
+    if (y === D0 + 2) return (Math.floor((x + z + 512) / 2) & 1) ? BAND_Y : LAPIS;
+    if (y === D0 + 3) return LAPIS;
+    const a = Math.atan2(z + 0.5 - C, x + 0.5 - C);
+    return phStone(PH_DRUM, x, y, z, Math.round(a * 7), { len: 5, seed: 9 });
+  });
+  for (const v of m.coords) if (v[1] >= D0 + 4 && v[1] < D1) { const p = m.get(...v); if (p && !p.team) stone.set(key(...v), p.c); }
+  // the drum's cornice: a lit ring a voxel out, the lantern floor
+  lathe(m, C, C, D1, D1 + 1, () => 7.4, (x, y, z) => (Math.hypot(x + 0.5 - C, z + 0.5 - C) > 6.6 ? shade(GORGE_L, 1) : SAND_D(x, y, z)));
+  lathe(m, C, C, D1 + 1, D1 + 2, () => 7.9, (x, y, z) => (Math.hypot(x + 0.5 - C, z + 0.5 - C) > 7.0 ? 0xfaf3e2 : 0xd8cbb0));
+  const L0 = D1 + 2, LH = 12;
+  // eight 2 x 2 columns round the fire: a base, a pale shaft, a gilt capital
+  for (let i = 0; i < 8; i++) {
+    const a = (i + 0.5) * Math.PI / 4;
+    const x = Math.round(C + Math.cos(a) * 5.6 - 1), z = Math.round(C + Math.sin(a) * 5.6 - 1);
+    for (let y = L0; y < L0 + LH; y++) {
+      const c = y === L0 ? LIME_S : y >= L0 + LH - 2 ? (y === L0 + LH - 1 ? 0xf6eedb : GILT) : (y - L0) % 4 === 0 ? 0xe2d6bc : 0xf3ead6;
+      m.box(x, y, z, 2, 1, 2, c);
+    }
   }
   // the fire: a bright emissive core (the beacon) on a bed of embers
-  for (let x = C - 2; x < C + 2; x++) for (let z = C - 2; z < C + 2; z++) {
-    const dx = Math.abs(x + 0.5 - C), dz = Math.abs(z + 0.5 - C);
-    if (dx > 1.5 || dz > 1.5) continue;
-    const core = dx < 1 && dz < 1;
-    m.set(x, L0, z, core ? BEACON[2] : BEACON[3], { glow: 0.95 });
-    m.set(x, L0 + 1, z, core ? BEACON[0] : BEACON[1], { glow: 0.95 });
-    m.set(x, L0 + 2, z, core ? BEACON[0] : BEACON[1], { glow: 0.95 });
-    if (core) { m.set(x, L0 + 3, z, BEACON[0], { glow: 0.95 }); m.set(x, L0 + 4, z, BEACON[1], { glow: 0.95 }); }
+  for (let x = C - 4; x < C + 4; x++) for (let z = C - 4; z < C + 4; z++) {
+    const d = Math.hypot(x + 0.5 - C, z + 0.5 - C);
+    if (d > 3.3) continue;
+    const h = Math.round(8 - d * 1.6);
+    for (let y = 0; y < Math.max(1, h); y++) {
+      const c = y === 0 ? (d > 2 ? BEACON[3] : BEACON[2]) : d < 1.5 && y < h - 1 ? BEACON[0] : y >= h - 1 ? BEACON[2] : BEACON[1];
+      m.set(x, L0 + y, z, c, { glow: 0.95 });
+    }
   }
-  // the entablature, the cornice, one ribbed pointed cap, the finial
+  // the entablature: a pale architrave, a lapis frieze, a lit lip
   const E = L0 + LH;
-  lathe(m, C, C, E, E + 1, () => 3.3, (x, y, z) => (Math.hypot(x + 0.5 - C, z + 0.5 - C) > 2.6 ? LIME_S : LIME(x, y, z)));
-  for (let x = C - 4; x < C + 4; x++) for (let z = C - 4; z < C + 4; z++) if (inOct(x, z, 4, 5.5)) m.set(x, E + 1, z, inOct(x, z, 3, 4) ? LIME(x, E + 1, z) : PIER);
-  // the cap: concentric octagons a voxel in per row, ribbed light / shadow
-  // on the diagonal facets, then a gilt point
-  const RIB = (x, y, z) => { const dx = Math.abs(x + 0.5 - C), dz = Math.abs(z + 0.5 - C); return Math.abs(dx - dz) < 1.1 ? 0xcfc2a4 : 0xebe2cc; };
-  [[4, 5.5], [3, 4], [2, 2.5]].forEach(([R, L], i) => {
-    for (let x = C - R; x < C + R; x++) for (let z = C - R; z < C + R; z++) if (inOct(x, z, R, L)) m.set(x, E + 2 + i, z, RIB);
-  });
-  m.box(C - 1, E + 5, C - 1, 2, 1, 2, 0xd8ccb0);
-  m.box(C - 1, E + 6, C - 1, 2, 1, 2, GILT_D);
-  m.set(C - 1, E + 7, C - 1, GILT); m.set(C - 1, E + 8, C - 1, GILT_L);
-  brazier(m, 2, 1, 22, 3); brazier(m, 22, 1, 22, 3);
-  // the fire bowls' flames burn in their own orange too (glow 0.95)
-  for (const v of m.coords) { const p = m.get(...v); if (p && p.glow && v[1] < 10) { p.glow = 0.95; p.c = v[1] === 4 ? BEACON[3] : v[1] === 5 ? BEACON[1] : BEACON[0]; } }
+  lathe(m, C, C, E, E + 1, () => 7.2, (x, y, z) => (Math.hypot(x + 0.5 - C, z + 0.5 - C) > 6.4 ? 0xf2e8d2 : 0xd8cbb0));
+  lathe(m, C, C, E + 1, E + 2, () => 7.2, (x, y, z) => (Math.floor((Math.atan2(z + 0.5 - C, x + 0.5 - C) + 4) * 6) & 1 ? LAPIS : BAND_Y));
+  lathe(m, C, C, E + 2, E + 3, () => 7.8, 0xfaf3e2);
+  // the ribbed dome: rings a step in per row, eight darker ribs, a gilt finial
+  const CONE = [7.6, 6.4, 5.6, 4.8, 4.0, 3.2, 2.4, 1.6];
+  CONE.forEach((r, i) => lathe(m, C, C, E + 3 + i, E + 4 + i, () => r, (x, y, z) => (Math.hypot(x + 0.5 - C, z + 0.5 - C) > r - 0.9 ? (i === 0 ? 0xe2d6bc : 0xf2eada) : 0xd8cbb0)));
+  const F = E + 3 + CONE.length;
+  m.box(C - 1, F, C - 1, 2, 1, 2, PH_GOLD_D);
+  m.box(C - 2, F + 1, C - 2, 4, 2, 4, PH_GOLD);
+  m.box(C - 1, F + 3, C - 1, 2, 2, 2, PH_GOLD_L);
+  m.box(C - 1, F + 5, C - 1, 1, 2, 1, PH_GOLD_L);
+  m.keep.push([C - 2, F, C - 2, C + 2, F + 7, C + 2]);
+  // ---- the fire bowls before the podium -------------------------------
+  for (const bx of [1, 44]) {
+    m.box(bx, 1, 44, 3, 8, 3, LIME);
+    m.box(bx, 8, 44, 3, 1, 3, LIME_S);
+    m.box(bx - 1, 9, 43, 5, 1, 5, PH_GOLD_D);
+    for (let x = bx - 1; x < bx + 4; x++) for (let z = 43; z < 48; z++) {
+      const rim = x === bx - 1 || x === bx + 3 || z === 43 || z === 47;
+      if (rim) { m.set(x, 10, z, PH_GOLD); continue; }
+      const core = x === bx + 1 && z === 45;
+      m.set(x, 10, z, BEACON[2], { glow: 0.95 });
+      m.set(x, 11, z, core ? BEACON[0] : BEACON[1], { glow: 0.95 });
+      if (core || ((x + z) & 1)) m.set(x, 12, z, core ? BEACON[0] : BEACON[2], { glow: 0.95 });
+      if (core) m.set(x, 13, z, BEACON[1], { glow: 0.95 });
+    }
+    m.keep.push([bx - 1, 9, 43, bx + 4, 11, 48]);
+  }
+  // ---- the sun pass: a lit side and a shadow side ---------------------
+  // the scene's sun comes from -x / +z (shadows fall to +x / -z): the stone
+  // of a face turned to it is lifted, the stone turned away pressed down,
+  // an edge voxel takes the mean of its two faces
+  for (const [k, c0] of stone) {
+    const [x, y, z] = k.split(',').map(Number);
+    const p = m.get(x, y, z);
+    if (!p || p.c !== c0 || p.team || p.glow) continue;
+    const nx = (m.has(x + 1, y, z) ? 0 : 1) - (m.has(x - 1, y, z) ? 0 : 1);
+    const nz = (m.has(x, y, z + 1) ? 0 : 1) - (m.has(x, y, z - 1) ? 0 : 1);
+    if (nx === 0 && nz === 0) continue;
+    const d = -nx + nz;
+    const f = d >= 2 ? 1.08 : d === 1 ? 1.05 : d === 0 ? 0.88 : d === -1 ? 0.7 : 0.66;
+    p.c = shade(c0, f);
+  }
   return m;
 }
 
@@ -5966,7 +6052,7 @@ const TYPES = {
   monument_priests: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(3), fine: 2 },
   monument_pharaohs: { w: 3, h: 3, variants: ['0'], ages: [1], build: () => monument(4), fine: 2 },
   monument_gods: { w: 4, h: 4, variants: ['ra', 'isis', 'set'], ages: [1], build: (v) => monument(5, ['ra', 'isis', 'set'][v]), fine: 2 },
-  lighthouse: { w: 3, h: 3, variants: ['0'], ages: [1], build: () => lighthouse() },
+  lighthouse: { w: 3, h: 3, variants: ['0'], ages: [1], build: () => lighthouse(), fine: 2 },
   sentry_tower: { w: 1, h: 1, variants: ['0'], ages: [1], build: () => tower(), draw: 1.5 },
   wonder: { w: 8, h: 8, variants: ['0'], ages: [1], build: () => wonder() },
   palm: { w: 1, h: 1, variants: ['0', '1', '2'], ages: [1], build: (v) => palmProp(v), stages: false, settle: false },

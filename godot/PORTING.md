@@ -1923,6 +1923,32 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   a sack at its front end; a big jar and two amphorae by the porch on a
   paved forecourt. No banner. Framing: `egt_focus=market` (the town view),
   `egt_focus=market&egt_dist=7&egt_pitch=34&egt_lift=0.6` (close).
+- **A Pharos in three stages, round 44** (building_20; the Lighthouse read
+  as three near-identical stacked boxes with the same pilaster-and-slit
+  pattern in one flat cream, abrupt steps, castle merlons). `lighthouse()`
+  is rebuilt at half voxels (`fine: 2` in TYPES, a 48 x 48 lot, `stageStep`
+  16) as three DIFFERENT stages, each parted from the next by a projecting
+  cavetto (a shadowed fluted gorge row, a lit one a voxel further out, a
+  pale lip slab over them; a low solid rail, no merlons): a wide square base
+  battered a voxel in on every second bed joint (17 -> 11 half-width, so the
+  steps read as course lines, not tiers) in pale limestone ashlar
+  (`phStone()`: 4-row courses with a dark bed joint, staggered head joints,
+  one tone per block plus a faint per-voxel drift; long / short quoins on
+  the corners), two team bands at the foot, slit windows, the door with a
+  gilt winged sun over a stair, a lapis / red-gold / lapis painted band
+  under its cornice and four gilt Tritons on the gallery's corners; a
+  narrower octagon in a warmer honey sandstone (pale arrises, a team band, a
+  window on each flat face, its own painted band and octagonal cavetto); a
+  round drum in lapis and gold rings, the colonnaded lantern (eight 2 x 2
+  columns with gilt capitals round an emissive fire), a lapis / gold
+  entablature and a pale cone under a gilt finial. A baked sun split (the
+  sun pass at the end of `lighthouse()`) multiplies the stone of faces
+  turned from the scene's sun (+x, -z) by 0.7 and lifts the lit ones (-x,
+  +z) by 1.05, so the lit and shadow faces differ about 2x in the capture.
+  The finial, the Tritons and the fire bowls are in `m.keep`. Framing:
+  `egt_focus=lighthouse` now aims 3.8 tiles up by default (the whole tower);
+  `egt_row=s/lighthouse/s0,s/lighthouse/s2,s/lighthouse/s4,s/lighthouse/s6,lighthouse/0/a1&egt_lift=2`
+  (the stages).
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8

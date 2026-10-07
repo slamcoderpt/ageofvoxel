@@ -192,6 +192,9 @@ static func scene_setup(game: Node) -> Dictionary:
 	# its framing aims at mid-height so the gilt tip stays in the shot
 	if focus_type == "obelisk" and focus_size > 0.0 and not game.args.has("egt_lift"):
 		game.args["egt_lift"] = "2.6"
+	# the Lighthouse stands ~8 tiles tall (round 44): aim at its middle stage
+	if focus_type == "lighthouse" and focus_size > 0.0 and not game.args.has("egt_lift"):
+		game.args["egt_lift"] = "3.8"
 	if (game.args.has("egt_lift") or game.args.has("egt_dx") or game.args.has("egt_dz")) and game.args.has("cam"):
 		game.args["cam"] = _lift_cam(str(game.args.cam), float(game.args.get("egt_lift", 0.0)), float(game.args.get("egt_dx", 0.0)), float(game.args.get("egt_dz", 0.0)))
 	print("egypt_town: %d buildings (%s), age %d, god %s, focus %s, sand %s" % [lots.size(), "sim" if use_sim else "render-only", age, god, focus_type if focus_type != "" else "town", sim.has_method("paint_ground")])
