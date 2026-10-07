@@ -1062,58 +1062,116 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 		upos(u, x, z);
 		const double gy = h_at(x, z);
 		const Lin gc = hex_lin(0xffcf5a);
-		decal(I_DECAL_ADD, x, gy + 0.12, z, 3.6, now * 0.6, gc.r, gc.g, gc.b, 1.1f, 5, 0.78f, (float)now);
-		glow(true, x, gy + 1.6, z, 3.0, 3.4, gc.r, gc.g, gc.b, 0.22, 0);
+		decal(I_DECAL_ADD, x, gy + 0.12, z, 3.6, now * 0.6, gc.r, gc.g, gc.b, 1.5f, 5, 0.78f, (float)now); // (round 24: brighter, tied to the bolts)
+		glow(true, x, gy + 1.6, z, 3.0, 3.4, gc.r, gc.g, gc.b, 0.3, 0);
 	}
 	{
-		// the chain lightning, layered as the Lightning Storm's bolts are (godpower_view.cpp
-		// bolt_lines): a hot deep-gold leader that tapers toward its target, two soft halos and
-		// a wide amber veil, a second jittered strand, crackling side tendrils, and at each
-		// struck man a burst of light, a scorch-gold ground flash and sparks thrown off
+		// the chain lightning (round 24): a bolt that stands clear of the bright desert sand. Each
+		// arc is laid first as a dark outline (G_ARC_DARK, alpha-blended) a little wider than its
+		// glow, and as a soft dark shadow flat on the ground under it; over that a white-hot core
+		// (G_ARC clips it to white) about twice the old width inside a saturated gold rim and one
+		// tight gold halo (the old wide amber veils, which only lightened the sand into a haze, are
+		// gone), a second jittered strand with its own outline, and crackling side tendrils. Every
+		// struck man gets a hard impact (the sim keeps each arc 6 s for it): a
+		// white-hot flash with a star of rays, a gold ground flash, sparks, voxel debris (scorched
+		// earth, bronze and his team's pink) thrown out and settling, a puff of smoke and a
+		// scorch mark left on the sand for six seconds
 		std::vector<Line> L;
+		const double W = 0.46;
+		auto dark = [&](const std::vector<P> &pts, double w, double i, double taper, bool soft) {
+			L.push_back(Line{ pts, w, i, taper, 0, soft, G_ARC_DARK });
+		};
 		for (const aov::Arc &a : G.arcs) {
 			const double age = now - a.t0;
 			if (age < 0 || age > 0.45) continue;
-			const double k = std::pow(1 - age / 0.45, 0.8);
-			const double flick = 0.75 + 0.25 * std::sin(now * 90 + a.seed % 97);
+			// (held at full strength until its last 0.15 s, then cut: a hard strike, not a fade)
+			const double k = clamp01((0.45 - age) / 0.15);
+			const double flick = 0.8 + 0.2 * std::sin(now * 90 + a.seed % 97);
 			aov::RNG rng(a.seed ^ (uint32_t)std::floor(now * 20));
 			const P p0{ a.x0, a.y0, a.z0 }, p1{ a.x1, a.y1, a.z1 };
-			const std::vector<P> pts = fractal(rng, p0, p1, 6, 0.16);
-			const double W = 0.24;
-			line(L, pts, W, 1.2 * k * flick, 0.35, 0);
-			line(L, pts, W * 2.4, 0.7 * k, 0.3, 0, true);
-			line(L, pts, W * 5.0, 0.3 * k, 0.25, 0, true);
-			line(L, pts, W * 8.0, 0.08 * k, 0.2, 0.1, true);
-			const std::vector<P> twin = fractal(rng, p0, p1, 5, 0.24);
-			line(L, twin, W * 0.45, 0.7 * k * (1.7 - flick), 0.5, 0.2);
-			line(L, twin, W * 1.6, 0.22 * k, 0.5, 0.2, true);
+			const std::vector<P> pts = fractal(rng, p0, p1, 6, 0.14);
+			// its shadow: soft dark blots multiplied into the sand along the bolt's ground track
+			for (size_t q = 0; q < pts.size(); q += 2) {
+				const double gq = h_at(pts[q].x, pts[q].z);
+				decal(I_DECAL_MUL, pts[q].x, gq + 0.06, pts[q].z, 1.1, 0, 1, 1, 1, (float)(0.3 * k), 0);
+			}
+			dark(pts, W * 2.5, 0.95 * k, 0.25, false);
+			line(L, pts, W * 0.62, 1.2 * k * flick, 0.25, 0);
+			const std::vector<P> twin = fractal(rng, p0, p1, 5, 0.22);
+			dark(twin, W * 1.2, 0.7 * k, 0.4, false);
+			line(L, twin, W * 0.4, 0.8 * k * (1.8 - flick), 0.4, 0.2);
 			const int n = (int)pts.size();
-			for (int f = 0; f < 4 && n > 6; f++) {
+			for (int f = 0; f < 5 && n > 6; f++) {
 				const P q = pts[rng.int_(2, n - 3)];
-				const double len = rng.range(0.5, 1.3), an = rng.range(0, TAU);
-				const std::vector<P> tw = fractal(rng, q, P{ q.x + std::cos(an) * len, q.y + rng.range(-0.7, 0.3) * len, q.z + std::sin(an) * len }, 3, 0.25);
-				line(L, tw, W * 0.35, 0.8 * k, 0.9, 0.8);
-				line(L, tw, W * 1.5, 0.2 * k, 0.9, 0.85, true);
+				const double len = rng.range(0.6, 1.5), an = rng.range(0, TAU);
+				const std::vector<P> tw = fractal(rng, q, P{ q.x + std::cos(an) * len, q.y + rng.range(-0.8, 0.3) * len, q.z + std::sin(an) * len }, 3, 0.25);
+				dark(tw, W * 0.95, 0.7 * k, 0.8, false);
+				line(L, tw, W * 0.35, 0.9 * k, 0.9, 0.7);
 			}
-			const Lin gc = hex_lin(0xffc040), hc = hex_lin(0xfff0a0);
-			glow(false, a.x1, a.y1, a.z1, 2.4, 2.4, gc.r, gc.g, gc.b, 0.95 * k, 2);
-			glow(false, a.x1, a.y1, a.z1, 0.9, 0.9, hc.r, hc.g, hc.b, 1.0 * k, 3);
-			glow(false, a.x0, a.y0, a.z0, 1.2, 1.2, gc.r, gc.g, gc.b, 0.6 * k, 2);
-			const double gy = h_at(a.x1, a.z1);
-			decal(I_DECAL_ADD, a.x1, gy + 0.1, a.z1, 2.2 + 1.2 * (age / 0.45), 0, gc.r, gc.g, gc.b, (float)(0.9 * k), 8);
-			for (int j = 0; j < 10; j++) { // sparks thrown off the struck man, falling back
-				const double tt = age * (1.2 + 0.6 * hr(a.seed, j, 211)), an = hr(a.seed, j, 212) * TAU, sp = 1.5 + 2.0 * hr(a.seed, j, 213);
-				const double sx = a.x1 + std::cos(an) * sp * tt, sz = a.z1 + std::sin(an) * sp * tt;
-				const double sy = a.y1 + (2.5 * hr(a.seed, j, 214)) * tt - 6 * tt * tt;
-				const double ss = 0.05 * k;
-				if (sy < gy || ss < 0.005) continue;
-				cube(I_EMBER, sx, sy, sz, now, an, 0, ss, ss, ss, 3.2f, 2.3f, 0.7f);
+			const Lin gc = hex_lin(0xffb020);
+			glow(false, a.x0, a.y0, a.z0, 1.3, 1.3, gc.r, gc.g, gc.b, 0.7 * k, 2);
+		}
+		// the struck men
+		for (const aov::Arc &a : G.arcs) {
+			const double age = now - a.t0;
+			if (age < 0) continue;
+			const uint32_t sd = a.seed;
+			const struct { double x, z, t0; } h{ a.x1, a.z1, a.t0 };
+			const double gy = h_at(h.x, h.z), y1 = a.y1;
+			// a scorch mark on the sand, fading out over its last 1.5 s
+			const double so = clamp01(age / 0.08) * clamp01((6 - age) / 1.5);
+			decal(I_DECAL_MIX, h.x, gy + 0.05, h.z, 2.6 + 0.5 * hr(sd, 0, 221), hr(sd, 0, 222) * TAU, 1, 1, 1, (float)(1.0 * so), 0, (float)hr(sd, 0, 223));
+			if (age < 0.6) { // the flash: white-hot, a gold bloom round it, a gold ground flash
+				const double f = std::pow(clamp01(1 - age / 0.6), 1.2);
+				const Lin gc = hex_lin(0xffb020), wc = hex_lin(0xfff6e0);
+				glow(false, h.x, y1, h.z, 3.0, 3.0, gc.r, gc.g, gc.b, 0.9 * f, 3);
+				glow(false, h.x, y1, h.z, 1.4, 1.4, wc.r, wc.g, wc.b, 1.6 * f, 4);
+				decal(I_DECAL_ADD, h.x, gy + 0.1, h.z, 3.2 + 1.6 * (age / 0.6), 0, gc.r, gc.g, gc.b, (float)(1.3 * f), 8);
 			}
+			if (age < 0.45) { // a star of hard white-gold rays out of the hit, held, then cut
+				const double f = clamp01((0.45 - age) / 0.12);
+				for (int r = 0; r < 9; r++) {
+					const double an = (r + 0.6 * hr(sd, r, 224)) / 9.0 * TAU, el = (hr(sd, r, 225) - 0.3) * 1.3;
+					const double len = (0.55 + 0.85 * hr(sd, r, 226)) * (0.75 + 0.4 * clamp01(age / 0.3));
+					const P c{ h.x, y1, h.z };
+					const P e{ h.x + std::cos(an) * std::cos(el) * len, y1 + std::sin(el) * len, h.z + std::sin(an) * std::cos(el) * len };
+					const std::vector<P> ray{ c, P{ (c.x + e.x) / 2, (c.y + e.y) / 2, (c.z + e.z) / 2 }, e };
+					dark(ray, W * 0.95, 0.8 * f, 1.0, false);
+					line(L, ray, W * 0.42, 1.6 * f, 1.0, 0.5);
+				}
+			}
+			if (age < 1.0) { // sparks thrown off him, falling back
+				for (int j = 0; j < 18; j++) {
+					const double tt = age * (1.1 + 0.6 * hr(sd, j, 211)), an = hr(sd, j, 212) * TAU, sp = 2.0 + 3.0 * hr(sd, j, 213);
+					const double sx = h.x + std::cos(an) * sp * tt, sz = h.z + std::sin(an) * sp * tt;
+					const double sy = y1 + (1.0 + 4.0 * hr(sd, j, 214)) * tt - 9 * tt * tt;
+					const double ss = 0.075 * clamp01(1 - age);
+					if (sy < gy || ss < 0.005) continue;
+					cube(I_EMBER, sx, sy, sz, now, an, 0, ss, ss, ss * 2.2, 3.4f, 2.4f, 0.8f);
+				}
+			}
+			if (age < 3.0) { // voxel debris: clods of scorched earth, bronze and his team's pink, landing and lying
+				const double fade = clamp01((3.0 - age) / 0.8);
+				for (int j = 0; j < 16; j++) {
+					const double an = hr(sd, j, 231) * TAU, sp = 1.2 + 2.6 * hr(sd, j, 232), up = 2.5 + 4.0 * hr(sd, j, 233);
+					const double s0 = (0.11 + 0.11 * hr(sd, j, 234)) * fade;
+					const double tl = up / 12.0 + std::sqrt(up * up / 144.0 + 2 * std::max(0.0, y1 - 0.6 - gy) / 12.0); // landing time
+					const double tt = std::min(age, tl);
+					const double dx = h.x + std::cos(an) * sp * tt, dz = h.z + std::sin(an) * sp * tt;
+					const double dy = std::max(h_at(dx, dz) + s0 * 0.5, y1 - 0.6 + up * tt - 6 * tt * tt);
+					const double spin = tt * (6 + 8 * hr(sd, j, 235));
+					const uint32_t col = j % 4 == 0 ? 0xe07a98 : j % 4 == 1 ? 0x8a5a2a : j % 4 == 2 ? 0x2a2018 : 0x6a4a2e;
+					const Lin cc = hex_lin(col);
+					if (s0 > 0.01) cube(I_DEBRIS, dx, dy, dz, spin, an, spin * 0.7, s0, s0, s0, cc.r, cc.g, cc.b);
+				}
+			}
+			if (age < 2.0) // smoke curling off the scorch
+				puff(false, h.t0 + 0.05, hmix(sd, 3, 241), now, h.x, gy + 0.4, h.z, 6, 0x3a3029, 0.55, 1.6, 0.6, 1.3, 0, 1.8, 0.35, 1.f);
 		}
 		if (!L.empty()) emit_lines(G_ARC, L, 1);
 		if (!G.arcs.empty()) {
 			const aov::Arc &a = G.arcs.back();
-			lit(a.x1, a.y1 + 1, a.z1, 0xffc050, 22 * clamp01(1 - (now - a.t0) / 0.45), 12, 1.6);
+			lit(a.x1, a.y1 + 1, a.z1, 0xffc050, 30 * clamp01(1 - (now - a.t0) / 0.45), 13, 1.6);
 		}
 	}
 

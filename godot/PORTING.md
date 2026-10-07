@@ -4939,6 +4939,31 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   by the same footprint, darker in the core. The egypt_powers "locust_swarm" setup now casts from
   cx - 5 and captures at t = 6 (focus cx + 3): the swarm reaching the Farms with their crops still
   standing (a Farm it destroys leaves its bare plot, the building view's, not the power's).
+- **The Son of Osiris' chain lightning stands clear of the sand** (gods round 24,
+  godpower_view_egypt.cpp, ribbon_dark.gdshader, godpowers.gd): the critic saw thin pale-cream
+  strands the value and hue of the desert floor, hazy smears and only soft yellow glows on the
+  struck men. Additive light on bright sand only lightens it, and the grade turns a bright warm
+  colour cream, so every bolt is now built in layers: a new ribbon group G_ARC_DARK
+  (ribbon_dark.gdshader, alpha-blended, drawn before the additive bolt) lays a strip 2.5 W wide
+  under it (W = 0.46, about twice the old width): a dark char-brown edge (0.03 / 0.014 / 0.004)
+  round a painted gold body (0.36 / 0.165 / 0) inside 0.36 of its half-width. The body writes the
+  grade's emissive mark (a negative blue, game/lighting/grade_effect.gd), so it stays a saturated
+  gold. Over it G_ARC draws a white-hot core (gain 4.5, also marked emissive, so it whitens to
+  yellow-white and is not grayed) and a narrow gold rim. The wide amber veils that made the haze
+  are gone. The twin strand and the five side tendrils each get their own dark edge. Soft
+  decal_mul blots along the bolt's ground track are its shadow. A bolt holds full strength
+  until its last 0.15 s and is then cut, a hard strike instead of a fade. Each struck man gets:
+  a white flash in a gold bloom, a gold ground flash, a star of nine white-gold rays with dark
+  edges (held 0.45 s), 18 sparks, 16 voxel debris cubes (char, bronze, earth and his team's
+  pink) thrown out that land and lie for 3 s, a smoke puff, and a scorch mark (decal_mix
+  kind 0) left 6 s. The sim keeps each Arc 6 s instead of 0.5 s for that (egypt_powers.cpp;
+  visual only, nothing in the sim reads arcs; egypt_gods_check and check-sim unchanged). The
+  glyph ring under him is brighter (1.5). The egypt_powers "son_of_osiris" setup now has four
+  hoplites, as many as one bolt and its three jumps strike, so no man in the shot stands
+  unstruck. They stand 8.6 to 9.1 tiles out, 0.25 rad apart, all within 4.8 tiles of the middle
+  one he is ordered on. The Greek line is moved 3 tiles east, out of the chain's reach. The
+  framing is shifted (focus + (4.5, 0.6)) so all four strikes sit well inside the frame;
+  t = 1.6 shows the aftermath (scorches, debris, smoke).
 
 - **Horus' Tornado funnel** (round 12: egypt_fx.gd `_make_funnel`, tornado.gdshader `mode`):
   a value structure instead of a pale haze. The body (mode 1, the ring mesh's outer face;

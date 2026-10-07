@@ -56,7 +56,9 @@ public:
 	// Thoth's Meteor's emissive fire trail (G_LAVA: its orange kept by the grade), the local
 	// player's Vision rings and streaks (G_VISION: drawn over the fog of war), the Eclipse's magenta
 	// rising streaks and the corona glyph over each empowered myth unit (G_ECLIPSE)
-	enum Group { G_BOLT, G_SKY, G_ZAP, G_BAND, G_BAND2, G_TRAIL, G_FIRE, G_SPARK, G_BLOOM, G_GOLD, G_RAIN, G_SAND, G_ARC, G_GILD, G_LAVA, G_VISION, G_ECLIPSE, G_COUNT };
+	// G_ARC_DARK: alpha-blended strips (ribbon_dark.gdshader): the painted gold body and dark edge
+	// under each chain lightning bolt
+	enum Group { G_BOLT, G_SKY, G_ZAP, G_BAND, G_BAND2, G_TRAIL, G_FIRE, G_SPARK, G_BLOOM, G_GOLD, G_RAIN, G_SAND, G_ARC, G_GILD, G_LAVA, G_VISION, G_ECLIPSE, G_ARC_DARK, G_COUNT };
 	enum Inst { I_DEBRIS, I_EMBER, I_GLOW, I_RIM, I_DECAL_MIX, I_DECAL_ADD, I_DECAL_MUL, I_PUFF, I_FLAME, I_COUNT };
 
 	struct Ribbon {

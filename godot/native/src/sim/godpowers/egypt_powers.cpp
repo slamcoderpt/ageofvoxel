@@ -909,7 +909,9 @@ void GodPowers::update_egypt(double dt) {
 
 	// what the renderer still draws
 	rises.erase(std::remove_if(rises.begin(), rises.end(), [&](const RiseFx &f) { return now - f.t0 > (f.kind == 0 ? SERPENT_MARK_LIFE : 4); }), rises.end());
-	arcs.erase(std::remove_if(arcs.begin(), arcs.end(), [&](const Arc &a) { return now - a.t0 > 0.5; }), arcs.end());
+	// (kept 6 s, not the bolt's half second: the view draws each struck man's flash, debris and
+	// scorch mark from it; visual only, nothing in the sim reads arcs)
+	arcs.erase(std::remove_if(arcs.begin(), arcs.end(), [&](const Arc &a) { return now - a.t0 > 6.0; }), arcs.end());
 	speeds();
 }
 

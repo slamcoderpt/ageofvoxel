@@ -98,6 +98,8 @@ static func scene_setup(game: Node) -> Dictionary:
 	# (the Eclipse: the Greek line drawn back east, so the empowered Sphinxes are seen charging
 	# across open sand at the t of the capture, the spell's marks clear of the melee's hit sparks)
 	var ax := 7.0 if power == "eclipse" else 0.0
+	if power == "son_of_osiris":
+		ax = 3.0   # (round 24: the line out of the chain's 4.8-tile reach of his four foes)
 	for i in 18:
 		army.append(u.call("hoplite" if i % 3 else "toxotes", 2, ax + 4.0 + (i % 6) * 1.1, az - 2.0 + (i / 6) * 1.2, -PI * 0.5))
 	var focus := Vector2(cx, cz)
@@ -209,17 +211,19 @@ static func scene_setup(game: Node) -> Dictionary:
 		# bolt on (spawned before the capture tick: they are in every frame)
 		# (a loose arc 7 to 8 tiles out, about 2.3 tiles apart: each jump of the chain is in the
 		# clear, and all of them are within the 4.8 tiles of the middle one he is ordered on)
+		# (round 24) four of them, as many as one bolt and its three jumps strike, so no man in the
+		# shot stands unstruck
 		var hops := []
-		for i in 5:
-			var an := -0.6 + i * 0.3
-			hops.append(u.call("hoplite", 2, focus.x - cx + cos(an) * (7.5 + (i % 2) * 0.8), focus.y - cz + sin(an) * (7.5 + (i % 2) * 0.8), -PI * 0.5))
+		for i in 4:
+			var an := -0.4 + i * 0.25
+			hops.append(u.call("hoplite", 2, focus.x - cx + cos(an) * (8.6 + (i % 2) * 0.5), focus.y - cz + sin(an) * (8.6 + (i % 2) * 0.5), -PI * 0.5))
 		sim.tick(1)
 		var U: Dictionary = sim.get_units()
 		var names: PackedStringArray = sim.unit_type_names()
 		for k in U.ids.size():
 			if int(U.owner[k]) == 1 and names[U.type[k]] == "son_of_osiris":
-				sim.order(int(U.ids[k]), {"type": "attack", "target": hops[2]})
-		focus += Vector2(3.5, 0.0)   # (framed between him and them)
+				sim.order(int(U.ids[k]), {"type": "attack", "target": hops[1]})
+		focus += Vector2(4.5, 0.6)   # (framed between him and them: round 24, the four strikes well inside the frame)
 	var t := float(game.args.get("t", st[2]))
 	sim.tick(int(round(t * 30.0)))
 	if power == "plague_of_serpents" and t >= 0.6:

@@ -118,7 +118,10 @@ func setup(g: Node) -> void:
 		_ribbon_mat(0xc8a060, 0xffe2a8, 0.9, 0x8a6a3a),                  # sand ribbons
 		# the Son of Osiris' chain lightning: linear gold leaning to yellow, kept below where AgX
 		# bleaches a saturated orange to salmon pink
-		_ribbon_mat(Vector3(1.0, 0.5, 0.0), Vector3(1.0, 0.72, 0.16), 0.95, Vector3(0.75, 0.28, 0.0)),
+		# (round 24) a white-hot core (gain 4.5, marked emissive below so the grade whitens it to a
+		# yellow-white instead of graying it) inside a narrow gold rim; the bolt stands on G_ARC_DARK's
+		# painted gold body and dark edge, so it reads against the sand instead of only lightening it
+		_ribbon_mat(Vector3(0.16, 0.06, 0.0), Vector3(1.0, 0.97, 0.9), 4.5, Vector3(0.14, 0.05, 0.0)),
 		# Prosperity's column of gold light over the mines: the same kept-low linear gold, softer,
 		# leaning further to yellow at the fringe so the shaft over sand reads gold, not salmon
 		_ribbon_mat(Vector3(0.9, 0.55, 0.0), Vector3(1.0, 0.78, 0.12), 0.8, Vector3(0.6, 0.3, 0.0)),
@@ -131,9 +134,14 @@ func setup(g: Node) -> void:
 		# the Eclipse's rising streaks and the corona over each empowered myth unit: magenta
 		# round a pale pink core, drawn over the units (round 19)
 		_ribbon_mat(0xff20c0, 0xffd8f4, 2.2, 0xc010a0),
+		# (G_ARC_DARK) the painted gold body and dark edge under each of the Son of Osiris' bolts,
+		# alpha-blended before the additive bolt (round 24: ribbon_dark.gdshader)
+		_mat("ribbon_dark.gdshader", 30),
 	]
+	_ribbon_mats[17].set_shader_parameter("tint", Vector3(0.03, 0.014, 0.004))   # (a warm char brown under the gold)
 	_ribbon_mats[14].set_shader_parameter("emit", true)
-	var prio := [30, 29, 31, 27, 27, 26, 30, 32, 29, 31, 24, 28, 31, 29, 30, Material.RENDER_PRIORITY_MAX, 34]
+	_ribbon_mats[12].set_shader_parameter("emit", true)   # (the chain lightning's core: kept white-hot gold by the grade)
+	var prio := [30, 29, 31, 27, 27, 26, 30, 32, 29, 31, 24, 28, 31, 29, 30, Material.RENDER_PRIORITY_MAX, 34, 30]
 	for i in _ribbon_mats.size():
 		_ribbon_mats[i].render_priority = prio[i]
 	_ribbon_mesh.custom_aabb = aabb
