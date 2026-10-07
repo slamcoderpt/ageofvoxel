@@ -444,7 +444,14 @@ function headE(style) {
     m.set(2, 3, 5, 0x4a2814).set(2, 2, 5, 0x5a321c).set(4, 2, 5, SKIN_SH);
     m.box(-1, 2, 1, 1, 3, 3, BRONZE).box(7, 2, 1, 1, 3, 3, BRONZE);   // cheek flaps behind the face
   } else if (style === 'camel') {
-    nemesN(m, LINEN, TEAM, { chest: 7 });
+    // (round 29, unit_08) Retold's camel rider wears a tall cylindrical cap,
+    // not a nemes: a dark leather band at the brow, a team band, a gold rim,
+    // a tan felt crown rising four rows above the skull to a darker lid, so
+    // the rider ends in a clean vertical post above the camel's hump
+    const CAP = 0xa0703c, CAP_SH = 0x7e5428, LID = 0x5e3c1c;
+    capN(m, (x, y, z) => (y <= 5 ? LEATHER_DK : y <= 7 ? TEAM : y === 8 ? GOLD(x, y, z) : (x === -1 || z === -1) ? CAP_SH : CAP), { y0: 5, front: 6, top: 12 });
+    for (let x = 0; x <= 6; x++) for (let z = 0; z <= 5; z++) if (m.has(x, 12, z)) m.set(x, 12, z, (x === 0 || x === 6 || z === 0 || z === 5) ? CAP_SH : LID);
+    for (let y = 8; y <= 11; y++) for (let x = 0; x <= 6; x++) for (let z = 0; z <= 5; z++) m.set(x, y, z, CAP);   // a solid crown
   } else if (style === 'priest') {
     // a shaved priest under a white headcloth to the shoulders, a gold sun disc on the brow
     capN(m, LINEN, { y0: 5, front: 6, top: 8 });
@@ -1007,16 +1014,29 @@ function khopeshFine({ metal = 0x4a525c, edge = 0xf2f6fa, spine = 0x24282e, guar
   }
   return m;
 }
-// the camel rider's sword (round 9): one straight, solid metal-grey blade,
-// 2 x 2 voxels and 11 long, a lighter honed edge row, a short point, over a
-// gold guard and a dark grip in the fist (along +y; the part's rest tilts it
-// forward and out from the body, so it stands clear of the rider and the neck)
+// the camel rider's sword (round 29): authored at the rider's body voxel (half
+// a rig voxel, the part scaled like the arm), about one arm long overall: a
+// gold pommel, a 2 x 2 dark leather grip with a gold band, a gold crossguard
+// eight wide with dark end caps and a shaded underside, then a dark steel
+// blade four wide and two thick, 12 long: a near-black fuller down the middle,
+// a lit honed edge row on the outer side and a mid-grey edge on the inner,
+// tapering over the last three rows to a bright point (along +y, the grip in
+// the fist at the origin)
 function camelSwordM() {
   const m = new VoxelModel();
-  m.box(0, -2, 0, 2, 3, 2, LEATHER_DK).box(0, -3, 0, 2, 1, 2, GOLD);
-  m.box(-1, 1, -1, 4, 1, 4, GOLD);
-  m.box(0, 2, 0, 2, 11, 2, 0x8a929a).box(0, 2, 1, 2, 11, 1, 0xb8c0c8);
-  m.box(0, 13, 0, 2, 1, 2, 0xb8c0c8).set(0, 14, 1, 0xd0d6dc).set(1, 14, 1, 0xd0d6dc);
+  const FACE = 0x4c545c, FULLER = 0x262a30, EDGE = 0xd8dee4, EDGE_IN = 0x8a929a;
+  m.box(-1, -6, -1, 4, 2, 4, GOLD).box(0, -7, 0, 2, 1, 2, GOLD_DK);       // pommel
+  m.box(0, -4, 0, 2, 4, 2, LEATHER_DK).box(0, -2, 0, 2, 1, 2, GOLD);   // grip, a gold band
+  m.box(-3, 0, -1, 8, 1, 4, GOLD).box(-3, -1, 0, 8, 1, 2, GOLD_DK);    // the crossguard, its shaded underside
+  for (const x of [-3, 4]) m.box(x, 0, -1, 1, 2, 4, LEATHER_DK);         // end caps
+  const top = 13;
+  for (let y = 1; y <= top; y++) {
+    const [x0, x1] = y <= top - 3 ? [-1, 2] : y <= top - 2 ? [-1, 1] : y <= top - 1 ? [0, 1] : [0, 0];
+    for (let x = x0; x <= x1; x++) for (let z = 0; z <= 1; z++) {
+      const c = y === top ? EDGE : x === x0 ? EDGE : x === x1 ? EDGE_IN : (y < top - 3 && y > 1 ? FULLER : FACE);
+      m.set(x, y, z, x1 - x0 >= 3 && (x === 0 || x === 1) && !(y < top - 3 && y > 1) ? FACE : c);
+    }
+  }
   return m;
 }
 // (round 25) the Avenger's sword at half a rig voxel (part scale 0.5): a
@@ -1668,9 +1688,9 @@ function riderLegsM({ y = 11, x0 = -2, x1 = 7, skin = SKIN, kiltC = TEAM, len = 
 // border, a gold trim and a two-tone fringe, a long S-curved neck that dips from the chest and
 // rises high above the rider's knees to a small head with a narrow muzzle,
 // long thin legs with knobby knees and broad pads, a team scarf at the throat.
-// The rider: bronze skin over the white cloth, a team tunic and kilt, a gold
-// collar, a striped linen-and-team nemes, and a long hooked khopesh-sword
-// held out from his side.
+// The rider (round 29): bronze skin over a red cloth, a team kilt and
+// sleeves, a banded bronze corslet, a gold collar, Retold's tall cylindrical
+// cap, and an arm-long straight sword with a gold hilt held out from his side.
 {
   const HIDE = pick3(15, 0x9a7048, 0x8c6440, 0xa67a50, 0.5, 0.85);
   const BELLY = pick3(17, 0xc9a67a, 0xbf9c70, 0xd2b084, 0.5, 0.85);
@@ -1687,13 +1707,17 @@ function riderLegsM({ y = 11, x0 = -2, x1 = 7, skin = SKIN, kiltC = TEAM, len = 
   // the hump keeps its dome and the cloth reads as draped), spans only the
   // seat (z 8..13: the hump's tan fore and aft slopes and the whole rump,
   // shoulders and lower flanks stay bare) and stops at mid-barrel, well above
-  // the elbows. From the top down: a white linen field (lit on top, a shade
-  // step on the flanks), two rows of the army's colour, one gold trim row,
-  // and a two-tone fringe (red / ochre, tassels on every other column)
+  // the elbows. From the top down: a red field (round 29; lit on top, a
+  // cream stripe at the foot), two rows of the army's colour, one gold trim
+  // row, and a two-tone fringe (brown / ochre, tassels on every other column)
   const cloth = new VoxelModel();
-  const CZ0 = 6, CZ1 = 15, TRIM_Y = 5, CLOTH_TOP = 0xf6f2e6, CLOTH_SIDE = 0xe4dcc6, CLOTH_SH = 0xccc2a8;
+  // (round 29) the field a deep madder red with a cream stripe over the team
+  // border (Retold's chariot-horse blanket colours): the white field read as
+  // the rider's own white kilt and fused man and saddle; on red the team-and-
+  // bronze rider stands clear
+  const CZ0 = 6, CZ1 = 15, TRIM_Y = 5, CLOTH_TOP = 0xa8382a, CLOTH_SIDE = 0x8e2a1c, CLOTH_SH = BLANKET_CREAM;
   const clothC = (y, z, top) => {
-    if (y <= TRIM_Y - 1) return (z & 1) ? RED : OCHRE;          // the fringe
+    if (y <= TRIM_Y - 1) return (z & 1) ? LEATHER : OCHRE;      // the fringe (round 29: Retold's brown / ochre zigzag hem)
     if (y === TRIM_Y) return GOLD;                              // the gold trim band
     if (y <= TRIM_Y + 2) return TEAM;                           // the team border
     return top ? CLOTH_TOP : y === TRIM_Y + 3 ? CLOTH_SH : CLOTH_SIDE;   // the linen field, shaded towards the hem
@@ -1722,7 +1746,17 @@ function riderLegsM({ y = 11, x0 = -2, x1 = 7, skin = SKIN, kiltC = TEAM, len = 
     const x = ((k >> 20) & 1023) - 512, y = ((k >> 10) & 1023) - 512, z = (k & 1023) - 512;
     if (y > TRIM_Y + 2 && !zIn(y, z - 1) !== !zIn(y, z + 1) && (x < 3 || x > 5)) cloth.set(x, y, z, TEAM);
   }
-  for (let z = CZ0; z <= CZ1; z += 2) for (let x = -3; x <= 11; x++) if (cloth.has(x, TRIM_Y - 1, z) && (x < 1 || x > 7)) cloth.set(x, TRIM_Y - 2, z, z % 4 === 1 ? RED : OCHRE);
+  for (let z = CZ0; z <= CZ1; z += 2) for (let x = -3; x <= 11; x++) if (cloth.has(x, TRIM_Y - 1, z) && (x < 1 || x > 7)) cloth.set(x, TRIM_Y - 2, z, z % 4 === 1 ? LEATHER : OCHRE);
+  // (round 29) a dark leather saddle pad on the cloth's crown, framed by a
+  // near-black rim row: the rider's kilt sits on a dark outline instead of
+  // melting into the white field
+  for (let z = 8; z <= 13; z++) for (let x = 1; x <= 7; x++) {
+    let top = -1;
+    for (let y = 18; y >= 0; y--) if (cloth.has(x, y, z)) { top = y; break; }
+    if (top < 12) continue;
+    const rim = z === 8 || z === 13 || x === 1 || x === 7;
+    cloth.set(x, top + 1, z, rim ? DARK : LEATHER);
+  }
   // the rider's legs (a separate part, so they carry their own outline): each
   // a bent two-segment limb in half voxels of the camel, the white-kilted
   // thigh running out and forward over the cloth from the hip, a knee, and
@@ -1733,10 +1767,15 @@ function riderLegsM({ y = 11, x0 = -2, x1 = 7, skin = SKIN, kiltC = TEAM, len = 
   const H = (v) => v.map((c) => c * 2);
   const skin = (x, y, z) => (legs.has(x, y + 1, z) ? LEG_M : LEG_L);
   for (const s of [-1, 1]) {
-    const hip = [4 + s * 1.7, 15.2, 10.0], knee = [4 + s * 4.6, 12.6, 12.9], ankle = [4 + s * 6.4, 3.6, 12.0], toe = [4 + s * 6.5, 3.0, 13.4];
-    tube(legs, H(hip), H(knee), 1.9, 1.6, (x, y, z, t) => (t < 0.35 ? TEAM : LEG_M));   // the team kilt over the upper thigh (against the white cloth)
-    tube(legs, H(knee), H(ankle), 1.55, 1.2, LEG_M);
-    tube(legs, H(ankle), H(toe), 1.1, 1.0, FOOT);
+    // (round 29) the legs straddle the hump close to the cloth (Retold's
+    // rider, unit_08): the thigh forward and down over the shoulder of the
+    // drape to a knee over the camel's shoulder, the shin hanging in front of
+    // the cloth's front edge, the foot level with the fringe; no more long
+    // spread limb standing off the flank like a bow
+    const hip = [4 + s * 2.0, 15.8, 11.0], knee = [4 + s * 4.0, 13.6, 14.6], ankle = [4 + s * 4.6, 5.4, 15.8], toe = [4 + s * 4.7, 4.8, 17.2];
+    tube(legs, H(hip), H(knee), 2.1, 1.8, (x, y, z, t) => (t < 0.5 ? TEAM : LEG_M));   // the team kilt over the upper thigh (against the red cloth)
+    tube(legs, H(knee), H(ankle), 1.6, 1.3, LEG_M);
+    tube(legs, H(ankle), H(toe), 1.3, 1.1, FOOT);
   }
   for (const [k, v] of legs.vox) if (v.c === LEG_M) {
     const x = ((k >> 20) & 1023) - 512, y = ((k >> 10) & 1023) - 512, z = (k & 1023) - 512;
@@ -1770,14 +1809,17 @@ function riderLegsM({ y = 11, x0 = -2, x1 = 7, skin = SKIN, kiltC = TEAM, len = 
   };
   const low = () => new VoxelModel().box(0, 2, 0, 2, 7, 2, BELLY).box(0, 1, 0, 2, 1, 2, KNEE).box(0, 0, -1, 2, 1, 4, PAD);
   const coat = { coat: true };
-  const R = 0.065 / 0.09;   // the rider a touch under the foot soldiers' size: the camel dominates
+  // (round 29) the rider 1.15 x his old size (the head 1.35 x) and seated
+  // higher, so head and shoulders stand clear above the hump
+  const R = 0.065 / 0.09 * 1.15;
   const t = manTorso();
-  // the rider reads apart from the blue cloth by a value step: a flat white
-  // kilt and the seat under a dark leather corslet and belt, the team tunic
-  // only on the shoulders and sleeves above it
-  eKilt(t, { color: 0xf2ecdc, side: LINEN_SH, hem: LINEN_SH, len: 6, fold: false });
+  // the rider reads apart from the white-and-team cloth by value and hue
+  // (unit_08): a team kilt over the dark saddle pad, a banded bronze-brown
+  // scale corslet (warm mid / dark rows) from belt to chest, the team tunic
+  // only on the shoulders and sleeves above it, the gold collar
+  eKilt(t, { hem: TM_DK, len: 5, fold: false });
   paint(t, (x, y, z) => (y >= 2 && y <= 13 ? (z >= 2 && Math.abs(x + 0.5) < 5 ? TM : TM_SH) : null));   // the team tunic
-  paint(t, (x, y, z) => (y >= 2 && y <= 9 ? (Math.abs(x + 0.5) < 5 ? LEATHER : LEATHER_DK) : null));   // the leather corslet all round
+  paint(t, (x, y, z) => (y >= 2 && y <= 9 ? ((y & 1) ? (Math.abs(x + 0.5) < 5 ? 0x9a6a34 : 0x7a5028) : 0x4a2c14) : null));   // the banded corslet all round
   eCollar(t, [GOLD, GOLD, TEAM_TRIM, TEAM_TRIM, GOLD], { r0: 2.6 });
   eBelt(t, LEATHER_DK, GOLD);
   rig('camel_rider', { voxel: 0.09, anim: 'horse', style: 'camel', pose: 'mount', gait: 0.75, stride: 0.9, graze: false }, [
@@ -1794,8 +1836,11 @@ function riderLegsM({ y = 11, x0 = -2, x1 = 7, skin = SKIN, kiltC = TEAM, len = 
     part('cannonBL', low(), [1, 9, 1], [0, -7, 0], 'legBL', coat),
     part('legBR', up(true), [1, 8, 1], [-2.5, 2, -5.5], 'body', coat),
     part('cannonBR', low(), [1, 9, 1], [0, -7, 0], 'legBR', coat),
-    ...riderMan({ torso: t, s: R, torsoJoint: [0, 15.4, 0], torsoParent: 'body', head: 'camel', arm: { sleeve: TEAM, bracer: GOLD } }),
-    part('weapon', camelSwordM(), [0.5, 0, 0.5], sc(HAND_E, R), 'armR', { scale: R, jitter: 0.015, rest: [0.55, 0, 0.3] }),
+    ...riderMan({ torso: t, s: R, headScale: 1.05, torsoJoint: [0, 16.2, 0.2], torsoParent: 'body', head: 'camel', arm: { sleeve: TEAM, bracer: GOLD } }),
+    // the sword at the arm's own voxel size (one arm long), raised forward
+    // and out to the side from the fist, so the blade reads in profile clear
+    // of the body, the hump and the neck
+    part('weapon', camelSwordM(), [0.5, 0, 0.5], sc(HAND_E, R), 'armR', { scale: BODY_SCALE * R, jitter: 0.01, rest: [0.75, 0, 0.6] }),
   ]);
 }
 

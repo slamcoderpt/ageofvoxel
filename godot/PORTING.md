@@ -2352,6 +2352,27 @@ silver row, two-tone fringe) over the rider's linen-kilted legs. `stripedBlanket
 takes `spine` and `hem: [a, b]` for that. Close views:
 `--params "eu_one=camel_rider&eu_turn=90&eu_zoom=1.2&eu_ax=-0.6&eu_az=-1.3&eu_pitch=18"`.
 
+Camel Rider, round 29 (unit_08; the rider read as a heap fused with the cloth):
+the rider is 1.15 x his old size (`R = 0.065 / 0.09 * 1.15`, head scale 1.05,
+so the head ~1.35 x) and sits higher (torso joint y 16.2); his head is
+Retold's tall cylindrical cap (`headE('camel')`: dark leather brow band, team
+band, gold rim, a tan felt crown four rows over the skull to a dark lid), not
+the striped nemes, so he ends in a clean vertical post above the hump. Body:
+a team kilt, a banded bronze-brown scale corslet (warm mid / dark rows), team
+only on the shoulders and sleeves, the gold collar. The saddle cloth's field
+is madder red (top 0xa8382a, flanks 0x8e2a1c, a cream stripe over the team
+border, a brown / ochre zigzag fringe), with a dark leather saddle pad framed
+by a near-black rim row on the crown under the seat. The legs straddle close:
+the team-kilted thigh to a knee over the camel's shoulder, the shin hanging in
+front of the cloth's front edge, the foot level with the fringe (no long limb
+off the flank). The sword (`camelSwordM`) is authored at the arm's own voxel
+(part scale `BODY_SCALE * R`) and is about one arm long: a gold pommel, a 2 x 2
+leather grip with a gold band, an eight-wide gold crossguard with dark end
+caps, a dark steel blade four wide (near-black fuller, a lit honed edge row, a
+mid-grey inner edge, a three-row taper to a bright point), raised forward and
+out from the fist (`rest [0.75, 0, 0.6]`). Check:
+`--params "eu_focus=camel_rider"` and `eu_group=mounted`.
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower
