@@ -2099,6 +2099,45 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   `model_override[id]`, `set_static(entries)` (render-only:
   `{type, owner, x, z, key | variant, age, god, built, progress, yaw, scale}`).
 
+- **Footings** (round 48, `apron()` in export-egypt.mjs, `apron/<type>/<variant>`
+  in the `egypt` group, drawn by `egypt_buildings.gd` `_set_apron()` as a child
+  MeshInstance3D named `apron` under every Egyptian building, sim-spawned or
+  `set_static` (`"bare": true` skips it), the same transform; construction
+  stages use the first variant's; farms, palms and clutter have none): every
+  building is grounded instead of standing on bare sand with a hard edge. At
+  1/8-tile voxels on the lot plus `AP` = 8 voxels round it, read from the
+  finished model (fine grids folded down): a **stone foundation skirt** of
+  pale dressed slabs (two rings one voxel high, three on lots of 5+ tiles, the
+  inner ring two high, the outer arris darker, a few chipped) hugging the
+  main masses only (cells walled 5+ rows high with 6 of their 3 x 3
+  neighbours: no skirts round poles or columns); a **trodden-earth footprint**
+  (`AP_EARTH`, two steps under the terrain's dirt, mottled with `AP_DUST`,
+  darker in the walls' drip line) over the whole lot wherever the building
+  laid no ground of its own, fraying out past the lot in a noise-shaped
+  edge; **worn tracks** (`AP_TRACK`) running on from every door path; sparse
+  **debris** (pebbles, potsherds, straw, broken bricks), dry grass and low
+  **shrubs** on the fringe, a pot or two by the corners. Its ground row sits
+  0.0125 under the building's own (pivot y 0.9), and each footing is lifted
+  a hair (0..0.007) by its id so overlapping neighbours never flicker; it
+  casts no shadow.
+- **A silhouette per function** (round 48): the **Barracks** is fronted by a
+  **pylon gate** (two battered sandstone towers, a voxel in four rows, under a
+  red / ochre cavetto over the owner's band, a long team banner hung down
+  each face, a mast with a team streamer on each roof, a lower gate block
+  with an open passage through to the drill yard under a red spear lintel)
+  before a lower hall; the **Market** is an **open colonnade** (seven lotus
+  columns and a back row of three before a long mud-brick store hall, a
+  painted architrave, the back half roofed, the front an open pergola of
+  palm beams with blue / white striped cloths over every second bay, a
+  counter of produce in each bay, a paved trading floor); the **Mining
+  Camp** is a **tall tapered ore tower** (24 rows, a voxel in five) with a
+  timber hoist and a basket of ore on its roof; the **Lumber Camp** a low
+  keeper's hut beside a tall **open timber shed** (palm-trunk posts, beams
+  and rafters, a ragged pitched frond mat) over the log stack; every
+  **house** plan is a **walled compound** (a low yard wall in the house's own
+  dress along the lot's front edges, a gate before the door between two
+  piers capped in the owner's colour).
+
 Capture scene `egypt_town` (`game/buildings/egypt_town_scene.gd`): a whole
 Egyptian settlement on the flat start of a battle map, laid out like
 `reference/egypt/building_01`: houses in touching rows along paved lanes,
@@ -2110,7 +2149,12 @@ worn earth everywhere, `LANES` paved (`AovSim.paint_ground`; sand reads as
 beach on low ground), and the map's ground details (pebbles, tufts) are
 hidden so the ground is clean like Retold's (`egt_details=1` keeps them).
 Houses stand a lane's width (one tile) apart, palms only at the quarters'
-edges, the street clutter sparse. Player 1 is made Egyptian and the sim's types are
+edges, the street clutter sparse (round 48: the gaps between the compounds
+filled and linked: garden plots (clutter 9), whitewashed garden walls with a
+palm (clutter 10), a few goods by the market and the lumber camp, sixteen
+more palms between the compounds and along the main street, two more houses
+by the temple, `GREEN` grass / dry-grass ground on the farms' side in the
+whole-town view). Player 1 is made Egyptian and the sim's types are
 spawned, the rest (lighthouse, wonder, palms, clutter) drawn render-only.
 The whole-town camera is set by the scene (`cam` overrides it).
 

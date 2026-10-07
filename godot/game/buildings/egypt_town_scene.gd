@@ -48,12 +48,18 @@ const LAYOUT := [
 	# the military quarter east
 	["eg_barracks", 7, -8, {}], ["siege_works", 13, -9, {}], ["migdol", 15, -1, {}], ["mining_camp", 22, 7, {}],
 	["house", 7, -2, {"variant": 2}], ["house", 11, -2, {"variant": 1}], ["house", 12, 9, {"variant": 1}],
+	# round 48: a pair more by the temple's east flank, so the quarter closes up
+	["house", 5, -13, {"variant": 0}], ["house", 9, -13, {"variant": 2}],
 	["lighthouse", -14, -16, {}], ["wonder", -25, -20, {}],
 ]
 ## palms at the edges of the quarters (not over the lanes: their shadows would
 ## lie across the buildings)
-const PALMS := [[-17, -12], [-5, -16], [11, -12], [4, -17], [-15, 12], [12, 13], [22, -8], [-26, -1],
-	[-16, 4], [20, 13], [-19, -12], [19, -3], [-17, 13], [2, 21]]
+const PALMS := [[-17, -12], [-5, -16], [13, -12], [4, -17], [-15, 12], [12, 13], [22, -8], [-26, -1],
+	[-16, 4], [20, 13], [-19, -12], [19, -3], [-17, 13], [2, 21],
+	# round 48: palms in the gaps between the compounds and along the main
+	# street's edge, tying the quarters together
+	[-14, 3], [-9, 3], [16, 2], [-1, 13], [10, 13], [-11, 13], [-21, -6], [-21, 6], [-28, 4],
+	[-28, 9], [-27, 12], [3, -11], [13, -14], [21, 3], [-6, -10], [-23, -12]]
 ## street clutter between the buildings, sparse: [tile x, tile z (centre), variant, yaw]
 ## (clutter variants, export-egypt.mjs: 0 jars, 1 crates + sacks, 2 mud-brick
 ## wall run, 3 hand cart, 4 pen corner, 5 reed sunshade stall, 6 woodpile, 7 well,
@@ -61,8 +67,20 @@ const PALMS := [[-17, -12], [-5, -16], [11, -12], [4, -17], [-15, 12], [12, 13],
 ## (round 46: cut from eight to three, each tied to the building beside it:
 ## the quarry blocks by the obelisks, the well by the granary and the farms,
 ## the ore cart by the mining camp; no general scatter of crates and sacks)
+## (round 48: 9 a garden plot, 10 a whitewashed garden wall with a palm:
+## the gaps between the compounds filled and linked, a few goods by the
+## market and the lumber camp)
 const CLUTTER := [
 	[-5.5, -4.0, 8, 0.0], [-21.0, 0.3, 7, 0.0], [16.5, 10.5, 3, 0.0],
+	[9.0, 2.6, 9, 0.0], [13.0, 2.6, 9, 1.57], [-6.0, -7.6, 9, 0.0], [-17.0, 6.6, 9, 0.0],
+	[-3.0, 11.0, 10, 1.57], [3.0, 11.0, 10, 1.57], [-6.0, 13.6, 10, 0.0], [10.5, 13.6, 10, 0.0],
+	[-14.0, 6.6, 10, 0.0], [-20.0, -3.0, 10, 1.57], [6.0, -9.6, 10, 0.0],
+	[-13.5, 10.5, 0, 0.0], [-22.5, -4.5, 1, 0.0], [-10.0, 13.8, 5, 0.0],
+]
+## round 48: green ground (GRASS 0, DRYGRASS 6) on the farms' side and under
+## the palm groves, so the town does not stand on one flat sand (tile rects)
+const GREEN := [
+	[-30, -1, 6, 15, 0], [-28, -4, 3, 4, 0], [-31, 14, 5, 3, 0], [-25, 13, 3, 2, 6], [-26, 3, 1, 3, 0],
 ]
 ## paved lanes (tile rects relative to the centre: x, z, w, h), the rest worn earth
 const LANES := [
@@ -158,6 +176,9 @@ static func scene_setup(game: Node) -> Dictionary:
 		if not states:
 			for r in LANES:
 				sim.paint_ground(cx + int(r[0]), cz + int(r[1]), int(r[2]), int(r[3]), 4)   # PAVED
+			if row_keys == "" and focus_type == "":
+				for r in GREEN:
+					sim.paint_ground(cx + int(r[0]), cz + int(r[1]), int(r[2]), int(r[3]), int(r[4]))
 		else:
 			sim.paint_ground(cx - 32, cz - 5, 64, 7, 4)
 	if not states and EgyptBuildingsRef.types().has("clutter"):

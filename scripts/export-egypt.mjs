@@ -2482,6 +2482,20 @@ function house(v, age) {
     for (let k = 0; k < n; k++) slit(m, face, u + 2 * k * d, y0, 2, 1, { lintel: false, sill: false });
     for (let i = -1; i <= 2 * n - 1; i++) { onFace(face, u + i * d, y0 + 2, S.line); onFace(face, u + i * d, y0 - 1, S.line); }
   };
+  // round 48: every plan is a walled compound: a low yard wall in the
+  // house's own dress along the lot edges in front, a gate before the door
+  // between two piers a course taller (capped in the owner's colour)
+  const yard = (S, pts, g0, g1) => {
+    const gaps = [];
+    for (let x = g0; x < g1; x++) gaps.push([x, 23]);
+    yardWall(m, pts, 4, arch ? HT_MUDP : S.wall, S.cap, gaps);
+    for (const x of [g0 - 1, g1]) { m.set(x, 4, 23, S.wall); m.set(x, 5, 23, arch ? S.cap : TEAM); m.set(x, 6, 23, S.cap); }
+  };
+  if (v === 1) yard(O, [[0, 12], [0, 23], [23, 23], [23, 12]], 8, 12);
+  else if (v === 2) yard(M, [[0, 11], [0, 23], [23, 23], [23, 15]], 5, 9);
+  else if (v === 3) yard(W, [[0, 13], [0, 23], [23, 23], [23, 13]], 11, 15);
+  else if (v === 4) yard(O, [[0, 14], [0, 23], [23, 23], [23, 14]], 5, 9);
+  else if (v === 5) yard(M, [[0, 15], [0, 23], [23, 23], [23, 18]], 6, 10);
   if (v === 0) {
     // the weaver's courtyard house (whitewash): a two-storey block at the
     // back, a low wing beside it, a walled court in front entered through a
@@ -2634,14 +2648,25 @@ function cleanCrate(m, x, y, z, n, c = 0xb48a52) {
 }
 function lumberCamp() {
   const m = lot(24, 24);
-  block(m, 2, 3, 13, 15, 1, 13, { wall: ESAND, roofC: EDECK, rimC: LIME, gorge: [0x963f2a, 0xa5492f], torus: false, lipOut: 2, batter: 5, band: null, flare: true });
-  // the door, centred on the front and clear of every prop (its worn path
-  // runs straight out to the lot edge)
-  door(m, '+z', 6, 4, 1, 6);
-  slit(m, '+x', 7, 6, 2, 1);
-  // the canvas from the block's east face over the stock
-  const yTop = 10, f = 12 - Math.floor((yTop - 1) / 5);
-  clothAwning(m, '+x', f, 4, 19, yTop, 22 - f, 2.5, { posts: [4, 11, 18], sw: 2, belly: 0.5, sag: 1.2 });
+  // round 48: a low keeper's hut and, the silhouette, a tall OPEN TIMBER
+  // SHED over the stock: palm-trunk posts, palm-log beams and rafters, a
+  // ragged mat of dried fronds sloping down to the front
+  block(m, 1, 3, 10, 13, 1, 8, { wall: ESAND, roofC: EDECK, rimC: LIME, gorge: [0x963f2a, 0xa5492f], torus: false, lipOut: 1, batter: 5, band: null, flare: true });
+  door(m, '+z', 4, 3, 1, 5);
+  slit(m, '-x', 7, 5, 2, 1);
+  {
+    const SX0 = 11, SX1 = 23, SZ0 = 3, SZ1 = 20;
+    const yAt = (z) => 14 - Math.round(((z - SZ0) * 3) / (SZ1 - SZ0));   // the pitch: 14 at the back, 11 at the front
+    for (const x of [SX0, SX1]) for (const z of [SZ0, SZ1]) for (let y = 1; y < yAt(z); y++) pset(m, x, y, z, y % 3 === 0 ? 0x5e4630 : PALM_T(x, y, z));
+    for (let x = SX0 - 1; x <= SX1 + 1; x++) for (const z of [SZ0, SZ1]) pset(m, x, yAt(z), z, (x & 1) ? 0x7a5a38 : 0x6a4c2e);
+    for (let x = SX0; x <= SX1; x += 3) for (let z = SZ0; z <= SZ1; z++) pset(m, x, yAt(z), z, (z & 1) ? 0x7a5a38 : 0x6a4c2e);
+    for (let x = SX0 - 1; x <= SX1 + 1; x++) for (let z = SZ0 - 1; z <= SZ1 + 1; z++) {
+      const edge = x === SX0 - 1 || x === SX1 + 1 || z === SZ0 - 1 || z === SZ1 + 1;
+      if (edge && hash3(x, 9, z, 615) < 0.4) continue;
+      m.set(x, yAt(Math.min(SZ1, Math.max(SZ0, z))) + 1, z, FROND_DRY(x, 0, z));
+    }
+    for (let x = SX0 - 1; x <= SX1 + 1; x++) if (hash3(x, 3, 1, 617) < 0.6) m.set(x, yAt(SZ1), SZ1 + 2, FROND_DRY(x, 1, SZ1 + 2));
+  }
   // the stock (building_06): round logs stacked 3 over 2 along z under the
   // canvas, a voxel of shade between neighbours so every pale cut end reads
   // as its own disc, the upper logs bedded in the gaps
@@ -2740,7 +2765,9 @@ function mcNugget(m, x, z, s = 0) {
 }
 function miningCamp() {
   const m = lot(24, 24);
-  const X0 = 5, Z0 = 3, X1 = 17, Z1 = 13, Y0 = 1, H = 12, B = 7, top = Y0 + H;
+  // round 48: a tall tapered ore tower (a strong batter, a voxel in five
+  // rows) with a timber hoist on its roof, not one more low block
+  const X0 = 4, Z0 = 2, X1 = 16, Z1 = 13, Y0 = 1, H = 24, B = 5, top = Y0 + H;
   if (m.feet) m.feet.push({ x0: X0, z0: Z0, x1: X1, z1: Z1, hb: 1 });
   m.blocks.push({ x0: X0, z0: Z0, x1: X1, z1: Z1, y0: Y0, h: H, b: B, base: 0 });
   let I = 0;
@@ -2777,9 +2804,20 @@ function miningCamp() {
   m.lastTop = { c0: c0 - 1, c1: c1 + 1, d0: d0 - 1, d1: d1 + 1, y: top + 2 };
   // the door: a dark sandstone frame under a timber lintel (no pale
   // limestone frame to break the wall's courses)
-  door(m, '+z', 11, 4, 1, 5, { deep: 3, frame: SAND_D, lintel: false });
-  for (let x = 9; x <= 16; x++) pset(m, x, 6, Z1, x === 9 || x === 16 ? MC_BIN : MC_BIN_D);
-  slit(m, '-z', 11, 6, 3, 1); slit(m, '-x', 8, 6, 3, 1);   // one slit a face (a pair reads as eyes)
+  door(m, '+z', 10, 4, 1, 5, { deep: 3, frame: SAND_D, lintel: false });
+  for (let x = 9; x <= 14; x++) pset(m, x, 6, Z1, x === 9 || x === 14 ? MC_BIN : MC_BIN_D);
+  slit(m, '-z', 9, 8, 3, 1); slit(m, '-x', 7, 8, 3, 1);   // one slit a face (a pair reads as eyes)
+  slit(m, '+z', 9, 15, 3, 1); slit(m, '+x', 7, 15, 3, 1); slit(m, '-x', 7, 19, 2, 1);
+  // the hoist: two posts on the roof, a beam jutting out over the front,
+  // a rope down to a basket of ore
+  {
+    const L = m.lastTop, ry = L.y + 2, cx = Math.floor((L.c0 + L.c1) / 2), cz = Math.floor((L.d0 + L.d1) / 2);
+    for (const x of [cx - 2, cx + 1]) for (let y = ry; y < ry + 6; y++) pset(m, x, y, cz, MC_BIN);
+    for (let x = cx - 2; x <= cx + 1; x++) pset(m, x, ry + 6, cz, MC_BIN_L);
+    for (let z = cz; z <= L.d1 + 3; z++) pset(m, cx, ry + 6, z, MC_BIN_L);
+    for (let y = ry - 2; y < ry + 6; y++) pset(m, cx, y, L.d1 + 3, CORD);
+    for (let i = -1; i <= 1; i++) for (let k = -1; k <= 1; k++) { pset(m, cx + i, ry - 4, L.d1 + 3 + k, STRAW[0]); pset(m, cx + i, ry - 3, L.d1 + 3 + k, (i || k) ? STRAW[1] : MC_GOLD[0]); }
+  }
   // the awnings: flat taut canvas (belly 0, sag 0) under the stripe, on dark
   // posts at the outer corners
   const yTop = 8, inset = Math.floor((yTop - Y0) / B);
@@ -3297,9 +3335,10 @@ function bkBarrel(m, X, Z) {
 function barracks() {
   const W = 40;
   const m = lot(W, W, EARTH);
-  patch(m, 7, 20, 33, 35, SANDGROUND, { seed: 5 });
-  // the hall: one battered mass, one cavetto, one slab
-  const R = bkMass(m, 4, 3, 36, 21, 1, 16, 6);
+  patch(m, 7, 17, 33, 31, SANDGROUND, { seed: 5 });
+  // the hall: one battered mass, one cavetto, one slab (round 48: lower,
+  // behind the pylon gate)
+  const R = bkMass(m, 4, 3, 36, 17, 1, 12, 6);
   const { c0, c1, d0, d1, top } = R;
   const ring = (x, z, p) => Math.min(x - (c0 - p), (c1 - 1 + p) - x, z - (d0 - p), (d1 - 1 + p) - z);
   const fl = (x, z) => BK_FLUTE[((x + z + 512) >> 1) & 1];
@@ -3361,41 +3400,68 @@ function barracks() {
   sack(m, c1 - 5, DY + 1, d1 - 5);
   // the door: centred, deep, dark cedar leaves in a sandstone frame, the
   // painted lintel band over it (the only strong colour on the walls)
-  door(m, '+z', 17, 6, 1, 10, { deep: 3, frame: shade(0xd2aa76, 0.86), lintel: false, proud: true });
-  paint(m, '+z', 13, 16, [
+  door(m, '+z', 17, 6, 1, 6, { deep: 3, frame: shade(0xd2aa76, 0.86), lintel: false, proud: true });
+  paint(m, '+z', 13, 11, [
     'RRRRRRRRRRRRRR',
     'LLLLLLLLLLLLLL',
     'LGGGGGRRGGGGGL',
     'LLLGGGRRGGGLLL',
     'GBRGBRGBRGBRGB',
   ], { R: RED_M, L: LAPIS, G: GILT, B: 0x3f7a5a });
-  for (let x = 13; x < 27; x++) { const p = outer(m, '+z', x, 17, lim(m)); if (p) m.set(p[0], p[1], p[2], LIME(p[0], p[1], p[2])); }
+  for (let x = 13; x < 27; x++) { const p = outer(m, '+z', x, 12, lim(m)); if (p) m.set(p[0], p[1], p[2], LIME(p[0], p[1], p[2])); }
   // a paved way from the gate to the door
-  patch(m, 15, 21, 25, 40, PAVE, { rag: 1, seed: 9 });
+  patch(m, 15, 17, 25, 40, PAVE, { rag: 1, seed: 9 });
   // a row of three high slits in the back face, one in each end face
-  for (const u of [14, 20, 26]) slit(m, '-z', u, 9, 4, 1);
-  slit(m, '-x', 11, 9, 4, 1); slit(m, '+x', 11, 9, 4, 1);
+  for (const u of [14, 20, 26]) slit(m, '-z', u, 7, 3, 1);
+  slit(m, '-x', 9, 7, 3, 1); slit(m, '+x', 9, 7, 3, 1);
   // the yard: thin plain walls (a lighter top row, no cornice, no paint)
   const YH = 6;
-  bkMass(m, 4, 20, 7, 38, 1, YH, 0, { top: BK_TOP });
-  bkMass(m, 33, 20, 36, 38, 1, YH, 0, { top: BK_TOP });
-  bkMass(m, 7, 35, 14, 38, 1, YH, 0, { top: BK_TOP });
-  bkMass(m, 26, 35, 33, 38, 1, YH, 0, { top: BK_TOP });
-  // the gate piers: the walls' ends two rows taller, the same plain top
-  for (const x0 of [13, 24]) bkMass(m, x0, 35, x0 + 3, 38, 1, YH + 2, 0, { top: BK_TOP });
-  // the team banners on poles at the yard's two front corners, clear of the door
-  banner(m, 5, YH + 1, 37, 20, '+z');
-  banner(m, 34, YH + 1, 37, 20, '+z');
+  bkMass(m, 4, 16, 7, 31, 1, YH, 0, { top: BK_TOP });
+  bkMass(m, 33, 16, 36, 31, 1, YH, 0, { top: BK_TOP });
+  // ---- round 48: the PYLON GATE, the barracks' face (the Temple's form in
+  // a soldier's dress, so the two read apart): two battered sandstone
+  // towers (a voxel in four rows), each under a red / ochre cavetto over the
+  // owner's band, three cowhide shields hung across each face, a mast with a
+  // long team streamer on each roof; between them a lower gate block with an
+  // open passage through to the yard (no leaves: troops march out), a
+  // painted lintel of crossed spears on red over it
+  const GZ0 = 29, GZ1 = 39, GH = 20, Kb = Math.floor((GH - 1) / 4);
+  let GT = 0;
+  for (const [x0, x1] of [[1, 15], [25, 39]]) GT = pylon(m, x0, GZ0, x1, GZ1, GH, { wall: BK_WALL, b: 4, band: 'team', gorge: [0x9a3f28, 0xb8503c, 0xc4923c, 0xb8503c], lipOut: 2, roofC: BK_DECK });
+  for (let x = 13; x < 27; x++) for (let z = GZ0 + 2; z < GZ1 - 1; z++) for (let y = 1; y < 14; y++) {
+    if (m.has(x, y, z)) continue;
+    m.set(x, y, z, y === 13 ? LIP(x, y, z) : y === 12 ? (((x + z) & 1) ? 0x9a3f28 : 0xb8503c) : y === 11 ? TEAM : y === 1 ? BK_BASE : BK_WALL(x, y, z));
+  }
+  // the passage
+  for (let x = 17; x < 23; x++) for (let z = GZ0 - 1; z < GZ1; z++) for (let y = 1; y < 9; y++) m.remove(x, y, z);
+  for (let x = 17; x < 23; x++) for (let z = GZ0 + 2; z < GZ1 - 1; z++) m.set(x, 0, z, PAVE);
+  for (const x of [16, 23]) for (let y = 1; y < 9; y++) for (let z = GZ0 + 2; z < GZ1 - 1; z++) if (m.has(x, y, z) || z === GZ1 - 2) m.set(x, y, z, shade(BK_WALL(x, y, z), 0.7));
+  for (let x = 16; x < 24; x++) for (let z = GZ0 + 2; z < GZ1 - 1; z++) m.set(x, 9, z, shade(0xd2aa76, 0.86));
+  paint(m, '+z', 15, 10, ['RSRRRRRRSR', 'RRSRRRRSRR'], { R: RED_M, S: 0xd8d0c0 });
+  // shields across each tower's face, the masts with streamers on the roofs
+  // a long team banner hung down each tower's face from under the cornice
+  // (a gilt rod, the cloth, a darker hem), clear of the passage
+  for (const u0 of [6, 30]) for (let i = 0; i < 4; i++) for (let y = 5; y <= 16; y++) {
+    const p = outer(m, '+z', u0 + i, y, lim(m));
+    if (!p) continue;
+    m.set(p[0], p[1], p[2] + 1, y === 16 ? GILT : y === 5 ? (i === 1 || i === 2 ? TEAM : null) : y === 6 ? TEAM : TEAMB);
+  }
+  for (const [x, dir] of [[15 - Kb - 2, -1], [25 + Kb + 1, 1]]) {
+    const z = GZ1 - Kb - 2, RT = GT - 1, top = RT + 12;
+    for (let y = RT; y <= top; y++) pset(m, x, y, z, POLE(x, y, z));
+    pset(m, x, top + 1, z, GILT);
+    for (let q = 1; q <= 8; q++) for (let r = 0; r < (q < 6 ? 2 : 1); r++) m.set(x + dir * q, top - 1 - r - (q >> 2), z, q === 8 ? GILT : TEAMB);
+  }
   // the spear rack along the west wall's inner face with two cowhide shields
-  rack(m, 8, 31, 8);
+  rack(m, 8, 25, 8);
   for (const sx of [9, 13]) for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
     const c = i === 1 && j === 1 ? 0xb08a3c : (i + j) % 3 === 0 ? 0x6a4428 : 0xeee2c8;
-    pset(m, sx + i, 2 + j, 33, c);
+    pset(m, sx + i, 2 + j, 27, c);
   }
   // a practice dummy, a straw archery butt with a red ring, barrels by the hall
-  dummy(m, 21, 28);
-  lathe(m, 29.5, 27.5, 1, 6, () => 2.2, (x, y, z) => (y === 3 ? RED : THATCH(x, y, z)));
-  bkBarrel(m, 9, 23); bkBarrel(m, 31, 23);
+  dummy(m, 26, 23);
+  lathe(m, 30.5, 25.5, 1, 6, () => 2.2, (x, y, z) => (y === 3 ? RED : THATCH(x, y, z)));
+  bkBarrel(m, 9, 20); bkBarrel(m, 31, 20);
   return m;
 }
 
@@ -5380,66 +5446,78 @@ function lotusColumn(m, cx, cz, y0, top) {
   return yb + 3;   // the abacus row
 }
 function market() {
+  // Round 48: an OPEN COLONNADE, not a box: a long mud-brick store hall
+  // across the back under a stepped cavetto; before it a portico of seven
+  // lotus columns carrying an architrave (lapis / red) and a deep shade
+  // roof, its back half a solid slab, its front half an open pergola of palm
+  // beams with the market's blue / white striped cloths drawn over every
+  // second bay; the stalls under it, a counter of produce in each bay, jars,
+  // sacks and baskets, and the paved trading floor before it.
   const m = lot(64, 64, EARTH);
   m.stageStep = 12;
-  // the street before the door, paved
-  patch(m, 12, 44, 38, 64, PAVE, { seed: 2, rag: 3 });
-  // the hall: one battered mud-brick block, a deep stepped cavetto (three
-  // voxels out) over a lapis band and a painted frieze, a pale lip
-  block(m, 4, 6, 44, 40, 1, 24, { wall: MKT_MUD, batter: 10, band: 'lapis', frieze: 2, style: 'cornice', lipOut: 3, flare: true, rimC: LIME, roofC: PLASTER, rim: true });
+  patch(m, 2, 20, 62, 64, PAVE, { seed: 2, rag: 3 });
+  // the store hall
+  block(m, 4, 3, 60, 21, 1, 26, { wall: MKT_MUD, batter: 10, band: 'lapis', frieze: 2, style: 'cornice', lipOut: 3, flare: true, rimC: LIME, roofC: PLASTER, rim: true });
   let T = m.lastTop;
-  // a pale parapet ring on the lip, the deck inside it laid in slabs
   for (let x = T.c0; x < T.c1; x++) for (let z = T.d0; z < T.d1; z++) {
     const e = Math.min(x - T.c0, T.c1 - 1 - x, z - T.d0, T.d1 - 1 - z);
     if (e === 1) pset(m, x, T.y + 1, z, LIME(x, T.y + 1, z));
   }
   roofField(m, T.c0 + 2, T.d0 + 2, T.c1 - 2, T.d1 - 2, T.y, { g: 4 });
-  // high slit windows on the front and the east face
-  for (const u of [9, 38]) slit(m, '+z', u, 12, 5, 2);
-  for (const u of [33, 13]) slit(m, '+x', u, 14, 4, 2);
-  // the entrance block on the front axis: limestone, taller than the hall,
-  // the owner's band under its own cavetto
-  block(m, 13, 34, 35, 47, 1, 31, { wall: LIME, batter: 0, band: 'team', frieze: 1, lipOut: 2, flare: true, rimC: LIME, roofC: PLASTER });
-  T = m.lastTop;
-  roofField(m, T.c0, T.d0, T.c1, T.d1, T.y, { g: 3 });
-  // the porch cut into it: open on the front, painted inside (a dado and a
-  // register band), the doorway in its back wall, the lintel over it
-  const P0 = 16, P1 = 32, PZ0 = 40, PT = 21;
-  for (let x = P0; x < P1; x++) for (let z = PZ0; z < 47; z++) for (let y = 1; y < PT; y++) m.remove(x, y, z);
-  for (let x = P0; x < P1; x++) for (let z = PZ0; z < 47; z++) pset(m, x, 0, z, (x + z) & 1 ? 0xd8cbb0 : 0xcdbf9f);
-  const inner = (x, y, z) => (y <= 3 ? 0xa8462e : y >= PT - 4 && y <= PT - 3 ? ((Math.floor((x + z) / 2) & 1) ? BLUEP : 0xe0b048) : y === PT - 2 ? RED : 0xefe4cb);
-  for (let y = 1; y < PT; y++) {
-    for (let x = P0; x < P1; x++) pset(m, x, y, PZ0 - 1, inner(x, y, PZ0 - 1));
-    for (let z = PZ0; z < 47; z++) { pset(m, P0 - 1, y, z, inner(P0 - 1, y, z)); pset(m, P1, y, z, inner(P1, y, z)); }
+  for (const u of [12, 30, 48]) slit(m, '-z', u, 14, 5, 2);
+  slit(m, '-x', 12, 14, 5, 2); slit(m, '+x', 12, 14, 5, 2);
+  // the hall's doors into the colonnade (three, dark)
+  for (const u of [14, 30, 46]) door(m, '+z', u, 4, 1, 11, { frame: LIME, proud: false, lintelC: GILT });
+  // the portico floor: flagstones under the roof
+  for (let x = 3; x < 61; x++) for (let z = 21; z < 44; z++) pset(m, x, 0, z, (((x >> 2) + (z >> 2)) & 1) ? 0xd8cbb0 : 0xcdbf9f);
+  // the columns: seven along the front, three more in a back row
+  const PT = 21, CZ = 41, COLS = [6, 15, 24, 32, 40, 49, 58];
+  for (const cx of COLS) lotusColumn(m, cx, CZ, 1, PT);
+  for (const cx of [15, 32, 49]) lotusColumn(m, cx, 30, 1, PT);
+  // the architrave on the columns (front and back row), painted lapis / red
+  const AY = PT + 1;
+  for (let x = 2; x < 63; x++) for (const z0 of [CZ - 1, 29]) for (let z = z0; z < z0 + 3; z++) {
+    m.set(x, AY, z, z === z0 + 1 ? OCHRE_M : SAND_D(x, AY, z));
+    m.set(x, AY + 1, z, ((x >> 1) & 1) ? LAPIS : RED_M);
   }
-  door(m, '+z', 22, 4, 1, 13, { frame: LIME, proud: false, lintelC: GILT });
-  // the two lotus columns in the porch mouth, the lintel resting on them
-  for (const cx of [20, 27]) lotusColumn(m, cx, 44, 1, PT);
-  // the stalls: one row along the east side under one shared blue / white
-  // cloth from a batten on the hall's wall, posts at the stall ends
-  const f = 42, yTop = 17, depth = 15, drop = 6;
-  const posts = [8, 18, 28, 38];
-  clothAwning(m, '+x', f, 7, 40, yTop, depth, drop, { posts, sw: 2, sag: 0.5, belly: 0.3, stripes: [MKT_AW, MKT_AWW], hem: 0x1f3c78 });
-  // a counter of produce under each stall, its front at the cloth's edge
+  for (let z = 21; z < CZ + 2; z++) for (const x of [2, 62]) { m.set(x, AY, z, SAND_D(x, AY, z)); m.set(x, AY + 1, z, ((z >> 1) & 1) ? LAPIS : RED_M); }
+  // the back half roofed solid (a pale lip, the owner's line), the front an
+  // open pergola of palm beams across the architraves
+  for (let x = 2; x < 63; x++) for (let z = 21; z < 32; z++) {
+    m.set(x, AY + 2, z, (z === 31 || x === 2 || x === 62) ? LIP(x, AY + 2, z) : (z === 30 || x === 3 || x === 61) ? TEAM : EDECK(x, AY + 2, z));
+  }
+  const bay = (x) => COLS.findIndex((c, i) => i + 1 < COLS.length && x > c && x < COLS[i + 1]);
+  for (let x = 2; x < 63; x++) {
+    const b = bay(x);
+    const cloth = b >= 0 && (b & 1) === 0;
+    for (let z = 32; z < CZ + 3; z++) {
+      if (cloth) {
+        // a striped cloth sagging a voxel between the beams
+        const sag = (z > 34 && z < CZ) ? 1 : 0;
+        const stripe = Math.floor((x - COLS[b]) / 2) & 1;
+        m.set(x, AY + 2 - sag, z, stripe ? MKT_AWW[(x + z) % 3] : MKT_AW[(x + z) % 3]);
+      } else if (x % 3 === 0) m.set(x, AY + 2, z, PALM_T(x, AY + 2, z));
+    }
+    if (cloth) for (let y = AY - 1; y <= AY; y++) if (((x >> 1) & 1) === 0) pset(m, x, y, CZ + 3, x & 2 ? MKT_AWW[0] : 0x1f3c78);   // the valance
+  }
+  // the stalls: a counter of produce in each bay of the front row
   const counter = (x0, x1, z0, z1, goods) => {
     for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) for (let y = 1; y < 4; y++) pset(m, x, y, z, (x === x0 || x === x1 - 1 || z === z0 || z === z1 - 1) ? PLANK(x, y, z) : DARKWOOD);
     const n = goods.length;
-    goods.forEach((g, i) => { const a = z0 + Math.round(((z1 - z0) * i) / n), b = z0 + Math.round(((z1 - z0) * (i + 1)) / n); goodsBox(m, x0, 4, a, x1 - x0, b - a, g, 1, 0x7a5430); });
+    goods.forEach((g, i) => { const xa = x0 + Math.round(((x1 - x0) * i) / n), xb = x0 + Math.round(((x1 - x0) * (i + 1)) / n); goodsBox(m, xa, 4, z0, xb - xa, z1 - z0, g, 1, 0x7a5430); });
   };
-  counter(53, 62, 10, 17, ['orange', 'melon']);
-  counter(53, 62, 20, 27, ['green', 'date']);
-  counter(53, 62, 30, 37, ['grain', 'fish']);
-  // pots and crates behind the counters, by the wall
-  jar(m, 47.5, 1, 11.5, 0xb8683e, true); jar(m, 49.5, 1, 15.5, 0xc8a070, false);
-  crate(m, 45, 1, 21, 5, 5, 5); jar(m, 49.5, 1, 25.5, 0xb8683e, false);
-  sack(m, 46, 1, 31); jar(m, 48.5, 1, 35.5, 0xb8683e, true);
-  // in front of the stalls, between the posts: baskets and big jars
-  jar(m, 61.5, 1, 18.5, 0xc8a070, false); basket(m, 59, 38, 'orange');
-  // a stack of crates at the row's back end, a crate and a sack at its
-  // front end; a big jar by the porch, amphorae on its west side
-  crate(m, 50, 1, 1, 6, 6, 6); crate(m, 57, 1, 1, 5, 5, 5); crate(m, 51, 7, 2, 4, 4, 4);
-  crate(m, 54, 1, 42, 4, 4, 4); sack(m, 59, 1, 42);
-  jar(m, 37.5, 1, 50.5, 0xb8683e, true); amphora(m, 11.5, 1, 49.5, 1); amphora(m, 8.5, 1, 52.5, 2);
+  counter(9, 13, 34, 39, ['orange']);
+  counter(18, 22, 34, 39, ['melon']);
+  counter(27, 30, 34, 39, ['green']);
+  counter(35, 38, 34, 39, ['date']);
+  counter(43, 47, 34, 39, ['grain']);
+  counter(52, 56, 34, 39, ['fish']);
+  // goods by the hall's wall and out on the floor
+  jar(m, 8.5, 1, 23.5, 0xb8683e, true); jar(m, 11.5, 1, 24.5, 0xc8a070, false);
+  crate(m, 22, 1, 22, 5, 5, 5); sack(m, 38, 1, 23); sack(m, 41, 1, 24);
+  jar(m, 53.5, 1, 23.5, 0xb8683e, true); crate(m, 56, 1, 22, 4, 4, 4);
+  basket(m, 6, 47, 'orange'); basket(m, 26, 49, 'date'); jar(m, 44.5, 1, 48.5, 0xb8683e, true);
+  amphora(m, 57.5, 1, 49.5, 1); amphora(m, 60.5, 1, 52.5, 2); sack(m, 14, 1, 50);
   return m;
 }
 
@@ -6158,6 +6236,31 @@ function clutter(v) {
   } else if (v === 6) {
     woodPile(m, 1, 3, 10); woodPile(m, 7, 3, 10);
     m.line(14, 1, 4, 14, 7, 6, POLE); crate(m, 13, 1, 10, 2, 2, 2);
+  } else if (v === 9) {
+    // round 48: a garden plot between houses: a low mud kerb round a bed of
+    // dark watered earth, shrubs and a young palm, a water jar at its corner
+    for (let x = 1; x < 15; x++) for (let z = 1; z < 15; z++) {
+      const e = Math.min(x - 1, 14 - x, z - 1, 14 - z);
+      if (e === 0) { m.set(x, 1, z, MUDCAP); m.set(x, 0, z, EARTH); }
+      else m.set(x, 0, z, pick(hash3(x, 0, z, 619), [0x6e5236, 0x664c32, 0x745838]));
+    }
+    for (const [x, z] of [[4, 4], [10, 5], [5, 10], [11, 11], [8, 8]]) {
+      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+        if (Math.abs(a) + Math.abs(b) === 2 && hash3(x + a, 3, z + b, 621) < 0.5) continue;
+        m.set(x + a, 1, z + b, pick(hash3(x + a, 1, z + b, 623), AP_SHRUB));
+        if (!a || !b) m.set(x + a, 2, z + b, shade(pick(hash3(x + a, 2, z + b, 625), AP_SHRUB), 1.08));
+      }
+      m.set(x, 3, z, shade(AP_SHRUB[3], 1.1));
+    }
+    palm(m, 11, 1, 3, 14, { lx: 0.5, lz: -0.3, len: 6, fronds: 7, dates: false });
+    jar(m, 2, 1, 13, 0xb8683e, true);
+  } else if (v === 10) {
+    // round 48: a whitewashed garden wall linking two compounds: a plinth
+    // course, coursed wall, a pale coping, a palm leaning over it, two pots
+    yardWall(m, [[0, 8], [15, 8]], 5, HT_WHITE, LIME);
+    for (let x = 0; x < 16; x++) if ((x & 3) === 0) m.set(x, 4, 8, TEAM);
+    palm(m, 4, 1, 11, 20, { lx: 0.6, lz: -0.5, len: 7, fronds: 8 });
+    jar(m, 11, 1, 11, 0xb8683e); jar(m, 13, 1, 10, 0xc8a070);
   } else if (v === 8) {
     // round 36: a quarry pile by the obelisk: dressed blocks stacked in a
     // clear stepped pyramid (pale limestone and warm sandstone alternating,
@@ -6184,6 +6287,180 @@ function clutter(v) {
     m.box(3, 10, 6, 8, 1, 1, DARKWOOD); m.box(6, 5, 6, 2, 3, 1, 0x8a6236);
     for (let x = 10; x < 14; x++) for (let z = 10; z < 13; z++) m.set(x, 1, z, x === 10 || x === 13 || z === 10 || z === 12 ? LIME : WATER);
     amphora(m, 3.5, 1, 12.5, 2);
+  }
+  return m;
+}
+
+// ---- the footing (round 48) ------------------------------------------------------
+// Every building's own ground model, `apron/<type>/<variant>` (drawn under the
+// building by egypt_buildings.gd, the same transform): it grounds the model in
+// the town instead of leaving a hard edge on bare sand. At 1/8-tile voxels on
+// the lot plus AP voxels round it, read from the finished model (any `fine`
+// grid folded down):
+//  - a stone foundation skirt hugging the building's main masses (cells
+//    walled 5+ rows high in a 3 x 3 neighbourhood: no poles or columns):
+//    two rings of dressed sandstone slabs one voxel high (three on a big
+//    lot, the inner ring two high), a darker arris on the outer edge, so the
+//    walls stand on a stepped base;
+//  - a trodden-earth footprint over the whole lot (wherever the building
+//    laid no ground of its own) fraying out over AP voxels in a ragged,
+//    noise-shaped edge, darker in the walls' drip line, mottled with dust,
+//    worn tracks running on from every door path out past the lot;
+//  - debris on it: pebbles, potsherds, straw, broken mud bricks, a few
+//    pots by the corners, dry grass tufts and low shrubs on the fringe.
+const AP = 8;
+const AP_EARTH = [0x84654a, 0x7e6046, 0x8a6a4e, 0x795b42];
+const AP_DUST = [0x9c7d5a, 0x967856, 0xa2835f];
+const AP_TRACK = [0x6e5238, 0x74573c, 0x684d34];
+const AP_SKIRT = [0xe2d1ac, 0xd9c7a1, 0xe7d8b6, 0xd2bf98];
+const AP_SKIRT_E = 0x9a8260;
+const AP_PEBBLE = [0x7a6f62, 0x8a7d6c, 0x6a5e52, 0x9a8a74];
+const AP_SHRUB = [0x5f7a34, 0x6b8a3c, 0x55702e, 0x7a8f45];
+const AP_GRASS = [0xa89a5a, 0x9c8e50, 0xb4a466, 0x8c8048];
+// smooth 2-D value noise in [0, 1) on a `s`-cell lattice
+function vnoise(x, z, s, seed) {
+  const fx = x / s, fz = z / s, x0 = Math.floor(fx), z0 = Math.floor(fz), tx = fx - x0, tz = fz - z0;
+  const h = (i, k) => hash3(x0 + i, seed, z0 + k, 577);
+  const sx = tx * tx * (3 - 2 * tx), sz = tz * tz * (3 - 2 * tz);
+  return (h(0, 0) * (1 - sx) + h(1, 0) * sx) * (1 - sz) + (h(0, 1) * (1 - sx) + h(1, 1) * sx) * sz;
+}
+function apron(full, k, seed = 0, { skirt = true } = {}) {
+  const W = Math.round(full.W / k), D = Math.round(full.D / k);
+  const NW = W + 2 * AP, ND = D + 2 * AP;
+  const m = new Rec(NW, ND);
+  const K = (X, Z) => X * 4096 + Z;
+  const g0 = new Set(), top = new Map();
+  for (const [x, y, z] of full.coords) {
+    if (!full.get(x, y, z)) continue;
+    const X = Math.floor(x / k) + AP, Z = Math.floor(z / k) + AP;
+    if (y === 0) g0.add(K(X, Z));
+    else top.set(K(X, Z), Math.max(top.get(K(X, Z)) || 0, Math.max(1, Math.floor(y / k))));
+  }
+  const tall = (X, Z) => (top.get(K(X, Z)) || 0) >= 5;
+  const mass = new Set();
+  for (const key of top.keys()) {
+    const X = Math.floor(key / 4096), Z = key % 4096;
+    if (!tall(X, Z)) continue;
+    let n = 0;
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) if (tall(X + i, Z + j)) n++;
+    if (n >= 6) mass.add(key);
+  }
+  // Chebyshev distances (8-neighbour BFS) from the masses and from anything standing
+  const bfs = (src, R) => {
+    const d = new Map();
+    let fr = [];
+    for (const key of src) { d.set(key, 0); fr.push(key); }
+    for (let r = 1; r <= R && fr.length; r++) {
+      const nx = [];
+      for (const key of fr) {
+        const X = Math.floor(key / 4096), Z = key % 4096;
+        for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+          const q = K(X + i, Z + j);
+          if (X + i < 0 || Z + j < 0 || X + i >= NW || Z + j >= ND || d.has(q)) continue;
+          d.set(q, r); nx.push(q);
+        }
+      }
+      fr = nx;
+    }
+    return d;
+  };
+  const big = Math.min(W, D) >= 40;
+  const SR = big ? 3 : 2;
+  const dM = bfs(mass, SR);
+  const dS = bfs(top.keys(), 3);
+  const used = new Set();
+  // the skirt
+  if (skirt) for (const [key, d] of dM) {
+    if (d < 1 || top.has(key)) continue;
+    const X = Math.floor(key / 4096), Z = key % 4096;
+    const h = big && d === 1 ? 2 : 1;
+    // slabs 3 voxels long, one tone each, a darker joint between them
+    const slab = Math.floor((X + Z * 3) / 3);
+    let c = pick(hash3(slab, d, 11, 579), AP_SKIRT);
+    if ((X + Z * 3) % 3 === 0) c = shade(c, 0.9);
+    // the outer ring's arris darker, the inner ring's top lit
+    if (d === SR) c = shade(c, 0.8);
+    for (let y = 1; y <= h; y++) m.set(X, y, Z, y < h ? shade(c, 0.8) : c);
+    if (d === SR && hash3(X, 3, Z, 581) < 0.08) m.set(X, h, Z, AP_SKIRT_E);   // a chipped edge
+    used.add(key);
+  }
+  // the trodden earth: the lot, fraying out over AP voxels
+  const out = (X, Z) => Math.max(AP - X, X - (AP + W - 1), AP - Z, Z - (AP + D - 1), 0);
+  for (let X = 0; X < NW; X++) for (let Z = 0; Z < ND; Z++) {
+    const key = K(X, Z);
+    if (g0.has(key) || top.has(key) || used.has(key)) continue;
+    const o = out(X, Z);
+    const n = vnoise(X, Z, 3, seed), n2 = vnoise(X + 50, Z, 2, seed + 7);
+    if (o > 0 && o > (AP - 1) * (0.35 + 0.75 * n) - 0.5 * n2) continue;
+    // the fringe frays into single specks
+    if (o >= 3 && hash3(X, seed, Z, 583) < 0.03 * o) continue;
+    const near = dS.get(key);
+    let c;
+    if (near !== undefined && near <= 1) c = shade(pick(hash3(X, 1, Z, 585), AP_EARTH), 0.9);
+    else if (vnoise(X, Z, 4, seed + 3) > 0.62) c = pick(hash3(X >> 1, 2, Z >> 1, 587), AP_DUST);
+    else c = pick(hash3(X >> 1, 3, Z >> 1, 589), AP_EARTH);
+    m.set(X, 0, Z, c);
+  }
+  // worn tracks on from every door path, out past the lot edge
+  for (const p of full.paths || []) {
+    const n = OUT_N[p.face];
+    const a0 = Math.floor(p.a0 / k), a1 = Math.ceil(p.a1 / k);
+    const along = n[0] !== 0 ? 'x' : 'z';
+    const edge = along === 'x' ? (n[0] > 0 ? AP + W : AP - 1) : (n[2] > 0 ? AP + D : AP - 1);
+    const sgn = along === 'x' ? n[0] : n[2];
+    for (let s = 0; s < AP; s++) for (let a = a0 - 1; a <= a1; a++) {
+      const c = edge + sgn * s, A = a + AP;
+      if ((a === a0 - 1 || a === a1) && hash3(a, s, c, 591) < 0.5) continue;
+      if (s > 2 && hash3(a, s, c, 593) < (s - 2) * 0.22) continue;
+      const [X, Z] = along === 'x' ? [c, A] : [A, c];
+      if (X < 0 || Z < 0 || X >= NW || Z >= ND || top.has(K(X, Z)) || used.has(K(X, Z))) continue;
+      m.set(X, 0, Z, pick(hash3(X >> 1, 5, Z >> 1, 595), AP_TRACK));
+    }
+  }
+  // the debris
+  const free = (X, Z) => !top.has(K(X, Z)) && !used.has(K(X, Z)) && !g0.has(K(X, Z)) && !m.has(X, 1, Z);
+  for (let X = 1; X < NW - 1; X++) for (let Z = 1; Z < ND - 1; Z++) {
+    if (!m.has(X, 0, Z) || !free(X, Z)) continue;
+    const near = dS.get(K(X, Z));
+    if (near !== undefined && near <= 1) continue;
+    const o = out(X, Z), h = hash3(X, seed, Z, 597), t = hash3(X, seed + 1, Z, 599);
+    if (h < 0.008) m.set(X, 1, Z, pick(t, AP_PEBBLE));                                     // a pebble
+    else if (h < 0.034) m.set(X, 0, Z, pick(t, [0xb0603a, 0xa25834, 0xbc6c44]));             // a potsherd
+    else if (h < 0.046) m.set(X, 0, Z, pick(t, [0xc8a85a, 0xbc9c50]));                       // spilt straw
+    else if (h < 0.05 && free(X + 1, Z)) { m.set(X, 1, Z, 0x8e5a34); m.set(X + 1, 1, Z, 0x784a2a); }   // a broken brick
+    else if (o >= 2 && h < 0.068) {                                                         // dry grass on the fringe
+      m.set(X, 1, Z, pick(t, AP_GRASS));
+      if (t < 0.4) m.set(X, 2, Z, pick(1 - t, AP_GRASS));
+    }
+  }
+  // low shrubs on the fringe (a few per lot, at hashed spots off the corners)
+  const nS = Math.max(2, Math.round((W + D) / 12));
+  for (let i = 0; i < nS * 4 && i < 40; i++) {
+    const X = Math.floor(hash3(i, seed, 1, 601) * NW), Z = Math.floor(hash3(i, seed, 2, 603) * ND);
+    const o = out(X, Z);
+    if (o < 1 || o > AP - 2) continue;
+    let ok = true;
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) if (!free(X + a, Z + b) || X + a < 0 || Z + b < 0 || X + a >= NW || Z + b >= ND) ok = false;
+    if (!ok) continue;
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+      if (Math.abs(a) + Math.abs(b) === 2 && hash3(X + a, 7, Z + b, 605) < 0.6) continue;
+      m.set(X + a, 1, Z + b, pick(hash3(X + a, 1, Z + b, 607), AP_SHRUB));
+      if (a === 0 || b === 0) m.set(X + a, 2, Z + b, shade(pick(hash3(X + a, 2, Z + b, 609), AP_SHRUB), 1.1));
+    }
+    m.set(X, 3, Z, shade(AP_SHRUB[1], 1.15));
+    used.add(K(X, Z));
+  }
+  // a pot or two by the lot's front corners, against the skirt or the walls
+  const corners = [[AP - 2, AP + D - 1], [AP + W, AP + D - 1], [AP - 2, AP + 1], [AP + W, AP + 1]];
+  let pots = 0;
+  for (let i = 0; i < 4 && pots < 2; i++) {
+    const [X, Z] = corners[(i + Math.floor(seed)) % 4];
+    if (hash3(X, seed, Z, 611) < 0.35) continue;
+    let ok = true;
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) if (X + a < 0 || Z + b < 0 || X + a >= NW || Z + b >= ND || !free(X + a, Z + b)) ok = false;
+    if (!ok) continue;
+    jar(m, X, 1, Z, pick(hash3(X, 2, Z, 613), [0xb8683e, 0xa85c36, 0xc8a070]));
+    pots++;
   }
   return m;
 }
@@ -6260,7 +6537,7 @@ const TYPES = {
   sentry_tower: { w: 1, h: 1, variants: ['0'], ages: [1], build: () => tower(), draw: 1.5 },
   wonder: { w: 8, h: 8, variants: ['0'], ages: [1], build: () => wonder() },
   palm: { w: 1, h: 1, variants: ['0', '1', '2'], ages: [1], build: (v) => palmProp(v), stages: false, settle: false, chip: false },
-  clutter: { w: 2, h: 2, variants: ['0', '1', '2', '3', '4', '5', '6', '7', '8'], ages: [1], build: (v) => clutter(v), stages: false, chip: false },
+  clutter: { w: 2, h: 2, variants: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'], ages: [1], build: (v) => clutter(v), stages: false, chip: false },
 };
 
 // --preview <type>[:variant] --preview-out <file.json>: dump one model's
@@ -6305,8 +6582,8 @@ function mergeGeo(a, b) {
   g.setIndex(new THREE_IndexAttribute(idx, 1));
   return g;
 }
-const geo = (m, seed = 7, vox = VOX) => {
-  const pivot = [m.W / 2, 0.8, m.D / 2];   // the ground row sinks to 0.025 above the terrain: a decal, no plinth
+const geo = (m, seed = 7, vox = VOX, py = 0.8) => {
+  const pivot = [m.W / 2, py, m.D / 2];   // the ground row sinks to 0.025 above the terrain: a decal, no plinth
   let out = withSkin(S.withExtras(buildVoxelGeometry(m, { size: vox, pivot, jitter: 0.012, seed }), m, vox, pivot, { maxY: m.extraMaxY ?? Infinity }), m, vox, pivot);
   // half-voxel insets (fineFigure): sub-voxel u lands at parent voxel u / k
   for (const f of m.fine || []) out = mergeGeo(out, buildVoxelGeometry(f.m, { size: vox / f.k, pivot: pivot.map((v) => v * f.k), jitter: f.jitter ?? 0.03, seed }));
@@ -6339,6 +6616,9 @@ for (const [type, T] of Object.entries(TYPES)) {
       skin(full);
       clothSkin(full);
       g.add(`${type}/${vn}/a${age}`, geo(full, 11 + vi * 3 + age, VOX / (T.fine || 1)));
+      // round 48: the footing (one per variant, from its first age look;
+      // its ground row 0.0125 under the building's own, see apron())
+      if (ai === 0 && T.apron !== false && T.stages !== false) g.add(`apron/${type}/${vn}`, geo(apron(full, T.fine || 1, vi * 7 + type.length, { skirt: T.skirt !== false }), 5 + vi, VOX, 0.9));
       if (vi === 0 && ai === 0 && T.stages !== false) {
         for (const k of g.extra.stage_keys) {
           const sm = stage(full, k);

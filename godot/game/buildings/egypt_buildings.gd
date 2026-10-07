@@ -107,6 +107,39 @@ static func mesh_for_key(key: String) -> Mesh:
 		return BuildingAO.mesh(STAGE_GROUP, key.substr(2))
 	return BuildingAO.mesh(GROUP, key)
 
+## Round 48: the footing drawn under a building (export-egypt.mjs apron():
+## a stone skirt round the walls, a trodden-earth footprint fraying out past
+## the lot, debris, pots, shrubs): "apron/<type>/<variant>", "" when the
+## models have none. Stages use the first variant's.
+static func apron_key(key: String) -> String:
+	var stage := key.begins_with("s/")
+	var p := (key.substr(2) if stage else key).split("/")
+	if p.size() < 2:
+		return ""
+	var v := p[1]
+	if stage:
+		v = str(types().get(p[0], {}).get("variants", ["0"])[0])
+	var ak := "apron/%s/%s" % [p[0], v]
+	return ak if not VoxelModels.info(GROUP, ak).is_empty() else ""
+
+## Put (or swap) the footing child under a building's MeshInstance3D.
+func _set_apron(mi: MeshInstance3D, key: String, salt: int) -> void:
+	var ak := apron_key(key)
+	var ap: MeshInstance3D = mi.get_node_or_null("apron")
+	if ak == "":
+		if ap != null:
+			ap.queue_free()
+		return
+	if ap == null:
+		ap = MeshInstance3D.new()
+		ap.name = "apron"
+		ap.material_override = mi.material_override
+		ap.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		# overlapping footings of neighbours: a hair apart so they never flicker
+		ap.position.y = float(posmod(salt * 7919, 9)) * 0.0009
+		mi.add_child(ap)
+	ap.mesh = BuildingAO.mesh(GROUP, ak)
+
 ## A finished building's mesh (portraits / placement ghosts).
 static func mesh_for(type_name: String, age := 1, god := "ra", variant := 0) -> Mesh:
 	var key := model_key(type_name, variant, true, 1.0, age, god)
@@ -200,6 +233,7 @@ func from_buildings(B: Dictionary, names: PackedStringArray) -> void:
 		if e.key != key:
 			e.key = key
 			e.mi.mesh = mesh_for_key(key)
+			_set_apron(e.mi, key, id)
 		if fog_changed:
 			e.mi.visible = owner == LOCAL_PLAYER or game.sim.is_explored(e.mi.position.x, e.mi.position.z)
 	for id in _nodes.keys():
@@ -231,3 +265,5 @@ func set_static(entries: Array) -> void:
 		mi.scale = Vector3(s, s, s)
 		add_child(mi)
 		_static.append(mi)
+		if not en.get("bare", false):
+			_set_apron(mi, key, _static.size())
