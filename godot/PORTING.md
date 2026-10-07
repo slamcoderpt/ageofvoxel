@@ -1949,6 +1949,32 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   `egt_focus=lighthouse` now aims 3.8 tiles up by default (the whole tower);
   `egt_row=s/lighthouse/s0,s/lighthouse/s2,s/lighthouse/s4,s/lighthouse/s6,lighthouse/0/a1&egt_lift=2`
   (the stages).
+- **A lion that reads from behind, round 45** (building_21; the Wonder's
+  sphinx was finished only at the front: behind the head a beige heap of
+  stair-stepped ellipsoids, forelegs melting into the deck, the deck one
+  plain plane). `lionPart()` in `sphinx()` is rebuilt the way the
+  Egyptians carved it, as a block with its anatomy in relief rather than
+  voxel onions: a long body block (a p = 5 section, tight rounded arrises)
+  whose back runs dead level from the rump to the shoulders, the rump
+  rounded off in plan and profile; on each flank the folded hind leg as a
+  raised haunch panel (0.8 voxel proud) with its paw tucked forward along
+  the ground (two toe notches), and the shoulder as a raised panel over the
+  elbow; two shoulder blades standing proud of the spine; square-cut
+  forearms tapering to a wrist and broad paws with three toe notches cut
+  through their tops and fronts; the tail a cubic from the rump's foot up
+  over its top to a tuft lying on the back. Creases (`SPX_CREASE`, the
+  darkest stone) ring every raised panel, sit behind the blades, at the
+  wrists and along the whole ground line; the flank carries three values
+  (panels a ramp step lighter, belly a step darker, the block between), on
+  a wider `SPX_ST` ramp. The nemes now falls on over the shoulders (a
+  striped flap leaning back as it falls, gold hem), its back is closed and
+  its striped queue lies on the spine between the blades to a gold tip.
+  The decks: staggered flags in three tones with darker joints on both
+  steps, a raised `LIP` coping ring round the upper deck with a shadowed
+  gutter inside it, and four gilt-capped offering stands in its corners.
+  Framing: `egt_focus=wonder` (the town view),
+  `egt_focus=wonder&egt_dist=5.5&egt_pitch=32&egt_lift=2.6&egt_yaw=-40&egt_dz=-0.6`
+  (sun side close), `...&egt_yaw=70` (shadow side), `egt_dist=8&egt_pitch=40&egt_lift=2&egt_yaw=150` (from behind).
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8

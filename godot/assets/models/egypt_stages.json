@@ -2,7 +2,7 @@
  "format": 2,
  "group": "egypt_stages",
  "bin": "egypt_stages.bin.gz",
- "bytes": 121051640,
+ "bytes": 121111224,
  "voxel": 0.125,
  "stages": 8,
  "models": {
@@ -1350,8 +1350,8 @@
    "index": 118010040
   },
   "wonder/s6": {
-   "vertices": 70552,
-   "indices": 105828,
+   "vertices": 72120,
+   "indices": 108180,
    "aabb": [
     -3.875,
     -0.1,
@@ -1361,10 +1361,10 @@
     4.125
    ],
    "position": 118370664,
-   "normal": 119217288,
-   "color": 120063912,
-   "extra": 120346120,
-   "index": 120628328
+   "normal": 119236104,
+   "color": 120101544,
+   "extra": 120390024,
+   "index": 120678504
   }
  }
 }

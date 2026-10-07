@@ -5612,9 +5612,10 @@ function farm() {
 // hang in front of the chest. Built as signed shapes sampled at the fine
 // voxel centres (coarse coordinates), then shaded: tops a step lighter,
 // undersides and recesses darker, the sunward (-x) flank lighter.
-const SPX_ST = [0xae9a74, 0xcbba95, 0xd9caa8, 0xe3d6b8];   // deep, shade, base, light
+const SPX_ST = [0x8e7a56, 0xae9b74, 0xcbb994, 0xe0d2b2];   // round 45: wider steps, so the lion's masses read   // deep, shade, base, light
 const SPX_GOLD = [0x7a5200, 0x9c6800, 0xb88400, 0xd09c18];
 const SPX_LAP = [0x203a66, 0x2b4a7c, 0x34558c, 0x4a6aa4];
+const SPX_CREASE = [0x5a4a34, 0x705c42, 0x8a7656];   // the cut lines between the lion's masses (deep, shade, lit)
 const SPX_IVORY = 0xf0e8d4, SPX_KOHL = 0x1a2a4a, SPX_BROW = 0x9c8662, SPX_LIP = 0xb88a6c, SPX_LIPD = 0x7a4a3a, SPX_GROOVE = 0x8c7a58;
 function sphinx(m, X0, sy) {
   const k = 3, sub = new Rec(m.W * k, m.D * k);
@@ -5663,7 +5664,16 @@ function sphinx(m, X0, sy) {
     if (v >= 0 && v < 7.6 && au < W && pz > zc - 4.4 && pz < zf - 0.45) {
       if (au >= hw || pz < zf - 1.2 - 0.11 * u * u) return au < hw + 0.34 && pz > zf - 0.85 ? 'gold' : 'nemes';
     }
+    // round 45: the wings fall on down over the shoulders, a striped flap
+    // draped on each shoulder that leans back as it falls, a gold hem at its
+    // edge; the back of the headdress is closed, its queue lies on the spine
+    // (lionPart)
     if (v >= -3.4 && v < 0 && au >= 2.6 && au < 6.8 - 0.25 * (-v) && pz > zc - 4.4 && pz < zf - 2.0) return 'nemes';
+    if (v >= -8.4 && v < -3.4 && au >= 2.4 && au < 6.85 - 0.12 * (-v)) {
+      const back = zc - 4.4 - 0.55 * (-3.4 - v), front = zf - 2.0 - 0.35 * (-3.4 - v);
+      if (pz > back && pz < front) return au > 6.85 - 0.12 * (-v) - 0.4 || pz < back + 0.4 ? 'gold' : 'drape';
+    }
+    if (au < 4.4 && v >= -1.2 && v < 7.7 && pz > zc - 4.9 && pz <= zc - 3.4) return 'nemes';   // the closed back of the headdress
     // the neck under the chin
     if (au < 2.6 && v >= -4 && v < 0.2 && pz > 26 && pz < zf - 1.0) return 'body';
     // the lappets: two striped bands hanging in front of the chest
@@ -5672,49 +5682,98 @@ function sphinx(m, X0, sy) {
     if (au < 0.72 + (v < -2.6 ? 0.12 : 0) && v >= -3.1 && v < 0.3 && pz > zf - 1.4 && pz < zf - 0.25 + (v < -2.4 ? 0.2 : 0)) return 'beard';
     return null;
   }
+  // ---- the lion (round 45): carved the way the Egyptians carved it, as a
+  // block with its anatomy in relief, not as voxel onions (building_21): a
+  // long body block whose back runs dead level from the rump to the
+  // shoulders, its arrises rounded tight and the rump rounded off in plan
+  // and profile; on each flank the folded hind leg as a raised haunch panel
+  // with its paw tucked forward along the ground, and the shoulder as a
+  // raised panel over the elbow; two shoulder blades standing proud of the
+  // spine; the forelegs as straight square-cut forearms to a wrist and broad
+  // paws with three toe notches cut through their tops and fronts; the tail
+  // curling up over the rump to a tuft lying on the back. Creases (tagged
+  // 'crease', the darkest stone) are cut round every raised panel, behind
+  // the shoulder blades, at the wrists and under the whole statue where it
+  // sits on the deck.
+  const BT = sy + 8.4, BW = 5.0, ZR = 8.0, ZF = 30.5;   // the level spine, the body's half width, the rump end, the chest
+  const eV = (px, py, pz, cx, cy, cz, rx, ry, rz, p = 2) => Math.abs((px - cx) / rx) ** p + Math.abs((py - cy) / ry) ** p + Math.abs((pz - cz) / rz) ** p;
+  const e2 = (a, b, p = 2) => Math.abs(a) ** p + Math.abs(b) ** p;
+  // the body's half width at (py, pz) (0 outside): a p = 5 section, the rump rounded
+  function bodyW(py, pz) {
+    if (pz < ZR || pz > ZF) return 0;
+    const f = pz < ZR + 3.4 ? Math.sqrt(Math.max(0, 1 - ((ZR + 3.4 - pz) / 3.4) ** 2)) : 1;
+    const h = (BT - sy) * (0.62 + 0.38 * f), t = (py - sy) / h;
+    if (t < 0 || t > 1) return 0;
+    return BW * Math.max(0.25, f) * (1 - t ** 5) ** 0.2;
+  }
+  // the tail: a cubic from the rump's foot up over its top to the right of the spine
+  const TAIL = [[X0 + 1.4, sy + 2.6, 8.6], [X0 + 4.4, sy + 4.6, 5.9], [X0 + 4.9, sy + 10.2, 8.2], [X0 + 3.9, BT + 0.45, 12.4]];
+  const tailPts = [];
+  for (let i = 0; i <= 40; i++) {
+    const t = i / 40, a = 1 - t, w = [a * a * a, 3 * a * a * t, 3 * a * t * t, t * t * t];
+    tailPts.push([0, 1, 2].map((c) => w.reduce((s, wi, n) => s + wi * TAIL[n][c], 0)));
+  }
   function lionPart(px, py, pz) {
-    const u = px - X0;
-    // ---- the lion
-    // the chest and neck rising under the head
-    if (ell(px, py, pz, X0, sy + 4.0, 28.4, 6.0, 7.6, 3.6)) return 'body';
-    // the body: a flat-based loaf; the back line climbs from the rump to the shoulders
-    if (pz >= 7.4 && pz < 28) {
-      const H = sy + 9.4 * sm(7.0, 11.5, pz) + 1.0 * sm(11.5, 22, pz) + 1.4 * sm(20, 27, pz) + 0.4;
-      const Wb = 6.2 - 0.8 * sm(12, 18, pz) + 1.2 * sm(19, 26, pz);
-      const end = pz < 11.5 ? Math.sqrt(Math.max(0, 1 - ((11.5 - pz) / 4.1) ** 2)) : 1;
-      if (sup(u / (Wb * Math.max(0.35, end)), (py - sy) / (H - sy), 2.4)) return 'body';
-    }
-    // haunches (the folded hind legs) and the hind paws tucked forward
-    for (const s of [-1, 1]) {
-      if (ell(px, py, pz, X0 + s * 4.7, sy + 3.4, 14.0, 3.2, 5.8, 6.6)) return 'body';
-      if (s * u > 5.2 && s * u < 8.0 && py < sy + 1.7 && pz > 15.5 && pz < 21.8 - 0.2 * (py - sy)) return pz > 21.0 && ((s * u - 5.2) % 0.85) < 0.3 ? 'groove' : 'body';
-      // the shoulder and upper foreleg
-      if (ell(px, py, pz, X0 + s * 4.9, sy + 4.4, 26.0, 2.8, 5.6, 3.7)) return 'body';
-      // the forearm reaching out, a little lower toward the paw
-      const lc = X0 + s * 5.25, lu = px - lc;
-      if (pz >= 26 && pz < 37.4) {
-        const lh = 4.4 - 1.0 * sm(26, 29, pz), lw = 2.0;
-        if (sup(lu / lw, (py - sy) / lh, 2.2)) return 'body';
-      }
-      // the paw: broad, rounded at the front, the toes grooved
-      if (pz >= 37.0 && pz < 39.9) {
-        const r = pz > 38.8 ? Math.sqrt(Math.max(0, 1 - ((pz - 38.8) / 1.1) ** 2)) : 1;
-        if (sup(lu / (2.25 * Math.max(0.45, r)), (py - sy) / (2.5 * Math.max(0.55, r)), 2.4)) {
-          const g = (lu + 2.25) % 1.12;
-          return pz > 38.3 && g < 0.34 && Math.abs(lu) < 1.9 ? 'groove' : 'body';
-        }
+    const u = px - X0, au = Math.abs(u), s = u < 0 ? -1 : 1;
+    const lift = py - sy;
+    // the tail and its tuft (they lie on the body)
+    for (const [tx, ty, tz] of tailPts) if ((px - tx) ** 2 + (py - ty) ** 2 + (pz - tz) ** 2 <= 0.3) return 'body';
+    const [ex, ey, ez] = tailPts[tailPts.length - 1];
+    if (eV(px, py, pz, ex - 0.2, ey + 0.1, ez + 0.6, 0.85, 0.7, 1.15) <= 1) return 'tuft';
+    // the nemes queue: a striped tail of the headdress lying on the spine
+    // between the shoulder blades, narrowing to a gold tip
+    if (au < 1.15 - 0.04 * (26.8 - pz) && pz >= 20.2 && pz < 26.8 && py >= BT - 0.4 && py < BT + 0.75) return pz < 20.9 ? 'gold' : 'queue';
+    // the forelegs
+    const lc = X0 + s * 5.2 + 1 / 6, lu = px - lc;      // the foreleg's axis (on a fine voxel centre)
+    if (pz >= 36.0 && pz < 38.9) {
+      // the paw: broad, its front corners rounded, the knuckles falling to the front
+      const r = pz > 37.4 ? (pz - 37.4) / 1.5 : 0;
+      const hh = 2.6 - 0.8 * sm(37.6, 38.9, pz);
+      if (e2(lu / 2.5, r, 3) <= 1 && e2(lu / 2.5, lift / hh, 4) <= 1) {
+        if (lift < 1 / 3) return 'crease';
+        const rel = Math.floor(px * 3) - Math.floor(lc * 3);
+        if ((rel === -4 || rel === 0 || rel === 4) && pz > 37.6) return lift > hh - 0.75 ? null : 'crease';   // the toe notches
+        if (pz < 36.4 && lift > 0.9) return 'crease';                                                      // the wrist
+        return 'body';
       }
     }
-    // the tail: from the rump along the right flank to a tuft
-    for (let i = 0; i <= 24; i++) {
-      const t = i / 24, a = 1 - t;
-      const tx = a * a * (X0 + 3.0) + 2 * a * t * (X0 + 8.6) + t * t * (X0 + 8.3);
-      const tz = a * a * 8.6 + 2 * a * t * 8.2 + t * t * 20.5;
-      const r = t > 0.9 ? 0.85 : 0.5;
-      const ty = sy + r;
-      if ((px - tx) ** 2 + (py - ty) ** 2 + (pz - tz) ** 2 <= r * r) return 'body';
+    if (pz >= ZF - 3.5 && pz < 36.4) {
+      // the forearm, square cut, tapering a little to the wrist, off the shoulder panel
+      const t = sm(29, 35.8, pz), hw = 1.75 - 0.15 * t, hh = 3.4 - 0.9 * t;
+      if (e2(lu / hw, lift / hh, 4) <= 1) return lift < 1 / 3 ? 'crease' : 'body';
     }
-    return null;
+    // the hind paw tucked forward along the ground in front of the haunch
+    const hc = X0 + s * 5.9 + 1 / 6, hu = px - hc;
+    if (pz >= 14.0 && pz < 21.6) {
+      const r = pz > 20.2 ? (pz - 20.2) / 1.4 : 0;
+      const hh = 1.9 - 0.5 * sm(20.4, 21.6, pz);
+      if (e2(hu / 1.4, r, 3) <= 1 && e2(hu / 1.4, lift / hh, 4) <= 1) {
+        if (lift < 1 / 3) return 'crease';
+        const rel = Math.floor(px * 3) - Math.floor(hc * 3);
+        if ((rel === -2 || rel === 2) && pz > 20.5) return lift > hh - 0.6 ? null : 'crease';
+        return 'body';
+      }
+    }
+    // the chest under the head
+    const chest = eV(px, py, pz, X0, sy + 5.0, 28.6, 4.6, 7.2, 3.0) <= 1;
+    // the body block, with the raised panels on its flanks and the blades on its back
+    const w = bodyW(py, pz);
+    const eH = e2((py - (sy + 4.0)) / 3.7, (pz - 13.4) / 4.6, 2.2);          // the haunch panel
+    const eS = e2((py - (sy + 4.6)) / 3.9, (pz - 25.6) / 3.3, 2.2);          // the shoulder panel
+    const eB = e2((au - 2.7) / 1.3, (pz - 23.6) / 2.7, 2.2);                  // the shoulder blade
+    const panel = eH <= 1 ? 0.8 * Math.min(1, (1 - eH) * 4) : eS <= 1 ? 0.8 * Math.min(1, (1 - eS) * 4) : 0;
+    const inPanelW = w > 0 && au < w + panel + 0.01;
+    const blade = eB <= 1 && py >= BT - 0.5 && py < BT + 0.75 * Math.min(1, (1 - eB) * 3);
+    if (!(inPanelW || blade || chest)) return null;
+    if (lift < 1 / 3) return 'crease';
+    // the cut round each panel, on the flank just outside it
+    if (!blade && !chest && ((eH > 1 && eH < 1.4) || (eS > 1 && eS < 1.38)) && au > w - 0.8) return 'crease';
+    if (!blade && eB > 1 && eB < 1.45 && py >= BT - 0.6) return 'crease';
+    // three stone values on the flank: the raised panels and blades a step
+    // lighter (worn smooth), the belly a step darker, the block between
+    if (blade || (panel > 0 && au > w - 0.05)) return 'panel';
+    if (lift < 1.7 && !chest) return 'belly';
+    return 'body';
   }
   // sample the box round the sphinx
   const x0 = (X0 - 9) * k, x1 = (X0 + 9) * k, y0 = sy * k, y1 = (sy + 25) * k, z0 = 6 * k, z1 = 40 * k;
@@ -5754,6 +5813,14 @@ function sphinx(m, X0, sy) {
     const X = x0 + i, Y = y0 + j, Z = z0 + l;
     let c;
     if (tag === 'body' || tag === 'face') c = SPX_ST[s];
+    else if (tag === 'panel') c = SPX_ST[Math.min(3, s + 1)];
+    else if (tag === 'belly') c = SPX_ST[Math.max(0, s - 1)];
+    else if (tag === 'crease') c = SPX_CREASE[s > 1 ? 1 : 0];
+    else if (tag === 'tuft') c = SPX_CREASE[s > 1 ? 2 : 1];
+    else if (tag === 'drape') {
+      // the flap's stripes run with its fall: bands across it, counted down from the head
+      c = (Math.floor(j / 2) % 2 ? SPX_LAP : SPX_GOLD)[Math.max(1, s)];
+    } else if (tag === 'queue') c = (Math.floor(l / 2) % 2 ? SPX_LAP : SPX_GOLD)[Math.max(1, s)];
     else if (tag === 'cap') {
       // the cap's stripes fan out from the brow (Tutankhamun's mask)
       const hu = ((X + 0.5) / k - X0) / HS, hv = ((Y + 0.5) / k - chinY) / HS;
@@ -5831,6 +5898,30 @@ function wonder() {
       rows[r] = row;
     }
     paint(m, face, u0, 16, rows, DK);
+  }
+  // round 45: the decks are not plain planes: each step's top laid in
+  // staggered flags with darker joints, the upper deck under a raised
+  // coping ring (the lightest line on the building) with a shadowed gutter
+  // inside it and gilt-capped offering stands in its corners (building_21)
+  const JOINT = 0xb09f7c, GUTTER = 0xa08e6c, FLAG = [0xcdc2aa, 0xd8cdb4, 0xc4b89c];
+  const flags = (y, x0, z0, x1, z1, skip) => {
+    for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) {
+      if (skip && skip(x, z) || !m.get(x, y, z)) continue;
+      const row = Math.floor((z - z0) / 4), joint = (z - z0) % 4 === 0 || (x - x0 + (row % 2) * 3) % 6 === 0;
+      m.set(x, y, z, joint ? JOINT : FLAG[Math.floor(hash3(Math.floor((x - x0 + (row % 2) * 3) / 6), y, row, 45) * 3)]);
+    }
+  };
+  flags(8, 8, 4, 58, 44, (x, z) => x >= 12 && x < 54 && z >= 6 && z < 40);
+  flags(17, 13, 7, 53, 39);
+  for (let x = 12; x < 54; x++) for (let z = 6; z < 40; z++) {
+    const d = Math.min(x - 12, 53 - x, z - 6, 39 - z);
+    if (d === 0) m.set(x, 18, z, LIP(x, 18, z));
+    else if (d === 1) m.set(x, 17, z, GUTTER);
+  }
+  for (const [x, z] of [[14, 8], [50, 8], [14, 35], [50, 35]]) {
+    m.box(x, 18, z, 2, 2, 2, LIME);
+    m.box(x, 20, z, 2, 1, 2, CG_L);
+    m.set(x, 19, z, LAPIS_S); m.set(x + 1, 19, z + 1, LAPIS_S);
   }
   // the sphinx (round 22: a third-voxel model on a deck raised so it stands
   // clear over the gate, see sphinx())
