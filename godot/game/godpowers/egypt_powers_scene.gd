@@ -18,7 +18,7 @@ const SETUPS := {
 	# power: [major god, [classical, heroic, mythic], default t, camera distance, pitch, yaw]
 	"rain": ["ra", ["bast", "sobek", "horus"], 6.0, 46.0, 46.0, 28.0],
 	"prosperity": ["isis", ["bast", "sobek", "thoth"], 4.0, 28.0, 46.0, 20.0],
-	"vision": ["set", ["ptah", "sekhmet", "horus"], 3.2, 66.0, 56.0, 20.0],
+	"vision": ["set", ["ptah", "sekhmet", "horus"], 1.5, 64.0, 54.0, 20.0],
 	"eclipse": ["ra", ["bast", "sobek", "horus"], 4.0, 30.0, 40.0, 28.0],
 	"shifting_sands": ["set", ["ptah", "sekhmet", "horus"], 2.4, 46.0, 50.0, 0.0],
 	"plague_of_serpents": ["isis", ["anubis", "nephthys", "thoth"], 3.6, 11.0, 30.0, 24.0],
@@ -110,9 +110,11 @@ static func scene_setup(game: Node) -> Dictionary:
 					u.call("sphinx", 1, -4.0 + (i % 3) * 1.8, 1.0 + (i / 3) * 1.8, PI * 0.5)
 				focus = Vector2(cx - 2, cz + 2)
 		"vision":
-			tx = cx + 16
-			tz = cz - 4
-			focus = Vector2(cx + 6, cz)
+			tx = cx + 10
+			tz = cz + 6   # (open sand by the Greek army, the Eye and its column in the clear)
+			# framed on the cast: the Eye and its column in the middle, the whole front racing
+			# out over the dark beyond the Egyptian town's sight (power_04)
+			focus = Vector2(tx, tz - 1)
 			game.args["fog"] = "true"
 		"shifting_sands":
 			for i in 10:

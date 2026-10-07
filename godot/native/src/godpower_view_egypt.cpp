@@ -9,8 +9,9 @@
 //                   shoots rising, a cool grey grade and a rainbow (egypt_fx.gd)
 //   Prosperity      a gold column over every gold mine the caster works, gold motes spiralling
 //                   up, a sun ring on the ground, glints over his miners
-//   Vision          the reveal's edge as a bright swirling ring growing to 42 tiles, white
-//                   wisps on it, an Eye of Horus burnt into the ground at its heart
+//   Vision          an Eye of Horus and a column of cyan light at its heart; the reveal's edge a
+//                   thick band under swirling rings and streaks racing out to 42 tiles, kicking up
+//                   sand; everything it passes flashes, the revealed enemy keeps a cyan rim
 //   Eclipse         the world sunk in a deep blue dusk (egypt_fx.gd), pink-violet halos and
 //                   motes round the caster's myth units, his Monuments glowing
 //   Shifting Sands  sand vortices at both ends: a sand swirl on the ground, sand spiralling
@@ -335,37 +336,192 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 		}
 	}
 
-	// ---- Vision: the swirling edge, wisps, the Eye --------------------------------------------------
+	// ---- Vision: an Eye and a column of light at the heart, a thick swirling front, the revealed lit -----
+	// (round 18) The cast reads from its heart out: the Eye of Horus burnt into the ground under a
+	// glyph ring and a column of cyan light with two strands winding up it; the reveal's edge is a
+	// thick saturated band on the ground under a curtain of swirling rings and vertical streaks
+	// (power_04's white swirl rings), kicking up sand and grit while it races out (10 m + 15 m/s);
+	// every unit and building it passes flashes (a rim, a light shaft, a ring and a puff of dust) and
+	// the enemy it reveals keeps a faint cyan rim for the 20 s. The caster's rings and streaks are in
+	// G_VISION, drawn over the fog of war (fog_view.gd draws at RENDER_PRIORITY_MAX - 1).
 	for (const aov::VisionCast &v : G.visions) {
 		const double age = now - v.t0, k = env(now, v.t0, v.t0 + v.dur, 0.3, 1.5);
+		if (k <= 0.005) continue;
 		const double gy = h_at(v.x, v.z);
-		const Lin wc = hex_lin(0xe8f6ff), cy = hex_lin(0x5fe0ff);
-		const double r = v.r;
-		decal(I_DECAL_ADD, v.x, gy + 0.25, v.z, 2 * r * 1.04, 0, wc.r, wc.g, wc.b, (float)(1.6 * k), 4, (float)std::max(0.03, 1.6 / r), 0.73f);
-		decal(I_DECAL_ADD, v.x, gy + 0.2, v.z, 2 * r * 1.12, -now * 0.35, cy.r, cy.g, cy.b, (float)(0.9 * k), 6, 0.8f, (float)(now * 0.2));
-		decal(I_DECAL_ADD, v.x, gy + 0.18, v.z, 2 * r * 0.96, now * 0.22, wc.r, wc.g, wc.b, (float)(0.5 * k), 6, 0.82f, (float)(now * 0.3 + 3));
-		// the Eye of Horus at the heart, burning out over 4 s
-		const double ek = clamp01(1 - (age - 1.5) / 3.0) * clamp01(age / 0.4);
-		if (ek > 0) {
-			decal(I_DECAL_ADD, v.x, gy + 0.3, v.z, 9, 0, cy.r * 1.5f, cy.g * 1.5f, cy.b * 1.5f, (float)(1.8 * ek), 7);
-			glow(false, v.x, gy + 2, v.z, 7, 5, cy.r, cy.g, cy.b, 0.3 * ek, 0);
-			lit(v.x, gy + 4, v.z, 0x80e0ff, 14 * ek, 16, 1.4);
+		const Lin wc = hex_lin(0xeef9ff), cy = hex_lin(0x22b8ff), cd = hex_lin(0x1070ff);
+		const double R = std::max(0.5, v.r);
+		const double Rmax = aov::power_def(aov::GP_VISION).radius;
+		const double grow = 1 - sstep(Rmax - 3, Rmax, R);      // 1 while the front races out
+		const double fk = 0.55 + 0.45 * grow;                   // the front's strength
+		const double burst = std::exp(-age * 1.1);              // the cast's flash, fading
+		const Group vg = v.owner == 1 ? G_VISION : G_BAND2;
+		const uint32_t vs = hmix((uint32_t)(v.x * 64), (uint32_t)(v.z * 64), (uint32_t)(v.t0 * 30));
+		std::vector<Line> L;
+
+		// -- the heart: the Eye, a glyph ring, the cast's shock ring, a column of light
+		decal(I_DECAL_ADD, v.x, gy + 0.3, v.z, 14, 0, cy.r * 1.6f, cy.g * 1.6f, cy.b * 1.6f, (float)((2.0 + 2.0 * burst) * k), 7);
+		decal(I_DECAL_ADD, v.x, gy + 0.26, v.z, 17, now * 0.25, cy.r, cy.g, cy.b, (float)((1.3 + 1.2 * burst) * k), 5, 0.78f, (float)(now * 0.3));
+		if (age < 1.3)
+			decal(I_DECAL_ADD, v.x, gy + 0.2, v.z, 4 + 26 * std::pow(age / 1.3, 0.6), 0, wc.r, wc.g, wc.b, (float)(2.6 * (1 - age / 1.3)), 4, 0.08f, 0.31f);
+		const double col = (0.95 + 1.3 * burst) * k;
+		glow(false, v.x, gy + 13, v.z, 4.2, 28, cd.r, cd.g, cd.b, 0.6 * col, 0);
+		glow(false, v.x, gy + 13, v.z, 2.0, 28, cy.r, cy.g, cy.b, 1.0 * col, 0);
+		glow(false, v.x, gy + 13, v.z, 0.7, 28, wc.r, wc.g, wc.b, 1.4 * col, 1);
+		glow(false, v.x, gy + 1.2, v.z, 5, 4, wc.r, wc.g, wc.b, 0.7 * col, 2);
+		{ // the shaft itself: a straight beam of light out of the Eye
+			std::vector<P> pts;
+			for (int q = 0; q <= 12; q++) {
+				const double f = q / 12.0;
+				P p{ v.x, gy + 0.2 + f * 24, v.z };
+				p.m = (float)(1 - 0.85 * f);
+				p.wm = (float)(1 - 0.5 * f);
+				pts.push_back(p);
+			}
+			line(L, pts, 0.45, 1.3 * col, 0, 0);
+			line(L, pts, 2.2, 0.55 * col, 0, 0, true);
 		}
-		// wisps riding the edge
-		const int NW = (int)(std::min(140.0, 18 + r * 3.2));
-		for (int i = 0; i < NW; i++) {
-			const double a = hr(i, 41) * TAU + now * (0.25 + 0.2 * hr(i, 42)) * (i % 2 ? 1 : -1);
-			const double rr = r * (0.97 + 0.06 * hr(i, 43));
-			const double px = v.x + std::cos(a) * rr, pz = v.z + std::sin(a) * rr;
-			const double per = 1.4 + hr(i, 44), f = std::fmod(now / per + hr(i, 45), 1.0);
-			const Lin c = hex_lin(i % 3 ? 0xdff4ff : 0x9fe8ff);
-			Basis bs;
-			const double s = (0.35 + 0.5 * hr(i, 46)) * (0.5 + f);
-			bs.rows[0] = Vector3((real_t)s, 0, 0);
-			bs.rows[1] = Vector3(0, (real_t)s, 0);
-			bs.rows[2] = Vector3(0, 0, 1);
-			inst(I_FLAME, bs, px, h_at(px, pz) + 0.4 + f * 1.8, pz, c.r, c.g, c.b, (float)(0.5 * k * std::sin(f * PI)), 0);
+		for (int s = 0; s < 2; s++) { // two strands winding up the column
+			std::vector<P> pts;
+			const int n = 40;
+			for (int q = 0; q <= n; q++) {
+				const double f = (double)q / n, a = s * PI + f * 9 + now * 2.4, rr = 1.5 - 0.8 * f;
+				P p{ v.x + std::cos(a) * rr, gy + 0.3 + f * 18, v.z + std::sin(a) * rr };
+				p.m = (float)(std::sin(PI * std::min(1.0, f * 1.15)) * (0.6 + 0.4 * std::sin(f * 20 - now * 8)));
+				pts.push_back(p);
+			}
+			line(L, pts, 0.2, 0.9 * col, 0.6, 0.2);
+			line(L, pts, 0.6, 0.35 * col, 0.6, 0.2, true);
 		}
+		for (int i = 0; i < 70; i++) { // motes rising in the column
+			const double f = std::fmod(now / (1.6 + hr(i, 61)) + hr(i, 62), 1.0), a = hr(i, 63) * TAU + f * 5;
+			const double rr = 0.4 + 2.0 * hr(i, 64) * (1 - 0.6 * f), s = 0.07 * std::sin(f * PI) * k;
+			cube(I_EMBER, v.x + std::cos(a) * rr, gy + 0.3 + f * 16, v.z + std::sin(a) * rr, now * 2, a, i, s * 0.5, s * 2.2, s * 0.5, 0.9f, 2.6f, 3.4f);
+		}
+		lit(v.x, gy + 4, v.z, 0x70d8ff, (14 + 30 * burst) * k, 22, 1.3);
+
+		// -- the front: a thick saturated band on the ground, a crisp white edge, swirl inside
+		{
+			const double S = 2 * R / 0.86, wb = std::min(0.3, 2.8 / (S * 0.5));
+			decal(I_DECAL_ADD, v.x, gy + 0.25, v.z, S, -now * 0.2, cy.r, cy.g, cy.b, (float)(3.2 * fk * k), 4, (float)wb, 0.53f);
+			decal(I_DECAL_ADD, v.x, gy + 0.24, v.z, 2 * R * 1.01, 0, wc.r, wc.g, wc.b, (float)(1.8 * fk * k), 2, (float)std::max(0.9, 1 - 1.2 / R));
+			decal(I_DECAL_ADD, v.x, gy + 0.18, v.z, 2 * R, now * 0.22, cy.r, cy.g, cy.b, (float)(0.3 * k), 6, 0.86f, (float)(now * 0.3 + 3));
+		}
+		// swirling rings at three heights, broken into turning arcs (power_04)
+		for (int j = 0; j < 3; j++) {
+			const double hgt = (0.5 + 1.5 * j) * (0.7 + 0.5 * grow), sp = (j % 2 ? -0.55 : 0.4) * (1 + grow);
+			for (int a2 = 0; a2 < 3; a2++) {
+				const double span = (0.45 + 0.3 * hr(vs, j * 3 + a2, 71)) * PI;
+				const double a0 = hr(vs, j * 3 + a2, 72) * TAU + now * sp;
+				const int n = std::max(16, (int)(R * span / 0.9));
+				std::vector<P> pts;
+				for (int q = 0; q <= n; q++) {
+					const double f = (double)q / n, a = a0 + span * f;
+					const double rr = R * (1.0 + 0.012 * std::sin(a * 5 + now * 3 + j)) - 0.35 * j;
+					P p{ v.x + std::cos(a) * rr, gy + hgt + 0.35 * std::sin(a * 3 + now * 2.2 + j * 2), v.z + std::sin(a) * rr };
+					const double e = std::sin(PI * f);
+					p.m = (float)(e * (0.65 + 0.35 * std::sin(a * 7 - now * 5)));
+					p.wm = (float)(0.5 + 0.5 * e);
+					pts.push_back(p);
+				}
+				const double ii = (j == 0 ? 1.1 : j == 1 ? 0.85 : 0.6) * fk * k;
+				line(L, pts, 0.32, ii, 0, 0);
+				line(L, pts, 1.3, 0.4 * ii, 0, 0, true);
+			}
+		}
+		// vertical streaks standing on the edge, flickering in and out
+		const int NS = (int)std::min(120.0, 20 + R * 2.4);
+		for (int i = 0; i < NS; i++) {
+			const double per = 0.9 + 0.8 * hr(vs, i, 81), f = std::fmod(now / per + hr(vs, i, 82), 1.0);
+			const double a = hr(vs, i, 83) * TAU + now * 0.3 * (i % 2 ? 1 : -1);
+			const double rr = R * (0.985 + 0.02 * hr(vs, i, 84));
+			const double hh = (2.0 + 4.5 * hr(vs, i, 85)) * (0.6 + 0.6 * grow) * (0.4 + 0.6 * std::sin(f * PI));
+			const double px = v.x + std::cos(a) * rr, pz = v.z + std::sin(a) * rr, g0 = h_at(px, pz);
+			std::vector<P> pts;
+			for (int q = 0; q <= 5; q++) {
+				const double ff = q / 5.0;
+				P p{ px + std::cos(a + PI / 2) * 0.4 * ff, g0 + 0.2 + hh * ff, pz + std::sin(a + PI / 2) * 0.4 * ff };
+				p.m = (float)(1 - ff);
+				pts.push_back(p);
+			}
+			const double ii = std::sin(f * PI) * fk * k;
+			line(L, pts, 0.14, 0.9 * ii, 0.5, 0);
+			line(L, pts, 0.5, 0.3 * ii, 0.5, 0, true);
+		}
+		// sand and grit thrown up at the leading edge while it races out
+		if (grow > 0.01) {
+			for (int i = 0; i < 120; i++) {
+				const double per = 0.3 + 0.2 * hr(vs, i, 91), f = std::fmod(now / per + hr(vs, i, 92), 1.0);
+				const double tb = age - f * per;
+				if (tb < 0) continue;
+				const double rb = std::min(Rmax, aov::VISION_R0 + aov::VISION_GROW * tb);
+				const double a = hr(vs, i, 93) * TAU, rr = rb - 0.8 + 1.4 * f;
+				const double px = v.x + std::cos(a) * rr, pz = v.z + std::sin(a) * rr;
+				Basis bs;
+				const double s = (0.8 + 1.2 * f) * (0.8 + 0.4 * hr(vs, i, 94));
+				bs.rows[0] = Vector3((real_t)s, 0, 0);
+				bs.rows[1] = Vector3(0, (real_t)(s * 0.8), 0);
+				bs.rows[2] = Vector3(0, 0, 1);
+				const Lin dc = hex_lin(i % 3 ? 0x9a7648 : 0x7e6040);
+				inst(I_PUFF, bs, px, h_at(px, pz) + 0.3 + 1.4 * f, pz, dc.r, dc.g, dc.b, (float)(0.22 * std::sin(f * PI) * grow * k), (float)hr(vs, i, 95), 1);
+			}
+			for (int i = 0; i < 180; i++) {
+				const double per = 0.6 + 0.3 * hr(vs, i, 101), f = std::fmod(now / per + hr(vs, i, 102), 1.0);
+				const double t = f * per, tb = age - t;
+				if (tb < 0) continue;
+				const double rb = std::min(Rmax, aov::VISION_R0 + aov::VISION_GROW * tb);
+				const double a = hr(vs, i, 103) * TAU, rr = rb + (2.5 + 3 * hr(vs, i, 104)) * t;
+				const double y = (4 + 4 * hr(vs, i, 105)) * t - 9.8 * t * t;
+				if (y < -0.2) continue;
+				const double px = v.x + std::cos(a) * rr, pz = v.z + std::sin(a) * rr;
+				const double s = 0.09 + 0.09 * hr(vs, i, 106);
+				const Lin dc = hex_lin(SAND[i & 3]);
+				cube(I_DEBRIS, px, h_at(px, pz) + 0.2 + std::max(0.0, y), pz, t * 9, a, t * 7, s, s, s, dc.r, dc.g, dc.b);
+			}
+		}
+
+		// -- every unit and building the front passes flashes; the enemy it reveals keeps a rim
+		int nf = 0;
+		double best = 0, bx = 0, by = 0, bz = 0;
+		auto mark = [&](double x, double z, double h, double wdt, bool enemy, uint32_t id) {
+			const double d = std::hypot(x - v.x, z - v.z);
+			if (d > R + 0.5) return;
+			const double tp = std::max(0.0, (d - aov::VISION_R0) / aov::VISION_GROW), dt = age - tp;
+			if (dt < 0) return;
+			const double fl = std::exp(-dt * 1.7) * k, rim = (enemy ? 0.45 : 0.0) * k;
+			const double o = fl + rim;
+			if (o < 0.02) return;
+			const double g0 = h_at(x, z);
+			double dx = x - cam.x, dz = z - cam.z;
+			const double dl = std::max(1e-6, std::hypot(dx, dz));
+			dx = dx / dl * 0.5;
+			dz = dz / dl * 0.5;
+			glow(true, x + dx, g0 + h * 0.5, z + dz, wdt * 1.5 + 0.9, h * 1.6, cy.r, cy.g, cy.b, 0.9 * o, 0);
+			if (fl > 0.02) {
+				glow(false, x, g0 + h * 0.5, z, wdt * 0.9 + 0.5, h * 1.1, wc.r, wc.g, wc.b, 0.5 * fl, 0);
+				glow(false, x, g0 + h + 3, z, 0.4, 7, wc.r, wc.g, wc.b, 0.7 * fl, 1);
+				decal(I_DECAL_ADD, x, g0 + 0.15, z, wdt * 1.3 + 1 + 3 * (1 - std::exp(-dt * 3)), 0, cy.r, cy.g, cy.b, (float)(2.2 * fl), 2, 0.7f);
+				if (nf < 90) {
+					nf++;
+					puff(false, v.t0 + tp, hmix(vs, id, 111), now, x, g0 + 0.2, z, 5 + (int)wdt, 0xcfae78, 0.5 + 0.15 * wdt, 1.4, 2.6, 0.9, 0.3, 1.3, 0.3 + 0.3 * wdt, 1);
+				}
+				if (fl > best) { best = fl; bx = x; by = g0 + h; bz = z; }
+			}
+			if (enemy && rim > 0.02)
+				decal(I_DECAL_ADD, x, g0 + 0.12, z, wdt * 1.2 + 1.2, 0, cy.r, cy.g, cy.b, (float)(0.9 * rim), 2, 0.75f);
+		};
+		for (int u = 0; u < U.size(); u++) {
+			if (U.removed[u] || U.dead[u]) continue;
+			double x, z;
+			upos(u, x, z);
+			mark(x, z, type_height(U.type[u]), 0.5, U.owner[u] != v.owner && U.owner[u] != 0, (uint32_t)u);
+		}
+		for (int b = 0; b < B.size(); b++) {
+			if (B.removed[b] || B.dead[b]) continue;
+			const double w = std::max(B.w[b], B.h[b]);
+			mark(B.x[b], B.z[b], 1.5 + w * 0.7, w * 0.5, B.owner[b] != v.owner && B.owner[b] != 0, 0x10000u + (uint32_t)b);
+		}
+		if (best > 0.05) lit(bx, by + 1, bz, 0xa8ecff, 26 * best, 14, 1.5);
+		if (!L.empty()) emit_lines(vg, L, 1);
 	}
 
 	// ---- Eclipse: halos on the caster's myth units, his Monuments glowing ---------------------------

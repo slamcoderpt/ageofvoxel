@@ -3702,6 +3702,24 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
 - **Locust haze** (gods round 16): the swarm's dust haze is drawn with the puff shader's soft
   round mode (`INSTANCE_CUSTOM.y` 1, as Thoth's smoke), larger and fainter, instead of hard
   camera-facing squares that read as pale tiles over a Farm.
+- **Vision reads as a cast** (gods round 18, godpower_view_egypt.cpp): the old visual was a thin
+  pale ring and a cyan wash over the whole disc, with the Eye burnt out after 4 s. Now, from the
+  heart out: the Eye of Horus (decal_add kind 7) under a turning glyph ring and a column of light
+  (a straight beam ribbon, two strands winding up it, layered glow sprites, rising cyan motes and a
+  light), the cast's shock ring for its first 1.3 s; the reveal's edge is a thick saturated band
+  (kind 4, ~2.8 tiles) with a crisp white rim, under three heights of swirling arcs and vertical
+  streaks flickering on the edge (power_04's white swirl rings), all following the sim's
+  `VisionCast::r` (10 m + 15 m/s to 70 m). While the front races out it throws sand puffs and
+  grit cubes off its leading edge. Every unit and building it passes flashes when the front
+  reaches it (`(d - VISION_R0) / VISION_GROW` after the cast: a rim glow, a white body glow, a
+  light shaft over it, a ring and a puff of dust, the brightest one lit by a point light), and
+  the enemy it reveals keeps a faint cyan rim and ground ring for the 20 s. The whole-disc swirl
+  wash is down to a thin rim inside the edge. The local player's rings and streaks are their own
+  ribbon group `G_VISION` (godpowers.gd, saturated cyan round a white core) drawn at
+  `RENDER_PRIORITY_MAX`, with the fog of war (fog_view.gd) one under it, so they stand over the
+  dark beyond the reveal as in power_04 (an enemy's Vision stays in G_BAND2, under the fog).
+  The egypt_powers "vision" framing is on the cast (open sand by the Greek army, t 1.5 s,
+  distance 64): the lit disc and its column cut out of the dark, with no far haze at the border.
   ground) rolls lumps round and outward, darker than the sand with a sunlit outer roll and a
   crisp, lumpy edge; godpower_view_egypt.cpp keeps 44 soft round puffs rolling off its rim (no
   voxel squares). 12 big **wreckage** blocks (`CHUNKS`: roof tiles, beams, mud bricks, a

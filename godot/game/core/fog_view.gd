@@ -30,7 +30,8 @@ func _init(p_sim: Object, p_cam: Camera3D) -> void:
 	mesh = q
 	_mat = ShaderMaterial.new()
 	_mat.shader = Shader_
-	_mat.render_priority = Material.RENDER_PRIORITY_MAX
+	# (one under the top: the local player's Vision rings, godpowers.gd, draw over it)
+	_mat.render_priority = Material.RENDER_PRIORITY_MAX - 1
 	var dk := Color(0.032, 0.043, 0.04)
 	var hz := Color(0.30, 0.305, 0.30)
 	if RenderingServer.get_current_rendering_method() == "gl_compatibility":
