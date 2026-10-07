@@ -2022,6 +2022,34 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   `egt_focus=temple&egt_dist=17&egt_lift=1`, `egt_focus=town_center` (the
   round 32 god framing no longer applies: the god stands at the sanctuary
   door on the axis, not at the front-left corner).
+- **Battered walls, coursing, a pylon gate, round 47** (the critic: every
+  building a flat-roofed box with a 1-voxel rim, no batter, no torus or
+  cavetto, no pylon; walls flat planes with no coursing). Temple: the court
+  is gone and the hall is fronted by a real PYLON (z 30 .. 44): two
+  trapezoidal limestone towers 22 rows high battered a voxel in every four
+  rows on all sides (`pylon()` now takes `y0`, so it stands on the
+  podium), a torus roll up every edge and along the top (corner rolls
+  thinned to r 0.4 so they read as moulding, not as poles), a curved
+  cavetto flaring three voxels out in lapis / green flutes under a pale lip;
+  a painted register of hieroglyphs (`glyphRegister()`: an ink rule, signs
+  three wide every five voxels, mostly ink with a red or lapis sign, an ink
+  rule) round each tower's foot and high on its flanks and back, the god
+  in a sunk relief on each front; the gate block set back two voxels under
+  its own cornice, the doorway in two steps (a rebate, then the deep door
+  with leaves) under a gilt winged sun; one cedar mast on each tower's roof
+  at its inner front corner with a long team streamer (masts standing
+  before the battered faces read as scaffolding); the obelisks moved out to
+  the front corners. Coursing: `brick()` courses are three rows with a
+  darker bed joint under each (`bed` 0.88), house blocks are battered (1 in
+  4 or 5); `chip()` (after `recourse()`, `chip: false` in TYPES for the
+  farm, obelisk, monuments, palms and clutter) sets a few whole ashlar
+  blocks back a voxel (a recessed / robbed block, drawn by `skin()` as a
+  sunk cell with reveals) and nicks a few arrises. Town Center: a taller
+  portico of six lotus columns (`lotusColumn()`, 13 rows) before the
+  palace and a free colonnade of four lotus columns under a painted
+  architrave down the court's west side. Framing:
+  `egt_row=temple/ra/a1&egt_pitch=24&egt_dist=15&egt_yaw=20` (the pylon),
+  `egt_row=eg_barracks/0/a1,town_center/0/a1&egt_pitch=34&egt_dist=30`.
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8

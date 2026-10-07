@@ -2,7 +2,7 @@
  "format": 2,
  "group": "egypt_stages",
  "bin": "egypt_stages.bin.gz",
- "bytes": 120420936,
+ "bytes": 122527048,
  "voxel": 0.125,
  "stages": 8,
  "models": {
@@ -24,8 +24,8 @@
    "index": 978688
   },
   "town_center/s2": {
-   "vertices": 63042,
-   "indices": 91734,
+   "vertices": 64330,
+   "indices": 93666,
    "aabb": [
     -3.5,
     -0.1,
@@ -35,14 +35,14 @@
     3.5
    ],
    "position": 1162192,
-   "normal": 1918696,
-   "color": 2675200,
-   "extra": 2927368,
-   "index": 3179536
+   "normal": 1934152,
+   "color": 2706112,
+   "extra": 2963432,
+   "index": 3220752
   },
   "town_center/s4": {
-   "vertices": 85864,
-   "indices": 121956,
+   "vertices": 90952,
+   "indices": 129588,
    "aabb": [
     -3.5,
     -0.1,
@@ -51,15 +51,15 @@
     2.775,
     3.5
    ],
-   "position": 3546472,
-   "normal": 4576840,
-   "color": 5607208,
-   "extra": 5950664,
-   "index": 6294120
+   "position": 3595416,
+   "normal": 4686840,
+   "color": 5778264,
+   "extra": 6142072,
+   "index": 6505880
   },
   "town_center/s6": {
-   "vertices": 99418,
-   "indices": 141234,
+   "vertices": 104506,
+   "indices": 148866,
    "aabb": [
     -3.5,
     -0.1,
@@ -68,11 +68,11 @@
     3.65,
     3.5
    ],
-   "position": 6781944,
-   "normal": 7974960,
-   "color": 9167976,
-   "extra": 9565648,
-   "index": 9963320
+   "position": 7024232,
+   "normal": 8278304,
+   "color": 9532376,
+   "extra": 9950400,
+   "index": 10368424
   },
   "house/s0": {
    "vertices": 6200,
@@ -85,11 +85,11 @@
     0.775,
     1.375
    ],
-   "position": 10528256,
-   "normal": 10602656,
-   "color": 10677056,
-   "extra": 10701856,
-   "index": 10726656
+   "position": 10963888,
+   "normal": 11038288,
+   "color": 11112688,
+   "extra": 11137488,
+   "index": 11162288
   },
   "house/s2": {
    "vertices": 9104,
@@ -102,15 +102,15 @@
     1.15,
     1.5
    ],
-   "position": 10763856,
-   "normal": 10873104,
-   "color": 10982352,
-   "extra": 11018768,
-   "index": 11055184
+   "position": 11199488,
+   "normal": 11308736,
+   "color": 11417984,
+   "extra": 11454400,
+   "index": 11490816
   },
   "house/s4": {
-   "vertices": 12288,
-   "indices": 18432,
+   "vertices": 12304,
+   "indices": 18456,
    "aabb": [
     -1.375,
     -0.1,
@@ -119,15 +119,15 @@
     1.65,
     1.5
    ],
-   "position": 11109808,
-   "normal": 11257264,
-   "color": 11404720,
-   "extra": 11453872,
-   "index": 11503024
+   "position": 11545440,
+   "normal": 11693088,
+   "color": 11840736,
+   "extra": 11889952,
+   "index": 11939168
   },
   "house/s6": {
-   "vertices": 14952,
-   "indices": 22428,
+   "vertices": 14904,
+   "indices": 22356,
    "aabb": [
     -1.375,
     -0.1,
@@ -136,11 +136,11 @@
     2.15,
     1.5
    ],
-   "position": 11576752,
-   "normal": 11756176,
-   "color": 11935600,
-   "extra": 11995408,
-   "index": 12055216
+   "position": 12012992,
+   "normal": 12191840,
+   "color": 12370688,
+   "extra": 12430304,
+   "index": 12489920
   },
   "granary/s0": {
    "vertices": 6772,
@@ -153,15 +153,15 @@
     0.775,
     1.5
    ],
-   "position": 12144928,
-   "normal": 12226192,
-   "color": 12307456,
-   "extra": 12334544,
-   "index": 12361632
+   "position": 12579344,
+   "normal": 12660608,
+   "color": 12741872,
+   "extra": 12768960,
+   "index": 12796048
   },
   "granary/s2": {
-   "vertices": 13944,
-   "indices": 18852,
+   "vertices": 13960,
+   "indices": 18876,
    "aabb": [
     -1.5009,
     -0.1,
@@ -170,15 +170,15 @@
     1.15,
     1.5
    ],
-   "position": 12402240,
-   "normal": 12569568,
-   "color": 12736896,
-   "extra": 12792672,
-   "index": 12848448
+   "position": 12836656,
+   "normal": 13004176,
+   "color": 13171696,
+   "extra": 13227536,
+   "index": 13283376
   },
   "granary/s4": {
-   "vertices": 21900,
-   "indices": 28464,
+   "vertices": 21932,
+   "indices": 28512,
    "aabb": [
     -1.5009,
     -0.1,
@@ -187,15 +187,15 @@
     1.65,
     1.5
    ],
-   "position": 12923856,
-   "normal": 13186656,
-   "color": 13449456,
-   "extra": 13537056,
-   "index": 13624656
+   "position": 13358880,
+   "normal": 13622064,
+   "color": 13885248,
+   "extra": 13972976,
+   "index": 14060704
   },
   "granary/s6": {
-   "vertices": 26766,
-   "indices": 34470,
+   "vertices": 26798,
+   "indices": 34518,
    "aabb": [
     -1.5009,
     -0.1,
@@ -204,11 +204,11 @@
     2.025,
     1.5
    ],
-   "position": 13738512,
-   "normal": 14059704,
-   "color": 14380896,
-   "extra": 14487960,
-   "index": 14595024
+   "position": 14174752,
+   "normal": 14496328,
+   "color": 14817904,
+   "extra": 14925096,
+   "index": 15032288
   },
   "lumber_camp/s0": {
    "vertices": 7224,
@@ -221,15 +221,15 @@
     0.775,
     1.5
    ],
-   "position": 14732904,
-   "normal": 14819592,
-   "color": 14906280,
-   "extra": 14935176,
-   "index": 14964072
+   "position": 15170360,
+   "normal": 15257048,
+   "color": 15343736,
+   "extra": 15372632,
+   "index": 15401528
   },
   "lumber_camp/s2": {
-   "vertices": 12232,
-   "indices": 18348,
+   "vertices": 12264,
+   "indices": 18396,
    "aabb": [
     -1.5,
     -0.1,
@@ -238,15 +238,15 @@
     1.275,
     1.5
    ],
-   "position": 15007416,
-   "normal": 15154200,
-   "color": 15300984,
-   "extra": 15349912,
-   "index": 15398840
+   "position": 15444872,
+   "normal": 15592040,
+   "color": 15739208,
+   "extra": 15788264,
+   "index": 15837320
   },
   "lumber_camp/s4": {
-   "vertices": 15232,
-   "indices": 22848,
+   "vertices": 15280,
+   "indices": 22920,
    "aabb": [
     -1.5,
     -0.1,
@@ -255,15 +255,15 @@
     1.775,
     1.5
    ],
-   "position": 15472232,
-   "normal": 15655016,
-   "color": 15837800,
-   "extra": 15898728,
-   "index": 15959656
+   "position": 15910904,
+   "normal": 16094264,
+   "color": 16277624,
+   "extra": 16338744,
+   "index": 16399864
   },
   "lumber_camp/s6": {
-   "vertices": 17568,
-   "indices": 26352,
+   "vertices": 17616,
+   "indices": 26424,
    "aabb": [
     -1.5,
     -0.1,
@@ -272,11 +272,11 @@
     2.15,
     1.5
    ],
-   "position": 16051048,
-   "normal": 16261864,
-   "color": 16472680,
-   "extra": 16542952,
-   "index": 16613224
+   "position": 16491544,
+   "normal": 16702936,
+   "color": 16914328,
+   "extra": 16984792,
+   "index": 17055256
   },
   "mining_camp/s0": {
    "vertices": 6696,
@@ -289,15 +289,15 @@
     0.775,
     1.5
    ],
-   "position": 16718632,
-   "normal": 16798984,
-   "color": 16879336,
-   "extra": 16906120,
-   "index": 16932904
+   "position": 17160952,
+   "normal": 17241304,
+   "color": 17321656,
+   "extra": 17348440,
+   "index": 17375224
   },
   "mining_camp/s2": {
-   "vertices": 11128,
-   "indices": 16692,
+   "vertices": 11136,
+   "indices": 16704,
    "aabb": [
     -1.5,
     -0.1,
@@ -306,15 +306,15 @@
     1.275,
     1.5
    ],
-   "position": 16973080,
-   "normal": 17106616,
-   "color": 17240152,
-   "extra": 17284664,
-   "index": 17329176
+   "position": 17415400,
+   "normal": 17549032,
+   "color": 17682664,
+   "extra": 17727208,
+   "index": 17771752
   },
   "mining_camp/s4": {
-   "vertices": 13816,
-   "indices": 20724,
+   "vertices": 13856,
+   "indices": 20784,
    "aabb": [
     -1.5,
     -0.1,
@@ -323,15 +323,15 @@
     1.775,
     1.5
    ],
-   "position": 17395944,
-   "normal": 17561736,
-   "color": 17727528,
-   "extra": 17782792,
-   "index": 17838056
+   "position": 17838568,
+   "normal": 18004840,
+   "color": 18171112,
+   "extra": 18226536,
+   "index": 18281960
   },
   "mining_camp/s6": {
-   "vertices": 16000,
-   "indices": 24000,
+   "vertices": 16040,
+   "indices": 24060,
    "aabb": [
     -1.5,
     -0.1,
@@ -340,79 +340,79 @@
     2.15,
     1.5
    ],
-   "position": 17920952,
-   "normal": 18112952,
-   "color": 18304952,
-   "extra": 18368952,
-   "index": 18432952
+   "position": 18365096,
+   "normal": 18557576,
+   "color": 18750056,
+   "extra": 18814216,
+   "index": 18878376
   },
   "temple/s0": {
-   "vertices": 19672,
-   "indices": 29508,
+   "vertices": 20216,
+   "indices": 30324,
    "aabb": [
-    -2.375,
+    -2.5,
     -0.1,
     -2.875,
-    2.375,
+    2.5,
     0.775,
     3
    ],
-   "position": 18528952,
-   "normal": 18765016,
-   "color": 19001080,
-   "extra": 19079768,
-   "index": 19158456
+   "position": 18974616,
+   "normal": 19217208,
+   "color": 19459800,
+   "extra": 19540664,
+   "index": 19621528
   },
   "temple/s2": {
-   "vertices": 32712,
-   "indices": 49068,
+   "vertices": 42968,
+   "indices": 64452,
    "aabb": [
-    -2.375,
+    -2.5,
     -0.1,
     -2.875,
-    2.375,
-    1.65,
+    2.5,
+    2.15,
     3.125
    ],
-   "position": 19276488,
-   "normal": 19669032,
-   "color": 20061576,
-   "extra": 20192424,
-   "index": 20323272
+   "position": 19742824,
+   "normal": 20258440,
+   "color": 20774056,
+   "extra": 20945928,
+   "index": 21117800
   },
   "temple/s4": {
-   "vertices": 48976,
-   "indices": 73464,
+   "vertices": 62160,
+   "indices": 93240,
    "aabb": [
-    -2.375,
+    -2.5,
     -0.1,
     -2.875,
-    2.375,
-    2.65,
-    3.125
-   ],
-   "position": 20519544,
-   "normal": 21107256,
-   "color": 21694968,
-   "extra": 21890872,
-   "index": 22086776
-  },
-  "temple/s6": {
-   "vertices": 60080,
-   "indices": 90120,
-   "aabb": [
-    -2.375,
-    -0.1,
-    -2.875,
-    2.375,
+    2.5,
     3.4,
     3.125
    ],
-   "position": 22380632,
-   "normal": 23101592,
-   "color": 23822552,
-   "extra": 24062872,
-   "index": 24303192
+   "position": 21375608,
+   "normal": 22121528,
+   "color": 22867448,
+   "extra": 23116088,
+   "index": 23364728
+  },
+  "temple/s6": {
+   "vertices": 72776,
+   "indices": 109164,
+   "aabb": [
+    -2.5,
+    -0.1,
+    -2.875,
+    2.5,
+    4.65,
+    3.125
+   ],
+   "position": 23737688,
+   "normal": 24611000,
+   "color": 25484312,
+   "extra": 25775416,
+   "index": 26066520
   },
   "eg_barracks/s0": {
    "vertices": 15864,
@@ -425,15 +425,15 @@
     0.775,
     2.5
    ],
-   "position": 24663672,
-   "normal": 24854040,
-   "color": 25044408,
-   "extra": 25107864,
-   "index": 25171320
+   "position": 26503176,
+   "normal": 26693544,
+   "color": 26883912,
+   "extra": 26947368,
+   "index": 27010824
   },
   "eg_barracks/s2": {
-   "vertices": 26576,
-   "indices": 39864,
+   "vertices": 26664,
+   "indices": 39996,
    "aabb": [
     -2.375,
     -0.1,
@@ -442,15 +442,15 @@
     1.65,
     2.5
    ],
-   "position": 25266504,
-   "normal": 25585416,
-   "color": 25904328,
-   "extra": 26010632,
-   "index": 26116936
+   "position": 27106008,
+   "normal": 27425976,
+   "color": 27745944,
+   "extra": 27852600,
+   "index": 27959256
   },
   "eg_barracks/s4": {
-   "vertices": 33288,
-   "indices": 49932,
+   "vertices": 33376,
+   "indices": 50064,
    "aabb": [
     -2.375,
     -0.1,
@@ -459,15 +459,15 @@
     2.4,
     2.5
    ],
-   "position": 26276392,
-   "normal": 26675848,
-   "color": 27075304,
-   "extra": 27208456,
-   "index": 27341608
+   "position": 28119240,
+   "normal": 28519752,
+   "color": 28920264,
+   "extra": 29053768,
+   "index": 29187272
   },
   "eg_barracks/s6": {
-   "vertices": 41968,
-   "indices": 62952,
+   "vertices": 42120,
+   "indices": 63180,
    "aabb": [
     -2.375,
     -0.1,
@@ -476,11 +476,11 @@
     3.275,
     2.5
    ],
-   "position": 27541336,
-   "normal": 28044952,
-   "color": 28548568,
-   "extra": 28716440,
-   "index": 28884312
+   "position": 29387528,
+   "normal": 29892968,
+   "color": 30398408,
+   "extra": 30566888,
+   "index": 30735368
   },
   "migdol/s0": {
    "vertices": 30024,
@@ -493,15 +493,15 @@
     0.775,
     3.5
    ],
-   "position": 29136120,
-   "normal": 29496408,
-   "color": 29856696,
-   "extra": 29976792,
-   "index": 30096888
+   "position": 30988088,
+   "normal": 31348376,
+   "color": 31708664,
+   "extra": 31828760,
+   "index": 31948856
   },
   "migdol/s2": {
-   "vertices": 53736,
-   "indices": 80604,
+   "vertices": 54168,
+   "indices": 81252,
    "aabb": [
     -3.375,
     -0.1,
@@ -510,15 +510,15 @@
     2.525,
     3.75
    ],
-   "position": 30277032,
-   "normal": 30921864,
-   "color": 31566696,
-   "extra": 31781640,
-   "index": 31996584
+   "position": 32129000,
+   "normal": 32779016,
+   "color": 33429032,
+   "extra": 33645704,
+   "index": 33862376
   },
   "migdol/s4": {
-   "vertices": 81128,
-   "indices": 121692,
+   "vertices": 81752,
+   "indices": 122628,
    "aabb": [
     -3.375,
     -0.1,
@@ -527,15 +527,15 @@
     4.15,
     3.75
    ],
-   "position": 32319000,
-   "normal": 33292536,
-   "color": 34266072,
-   "extra": 34590584,
-   "index": 34915096
+   "position": 34187384,
+   "normal": 35168408,
+   "color": 36149432,
+   "extra": 36476440,
+   "index": 36803448
   },
   "migdol/s6": {
-   "vertices": 103816,
-   "indices": 155724,
+   "vertices": 104624,
+   "indices": 156936,
    "aabb": [
     -3.375,
     -0.1,
@@ -544,11 +544,11 @@
     5.65,
     3.75
    ],
-   "position": 35401864,
-   "normal": 36647656,
-   "color": 37893448,
-   "extra": 38308712,
-   "index": 38723976
+   "position": 37293960,
+   "normal": 38549448,
+   "color": 39804936,
+   "extra": 40223432,
+   "index": 40641928
   },
   "siege_works/s0": {
    "vertices": 26304,
@@ -561,15 +561,15 @@
     0.775,
     3.5
    ],
-   "position": 39346872,
-   "normal": 39662520,
-   "color": 39978168,
-   "extra": 40083384,
-   "index": 40188600
+   "position": 41269672,
+   "normal": 41585320,
+   "color": 41900968,
+   "extra": 42006184,
+   "index": 42111400
   },
   "siege_works/s2": {
-   "vertices": 46928,
-   "indices": 70392,
+   "vertices": 47176,
+   "indices": 70764,
    "aabb": [
     -3.375,
     -0.1,
@@ -578,15 +578,15 @@
     2.025,
     3.5
    ],
-   "position": 40346424,
-   "normal": 40909560,
-   "color": 41472696,
-   "extra": 41660408,
-   "index": 41848120
+   "position": 42269224,
+   "normal": 42835336,
+   "color": 43401448,
+   "extra": 43590152,
+   "index": 43778856
   },
   "siege_works/s4": {
-   "vertices": 69696,
-   "indices": 104544,
+   "vertices": 70024,
+   "indices": 105036,
    "aabb": [
     -3.375,
     -0.1,
@@ -595,15 +595,15 @@
     3.275,
     3.5
    ],
-   "position": 42129688,
-   "normal": 42966040,
-   "color": 43802392,
-   "extra": 44081176,
-   "index": 44359960
+   "position": 44061912,
+   "normal": 44902200,
+   "color": 45742488,
+   "extra": 46022584,
+   "index": 46302680
   },
   "siege_works/s6": {
-   "vertices": 84200,
-   "indices": 126300,
+   "vertices": 84536,
+   "indices": 126804,
    "aabb": [
     -3.375,
     -0.1,
@@ -612,11 +612,11 @@
     4.4,
     3.5
    ],
-   "position": 44778136,
-   "normal": 45788536,
-   "color": 46798936,
-   "extra": 47135736,
-   "index": 47472536
+   "position": 46722824,
+   "normal": 47737256,
+   "color": 48751688,
+   "extra": 49089832,
+   "index": 49427976
   },
   "armory/s0": {
    "vertices": 35824,
@@ -629,15 +629,15 @@
     0.3875,
     2
    ],
-   "position": 47977736,
-   "normal": 48407624,
-   "color": 48837512,
-   "extra": 48980808,
-   "index": 49124104
+   "position": 49935192,
+   "normal": 50365080,
+   "color": 50794968,
+   "extra": 50938264,
+   "index": 51081560
   },
   "armory/s2": {
-   "vertices": 61912,
-   "indices": 92868,
+   "vertices": 62336,
+   "indices": 93504,
    "aabb": [
     -2,
     -0.05,
@@ -646,15 +646,15 @@
     1.2625,
     2
    ],
-   "position": 49339048,
-   "normal": 50081992,
-   "color": 50824936,
-   "extra": 51072584,
-   "index": 51320232
+   "position": 51296504,
+   "normal": 52044536,
+   "color": 52792568,
+   "extra": 53041912,
+   "index": 53291256
   },
   "armory/s4": {
-   "vertices": 86152,
-   "indices": 129228,
+   "vertices": 86728,
+   "indices": 130092,
    "aabb": [
     -2,
     -0.05,
@@ -663,15 +663,15 @@
     2.075,
     2
    ],
-   "position": 51691704,
-   "normal": 52725528,
-   "color": 53759352,
-   "extra": 54103960,
-   "index": 54448568
+   "position": 53665272,
+   "normal": 54706008,
+   "color": 55746744,
+   "extra": 56093656,
+   "index": 56440568
   },
   "armory/s6": {
-   "vertices": 102016,
-   "indices": 153024,
+   "vertices": 102736,
+   "indices": 154104,
    "aabb": [
     -2,
     -0.05,
@@ -680,11 +680,11 @@
     2.825,
     2
    ],
-   "position": 54965480,
-   "normal": 56189672,
-   "color": 57413864,
-   "extra": 57821928,
-   "index": 58229992
+   "position": 56960936,
+   "normal": 58193768,
+   "color": 59426600,
+   "extra": 59837544,
+   "index": 60248488
   },
   "market/s0": {
    "vertices": 33168,
@@ -697,15 +697,15 @@
     0.3875,
     2
    ],
-   "position": 58842088,
-   "normal": 59240104,
-   "color": 59638120,
-   "extra": 59770792,
-   "index": 59903464
+   "position": 60864904,
+   "normal": 61262920,
+   "color": 61660936,
+   "extra": 61793608,
+   "index": 61926280
   },
   "market/s2": {
-   "vertices": 52392,
-   "indices": 78588,
+   "vertices": 52664,
+   "indices": 78996,
    "aabb": [
     -1.9375,
     -0.05,
@@ -714,15 +714,15 @@
     0.95,
     2
    ],
-   "position": 60102472,
-   "normal": 60731176,
-   "color": 61359880,
-   "extra": 61569448,
-   "index": 61779016
+   "position": 62125288,
+   "normal": 62757256,
+   "color": 63389224,
+   "extra": 63599880,
+   "index": 63810536
   },
   "market/s4": {
-   "vertices": 65752,
-   "indices": 98628,
+   "vertices": 66256,
+   "indices": 99384,
    "aabb": [
     -1.9375,
     -0.05,
@@ -731,15 +731,15 @@
     1.45,
     2
    ],
-   "position": 62093368,
-   "normal": 62882392,
-   "color": 63671416,
-   "extra": 63934424,
-   "index": 64197432
+   "position": 64126520,
+   "normal": 64921592,
+   "color": 65716664,
+   "extra": 65981688,
+   "index": 66246712
   },
   "market/s6": {
-   "vertices": 78176,
-   "indices": 117264,
+   "vertices": 78688,
+   "indices": 118032,
    "aabb": [
     -1.9375,
     -0.05,
@@ -748,11 +748,11 @@
     1.95,
     2
    ],
-   "position": 64591944,
-   "normal": 65530056,
-   "color": 66468168,
-   "extra": 66780872,
-   "index": 67093576
+   "position": 66644248,
+   "normal": 67588504,
+   "color": 68532760,
+   "extra": 68847512,
+   "index": 69162264
   },
   "obelisk/s0": {
    "vertices": 9400,
@@ -765,11 +765,11 @@
     0.2583,
     0.5833
    ],
-   "position": 67562632,
-   "normal": 67675432,
-   "color": 67788232,
-   "extra": 67825832,
-   "index": 67863432
+   "position": 69634392,
+   "normal": 69747192,
+   "color": 69859992,
+   "extra": 69897592,
+   "index": 69935192
   },
   "obelisk/s2": {
    "vertices": 28992,
@@ -782,11 +782,11 @@
     1.8,
     0.7083
    ],
-   "position": 67919832,
-   "normal": 68267736,
-   "color": 68615640,
-   "extra": 68731608,
-   "index": 68847576
+   "position": 69991592,
+   "normal": 70339496,
+   "color": 70687400,
+   "extra": 70803368,
+   "index": 70919336
   },
   "obelisk/s4": {
    "vertices": 43328,
@@ -799,11 +799,11 @@
     3.2167,
     0.7083
    ],
-   "position": 69021528,
-   "normal": 69541464,
-   "color": 70061400,
-   "extra": 70234712,
-   "index": 70408024
+   "position": 71093288,
+   "normal": 71613224,
+   "color": 72133160,
+   "extra": 72306472,
+   "index": 72479784
   },
   "obelisk/s6": {
    "vertices": 55656,
@@ -816,11 +816,11 @@
     4.5083,
     0.7083
    ],
-   "position": 70667992,
-   "normal": 71335864,
-   "color": 72003736,
-   "extra": 72226360,
-   "index": 72448984
+   "position": 72739752,
+   "normal": 73407624,
+   "color": 74075496,
+   "extra": 74298120,
+   "index": 74520744
   },
   "monument_villagers/s0": {
    "vertices": 7736,
@@ -833,11 +833,11 @@
     0.3875,
     0.875
    ],
-   "position": 72782920,
-   "normal": 72875752,
-   "color": 72968584,
-   "extra": 72999528,
-   "index": 73030472
+   "position": 74854680,
+   "normal": 74947512,
+   "color": 75040344,
+   "extra": 75071288,
+   "index": 75102232
   },
   "monument_villagers/s2": {
    "vertices": 19752,
@@ -850,11 +850,11 @@
     1.2625,
     0.9375
    ],
-   "position": 73076888,
-   "normal": 73313912,
-   "color": 73550936,
-   "extra": 73629944,
-   "index": 73708952
+   "position": 75148648,
+   "normal": 75385672,
+   "color": 75622696,
+   "extra": 75701704,
+   "index": 75780712
   },
   "monument_villagers/s4": {
    "vertices": 31720,
@@ -867,11 +867,11 @@
     2.075,
     0.9375
    ],
-   "position": 73827464,
-   "normal": 74208104,
-   "color": 74588744,
-   "extra": 74715624,
-   "index": 74842504
+   "position": 75899224,
+   "normal": 76279864,
+   "color": 76660504,
+   "extra": 76787384,
+   "index": 76914264
   },
   "monument_villagers/s6": {
    "vertices": 40456,
@@ -884,11 +884,11 @@
     2.825,
     0.9375
    ],
-   "position": 75032824,
-   "normal": 75518296,
-   "color": 76003768,
-   "extra": 76165592,
-   "index": 76327416
+   "position": 77104584,
+   "normal": 77590056,
+   "color": 78075528,
+   "extra": 78237352,
+   "index": 78399176
   },
   "monument_soldiers/s0": {
    "vertices": 7664,
@@ -901,11 +901,11 @@
     0.3875,
     0.8125
    ],
-   "position": 76570152,
-   "normal": 76662120,
-   "color": 76754088,
-   "extra": 76784744,
-   "index": 76815400
+   "position": 78641912,
+   "normal": 78733880,
+   "color": 78825848,
+   "extra": 78856504,
+   "index": 78887160
   },
   "monument_soldiers/s2": {
    "vertices": 25608,
@@ -918,11 +918,11 @@
     1.825,
     0.9375
    ],
-   "position": 76861384,
-   "normal": 77168680,
-   "color": 77475976,
-   "extra": 77578408,
-   "index": 77680840
+   "position": 78933144,
+   "normal": 79240440,
+   "color": 79547736,
+   "extra": 79650168,
+   "index": 79752600
   },
   "monument_soldiers/s4": {
    "vertices": 40696,
@@ -935,11 +935,11 @@
     3.1375,
     0.9375
    ],
-   "position": 77834488,
-   "normal": 78322840,
-   "color": 78811192,
-   "extra": 78973976,
-   "index": 79136760
+   "position": 79906248,
+   "normal": 80394600,
+   "color": 80882952,
+   "extra": 81045736,
+   "index": 81208520
   },
   "monument_soldiers/s6": {
    "vertices": 53632,
@@ -952,11 +952,11 @@
     4.3875,
     0.9375
    ],
-   "position": 79380936,
-   "normal": 80024520,
-   "color": 80668104,
-   "extra": 80882632,
-   "index": 81097160
+   "position": 81452696,
+   "normal": 82096280,
+   "color": 82739864,
+   "extra": 82954392,
+   "index": 83168920
   },
   "monument_priests/s0": {
    "vertices": 7664,
@@ -969,11 +969,11 @@
     0.3875,
     0.8125
    ],
-   "position": 81418952,
-   "normal": 81510920,
-   "color": 81602888,
-   "extra": 81633544,
-   "index": 81664200
+   "position": 83490712,
+   "normal": 83582680,
+   "color": 83674648,
+   "extra": 83705304,
+   "index": 83735960
   },
   "monument_priests/s2": {
    "vertices": 24000,
@@ -986,11 +986,11 @@
     1.575,
     0.9375
    ],
-   "position": 81710184,
-   "normal": 81998184,
-   "color": 82286184,
-   "extra": 82382184,
-   "index": 82478184
+   "position": 83781944,
+   "normal": 84069944,
+   "color": 84357944,
+   "extra": 84453944,
+   "index": 84549944
   },
   "monument_priests/s4": {
    "vertices": 32328,
@@ -1003,11 +1003,11 @@
     2.575,
     0.9375
    ],
-   "position": 82622184,
-   "normal": 83010120,
-   "color": 83398056,
-   "extra": 83527368,
-   "index": 83656680
+   "position": 84693944,
+   "normal": 85081880,
+   "color": 85469816,
+   "extra": 85599128,
+   "index": 85728440
   },
   "monument_priests/s6": {
    "vertices": 43952,
@@ -1020,11 +1020,11 @@
     3.575,
     0.9375
    ],
-   "position": 83850648,
-   "normal": 84378072,
-   "color": 84905496,
-   "extra": 85081304,
-   "index": 85257112
+   "position": 85922408,
+   "normal": 86449832,
+   "color": 86977256,
+   "extra": 87153064,
+   "index": 87328872
   },
   "monument_pharaohs/s0": {
    "vertices": 19248,
@@ -1037,11 +1037,11 @@
     0.3875,
     1.3125
    ],
-   "position": 85520824,
-   "normal": 85751800,
-   "color": 85982776,
-   "extra": 86059768,
-   "index": 86136760
+   "position": 87592584,
+   "normal": 87823560,
+   "color": 88054536,
+   "extra": 88131528,
+   "index": 88208520
   },
   "monument_pharaohs/s2": {
    "vertices": 46720,
@@ -1054,11 +1054,11 @@
     1.575,
     1.4375
    ],
-   "position": 86252248,
-   "normal": 86812888,
-   "color": 87373528,
-   "extra": 87560408,
-   "index": 87747288
+   "position": 88324008,
+   "normal": 88884648,
+   "color": 89445288,
+   "extra": 89632168,
+   "index": 89819048
   },
   "monument_pharaohs/s4": {
    "vertices": 61944,
@@ -1071,11 +1071,11 @@
     2.6375,
     1.4375
    ],
-   "position": 88027608,
-   "normal": 88770936,
-   "color": 89514264,
-   "extra": 89762040,
-   "index": 90009816
+   "position": 90099368,
+   "normal": 90842696,
+   "color": 91586024,
+   "extra": 91833800,
+   "index": 92081576
   },
   "monument_pharaohs/s6": {
    "vertices": 80904,
@@ -1088,11 +1088,11 @@
     3.6375,
     1.4375
    ],
-   "position": 90381480,
-   "normal": 91352328,
-   "color": 92323176,
-   "extra": 92646792,
-   "index": 92970408
+   "position": 92453240,
+   "normal": 93424088,
+   "color": 94394936,
+   "extra": 94718552,
+   "index": 95042168
   },
   "monument_gods/s0": {
    "vertices": 27728,
@@ -1105,11 +1105,11 @@
     0.3875,
     2
    ],
-   "position": 93455832,
-   "normal": 93788568,
-   "color": 94121304,
-   "extra": 94232216,
-   "index": 94343128
+   "position": 95527592,
+   "normal": 95860328,
+   "color": 96193064,
+   "extra": 96303976,
+   "index": 96414888
   },
   "monument_gods/s2": {
    "vertices": 41688,
@@ -1122,11 +1122,11 @@
     0.825,
     2
    ],
-   "position": 94509496,
-   "normal": 95009752,
-   "color": 95510008,
-   "extra": 95676760,
-   "index": 95843512
+   "position": 96581256,
+   "normal": 97081512,
+   "color": 97581768,
+   "extra": 97748520,
+   "index": 97915272
   },
   "monument_gods/s4": {
    "vertices": 52848,
@@ -1139,11 +1139,11 @@
     1.2,
     2
    ],
-   "position": 96093640,
-   "normal": 96727816,
-   "color": 97361992,
-   "extra": 97573384,
-   "index": 97784776
+   "position": 98165400,
+   "normal": 98799576,
+   "color": 99433752,
+   "extra": 99645144,
+   "index": 99856536
   },
   "monument_gods/s6": {
    "vertices": 67976,
@@ -1156,11 +1156,11 @@
     1.6375,
     2
    ],
-   "position": 98101864,
-   "normal": 98917576,
-   "color": 99733288,
-   "extra": 100005192,
-   "index": 100277096
+   "position": 100173624,
+   "normal": 100989336,
+   "color": 101805048,
+   "extra": 102076952,
+   "index": 102348856
   },
   "lighthouse/s0": {
    "vertices": 21368,
@@ -1173,15 +1173,15 @@
     0.3875,
     1.5
    ],
-   "position": 100684952,
-   "normal": 100941368,
-   "color": 101197784,
-   "extra": 101283256,
-   "index": 101368728
+   "position": 102756712,
+   "normal": 103013128,
+   "color": 103269544,
+   "extra": 103355016,
+   "index": 103440488
   },
   "lighthouse/s2": {
-   "vertices": 57800,
-   "indices": 86700,
+   "vertices": 57816,
+   "indices": 86724,
    "aabb": [
     -1.5,
     -0.05,
@@ -1190,15 +1190,15 @@
     2.6375,
     1.5
    ],
-   "position": 101496936,
-   "normal": 102190536,
-   "color": 102884136,
-   "extra": 103115336,
-   "index": 103346536
+   "position": 103568696,
+   "normal": 104262488,
+   "color": 104956280,
+   "extra": 105187544,
+   "index": 105418808
   },
   "lighthouse/s4": {
-   "vertices": 89816,
-   "indices": 134724,
+   "vertices": 89912,
+   "indices": 134868,
    "aabb": [
     -1.5,
     -0.05,
@@ -1207,15 +1207,15 @@
     4.6375,
     1.5
    ],
-   "position": 103693336,
-   "normal": 104771128,
-   "color": 105848920,
-   "extra": 106208184,
-   "index": 106567448
+   "position": 105765704,
+   "normal": 106844648,
+   "color": 107923592,
+   "extra": 108283240,
+   "index": 108642888
   },
   "lighthouse/s6": {
-   "vertices": 116312,
-   "indices": 174468,
+   "vertices": 116408,
+   "indices": 174612,
    "aabb": [
     -1.5,
     -0.05,
@@ -1224,11 +1224,11 @@
     6.575,
     1.5
    ],
-   "position": 107106344,
-   "normal": 108502088,
-   "color": 109897832,
-   "extra": 110363080,
-   "index": 110828328
+   "position": 109182360,
+   "normal": 110579256,
+   "color": 111976152,
+   "extra": 112441784,
+   "index": 112907416
   },
   "sentry_tower/s0": {
    "vertices": 2584,
@@ -1241,11 +1241,11 @@
     0.775,
     0.75
    ],
-   "position": 111526200,
-   "normal": 111557208,
-   "color": 111588216,
-   "extra": 111598552,
-   "index": 111608888
+   "position": 113605864,
+   "normal": 113636872,
+   "color": 113667880,
+   "extra": 113678216,
+   "index": 113688552
   },
   "sentry_tower/s2": {
    "vertices": 4784,
@@ -1258,15 +1258,15 @@
     1.775,
     0.75
    ],
-   "position": 111624392,
-   "normal": 111681800,
-   "color": 111739208,
-   "extra": 111758344,
-   "index": 111777480
+   "position": 113704056,
+   "normal": 113761464,
+   "color": 113818872,
+   "extra": 113838008,
+   "index": 113857144
   },
   "sentry_tower/s4": {
-   "vertices": 7576,
-   "indices": 11364,
+   "vertices": 7592,
+   "indices": 11388,
    "aabb": [
     -0.75,
     -0.1,
@@ -1275,15 +1275,15 @@
     2.9,
     0.75
    ],
-   "position": 111806184,
-   "normal": 111897096,
-   "color": 111988008,
-   "extra": 112018312,
-   "index": 112048616
+   "position": 113885848,
+   "normal": 113976952,
+   "color": 114068056,
+   "extra": 114098424,
+   "index": 114128792
   },
   "sentry_tower/s6": {
-   "vertices": 10528,
-   "indices": 15792,
+   "vertices": 10560,
+   "indices": 15840,
    "aabb": [
     -0.75,
     -0.1,
@@ -1292,11 +1292,11 @@
     3.775,
     0.75
    ],
-   "position": 112094072,
-   "normal": 112220408,
-   "color": 112346744,
-   "extra": 112388856,
-   "index": 112430968
+   "position": 114174344,
+   "normal": 114301064,
+   "color": 114427784,
+   "extra": 114470024,
+   "index": 114512264
   },
   "wonder/s0": {
    "vertices": 32640,
@@ -1309,15 +1309,15 @@
     0.775,
     4
    ],
-   "position": 112494136,
-   "normal": 112885816,
-   "color": 113277496,
-   "extra": 113408056,
-   "index": 113538616
+   "position": 114575624,
+   "normal": 114967304,
+   "color": 115358984,
+   "extra": 115489544,
+   "index": 115620104
   },
   "wonder/s2": {
-   "vertices": 43736,
-   "indices": 65604,
+   "vertices": 43888,
+   "indices": 65832,
    "aabb": [
     -3.875,
     -0.1,
@@ -1326,15 +1326,15 @@
     1.65,
     4
    ],
-   "position": 113734456,
-   "normal": 114259288,
-   "color": 114784120,
-   "extra": 114959064,
-   "index": 115134008
+   "position": 115815944,
+   "normal": 116342600,
+   "color": 116869256,
+   "extra": 117044808,
+   "index": 117220360
   },
   "wonder/s4": {
-   "vertices": 60104,
-   "indices": 90156,
+   "vertices": 60312,
+   "indices": 90468,
    "aabb": [
     -3.875,
     -0.1,
@@ -1343,15 +1343,15 @@
     2.65,
     4.125
    ],
-   "position": 115396424,
-   "normal": 116117672,
-   "color": 116838920,
-   "extra": 117079336,
-   "index": 117319752
+   "position": 117483688,
+   "normal": 118207432,
+   "color": 118931176,
+   "extra": 119172424,
+   "index": 119413672
   },
   "wonder/s6": {
-   "vertices": 72120,
-   "indices": 108180,
+   "vertices": 72408,
+   "indices": 108612,
    "aabb": [
     -3.875,
     -0.1,
@@ -1360,11 +1360,11 @@
     3.4,
     4.125
    ],
-   "position": 117680376,
-   "normal": 118545816,
-   "color": 119411256,
-   "extra": 119699736,
-   "index": 119988216
+   "position": 119775544,
+   "normal": 120644440,
+   "color": 121513336,
+   "extra": 121802968,
+   "index": 122092600
   }
  }
 }

@@ -87,6 +87,7 @@ function ashlar(tones, { course = 4, len = 7, head = 0.9, bed = 0.86, spread = 0
     return c;
   };
   fn.ash = true;
+  fn.course = course; fn.len = len;
   return fn;
 }
 function masonry(tonesA, tonesB, { len = 8, course = 4, bed = 0.84, head = 0.9, grime = 4, seed = 3 } = {}) {
@@ -1735,7 +1736,7 @@ function skin(m) {
     // edge, a 270-degree roll round the hip line from the base course to the
     // horizontal roll under the cavetto, so every corner is one straight bead
     if (B.roll) {
-      const sl = (y) => (y - y0) / b, r = 0.55, NS = 6;
+      const sl = (y) => (y - y0) / b, r = 0.4, NS = 6;
       _k.setHex(B.roll === true ? ROLL_L : B.roll);
       const c = [_k.r, _k.g, _k.b];
       for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
@@ -2210,8 +2211,11 @@ const HROOF_C = (x, y, z) => { const c = pick(hash3(x >> 2, y, z >> 2, 87), [0xb
 // two or three close tones by course (A B A C, `course` rows each), no
 // per-voxel speckle; the head joints a faint shade every `len` voxels in a
 // running bond, so a wall reads as horizontal courses, never a checker
-function brick(tones, { course = 2, len = 6, head = 0.95 } = {}) {
-  return ashlar(tones, { course, len, head, bed: 1, hi: 1, spread: 0.02, seed: 61 });
+function brick(tones, { course = 2, len = 6, head = 0.95, bed = 0.88 } = {}) {
+  // round 47: a darker bed joint under every course (the walls read as laid
+  // block, not plastic); a course is three rows (two-row courses with a dark
+  // bed under each read as stripes)
+  return ashlar(tones, { course: course === 2 ? 3 : course, len, head, bed, hi: 1, spread: 0.025, seed: 61 });
 }
 // a whitewashed limestone house wall (light, faintly cool so the grade's
 // sandstone pass leaves it cream, not tan)
@@ -2258,6 +2262,45 @@ function recourse(m) {
     if (!ez && !ex) continue;
     const c = ez ? e.fn(x, y, 0) : e.fn(0, y, z);
     v.c = e.f === 1 ? c : shade(c, e.f);
+  }
+}
+// Round 47: wear on the dressed faces. A few whole blocks of every ashlar
+// face are set back a voxel (the outer voxel cut away, the one behind it
+// darkened: a recessed / robbed block, drawn by skin() as a clean sunk cell
+// on a battered face), a few more lose a corner voxel (a chipped arris).
+// Chosen per block (course x block in the face's own coordinates), so a
+// recess is always one whole block between its joints; only where the wall
+// is at least three voxels deep, never at a corner, a foot or a painted row.
+function chip(m, { rate = 0.035, nick = 0.05 } = {}) {
+  const cut = [], dark = [];
+  for (const [x, y, z] of m.coords) {
+    if (y < 3) continue;
+    const v = m.get(x, y, z);
+    if (!v || v.team || v.glow || v.clean) continue;
+    const e = ASH.get(v.c);
+    if (!e || !e.fn.course || e.fn.course < 3) continue;
+    const open = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => !m.has(x + dx, y, z + dz));
+    if (open.length !== 1) continue;
+    const [dx, dz] = open[0];
+    if (!m.has(x - dx, y, z - dz) || !m.has(x - 2 * dx, y, z - 2 * dz)) continue;
+    if (!m.has(x, y + 1, z) || !m.has(x, y - 1, z)) continue;
+    const { course, len } = e.fn;
+    const yy = y - 1, row = Math.floor(yy / course), k = yy % course;
+    if (k === 0) continue;                                    // the bed joint stays
+    const u = (dz ? x : z) + (row & 1) * (len >> 1) + 512;
+    const blk = Math.floor(u / len), ui = u % len;
+    if (ui === 0) continue;                                   // the head joint stays
+    const face = dx * 3 + dz + 7;
+    const h = hash3(blk, row, face * 131 + (dz ? z : x), 4711);
+    if (h < rate) cut.push([x, y, z, dx, dz, e]);
+    else if (h < rate + nick && k === course - 1 && ui === 1) dark.push([x, y, z, dx, dz, e]);
+  }
+  for (const [x, y, z, dx, dz, e] of [...cut, ...dark]) {
+    const b = m.get(x - dx, y, z - dz);
+    if (!b) continue;
+    m.remove(x, y, z);
+    b.c = shade(e.fn(dz ? x : 0, y, dz ? 0 : z), 0.7);
+    b.clean = 1;
   }
 }
 // a house block on [x0, x1) x [z0, z1) from y0, h wall rows, battered a
@@ -2443,8 +2486,8 @@ function house(v, age) {
     // the weaver's courtyard house (whitewash): a two-storey block at the
     // back, a low wing beside it, a walled court in front entered through a
     // painted gate, the upright loom in the court
-    hbox(m, 3, 3, 14, 12, 1, 12, { ...W, batter: 5 });
-    hbox(m, 14, 5, 21, 12, 1, 6, W);
+    hbox(m, 3, 3, 14, 12, 1, 12, { ...W, batter: 4 });
+    hbox(m, 14, 5, 21, 12, 1, 6, { ...W, batter: 4 });
     dr(W, '+z', 7, 3, 6);
     hw(W, '+z', 7, 9); hw(W, '-x', 6, 8); hw(W, '-z', 6, 8); hw(W, '+z', 16, 4, 2);
     for (let x = 4; x < 21; x++) for (let z = 13; z < 21; z++) m.set(x, 0, z, PAVE);
@@ -2476,7 +2519,7 @@ function house(v, age) {
     // outside stair and shaded by a frond mat on poles; the threshing floor
     // in front, one heap of grain
     hbox(m, 3, 3, 11, 11, 1, 17, { ...M, batter: 6 });
-    hbox(m, 11, 5, 20, 13, 1, 7, M); const U = m.lastTop;
+    hbox(m, 11, 5, 20, 13, 1, 7, { ...M, batter: 4 }); const U = m.lastTop;
     dr(M, '+z', 5, 3, 6);
     hw(M, '+z', 5, 10, 2); hw(M, '+z', 5, 14, 2); hw(M, '-x', 5, 11, 2); hw(M, '-z', 6, 12, 2);
     outStair(m, 21, 14, 2, 8, -1, HT_MUD, MUDCAP);
@@ -2486,7 +2529,7 @@ function house(v, age) {
     // the baker's house (whitewash): a wide block with a roof room at the
     // back of its terrace, a blue and white striped cloth over the shop
     // front on three poles, the bread oven at the corner
-    const t = hbox(m, 5, 3, 21, 13, 1, 10, W); const T = m.lastTop;
+    const t = hbox(m, 5, 3, 21, 13, 1, 10, { ...W, batter: 5 }); const T = m.lastTop;
     hbox(m, T.c0 + 2, T.d0 + 2, T.c0 + 9, T.d0 + 7, t, 5, { ...W, grime: false });
     dr(W, '+z', 11, 3, 5);
     hw(W, '-x', 6, 6); hw(W, '+x', 7, 6); hw(W, '-z', 9, 6);
@@ -2497,7 +2540,7 @@ function house(v, age) {
   } else if (v === 4) {
     // the jar merchant (ochre): a long low house, the one wind-catcher of
     // the set at its end, a frond awning on palm posts over a row of jars
-    const t = hbox(m, 2, 6, 22, 14, 1, 7, O); const T = m.lastTop;
+    const t = hbox(m, 2, 6, 22, 14, 1, 7, { ...O, batter: 4 }); const T = m.lastTop;
     windCatcher(m, T.c1 - 7, T.d0 + 2, t, 4, 3, 7, O.wall);
     dr(O, '+z', 5, 3, 4);
     hw(O, '-x', 8, 4); hw(O, '+x', 8, 4); hw(O, '-z', 6, 4); hw(O, '-z', 14, 4);
@@ -2507,7 +2550,7 @@ function house(v, age) {
     // the terrace house: a wide mud-brick ground floor, a whitewashed upper
     // room set back on its left half, the rest an open terrace reached by
     // an outside stair along the front; a mud grain bin by the door
-    hbox(m, 3, 4, 21, 15, 1, 7, M); const U = m.lastTop;
+    hbox(m, 3, 4, 21, 15, 1, 7, { ...M, batter: 4 }); const U = m.lastTop;
     hbox(m, U.c0 + 2, U.d0 + 2, U.c0 + 10, U.d1 - 3, U.y, 7, { ...W, grime: false });
     dr(M, '+z', 6, 3, 5);
     hw(W, '+z', U.c0 + 4, U.y + 3, 2); hw(M, '-x', 7, 4); hw(M, '-z', 6, 4);
@@ -2977,8 +3020,10 @@ function townCenter() {
     slit(s, '+z', 14, 4, 3, 1); slit(s, '+z', 41, 4, 3, 1); slit(s, '-x', 14, 5, 3, 1); slit(s, '+x', 14, 5, 3, 1);
     // the portico before the palace front (z 24 .. 30): six columns, a
     // painted architrave and a reed-mat roof under a pale lip
-    const X0 = 11, X1 = 45, Z0 = 24, Z1 = 30, H = 9;
-    for (const x of [12, 17, 22, 32, 37, 42]) tcColumn(s, x, Z1 - 3, 1, H);
+    // (round 47: a taller portico of lotus columns, 3 x 3 shafts painted at
+    // the foot and neck under open green and lapis bells, as the market's)
+    const X0 = 10, X1 = 46, Z0 = 24, Z1 = 31, H = 13;
+    for (const x of [13, 18, 23, 33, 38, 43]) lotusColumn(s, x, Z1 - 3, 1, H);
     const R = bandRows('lapis');
     for (let x = X0; x < X1; x++) for (let z = Z0; z < Z1; z++) {
       const e = Math.min(x - X0, X1 - 1 - x, z - Z0 + 3, Z1 - 1 - z);
@@ -2987,6 +3032,16 @@ function townCenter() {
       if (e <= 1) s.set(x, H + 1, z, LIP(x, H + 1, z));
     }
     roofField(s, X0, Z0 - 3, X1, Z1, H, { field: TC_MAT });
+  });
+  // round 47: a free colonnade down the court's west side, five lotus
+  // columns carrying an architrave painted in lapis and red with a pale lip
+  inner(m, (s) => {
+    const CX = 11, Zs = [32, 36, 40, 44], TOP = 13;
+    for (const z of Zs) lotusColumn(s, CX, z, 1, TOP);
+    for (let z = Zs[0] - 2; z <= Zs[Zs.length - 1] + 2; z++) for (let i = -1; i <= 1; i++) {
+      s.set(CX + i, TOP, z, SAND_D(CX + i, TOP, z));
+      s.set(CX + i, TOP + 1, z, i === 0 ? LIP(CX + i, TOP + 1, z) : (((z >> 1) & 1) ? LAPIS : RED_M));
+    }
   });
   // the granary: a big domed silo at the front right with a ladder
   // (silo(), ladder() lay mesh polygons on m itself, so not through inner())
@@ -3090,27 +3145,58 @@ function temple(god) {
   }
   // screen walls between the outer columns on the hall's sides, half height
   for (const x of [5, 6, 33, 34]) for (let z = 16; z < 27; z++) for (let y = Y; y < Y + 6; y++) if (!m.has(x, y, z)) m.set(x, y, z, y === Y + 5 ? LIME(x, y, z) : y === Y + 4 ? RED_M : SAND_D(x, y, z));
-  // ---- the court (z 27 .. 37): grey flags inside low enclosure walls
-  for (const [x0, x1] of [[4, 6], [34, 36]]) for (let x = x0; x < x1; x++) for (let z = 27; z < 37; z++) for (let y = Y; y < Y + 7; y++) {
-    m.set(x, y, z, y === Y + 6 ? LIME(x, y, z) : y === Y + 5 ? LAPIS : SAND(x, y, z));
+  // ---- round 47: the PYLON (z 30 .. 44), the temple's face: two tall
+  // trapezoidal towers battered a voxel in every four rows on all sides
+  // (smoothed by skin(), a torus roll up every edge), each under a curved
+  // cavetto flaring three voxels out over the owner's band; a painted
+  // register of hieroglyphs between ink rules wrapped round each tower's
+  // foot and a second one high on its flanks and back, the god in a sunk
+  // relief on each front; four tall flagpoles with long team streamers
+  // standing before the towers; the gate block between them set back two
+  // voxels, its own cornice, a two-step recessed doorway (a rebate, then the
+  // deep door) under a gilt winged sun. The court in front of the hall is
+  // gone: the pylon stands straight before the columned hall.
+  const PZ0 = 30, PZ1 = 44, PH = 22;
+  let PRT = 0;
+  for (const [x0, x1] of [[0, 17], [23, 40]]) {
+    PRT = pylon(m, x0, PZ0, x1, PZ1, PH, { wall: LIME, b: 4, band: 'team', gorge: [0x34588a, 0x3f6596, 0x2f6f5a, 0x3f6596], lipOut: 3, roofC: LIME_S, y0: Y });
+    glyphRegister(m, x0, PZ0, x1, PZ1, Y + 1, ['+z', '-z', '+x', '-x'], x0);
+    glyphRegister(m, x0, PZ0, x1, PZ1, Y + 13, x0 ? ['+x', '-z'] : ['-x', '-z'], x0 + 3);
   }
-  // ---- the pylon (z 37 .. 44): two battered limestone towers, a gate block
-  for (const [x0, x1] of [[3, 17], [23, 37]]) {
-    block(m, x0, 37, x1, 44, Y, 20, { wall: LIME, batter: 7, band: 'team', frieze: 0, roofC: LIME_S, rimC: LIME, lipOut: 2, plinth: false, gorge: [0x34588a, 0x3f6596], torus: true });
-    flatTop(LIME);
-    bands(m, x0, 37, x1, 44, Y + 3, [INK, RED_B, OCHRE_B, TURQ, INK]);
+  // the gate block, set back two voxels from the towers' feet, filling only
+  // where the towers' battered flanks leave room
+  for (let x = 14; x < 26; x++) for (let z = PZ0 + 3; z < PZ1 - 2; z++) for (let y = Y; y < Y + 16; y++) {
+    if (m.has(x, y, z)) continue;
+    m.set(x, y, z, y === Y + 15 ? LIP(x, y, z) : y === Y + 14 ? (((x + z) & 1) ? GORGE : GORGE_L) : y === Y + 13 ? LAPIS : y === Y + 12 ? GILT : y === Y ? SAND_D(x, y, z) : LIME(x, y, z));
   }
-  for (let x = 16; x < 24; x++) for (let z = 38; z < 43; z++) for (let y = Y; y < Y + 15; y++) {
-    m.set(x, y, z, y === Y + 14 ? LIP(x, y, z) : y === Y + 13 ? (((x + z) & 1) ? GORGE : GORGE_L) : y === Y + 12 ? LAPIS : y === Y + 11 ? GILT : LIME(x, y, z));
+  for (let x = 13; x < 27; x++) for (let z = PZ0 + 2; z < PZ1 - 1; z++) {
+    const e = Math.min(x - 13, 26 - x, z - PZ0 - 2, PZ1 - 2 - z);
+    if (e === 0 && !m.has(x, Y + 15, z)) m.set(x, Y + 15, z, LIP(x, Y + 15, z));
   }
-  door(m, '+z', AX - 2, 4, Y, 9, { deep: 5, frame: GILT_D, lintel: false, leaf: false });
-  paint(m, '+z', AX - 4, Y + 10, ['GG.GG.GG', '.GGRRGG.'], { G: GILT, R: RED });
-  // the reliefs on the towers' fronts: the god in a sunk panel on each,
-  // a row of cartouches over it
-  recessPanel(m, '+z', 7, Y + 17, PANEL_GOD, RELIEF);
-  recessPanel(m, '+z', 27, Y + 17, PANEL_GOD, RELIEF);
-  // the owner's pennants on masts in the towers' faces (flanking the gate)
-  banner(m, 14, Y, 44, 26, '+z'); banner(m, 25, Y, 44, 26, '+z');
+  // the rebate: the doorway's outer frame cut a voxel into the gate's face
+  for (let x = AX - 4; x < AX + 4; x++) for (let y = Y; y < Y + 12; y++) {
+    m.remove(x, y, PZ1 - 3);
+    m.set(x, y, PZ1 - 4, y === Y ? SAND_D(x, y, PZ1 - 4) : (x === AX - 4 || x === AX + 3) ? shade(LIME(x, y, PZ1 - 4), 0.72) : shade(LIME(x, y, PZ1 - 4), 0.84));
+  }
+  door(m, '+z', AX - 2, 4, Y, 9, { deep: 5, frame: GILT_D, lintel: false, leaf: true, leafShade: 0.5 });
+  paint(m, '+z', AX - 4, Y + 11, ['GG.GG.GG', '.GGRRGG.'], { G: GILT, R: RED });
+  // the god in a sunk relief on each tower's front, over the foot register
+  const PG = PANEL_GOD.slice(1, 12);
+  recessPanel(m, '+z', 5, Y + 17, PG, RELIEF);
+  recessPanel(m, '+z', 29, Y + 17, PG, RELIEF);
+  // the flagpoles: a cedar mast on each tower's roof at its inner front
+  // corner, a gilt tip and a long team streamer flying outward, so the
+  // towers' faces stay clear (masts standing before the faces read as
+  // scaffolding against the batter)
+  {
+    const K = Math.floor((PH - 1) / 4), RT = PRT - 1;
+    for (const [x, dir] of [[17 - K - 2, -1], [23 + K + 1, 1]]) {
+      const z = PZ1 - K - 2, top = RT + 12;
+      for (let y = RT; y <= top; y++) pset(m, x, y, z, POLE(x, y, z));
+      pset(m, x, top + 1, z, GILT);
+      for (let k = 1; k <= 8; k++) for (let r = 0; r < (k < 6 ? 2 : 1); r++) m.set(x + dir * k, top - 1 - r - (k >> 2), z, k === 8 ? GILT : TEAMB);
+    }
+  }
   // ---- the god's statue at the sanctuary door on the axis, facing the gate
   // down the open aisle of the hall
   const G = {
@@ -3156,7 +3242,7 @@ function temple(god) {
     m.box(cx, T, cz, 2, 1, 2, OB_GOLD); m.set(cx, T + 1, cz, OB_GOLD_L); m.set(cx + 1, T + 1, cz + 1, OB_GOLD);
     (m.keep ??= []).push([cx - 1, T - 1, cz - 1, cx + 3, T + 3, cz + 3]);
   };
-  tob(9, 46, 22); tob(30, 46, 22);
+  tob(5, 46, 20); tob(34, 46, 20);
   return m;
 }
 
@@ -3368,11 +3454,11 @@ function migdol() {
 // pale lip with the team line inside a one-voxel parapet over a recessed
 // roof deck. The voxel gorge rows block() lays are cut away (the skin draws
 // the curve over the wall's top). Returns the deck's y + 1.
-function pylon(m, x0, z0, x1, z1, h, { wall = SAND, b = 9, band = 'team', gorge = [GORGE, GORGE_L], lipOut = 2, roofC = PLASTER, frieze = 0 } = {}) {
-  block(m, x0, z0, x1, z1, 1, h, { wall, batter: b, band, lipOut, flare: true, gorge, torus: true, rimC: LIME, roofC, frieze, style: 'cornice' });
+function pylon(m, x0, z0, x1, z1, h, { wall = SAND, b = 9, band = 'team', gorge = [GORGE, GORGE_L], lipOut = 2, roofC = PLASTER, frieze = 0, y0 = 1 } = {}) {
+  block(m, x0, z0, x1, z1, y0, h, { wall, batter: b, band, lipOut, flare: true, gorge, torus: true, rimC: LIME, roofC, frieze, style: 'cornice' });
   const B = m.blocks[m.blocks.length - 1];
   B.cav = { lipOut, gorge }; B.roll = true;
-  const top = 1 + h, K = Math.floor((h - 1) / b);
+  const top = y0 + h, K = Math.floor((h - 1) / b);
   const a0 = x0 + K, a1 = x1 - K, b0 = z0 + K, b1 = z1 - K;
   for (let y = top; y <= top + 1; y++) for (let x = a0 - lipOut; x < a1 + lipOut; x++) for (let z = b0 - lipOut; z < b1 + lipOut; z++) {
     if (x < a0 || x >= a1 || z < b0 || z >= b1) m.remove(x, y, z);
@@ -3387,6 +3473,45 @@ function pylon(m, x0, z0, x1, z1, h, { wall = SAND, b = 9, band = 'team', gorge 
     else if (e === 2) m.set(x, T.y, z, LIME_S);
   }
   return T.y + 2;
+}
+// Round 47: a painted register of hieroglyphs round a (battered) block on
+// [x0, x1) x [z0, z1): from y0 an ink rule, three rows of signs (3 wide, a
+// voxel apart, in ink, red, lapis and green on the stone), an ink rule;
+// painted on each listed face's outermost voxels (skin() carries the colours
+// onto the slope), only over dressed stone (never a door, panel or band)
+const GLYPHS = [
+  ['.R.', 'RRR', '.R.'],    // sun
+  ['B.B', '.B.', 'B.B'],    // water
+  ['.G.', '.G.', 'GG.'],    // reed
+  ['.B.', 'BBB', '.B.'],    // ankh
+  ['KK.', '.KK', '.K.'],    // falcon
+  ['KKK', 'K.K', '.R.'],    // eye
+  ['G.G', '.G.', '.G.'],    // papyrus
+  ['RRR', '...', 'KKK'],    // bread over the mat
+];
+const GLYPH_C = { R: 0x9a3626, B: 0x2c4f8c, G: 0x2a2420, K: 0x2a2420 };
+function glyphRegister(m, x0, z0, x1, z1, y0, faces, seed = 0) {
+  for (const f of faces) {
+    const alongX = f === '+z' || f === '-z';
+    const lo = alongX ? x0 : z0, hi = alongX ? x1 : z1;
+    for (let u = lo; u < hi; u++) for (let r = 0; r < 5; r++) {
+      const y = y0 + r;
+      const p = outer(m, f, u, y, lim(m));
+      if (!p) continue;
+      const v = m.get(p[0], p[1], p[2]);
+      if (!v || v.team || v.glow || !ASH.has(v.c)) continue;
+      // the sign cell along the face, counted from the face's start
+      const a = u - lo - 1;
+      let c = null;
+      if (r === 0 || r === 4) c = INK;
+      else if (a >= 0 && a % 5 < 3) {
+        const g = GLYPHS[(Math.floor(a / 5) * 5 + seed + (alongX ? 0 : 3)) % GLYPHS.length];
+        const ch = g[3 - r][(f === '+z' || f === '-x') ? a % 5 : 2 - (a % 5)];
+        if (ch !== '.') c = GLYPH_C[ch];
+      }
+      if (c !== null) pset(m, p[0], p[1], p[2], c);
+    }
+  }
 }
 // a relief panel sunk one voxel into a face: rows (top first) of palette
 // keys, '.' the panel's dressed ground, framed by a dark incised border; on a
@@ -6118,24 +6243,24 @@ const TYPES = {
   granary: { w: 3, h: 3, variants: ['0'], ages: [1], build: () => granary() },
   lumber_camp: { w: 3, h: 3, variants: ['0'], ages: [1], build: () => lumberCamp() },
   mining_camp: { w: 3, h: 3, variants: ['0'], ages: [1], build: () => miningCamp() },
-  farm: { w: 4, h: 4, variants: ['0'], ages: [1], build: () => farm(), stages: false, settle: false },
+  farm: { w: 4, h: 4, variants: ['0'], ages: [1], build: () => farm(), stages: false, settle: false, chip: false },
   temple: { w: 5, h: 6, variants: ['ra', 'isis', 'set'], ages: [1], build: (v) => temple(['ra', 'isis', 'set'][v]) },
   eg_barracks: { w: 5, h: 5, variants: ['0'], ages: [1], build: () => barracks() },
   migdol: { w: 7, h: 7, variants: ['0'], ages: [1], build: () => migdol() },
   siege_works: { w: 7, h: 7, variants: ['0'], ages: [1], build: () => siegeWorks() },
   armory: { w: 4, h: 4, variants: ['0'], ages: [1], build: () => armory(), fine: 2 },
   market: { w: 4, h: 4, variants: ['0'], ages: [1], build: () => market(), fine: 2 },
-  obelisk: { w: 1, h: 1, variants: ['0'], ages: [1], build: () => obelisk(), draw: 1.5, fine: 3 },
-  monument_villagers: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(1), fine: 2 },
-  monument_soldiers: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(2), fine: 2 },
-  monument_priests: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(3), fine: 2 },
-  monument_pharaohs: { w: 3, h: 3, variants: ['0'], ages: [1], build: () => monument(4), fine: 2 },
-  monument_gods: { w: 4, h: 4, variants: ['ra', 'isis', 'set'], ages: [1], build: (v) => monument(5, ['ra', 'isis', 'set'][v]), fine: 2 },
+  obelisk: { w: 1, h: 1, variants: ['0'], ages: [1], build: () => obelisk(), draw: 1.5, fine: 3, chip: false },
+  monument_villagers: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(1), fine: 2, chip: false },
+  monument_soldiers: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(2), fine: 2, chip: false },
+  monument_priests: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(3), fine: 2, chip: false },
+  monument_pharaohs: { w: 3, h: 3, variants: ['0'], ages: [1], build: () => monument(4), fine: 2, chip: false },
+  monument_gods: { w: 4, h: 4, variants: ['ra', 'isis', 'set'], ages: [1], build: (v) => monument(5, ['ra', 'isis', 'set'][v]), fine: 2, chip: false },
   lighthouse: { w: 3, h: 3, variants: ['0'], ages: [1], build: () => lighthouse(), fine: 2 },
   sentry_tower: { w: 1, h: 1, variants: ['0'], ages: [1], build: () => tower(), draw: 1.5 },
   wonder: { w: 8, h: 8, variants: ['0'], ages: [1], build: () => wonder() },
-  palm: { w: 1, h: 1, variants: ['0', '1', '2'], ages: [1], build: (v) => palmProp(v), stages: false, settle: false },
-  clutter: { w: 2, h: 2, variants: ['0', '1', '2', '3', '4', '5', '6', '7', '8'], ages: [1], build: (v) => clutter(v), stages: false },
+  palm: { w: 1, h: 1, variants: ['0', '1', '2'], ages: [1], build: (v) => palmProp(v), stages: false, settle: false, chip: false },
+  clutter: { w: 2, h: 2, variants: ['0', '1', '2', '3', '4', '5', '6', '7', '8'], ages: [1], build: (v) => clutter(v), stages: false, chip: false },
 };
 
 // --preview <type>[:variant] --preview-out <file.json>: dump one model's
@@ -6209,6 +6334,7 @@ for (const [type, T] of Object.entries(TYPES)) {
       const full = T.build(vi, age);
       if (T.settle !== false) settle(full);
       recourse(full);
+      if (T.chip !== false) chip(full);
       weather(full);
       skin(full);
       clothSkin(full);
