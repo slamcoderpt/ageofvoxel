@@ -1975,6 +1975,53 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   Framing: `egt_focus=wonder` (the town view),
   `egt_focus=wonder&egt_dist=5.5&egt_pitch=32&egt_lift=2.6&egt_yaw=-40&egt_dz=-0.6`
   (sun side close), `...&egt_yaw=70` (shadow side), `egt_dist=8&egt_pitch=40&egt_lift=2&egt_yaw=150` (from behind).
+- **A town, not one module; a temple on one axis, round 46** (building_01,
+  building_03/04, building_08; the town read as eight copies of one beige
+  box with a flat roof in a blue and red rim, every base ringed by the same
+  crates and sacks, and the temple and Town Center as piles of tiers, a
+  dome, colossi and roof frames). Houses (`house()`): six plans in three
+  wall tints that part by value and hue from each other and from the sand:
+  whitewash (`HT_WHITE`, lapis cornice, pale coping with the owner's line:
+  the weaver's courtyard house, the baker's under a blue and white striped
+  cloth on three poles), ochre (`HT_OCHRE`, a darker red ochre so the sun
+  does not wash it to cream, a green and red cornice, a red-ochre coping
+  `HT_OCAP` and a reed-mat deck, no pale rim: the potter's portico house,
+  the long low merchant's house with the set's one wind-catcher and a frond
+  awning on palm posts), mud brick (`HT_MUD`, a plain mud gorge and mud
+  coping, no paint: a three-storey battered tower house beside a store
+  whose terrace is reached by an outside stair and shaded by a frond mat on
+  poles, `roofShade()`; a terrace house with a whitewashed upper room set
+  back on its mud ground floor and an outside stair along the front). The
+  footprints run from 8 x 8 (the tower) through 20 x 8 (the merchant's) to
+  17 x 17 (the courtyard), the heights from 7 to 17 rows. Each house keeps
+  one group of its trade's goods (a loom, the kiln and two amphorae, a
+  grain heap, the oven and a basket, two jars, a grain bin); the general
+  scatter is gone, and `egypt_town`'s street clutter is cut from eight
+  pieces to three, each beside the building it serves (quarry blocks by
+  the obelisks, the well by the granary, the ore cart by the mining camp).
+  Age 1 keeps the same plans in mud brick under thatch, in two mud tones.
+  Temple (`temple()`, 5 x 6): one approach axis from the front: two
+  box-built obelisks (pink granite shaft stepping in two thirds up, painted
+  signs, gilt pyramidion kept gold through the grade by `m.keep`, the
+  owner's band on the die) either side of the stair; a pale limestone
+  pylon, two battered towers with sunk god reliefs, the owner's pennants on
+  masts and a painted band, a lower gate block with a deep doorway under a
+  winged sun, flat tops (no sunk-deck frame); an open court in grey flags
+  behind low enclosure walls; a columned hall of three rows of papyrus
+  columns under ochre architraves, slab roofs over the side aisles only, the
+  central aisle open so the god (now at third voxels, two thirds the size)
+  is seen from above at the sanctuary door; the sanctuary, a limestone block
+  with a gilt band and the owner's line, rising behind. Town Center: the
+  three stacked tiers, the corner silo turret, the palm and the crate pile
+  are gone; the palace stands on the gate's axis across the back of the
+  court (one limestone storey under a lapis cornice and frieze, one ochre
+  roof room), fronted by a portico of six painted columns, a fire altar on
+  the axis, the domed silo in the front right corner. `hbox()` takes an
+  optional `gorge` pair; `--preview type:variant:age` previews an age look.
+  Framing: the town view (default), `egt_row=house/0/a2,house/1/a2,house/2/a2,house/3/a2,house/4/a2,house/5/a2&egt_pitch=40&egt_dist=24`,
+  `egt_focus=temple&egt_dist=17&egt_lift=1`, `egt_focus=town_center` (the
+  round 32 god framing no longer applies: the god stands at the sanctuary
+  door on the axis, not at the front-left corner).
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8

@@ -58,9 +58,11 @@ const PALMS := [[-17, -12], [-5, -16], [11, -12], [4, -17], [-15, 12], [12, 13],
 ## (clutter variants, export-egypt.mjs: 0 jars, 1 crates + sacks, 2 mud-brick
 ## wall run, 3 hand cart, 4 pen corner, 5 reed sunshade stall, 6 woodpile, 7 well,
 ## 8 quarry blocks)
+## (round 46: cut from eight to three, each tied to the building beside it:
+## the quarry blocks by the obelisks, the well by the granary and the farms,
+## the ore cart by the mining camp; no general scatter of crates and sacks)
 const CLUTTER := [
-	[-5.5, -4.0, 8, 0.0], [-7.0, 6.5, 5, 0.0], [3.5, 7.2, 3, 1.57], [-21.0, 0.3, 7, 0.0],
-	[6.0, -10.0, 2, 0.0], [-11.0, 13.0, 2, 1.57], [3.5, 13.2, 4, 1.57], [16.5, 10.5, 3, 0.0],
+	[-5.5, -4.0, 8, 0.0], [-21.0, 0.3, 7, 0.0], [16.5, 10.5, 3, 0.0],
 ]
 ## paved lanes (tile rects relative to the centre: x, z, w, h), the rest worn earth
 const LANES := [

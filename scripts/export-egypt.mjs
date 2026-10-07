@@ -2264,7 +2264,7 @@ function recourse(m) {
 // voxel every `batter` rows (registered for skin()); sets m.lastTop to the
 // lip ring and the deck (roofParapet() builds on it) and returns the row
 // above the deck
-function hbox(m, x0, z0, x1, z1, y0, h, { wall = EWHITE, roof = EDECK, batter = 0, grime = true, band = 'lapis', lipC = LIP, rim = true, pRows = 1, cav = true, torus = null } = {}) {
+function hbox(m, x0, z0, x1, z1, y0, h, { wall = EWHITE, roof = EDECK, batter = 0, grime = true, band = 'lapis', lipC = LIP, rim = true, pRows = 1, cav = true, torus = null, gorge = null } = {}) {
   // round 28: a battered block (a voxel in every `batter` rows, smoothed by
   // skin()) under an Egyptian cavetto cornice: a torus roll on the wall's
   // top row, the gorge (two rows of 2-voxel painted flutes, the lower on the
@@ -2304,7 +2304,7 @@ function hbox(m, x0, z0, x1, z1, y0, h, { wall = EWHITE, roof = EDECK, batter = 
     m.lastTop = { c0, c1, d0, d1, y: top };
     return top + 1;
   }
-  const [gA, gB] = !band ? HGORGE_MUD.slice(1, 3) : band === 'red' ? [BAND_R, BAND_B] : band === 'ochre' ? [BAND_Y, BAND_R] : [BAND_B, BAND_R];
+  const [gA, gB] = gorge ? gorge : !band ? HGORGE_MUD.slice(1, 3) : band === 'red' ? [BAND_R, BAND_B] : band === 'ochre' ? [BAND_Y, BAND_R] : [BAND_B, BAND_R];
   const fl = (x, z) => ((((x + z + 512) >> 1) & 1) ? gA : gB);
   // the gorge's lower row on the wall plane (shaded), the deck's bed inside
   for (let x = c0; x < c1; x++) for (let z = d0; z < d1; z++) {
@@ -2388,141 +2388,132 @@ function oven(m, cx, cz) {
   beehive(m, X, Z, [2, 2, 2, 2, 1, 1]);
   for (const y of [1, 2]) { pset(m, X, y, Z + 2, MOUTH); pset(m, X, y, Z + 1, y === 1 ? FIRE[2] : FIRE[1]); m.get(X, y, Z + 1).glow = 0.6; }
 }
+// ---- houses (round 46) ----------------------------------------------------------
+// Four looks, not one module: each plan has its own footprint, height and
+// roof, and one of three wall tints that stand apart from each other and
+// from the sand by value and hue: a bright cool whitewash under a lapis
+// cornice (the courtyard house, the baker's), a saturated ochre plaster
+// under a red and green cornice (the potter's, the merchant's), a dark
+// mud brick with a plain mud gorge and mud coping, no paint at all (the
+// tower house, the terrace house, whose upper room is whitewashed). Only
+// one plan carries a wind-catcher; the terrace roofs are reached by outside
+// stairs, shaded by striped cloth or a frond mat on poles. Each house keeps
+// ONE group of goods on the ground, its trade (a loom, a kiln, a grain heap,
+// an oven, jars, a grain bin), never a general scatter of crates and sacks.
+const HT_WHITE = brick([0xf6f4ee, 0xf0eee6, 0xf3f1ea], { len: 7, head: 0.97 });
+const HT_OCHRE = brick([0xb4632a, 0xac5d27, 0xba692f], { len: 6, head: 0.92 });
+const HT_MUD = brick([0x845834, 0x7c5231, 0x8b5e39], { course: 2, len: 5, head: 0.86 });
+const HT_MUDP = brick([0xb48c5c, 0xab8456, 0xba9262], { course: 2, len: 5, head: 0.9 });
+const HT_GREEN = [0x3a8a58, 0x2f7048];
+// the ochre houses' coping: a red-ochre plaster, not the pale limestone lip
+const HT_OCAP = (x, y, z) => pick(hash3(x >> 1, y, z >> 1, 463), [0xa4502a, 0x9c4c28, 0xaa562e]);
+// a frond mat on four poles over a roof terrace ([x0, x1) x [z0, z1), the
+// deck at row y, the mat h rows above it)
+function roofShade(m, x0, z0, x1, z1, y, h) {
+  for (const [x, z] of [[x0, z0], [x1 - 1, z0], [x0, z1 - 1], [x1 - 1, z1 - 1]]) for (let yy = y; yy < y + h; yy++) m.set(x, yy, z, PALM_T(x, yy, z));
+  for (let x = x0 - 1; x <= x1; x++) for (let z = z0 - 1; z <= z1; z++) {
+    const e = Math.min(x - x0 + 1, x1 - x, z - z0 + 1, z1 - z);
+    if (e === 0 && hash3(x, y, z, 462) < 0.35) continue;      // a ragged edge
+    m.set(x, y + h, z, (x - x0) % 3 === 0 ? 0x6a4c2e : FROND_DRY(x, y + h, z));
+  }
+}
 function house(v, age) {
-  // round 27: every house is a small cube (or two) in clean brick courses,
-  // a painted band under a flush parapet with a pale coping and the owner's
-  // line, a sunk roof terrace a step darker than the walls, a malqaf
-  // (wind-catcher) on most; no overhanging slabs, no lids on piers. Each
-  // plan has its own massing and its trade's goods on the ground.
   const m = lot(24, 24);
   const arch = age === 1;
-  // round 28: the main cube battered (a voxel in five rows), every block
-  // under a cavetto cornice (hbox); the low wings stand plumb
-  const white = arch ? { wall: EMUD, roof: THATCH, lipC: MUDCAP, band: null, batter: 5 } : { wall: EWHITE, batter: 5 };
-  const mud = arch ? white : { wall: EMUD, band: 'red' };
-  const CAP = arch ? MUDCAP : LIME;
-  // round 28: doors and windows lie in the wall plane (nothing proud: on a
-  // battered wall a projecting lintel or sill pokes through the smooth
-  // skin as a pale tooth): the opening cut in, its frame, lintel and sill
-  // painted on the face; drawn before the goods so no ray lands on a prop
+  // the three looks (age 1: all in raw mud brick under thatch, two tones)
+  const W = arch ? { wall: HT_MUDP, roof: THATCH, lipC: MUDCAP, band: null, frame: MUDCAP_D, cap: MUDCAP, line: MUDCAP_D }
+    : { wall: HT_WHITE, roof: EDECK, band: 'lapis', frame: HACC, cap: LIME, line: LIME_S };
+  const O = arch ? { wall: EMUD, roof: THATCH, lipC: MUDCAP, band: null, frame: MUDCAP_D, cap: MUDCAP, line: MUDCAP_D }
+    : { wall: HT_OCHRE, roof: TC_MAT, band: 'red', gorge: HT_GREEN, frame: HACC_D, cap: HT_OCAP, lipC: HT_OCAP, rim: false, line: LIME_S };
+  const M = { wall: HT_MUD, roof: arch ? THATCH : HROOF_M, lipC: MUDCAP, band: null, frame: MUDCAP_D, cap: MUDCAP, line: MUDCAP_D, rim: arch };
   const onFace = (face, u, y, c) => { const p = outer(m, face, u, y, lim(m)); if (p) m.set(p[0], p[1], p[2], c); };
   const fdir = (face) => (face === '+z' || face === '-x' ? 1 : -1);
-  const dr = (face, u, w, h, open = false) => {
-    door(m, face, u, w, 1, h, { deep: 3, leaf: !open, leafShade: 0.45, lintel: false, frame: arch ? MUDCAP_D : HACC, proud: false });
-    for (let i = -1; i <= w; i++) onFace(face, u + i * fdir(face), 1 + h + 1, arch ? MUDCAP_D : TEAM);
+  // a door cut into the wall plane, its frame painted, the owner's line over it
+  const dr = (S, face, u, w, h, open = false) => {
+    door(m, face, u, w, 1, h, { deep: 3, leaf: !open, leafShade: 0.45, lintel: false, frame: S.frame, proud: false });
+    for (let i = -1; i <= w; i++) onFace(face, u + i * fdir(face), 1 + h + 1, arch ? S.line : TEAM);
   };
-  const hw = (face, u, y0) => {
+  // a row of three window slits between two painted rules
+  const hw = (S, face, u, y0, n = 3) => {
     const d = fdir(face);
-    for (let k = 0; k < 3; k++) slit(m, face, u + 2 * k * d, y0, 2, 1, { lintel: false, sill: false });
-    for (let i = -1; i <= 5; i++) { onFace(face, u + i * d, y0 + 2, arch ? MUDCAP_D : LIME_S); onFace(face, u + i * d, y0 - 1, arch ? MUDCAP_D : LIME_S); }
+    for (let k = 0; k < n; k++) slit(m, face, u + 2 * k * d, y0, 2, 1, { lintel: false, sill: false });
+    for (let i = -1; i <= 2 * n - 1; i++) { onFace(face, u + i * d, y0 + 2, S.line); onFace(face, u + i * d, y0 - 1, S.line); }
   };
-  const malqaf = (x, z, y, w, d, h, wall) => windCatcher(m, x, z, y, w, d, h, wall);
   if (v === 0) {
-    // the weaver's courtyard house: a two-storey cube at the back with a
-    // wind-catcher, a low mud-brick wing, a walled court in front with a
-    // gate and an upright loom
-    const t = hbox(m, 3, 3, 14, 12, 1, 12, white); const T = m.lastTop;
-    malqaf(T.c0 + 2, T.d0 + 2, t, 4, 3, 6, white.wall);
-    hbox(m, 14, 4, 21, 12, 1, 7, mud);
-    dr('+z', 7, 3, 6);
-    hw('+z', 7, 9); hw('-x', 7, 8); hw('-z', 7, 8); hw('+z', 17, 4);
+    // the weaver's courtyard house (whitewash): a two-storey block at the
+    // back, a low wing beside it, a walled court in front entered through a
+    // painted gate, the upright loom in the court
+    hbox(m, 3, 3, 14, 12, 1, 12, { ...W, batter: 5 });
+    hbox(m, 14, 5, 21, 12, 1, 6, W);
+    dr(W, '+z', 7, 3, 6);
+    hw(W, '+z', 7, 9); hw(W, '-x', 6, 8); hw(W, '-z', 6, 8); hw(W, '+z', 16, 4, 2);
     for (let x = 4; x < 21; x++) for (let z = 13; z < 21; z++) m.set(x, 0, z, PAVE);
-    yardWall(m, [[3, 13], [3, 21], [21, 21], [21, 13]], 5, white.wall, CAP, [[11, 21], [12, 21], [13, 21]]);
-    for (const x of [10, 14]) for (let y = 1; y <= 6; y++) m.set(x, y, 21, y === 1 ? PLINTH : HACC);
-    for (let x = 10; x <= 14; x++) { m.set(x, 7, 21, TEAM); m.set(x, 8, 21, CAP); }
-    palm(m, 6, 1, 17, 14, { lx: 0, lz: 1, len: 6, fronds: 8 });
-    goodsMat(m, 12, 14, 21, 19);
-    sack(m, 13, 1, 15); sack(m, 17, 1, 15); basket(m, 8, 16, 'date', 3);
+    yardWall(m, [[3, 13], [3, 21], [21, 21], [21, 13]], 4, W.wall, W.cap, [[11, 21], [12, 21], [13, 21]]);
+    for (const x of [10, 14]) for (let y = 1; y <= 6; y++) m.set(x, y, 21, y === 1 ? PLINTH : W.frame);
+    for (let x = 10; x <= 14; x++) { m.set(x, 7, 21, arch ? MUDCAP_D : TEAM); m.set(x, 8, 21, W.cap); }
+    loom(m, 13, 15, 6, 7);
   } else if (v === 1) {
-    // the potter's workshop: one deep sandstone cube whose front is a
-    // portico cut into it (three painted papyrus columns under the flush
-    // band), the wheel and drying bench in its shade; the kiln, amphorae
-    // and a woodpile outside
-    const o = arch ? white : { wall: ESAND, band: 'lapis' };
-    hbox(m, 3, 3, 17, 17, 1, 9, { ...o, batter: 0 });
+    // the potter's workshop (ochre): one deep square block whose front is a
+    // portico of three painted columns, the wheel in its shade; the kiln
+    // outside, two amphorae of the day's firing by it
+    hbox(m, 3, 3, 17, 17, 1, 9, O);
     for (let x = 4; x < 16; x++) for (let z = 12; z < 17; z++) for (let y = 1; y < 7; y++) m.remove(x, y, z);
-    for (let x = 4; x < 16; x++) for (let y = 1; y < 7; y++) m.set(x, y, 11, y > 4 ? REVEAL2 : shade(o.wall(x, y, 11), 0.62));
+    for (let x = 4; x < 16; x++) for (let y = 1; y < 7; y++) m.set(x, y, 11, y > 4 ? REVEAL2 : shade(O.wall(x, y, 11), 0.62));
     for (let x = 4; x < 16; x++) for (let z = 12; z < 17; z++) m.set(x, 0, z, PAVE);
     for (const x of [5, 9, 13]) {
       if (arch) { for (let y = 1; y < 7; y++) for (let i = 0; i < 2; i++) m.set(x + i, y, 15, PALM_T(x, y, 15)); }
       else hcolumn(m, x, 15, 1, 7);
     }
-    for (let x = 5; x < 9; x++) for (let z = 12; z < 14; z++) for (let y = 1; y < 3; y++) m.set(x, y, z, PLANK(x, y, z));
-    jar(m, 6, 3, 13, 0xc8a070);
+    hw(O, '-x', 6, 6); hw(O, '-z', 6, 6);
     lathe(m, 12, 13, 1, 3, () => 1.2, DARKWOOD); lathe(m, 12, 13, 3, 4, () => 1.8, 0x7a5634); lathe(m, 12, 13, 4, 6, (y) => (y === 4 ? 0.9 : 0.6), CLAY);
-    // the kiln: a tall mud-brick beehive with a glowing stoke hole
-    const kx = 20.5, kz = 7;
     beehive(m, 20, 7, [3, 3, 3, 3, 3, 3, 2, 2, 2, 1, 1]);
     for (let y = 1; y < 4; y++) { pset(m, 20, y, 10, MOUTH); pset(m, 20, y, 9, REVEAL); }
     pset(m, 20, 1, 9, FIRE[2]); m.get(20, 1, 9).glow = 0.6; pset(m, 20, 2, 9, FIRE[1]); m.get(20, 2, 9).glow = 0.6;
-    woodPile(m, 18, 13, 4);
-    // the day's firing on a mat: three amphorae a voxel apart, a neat
-    // stack of mud bricks for the kiln
-    goodsMat(m, 3, 18, 23, 23);
-    for (let i = 0; i < 3; i++) amphora(m, 5 + i * 4, 1, 20, i);
-    brickStack(m, 16, 1, 19, 6, 3, 4);
+    amphora(m, 19.5, 1, 14.5, 0); amphora(m, 19.5, 1, 19.5, 2);
   } else if (v === 2) {
-    // the farmer's tower house: a tall narrow cube with a wind-catcher, a
-    // low mud-brick store against it with a roof terrace; the threshing
-    // floor outside: a gold grain heap, linen sacks, a basket
-    const t = hbox(m, 3, 4, 12, 13, 1, 15, white); const T = m.lastTop;
-    malqaf(T.c0 + 2, T.d0 + 2, t, 4, 3, 7, white.wall);
-    hbox(m, 12, 6, 20, 13, 1, 7, { ...mud, pRows: 2 });
-    dr('+z', 6, 3, 7);
-    hw('+z', 6, 11); hw('-x', 8, 10); hw('-x', 8, 5); hw('-z', 7, 10); hw('+x', 8, 11);
-    grainHeap(m, 19, 18.5, 3, 5);
-    sackStack(m, 3, 1, 15, 2);
-    basket(m, 12, 19, 'grain', 2);
+    // the tower house (mud brick): a narrow battered tower three storeys
+    // tall, a low store against it whose roof terrace is reached by an
+    // outside stair and shaded by a frond mat on poles; the threshing floor
+    // in front, one heap of grain
+    hbox(m, 3, 3, 11, 11, 1, 17, { ...M, batter: 6 });
+    hbox(m, 11, 5, 20, 13, 1, 7, M); const U = m.lastTop;
+    dr(M, '+z', 5, 3, 6);
+    hw(M, '+z', 5, 10, 2); hw(M, '+z', 5, 14, 2); hw(M, '-x', 5, 11, 2); hw(M, '-z', 6, 12, 2);
+    outStair(m, 21, 14, 2, 8, -1, HT_MUD, MUDCAP);
+    roofShade(m, U.c0 + 2, U.d0 + 2, U.c1 - 2, U.d1 - 2, U.y, 5);
+    grainHeap(m, 7, 18.5, 3, 4);
   } else if (v === 3) {
-    // the baker's house: a whitewashed cube with a roof terrace shaded by a
-    // palm-frond mat on four poles, the bread oven, fuel and baskets of
-    // loaves in the yard
-    const t = hbox(m, 8, 3, 21, 15, 1, 10, { ...white, pRows: 2 }); const T = m.lastTop;
-    // the roof room at the back of the terrace (its doorway onto the
-    // terrace), dates drying on a mat in front of it
-    hbox(m, T.c0 + 2, T.d0 + 2, T.c0 + 9, T.d0 + 7, t, 5, { ...white, grime: false, band: null });
-    dr('+z', 11, 3, 6);
-    hw('+z', 16, 6); hw('-x', 7, 6); hw('+x', 8, 6); hw('-z', 13, 6);
-    for (const x of [T.c0 + 5, T.c0 + 6]) for (let y = t; y < t + 4; y++) { m.remove(x, y, T.d0 + 6); m.set(x, y, T.d0 + 5, REVEAL); }
-    for (let x = T.c1 - 7; x < T.c1 - 3; x++) for (let z = T.d0 + 3; z < T.d0 + 8; z++) m.set(x, t, z, (x === T.c1 - 7 || x === T.c1 - 4 || z === T.d0 + 3 || z === T.d0 + 7) ? FROND_DRY(x, t, z) : PROD.date(x, t, z));
-    oven(m, 4, 8);
-    woodPile(m, 1, 12, 5);
-    goodsMat(m, 2, 18, 13, 23); basket(m, 3, 19, 'date', 3); basket(m, 8, 19, 'grain', 3);
-    goodsMat(m, 14, 18, 23, 22); pots(m, 16, 20, 2, 3);
+    // the baker's house (whitewash): a wide block with a roof room at the
+    // back of its terrace, a blue and white striped cloth over the shop
+    // front on three poles, the bread oven at the corner
+    const t = hbox(m, 5, 3, 21, 13, 1, 10, W); const T = m.lastTop;
+    hbox(m, T.c0 + 2, T.d0 + 2, T.c0 + 9, T.d0 + 7, t, 5, { ...W, grime: false });
+    dr(W, '+z', 11, 3, 5);
+    hw(W, '-x', 6, 6); hw(W, '+x', 7, 6); hw(W, '-z', 9, 6);
+    if (arch) palmAwning(m, '+z', 12, 6, 20, 6, 5, { posts: [6, 13, 19] });
+    else clothAwning(m, '+z', 12, 6, 20, 8, 6, 3, { posts: [6, 13, 19], sw: 2, sag: 0.6, belly: 0.4, stripes: [MKT_AW, MKT_AWW], hem: 0x1f3c78 });
+    oven(m, 3, 19);
+    basket(m, 14, 15, 'date', 3);
   } else if (v === 4) {
-    // the jar merchant: a wide low cube with a wind-catcher at one end, his
-    // amphorae in a timber rack and a row of painted storage jars in front
-    const t = hbox(m, 2, 4, 22, 13, 1, 8, white); const T = m.lastTop;
-    malqaf(T.c1 - 7, T.d0 + 2, t, 4, 3, 6, white.wall);
-    dr('+z', 6, 3, 6);
-    hw('+x', 8, 4); hw('-x', 8, 4); hw('-z', 7, 4); hw('-z', 16, 4); hw('+z', 15, 4);
-    // the amphora rack: two posts and a rail behind three amphorae on a
-    // plank sill; two big blue-banded jars on a mat
-    for (let x = 12; x < 24; x++) for (const z of [17, 18, 19]) pset(m, x, 0, z, z === 18 ? 0x8e6a42 : 0x6e4e30);
-    for (let i = 0; i < 3; i++) amphora(m, 14 + i * 4, 1, 18, i);
-    for (const x of [12, 23]) for (let y = 1; y < 8; y++) m.set(x, y, 16, POLE(x, y, 16));
-    for (let x = 12; x <= 23; x++) m.set(x, 8, 16, DARKWOOD);
-    goodsMat(m, 1, 16, 12, 23);
-    jar(m, 3, 1, 19, 0xd8c8a0, true); jar(m, 9, 1, 19, 0xb8683e, true);
+    // the jar merchant (ochre): a long low house, the one wind-catcher of
+    // the set at its end, a frond awning on palm posts over a row of jars
+    const t = hbox(m, 2, 6, 22, 14, 1, 7, O); const T = m.lastTop;
+    windCatcher(m, T.c1 - 7, T.d0 + 2, t, 4, 3, 7, O.wall);
+    dr(O, '+z', 5, 3, 4);
+    hw(O, '-x', 8, 4); hw(O, '+x', 8, 4); hw(O, '-z', 6, 4); hw(O, '-z', 14, 4);
+    palmAwning(m, '+z', 13, 10, 21, 6, 5, { posts: [10, 15, 20] });
+    jar(m, 12, 1, 16, 0xd8c8a0, true); jar(m, 17.5, 1, 16, 0xb8683e, true);
   } else {
-    // two cubes: a tall white one with a wind-catcher, a low mud-brick one
-    // whose terrace is reached by an outside stair; round mud grain bins
-    const t = hbox(m, 3, 3, 12, 13, 1, 13, white); const T = m.lastTop;
-    malqaf(T.c0 + 3, T.d0 + 2, t, 4, 3, 6, white.wall);
-    hbox(m, 12, 5, 21, 14, 1, 7, { ...mud, pRows: 2 }); const U = m.lastTop;
-    dr('+z', 6, 3, 7);
-    dr('+x', 9, 3, 5, true);
-    hw('+z', 6, 9); hw('-x', 7, 9); hw('-z', 7, 9);
-    for (let x = U.c1 - 3; x < U.c1; x++) for (let y = U.y; y <= U.y + 2; y++) m.remove(x, y, U.d1 - 1), m.remove(x, y, U.d1 - 2);
-    for (let x = U.c1 - 3; x < U.c1; x++) for (const z of [U.d1 - 1, U.d1 - 2]) m.set(x, U.y, z, EDECK(x, U.y, z));
-    outStair(m, 12, 14, 2, 8, 1, EMUD, CAP);
-    // two square mud grain bins under plastered caps, a stack of mud
-    // bricks for the next one, an amphora: each a voxel apart
-    for (const X of [4, 10]) {
-      for (let r = 0; r < 5; r++) prow(m, X, 1 + r, 19, 2, r === 0 ? 0x7a5636 : r & 1 ? 0x9c7049 : 0x936843, true);
-      prow(m, X, 6, 19, 2, 0xc29a6b, true); prow(m, X, 7, 19, 1, 0xcfa97c, true); pset(m, X, 8, 19, 0x6a4a2c);
-    }
-    brickStack(m, 14, 1, 18, 6, 3, 4); amphora(m, 22, 1, 19, 3);
+    // the terrace house: a wide mud-brick ground floor, a whitewashed upper
+    // room set back on its left half, the rest an open terrace reached by
+    // an outside stair along the front; a mud grain bin by the door
+    hbox(m, 3, 4, 21, 15, 1, 7, M); const U = m.lastTop;
+    hbox(m, U.c0 + 2, U.d0 + 2, U.c0 + 10, U.d1 - 3, U.y, 7, { ...W, grime: false });
+    dr(M, '+z', 6, 3, 5);
+    hw(W, '+z', U.c0 + 4, U.y + 3, 2); hw(M, '-x', 7, 4); hw(M, '-z', 6, 4);
+    outStair(m, 22, 16, 2, 8, -1, HT_MUD, MUDCAP);
+    for (let r = 0; r < 5; r++) prow(m, 4, 1 + r, 20, 2, r === 0 ? 0x5e4028 : r & 1 ? 0x8a5d38 : 0x815634, true);
+    prow(m, 4, 6, 20, 2, 0xc29a6b, true); prow(m, 4, 7, 20, 1, 0xcfa97c, true); pset(m, 4, 8, 20, 0x6a4a2c);
   }
   return m;
 }
@@ -2969,67 +2960,43 @@ function townCenter() {
     paint(m, '+z', px + 1, 9, ['.O.', 'OOO', '.O.', 'BOB', 'B.B', 'B.B', 'K.K'], { O: OCHRE, B: TURQ, K: INK });
     paint(m, '+z', px + 5, 9, ['K', '.', 'R', 'K', '.', 'B', 'K'], { K: INK, R: RED, B: TURQ });
   }
-  // the sanctuary: three receding tiers, each under its own cornice
+  // round 46: ONE axis from the gate to the palace, no stacked tiers: the
+  // palace across the back of the court on the gate's axis, a single
+  // limestone storey under a lapis cornice and frieze with one ochre roof
+  // room on its middle, fronted by a portico of six painted columns under a
+  // flat roof, its doorway on the axis; the court before it open, flagged
+  // grey, a fire altar on the axis; the granary silo in the front left
+  // corner the only other mass
   inner(m, (s) => {
     const g = [0x34588a, 0x3f6596];
-    const field = (T, o) => roofField(s, T.c0, T.d0, T.c1, T.d1, T.y, o);
-    const t1 = block(s, 8, 8, 30, 27, 1, 9, { wall: LIME, batter: 6, band: 'red', roofC: PLASTER, lipOut: 2, rimC: LIME, gorge: g });
-    field(s.lastTop);
-    const t2 = block(s, 12, 10, 26, 23, t1 - 1, 6, { wall: SAND, batter: 0, band: 'lapis', roofC: PLASTER, lipOut: 2, rimC: LIME, gorge: [RED_M, 0xa8563a] });
-    field(s.lastTop, { line: RED_B, band: OCHRE_B });
-    block(s, 15, 12, 23, 20, t2 - 1, 5, { wall: LIME, batter: 0, band: 'team', roofC: PLASTER, lipOut: 1, rimC: LIME, gorge: g, torus: false });
-    field(s.lastTop, { g: 3 });
-    door(s, '+z', 17, 4, 1, 8, { lattice: true, sun: true, deep: 3, frame: SAND });
-    door(s, '+z', 17, 4, t1, 4, { leaf: false, deep: 2, frame: LIME });
-    slit(s, '+z', 11, 4, 3, 1); slit(s, '+z', 26, 4, 3, 1); slit(s, '+x', 13, 4, 3, 1); slit(s, '+x', 20, 4, 3, 1);
-    // painted reliefs either side of the door: an offering king, a god
-    paint(s, '+z', 12, 8, ['.O.', 'OOO', '.O.', 'BOB', 'B.B', 'K.K'], { O: OCHRE, B: LAPIS, K: INK });
-    paint(s, '+z', 23, 8, ['.R.', 'OOO', '.O.', 'BOB', 'B.B', 'K.K'], { O: OCHRE, B: TURQ, K: INK, R: RED });
-  });
-  // the colonnaded hall: a low flat roof on papyrus columns, an ochre back
-  // wall, the portico deep in shadow
-  inner(m, (s) => {
-    const X0 = 34, X1 = 49, Z0 = 8, Z1 = 25, H = 10;
-    block(s, 37, Z0, X1, 17, 1, H - 1, { wall: OCHRE_P, batter: 0, band: null, parapet: false, torus: false });
-    door(s, '+z', 41, 3, 1, 6, { deep: 2 });
-    paint(s, '+z', 38, 7, ['BRB', 'O.O', 'BRB'], { O: OCHRE, B: LAPIS, R: RED });
-    paint(s, '+z', 45, 7, ['BRB', 'O.O', 'BRB'], { O: OCHRE, B: LAPIS, R: RED });
-    for (const x of [35, 39, 43, 46]) tcColumn(s, x, Z1 - 3, 1, H);
-    for (const z of [Z0 + 3, Z0 + 8]) tcColumn(s, X0 + 1, z, 1, H);
-    // the architrave: a painted beam round the edge (red / lapis blocks), the
-    // gorge flaring a voxel out above it, the mud roof inside a pale lip
-    // (round 27: flush, no overhanging slab: the painted architrave, the
-    // reed-mat deck sunk inside a two-voxel pale coping)
+    const t1 = block(s, 10, 8, 46, 24, 1, 12, { wall: LIME, batter: 0, band: 'lapis', frieze: 2, roofC: PLASTER, lipOut: 2, rimC: LIME, gorge: g });
+    roofField(s, s.lastTop.c0, s.lastTop.d0, s.lastTop.c1, s.lastTop.d1, s.lastTop.y);
+    block(s, 21, 10, 35, 20, t1 - 1, 6, { wall: OCHRE_P, batter: 0, band: 'team', roofC: PLASTER, lipOut: 1, rimC: LIME, gorge: [RED_M, 0xa8563a], torus: false });
+    roofField(s, s.lastTop.c0, s.lastTop.d0, s.lastTop.c1, s.lastTop.d1, s.lastTop.y, { line: RED_B, band: OCHRE_B, g: 3 });
+    door(s, '+z', 26, 4, 1, 8, { lattice: true, sun: true, deep: 3, frame: SAND });
+    slit(s, '+z', 14, 4, 3, 1); slit(s, '+z', 41, 4, 3, 1); slit(s, '-x', 14, 5, 3, 1); slit(s, '+x', 14, 5, 3, 1);
+    // the portico before the palace front (z 24 .. 30): six columns, a
+    // painted architrave and a reed-mat roof under a pale lip
+    const X0 = 11, X1 = 45, Z0 = 24, Z1 = 30, H = 9;
+    for (const x of [12, 17, 22, 32, 37, 42]) tcColumn(s, x, Z1 - 3, 1, H);
     const R = bandRows('lapis');
     for (let x = X0; x < X1; x++) for (let z = Z0; z < Z1; z++) {
-      const e = Math.min(x - X0, X1 - 1 - x, z - Z0, Z1 - 1 - z);
+      const e = Math.min(x - X0, X1 - 1 - x, z - Z0 + 3, Z1 - 1 - z);
       s.set(x, H - 1, z, e === 0 ? R[0] : SAND_D(x, H - 1, z));
       s.set(x, H, z, e === 0 ? R[2](x, H, z) : e === 1 ? LIP(x, H, z) : TC_HALLROOF(x, H, z));
       if (e <= 1) s.set(x, H + 1, z, LIP(x, H + 1, z));
     }
-    // round 35: the deck sunk inside a lapis line and a red band, reed mats
-    // in a basket weave between palm-trunk beams
-    roofField(s, X0, Z0, X1, Z1, H, { field: TC_MAT });
+    roofField(s, X0, Z0 - 3, X1, Z1, H, { field: TC_MAT });
   });
-  // the granary: a big domed silo at the front left with a ladder and sacks
+  // the granary: a big domed silo at the front right with a ladder
   // (silo(), ladder() lay mesh polygons on m itself, so not through inner())
-  silo(m, 15.5, 36.5, 1, 6, 11);
-  ladder(m, [22.6, 1, 38.4], [21.4, 11.6, 37.6]);
-  sack(m, 22, 1, 30); sack(m, 22, 1, 34);
-  // the small domed silo turret on the front-right corner of the wall
-  silo(m, 50.5, 50.5, 1, 3.8, 8);
-  // the courtyard: a fire pit, a basin, jars, a palm
-  m.box(27, 1, 34, 5, 1, 5, LIME); m.box(28, 1, 35, 3, 1, 3, DARK);
-  m.set(29, 2, 36, FIRE[3], FG); m.set(28, 2, 36, FIRE[1], FG); m.set(29, 2, 35, FIRE[2], FG); m.set(30, 2, 37, FIRE[0], FG); m.set(29, 3, 36, FIRE[2], FG);
-  for (let x = 31; x < 35; x++) for (let z = 21; z < 25; z++) m.set(x, 1, z, x === 31 || x === 34 || z === 21 || z === 24 ? LIME : WATER);
-  // round 35: the courtyard's stores, each a clear shape a voxel apart from
-  // the next: two crates on a pallet with a third on top, a pair of tall
-  // amphorae, two linen grain sacks
-  tcPallet(m, 37, 29, 12, 6);
-  tcCrate(m, 37, 2, 29); tcCrate(m, 43, 2, 29); tcCrate(m, 40, 7, 29);
-  tcAmphora(m, 37, 1, 40); tcAmphora(m, 42, 1, 41);
-  tcSack(m, 45, 1, 36); tcSack(m, 45, 1, 41, 3);
-  palm(m, 8, 1, 28, 21, { lx: 0.3, lz: 1, len: 7 });
+  silo(m, 40.5, 38.5, 1, 6, 11);
+  ladder(m, [33.4, 1, 40.4], [34.6, 11.6, 39.6]);
+  // the court's one prop group: a fire altar on the axis before the portico
+  m.box(25, 1, 34, 7, 2, 5, LIME); m.box(26, 2, 35, 5, 1, 3, DARK);
+  m.set(28, 3, 36, FIRE[3], FG); m.set(27, 3, 36, FIRE[1], FG); m.set(29, 3, 35, FIRE[2], FG); m.set(28, 4, 36, FIRE[2], FG); m.set(28, 3, 37, FIRE[0], FG);
+  // the stores by the silo: two tall amphorae and a grain sack
+  tcAmphora(m, 44, 1, 30); tcAmphora(m, 31, 1, 44); tcSack(m, 46, 1, 34, 3);
   // the Ra statue on its plinth at the front-left corner, in sandstone with
   // gold regalia and the owner's kilt (building_02)
   fineStatue(m, 2, 45, 12, 54, 1, 9, { h: 25, skin: BASALT, gold: GILT_L, kilt: GILT, kiltFront: TEAMB, head: 'falcon', crown: 'disc', arms: 'crossed', pose: 'stride' }, 1);
@@ -3041,134 +3008,155 @@ function townCenter() {
   return m;
 }
 
-// Temple (5 x 6; building_08): a two-tier stepped platform with a ramp, a
-// pillared kiosk of papyrus columns with screen walls and white drapes, a
-// flat roof with a team rim, the major god's statue on a plinth at the front
-// left, a potted palm and fire bowls at the ramp foot.
+// Temple (5 x 6; round 46): one approach axis from the front (+z) to the
+// back, so it reads at a glance as an Egyptian temple: a pair of gilt-tipped
+// obelisks on the ground before a pale limestone PYLON (two battered towers
+// with a painted relief of the god and a cartouche band, the owner's
+// pennants on masts in their faces, a lower gate block between them with a
+// deep doorway under a winged sun), then an open court floored in cool grey
+// flags behind low enclosure walls with the major god's statue on the axis
+// facing the gate, then a COLUMNED HALL in warm ochre sandstone (a portico
+// of four painted papyrus columns either side of the axis under a lapis
+// cornice), then the SANCTUARY, a narrower limestone block rising behind it
+// with a gilt band and a team line. Every mass has its own value: the pylon
+// lightest, the hall a warm mid ochre, the court floor grey, the podium dark.
 function temple(god) {
   const W = 40, D = 48;
   const m = lot(W, D);
-  // tier 1 and tier 2 platforms
-  // the reliefs: a painted procession band (ink figures on ochre, red and
-  // lapis glyphs) on the faces of both tiers
-  const RELIEF = (x, y, z, e) => {
-    const u = (x + z) % 8;
-    return u === 0 ? INK : u === 2 || u === 5 ? RED : u === 3 ? BLUEP : OCHRE;
-  };
-  const tier = (x0, z0, x1, z1, y0, h, band) => {
-    for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) {
-      const e = Math.min(x - x0, x1 - 1 - x, z - z0, z1 - 1 - z);
-      m.set(x, y, z, y === y0 + h - 1 ? (e === 0 ? LIME(x, y, z) : PAVE(x, y, z)) : (y === y0 + h - 2 && e === 0 ? band(x, y, z) : SAND(x, y, z)));
-    }
-  };
-  tier(1, 2, 39, 38, 1, 3, () => TEAM);
-  tier(5, 5, 35, 33, 4, 3, RELIEF);
-  // the ramp up the front (z 33 -> 46), with low side walls
-  for (let z = 33; z < 47; z++) {
-    const yTop = Math.max(1, Math.round(6 - ((z - 33) * 5) / 13));
-    for (let x = 15; x < 25; x++) for (let y = 1; y <= yTop; y++) m.set(x, y, z, y === yTop ? LIME(x, y, z) : SAND(x, y, z));
-    for (const x of [14, 25]) for (let y = 1; y <= yTop + 1; y++) m.set(x, y, z, y === yTop + 1 ? LIME_S : SAND_D(x, y, z));
+  const AX = 20;                                     // the axis (x)
+  const Y = 3;                                       // the podium's floor row
+  // the podium: two courses of dark ashlar, a pale lip, the owner's line
+  for (let x = 2; x < 38; x++) for (let z = 2; z < 44; z++) {
+    const e = Math.min(x - 2, 37 - x, z - 2, 43 - z);
+    m.set(x, 1, z, PLINTH(x, 1, z));
+    m.set(x, 2, z, e === 0 ? LIME(x, 2, z) : e === 1 ? TEAM : FLAG(x, 2, z));
   }
-  // the kiosk (building_08): a square colonnade of twelve clean sandstone
-  // papyrus columns round [9, 31) x [8, 30), 3 x 3 voxels each on a 6-voxel
-  // pitch, so every gap is an even 3-voxel dark slot (the front middle one is
-  // the entrance, on the ramp's axis, the dark naos door behind it). Each
-  // column: a dark foot, a plain shaft with faint drum joints, one lapis band
-  // at the neck, a flared limestone bell capital and a dark abacus under the
-  // architrave. Above: one tidy 2-row painted strip (a red fillet, lapis
-  // panels), a torus roll, the cavetto gorge flaring one voxel out with its
-  // shadowed underside, and the lip slab with the team line round a darker deck.
-  const fl = 7;
-  const colH = 13;
-  const K0 = 9, K1 = 31, L0 = 8, L1 = 30;           // the kiosk's outer bounds (x, z)
-  const pitch = [10, 16, 22, 28];                   // column starts along x
-  const pitchZ = [9, 15, 21, 27];                   // column starts along z
-  const SHAFT = [0xe2c491, 0xd3b27e];               // the faces, the arrises
-  const LAPIS_N = 0x2f5f9e;
-  const column = (x0, z0) => {
+  // the stair up the front on the axis, framed by two low limestone walls
+  for (let z = 44; z < 47; z++) for (let x = AX - 6; x < AX + 6; x++) {
+    const yT = z === 44 ? 2 : 1;
+    for (let y = 1; y <= yT; y++) m.set(x, y, z, LIME(x, y, z));
+  }
+  const COLUMN = (x0, z0, y0, colH, ring = LAPIS) => {
+    // a 3 x 3 papyrus column: a dark foot, a pale shaft, red and lapis neck
+    // rings, a green bell capital flaring to 5 x 5, a dark abacus
     for (let r = 0; r < colH; r++) {
-      const y = fl + r;
-      // the bell capital flares to 5 x 5 (corners clipped on its lower row)
+      const y = y0 + r;
       const flare = r === colH - 3 || r === colH - 2;
       const ext = flare ? 1 : 0;
       for (let i = -ext; i < 3 + ext; i++) for (let k = -ext; k < 3 + ext; k++) {
-        const X = x0 + i, Z = z0 + k;
+        const Xv = x0 + i, Zv = z0 + k;
         const edgeI = i < 0 || i > 2, edgeK = k < 0 || k > 2;
         if (r === colH - 3 && edgeI && edgeK) continue;
         let c;
-        if (r === 0) c = SAND_D(X, y, Z);                                   // the foot
-        else if (r === colH - 1) c = (i === 1 && k === 1) ? SAND_D(X, y, Z) : shade(0xc9a874, 0.86);  // the abacus
-        else if (flare) c = r === colH - 2 ? (edgeI || edgeK ? 0xefe2c4 : 0xe8d9b8) : (edgeI || edgeK ? 0xe3d3b0 : 0xd8c6a0);
-        else if (r === colH - 4) c = LAPIS_N;                                // the neck band
-        else {
-          c = (i === 1 || k === 1) ? SHAFT[0] : SHAFT[1];                 // rounded: darker arrises
-          if (r % 4 === 0) c = shade(c, 0.93);                               // drum joints
-        }
-        m.set(X, y, Z, c);
+        if (r === 0) c = PLINTH(Xv, y, Zv);
+        else if (r === colH - 1) c = shade(0xc9a874, 0.86);
+        else if (flare) c = r === colH - 2 ? (edgeI || edgeK ? H_G : 0x2f7048) : (edgeI || edgeK ? 0x2f7048 : H_G);
+        else if (r === colH - 4) c = ring;
+        else if (r === colH - 5) c = RED_B;
+        else c = (i === 1 || k === 1) ? 0xeee4cc : 0xd9cba8;
+        m.set(Xv, y, Zv, c);
       }
     }
   };
-  for (const x of pitch) { column(x, pitchZ[0]); column(x, pitchZ[3]); }
-  for (const z of [pitchZ[1], pitchZ[2]]) { column(pitch[0], z); column(pitch[3], z); }
-  // the floor under the roof in a darker flagging, so the slots read dark
-  for (let x = K0; x < K1; x++) for (let z = L0; z < L1; z++) m.set(x, fl - 1, z, shade(PAVE(x, fl - 1, z), 0.8));
-  // the naos inside, in a darker sandstone, with its door on the entrance axis
-  const NAOS = (x, y, z) => shade(SAND_D(x, y, z), 0.82);
-  block(m, 14, 13, 26, 24, fl, 11, { wall: NAOS, socle: 1, frieze: 0, band: null, parapet: false, rim: false, roofC: NAOS, rimC: NAOS, plinth: false, torus: false });
-  door(m, '+z', 19, 3, fl, 7, { sun: false, lintel: true });
-  // the architrave: one 2-row painted strip under the cornice (a red fillet,
-  // then lapis panels split by pale separators every fourth voxel)
-  const ay = fl + colH;
-  for (let x = K0; x < K1; x++) for (let z = L0; z < L1; z++) {
-    const e = Math.min(x - K0, K1 - 1 - x, z - L0, L1 - 1 - z);
-    if (e > 3) { m.set(x, ay + 1, z, shade(0xb39a74, 0.72)); continue; }   // the coffered ceiling
-    const u = (e === 0 && (z === L0 || z === L1 - 1)) ? x : z;
-    m.set(x, ay, z, e === 0 ? RED_M : SAND_D(x, ay, z));
-    m.set(x, ay + 1, z, e === 0 ? ((u % 4 === 0) ? FRIEZE_SEP : LAPIS) : SAND_D(x, ay + 1, z));
+  // ---- the sanctuary (z 3 .. 15): the tallest block behind the hall, in
+  // limestone, a gilt band and the owner's line under its cornice, the
+  // shrine door on the axis
+  // a flat top flush with the coping (no sunk deck: a ring of coping round a
+  // dark slot read as one more roof frame)
+  const flatTop = (c = LIME_S) => { const T = m.lastTop; for (let x = T.c0 + 2; x < T.c1 - 2; x++) for (let z = T.d0 + 2; z < T.d1 - 2; z++) m.set(x, T.y + 1, z, typeof c === 'function' ? c(x, T.y + 1, z) : c); };
+  block(m, 10, 3, 30, 15, Y, 19, { wall: LIME, band: 'team', frieze: 0, roofC: LIME_S, rimC: LIME, lipOut: 2, plinth: false, gorge: [0x34588a, 0x3f6596], torus: false });
+  flatTop(TCF_SLAB(4));
+  bands(m, 10, 3, 30, 15, Y + 16, [GILT_D, GILT, GILT_D]);
+  door(m, '+z', AX - 2, 4, Y, 9, { deep: 3, frame: GILT_D, lintel: false, leaf: true });
+  // ---- the columned hall (z 15 .. 27): an open hypostyle of three rows of
+  // papyrus columns carrying ochre architraves along the rows, roofed over
+  // the side aisles in slabs, the central aisle on the axis left open to the
+  // sky so the god at the sanctuary door is seen from above between the
+  // columns; low ochre screen walls between the outer columns
+  const HC = 14;                                     // column height
+  const colX = [6, 11, 25, 30];                      // outer aisles; the axis aisle 14 .. 25 open
+  const rowZ = [16, 20, 24];
+  for (const z of rowZ) for (const x of colX) COLUMN(x, z, Y, HC);
+  const AY = Y + HC;                                  // the architrave row
+  for (const z of rowZ) for (let x = 5; x < 35; x++) {
+    if (x >= 15 && x < 25 && z !== 24) continue;    // the axis aisle stays open but for the front beam
+    for (let k = 0; k < 3; k++) { m.set(x, AY, z + k, k === 1 ? OCHRE_M : SAND_D(x, AY, z + k)); m.set(x, AY + 1, z + k, (x + z) % 4 === 0 ? LAPIS : RED_M); }
   }
-  // the cornice: a torus roll flush with the strip, the gorge foot (fluted),
-  // the gorge flaring one voxel out (its underside throws the shadow line),
-  // then the lip slab with the team line and the deck
-  for (let x = K0; x < K1; x++) for (let z = L0; z < L1; z++) {
-    const e = Math.min(x - K0, K1 - 1 - x, z - L0, L1 - 1 - z);
-    m.set(x, ay + 2, z, e === 0 ? ROLL : SAND_D(x, ay + 2, z));
-    m.set(x, ay + 3, z, e === 0 ? (((x + z) & 1) ? GORGE : GORGE_L) : SAND_D(x, ay + 3, z));
+  // roof slabs over the side aisles (between the architraves), a pale lip
+  for (const [x0, x1] of [[5, 15], [25, 35]]) for (let x = x0; x < x1; x++) for (let z = 16; z < 27; z++) {
+    if (!m.has(x, AY + 1, z)) m.set(x, AY + 1, z, EDECK(x, AY + 1, z));
+    const e = Math.min(x - x0, x1 - 1 - x, z - 16, 26 - z);
+    m.set(x, AY + 2, z, e === 0 ? LIP(x, AY + 2, z) : e === 1 && (x === x0 + 1 || x === x1 - 2) ? TEAM : EDECK(x, AY + 2, z));
   }
-  const ROOFDECK = (x, y, z) => { const c = pick(hash3(x >> 1, y, z >> 1, 77), [0xc9b593, 0xc2ae8b, 0xcdb998]); return ((x - K0) % 6 === 4 || (z - L0) % 6 === 4) ? shade(c, 0.9) : c; };
-  for (let x = K0 - 1; x <= K1; x++) for (let z = L0 - 1; z <= L1; z++) {
-    const e = Math.min(x - K0 + 1, K1 - x, z - L0 + 1, L1 - z);
-    m.set(x, ay + 4, z, e === 0 ? shade(((x + z) & 1) ? GORGE : GORGE_L, 0.84) : SAND_D(x, ay + 4, z));
-    // round 27: a two-voxel parapet with a pale coping and the owner's
-    // line round a sunk mud-plaster deck (no pale lid)
-    m.set(x, ay + 5, z, e <= 1 ? LIP(x, ay + 5, z) : EDECK(x, ay + 5, z));
-    if (e <= 1) m.set(x, ay + 6, z, e === 1 ? TEAM : LIP(x, ay + 6, z));
+  // screen walls between the outer columns on the hall's sides, half height
+  for (const x of [5, 6, 33, 34]) for (let z = 16; z < 27; z++) for (let y = Y; y < Y + 6; y++) if (!m.has(x, y, z)) m.set(x, y, z, y === Y + 5 ? LIME(x, y, z) : y === Y + 4 ? RED_M : SAND_D(x, y, z));
+  // ---- the court (z 27 .. 37): grey flags inside low enclosure walls
+  for (const [x0, x1] of [[4, 6], [34, 36]]) for (let x = x0; x < x1; x++) for (let z = 27; z < 37; z++) for (let y = Y; y < Y + 7; y++) {
+    m.set(x, y, z, y === Y + 6 ? LIME(x, y, z) : y === Y + 5 ? LAPIS : SAND(x, y, z));
   }
-  void ROOFDECK;
-  // the god statue on its plinth at the front left (on tier 1). Round 32:
-  // in the temple's own sandstone and limestone (tcSandstone over the figure
-  // and the plinth, the lapis inlay as limestone: cleanStatue o.sand), not
-  // dark basalt that pulled the eye from the bright temple: Ra / Horus a
-  // falcon-headed god standing straight, the left foot forward, arms at his
-  // sides, the striped wig framing an ochre-gilt falcon head with a dark
-  // hooked beak, a soft ochre-red sun disc with a reared uraeus; the dark
-  // only in the eyes, the beak tip and small line accents
+  // ---- the pylon (z 37 .. 44): two battered limestone towers, a gate block
+  for (const [x0, x1] of [[3, 17], [23, 37]]) {
+    block(m, x0, 37, x1, 44, Y, 20, { wall: LIME, batter: 7, band: 'team', frieze: 0, roofC: LIME_S, rimC: LIME, lipOut: 2, plinth: false, gorge: [0x34588a, 0x3f6596], torus: true });
+    flatTop(LIME);
+    bands(m, x0, 37, x1, 44, Y + 3, [INK, RED_B, OCHRE_B, TURQ, INK]);
+  }
+  for (let x = 16; x < 24; x++) for (let z = 38; z < 43; z++) for (let y = Y; y < Y + 15; y++) {
+    m.set(x, y, z, y === Y + 14 ? LIP(x, y, z) : y === Y + 13 ? (((x + z) & 1) ? GORGE : GORGE_L) : y === Y + 12 ? LAPIS : y === Y + 11 ? GILT : LIME(x, y, z));
+  }
+  door(m, '+z', AX - 2, 4, Y, 9, { deep: 5, frame: GILT_D, lintel: false, leaf: false });
+  paint(m, '+z', AX - 4, Y + 10, ['GG.GG.GG', '.GGRRGG.'], { G: GILT, R: RED });
+  // the reliefs on the towers' fronts: the god in a sunk panel on each,
+  // a row of cartouches over it
+  recessPanel(m, '+z', 7, Y + 17, PANEL_GOD, RELIEF);
+  recessPanel(m, '+z', 27, Y + 17, PANEL_GOD, RELIEF);
+  // the owner's pennants on masts in the towers' faces (flanking the gate)
+  banner(m, 14, Y, 44, 26, '+z'); banner(m, 25, Y, 44, 26, '+z');
+  // ---- the god's statue at the sanctuary door on the axis, facing the gate
+  // down the open aisle of the hall
   const G = {
     ra: { head: 'falcon', crown: 'disc', arms: 'side', kilt: GILT },
     isis: { head: 'human', crown: 'horns', arms: 'wings', kilt: GILT, pose: 'dress' },
     set: { head: 'jackal', crown: 'set', arms: 'side', kilt: GILT },
   }[god];
-  // the team colour only as the kilt's apron
-  fineStatue(m, 1, 30, 10, 38, 4, 6, { h: 30, gold: GILT_L, kiltFront: TEAM, pose: 'stride', sand: true, ...G }, 2);
+  // (at third voxels, two thirds the Town Center's statue: taller than the
+  // columns, under the sanctuary's cornice, so it crowns the axis without
+  // hiding the hall)
+  {
+    const k = 3, x0 = AX - 4, x1 = AX + 4, z0 = 16, z1 = 22;
+    const sub = new Rec(m.W * k, m.D * k);
+    const py = monPlinth(sub, x0 * k, z0 * k, x1 * k, z1 * k, Y * k, 2 * k, { seed: 2 });
+    const pd = monDie(sub, x0 * k + 3, z0 * k + 3, x1 * k - 3, z1 * k - 3, py, 2);
+    cleanStatue(sub, Math.round(((x0 + x1) * k) / 2), pd, Math.round(((z0 + z1) * k) / 2) - 1, toClean({ gold: GILT_L, kiltFront: TEAM, pose: 'stride', sand: true, ...G }));
+    (m.fine ??= []).push({ m: sub, k });
+  }
   const st = m.fine[m.fine.length - 1].m;
   for (const [x, y, z] of st.coords) {
     const v = st.get(x, y, z);
     if (v && !v.team) v.c = tcSandstone(v.c, x, y, z);
   }
-  pottedPalm(m, 33, 4, 35);
-  // round 32: one short pair of limestone obelisks flanking the ramp's
-  // foot, set back against tier 1's face (the town's two Obelisk buildings
-  // no longer stand beside them), so the stairs and the colonnade stay open
-  for (const cx of [12, 28]) smallObelisk(m, cx, 40, 1, 13, { small: true });
+  // ---- the obelisk pair before the pylon, on the ground either side of the
+  // stair: box-built (no smooth batter, which drew them as pale spikes), a
+  // dark die with the owner's band, a 3 x 3 granite-pink shaft stepping to
+  // 2 x 2 two thirds up, a column of painted signs down its front, a gilt
+  // pyramidion kept gold through the grade (m.keep)
+  const tob = (cx, cz, h) => {
+    for (let x = cx - 2; x < cx + 3; x++) for (let z = cz - 2; z < cz + 3; z++) { m.set(x, 1, z, PLINTH(x, 1, z)); m.set(x, 2, z, (x === cx - 2 || x === cx + 2 || z === cz - 2 || z === cz + 2) ? TEAM : LIME(x, 2, z)); }
+    const SH = (x, y, z) => pick(hash3(x, y >> 2, z, 464), [0xd9b79a, 0xd2b093, 0xdcbca0]);
+    const h2 = Math.round(h * 0.66);
+    for (let y = 3; y < 3 + h; y++) {
+      const r = y - 3, n = r < h2 ? 3 : 2, o = r < h2 ? -1 : 0;
+      for (let i = 0; i < n; i++) for (let k = 0; k < n; k++) {
+        const x = cx + o + i, z = cz + o + k;
+        const front = k === n - 1 && i === (n === 3 ? 1 : 0);
+        const sign = front && r > 1 && r < h - 2 ? [RED_B, null, LAPIS, null, INK, null][r % 6] : null;
+        m.set(x, y, z, sign ?? (i === n - 1 || k === n - 1 ? SH(x, y, z) : shade(SH(x, y, z), 0.9)));
+      }
+    }
+    const T = 3 + h;
+    m.box(cx, T, cz, 2, 1, 2, OB_GOLD); m.set(cx, T + 1, cz, OB_GOLD_L); m.set(cx + 1, T + 1, cz + 1, OB_GOLD);
+    (m.keep ??= []).push([cx - 1, T - 1, cz - 1, cx + 3, T + 3, cz + 3]);
+  };
+  tob(9, 46, 22); tob(30, 46, 22);
   return m;
 }
 
@@ -6154,8 +6142,8 @@ const TYPES = {
 // voxels (half-voxel insets included, scaled) as [x, y, z, size, rgb] for a
 // quick offline look (no export)
 if (argOf('preview', '')) {
-  const [pt, pv] = argOf('preview', '').split(':');
-  const full = TYPES[pt].build(+(pv || 0), 1);
+  const [pt, pv, pa] = argOf('preview', '').split(':');
+  const full = TYPES[pt].build(+(pv || 0), +(pa || 1));
   const out = [];
   const dump = (mm, k) => { for (const [x, y, z] of mm.coords) { const v = mm.get(x, y, z); if (v) out.push([x / k, y / k, z / k, 1 / k, v.team ? 0x2850c8 : v.c]); } };
   dump(full, 1);
