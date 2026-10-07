@@ -25,6 +25,8 @@
 //   10 the Eclipse's mark (round 19): one hard-edged disc, a faint fill (custom.y) inside a
 //     crisp bright rim with a hot white core, a thin inner ring, a soft halo just outside;
 //     COLOR.rgb * COLOR.a, custom.z = phase (a slow shimmer along the rim)
+//   11 a serpent's emergence cracks glowing (emerge_cracks, as decal_mix kind 6) and the
+//     hole's heart; custom.y = seed, custom.z = grow
 // custom.w < -0.5: emissive, the colour kept by the grade (a negative blue: see
 //   flame.gdshader and game/lighting/grade_effect.gd)
 shader_type spatial;
@@ -40,7 +42,9 @@ void vertex() {
 	// (Godot) pulled toward the camera along the view ray: the same pixels, but
 	// the flat decal is no longer swallowed by voxel-step bumps in the ground
 	vec3 wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	wp += normalize(CAMERA_POSITION_WORLD - wp) * 0.8;
+	// (the Plague of Serpents' marks are pulled only a little: a serpent's coils and the sand
+	// voxels heaped round them lie a few tenths over the ground and must stay in front)
+	wp += normalize(CAMERA_POSITION_WORLD - wp) * ((INSTANCE_CUSTOM.x > 10.5 && INSTANCE_CUSTOM.x < 11.5) ? 0.1 : 0.8);
 	POSITION = PROJECTION_MATRIX * (VIEW_MATRIX * vec4(wp, 1.0));
 }
 
@@ -59,6 +63,29 @@ float plates(vec2 p, float seed) { // as decal_mix.gdshader
 			if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
 		}
 	return d2 - d1;
+}
+// the Plague of Serpents' emergence cracks (decal_mix kind 6 and decal_add kind 11 share it):
+// jagged cracks running out from the hole a serpent burst from, one branch off each, and short
+// splits between them; p in -1..1, grow 0..1 (the cracks race out in the first half second)
+float emerge_cracks(vec2 p, float seed, float grow) {
+	float d = length(p);
+	float an = atan(p.y, p.x);
+	float v = 0.0;
+	for (int k = 0; k < 11; k++) {
+		float fk = float(k);
+		float a0 = fk / 11.0 * 6.2831853 + (h1(fk + seed) - 0.5) * 0.45;
+		float len = (0.55 + 0.4 * h1(fk * 3.7 + seed)) * grow;
+		float th = a0 + (vn1(d * 9.0 + fk * 5.0 + seed) - 0.5) * 0.55;
+		float da = abs(mod(an - th + 3.14159265, 6.2831853) - 3.14159265) * d;
+		float w = 0.075 * (1.0 - 0.7 * d / max(len, 0.01)) + 0.012;
+		float line = (1.0 - smoothstep(w * 0.45, w, da)) * (1.0 - smoothstep(len * 0.85, len, d)) * step(0.1, d);
+		float rb = len * (0.35 + 0.3 * h1(fk * 9.1 + seed));
+		float thb = th + (h1(fk * 4.3 + seed) > 0.5 ? 0.55 : -0.55) * smoothstep(rb, rb + 0.08, d);
+		float db = abs(mod(an - thb + 3.14159265, 6.2831853) - 3.14159265) * d;
+		float lb = (1.0 - smoothstep(0.01, 0.022, db)) * step(rb, d) * (1.0 - smoothstep(rb + 0.12, rb + 0.22, d));
+		v = max(v, max(line, lb * 0.85));
+	}
+	return v;
 }
 // the lava's colour by temperature T (0 dull red .. 1 white-yellow), linear, before the grade's x2.1
 vec3 lava(float T) {
@@ -226,6 +253,12 @@ void fragment() {
 		c = v_col.rgb * (fill * inside + rim * 1.5 * shim + inner * 0.55 + halo * 0.45) * v_col.a;
 		c += vec3(1.0) * core * 0.35 * v_col.a;
 		c *= 1.0 - smoothstep(0.99, 1.0, d);
+	} else if (kind == 11) {
+		// a serpent's emergence cracks glowing (the same cracks as decal_mix kind 6)
+		float cr = emerge_cracks(p, v_c.y * 41.0, v_c.z);
+		float hole = exp(-pow(d / 0.16, 2.0));
+		c = v_col.rgb * (cr * (1.0 - smoothstep(0.08, 0.8, d)) + hole * 0.8) * v_col.a;   // (the outer cracks stay dark)
+		c *= 1.0 - smoothstep(0.9, 1.0, d);
 	} else if (kind == 8) {
 		c = v_col.rgb * v_col.a * (exp(-d * d * 3.5) - 0.03) * (1.0 - smoothstep(0.85, 1.0, d));
 		c = max(c, vec3(0.0));

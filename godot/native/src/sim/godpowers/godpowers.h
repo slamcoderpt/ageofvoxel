@@ -65,6 +65,7 @@ constexpr double ECLIPSE_DAMAGE = 1.2, ECLIPSE_SPEED = 1.15, ECLIPSE_ARMOR = 0.1
 constexpr double SANDS_MIN_DIST = 40 * 0.6;  // Shifting Sands: the destination at least 40 m away
 constexpr int SERPENTS = 14, SERPENT_WAVE = 2; // Plague of Serpents: 2 at once, then 2 every 3 s
 constexpr double SERPENT_EVERY = 3, SERPENT_GUARD = 6;
+constexpr double SERPENT_MARK_LIFE = 22;      // (visual only) how long the broken ground where a Serpent rose is kept in rises
 constexpr int SWARMS = 5;                    // Locust Swarm: 5 swarms at 3 m/s for 20 s,
 constexpr double SWARM_SPEED = 3 * 0.6, SWARM_DPS = 3.5, SWARM_FARM = 6, SWARM_OWN = 0.1, SWARM_TICK = 0.25; // 3.5 divine/s in 6 m
 constexpr double CITADEL_HP = 1200, CITADEL_ATTACK = 1.2, CITADEL_SIGHT = 1 * 0.6, CITADEL_WORK = 1.25,

@@ -20,6 +20,11 @@
 //     dark lip, soot rays flung out over the ground and the ground round it baked and cracked
 //     into plates (dark crack lines); custom.y = seed, custom.z = age 0 fresh .. 1 old (the
 //     soot greys); the glowing lava is decal_add kind 9 drawn over it
+//   6 a serpent's emergence (Plague of Serpents): a dark pit, churned dark ochre sand round it,
+//     jagged radial cracks (emerge_cracks, glowing: decal_add kind 11); custom.y = seed,
+//     custom.z = grow 0..1
+//   7 the serpents' vortex: spiral arms, a deep emerald heart paling to light green at the edge;
+//     custom.y = phase
 shader_type spatial;
 render_mode unshaded, blend_mix, depth_draw_never, cull_disabled, fog_disabled, shadows_disabled;
 
@@ -32,7 +37,9 @@ void vertex() {
 	// (Godot) pulled toward the camera along the view ray: the same pixels, but
 	// the flat decal is no longer swallowed by voxel-step bumps in the ground
 	vec3 wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	wp += normalize(CAMERA_POSITION_WORLD - wp) * 0.6;
+	// (the Plague of Serpents' marks are pulled only a little: a serpent's coils and the sand
+	// voxels heaped round them lie a few tenths over the ground and must stay in front)
+	wp += normalize(CAMERA_POSITION_WORLD - wp) * ((INSTANCE_CUSTOM.x > 5.5 && INSTANCE_CUSTOM.x < 7.5) ? 0.1 : 0.6);
 	POSITION = PROJECTION_MATRIX * (VIEW_MATRIX * vec4(wp, 1.0));
 }
 
@@ -53,6 +60,31 @@ float plates(vec2 p, float seed) {
 	return d2 - d1;
 }
 vec3 lin(vec3 c) { return pow(c / 255.0, vec3(2.2)); }
+float vn1(float x) { float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(h1(i), h1(i + 1.0), f); }
+
+// the Plague of Serpents' emergence cracks (decal_mix kind 6 and decal_add kind 11 share it):
+// jagged cracks running out from the hole a serpent burst from, one branch off each, and short
+// splits between them; p in -1..1, grow 0..1 (the cracks race out in the first half second)
+float emerge_cracks(vec2 p, float seed, float grow) {
+	float d = length(p);
+	float an = atan(p.y, p.x);
+	float v = 0.0;
+	for (int k = 0; k < 11; k++) {
+		float fk = float(k);
+		float a0 = fk / 11.0 * 6.2831853 + (h1(fk + seed) - 0.5) * 0.45;
+		float len = (0.55 + 0.4 * h1(fk * 3.7 + seed)) * grow;
+		float th = a0 + (vn1(d * 9.0 + fk * 5.0 + seed) - 0.5) * 0.55;
+		float da = abs(mod(an - th + 3.14159265, 6.2831853) - 3.14159265) * d;
+		float w = 0.075 * (1.0 - 0.7 * d / max(len, 0.01)) + 0.012;
+		float line = (1.0 - smoothstep(w * 0.45, w, da)) * (1.0 - smoothstep(len * 0.85, len, d)) * step(0.1, d);
+		float rb = len * (0.35 + 0.3 * h1(fk * 9.1 + seed));
+		float thb = th + (h1(fk * 4.3 + seed) > 0.5 ? 0.55 : -0.55) * smoothstep(rb, rb + 0.08, d);
+		float db = abs(mod(an - thb + 3.14159265, 6.2831853) - 3.14159265) * d;
+		float lb = (1.0 - smoothstep(0.01, 0.022, db)) * step(rb, d) * (1.0 - smoothstep(rb + 0.12, rb + 0.22, d));
+		v = max(v, max(line, lb * 0.85));
+	}
+	return v;
+}
 
 // premultiplied "over"
 void over(inout vec3 P, inout float A, vec3 c, float a) {
@@ -64,7 +96,53 @@ void fragment() {
 	vec2 q = UV - 0.5;           // -0.5..0.5 (the canvas centre is 0)
 	float r = length(q);
 	float ang = atan(q.y, q.x) + 3.14159265;
-	if (v_c.x > 4.5) {
+	if (v_c.x > 6.5) {
+		// 7 the serpents' vortex (Plague of Serpents): spiral arms turning in to a deep emerald
+		// heart, paling to a light green at the edge; custom.y = phase
+		vec2 p = q * 2.0;
+		float d = length(p);
+		float an = atan(p.y, p.x);
+		float ph = v_c.y;
+		float arm = sin(4.0 * (an + 2.4 * log(max(d, 0.02))) + ph * 5.0);
+		float arms = smoothstep(-0.35, 0.85, arm);
+		float t = smoothstep(0.0, 0.95, d);
+		vec3 core = lin(vec3(6.0, 52.0, 30.0)), mid = lin(vec3(28.0, 118.0, 58.0)), edge = lin(vec3(150.0, 214.0, 136.0));
+		vec3 cc = t < 0.5 ? mix(core, mid, t * 2.0) : mix(mid, edge, t * 2.0 - 1.0);
+		float grain = h2(floor(UV * 72.0) + 3.1);
+		vec3 col = mix(cc * 0.55, cc * 1.18, arms) * (0.92 + 0.16 * grain);
+		float a = mix(0.95, 0.16, pow(t, 0.8)) * mix(0.62, 1.0, arms);
+		a *= smoothstep(0.0, 0.04, d + 0.04) * (1.0 - smoothstep(0.86, 1.0, d));
+		ALBEDO = col;
+		ALPHA = clamp(a * v_col.a, 0.0, 1.0);
+	} else if (v_c.x > 5.5) {
+		// 6 a serpent's emergence (Plague of Serpents): the dark hole it burst from, churned dark
+		// ochre sand heaped round it, jagged cracks running out over the ground; custom.y = seed,
+		// custom.z = grow 0..1 (the cracks race out)
+		vec2 p = q * 2.0;
+		float d = length(p);
+		float seed = v_c.y * 41.0, grow = v_c.z;
+		float an = atan(p.y, p.x);
+		vec3 P = vec3(0.0);
+		float A = 0.0;
+		vec2 cell = floor(UV * 56.0);
+		float hc = h2(cell + seed);
+		// the churned ring of displaced sand (under the voxel heap) and a scuffed halo past it
+		float wob = (vn1(an * 3.0 + seed) - 0.5) * 0.08;
+		float churn = (1.0 - smoothstep(0.42 + wob, 0.62 + wob, d)) * smoothstep(0.08, 0.14, d);
+		over(P, A, lin(mix(vec3(118.0, 82.0, 44.0), vec3(150.0, 108.0, 60.0), hc)), churn * (0.62 + 0.3 * hc));
+		float scuff = (1.0 - smoothstep(0.5, 0.85, d)) * smoothstep(0.38, 0.52, d) * (0.6 + 0.4 * vn1(an * 7.0 + seed * 2.0));
+		over(P, A, lin(vec3(150.0, 110.0, 64.0)), scuff * 0.4);
+		// the cracks, darkest near the hole
+		float cr = emerge_cracks(p, seed, grow);
+		over(P, A, lin(mix(vec3(22.0, 14.0, 8.0), vec3(58.0, 40.0, 22.0), smoothstep(0.2, 0.9, d))), cr * 0.95);
+		// the hole: a near-black pit with a dark lip
+		float hole = 1.0 - smoothstep(0.1, 0.15, d + 0.02 * (vn1(an * 4.0 + seed) - 0.5));
+		over(P, A, lin(vec3(14.0, 10.0, 6.0)), hole);
+		float lip = exp(-pow((d - 0.15) / 0.03, 2.0));
+		over(P, A, lin(vec3(70.0, 48.0, 26.0)), lip * 0.8);
+		ALBEDO = A > 0.0 ? P / A : vec3(0.0);
+		ALPHA = clamp(A * v_col.a * (1.0 - smoothstep(0.92, 1.0, d)), 0.0, 1.0);
+	} else if (v_c.x > 4.5) {
 		vec2 p = q * 2.0;
 		float d = length(p);
 		float seed = v_c.y * 37.0, age = v_c.z;

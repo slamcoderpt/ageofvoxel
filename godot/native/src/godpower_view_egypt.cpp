@@ -18,8 +18,11 @@
 //                   streaks rising up it, an eclipse corona over its health bar
 //   Shifting Sands  sand vortices at both ends: a sand swirl on the ground, sand spiralling
 //                   up, grains whirling, a burst at the destination when the units arrive
-//   Plague of Serpents  a green glyph ring round the spot, the sand cracking open with a
-//                   green glow and a puff of sand where each serpent rises
+//   Plague of Serpents  a green glyph ring round the spot over a painted vortex (a deep emerald
+//                   heart paling to light green); where each serpent bursts out: a dark pit and
+//                   jagged cracks glowing green, a raised ring of dark ochre sand voxels round
+//                   its coils, a plume of tan dust and voxel chunks up to its head that fall
+//                   back and lie round the hole, a low dust skirt (serpent_burst)
 //   Locust Swarm    five clouds of voxel locusts boiling along their track over a dusty brown
 //                   haze, a shadow under each
 //   Citadel         a gold pillar of light on the Town Center, a shock ring, sandstone blocks
@@ -665,7 +668,9 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 			const double gy = h_at(c.x, c.z);
 			const Lin col = hex_lin(kind ? 0x58b8ff : 0x7dff8c), deep = hex_lin(kind ? 0x2050ff : 0x10a040);
 			decal(I_DECAL_ADD, c.x, gy + 0.15, c.z, 2 * R * 1.08, now * (kind ? -0.08 : 0.08), col.r, col.g, col.b, (float)(1.3 * k), 5, 0.86f, (float)(now * 0.15));
-			decal(I_DECAL_ADD, c.x, gy + 0.12, c.z, 2 * R * 0.7, -now * 0.12, deep.r, deep.g, deep.b, (float)(0.6 * k), 6, 0.1f, (float)now);
+			if (kind) decal(I_DECAL_ADD, c.x, gy + 0.12, c.z, 2 * R * 0.7, -now * 0.12, deep.r, deep.g, deep.b, (float)(0.6 * k), 6, 0.1f, (float)now);
+			else // the serpents' vortex: a deep emerald heart paling to light green, painted (decal_mix kind 7)
+				decal(I_DECAL_MIX, c.x, gy + 0.04, c.z, 2 * R * 0.98, -now * 0.12, 1, 1, 1, (float)(0.95 * k), 7, (float)now);
 			for (int i = 0; i < 36; i++) { // low mist
 				const double f = std::fmod(now / (3 + 2 * hr(i, 91, kind)) + hr(i, 92, kind), 1.0);
 				const double a = hr(i, 93, kind) * TAU + now * 0.1, rr = R * std::sqrt(hr(i, 94, kind));
@@ -680,15 +685,125 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 			lit(c.x, gy + 3, c.z, kind ? 0x5aa0ff : 0x60ff80, 6 * k, 14, 1.5);
 		}
 
+	// ---- a serpent bursting out of the sand (Plague of Serpents, each rise) ---------------------------
+	// The ground breaks where it comes up and stays broken while the brood guards the spot
+	// (SERPENT_MARK_LIFE): a dark pit, churned dark ochre sand and jagged cracks racing out
+	// (decal_mix kind 6) glowing green for the first seconds (decal_add kind 11); a raised ring of
+	// displaced sand voxels heaped round its coils (two to three voxels high, darker ochre,
+	// thrown up in the first 0.3 s); a thick plume of tan dust and voxel chunks flung up to the
+	// height of its head, falling back round the hole and lying there; a low dust skirt drifting
+	// for a few seconds. Nothing tall and glowing over the serpent itself: its head stays clear.
+	auto serpent_burst = [&](double x, double z, double gy, double age, uint32_t sd, double now, int &) {
+		const double fade = clamp01((aov::SERPENT_MARK_LIFE - age) / 4.0);   // the mark settles away
+		const double grow = sstep(0, 0.5, age);
+		const double rot = sd % 628 / 100.0;
+		double cdx = cam.x - x, cdz = cam.z - z;
+		const double cl = std::max(1e-6, std::hypot(cdx, cdz));
+		cdx /= cl; cdz /= cl;
+		auto smoothstep_ = [](double e0, double e1, double v) { return sstep(e0, e1, v); };
+		// the broken ground, and its glow while the god's power is in it
+		decal(I_DECAL_MIX, x, gy + 0.05, z, 6.2, rot, 1, 1, 1, (float)(0.97 * fade), 6, (float)((sd >> 5) % 997 / 997.0), (float)grow);
+		const double gk = clamp01(1 - age / 5.0) * 0.85 + 0.15 * fade;
+		const Lin gc = hex_lin(0x5cff6a);
+		decal(I_DECAL_ADD, x, gy + 0.07, z, 6.2, rot, gc.r, gc.g, gc.b, (float)(1.3 * gk * (0.85 + 0.15 * std::sin(now * 5 + sd % 7))), 11,
+				(float)((sd >> 5) % 997 / 997.0), (float)grow);
+		// the raised ring of displaced sand: voxels heaped round the hole, highest on its crest
+		static const uint32_t OCHRE[5] = { 0x7c5226, 0x6a431c, 0x8a5c2a, 0x5a3816, 0x94683a };
+		const double pop = sstep(0.0, 0.3, age), sink = 1 - fade;
+		const int NA = 26;
+		for (int j = 0; j < NA; j++) {
+			const double a0 = (j + 0.5) / NA * TAU + rot;
+			for (int ring = 0; ring < 3; ring++) {
+				// inner slope, crest, outer skirt
+				const double rr = (ring == 0 ? 0.8 : ring == 1 ? 1.04 : 1.3) + 0.1 * (hr(sd, j * 3 + ring, 201) - 0.5);
+				const int layers = ring == 1 ? 2 + (hr(sd, j, 202) > 0.45) : ring == 0 ? 1 + (hr(sd, j, 203) > 0.4) : 1;
+				const double aj = a0 + (ring == 1 ? 0 : 0.5 / NA * TAU) + 0.08 * (hr(sd, j * 3 + ring, 204) - 0.5);
+				for (int l = 0; l < layers; l++) {
+					const double s = (0.21 - 0.025 * l) * (0.9 + 0.2 * hr(sd, j * 9 + ring * 3 + l, 205));
+					const double px = x + std::cos(aj) * rr, pz = z + std::sin(aj) * rr;
+					const double py = gy + s * 0.5 + l * s * 0.92 - (1 - pop) * (l + 1) * s - sink * (l + 1.2) * s;
+					if (py + s * 0.5 < gy) continue;
+					const Lin oc = hex_lin(OCHRE[(j + ring * 2 + l) % 5]);
+					const float sh = (float)(l == layers - 1 ? 1.0 : 0.8); // the crest's top caught by the sun
+					cube(I_DEBRIS, px, py, pz, 0.12 * (hr(sd, j, 206 + l) - 0.5), aj + 0.3 * hr(sd, j, 208 + ring), 0.12 * (hr(sd, j, 210 + l) - 0.5),
+							s, s, s, oc.r * sh, oc.g * sh, oc.b * sh);
+				}
+			}
+		}
+		// voxel chunks flung up to the serpent's head, falling back and lying round the hole
+		static const uint32_t CHUNK[4] = { 0xb08a50, 0x8e683a, 0x6e4a24, 0xc49c62 };
+		for (int i = 0; i < 44; i++) {
+			// (the chunks flung towards the camera fly lower: none hangs in front of the serpent's face)
+			const double a = hr(sd, i, 141) * TAU, sp = 0.5 + 1.9 * hr(sd, i, 142);
+			const double vy = (4.2 + 2.8 * hr(sd, i, 143)) * (1 - 0.42 * std::max(0.0, std::cos(a) * cdx + std::sin(a) * cdz));
+			const double g = 8.5, tl = 2 * vy / g;               // its flight time
+			const double s = (0.07 + 0.13 * hr(sd, i, 144)) * (age < tl ? 1 : fade * clamp01(1 - (age - tl - 4) / 2.0));
+			if (s <= 0.01) continue;
+			const double ta = std::min(age, tl);
+			const double rr = 0.35 + sp * ta;
+			const double yy = age < tl ? gy + 0.2 + vy * ta - 0.5 * g * ta * ta : gy + s * 0.5;
+			const double spin = age < tl ? age * (6 + 4 * hr(sd, i, 145)) : tl * 6;
+			const Lin cc = hex_lin(CHUNK[i & 3]);
+			cube(I_DEBRIS, x + std::cos(a) * rr, std::max(yy, gy + s * 0.5), z + std::sin(a) * rr, spin + i, a, spin * 0.7, s, s, s, cc.r, cc.g, cc.b);
+		}
+		// the plume: thick tan dust boiling up round the hole to the head's height (a hollow
+		// column: the dust rises round the coils, not over the face)
+		for (int i = 0; i < 40; i++) {
+			const double L = 2.2 + 1.4 * hr(sd, i, 151), del = 0.25 * hr(sd, i, 152);
+			const double t = age - del;
+			if (t < 0 || t > L) continue;
+			const double u = t / L;
+			const double a = hr(sd, i, 153) * TAU + u * 0.8;
+			const double rr = 0.75 + 0.55 * hr(sd, i, 154) + 0.9 * u;
+			const double top = 1.4 + 1.5 * hr(sd, i, 155);
+			const double yy = gy + 0.3 + top * (1 - std::exp(-t * 2.2));
+			const double sz = (0.55 + 0.5 * hr(sd, i, 156)) * (0.7 + 1.3 * u);
+			// (thinned on the camera's side above the coils, so the serpent's head is not veiled)
+			const double front = std::max(0.0, std::cos(a) * cdx + std::sin(a) * cdz) * smoothstep_(1.0, 1.8, yy - gy);
+			const double al = std::min(1.0, (1 - u) * 1.8) * 0.85 * std::min(1.0, t / 0.12) * (1 - 0.8 * front);
+			const Lin dc = hex_lin(i % 3 ? 0xc8a46c : 0xa88654);
+			Basis bs;
+			bs.rows[0] = Vector3((real_t)(sz * 0.55), 0, 0);
+			bs.rows[1] = Vector3(0, (real_t)(sz * 0.55), 0);
+			bs.rows[2] = Vector3(0, 0, 1);
+			inst(I_PUFF, bs, x + std::cos(a) * rr, yy, z + std::sin(a) * rr, dc.r, dc.g, dc.b, (float)al, (float)((sd ^ (uint32_t)i) % 997) / 997.f, 1.f);
+		}
+		// a burst of sand rolling out low along the ground
+		puff(false, now - age, sd ^ 0x5bd1e995u, now, x, gy + 0.25, z, 22, 0xb8925a, 1.1, 2.6, 3.4, 0.35, 0.0, 1.8, 0.5, 1.f);
+		// the dust skirt, drifting round the heap for a while after
+		const double sk = clamp01((age - 0.8) / 1.0) * clamp01((9 - age) / 3.0);
+		if (sk > 0)
+			for (int i = 0; i < 12; i++) {
+				const double per = 2.6 + hr(sd, i, 161), ph = std::fmod(now / per + hr(sd, i, 162), 1.0);
+				const double a = hr(sd, i, 163) * TAU + now * 0.15, rr = 1.0 + 0.8 * hr(sd, i, 164) + 0.4 * ph;
+				const double sz = 0.8 + 0.6 * ph;
+				Basis bs;
+				bs.rows[0] = Vector3((real_t)(sz * 0.55), 0, 0);
+				bs.rows[1] = Vector3(0, (real_t)(sz * 0.55), 0);
+				bs.rows[2] = Vector3(0, 0, 1);
+				const Lin dc = hex_lin(0xc4a068);
+				inst(I_PUFF, bs, x + std::cos(a) * rr, gy + 0.25 + 0.5 * ph, z + std::sin(a) * rr, dc.r, dc.g, dc.b, (float)(0.4 * sk * std::sin(ph * PI)),
+						(float)((sd ^ (uint32_t)(i + 77)) % 997) / 997.f, 1.f);
+			}
+		// a low green flash in the hole (kept under the coils: the head stays clear)
+		const double pk = clamp01(1 - age / 1.0);
+		glow(false, x, gy + 0.35, z, 2.2, 0.9 * pk + 0.2, gc.r, gc.g, gc.b, 0.8 * pk, 1);
+		if (age < 0.6) lit(x, gy + 1.5, z, 0x50ff70, 10 * (1 - age / 0.6), 8, 1.8);
+	};
+
 	// ---- rises: serpents and Minions clawing out, eggs, hatchings, the Scarab's burst ---------------
 	for (const aov::RiseFx &f : G.rises) {
 		const double age = now - f.t0;
-		if (age < 0 || age > 4) continue;
+		if (age < 0 || age > (f.kind == 0 ? aov::SERPENT_MARK_LIFE : 4)) continue;
 		const double gy = h_at(f.x, f.z);
 		const double k = clamp01(1 - age / 3.5);
 		const uint32_t sd = hmix((uint32_t)(f.t0 * 1000), (uint32_t)f.unit, f.kind);
 		switch (f.kind) {
-			case 0: case 1: { // a serpent / a Minion
+			case 0: { // a serpent bursting out of the sand
+				serpent_burst(f.x, f.z, gy, age, sd, now, li);
+				break;
+			}
+			case 1: { // a Minion
 				const Lin col = hex_lin(f.kind ? 0x6ab4ff : 0x86ff7a);
 				decal(I_DECAL_ADD, f.x, gy + 0.08, f.z, 3.2, sd % 628 / 100.0, col.r, col.g, col.b, (float)(1.6 * k), 0, (float)((sd >> 4) % 977 / 977.0));
 				decal(I_DECAL_MIX, f.x, gy + 0.05, f.z, 3.0, sd % 314 / 100.0, 1, 1, 1, (float)(0.85 * k), 0, (float)((sd >> 6) % 1000 / 1000.0), 1.f);

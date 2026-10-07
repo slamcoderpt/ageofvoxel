@@ -848,12 +848,21 @@ func _case_serpents() -> void:
 	var r := {}
 	r["cast"] = sim.cast_power(1, "plague_of_serpents", C.x, C.y)
 	var counts := []
+	var marks := []
 	var t0: float = float(sim.get_time())
 	for want in [0.05, 3.05, 6.05, 18.05, 25.0]:
 		while float(sim.get_time()) - t0 < want:
 			sim.tick(1)
 		counts.append(_units_of(sim, 1, "serpent").size())
+		# the broken ground where each rose (rises kind 0, visual only) is kept 22 s
+		var rs: PackedFloat32Array = sim.get_egypt_powers().rises
+		var nm := 0
+		for i in range(0, rs.size(), 5):
+			if int(rs[i]) == 0:
+				nm += 1
+		marks.append(nm)
 	r["serpents at 0 / 3 / 6 / 18 / 25 s"] = counts
+	r["emergence marks at 0 / 3 / 6 / 18 / 25 s"] = marks
 	var sp: Array = _units_of(sim, 1, "serpent")
 	var within := true
 	for id in sp:
@@ -867,7 +876,7 @@ func _case_serpents() -> void:
 	var dmg := _damage_by(sim, 6.0, func(e): return int(e.id) == hop)
 	r["damage on a hoplite that came near (6 s)"] = _r(float(dmg.get(hop, 0.0)))
 	r["serpent stats"] = sim.get_unit_def("serpent").hp
-	var ok: bool = r["cast"] and counts == [2, 4, 6, 14, 14] and within and r["uncontrolled"] and r["damage on a hoplite that came near (6 s)"] > 20
+	var ok: bool = r["cast"] and counts == [2, 4, 6, 14, 14] and marks == [2, 4, 6, 14, 10] and within and r["uncontrolled"] and r["damage on a hoplite that came near (6 s)"] > 20
 	_check("serpents.waves", ok, r)
 
 # Locust Swarm --------------------------------------------------------------------------

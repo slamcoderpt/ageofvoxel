@@ -908,7 +908,7 @@ void GodPowers::update_egypt(double dt) {
 	thoth.erase(std::remove_if(thoth.begin(), thoth.end(), [](const ThothCast &t) { return t.done; }), thoth.end());
 
 	// what the renderer still draws
-	rises.erase(std::remove_if(rises.begin(), rises.end(), [&](const RiseFx &f) { return now - f.t0 > 4; }), rises.end());
+	rises.erase(std::remove_if(rises.begin(), rises.end(), [&](const RiseFx &f) { return now - f.t0 > (f.kind == 0 ? SERPENT_MARK_LIFE : 4); }), rises.end());
 	arcs.erase(std::remove_if(arcs.begin(), arcs.end(), [&](const Arc &a) { return now - a.t0 > 0.5; }), arcs.end());
 	speeds();
 }

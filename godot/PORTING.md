@@ -3868,6 +3868,32 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   map lights at once (0.6..1.0 s, hashed) with a moonlit ring pulsing out from under it, then wears
   the round 19 marker (ground ring, head glow, rising streaks, corona). `TimedPower::x / z` is
   still filled (the capture framing; egypt_gods_check `eclipse.myth_and_favor`).
+- **A serpent bursts out of the ground** (gods round 21; godpower_view_egypt.cpp
+  `serpent_burst`, per RiseFx kind 0): the spot where each Serpent comes up is broken and stays
+  broken while the brood guards it. A dark pit, churned dark ochre sand and eleven jagged cracks
+  (each with a branch) racing out over 0.5 s to ~1.5-2.9 tiles (decal_mix kind 6, 6.2 tiles; the
+  shared `emerge_cracks()` is in decal_mix and decal_add), the inner cracks and the pit glowing
+  green, strongest the first 5 s (decal_add kind 11; the outer cracks stay dark); a raised ring
+  of displaced sand voxels round the coils (26 columns x inner slope / crest / skirt at 0.8 /
+  1.04 / 1.3 tiles, 1-2 / 2-3 / 1 voxels of 0.17-0.23 high, darker ochre 0x5a3816..0x94683a,
+  lit debris cubes with shadows) thrown up in the first 0.3 s; 44 voxel chunks flung up to
+  1-2.9 tiles (the serpent's head) that fall back and lie round the hole (the ones flung towards
+  the camera fly lower, so none hangs in front of the face); 40 soft tan dust puffs boiling up
+  a hollow column round the coils to 1.4-2.9 tiles (thinned on the camera's side above 1 tile),
+  a low burst of sand rolling out, and a dust skirt drifting round the heap until ~9 s. The old
+  tall green glow column and the green additive puff over the serpent are gone (they turned the
+  rising serpent's head into a faded ghost); only a low green flash stays in the hole. The marks
+  are kept SERPENT_MARK_LIFE = 22 s (godpowers.h, visual only: `rises` keeps kind 0 that long,
+  the others 4 s) and sink away over their last 4 s; egypt_gods_check `serpents.waves` asserts
+  the marks 2 / 4 / 6 / 14 / 10 at 0 / 3 / 6 / 18 / 25 s. Under the brood the old additive mint
+  swirl is replaced by a painted vortex (decal_mix kind 7, 0.98 x the power's diameter): spiral
+  arms turning in to a deep emerald heart (6,52,30) through (28,118,58) to a pale green
+  (150,214,136) at the edge, 95 % opaque at the centre, 16 % at the rim, under the bright glyph
+  ring. Decal_mix kinds 6 / 7 and decal_add kind 11 are pulled only 0.1 towards the camera (not
+  0.6 / 0.8): a serpent's coils and the sand heap lie a few tenths over the ground and must stay
+  in front of the ground marks. Capture: `node scripts/godot-shoot.mjs --scene egypt_powers
+  --params "power=plague_of_serpents"` (t = 3.6: the first pair's heaps and cracks, the second
+  pair mid-burst; t=1 the first plume, t=9 the heaps left round empty holes).
 - **Horus' Tornado funnel** (round 12: egypt_fx.gd `_make_funnel`, tornado.gdshader `mode`):
   a value structure instead of a pale haze. The body (mode 1, the ring mesh's outer face;
   the meshes wind so that is the *back* face) is fully opaque except at its silhouette (a dark
