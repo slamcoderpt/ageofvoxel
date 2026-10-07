@@ -2388,6 +2388,27 @@ mid-grey inner edge, a three-row taper to a bright point), raised forward and
 out from the fist (`rest [0.75, 0, 0.6]`). Check:
 `--params "eu_focus=camel_rider"` and `eu_group=mounted`.
 
+Axeman's axe and shield, round 30 (unit_02; the axe head read as a pale
+peach "C" cutout the size of the head, the shield panels skin-tan):
+`epsilonAxeM` is authored at half a rig voxel (part scale 0.5, the haft still
+one rig voxel square) with a head about 0.6 of the old one (10 x 6 half
+voxels): three tangs and two open eyes (the epsilon), the convex cutting edge
+out to the side (-x), so the RTS camera sees its face, not its edge. Each tang
+is bound to the haft by a dark leather band (one row a voxel proud, the next
+flush in a lighter leather). The bronze is a four-tone ramp: a near-black rim
+(top, bottom, back, over the eyes), a copper-bronze face, a lit row and a
+yellow glint row on the edge (`AXE_DK / MID / LT / HI`). The three lit tones
+are self-lit voxels (glow 0.78 / 0.8, the unit shader's `eg_fire` band, as the
+Phoenix's flames), because the frame grade's warm-chroma limiter turns any
+saturated orange or gold to peach-pink or cream, the "cardboard" look.
+`egShieldM({ cow: true })`: a cowhide face (cream with a hand-laid mask of
+dark and rust-brown patches, `COW_MASK`) inside the team rim, with a bronze
+boss in the same ramp. Every shield's back is now a dark wooden frame on
+leather instead of tan. Arms (`manArmM`, not slim): the deltoid is a voxel
+wider on the outer side (rows 13..16), the biceps a voxel deeper in front, and
+an elbow knob sits behind, so the shoulders carry mass. Check:
+`--params "eu_focus=axeman"`, `eu_one=axeman&eu_turn=20`, `eu_group=foot`.
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower

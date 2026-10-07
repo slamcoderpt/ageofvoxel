@@ -789,7 +789,7 @@ const ARM_ROWS_SLIM = [
 function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, sleeve = null, fist = null, bend = 0, grip = false, slim = false } = {}) {
   const m = new VoxelModel();
   const out = side === 'L' ? 1 : -1, H = palH(pal);
-  limbRows(m, slim ? ARM_ROWS_SLIM : ARM_ROWS, (x, y, z, nx, nz) => {
+  const tone = (x, y, z, nx, nz) => {
     const inner = nx * out < -0.55, front = nz > 0.45;
     let c = front ? pal.L : inner ? pal.D : pal.M;
     if (y >= 16 && nz > -0.6 && !inner) c = H;            // the lit shoulder cap
@@ -799,7 +799,23 @@ function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, 
     if (bnd && y >= 12 && y <= 13) c = bnd;
     if (sleeve && y >= 13) c = y === 13 ? (typeof sleeve === 'number' ? shadeC(sleeve, 0.86) : sleeve) : sleeve;
     return c;
-  });
+  };
+  limbRows(m, slim ? ARM_ROWS_SLIM : ARM_ROWS, tone);
+  if (!slim) {
+    // (round 30) shoulder and elbow mass: the deltoid a voxel wider on the
+    // outer side (rows 13..16, a rounded 3-deep column, its top lit), the
+    // biceps a voxel deeper in front, and an elbow knob behind
+    const put = (x, y, z, nx, nz) => {
+      const c = tone(x, y, z, nx, nz);
+      if (c === TEAM) tset(m, x, y, z, nz > 0.45 ? 0xffffff : TEAM_SHADE); else m.set(x, y, z, solid(c, x, y, z));
+    };
+    for (let y = 13; y <= 16; y++) for (let z = -1; z <= 1; z++) {
+      if ((y === 13 || y === 16) && z !== 0) continue;
+      put(3 * out, y, z, out, z / 2.3);
+    }
+    for (let y = 11; y <= 13; y++) put(0, y, 3, 0, 1);    // the biceps in front
+    put(0, 10, -2, 0, -1); m.set(0, 9, -2, pal.M);          // the elbow behind
+  }
   handVox(m, pal, out, { grip, fist, slim });
   return bendArm(m, bend);
 }
@@ -976,18 +992,57 @@ function spearM(len = 26) {
   m.box(0, -11, 0, 1, 2, 1, BLADE_DK);               // the butt spike
   return m;
 }
-// the epsilon axe: a long haft and a gold crescent blade held at two tangs
+// the epsilon axe (round 30), at half a rig voxel (part scale 0.5): a long
+// walnut haft two half-voxels square (one rig voxel) and a small bronze
+// crescent head about 0.6 of the old one (10 tall, 6 deep: half the head's
+// height at RTS zoom), the Egyptian epsilon: three tangs bound to the haft
+// with dark leather lashing bands round the haft, two open eyes between
+// them, the blade's convex cutting edge out to the side (-x, away from the
+// right hand's body, so the head shows its face to the RTS camera). A four-tone
+// bronze ramp: a near-black bronze rim along the top, bottom, back and over
+// the eyes, a warm copper-bronze face, a lit row inside the edge and a bright
+// yellow glint row on the cutting edge, so the head reads as metal against
+// skin and sand. Along +y from the grip (the fist) at the origin.
+// The lit tones are written as the unit shader's self-lit voxels (glow 0.75
+// .. 0.85, as the Phoenix's flame feathers): the frame grade's warm-chroma
+// limiter otherwise turns any saturated orange or gold peach-pink or cream
+// (round 29's skin-toned "cardboard" axe), and these keep their colour.
+const AXE_DK = 0x2a1600, AXE_MID = 0x5e3806, AXE_LT = 0x985c0e, AXE_HI = 0xf0c448;
+const AXE_GLOW = { [AXE_MID]: 0.78, [AXE_LT]: 0.78, [AXE_HI]: 0.8 };
+const bronzeSet = (m, x, y, z, c) => m.set(x, y, z, c, { glow: AXE_GLOW[c] || 0 });
 function epsilonAxeM() {
   const m = new VoxelModel();
-  m.box(0, -6, 0, 1, 22, 1, (x, y, z) => (y % 5 === 0 ? WOOD_DK : WOOD(x, y, z)));
-  for (let y = 9; y <= 16; y++) {
-    const d = Math.abs(y - 12.5);
-    const z1 = 5 - Math.round(d * d * 0.18);
-    // (an orange-leaning gold: the plain GOLD turns olive in shade on a blade this big)
-    for (let z = 1; z <= z1; z++) m.set(0, y, z, z === z1 ? 0xffd468 : (hash3(0, y, z, 83) < 0.5 ? 0xf2a428 : 0xe89a20));
+  const LASH = 0x2a1608, LASH_L = 0x5a3416;
+  m.box(0, -12, 0, 2, 45, 2, (x, y, z) => (y % 9 === 0 ? WOOD_DK : WOOD(x, y, z)));
+  m.box(0, 33, 0, 2, 1, 2, AXE_DK);                         // a bronze cap on the haft's top
+  m.box(0, -13, 0, 2, 1, 2, WOOD_DK);                       // the butt
+  const y0 = 22, y1 = 31, cy = 26.5;
+  const tang = (y) => y <= 23 || y === 26 || y === 27 || y >= 30;   // tangs; eyes at 24-25, 28-29
+  for (let y = y0; y <= y1; y++) {
+    const d = Math.abs(y - cy);
+    const zEdge = 7 - Math.round(d * d * 0.12);             // the convex cutting edge (5..7 from the haft)
+    for (let z = 2; z <= zEdge; z++) {
+      if (!tang(y) && z <= 3) continue;                     // the eyes, open through the head
+      let c = AXE_MID;                                      // the bronze face
+      if (z === zEdge) c = AXE_HI;                          // the bright honed edge
+      else if (z === zEdge - 1) c = AXE_LT;                 // lit just inside it
+      else if (y === y0 || y === y1 || z === 2) c = AXE_DK; // the dark rim: top, bottom, back
+      else if (z === 4 && (y === 25 || y === 28)) c = AXE_DK;   // a shadow over each eye
+      bronzeSet(m, 1 - z, y, 0, c); bronzeSet(m, 1 - z, y, 1, c);   // the blade out to the side (-x)
+    }
   }
-  m.carve(0, 11, 1, 1, 3, 2);           // the open eye between the tangs (the epsilon)
-  m.set(0, 16, 0, GOLD_DK).set(0, 9, 0, GOLD_DK);
+  // leather lashings binding each tang to the haft: one dark band a voxel
+  // proud all round the haft (and over the tang's back), the haft under the
+  // tang's second row wrapped flush in a lighter leather
+  for (const [ya, yb] of [[22, 23], [26, 27], [30, 31]]) {
+    for (let x = -1; x <= 2; x++) for (let z = -1; z <= 2; z++) {
+      if ((x === -1 || x === 2) && (z === -1 || z === 2)) continue;
+      if (x === 2 && ya !== 26) continue;                  // only the middle band stands proud behind
+      if (x >= 0 && x <= 1 && z >= 0 && z <= 1) continue;
+      m.set(x, ya, z, LASH);
+    }
+    m.box(0, yb, 0, 2, 1, 2, LASH_L).set(-1, yb, 0, LASH_L).set(-1, yb, 1, LASH_L);
+  }
   return m;
 }
 // (round 23) the khopesh at half a rig voxel (part scale 0.5): about 60 % of
@@ -1072,7 +1127,32 @@ function longBladeM(col = GOLD, len = 12) {
   return m;
 }
 // Egyptian shield: tall, round-topped, the face in the army's colour inside a gold rim
-function egShieldM({ face = TEAM, rim = GOLD, boss = GOLD, bands = false, w = 3, h = 6 } = {}) {
+// (round 30) cow: the face a dappled cowhide (Egyptian shields were hide on a
+// wooden frame): cream white with dark brown patches two or three voxels
+// across, inside the rim, so the shield never reads as skin-coloured; the
+// back a dark wooden frame (a vertical and two cross battens on leather)
+const COW_W = pick3(97, 0xf4efe4, 0xe8e0d0, 0xfaf6ee, 0.5, 0.85), COW_B = 0x3e2412, COW_B2 = 0x6a3c1c;
+// a hand-laid pattern (x -2..2 across, y 5 down to -5), B a brown patch, b a
+// rust-brown one, . white: irregular blotches of two to four voxels, none
+// in a line, so it reads as hide, not stripes
+const COW_MASK = [
+  '..B..',   // y 5
+  '.BB..',   // y 4
+  '.B..b',   // y 3
+  '....b',   // y 2
+  'b...B',   // y 1
+  'B...B',   // y 0
+  'B..BB',   // y -1
+  '...B.',   // y -2
+  '.b...',   // y -3
+  'BB...',   // y -4
+  'B..bB',   // y -5
+];
+const cowAt = (x, y) => {
+  const row = COW_MASK[5 - y], ch = row ? row[x + 2] : '.';
+  return ch === 'B' ? COW_B : ch === 'b' ? COW_B2 : null;
+};
+function egShieldM({ face = TEAM, rim = GOLD, boss = GOLD, bands = false, w = 3, h = 6, cow = false } = {}) {
   const m = new VoxelModel();
   for (let y = -h; y <= h - 1; y++) for (let x = -w; x <= w; x++) {
     const top = y > h - 1 - w;
@@ -1082,9 +1162,11 @@ function egShieldM({ face = TEAM, rim = GOLD, boss = GOLD, bands = false, w = 3,
     const edge = Math.abs(x) === w || y === -h || (top && x * x + (y - cy) * (y - cy) > (w - 1) * (w - 1) + 0.6);
     let c = edge ? rim : face;
     if (!edge && bands && (y === 0 || y === -3 || y === 3)) c = rim;
+    if (!edge && cow) c = cowAt(x, y) ?? COW_W(x, y, 1);
     if (!edge && Math.abs(x) <= 0 && Math.abs(y - 1) <= 1) c = boss;
-    m.set(x, y, 1, c);
-    m.set(x, y, 0, edge ? GOLD_DK : (x === 0 ? LEATHER_DK : (hash3(x, y, 0, 81) < 0.3 ? 0x3a2a1e : 0xa08868)));   // a cowhide back
+    if (cow && !edge && x === 0 && Math.abs(y - 1) <= 1) c = y === 2 ? AXE_HI : y === 1 ? AXE_LT : AXE_DK;   // a bronze boss, lit on top
+    bronzeSet(m, x, y, 1, c);
+    m.set(x, y, 0, edge ? GOLD_DK : (x === 0 || y === 2 || y === -3 ? WOOD_DK : (hash3(x, y, 0, 81) < 0.3 ? 0x2a1a10 : LEATHER)));   // the frame behind
   }
   m.box(0, -1, -1, 1, 3, 1, LEATHER);
   return m;
@@ -1319,8 +1401,8 @@ const sc = (j, s) => j.map((v) => v * s);
   eCollar(t, [GOLD_DK, SC, SC, GOLD_DK, SC, SC, GOLD_DK, SC], { r0: 2.4 });
   rig('axeman', { voxel: 0.07, anim: 'human', style: 'axe', pose: 'slash', stance: true }, [
     ...manParts({ torso: t, head: 'axe', arm: { sleeve: TEAM, bracer: GOLD }, leg: { kilt: TEAM } }),
-    part('weapon', epsilonAxeM(), [0, 0, 0], GRIP_E, 'armR'),
-    part('shield', egShieldM({ face: GOLD, rim: TEAM, boss: GOLD_DK, bands: true }), [0, 0, 0], SHIELD_E, 'armL'),
+    part('weapon', epsilonAxeM(), [0, 0, 0], GRIP_E, 'armR', { scale: 0.5, jitter: 0.01 }),
+    part('shield', egShieldM({ rim: TEAM, boss: AXE_MID, cow: true }), [0, 0, 0], SHIELD_E, 'armL'),
   ]);
 }
 
