@@ -2639,33 +2639,38 @@ stay planted) and rears the head; dying it slumps 0.12 rad to one flank
 instead of the horse's roll onto its side. `--params "eu_focus=petsuchos"`
 (`&eu_state=walk|die`) / `"eu_one=petsuchos&eu_turn=80&eu_pitch=12"` check it.
 
-Scarab (round 28, myth_07 / myth_14): a shell, not two bricks. The elytra
-are one stepped dome over the whole back (footprint a superellipse 6.6 voxels
-either side of the seam, square-shouldered at the front, round at the rear;
-height `7.4 * q^0.8`), tallest along the seam and falling away to the rear
-and both sides, so every height contour is a visible terrace. It is painted
-by height in six value steps: a near-black green rim (the lowest row also
-reaches one voxel past the row above, a lip over the near-black belly),
-bottle green, green, emerald, a gold-green iridescent shoulder and a pale
-white-green highlight band along the ridge, with short white specular glints
-on each crown; a one-voxel dark seam runs down the crown. The team colour is
-an iridescent edge band on the outer face just above the rim (team, with a
-teal row over it that turns violet at the tail), no longer a stripe on the
-seam. The colours are authored dark (the game's lighting lifts lit faces a
-long way). In front, a rounded green pronotum behind a dark gap with two pale
-glints; the head (`neck` channel) a dark wedge with a brow ridge and pale
-yellow side eyes. The mandibles are smooth inward hooks: a cubic curve in ten
-tapering tube segments (r 1.7 -> 0.55) out, forward and closing in, a dark
-tip, every voxel open to the sky a lighter brown (`lightTops`), and a pale
-tooth stub off each inner edge. Each of the six legs is a femur (`legFL`..,
-r 1.5 -> 1.15) leaving the body sideways and rising to the knee, a 2x2x2
-bronze knee knob (lit top) at the head of the tibia (`cannonFL`..,
-r 1.1 -> 0.8) angling down and out with two outer spurs, a smaller ankle
-joint, then a tarsus (r 0.75 -> 0.55) to a dark claw; every segment's top
-face is a light tan so the legs separate from their shadow. The front pair
-reach forward, the middle out, the hind pair back; the middle legs ride the
-`BR / BL` channels (horse anim). `--params "eu_focus=scarab"`
-(`&eu_state=walk|die`) / `"eu_one=scarab&eu_turn=60"` check it.
+Scarab (round 48, myth_07 / myth_14): a beetle, not a turtle. Every part
+is on the fine grid (`scale: 0.5`, 0.05 world units a voxel, greedy meshed).
+The elytra are one domed oval shell (half-width 14.5, z -19..17, crown 17
+voxels high, `HS * sqrt(q)` with square-ish shoulders and a round rear),
+each elytron a little convex beside a one-voxel seam sunk one voxel into the
+crown, a small dark scutellum at its front. It is shaded by height like
+Retold's iridescent shell: a near-black green rim (the bottom row all round),
+deep green, green, yellow-green, a maroon band, a red-orange band, orange and
+a gold crown; the band edges wobble along two sines (and a small fixed hash,
+no RNG) so the colours flow instead of terracing, and the front shoulders
+turn green / gold-green. The warm bands carry glow 0.8, the shader's
+`eg_fire` marker (as the Phoenix's flames), because a lit orange face
+otherwise crosses the tone map's highlight desaturation and reads salmon
+pink. Two one-voxel specular streaks follow the crown's curve (a long one on
+the lit left elytron, a short glint on the right); the team colour is a thin
+wavy streak along each elytron's flank (the reference's blue streaks). No
+white blocks, no cyan / violet rim. The pronotum is its own plate, narrower
+(10.5 either side) and lower than the shell behind a dark gap, dark olive
+bronze with two yellow-green highlight streaks; the head is smaller still
+(`neck` channel) with a pale yellow eye of five voxels under a dark brow on
+each side and a dark clypeus. The mandibles are two slender sickles (a cubic
+curve in 16 tube segments, radius 2.2 at the root easing to 0.6), out,
+forward and curving in with the tips 8 voxels apart, lit along the top, the
+last eighth near-black, a one-voxel prong on each inner edge. Each leg has
+three segments: a femur (`legFL`..., r 1.75 -> 1.4) out of the thorax side
+over a coxa knob on the body, rising to the knee; a tibia (`cannonFL`...,
+r 1.3 -> 0.95) bending down to the ground with three outer spurs; and a
+tarsus of three beads out along the ground to a two-voxel hooked claw. The
+front pair leave from under the pronotum and reach forward, the middle pair
+out, the hind pair back (middle legs on the `BR / BL` channels, horse anim).
+`--params "eu_focus=scarab"` (`&eu_state=walk|die`) /
+`"eu_one=scarab&eu_turn=60"` check it.
 
 Scorpion Man (round 22, myth_08): the tail is six team plates on a C-arc
 (`ANG` 1.05 -> 3.7 rad from straight back through up to forward-down) that
@@ -4846,6 +4851,51 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   (listed, never researchable: `TechDef::missing` "Kebenit" / "War Barge"); Tusks of Apedemak's -1 pop (`Techs::unit_pop`, economy train / recount). Hooks: gather (economy), train
   speed / cost, healing, building cost / time / hp, lifesteal and melee poison (on unit:damaged),
   refunds, the second Pharaoh. `Techs::done` is a 128-bit set, `UnitMask` 64 bits.
+- **One reading of "-X % vulnerability"** (gods round 16; round 15's multiplicative reading
+  reverted): EGYPT.md's conventions are TECHS.md's, which define it exactly: "-10 % hack
+  vulnerability" means 10 percentage points more armor (30 % to 40 %). So every Egyptian god
+  effect worded as a vulnerability adds flat armor, as the shared Armory lines (Copper..Iron
+  Armor / Shields +0.10 / +0.15) already did: Skin of the Rhino is `TE_HACK_ARMOR` /
+  `TE_PIERCE_ARMOR` +0.25 on the Laborer, Leather Frame Shield `TE_PIERCE_ARMOR` +0.15 on the
+  Spearman, and Bast's Eclipse gives the caster's myth units +0.10 hack / pierce / crush armor
+  (`ECLIPSE_ARMOR`, `GodPowers::armor_after`: + 0.10 capped at `ARMOR_CAP` 0.95; an armor already
+  over the cap, the 99 % crush of human units, is left alone). Every armor read goes through
+  `Techs::tech_armor(owner, type, base, pierce)` (flat tech armor, capped) and then
+  `armor_after` (the Eclipse): `Techs::unit_armor` for blows and arrows, `Techs::stats` for the
+  card, egypt_myth.cpp `armor_of`, the myth units' crush part, the Tornado's hack and crush shares
+  and Thoth's meteors' crush (the old x0.9 `vuln_mult` on the whole hit is gone).
+  egypt_gods_check `techs.ra_ptah_sobek_horus` asserts it: Laborer card armor 0.1875 / 0.2625 ->
+  0.4375 / 0.5125 with Skin of the Rhino, so a hoplite blow 7.313 -> 5.063 (x0.6923 = 0.5625 /
+  0.8125) and a toxotes arrow 5.163 -> 3.413 (x0.6610 = 0.4875 / 0.7375); a Spearman's pierce
+  0.075 -> 0.225 with Leather Frame Shield, a toxotes arrow 7.77 -> 6.51 (x0.8378 = 0.775 /
+  0.925) and its hoplite blow untouched (6.3); `eclipse.myth_and_favor`: a hoplite blow on a
+  Sphinx 9 x (1 - 0.3375) = 5.962 -> 9 x (1 - 0.4375) = 5.063 under the Eclipse.
+- **The Eclipse's tooltip** (gods round 17): its `desc` (what `get_power_def` hands the HUD's
+  power button) said "take 10% less damage", round 15's multiplicative reading; it now says
+  "-10% hack / pierce / crush vulnerability (+10 armor)", what the sim does (a hoplite blow on a
+  Sphinx 5.962 -> 5.063, x0.849; an arrow 3.85 -> 3.15). `eclipse.myth_and_favor` asserts the
+  tooltip text and that no "less damage" wording is left in it.
+- **Locust haze** (gods round 16): the swarm's dust haze is drawn with the puff shader's soft
+  round mode (`INSTANCE_CUSTOM.y` 1, as Thoth's smoke), larger and fainter, instead of hard
+  camera-facing squares that read as pale tiles over a Farm.
+- **Vision reads as a cast** (gods round 18, godpower_view_egypt.cpp): the old visual was a thin
+  pale ring and a cyan wash over the whole disc, with the Eye burnt out after 4 s. Now, from the
+  heart out: the Eye of Horus (decal_add kind 7) under a turning glyph ring and a column of light
+  (a straight beam ribbon, two strands winding up it, layered glow sprites, rising cyan motes and a
+  light), the cast's shock ring for its first 1.3 s; the reveal's edge is a thick saturated band
+  (kind 4, ~2.8 tiles) with a crisp white rim, under three heights of swirling arcs and vertical
+  streaks flickering on the edge (power_04's white swirl rings), all following the sim's
+  `VisionCast::r` (10 m + 15 m/s to 70 m). While the front races out it throws sand puffs and
+  grit cubes off its leading edge. Every unit and building it passes flashes when the front
+  reaches it (`(d - VISION_R0) / VISION_GROW` after the cast: a rim glow, a white body glow, a
+  light shaft over it, a ring and a puff of dust, the brightest one lit by a point light), and
+  the enemy it reveals keeps a faint cyan rim and ground ring for the 20 s. The whole-disc swirl
+  wash is down to a thin rim inside the edge. The local player's rings and streaks are their own
+  ribbon group `G_VISION` (godpowers.gd, saturated cyan round a white core) drawn at
+  `RENDER_PRIORITY_MAX`, with the fog of war (fog_view.gd) one under it, so they stand over the
+  dark beyond the reveal as in power_04 (an enemy's Vision stays in G_BAND2, under the fog).
+  The egypt_powers "vision" framing is on the cast (open sand by the Greek army, t 1.5 s,
+  distance 64): the lit disc and its column cut out of the dark, with no far haze at the border.
 - **Visuals** (godpower_view_egypt.cpp + game/godpowers/egypt_fx.gd, same buffers as the
   Lightning Storm): Rain streaks, splashes, wet farms, a rainbow and a grey wash; Prosperity's
   gold over each of the caster's mines (power_03's golden glow over the Mining Camp): a column of
@@ -5002,51 +5052,6 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   its inner wall (mode 0, seen down the open top) is the deep colour; a sheath of wisps (mode 2)
   shows only near the silhouette in broken tufts, so no veil lies over the buildings; the
   **dust skirt** (mode 3, `_skirt_mesh`: a low dome from r 1 / 2.2 m high to r 5.4 on the
-- **One reading of "-X % vulnerability"** (gods round 16; round 15's multiplicative reading
-  reverted): EGYPT.md's conventions are TECHS.md's, which define it exactly: "-10 % hack
-  vulnerability" means 10 percentage points more armor (30 % to 40 %). So every Egyptian god
-  effect worded as a vulnerability adds flat armor, as the shared Armory lines (Copper..Iron
-  Armor / Shields +0.10 / +0.15) already did: Skin of the Rhino is `TE_HACK_ARMOR` /
-  `TE_PIERCE_ARMOR` +0.25 on the Laborer, Leather Frame Shield `TE_PIERCE_ARMOR` +0.15 on the
-  Spearman, and Bast's Eclipse gives the caster's myth units +0.10 hack / pierce / crush armor
-  (`ECLIPSE_ARMOR`, `GodPowers::armor_after`: + 0.10 capped at `ARMOR_CAP` 0.95; an armor already
-  over the cap, the 99 % crush of human units, is left alone). Every armor read goes through
-  `Techs::tech_armor(owner, type, base, pierce)` (flat tech armor, capped) and then
-  `armor_after` (the Eclipse): `Techs::unit_armor` for blows and arrows, `Techs::stats` for the
-  card, egypt_myth.cpp `armor_of`, the myth units' crush part, the Tornado's hack and crush shares
-  and Thoth's meteors' crush (the old x0.9 `vuln_mult` on the whole hit is gone).
-  egypt_gods_check `techs.ra_ptah_sobek_horus` asserts it: Laborer card armor 0.1875 / 0.2625 ->
-  0.4375 / 0.5125 with Skin of the Rhino, so a hoplite blow 7.313 -> 5.063 (x0.6923 = 0.5625 /
-  0.8125) and a toxotes arrow 5.163 -> 3.413 (x0.6610 = 0.4875 / 0.7375); a Spearman's pierce
-  0.075 -> 0.225 with Leather Frame Shield, a toxotes arrow 7.77 -> 6.51 (x0.8378 = 0.775 /
-  0.925) and its hoplite blow untouched (6.3); `eclipse.myth_and_favor`: a hoplite blow on a
-  Sphinx 9 x (1 - 0.3375) = 5.962 -> 9 x (1 - 0.4375) = 5.063 under the Eclipse.
-- **The Eclipse's tooltip** (gods round 17): its `desc` (what `get_power_def` hands the HUD's
-  power button) said "take 10% less damage", round 15's multiplicative reading; it now says
-  "-10% hack / pierce / crush vulnerability (+10 armor)", what the sim does (a hoplite blow on a
-  Sphinx 5.962 -> 5.063, x0.849; an arrow 3.85 -> 3.15). `eclipse.myth_and_favor` asserts the
-  tooltip text and that no "less damage" wording is left in it.
-- **Locust haze** (gods round 16): the swarm's dust haze is drawn with the puff shader's soft
-  round mode (`INSTANCE_CUSTOM.y` 1, as Thoth's smoke), larger and fainter, instead of hard
-  camera-facing squares that read as pale tiles over a Farm.
-- **Vision reads as a cast** (gods round 18, godpower_view_egypt.cpp): the old visual was a thin
-  pale ring and a cyan wash over the whole disc, with the Eye burnt out after 4 s. Now, from the
-  heart out: the Eye of Horus (decal_add kind 7) under a turning glyph ring and a column of light
-  (a straight beam ribbon, two strands winding up it, layered glow sprites, rising cyan motes and a
-  light), the cast's shock ring for its first 1.3 s; the reveal's edge is a thick saturated band
-  (kind 4, ~2.8 tiles) with a crisp white rim, under three heights of swirling arcs and vertical
-  streaks flickering on the edge (power_04's white swirl rings), all following the sim's
-  `VisionCast::r` (10 m + 15 m/s to 70 m). While the front races out it throws sand puffs and
-  grit cubes off its leading edge. Every unit and building it passes flashes when the front
-  reaches it (`(d - VISION_R0) / VISION_GROW` after the cast: a rim glow, a white body glow, a
-  light shaft over it, a ring and a puff of dust, the brightest one lit by a point light), and
-  the enemy it reveals keeps a faint cyan rim and ground ring for the 20 s. The whole-disc swirl
-  wash is down to a thin rim inside the edge. The local player's rings and streaks are their own
-  ribbon group `G_VISION` (godpowers.gd, saturated cyan round a white core) drawn at
-  `RENDER_PRIORITY_MAX`, with the fog of war (fog_view.gd) one under it, so they stand over the
-  dark beyond the reveal as in power_04 (an enemy's Vision stays in G_BAND2, under the fog).
-  The egypt_powers "vision" framing is on the cast (open sand by the Greek army, t 1.5 s,
-  distance 64): the lit disc and its column cut out of the dark, with no far haze at the border.
   ground) rolls lumps round and outward, darker than the sand with a sunlit outer roll and a
   crisp, lumpy edge; godpower_view_egypt.cpp keeps 44 soft round puffs rolling off its rim (no
   voxel squares). 12 big **wreckage** blocks (`CHUNKS`: roof tiles, beams, mud bricks, a
