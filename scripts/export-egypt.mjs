@@ -3875,7 +3875,9 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
   // (o.sand: an umber headdress with a gold line every third row, so it
   // reads as one darker shape framing the gilt falcon head, not a noise of
   // one-voxel stripes)
-  const stripe = o.wig === 'gold' ? (x, y) => ((y - kn) & 1 ? CG_D : CG) : o.sand ? (x, y) => ((y - kn + 60) % 3 === 0 ? CG : LAPIS_S) : (x, y) => ((y - kn) & 1 ? LAPIS_S : CG);
+  // (o.basalt, round 37: wide bands, three gold rows and two lapis, so the
+  // nemes frames the face instead of swallowing it)
+  const stripe = o.wig === 'gold' ? (x, y) => ((y - kn) & 1 ? CG_D : CG) : o.basalt ? (x, y) => ((y - kn + 60) % 5 < 3 ? CG : LAPIS_S) : o.sand ? (x, y) => ((y - kn + 60) % 3 === 0 ? CG : LAPIS_S) : (x, y) => ((y - kn) & 1 ? LAPIS_S : CG);
 
   // ---- the lower body
   if (pose === 'mummy') {
@@ -4100,19 +4102,30 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
       }
     }
   } else if (arms === 'pots') {
-    M(9, 12, 10, 20, -2, 2, GRAN);                             // upper arms
-    M(9, 12, 7, 10, -2, 7, GRAN);                              // forearms forward
-    M(9, 12, 15, 16, -2, 2, CG);                               // armlets
-    // a round gold offering pot in each hand
+    // (round 37) the kneeling offerer of building_13: the arms hang free of
+    // the body (a voxel of air at the waist), bend at the elbow and run
+    // forward and down along the thighs, the open palms turned up in front
+    // of the knees, a gold offering pot standing on each palm, the fingers'
+    // tips curled up round its foot
+    M(8, 11, 17, 19, -2, 3, GRAN);                   // the shoulder caps
+    M(8, 11, 11, 17, -2, 2, GRAN);                   // upper arms, hanging
+    M(8, 11, 14, 15, -2, 2, CG_L);                   // armlets
+    M(8, 11, 9, 11, -2, 3, GRAN);                    // the elbows
+    M(8, 11, 8, 10, 3, 5, GRAN);                     // forearms, forward and down
+    M(8, 11, 7, 9, 5, 7, GRAN);
+    M(8, 11, 7, 9, 6, 7, CG_L);                      // bracelets
+    M(6, 11, 7, 8, 7, 12, GRAN);                     // the open palms
+    M(6, 11, 8, 9, 11, 12, GRAN_F);                  // finger tips, curled up
+    M(10, 11, 8, 9, 7, 11, GRAN_F);                  // the thumb's edge
     for (const sx of [-1, 1]) {
-      const xa = sx < 0 ? -13 : 8;
-      B(xa, xa + 5, 10, 14, 4, 9, (x, y, z) => {
-        const ix = x - xa, iz = z - 4, cxn = (ix === 0 || ix === 4) && (iz === 0 || iz === 4);
-        if (cxn) return null;
-        if (y === 13 && ix > 0 && ix < 4 && iz > 0 && iz < 4) return GRAN_D;   // the mouth
-        return y === 13 ? CG_L : CG;
+      const xa = sx < 0 ? -10 : 6;                             // the pot over the palm's centre
+      B(xa, xa + 4, 8, 13, 7, 11, (x, y, z) => {
+        const ix = x - xa, iz = z - 7, cxn = (ix === 0 || ix === 3) && (iz === 0 || iz === 3);
+        const yy = y;
+        if (cxn && (yy === 8 || yy === 12)) return null;       // the rounded foot and shoulder
+        if (yy === 12 && ix > 0 && ix < 3 && iz > 0 && iz < 3) return GRAN_D;   // the mouth
+        return yy === 12 || yy === 10 ? CG_L : CG;
       });
-      B(xa + 1, xa + 4, 14, 15, 5, 8, (x, y, z) => (x === xa + 2 && z === 6 ? null : CG_L));   // the rim
     }
   }
   // ---- neck and head: a flat face
@@ -4123,6 +4136,28 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     // ridge a voxel proud, lapis brows, ivory eyes with dark pupils and the
     // kohl line running out to the temples, a dark mouth line
     S(4, 38 + kn, 46 + kn, -3, 4, (x, y, z) => (z === 3 ? GRAN_F : GRAN));
+    if (o.basalt) {
+      // (round 37) a carved face in three values that reads at RTS zoom: a
+      // brow ridge a voxel proud, the eyes set in a shadowed socket under it,
+      // a straight nose proud from the brow to a lit tip over a shadowed
+      // nostril line, lit cheek planes, full lips over a dark mouth line, a
+      // short beard flush under the chin (no stub)
+      B(-4, 4, 45 + kn, 46 + kn, 4, 5, GRAN_F);                // the brow ridge
+      B(-4, 4, 44 + kn, 45 + kn, 3, 4, GRAN_R);                // the sockets' shadow
+      M(1, 4, 43 + kn, 44 + kn, 3, 4, IVORY);                  // the eyes, three wide
+      M(1, 2, 43 + kn, 44 + kn, 3, 4, KOHL);                   // pupils
+      M(3, 4, 43 + kn, 44 + kn, 3, 4, GRAN_R);                 // the outer corner
+      B(-1, 1, 41 + kn, 45 + kn, 4, 5, GRAN_F);                // the nose
+      B(-1, 1, 41 + kn, 42 + kn, 5, 6, BAS_H);                 // its lit tip
+      B(-1, 1, 40 + kn, 41 + kn, 4, 5, GRAN_R);                // the nostrils' shadow
+      M(2, 4, 41 + kn, 43 + kn, 3, 4, BAS_H);                  // cheek planes
+      M(1, 2, 41 + kn, 43 + kn, 3, 4, GRAN);                   // the cheek's fold by the nose
+      B(-2, 2, 40 + kn, 41 + kn, 4, 5, GRAN_F);                // the upper lip
+      B(-2, 2, 39 + kn, 40 + kn, 3, 4, GRAN_R);                // the mouth
+      B(-1, 1, 35 + kn, 38 + kn, 3, 5, GRAN);                  // the beard
+      B(-1, 1, 35 + kn, 36 + kn, 3, 5, CG);
+    }
+    if (!o.basalt) {
     B(-1, 1, 41 + kn, 45 + kn, 4, 5, GRAN_F);                  // the nose ridge
     B(-1, 1, 41 + kn, 42 + kn, 4, 5, GRAN);                    // its tip
     M(1, 4, 45 + kn, 46 + kn, 3, 4, o.god ? CG_L : LAPIS_S);   // the brows (a goddess': gold)
@@ -4140,6 +4175,7 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     if (pose !== 'dress') {
       B(-1, 1, 34 + kn, 38 + kn, 3, 5, GRAN);                  // the false beard
       B(-1, 1, 34 + kn, 35 + kn, 3, 5, CG);
+    }
     }
   }
   // the tripartite wig of gods and queens: striped lappets down the chest, a
@@ -4310,6 +4346,16 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     B(-1, 1, 47 + Y, 49 + Y, 5, 6, CG);                        // the uraeus
   }
   polishStatue(m, touched);
+  // o.basalt (round 37, the Monuments): a mid grey-green basalt in place of
+  // the near-black granite, so arms, torso and knees read apart; every face
+  // turned to the sky one step lighter (a lit bevel on each block's top)
+  if (o.basalt) for (const [x, y, z] of touched) {
+    const v = m.get(x, y, z);
+    if (!v || v.team) continue;
+    const c = BASALT_STONE.get(v.c);
+    if (c === undefined) continue;
+    v.c = !m.has(x, y + 1, z) && c !== BAS_D ? BAS_H : c;
+  }
   // the gods (round 18) in a lighter blue-grey slate with a real mid-tone
   // between the near-black recesses and the gold, so their forms read
   if (o.god && !o.sand) for (const [x, y, z] of touched) {
@@ -4327,6 +4373,13 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     if (l !== undefined) v.c = l;
   }
 }
+// the Monuments' basalt (cleanStatue o.basalt, round 37): the granite ramp
+// mapped to a mid grey-green (kept close to grey: warm light turns green olive)
+const BAS_D = 0x22292c, BAS_H = 0x6c7c80;
+const BASALT_STONE = new Map([
+  [0x1b1f26, 0x313b3f], [0x2a3039, 0x445054], [0x30363f, 0x485458], [0x262b33, 0x404c50],
+  [0x4b5563, BAS_H], [0x343d47, 0x56646a], [0x1c2027, BAS_D], [BAS_H, BAS_H],
+]);
 // the Temple's sandstone god (cleanStatue o.sand): an ochre-gilt falcon
 // head (a pale one with dark eyes read as a skull), a dark brown ink for the eyes /
 // beak tip, a soft ochre-red disc, a warm umber in place of the lapis inlay
@@ -4410,9 +4463,9 @@ function monument(kind, god = 'ra') {
     const pd = monDie(m, 9, 9, 23, 23, py, 2);
     const o = [
       null,
-      { pose: 'kneel', arms: 'pots', head: 'nemes', kiltFront: null },
-      { pose: 'mummy', arms: 'crossed', head: 'double' },
-      { pose: 'stride', arms: 'side', head: 'nemes', kilt: CG, anklets: 1, pillar: [-6, 6, 38] },
+      { pose: 'kneel', arms: 'pots', head: 'nemes', kiltFront: null, basalt: 1 },
+      { pose: 'mummy', arms: 'crossed', head: 'double', basalt: 1 },
+      { pose: 'stride', arms: 'side', head: 'nemes', kilt: CG, anklets: 1, pillar: [-6, 6, 38], basalt: 1 },
     ][kind];
     cleanStatue(m, 16, pd, kind === 1 ? 17 : 15, o);
     return m;
@@ -4424,8 +4477,8 @@ function monument(kind, god = 'ra') {
     // building_16: the king striding, fists at his sides, in the nemes and a
     // gold white crown; the queen in a gold sheath dress and vulture wig, her
     // near hand on his arm; one back pillar joining them
-    cleanStatue(m, 15, pd, 24, { pose: 'stride', head: 'nemes', crown: 'hedjet', arms: 'side', kilt: CG, anklets: 1, pillar: [-6, 25, 38] });
-    cleanStatue(m, 34, pd, 24, { pose: 'dress', head: 'wig', wig: 'gold', arms: 'embrace', kiltFront: null });
+    cleanStatue(m, 15, pd, 24, { pose: 'stride', head: 'nemes', crown: 'hedjet', arms: 'side', kilt: CG, anklets: 1, pillar: [-6, 25, 38], basalt: 1 });
+    cleanStatue(m, 34, pd, 24, { pose: 'dress', head: 'wig', wig: 'gold', arms: 'embrace', kiltFront: null, basalt: 1 });
     return m;
   }
   const m = lot(64, 64, EARTH);

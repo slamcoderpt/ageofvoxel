@@ -1748,6 +1748,24 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   grade keeps their lit (r, g) instead of its chroma limiter greying the
   gold to sand. Only the Obelisk's cap and collar use it (`OB_CAP*`, a
   yellower leaf than OB_GOLD since it is no longer desaturated).
+- **Basalt Monuments with carved faces, round 37** (the Monument to
+  Villagers' kneeling offerer read as one near-black mass: a flat charcoal
+  face with pixel eyes and a beard stub, a nemes striped every row, the pots
+  floating beside the body). `cleanStatue()` option `o.basalt`, set on every
+  Monument statue (Villagers, Soldiers, Priests, the Pharaoh pair; not the
+  gods): after `polishStatue()` the granite ramp maps to a mid grey-green
+  basalt (`BASALT_STONE`, `BAS_H` / `BAS_D`), and every voxel open to the sky
+  takes the light step, a lit bevel on each block's top. The face is carved in
+  three values: a brow ridge a voxel proud over a shadowed socket row,
+  three-wide ivory eyes, a proud nose with a lit tip over a nostril shadow,
+  lit cheek planes, a lip over a dark mouth line and a short beard flush
+  under the chin. The nemes takes wide bands (three gold rows, two lapis).
+  `arms: 'pots'` is rebuilt: the arms hang free of the torso, bend at the
+  elbow, run forward and down along the thighs, and the open palms (curled
+  finger tips, a thumb edge) hold the round gold pots in front of the knees.
+  The plinth is unchanged. `m.keep` was tried on the statue's gold and
+  dropped: unlimited, the nemes and pots went orange. Framing:
+  `egt_row=monument_villagers/0/a1&egt_pitch=30&egt_lift=2.6&egt_dist=7&egt_yaw=20`.
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8
