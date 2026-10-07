@@ -2629,6 +2629,30 @@ Scaled by the rig's `stance` (Priest / Pharaoh 0.3). Check:
 `eu_focus=slinger&eu_zoom=0.45&eu_pitch=34&eu_az=-1.2&eu_ax=-0.6` (and
 `spearman`, `axeman`, `laborer`), `eu_group=foot`, `eu_group=eco`.
 
+War Elephant head, round 35 (the head read as a lumpy grey stack of cubes: ear
+slabs jutting sideways like riot shields, the trunk lost in the blob, the
+tusks thin white sticks near the feet; it could pass for a bear or a rhino).
+The `neck` part of `war_elephant` is rebuilt on a grid twice as fine (part
+scale 0.5, flag `greedy`, outline 0.08; the separate `earL` / `earR` slabs are
+gone, the ears belong to the head). Shapes are superellipsoids (exponent
+2.6-2.8: broad planes with rounded edges), because a round ellipsoid on the
+fine grid shades as a pinstripe of lit tops and dark risers. A domed forehead
+stands proud over a **brow step** (below it the face sits back, the lip's
+underside and the face under it in a dark shade), the crown lit, with a dark
+eye under the brow each side. The **trunk** is a tube through eight points:
+four tapering segments (radius 4.3 to 2.1 fine voxels) in alternating greys
+with a dark ring between them, hanging forward of the chest to about half a
+metre off the ground, then curling forward and up at the tip. The **tusks**
+come out of grey lip sheaths at the corners of the mouth, curve down and
+forward and then up to the points. The **ears** are thin fans (2 cells),
+flat against the sides of the head and the front of the shoulders, with a
+pale rim, a darker field with two veins and a dark inner face. A team
+headstall with gold studs crosses the crown behind the dome. The neck root
+behind the skull is a dark crease, and the body's surface round it at the
+front of the shoulders is painted a darker grey, so the head separates from
+the body. Check: `eu_focus=war_elephant`, `eu_one=war_elephant&eu_turn=30`
+(and `eu_turn=60` / `100`), `eu_group=mounted`.
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower

@@ -2539,12 +2539,11 @@ function chariotLegsM() {
 // (cool, dark enough that the warm grade keeps it grey) with faint wrinkle
 // rows; a cow-hide saddle cloth over the back only (it follows the barrel and
 // stops at a team hem high on the flanks, so grey shows on the sides and
-// legs), a team saddle pad, a wooden howdah. The head is one solid grey mass
-// set forward of the shoulders and joined to them: a domed brow, two big flat
-// ear slabs a shade darker flaring out from the sides of the skull, a tapered
-// trunk of five stepped segments hanging to the ground and curling forward at
-// the tip, two bright ivory tusks out of the trunk's base; a narrow team brow
-// band with gold studs. A mahout with a spear on its neck (rider parts at
+// legs), a team saddle pad, a wooden howdah. The head (round 35, on a grid
+// twice as fine; see headM below): a domed forehead over a brow step, a
+// ringed, tapering trunk hanging forward and curling up, tusks from the mouth
+// curving up and forward, thin fan ears lying back along the head, and a dark
+// crease where the neck meets the shoulders. A mahout with a spear on its neck (rider parts at
 // 0.7 x, the human voxel size). Idle: no grazing (graze false).
 {
   const G = (x, y, z) => (hash3(x, y, z, 16) < 0.1 ? 0x6a6664 : 0x726e6b);
@@ -2555,6 +2554,9 @@ function chariotLegsM() {
   body.ellipsoid(5.5, 7, 15, 5.4, 6, 4.4, G);    // the high shoulders
   body.ellipsoid(5.5, 6, 3.5, 5.2, 5.4, 4, G);
   for (let y = 1; y <= 9; y += 3) for (let z = 1; z <= 19; z++) for (const x of [0, 11]) if (body.has(x, y, z) && (z % 5)) body.set(x, y, z, GW);   // wrinkle rows
+  // (round 35) a dark crease round the front of the shoulders where the neck sinks in
+  for (let z = 17; z <= 20; z++) for (let y = 1; y <= 12; y++) for (let x = 0; x <= 11; x++)
+    if (body.has(x, y, z) && !body.has(x, y, z + 1) && Math.hypot(x - 5.5, y - 7) < 6.5) body.set(x, y, z, 0x5a5654);
   // the saddle cloth: on the back, draped down the barrel to y 7, a team hem
   const cloth = new VoxelModel();
   const HIDE = (x, y, z) => (hash3(x >> 1, y >> 1, z >> 1, 91) < 0.33 ? 0x7a3e1c : 0xeee6d8);
@@ -2587,46 +2589,113 @@ function chariotLegsM() {
   for (const [x, z] of [[1, 1], [10, 1], [1, 8], [10, 8]]) how.box(x, 7, z, 1, 2, 1, WOOD_DK);
   how.set(5, 3, 2, 0x8a6a3a).set(6, 3, 6, 0xb08a4a).set(4, 3, 5, STONE(1, 1, 1));   // pots, a basket
   how.line(-1, 1, 5, -1, -3, 5, LEATHER_DK).line(12, 1, 5, 12, -3, 5, LEATHER_DK);   // girth ropes down to the cloth
-  // the head, in its own frame: x 0..11 (centre 5.5), the joint at (5.5, 0, 0)
-  // sits at the front of the shoulders; the skull's back sinks into them
+  // (round 35) the head, rebuilt on a grid twice as fine (part scale 0.5,
+  // geometric coords: cell i spans [i, i + 1], x symmetric about 0, the joint
+  // at the origin at the front of the shoulders, +z forward). It reads as an
+  // elephant from the RTS camera: a domed forehead over a clear brow step
+  // (the face below it sits back, with a dark crease under the lip), a
+  // tapered trunk of four ringed segments hanging forward of the chest and
+  // curling up at the tip, thick ivory tusks out of grey lip sheaths at the
+  // mouth curving down, forward and up, thin fan ears lying back along the
+  // sides of the head and over the shoulders (pale at the rim, a darker field,
+  // dark on the inner face), and a dark crease round the neck where it sinks
+  // into the shoulders. A team headstall with gold studs crosses the crown.
   const headM = new VoxelModel();
-  headM.ellipsoid(5.5, 0, -1, 4.6, 4.6, 3.6, G);       // the neck root inside the shoulders
-  headM.ellipsoid(5.5, 0.5, 3, 4.3, 4.6, 3.8, GH);     // the skull
-  headM.ellipsoid(5.5, 3.2, 3.2, 4.2, 2.8, 3.4, GH);    // the domed brow
-  headM.ellipsoid(5.5, -2.5, 4.8, 3, 2.6, 2.6, GH);    // the cheeks / trunk root
-  // the trunk: five stepped segments, each narrower, down to the ground and
-  // curling forward (and up) at the tip; a darker crease between segments
-  const SEG = [[4, 4, -3, 5, 3], [4, 3, -6, 6, 3], [4.5, 2, -9, 6, 3], [4.5, 2, -11, 7, 2], [5, 1, -12, 8, 1]];
-  for (const [x0, w, y0, z0, d] of SEG) {
-    headM.box(Math.round(x0), y0, z0, w, 3, d, GH);
-  }
-  headM.box(4, -12, 7, 3, 2, 2, GH);                     // the curl
-  headM.box(5, -12, 9, 2, 1, 2, GH).box(5, -11, 10, 2, 1, 1, GH);
-  // tusks: bright ivory prongs out of the trunk's base, forward then up
-  for (const x of [2.5, 8.5]) {
-    tube(headM, [x, -3.5, 5], [x, -5.5, 8.5], 1.05, 0.9, IVORY_SH);
-    tube(headM, [x, -5.5, 8.5], [x, -3.8, 10.8], 0.85, 0.3, IVORY);
-  }
-  // eyes, a dark crease under the brow
-  headM.set(2, 1, 5, DARK).set(9, 1, 5, DARK).set(2, 2, 5, GE).set(9, 2, 5, GE);
-  // a gold brow band across the domes
-  for (let x = 1; x <= 10; x++) {
-    let z = 10; while (z > -2 && !headM.has(x, 3, z)) z--;
-    if (z > -2) headM.set(x, 3, z, GOLD(x, 3, z));
-  }
-  // ears: big flat slabs (2 thick) one shade darker, separate parts hinged at
-  // the sides of the skull and turned out (rest yaw) so the back edge flares
-  // away from the head; rounded, with a lobe hanging below the jaw
-  const ear = (s) => {
-    const m = new VoxelModel();
-    for (let y = -7; y <= 5; y++) for (let z = -7; z <= 0; z++) {
-      const dy = (y + 0.5) / 5.2, dz = (z + 2.8) / 3.2;
-      const lobe = y < 0 && y >= -7 && z >= -3 && z <= -1 && (y + 7) >= (-1 - z);
-      if (dy * dy + dz * dz > 1 && !lobe) continue;
-      m.set(0, y, z, s > 0 ? GE : GEI).set(1, y, z, s > 0 ? GEI : GE);
+  {
+    const H = headM;
+    // superellipsoids (exponent e > 2): broad flat planes with rounded edges, so the
+    // fine grid shows a few wide terraces instead of a pinstripe of lit tops and
+    // shaded risers
+    const inE = (p, c, r, e) => { let s = 0; for (let i = 0; i < 3; i++) s += Math.abs((p[i] - c[i]) / r[i]) ** e; return s <= 1; };
+    const fill = (c, r, col, keep, e = 2) => {
+      for (let x = Math.floor(c[0] - r[0]) - 1; x <= Math.ceil(c[0] + r[0]); x++)
+        for (let y = Math.floor(c[1] - r[1]) - 1; y <= Math.ceil(c[1] + r[1]); y++)
+          for (let z = Math.floor(c[2] - r[2]) - 1; z <= Math.ceil(c[2] + r[2]); z++)
+            if (inE([x + 0.5, y + 0.5, z + 0.5], c, r, e) && !(keep && H.has(x, y, z))) H.set(x, y, z, col);
+    };
+    const NECK = 0x45413f, SKULL = 0x67635f, DOME = 0x716d69, DOME_HI = 0x7c7874, UNDER = 0x4c4846;
+    const TR_A = 0x6e6a67, TR_B = 0x64605d, TR_RING = 0x4a4644, TR_TIP = 0x76706c;
+    fill([0, 0, -3], [9.5, 9.5, 6.5], NECK, false, 2.6);            // the neck root, sunk in the shoulders
+    fill([0, 1, 4.5], [8.5, 9, 7.5], SKULL, false, 2.8);            // the skull
+    fill([0, 7.5, 7.5], [7.6, 6.8, 6.6], SKULL, false, 2.6);        // the domed forehead
+    // the brow step: below y 4.5 the face sits back behind the forehead's lip
+    for (const [k] of [...H.vox]) {
+      const x = ((k >> 20) & 1023) - 512, y = ((k >> 10) & 1023) - 512, z = (k & 1023) - 512;
+      if (y < 4 && z >= 11) H.remove(x, y, z);
     }
-    return m;
-  };
+    fill([0, 0, 8.5], [5.6, 4.6, 3.2], SKULL, true, 2.6);    // the face under the brow, set back
+    // the trunk: from the face down and forward, four tapering segments, then
+    // a curl forward and up at the tip; a dark ring every few cells
+    const TP = [[0, 2, 10.5, 4.3], [0, -5, 13.6, 3.6], [0, -11, 15.2, 3.0], [0, -17, 15.6, 2.5], [0, -22, 15.2, 2.1],
+      [0, -25, 17, 1.8], [0, -24.6, 19.6, 1.55], [0, -22.4, 20.8, 1.25]];
+    let s0 = 0;
+    for (let i = 0; i < TP.length - 1; i++) {
+      const a = TP[i], b = TP[i + 1], L = Math.hypot(b[1] - a[1], b[2] - a[2]);
+      const ss = s0;
+      tube(H, [a[0], a[1], a[2]], [b[0], b[1], b[2]], a[3], b[3], (x, y, z, t) => {
+        const s = ss + t * L;
+        if (s > 29) return TR_TIP;
+        if (s > 5 && (s % 3.6) < 0.75) return TR_RING;
+        return Math.floor(s / 3.6) & 1 ? TR_B : TR_A;
+      });
+      s0 += L;
+    }
+    // tusks: from grey lip sheaths at the mouth's corners, down and forward,
+    // then up and forward to the points
+    for (const sx of [-1, 1]) {
+      fill([sx * 4.3, -3.6, 10.6], [2.2, 2.4, 2.2], UNDER, true);   // the lip / sheath
+      const P = [[4.3, -4.2, 11.2, 1.5], [5.4, -8.2, 14.6, 1.3], [5.8, -10, 18, 1.1], [5.4, -8.6, 21.2, 0.85], [4.8, -6.4, 22.8, 0.45]];
+      for (let i = 0; i < P.length - 1; i++) {
+        const a = P[i], b = P[i + 1];
+        tube(H, [sx * a[0], a[1], a[2]], [sx * b[0], b[1], b[2]], a[3], b[3], i < 1 ? IVORY_SH : IVORY);
+      }
+    }
+    // shading of the head's surface: the dome lit, a pale crown highlight,
+    // the brow lip's underside and the face beneath it dark, the neck dark
+    const cells = [...H.vox.keys()].map((k) => [((k >> 20) & 1023) - 512, ((k >> 10) & 1023) - 512, (k & 1023) - 512]);
+    for (const [x, y, z] of cells) {
+      const v = H.get(x, y, z);
+      if (v.c !== SKULL || !surfaceOf(H, x, y, z)) continue;
+      if (y >= 4 && y <= 5 && z >= 9 && !H.has(x, y - 1, z)) v.c = UNDER;              // the brow lip's underside
+      else if (y >= 2 && y <= 3 && z >= 9 && H.has(x, y + 2, z + 1) ) v.c = UNDER;       // the shadow under the brow
+      else if (y >= 11 && z >= 3) v.c = (y >= 13 && Math.abs(x + 0.5) < 4) ? DOME_HI : DOME;
+      else if (z < 0) v.c = NECK;                                                          // the crease behind the skull
+      else if (hash3(x, y, z, 77) < 0.12) v.c = 0x605c59;
+    }
+    // eyes: a dark eye under the brow on each side, a pale lid, a wrinkle under it
+    for (const sx of [-1, 1]) {
+      const y = 3, z = 9;
+      let x = sx > 0 ? 12 : -13;
+      while (Math.abs(x) > 0 && !H.has(x, y, z)) x -= sx;
+      H.set(x, y, z, DARK).set(x, y, z - 1, DARK).set(x, y + 1, z, 0x5e5a57).set(x, y - 1, z - 1, 0x5e5a57);
+    }
+    // the team headstall over the crown behind the dome, gold studs
+    for (let x = -10; x <= 9; x++) for (const z of [1, 2]) {
+      let y = 20; while (y > 0 && !H.has(x, y, z)) y--;
+      if (y > 0) { if (z === 1 && (x & 3) === 1) H.set(x, y, z, GOLD(x, y, z)); else tset(H, x, y, z, z === 2 ? TEAM_SHADE : 0xffffff); }
+    }
+    // ears: thin fans (2 cells) lying back along the sides of the head and over
+    // the front of the shoulders, flaring a little at the back edge; a pale rim
+    // on the outer face, a darker field with two veins, dark inside
+    const EAR_RIM = 0x8e8884, EAR_F = 0x6c6865, EAR_V = 0x5c5855, EAR_IN = 0x4a4644;
+    const inEar = (y, z) => {
+      if (z > 5) return false;
+      const dy = (y + 0.5 - 0.5) / 10.5, dz = (z + 0.5 + 2.5) / 7.8;
+      const lobe = y < -6 && y >= -12 && z >= -4 && z <= 1 && ((y + 12) / 6) >= ((-z - 0.5) / 4) - 0.2;
+      return dy * dy + dz * dz <= 1 || lobe;
+    };
+    for (const sx of [-1, 1]) for (let y = -13; y <= 12; y++) for (let z = -12; z <= 5; z++) {
+      if (!inEar(y, z)) continue;
+      const rim = !inEar(y + 2, z) || !inEar(y - 2, z) || !inEar(y, z - 2) || !inEar(y + 1, z - 1) || !inEar(y - 1, z - 1);
+      const root = z >= 4;
+      const vein = !rim && !root && (Math.abs((y - 2) - (z - 4) * 0.55) < 0.6 || Math.abs((y + 4) - (z - 4) * 0.15) < 0.6);
+      const xo = 9.6;   // one flat plane (a stepped flare shades as a stripe at every step)
+      const xi = Math.round(xo);
+      const outer = root ? NECK : rim ? EAR_RIM : vein ? EAR_V : EAR_F;
+      if (sx > 0) H.set(xi + 1, y, z, outer).set(xi, y, z, EAR_IN);
+      else H.set(-xi - 2, y, z, outer).set(-xi - 1, y, z, EAR_IN);
+    }
+  }
   const legUp = new VoxelModel().box(0, 0, 0, 4, 6, 4, G);
   const legLow = new VoxelModel().box(0, 1, 0, 4, 6, 4, G).box(0, 0, 0, 4, 1, 4, GW);
   for (let x = 0; x < 4; x += 2) legLow.set(x, 0, 4, NAIL).set(x + 1, 0, 4, GW);   // toenails
@@ -2639,9 +2708,7 @@ function chariotLegsM() {
     part('barding', cloth, [5.5, 0, 9.5], [0, 0, 0], 'body'),
     part('howdah', how, [6, 0, 5], [0, 12, -3], 'body'),
     part('riderLegs', riderLegsM({ y: 13, x0: 2, x1: 9, z: 12, len: 5, sandal: false }), [5.5, 0, 9.5], [0, 0, 0], 'body'),
-    part('neck', headM, [5.5, 0, 0], [0, 8, 10], 'body'),
-    part('earL', ear(1), [0, 0, 0], [5, 1, 2.5], 'neck', { rest: [0, -0.5, 0.35] }),
-    part('earR', ear(-1), [2, 0, 0], [-5, 1, 2.5], 'neck', { rest: [0, 0.5, -0.35] }),
+    part('neck', headM, [0, 0, 0], [0, 8, 10], 'body', { scale: 0.5, greedy: true, outline: 0.08 }),
     part('tail', new VoxelModel().box(0, -8, 0, 1, 8, 1, G).box(-1, -10, 0, 3, 2, 1, HAIR), [0.5, 0, 0.5], [0, 9, -9], 'body'),
     part('legFL', legUp, [2, 6, 2], [3.5, 3, 5.5], 'body'),
     part('cannonFL', legLow, [2, 7, 2], [0, -5, 0], 'legFL'),
