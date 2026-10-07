@@ -29,8 +29,10 @@ extends RefCounted
 const LAYOUT := [
 	["town_center", -3, -3, {}],
 	["temple", -2, -15, {}],
-	# one pair of obelisks flanking the temple's entrance (not in the streets)
-	["obelisk", -3, -9, {}], ["obelisk", 3, -9, {}],
+	# one pair of obelisks either side of the processional way's foot, by
+	# the Town Center (round 32: no longer beside the temple's own short
+	# pair, where the four read as a fence of spikes before its stairs)
+	["obelisk", -4, -5, {}], ["obelisk", 3, -5, {}],
 	# the west quarter: two rows of houses on their lanes, a lane's width apart
 	# so every house stands on its own plinth line
 	["house", -19, -8, {"variant": 1}], ["house", -15, -8, {"variant": 0}], ["house", -11, -8, {"variant": 2}],

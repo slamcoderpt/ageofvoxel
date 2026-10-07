@@ -1126,13 +1126,13 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   voxel out (its shaded underside is the roof's shadow line), the lip slab
   with the team line round a darker jointed deck and a low inner parapet
   step; no screen walls or drapes; a darker naos and floor so the slots read
-  dark; two smoothly tapering limestone obelisks (`smallObelisk`) with gold
-  pyramidions at the ramp foot; the **major god's statue** (stout, h 30, crook and flail held
-  to the chest, no tall sceptre; a dark team apron): variants `ra` falcon
-  with the disc, `isis` winged with horns and disc, `set` the Set animal;
-  the discs are round, sampled round their true centre by `sunDisc`, two
-  voxels deep with a thin gold rim; in egypt_town the processional way's
-  obelisks stand two tiles out from the temple's front corners), `eg_barracks`
+  dark; one short pair of limestone obelisks (`smallObelisk(..., { small:
+  true })`, h 13 on a 4x4 die) flanking the ramp's foot against tier 1's
+  face; the **major god's statue** in the temple's own sandstone (see
+  "Sandstone temple god, round 32"): variants `ra` falcon with the disc,
+  `isis` winged with horns and disc, `set` the Set animal; in egypt_town the
+  two Obelisk buildings stand at the processional way's foot by the Town
+  Center, not beside the temple), `eg_barracks`
   5x5 (thick battered ranges round a drill yard, a raised gatehouse with a
   latticed door (no painted sun over it: it read as a face); the yard's
   front is a pylon gateway, no loose spear racks: two battered ochre
@@ -1649,6 +1649,29 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   hooped barrel by the trough; the door's path clear. `MINE_FRIEZE`,
   `PALMPOST`, `oreLump` and the turquoise dado are gone.
   `egt_focus=mining_camp&egt_dist=7` frames it close (`egt_yaw=208` the back).
+- **Sandstone temple god, round 32** (`temple()`, `cleanStatue()` option
+  `sand`, building_08): the cult statue is no longer dark basalt (it was the
+  darkest value in the frame, right against the bright temple, and read as
+  a burnt jumble). `toClean` passes `sand` through; with it `cleanStatue`
+  skips `GOD_SLATE` and maps the granite ramp to three clean sandstone steps
+  (`SAND_STONE`: recess, base, highlight; no random speckle) and the lapis
+  inlay to a warm umber (`SAND_LAPIS`); the temple then runs `tcSandstone`
+  over the figure's fine model so the plinth is sandstone too. Ra stands
+  straight, the left foot forward, arms at his sides (fists with gold
+  rolls), a plain gold kilt (no pleat lines) with the owner's apron, a gold
+  collar with one umber ring; an umber headdress with a gold line every
+  third row frames an ochre-gilt falcon head (`SAND_HEAD`) with a short
+  hooked beak (a slate root under a gilt cere, the dark tip), round dark
+  eyes and the tear-mark down each cheek; a soft ochre-red disc
+  (`SAND_DISC`) with a gold rim and a reared gold uraeus (coil, body, a
+  hood with a limestone belly line, its head forward). Dark tones only in
+  the eyes, beak tip and line accents. Set (arms at the sides) and Isis
+  (wings) take the same palette. The temple's four obelisks (its own ramp
+  pair plus the town's two Obelisk buildings at its stairs) read as a fence
+  of spikes hiding the facade: now one short pair at the ramp foot, set
+  back against tier 1, and the Obelisk buildings moved to the processional
+  way's foot (egypt_town_scene.gd LAYOUT). `egt_focus=temple&egt_dx=-1.9&
+  egt_dz=1.6&egt_dist=7&egt_lift=3&egt_pitch=28&egt_yaw=-20` frames the god.
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8

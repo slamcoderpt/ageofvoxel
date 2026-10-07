@@ -3011,21 +3011,31 @@ function temple(god) {
     if (e <= 1) m.set(x, ay + 6, z, e === 1 ? TEAM : LIP(x, ay + 6, z));
   }
   void ROOFDECK;
-  // the god statue on its plinth at the front left (on tier 1)
+  // the god statue on its plinth at the front left (on tier 1). Round 32:
+  // in the temple's own sandstone and limestone (tcSandstone over the figure
+  // and the plinth, the lapis inlay as limestone: cleanStatue o.sand), not
+  // dark basalt that pulled the eye from the bright temple: Ra / Horus a
+  // falcon-headed god standing straight, the left foot forward, arms at his
+  // sides, the striped wig framing an ochre-gilt falcon head with a dark
+  // hooked beak, a soft ochre-red sun disc with a reared uraeus; the dark
+  // only in the eyes, the beak tip and small line accents
   const G = {
-    // crook and flail held to the chest (no tall sceptre: from above it read as a banner pole)
-    // dark stone and gold like the Monuments (a gilt body read as sand in the sun)
-    ra: { head: 'falcon', crown: 'disc', arms: 'crossed', skin: BASALT, kilt: GILT },
-    isis: { head: 'human', crown: 'horns', arms: 'wings', skin: BASALT, kilt: GILT, pose: 'dress' },
-    set: { head: 'jackal', crown: 'set', arms: 'crossed', skin: BASALT, kilt: GILT },
+    ra: { head: 'falcon', crown: 'disc', arms: 'side', kilt: GILT },
+    isis: { head: 'human', crown: 'horns', arms: 'wings', kilt: GILT, pose: 'dress' },
+    set: { head: 'jackal', crown: 'set', arms: 'side', kilt: GILT },
   }[god];
-  // stout (h 30: the body reads as a statue from the RTS camera, not a pole),
-  // the team colour only as a dark apron, not a bright banner-like panel
-  fineStatue(m, 2, 30, 11, 38, 4, 7, { h: 30, gold: GILT_L, kiltFront: TEAM, pose: 'stride', ...G }, 2);
+  // the team colour only as the kilt's apron
+  fineStatue(m, 1, 30, 10, 38, 4, 6, { h: 30, gold: GILT_L, kiltFront: TEAM, pose: 'stride', sand: true, ...G }, 2);
+  const st = m.fine[m.fine.length - 1].m;
+  for (const [x, y, z] of st.coords) {
+    const v = st.get(x, y, z);
+    if (v && !v.team) v.c = tcSandstone(v.c, x, y, z);
+  }
   pottedPalm(m, 33, 4, 35);
-  // the temple's second tall element: a pair of limestone obelisks at the
-  // ramp foot on stepped bases, smoothly tapering, gold pyramidions
-  for (const ox of [10, 28]) smallObelisk(m, ox + 1, 43, 1, 20);
+  // round 32: one short pair of limestone obelisks flanking the ramp's
+  // foot, set back against tier 1's face (the town's two Obelisk buildings
+  // no longer stand beside them), so the stairs and the colonnade stay open
+  for (const cx of [12, 28]) smallObelisk(m, cx, 40, 1, 13, { small: true });
   return m;
 }
 
@@ -3398,9 +3408,13 @@ function obelisk() {
 // taper (4 voxels at the foot to ~1.5 under the tip) with a team ring at the
 // foot and a gold band under the tip, and a smooth gold pyramidion. (cx, cz):
 // the shaft's centre (a voxel corner).
-function smallObelisk(m, cx, cz, y0, h = 20) {
-  m.box(cx - 3, y0, cz - 3, 6, 1, 6, SAND_D);
-  m.box(cx - 2, y0 + 1, cz - 2, 4, 1, 4, LIME);
+function smallObelisk(m, cx, cz, y0, h = 20, { small = false } = {}) {
+  // (small: one 4 x 4 die two courses high instead of the 6 x 6 / 4 x 4 steps)
+  if (small) { m.box(cx - 2, y0, cz - 2, 4, 1, 4, SAND_D); m.box(cx - 2, y0 + 1, cz - 2, 4, 1, 4, LIME); }
+  else {
+    m.box(cx - 3, y0, cz - 3, 6, 1, 6, SAND_D);
+    m.box(cx - 2, y0 + 1, cz - 2, 4, 1, 4, LIME);
+  }
   const Y0 = y0 + 2, B = 16, TOP = Y0 + h;
   m.blocks.push({ x0: cx - 1, z0: cz - 1, x1: cx + 1, z1: cz + 1, y0: Y0, h, b: B, base: 0 });
   for (let y = Y0; y < TOP; y++) for (let x = cx - 1; x < cx + 1; x++) for (let z = cz - 1; z < cz + 1; z++) {
@@ -3621,7 +3635,7 @@ function toClean(o) {
   const arms = o.arms === 'bowls' ? 'pots' : o.arms === 'wings' ? 'wings' : o.arms === 'staff' ? 'staff' : o.arms === 'side' || o.arms === 'embrace' ? 'side' : 'crossed';
   // the gods (falcon, jackal, Isis' horns) in the lighter slate stone (round 18)
   const god = head === 'falcon' || head === 'jackal' || crown === 'horns';
-  return { pose: o.pose ?? 'stride', head, crown, arms, god, kilt: o.kilt === undefined || o.kilt === BASALT ? GRAN : CG, kiltFront: o.kiltFront === undefined ? TEAMB : o.kiltFront };
+  return { pose: o.pose ?? 'stride', head, crown, arms, god, sand: o.sand, kilt: o.kilt === undefined || o.kilt === BASALT ? GRAN : CG, kiltFront: o.kiltFront === undefined ? TEAMB : o.kiltFront };
 }
 function cleanStatue(m, cx, y0, cz, o = {}) {
   const { pose = 'stride', head = 'nemes', arms = 'side', kiltFront = TEAMB } = o;
@@ -3649,7 +3663,10 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
   // seventh of the figure, not a mannequin's quarter)
   const kn = pose === 'kneel' ? -16 : pose === 'stride' || pose === 'stand' ? 6 : pose === 'dress' ? 4 : 0;
   // one-voxel bands, gold and lapis alternating (a gold wig: gold / dark gold)
-  const stripe = o.wig === 'gold' ? (x, y) => ((y - kn) & 1 ? CG_D : CG) : (x, y) => ((y - kn) & 1 ? LAPIS_S : CG);
+  // (o.sand: an umber headdress with a gold line every third row, so it
+  // reads as one darker shape framing the gilt falcon head, not a noise of
+  // one-voxel stripes)
+  const stripe = o.wig === 'gold' ? (x, y) => ((y - kn) & 1 ? CG_D : CG) : o.sand ? (x, y) => ((y - kn + 60) % 3 === 0 ? CG : LAPIS_S) : (x, y) => ((y - kn) & 1 ? LAPIS_S : CG);
 
   // ---- the lower body
   if (pose === 'mummy') {
@@ -3710,7 +3727,7 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     const gk = kilt !== GRAN, KL = gk ? CG : GRAN, KD = gk ? CG_D : GRAN_D;
     for (let y = 21; y < 31; y++) {
       const hw = y >= 27 ? 6 : 7, zf = 5;
-      B(-hw, hw, y, y + 1, -4, zf, (x) => (y === 21 ? KD : ((x - (y >> 1) + 64) % 4 === 0 ? KD : KL)));
+      B(-hw, hw, y, y + 1, -4, zf, (x) => (y === 21 ? KD : (!o.sand && (x - (y >> 1) + 64) % 4 === 0) ? KD : KL));   // (o.sand: plain, no pleat lines)
     }
     if (kiltFront !== null) for (let y = 21; y < 31; y++) {
       const hw = y >= 27 ? 2 : 3, zf = 5;
@@ -3751,7 +3768,7 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
   for (let y = 30 + kn; y < 36 + kn; y++) for (let x = -8; x < 8; x++) {
     const d = Math.hypot(x + 0.5, (36.3 + kn - y) * 1.25);
     const r = [2.4, 3.3, 4.2, 5.1, 6.0, 6.8];
-    const c = d < r[0] || d >= r[5] ? null : d < r[1] ? CG_L : d < r[2] ? LAPIS_S : d < r[3] ? CG : d < r[4] ? LAPIS_S : ((x + 64) & 1 ? CG_L : CG_D);
+    const c = d < r[0] || d >= r[5] ? null : o.sand ? (d < r[3] ? CG_L : d < r[4] ? LAPIS_S : CG) : d < r[1] ? CG_L : d < r[2] ? LAPIS_S : d < r[3] ? CG : d < r[4] ? LAPIS_S : ((x + 64) & 1 ? CG_L : CG_D);
     if (c) set(x, y, male || pose === 'dress' ? 4 : 4, c);
   }
   // ---- arms
@@ -3946,25 +3963,43 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     const Y = kn;
     // (the head's golds are outside polishStatue's ramp, so the face stays
     // one clean gold plane behind the dark beak and eyes, not shaded dark)
-    S(3, 38 + Y, 40 + Y, -3, 3, SG);                           // the throat
-    S(4, 40 + Y, 46 + Y, -3, 4, SG);                           // the head
-    S(3, 46 + Y, 47 + Y, -2, 3, SG_L);                         // the domed crown
-    S(2, 47 + Y, 48 + Y, -1, 2, SG_L);
+    // (o.sand, the Temple's sandstone god: a warm ochre-gilt head, a step
+    // apart from the limestone-and-gold striped wig round it)
+    const HD = o.sand ? SAND_HEAD : SG, HD_L = o.sand ? SAND_HEAD_L : SG_L;
+    S(3, 38 + Y, 40 + Y, -3, 3, HD);                           // the throat
+    S(4, 40 + Y, 46 + Y, -3, 4, HD);                           // the head
+    S(3, 46 + Y, 47 + Y, -2, 3, HD_L);                         // the domed crown
+    S(2, 47 + Y, 48 + Y, -1, 2, HD_L);
     // the beak: a diagonal hook, each step a voxel further out and a
     // voxel lower, three rows deep at the root and one at the tip
     // (horn-brown, so it reads apart from the black eyes and stripes)
-    const HORN = 0x4e3a22;
-    B(-1, 1, 42 + Y, 45 + Y, 4, 5, HORN);                      // the root
-    B(-1, 1, 44 + Y, 45 + Y, 4, 5, IVORY);                     // the cere
-    B(-1, 1, 41 + Y, 44 + Y, 5, 6, HORN);
-    B(-1, 1, 40 + Y, 42 + Y, 6, 7, GRAN_D);
-    B(-1, 1, 39 + Y, 40 + Y, 6, 7, GRAN_D);                    // the hooked tip
-    B(-1, 1, 41 + Y, 42 + Y, 4, 5, CG_D);                      // the gape under it
-    M(2, 3, 43 + Y, 45 + Y, 3, 4, GRAN_D);                     // the eyes, front
-    M(2, 3, 44 + Y, 45 + Y, 3, 4, IVORY);                      // glints
-    M(3, 4, 43 + Y, 45 + Y, 2, 3, GRAN_D);                     // and round the side
-    M(2, 4, 45 + Y, 46 + Y, 3, 4, SG_L);                       // gold brows
-    M(2, 3, 41 + Y, 43 + Y, 3, 4, GRAN_D);                     // the malar stripe, a teardrop
+    const HORN = 0x4e3a22, DK = o.sand ? SAND_INK : GRAN_D;
+    if (o.sand) {
+      // the Temple's god (round 32): a short hooked beak (a skull-like long
+      // beak and big pale-ringed eyes read as an elephant from the front):
+      // the horn root under a pale cere, one step out and down, the dark
+      // hooked tip; the eye a single dark row under the brow with the
+      // falcon's tear-mark running down the cheek
+      B(-1, 1, 43 + Y, 45 + Y, 4, 5, SAND_BEAK);               // the root
+      B(-1, 1, 44 + Y, 45 + Y, 4, 5, HD_L);                    // the cere, gilt
+      B(-1, 1, 42 + Y, 44 + Y, 5, 6, SAND_BEAK);
+      B(-1, 1, 41 + Y, 43 + Y, 6, 7, DK);                      // the hooked tip
+      M(2, 4, 43 + Y, 45 + Y, 3, 4, DK);                       // the eyes, round
+      M(3, 4, 43 + Y, 45 + Y, 2, 3, DK);                       // round the side
+      M(3, 4, 40 + Y, 43 + Y, 3, 4, DK);                       // the tear-mark
+    } else {
+      B(-1, 1, 42 + Y, 45 + Y, 4, 5, HORN);                      // the root
+      B(-1, 1, 44 + Y, 45 + Y, 4, 5, IVORY);                     // the cere
+      B(-1, 1, 41 + Y, 44 + Y, 5, 6, HORN);
+      B(-1, 1, 40 + Y, 42 + Y, 6, 7, DK);
+      B(-1, 1, 39 + Y, 40 + Y, 6, 7, DK);                    // the hooked tip
+      B(-1, 1, 41 + Y, 42 + Y, 4, 5, CG_D);                      // the gape under it
+      M(2, 3, 43 + Y, 45 + Y, 3, 4, DK);                     // the eyes, front
+      M(2, 3, 44 + Y, 45 + Y, 3, 4, IVORY);                      // glints
+      M(3, 4, 43 + Y, 45 + Y, 2, 3, DK);                     // and round the side
+      M(2, 4, 45 + Y, 46 + Y, 3, 4, HD_L);                       // gold brows
+      M(2, 3, 41 + Y, 43 + Y, 3, 4, DK);                     // the malar stripe, a teardrop
+    }
   } else if (head === 'jackal') {
     // a jackal's head (round 18: Anubis' profile): a narrow skull, a long
     // muzzle six voxels out from the face, tapering, with a lighter bridge,
@@ -3994,9 +4029,20 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
     const Y = kn, cy = 52.5, r = 5.2;
     for (let x = -6; x < 6; x++) for (let y = 46; y < 59; y++) {
       const d = Math.hypot(x + 0.5, y + 0.5 - cy);
-      if (d <= r) { set(x, y + Y, -2, d > r - 1.1 ? CG : ST_RED); set(x, y + Y, -3, d > r - 1.1 ? CG : ST_RED); }
+      const red = o.sand ? SAND_DISC : ST_RED;
+      if (d <= r) { set(x, y + Y, -2, d > r - 1.1 ? CG : red); set(x, y + Y, -3, d > r - 1.1 ? CG : red); }
     }
-    B(-1, 1, 46 + Y, 49 + Y, 1, 2, CG);
+    if (!o.sand) B(-1, 1, 46 + Y, 49 + Y, 1, 2, CG);
+    else {
+      // the uraeus reared on the disc's foot, a voxel proud of it: a coil on
+      // the crown, the body rising, the hood flaring three wide with a
+      // limestone belly line, the head bent forward over the brow
+      B(-2, 2, 47 + Y, 48 + Y, -1, 1, CG_L);                   // the coil
+      B(-1, 1, 48 + Y, 51 + Y, -1, 0, CG);                     // the body
+      B(-2, 2, 51 + Y, 55 + Y, -1, 0, (x, y) => (x === 0 || x === -1) && y < 54 + Y ? SAND_LIME : CG_L);   // the hood
+      B(-1, 1, 55 + Y, 56 + Y, -1, 1, CG_L);                   // the head, forward
+      B(-1, 1, 54 + Y, 55 + Y, 0, 1, SAND_INK);                // its eyes
+    }
   } else if (o.crown === 'horns') {
     // Isis: a gold modius, cow horns cupping a red sun disc
     const Y = kn;
@@ -4057,11 +4103,32 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
   polishStatue(m, touched);
   // the gods (round 18) in a lighter blue-grey slate with a real mid-tone
   // between the near-black recesses and the gold, so their forms read
-  if (o.god) for (const [x, y, z] of touched) {
+  if (o.god && !o.sand) for (const [x, y, z] of touched) {
     const v = m.get(x, y, z), c = v && GOD_SLATE.get(v.c);
     if (c !== undefined) v.c = c;
   }
+  // o.sand (round 32, the Temple's god): the lapis inlay as limestone, so the
+  // nemes / wig and collar stripe gold on pale stone, and the granite as the
+  // Town Center statue's sandstone ramp (tcSandstone); the dark kept to the
+  // small line accents (eyes, beak tip, knuckles)
+  if (o.sand) for (const [x, y, z] of touched) {
+    const v = m.get(x, y, z);
+    if (!v || v.team) continue;
+    const l = SAND_LAPIS.get(v.c) ?? SAND_STONE.get(v.c);
+    if (l !== undefined) v.c = l;
+  }
 }
+// the Temple's sandstone god (cleanStatue o.sand): an ochre-gilt falcon
+// head (a pale one with dark eyes read as a skull), a dark brown ink for the eyes /
+// beak tip, a soft ochre-red disc, a warm umber in place of the lapis inlay
+// (the wig and collar stripe gold / umber, framing the pale head), and the
+// granite ramp mapped to three clean sandstone steps (no random speckle)
+const SAND_HEAD = 0xa86c1c, SAND_HEAD_L = 0xc08428, SAND_BEAK = 0x3c3834, SAND_INK = 0x3a2616, SAND_DISC = 0xb4552e, SAND_LIME = 0xeadcb8;
+const SAND_LAPIS = new Map([[0x34558c, 0x7a4a26], [0x263f6a, 0x5e381c], [0x4c6ca6, 0x8e5a30], [0x2454b4, 0x7a4a26]]);
+const SAND_STONE = new Map([
+  [0x1b1f26, 0xb08a58], [0x2a3039, 0xd2ae78], [0x30363f, 0xd2ae78], [0x262b33, 0xd2ae78],
+  [0x4b5563, 0xe4c48e], [0x343d47, 0xe4c48e], [0x1c2027, 0x8a6640],
+]);
 // (blue-grey: anything with green in it turns olive under the warm light)
 const GOD_SLATE = new Map([
   [0x1b1f26, 0x1f2432], [0x2a3039, 0x353d50], [0x30363f, 0x3d465a], [0x262b33, 0x2f3646],
