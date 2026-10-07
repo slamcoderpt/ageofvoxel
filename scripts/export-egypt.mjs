@@ -2847,6 +2847,86 @@ function tcColumn(m, x, z, y0, y1) {
 // the hall's roof: a reed-mat deck laid in strips across the beams (palm
 // ribs every third row), a different material from every plaster roof
 const TC_HALLROOF = (x, y, z) => { const c = pick(hash3(x, y, z >> 1, 313), [0xa08a58, 0x968050, 0xaa9462, 0x8c7648]); return z % 3 === 0 ? shade(c, 0.8) : c; };
+// Round 35: a roof read as a laid deck, not a blank slab. (x0, z0, x1, z1) is
+// the coping's outer rectangle, `y` the deck row; the ring e < cw is the
+// coping one row up (its inner row repainted `line`, a lapis line, unless it
+// is the owner's line), the deck's outer row (e === cw) a red-orange `band`,
+// and the field inside it sunk one more row and laid in slabs `g` voxels
+// square: one tone per slab, a darker seam between slabs.
+const TCF_TONES = [0xd8c39a, 0xd0b98e, 0xdccaa4, 0xcbb489];
+const TCF_SLAB = (g) => (x, y, z) => {
+  const c = pick(hash3(Math.floor(x / g), y, Math.floor(z / g), 351), TCF_TONES);
+  return (((x % g) + g) % g === 0 || ((z % g) + g) % g === 0) ? shade(c, 0.78) : c;
+};
+function roofField(m, x0, z0, x1, z1, y, { cw = 2, g = 4, line = LAPIS, band = 0xc8562e, field = null } = {}) {
+  const f = field || TCF_SLAB(g);
+  for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) {
+    const e = Math.min(x - x0, x1 - 1 - x, z - z0, z1 - 1 - z);
+    if (e < cw) {
+      const v = m.get(x, y + 1, z);
+      if (e === cw - 1 && line != null && v && !v.team) pset(m, x, y + 1, z, line);
+    } else if (e === cw) pset(m, x, y, z, band);
+    else { m.remove(x, y, z); pset(m, x, y - 1, z, f(x - x0, y - 1, z - z0)); }
+  }
+}
+// the hall's sunk deck: reed mats in a basket weave (the strips of each 4 x 4
+// mat run along x or z in turn) between dark palm-trunk beams on the seams
+const TC_MAT = (x, y, z) => {
+  const g = 4, u = ((x % g) + g) % g, w = ((z % g) + g) % g;
+  if (u === 0 || w === 0) return 0x6a4a2c;
+  const along = (Math.floor(x / g) + Math.floor(z / g)) & 1;
+  const s = along ? w : u;
+  return s === 2 ? 0x9a8250 : (s & 1) ? 0xb8a068 : 0xc8b07a;
+};
+// Round 35 courtyard props (flat colour, clean, a voxel apart): a crate (n
+// cube) with near-black edge slats round pale boards, the boards light and
+// mid by row (the lid's the other way); a tall amphora with a narrow neck
+// shading from dark terracotta at the foot to cream at the shoulder, a dark
+// painted band round its belly; a wooden pallet
+const TCK_L = 0xd6a866, TCK_M = 0xb7874c, TCK_D = 0x3e2614;
+function tcCrate(m, x, y, z, n = 5) {
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) for (let k = 0; k < n; k++) {
+    const ex = i === 0 || i === n - 1, ey = j === 0 || j === n - 1, ez = k === 0 || k === n - 1;
+    if (!ex && !ey && !ez) continue;
+    let c = (ex + ey + ez >= 2) ? TCK_D : (j & 1) ? TCK_L : TCK_M;
+    if (j === n - 1 && !ex && !ez) c = (i & 1) ? TCK_L : TCK_M;
+    pset(m, x + i, y + j, z + k, c);
+  }
+}
+const TCA = [0x8a3418, 0xa4441f, 0xbc5e2c, 0xd28a4e, 0xe4b67c, 0xeed6a8];
+function tcAmphora(m, X, y, Z) {
+  // 12 high: a pointed foot, a round belly five wide, a dark painted band,
+  // the shoulder narrowing to a one-voxel neck two high, a flared rim
+  prow(m, X, y, Z, 0, TCA[0]);
+  prow(m, X, y + 1, Z, 1, TCA[0], true);
+  prow(m, X, y + 2, Z, 1, TCA[1]);
+  prow(m, X, y + 3, Z, 2, TCA[1], true);
+  prow(m, X, y + 4, Z, 2, TCA[2], true);
+  prow(m, X, y + 5, Z, 2, 0x3a1c10, true);
+  prow(m, X, y + 6, Z, 2, TCA[3], true);
+  prow(m, X, y + 7, Z, 1, TCA[4]);
+  prow(m, X, y + 8, Z, 1, TCA[5], true);
+  pset(m, X, y + 9, Z, TCA[4]); pset(m, X, y + 10, Z, TCA[5]);
+  prow(m, X, y + 11, Z, 1, (i, k) => (i === 0 && k === 0 ? MOUTH : TCA[5]));
+  // two handles: a voxel out from the neck on each side, joined to the rim
+  for (const d of [-1, 1]) { pset(m, X + d, y + 9, Z, TCA[3]); }
+}
+// an open sack of grain (4 x 4 from (x, z), corners cut): tan burlap with a
+// darker foot, a pale rolled rim, golden grain heaped in the mouth
+const TCS = [0x7e6238, 0xa88a5a, 0xb99c6a, 0xeadcb8, 0xe6be52, 0xf2d478];
+function tcSack(m, x, y, z, h = 4) {
+  const cell = (r, c) => { for (let i = 0; i < 4; i++) for (let k = 0; k < 4; k++) {
+    if ((i === 0 || i === 3) && (k === 0 || k === 3)) continue;
+    pset(m, x + i, y + r, z + k, typeof c === 'function' ? c(i, k) : c);
+  } };
+  cell(0, TCS[0]);
+  for (let r = 1; r < h - 1; r++) cell(r, (i, k) => (i === 0 || k === 0 ? TCS[1] : TCS[2]));
+  cell(h - 1, (i, k) => (i >= 1 && i <= 2 && k >= 1 && k <= 2 ? TCS[4] : TCS[3]));
+  pset(m, x + 1, y + h, z + 1, TCS[5]); pset(m, x + 2, y + h, z + 2, TCS[4]);
+}
+function tcPallet(m, x0, z0, w, d) {
+  for (let x = x0; x < x0 + w; x++) for (let z = z0; z < z0 + d; z++) pset(m, x, 1, z, (x - x0) % 2 ? 0x8a6238 : 0x5a3c22);
+}
 function townCenter() {
   const N = 56;
   const m = lot(N, N);
@@ -2868,11 +2948,18 @@ function townCenter() {
   const PB = [INK, RED_B, RED_B, INK, OCHRE_B, OCHRE_B, INK, TURQ, TURQ, INK];
   for (const [x0, x1] of [[14, 25], [31, 42]]) {
     block(m, x0, 44, x1, 54, 1, 20, { batter: 8, band: null, frieze: 0, lipOut: 2 });
+    const T = m.lastTop;
     bands(m, x0, 44, x1, 54, 19, PB);
+    roofField(m, T.c0, T.d0, T.c1, T.d1, T.y);
   }
   for (let x = 24; x < 32; x++) for (let z = 46; z < 52; z++) for (let y = 1; y < 14; y++) m.set(x, y, z, y === 1 ? SAND_D(x, y, z) : SAND(x, y, z));
   for (let x = 23; x < 33; x++) for (let z = 46; z < 53; z++) for (let y = 14; y < 18; y++) m.set(x, y, z, y === 17 ? LIME(x, y, z) : y === 14 ? LIME_S : y === 16 ? TURQ : SAND(x, y, z));
-  for (let x = 22; x < 34; x++) for (let z = 45; z < 54; z++) { const e = Math.min(x - 22, 33 - x, z - 45, 53 - z); m.set(x, 18, z, e === 0 ? LIME(x, 18, z) : PLASTER(x, 18, z)); }
+  for (let x = 22; x < 34; x++) for (let z = 45; z < 54; z++) {
+    const e = Math.min(x - 22, 33 - x, z - 45, 53 - z);
+    m.set(x, 18, z, e <= 1 ? LIP(x, 18, z) : PLASTER(x, 18, z));
+    if (e <= 1) m.set(x, 19, z, LIME(x, 19, z));
+  }
+  roofField(m, 22, 45, 34, 54, 18, { g: 3 });
   door(m, '+z', 26, 4, 1, 11, { deep: 4, frame: LIME, lintel: false });
   for (let y = 1; y < 11; y++) for (let x = 26; x < 30; x++) m.set(x, y, 47, x === 27 || x === 28 ? REVEAL : shade(DOOR(x, y, 47), 0.5));
   // the flagstaffs against the pylons' fronts, the owner's pennants above the cornices
@@ -2885,9 +2972,13 @@ function townCenter() {
   // the sanctuary: three receding tiers, each under its own cornice
   inner(m, (s) => {
     const g = [0x34588a, 0x3f6596];
+    const field = (T, o) => roofField(s, T.c0, T.d0, T.c1, T.d1, T.y, o);
     const t1 = block(s, 8, 8, 30, 27, 1, 9, { wall: LIME, batter: 6, band: 'red', roofC: PLASTER, lipOut: 2, rimC: LIME, gorge: g });
+    field(s.lastTop);
     const t2 = block(s, 12, 10, 26, 23, t1 - 1, 6, { wall: SAND, batter: 0, band: 'lapis', roofC: PLASTER, lipOut: 2, rimC: LIME, gorge: [RED_M, 0xa8563a] });
+    field(s.lastTop, { line: RED_B, band: OCHRE_B });
     block(s, 15, 12, 23, 20, t2 - 1, 5, { wall: LIME, batter: 0, band: 'team', roofC: PLASTER, lipOut: 1, rimC: LIME, gorge: g, torus: false });
+    field(s.lastTop, { g: 3 });
     door(s, '+z', 17, 4, 1, 8, { lattice: true, sun: true, deep: 3, frame: SAND });
     door(s, '+z', 17, 4, t1, 4, { leaf: false, deep: 2, frame: LIME });
     slit(s, '+z', 11, 4, 3, 1); slit(s, '+z', 26, 4, 3, 1); slit(s, '+x', 13, 4, 3, 1); slit(s, '+x', 20, 4, 3, 1);
@@ -2916,6 +3007,9 @@ function townCenter() {
       s.set(x, H, z, e === 0 ? R[2](x, H, z) : e === 1 ? LIP(x, H, z) : TC_HALLROOF(x, H, z));
       if (e <= 1) s.set(x, H + 1, z, LIP(x, H + 1, z));
     }
+    // round 35: the deck sunk inside a lapis line and a red band, reed mats
+    // in a basket weave between palm-trunk beams
+    roofField(s, X0, Z0, X1, Z1, H, { field: TC_MAT });
   });
   // the granary: a big domed silo at the front left with a ladder and sacks
   // (silo(), ladder() lay mesh polygons on m itself, so not through inner())
@@ -2928,7 +3022,13 @@ function townCenter() {
   m.box(27, 1, 34, 5, 1, 5, LIME); m.box(28, 1, 35, 3, 1, 3, DARK);
   m.set(29, 2, 36, FIRE[3], FG); m.set(28, 2, 36, FIRE[1], FG); m.set(29, 2, 35, FIRE[2], FG); m.set(30, 2, 37, FIRE[0], FG); m.set(29, 3, 36, FIRE[2], FG);
   for (let x = 31; x < 35; x++) for (let z = 21; z < 25; z++) m.set(x, 1, z, x === 31 || x === 34 || z === 21 || z === 24 ? LIME : WATER);
-  goodsBox(m, 42, 1, 38, 4, 3, 'grain'); crate(m, 47, 1, 37, 3, 3, 3); sack(m, 38, 1, 39);
+  // round 35: the courtyard's stores, each a clear shape a voxel apart from
+  // the next: two crates on a pallet with a third on top, a pair of tall
+  // amphorae, two linen grain sacks
+  tcPallet(m, 37, 29, 12, 6);
+  tcCrate(m, 37, 2, 29); tcCrate(m, 43, 2, 29); tcCrate(m, 40, 7, 29);
+  tcAmphora(m, 37, 1, 40); tcAmphora(m, 42, 1, 41);
+  tcSack(m, 45, 1, 36); tcSack(m, 45, 1, 41, 3);
   palm(m, 8, 1, 28, 21, { lx: 0.3, lz: 1, len: 7 });
   // the Ra statue on its plinth at the front-left corner, in sandstone with
   // gold regalia and the owner's kilt (building_02)

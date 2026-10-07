@@ -1699,6 +1699,26 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   yard), with an open stair hatch beside it (dark well, pale kerb, ladder
   rails rising out), two water jars on the back parapet, a straw mat of
   drying grain and two linen sacks.
+- **Courtyard stores and laid roofs, round 35** (`townCenter()`,
+  `roofField()`, `tcCrate()`, `tcAmphora()`, `tcSack()`, `tcPallet()` in
+  export-egypt.mjs): the Town Center's courtyard props read as brown blobs and
+  its pylon tops, gate bridge and colonnade roof as blank cream slabs. The old
+  goodsBox / crate / sack are replaced by clean flat-colour props a voxel
+  apart: two 5-voxel crates on a slatted pallet with a third on top (near-black
+  edge slats round pale boards, light / mid by row, the lid the other way), two
+  12-high amphorae (pointed foot, a round belly five wide shading from dark
+  terracotta up to cream, a dark painted belly band, a one-voxel neck with
+  handles, a pale rim round the dark mouth) and two open sacks (tan burlap,
+  darker foot, pale rolled rim, golden grain in the mouth). `roofField(m, x0,
+  z0, x1, z1, y, {cw, g, line, band, field})` lays a roof as a deck: the
+  coping's inner row a lapis line (never over the owner's line), the deck's
+  outer row a red-orange band, the field inside sunk one more row and laid in
+  `g`-voxel slabs (one tone per slab, darker seams). It is applied to both
+  gate pylons, the gate bridge (now under a two-voxel coping), the three
+  sanctuary tiers (the middle one a red line and an ochre band) and the
+  colonnaded hall (`TC_MAT`: reed mats in a basket weave between dark
+  palm-trunk beams). A tier's field is sunk before the next tier is built on
+  it, so no tier loses its foot.
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8
