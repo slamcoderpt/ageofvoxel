@@ -521,8 +521,9 @@ func _run() -> void:
 			await _frames(4)
 		var spl := str(ui.tooltip.get("lines", []))
 		var spd: Dictionary = sim.get_unit_def("spearman")
-		_check("hovering the Spearman: his stats in the tooltip (hp, hack attack, speed, armor, pop)", str(ui.tooltip.get("title", "")) == "Train Spearman"
-			and spl.contains("%d hp" % int(round(float(spd.hp)))) and spl.contains("hack attack") and spl.contains("speed") and spl.contains("Armor"),
+		_check("hovering the Spearman: his stats in the tooltip (hp, hack attack, speed, armor, pop) and Retold's (speed 5.0, armor 40 / 10, 2 pop)", str(ui.tooltip.get("title", "")) == "Train Spearman"
+			and spl.contains("%d hp" % int(round(float(spd.hp)))) and spl.contains("hack attack") and spl.contains("speed") and spl.contains("Armor")
+			and spl.contains("Retold: speed 5.0") and spl.contains("armor 40 % / 10 %") and spl.contains("2 pop"),
 			"%s %s" % [ui.tooltip.get("title", ""), spl])
 		var n0 := _units("spearman").size()
 		await _key(KEY_Q)

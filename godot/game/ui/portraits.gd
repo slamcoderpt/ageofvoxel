@@ -40,6 +40,7 @@ const BUST_VIEW := {
 	"rhino_of_set": [62.0, 12.0, "whole"],
 	"elephant_of_set": [78.0, 10.0, "whole"],
 	"mercenary_cavalry": [62.0, 12.0, "fore"],
+	"camel_rider": [60.0, 22.0, "neck"],
 }
 
 ## Parts a bust also frames (and shows, when the card portrait hides them): the
@@ -248,7 +249,7 @@ func _render(obj: Node3D, bust := false) -> Texture2D:
 	vp.add_child(cam)
 	if obj.has_meta("bust_mirror"):
 		parts["_mirror"] = AABB()
-	for k in ["whole", "fore"]:
+	for k in ["whole", "fore", "neck"]:
 		if obj.has_meta("bust_" + k):
 			parts["_" + k] = AABB()
 	if obj.has_meta("bust_view"):
@@ -293,6 +294,10 @@ func _frame_bust(cam: Camera3D, obj: Node3D, body: AABB, parts := {}) -> void:
 		var bb: AABB = parts.body
 		var fq := AABB(Vector3(bb.position.x, bb.position.y + bb.size.y * 0.3, bb.end.z - bb.size.z * 0.45), Vector3(bb.size.x, bb.size.y * 0.7, bb.size.z * 0.45))
 		crop = crop.merge(parts.neck).merge(fq)
+	elif parts.has("_neck") and parts.has("neck") and parts.has("torso") and parts.has("head"):
+		# the Camel Rider: his head and chest and his camel's whole neck and head
+		# in profile in front of him (the long neck under the head is the camel)
+		crop = parts.head.merge(AABB(parts.torso.position + Vector3(0, parts.torso.size.y * 0.4, 0), parts.torso.size * Vector3(1, 0.6, 1))).merge(parts.neck)
 	var anchor: AABB = crop
 	if parts.has("head"):
 		anchor = parts.head
@@ -337,7 +342,7 @@ func _frame_bust(cam: Camera3D, obj: Node3D, body: AABB, parts := {}) -> void:
 		var dir: Vector3 = d0
 		if mirror:
 			dir.x = -dir.x
-		var f := _fit_view(dir, pts, anchor)
+		var f := _fit_view(dir, pts, anchor, man)
 		# a little preference for the classic 40-deg 3/4 (yaw 35-45, pitch 26)
 		var score: float = f.fill + (0.03 if absf(d0.y - sin(deg_to_rad(26.0))) < 0.01 and d0.x > 0.55 and d0.x < 0.7 else 0.0)
 		if best.is_empty() or score > float(best.score):
@@ -363,7 +368,7 @@ func _frame_bust(cam: Camera3D, obj: Node3D, body: AABB, parts := {}) -> void:
 ## One bust view (_frame_bust): the focus points' 2D bounds seen along dir, the
 ## orthographic frame size and its centre (right / up coordinates), and how much
 ## of the frame the subject's bounds fill.
-func _fit_view(dir: Vector3, pts: PackedVector3Array, anchor: AABB) -> Dictionary:
+func _fit_view(dir: Vector3, pts: PackedVector3Array, anchor: AABB, man := false) -> Dictionary:
 	var right := Vector3.UP.cross(dir).normalized()
 	var up := dir.cross(right).normalized()
 	var x0 := INF
@@ -381,6 +386,12 @@ func _fit_view(dir: Vector3, pts: PackedVector3Array, anchor: AABB) -> Dictionar
 	var h := maxf(y1 - y0, 0.001)
 	var size := maxf(minf(w, h) / 0.94, maxf(w, h) * 0.8)
 	size = minf(size, maxf(w, h) / 0.94)
+	# the narrow side spans at least 88 % of the frame (a tall, slim subject, the
+	# Mercenary waist-up with his halberd, the Slinger with his sling raised, the
+	# Camel Rider over his mount's neck, filled only ~78 % of the tile's width and
+	# left a quarter of it empty): the long side runs out instead, the window kept
+	# on the head (ANCHOR)
+	size = minf(size, minf(w, h) / 0.88)
 	var ac := anchor.get_center()
 	var cx := (x0 + x1) * 0.5
 	var cy := (y0 + y1) * 0.5
@@ -388,6 +399,38 @@ func _fit_view(dir: Vector3, pts: PackedVector3Array, anchor: AABB) -> Dictionar
 		cx = clampf(ac.dot(right), x0 + size * 0.47, x1 - size * 0.47)
 	if h > size * 0.94:
 		cy = clampf(ac.dot(up), y0 + size * 0.47, y1 - size * 0.47)
+	# the narrow side measured only over what stays in the frame: the Slinger's
+	# sling stick reaches far up-left, out of the frame's top, and does not fill
+	# its left side (the frame shrinks onto the part that does show; a man's bust
+	# only, a beast's long side already runs out on purpose)
+	for _pass in (4 if man else 0):
+		var tall_cut := h > size * 0.94
+		var wide_cut := w > size * 0.94
+		if tall_cut == wide_cut:
+			break
+		var a0 := INF
+		var a1 := -INF
+		for p in pts:
+			var x := p.dot(right)
+			var y := p.dot(up)
+			if tall_cut and absf(y - cy) <= size * 0.5:
+				a0 = minf(a0, x)
+				a1 = maxf(a1, x)
+			elif wide_cut and absf(x - cx) <= size * 0.5:
+				a0 = minf(a0, y)
+				a1 = maxf(a1, y)
+		if a1 <= a0:
+			break
+		var n2 := maxf(a1 - a0, 0.001)
+		if n2 / size >= 0.84:
+			break
+		size = n2 / 0.88
+		if tall_cut:
+			cx = (a0 + a1) * 0.5
+			cy = clampf(ac.dot(up), y0 + size * 0.47, y1 - size * 0.47)
+		else:
+			cy = (a0 + a1) * 0.5
+			cx = clampf(ac.dot(right), x0 + size * 0.47, x1 - size * 0.47)
 	var fill := (minf(w, size) * minf(h, size)) / (size * size)
 	return {"size": size, "cx": cx, "cy": cy, "fill": fill}
 

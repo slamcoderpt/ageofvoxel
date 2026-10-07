@@ -1289,6 +1289,9 @@ func _train_stat_lines(t: String, age: int) -> Array:
 	var a_s := "no attack" if dmg <= 0.0 else "%s %s attack%s" % [_num(snappedf(dmg, 0.1)), kind, (", range %s" % _num(snappedf(rng, 0.1))) if rng > 2.0 else ""]
 	var out := ["%d hp · %s · speed %s" % [int(round(hp)), a_s, _num(snappedf(float(d.get("speed", 0.0)), 0.1))],
 		"Armor %d %% hack, %d %% pierce · %d pop" % [int(round(float(d.get("hack_armor", 0.0)) * 100)), int(round(float(d.get("pierce_armor", 0.0)) * 100)), int(d.get("pop", 1))]]
+	var rn := _retold_note(d, float(d.get("speed", 0.0)))
+	if rn != "":
+		out.append(rn)
 	if str(d.get("god", "")) != "" or bool(d.get("myth", false)):
 		var segs := str(d.get("retold", "")).split("; ")
 		if segs.size() > 1:
@@ -1296,6 +1299,31 @@ func _train_stat_lines(t: String, age: int) -> Array:
 			if ab.contains(":") or not (ab.contains("LOS") or ab.contains("speed")):
 				out.append(ab.left(1).to_upper() + ab.substr(1))  # (the HUD wraps it to the tooltip's width)
 	return out
+
+## Retold's speed / armor / pop of an Egyptian unit where this sim's differ
+## (sim/civ's "retold" line, EGYPT.md 1: "speed 5.0", "armor 40/10/99", "2 pop";
+## this sim scales distances and armor, and halves the infantry's pop), as one
+## line: "Retold: speed 5.0 · armor 40 % / 10 % · 2 pop" ("" for a Greek type
+## or when they agree). `speed` is the speed shown beside it (a unit's live one).
+func _retold_note(d: Dictionary, speed: float) -> String:
+	var rt := str(d.get("retold", ""))
+	if rt == "":
+		return ""
+	# (the whole line, first match: the Laborer's speed and armor follow his ROF note)
+	var first := rt
+	var bits := []
+	var m := RegEx.create_from_string("speed (\\d+(?:\\.\\d+)?)").search(first)
+	if m and absf(float(m.get_string(1)) - speed) > 0.05:
+		bits.append("speed %s" % m.get_string(1))
+	m = RegEx.create_from_string("armor (\\d+)/(\\d+)").search(first)
+	if m and (int(m.get_string(1)) != int(round(float(d.get("hack_armor", 0.0)) * 100)) or int(m.get_string(2)) != int(round(float(d.get("pierce_armor", 0.0)) * 100))):
+		bits.append("armor %s %% / %s %%" % [m.get_string(1), m.get_string(2)])
+	m = RegEx.create_from_string("(\\d+) pop").search(first)
+	if m and int(m.get_string(1)) != int(d.get("pop", 1)):
+		bits.append("%s pop" % m.get_string(1))
+	if bits.is_empty():
+		return ""
+	return "Retold: " + " · ".join(PackedStringArray(bits.map(func(b): return str(b))))
 
 ## Is `god` one of the minor gods the player has chosen?
 func _god_chosen(god: String) -> bool:
@@ -1771,6 +1799,10 @@ func _info_for() -> Dictionary:
 		var los := float(live.get("sight", ud.get("sight", 0)))
 		if los > 0:
 			d.stats.append(["eye", _num(snappedf(los, 0.1)), "LOS"])
+		# an Egyptian unit: Retold's numbers where this sim's scaled ones differ
+		var rnote := _retold_note(ud, float(ud.get("speed", 0)))
+		if rnote != "":
+			d["notes"] = [rnote]
 		# carried goods and the current task, from the unit arrays
 		var u := units()
 		var ids: PackedInt32Array = u.ids
