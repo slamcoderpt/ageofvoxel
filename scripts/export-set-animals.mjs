@@ -364,12 +364,13 @@ function legs(o) {
 }
 
 // ---- Rhinoceros of Set (Mythic, 9 favor, 2 pop) ------------------------------
-// a slate-grey armoured body with darker skin folds at the shoulder and the
-// hip, a long low head with a great front horn and a smaller one behind it,
-// upright ears, pillar legs.
+// a dusty brown-grey armoured body (mud-tinted, warmer than the Elephant of
+// Set's cool grey, so the two read apart on their buttons) with darker skin
+// folds at the shoulder and the hip, a long low head with a great front horn
+// and a smaller one behind it, upright ears, pillar legs.
 {
-  const HIDE = pick3(151, 0x8a8680, 0x7e7a74, 0x96928c);
-  const FOLD = 0x5c5854, HORN = 0xd8ccb0, HORN_DK = 0xa89a7c, TOE = 0x3c3834;
+  const HIDE = pick3(151, 0x907e6a, 0x847260, 0x9c8a74);
+  const FOLD = 0x5e4e40, HORN = 0xd8ccb0, HORN_DK = 0xa89a7c, TOE = 0x3c3834;
   const body = new VoxelModel();
   body.ellipsoid(0, 3.6, 0, 3.2, 3.2, 6.4, HIDE).ellipsoid(0, 4.6, 2.6, 3, 3, 2.8, HIDE);   // the shoulder hump
   for (const zf of [2, -3]) paint(body, (x, y, z) => z === zf, FOLD);

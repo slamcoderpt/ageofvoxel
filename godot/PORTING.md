@@ -3699,6 +3699,38 @@ Owner: the ui piece. Reference: `reference/egypt/ui_01..05.jpg`.
   (`EGYPT_RETOLD_HP`: "3000 hp (Retold 2400, Fortified 3000)", the Sentry
   Tower's "750 hp (Retold 600)" and its build time). Verified (ui round 7):
   egypt_playtest 52/52, playtest 34/34, techs_playtest all ok.
+- **Busts told apart, train tooltips with stats** (ui round 8). Round 7's
+  Mercenary (a close head from his left) and Mercenary Cavalry (a rider's
+  head and chest) were the same dark head, blue headband and gold collar.
+  Now, in `portraits.gd`: a rider's focus also holds his mount's head (the
+  top half of its `neck` mesh), and `BUST_VIEW` gives some busts their own
+  view (yaw / pitch from the front-right) and focus: the Mercenary Cavalry
+  `"fore"` (rider + the horse's head, neck and chest, 62 / 12 deg), the
+  catapult, the Rhino and the Elephant of Set `"whole"` (the full model: the
+  catapult on its wheels with its arm, the Rhino's horns, the Elephant's
+  trunk, tusks and ears in profile). The Mercenary is framed waist-up from
+  his left with his halberd's head. `BUST_POSE` poses a rig part for the
+  bust (`Basis.from_euler`): the Laborer's right arm raises his pick over
+  his shoulder, the Slinger's raises his sling; `BUST_WITH` adds parts the
+  card hides (the Laborer's `toolPick`) and frames their top halves. The
+  Rhino of Set's hide is a dusty brown-grey (scripts/export-set-animals.mjs)
+  against the Elephant of Set's cool grey. egypt_playtest now fails on two
+  ALIKE busts, not only identical ones: `_bust_sig` (a 6-level colour
+  histogram of the opaque pixels + a 16x16 coverage grid) and `_bust_alike`
+  (histogram overlap x silhouette overlap) over every pair of the 37
+  Egyptian busts must stay under 0.62 (round 7: Mercenary / Mercenary
+  Cavalry 0.68, Laborer / Slinger 0.72, Rhino / Elephant 0.69; now the
+  closest pair, Spearman / Axeman, is 0.59). Every Egyptian train button's
+  tooltip (`_train_stat_lines`) gives hp, attack (hack / pierce / crush, a
+  ranged unit's range), speed, hack / pierce armor and pop, and a myth
+  unit's ability as sim/civ's Retold line names it ("Whirlwind: 30 hack
+  over 2 s to adjacent enemies in 2.5 m (recharge 15 s)"); the Pharaoh's
+  hp / attack are his age's. egypt_playtest asserts the Spearman's and the
+  Sphinx's (300 hp, Whirlwind) by hovering them. A locked bust's grey copy
+  (`hud.gd _portrait_variant` "locked") lifts the dark tones (gamma 0.7) so
+  a dark subject (the Mercenary Cavalry's black horse, greyed until
+  Heroic) keeps its shape. Verified (ui round 8): egypt_playtest 54/54,
+  playtest 34/34, techs_playtest 34/34, walls_playtest 38/38.
 - **Real-input playtest** (`game/core/egypt_playtest.gd`), launched with no
   scene argument like a player:
   ```

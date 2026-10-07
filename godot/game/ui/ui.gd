@@ -1254,6 +1254,7 @@ func _egypt_trains(b: Dictionary, list: Array) -> void:
 		if line == "" and str(d.get("god", "")) != "":
 			line = "Myth unit of %s." % str(d.god).capitalize()
 		c["lines"] = [line] if line != "" else []
+		c.lines.append_array(_train_stat_lines(t, age))
 		if tr.has("devotees"):
 			c.lines.append("Devotees: -10 % near your Monument.")
 		if not bool(tr.ok) and not reason.begins_with("Not enough") and reason != "Need more houses":
@@ -1265,6 +1266,36 @@ func _egypt_trains(b: Dictionary, list: Array) -> void:
 			c["deny"] = reason
 		list.append(c)
 		j += 1
+
+## An Egyptian train button's stats (as the Set summons' tooltips): hp, attack
+## (hack / pierce / crush, its range when ranged), speed, armor, pop, and a myth
+## unit's ability as Retold names it (sim/civ's "retold" line: "Whirlwind: ...").
+## The Pharaoh's hp / attack are his age's (by_age).
+func _train_stat_lines(t: String, age: int) -> Array:
+	var d: Dictionary = sim.get_unit_def(t)
+	if d.is_empty():
+		return []
+	var hp := float(d.get("hp", 0))
+	var atk: Dictionary = d.get("attack", {})
+	var dmg := float(atk.get("damage", 0.0))
+	var rng := float(atk.get("range", 0.0))
+	if d.has("by_age"):
+		var ba: Dictionary = d.by_age
+		var a := clampi(age, 0, 3)
+		hp = float(ba.hp[a])
+		dmg = float(ba.damage[a])
+		rng = float(ba.range[a])
+	var kind := "crush" if str(d.get("class", "")) == "siege" else "pierce" if str(atk.get("projectile", "")) != "" or rng > 2.0 else "hack"
+	var a_s := "no attack" if dmg <= 0.0 else "%s %s attack%s" % [_num(snappedf(dmg, 0.1)), kind, (", range %s" % _num(snappedf(rng, 0.1))) if rng > 2.0 else ""]
+	var out := ["%d hp · %s · speed %s" % [int(round(hp)), a_s, _num(snappedf(float(d.get("speed", 0.0)), 0.1))],
+		"Armor %d %% hack, %d %% pierce · %d pop" % [int(round(float(d.get("hack_armor", 0.0)) * 100)), int(round(float(d.get("pierce_armor", 0.0)) * 100)), int(d.get("pop", 1))]]
+	if str(d.get("god", "")) != "" or bool(d.get("myth", false)):
+		var segs := str(d.get("retold", "")).split("; ")
+		if segs.size() > 1:
+			var ab := str(segs[segs.size() - 1]).strip_edges()
+			if ab.contains(":") or not (ab.contains("LOS") or ab.contains("speed")):
+				out.append(ab.left(1).to_upper() + ab.substr(1))  # (the HUD wraps it to the tooltip's width)
+	return out
 
 ## Is `god` one of the minor gods the player has chosen?
 func _god_chosen(god: String) -> bool:

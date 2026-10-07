@@ -30,14 +30,50 @@ func unit(type: String, owner: int) -> Texture2D:
 ## the button (a man's head and shoulders, a beast's or a rider's forequarters,
 ## a machine whole), not the full figure of the card's portrait, so a train /
 ## summon button reads as a face at 54 px (Retold's unit buttons are busts).
+## Busts with their own view: [yaw, pitch] in degrees from the front-right, and
+## "whole" (the whole model framed, its silhouette is what reads: the catapult on
+## its wheels, the Rhino's horns and the Elephant's trunk and ears in profile) or
+## "fore" (a rider with his horse's head, neck and chest: the Mercenary Cavalry,
+## so he never reads as the Mercenary on foot beside him in the Town Center).
+const BUST_VIEW := {
+	"catapult": [55.0, 14.0, "whole"],
+	"rhino_of_set": [62.0, 12.0, "whole"],
+	"elephant_of_set": [78.0, 10.0, "whole"],
+	"mercenary_cavalry": [62.0, 12.0, "fore"],
+}
+
+## Parts a bust also frames (and shows, when the card portrait hides them): the
+## Laborer with his pick on his shoulder, the Slinger with his sling and pouch,
+## so neither is just a bare-chested head beside the other.
+const BUST_WITH := {
+	"laborer": ["toolPick"],
+	"slinger": ["weapon"],
+}
+
+## A bust's pose (radians, Basis.from_euler on the rig part): the Laborer's pick
+## raised over his shoulder, the Slinger's arm up with his sling.
+const BUST_POSE := {
+	"laborer": {"armR": Vector3(-1.4, 0, 0), "foreR": Vector3(-1.4, 0, 0)},
+	"slinger": {"armR": Vector3(-2.6, 0, 0)},
+}
+
 func bust(type: String, owner: int) -> Texture2D:
 	var key := "ub:%s:%d" % [type, owner]
 	if not _cache.has(key):
-		var obj := _unit_object(type, owner)
-		# the hired Mercenaries are seen from their left (shield side), so their busts
-		# do not repeat the Spearman's / the cavalry's from the same angle
-		if type.begins_with("mercenary"):
+		var pose: Dictionary = BUST_POSE.get(type, {})
+		var obj := _unit_object(type, owner, BUST_WITH.get(type, []), pose)
+		if BUST_WITH.has(type):
+			obj.set_meta("bust_with", BUST_WITH[type])
+		# the hired Mercenary is seen from his left (shield side), so his bust does
+		# not repeat the Spearman's from the same angle (the Mercenary Cavalry is
+		# told apart by his horse's head, _bust_focus)
+		if type == "mercenary":
 			obj.set_meta("bust_mirror", true)
+		if BUST_VIEW.has(type):
+			var bv: Array = BUST_VIEW[type]
+			obj.set_meta("bust_view", Vector2(bv[0], bv[1]))
+			if bv.size() > 2:
+				obj.set_meta("bust_" + str(bv[2]), true)
 		_cache[key] = _render(obj, true)
 	return _cache[key]
 
@@ -131,7 +167,7 @@ func _material(owner: int) -> ShaderMaterial:
 		_cache[key] = m
 	return _cache[key]
 
-func _unit_object(type: String, owner: int) -> Node3D:
+func _unit_object(type: String, owner: int, extra := [], pose := {}) -> Node3D:
 	var root := Node3D.new()
 	var rig := VoxelModels.rig(type)
 	if rig.is_empty():
@@ -147,10 +183,12 @@ func _unit_object(type: String, owner: int) -> Node3D:
 		if str(rig.get("anim", "")) == "flyer" and (str(p.name) == "wingL" or str(p.name) == "wingR"):
 			var up := 0.7 if str(p.name) == "wingL" else -0.7
 			t.basis = Basis(Vector3.BACK, up) * Basis(Vector3.UP, -up * 0.35)
+		if pose.has(str(p.name)):
+			t.basis = t.basis * Basis.from_euler(pose[str(p.name)])
 		if p.parent != null and str(p.parent) != "" and world.has(p.parent):
 			t = world[p.parent] * t
 		world[p.name] = t
-		if not bool(p.get("portrait", false)):
+		if not bool(p.get("portrait", false)) and not (str(p.name) in extra):
 			continue
 		var mi := MeshInstance3D.new()
 		mi.mesh = VoxelModels.mesh("units", p.mesh)
@@ -210,6 +248,12 @@ func _render(obj: Node3D, bust := false) -> Texture2D:
 	vp.add_child(cam)
 	if obj.has_meta("bust_mirror"):
 		parts["_mirror"] = AABB()
+	for k in ["whole", "fore"]:
+		if obj.has_meta("bust_" + k):
+			parts["_" + k] = AABB()
+	if obj.has_meta("bust_view"):
+		var vw: Vector2 = obj.get_meta("bust_view")
+		parts["_view"] = AABB(Vector3(vw.x, vw.y, 0), Vector3.ZERO)
 	if bust and not first_body:
 		_frame_bust(cam, obj, body, parts)
 		cam.current = true
@@ -236,6 +280,19 @@ func _render(obj: Node3D, bust := false) -> Texture2D:
 func _frame_bust(cam: Camera3D, obj: Node3D, body: AABB, parts := {}) -> void:
 	var tall := body.size.y > maxf(body.size.x, body.size.z) * 1.2
 	var crop := _bust_focus(body, parts)
+	if obj.has_meta("bust_with"):
+		for pn in obj.get_meta("bust_with"):
+			if parts.has(pn):
+				# (its top half: the pick's head, the sling's pocket)
+				var pb: AABB = parts[pn]
+				crop = crop.merge(AABB(Vector3(pb.position.x, pb.end.y - pb.size.y * 0.5, pb.position.z), Vector3(pb.size.x, pb.size.y * 0.5, pb.size.z)))
+	if parts.has("_whole"):
+		crop = body
+	elif parts.has("_fore") and parts.has("neck") and parts.has("body"):
+		# the rider and his horse's head, neck and chest (the forequarters)
+		var bb: AABB = parts.body
+		var fq := AABB(Vector3(bb.position.x, bb.position.y + bb.size.y * 0.3, bb.end.z - bb.size.z * 0.45), Vector3(bb.size.x, bb.size.y * 0.7, bb.size.z * 0.45))
+		crop = crop.merge(parts.neck).merge(fq)
 	var anchor: AABB = crop
 	if parts.has("head"):
 		anchor = parts.head
@@ -269,6 +326,11 @@ func _frame_bust(cam: Camera3D, obj: Node3D, body: AABB, parts := {}) -> void:
 				var py := deg_to_rad(pitch)
 				var yw := deg_to_rad(yaw)
 				dirs.append(Vector3(sin(yw) * cos(py), sin(py), cos(yw) * cos(py)))
+	if parts.has("_view"):
+		# a fixed view (bust(): BUST_VIEW, yaw / pitch in degrees from the front-right)
+		var vw: Vector3 = parts._view.position
+		dirs.clear()
+		dirs.append(Vector3(sin(deg_to_rad(vw.x)) * cos(deg_to_rad(vw.y)), sin(deg_to_rad(vw.y)), cos(deg_to_rad(vw.x)) * cos(deg_to_rad(vw.y))))
 	var mirror := parts.has("_mirror")
 	var best := {}
 	for d0 in dirs:
@@ -349,8 +411,10 @@ func _bust_focus(body: AABB, parts: Dictionary) -> AABB:
 				if parts.has(e):
 					eh = eh.merge(parts[e])
 			return eh
-		# (the mount's head then shows at the frame's edge; a camel's tall neck in
-		# the focus would shrink the rider to a figurine)
+		# the mount's head beside him (its neck mesh's top half: the horse's or the
+		# camel's head and ears), so a rider never reads as a man on foot
+		if parts.has("neck"):
+			f = f.merge(top.call(parts.neck, 0.5))
 		return f
 	if parts.has("head") and parts.has("torso") and parts.has("body"):
 		# a man's upper body on a beast's (Scorpion Man): his head and chest
@@ -361,10 +425,13 @@ func _bust_focus(body: AABB, parts: Dictionary) -> AABB:
 		var hd: AABB = parts.head
 		return hd.merge(top.call(parts.neck, 0.15))
 	if parts.has("head") and parts.has("torso") and parts.has("_mirror"):
-		# the Mercenary: a close head-and-collar portrait from his left, so his
-		# face and headdress, not a shield and spear, fill the button (the
-		# Spearman's bust is the shielded figure)
-		return parts.head.merge(top.call(parts.torso, 0.3))
+		# the Mercenary: waist-up from his left with his weapon's head in the frame
+		# (the Spearman is seen from his right behind his shield, the Mercenary
+		# Cavalry with his horse's head)
+		var f: AABB = parts.head.merge(top.call(parts.torso, 0.85))
+		if parts.has("weapon"):
+			f = f.merge(top.call(parts.weapon, 0.35))
+		return f
 	if parts.has("head") and tall:
 		# a standing man / myth figure: head and shoulders (the top 40 %)
 		return top.call(body, 0.4)

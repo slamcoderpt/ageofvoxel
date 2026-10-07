@@ -428,10 +428,12 @@ static func _portrait_variant(tex: Texture2D, mode: String) -> Texture2D:
 		for i in range(0, d.size(), 4):
 			if d[i + 3] == 0:
 				continue
-			var l := (d[i] * 0.3 + d[i + 1] * 0.55 + d[i + 2] * 0.15) / 255.0
-			d[i] = int(clampf(l * 0.6 + 0.03, 0.0, 1.0) * 255.0)
-			d[i + 1] = int(clampf(l * 0.62 + 0.035, 0.0, 1.0) * 255.0)
-			d[i + 2] = int(clampf(l * 0.68 + 0.045, 0.0, 1.0) * 255.0)
+			# (the dark tones lifted, gamma 0.7, so a dark subject, the Mercenary
+			# Cavalry's black horse, keeps its shape when greyed)
+			var l := pow((d[i] * 0.3 + d[i + 1] * 0.55 + d[i + 2] * 0.15) / 255.0, 0.7)
+			d[i] = int(clampf(l * 0.62 + 0.05, 0.0, 1.0) * 255.0)
+			d[i + 1] = int(clampf(l * 0.64 + 0.055, 0.0, 1.0) * 255.0)
+			d[i + 2] = int(clampf(l * 0.7 + 0.065, 0.0, 1.0) * 255.0)
 		img.set_data(img.get_width(), img.get_height(), false, Image.FORMAT_RGBA8, d)
 	var out := ImageTexture.create_from_image(img)
 	_grey[key] = out

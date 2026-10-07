@@ -515,6 +515,15 @@ func _run() -> void:
 		_check("the Barracks' grid: Spearman (Q), Axeman, Slinger", picked and str(sc.get("key", "")) == "Q"
 			and not _cmd_find(func(c): return str(c.get("arg", "")) == "axeman").is_empty() and not _cmd_find(func(c): return str(c.get("arg", "")) == "slinger").is_empty(),
 			"selected %s, Q = %s" % [picked, sc.get("title", "")])
+		var spw = _cmd_where(func(c): return str(c.get("action", "")) == "train" and str(c.get("arg", "")) == "spearman")
+		if spw != null:
+			await _move(spw + Vector2(3, 2))
+			await _frames(4)
+		var spl := str(ui.tooltip.get("lines", []))
+		var spd: Dictionary = sim.get_unit_def("spearman")
+		_check("hovering the Spearman: his stats in the tooltip (hp, hack attack, speed, armor, pop)", str(ui.tooltip.get("title", "")) == "Train Spearman"
+			and spl.contains("%d hp" % int(round(float(spd.hp)))) and spl.contains("hack attack") and spl.contains("speed") and spl.contains("Armor"),
+			"%s %s" % [ui.tooltip.get("title", ""), spl])
 		var n0 := _units("spearman").size()
 		await _key(KEY_Q)
 		await _frames(3)
@@ -659,6 +668,24 @@ func _set_match() -> void:
 		if not fb.ok:
 			loose.append("%s (%s)" % [eg_types[i], fb.desc])
 	_check("every Egyptian unit's button bust fills its tile (%d busts)" % eg_types.size(), loose.is_empty() and eg_types.size() >= 30, str(loose))
+	# no two busts alike (not only not identical): their colour mix x their silhouette
+	# (_bust_alike) stays under 0.62; round 7's Mercenary / Mercenary Cavalry (two
+	# dark heads with the same blue headband and gold collar) scored 0.68, the
+	# Laborer / Slinger 0.72, the Rhino / Elephant of Set 0.69
+	var sigs := []
+	for i in eg_types.size():
+		var bt: Texture2D = texs[i]
+		sigs.append(_bust_sig(bt.get_image() if bt != null else null))
+	var alike := []
+	var worst := [0.0, "", ""]
+	for i in eg_types.size():
+		for j in range(i + 1, eg_types.size()):
+			var a := _bust_alike(sigs[i], sigs[j])
+			if a > float(worst[0]):
+				worst = [a, eg_types[i], eg_types[j]]
+			if a >= 0.62:
+				alike.append("%s / %s %.2f" % [eg_types[i], eg_types[j], a])
+	_check("no two Egyptian busts alike (colours x silhouette < 0.62; closest %s / %s %.2f)" % [worst[1], worst[2], worst[0]], alike.is_empty(), str(alike))
 	var keys_seen := {}
 	var dup := []
 	for c in ui.commands:
@@ -741,8 +768,10 @@ func _temple_step(lots: Array) -> void:
 	if sp != null:
 		await _move(sp + Vector2(3, 2))
 		await _frames(4)
-	_check("hovering the Sphinx: its tooltip names Bast", str(ui.tooltip.get("title", "")) == "Train Sphinx"
-		and str(ui.tooltip.get("lines", [])).contains("Bast"), "%s %s" % [ui.tooltip.get("title", ""), ui.tooltip.get("lines", [])])
+	var sphl := str(ui.tooltip.get("lines", []))
+	_check("hovering the Sphinx: its tooltip names Bast, its stats (300 hp, attack, armor, pop) and Whirlwind", str(ui.tooltip.get("title", "")) == "Train Sphinx"
+		and sphl.contains("Bast") and sphl.contains("300 hp") and sphl.contains("attack") and sphl.contains("Armor") and sphl.contains("pop")
+		and sphl.contains("Whirlwind"), "%s %s" % [ui.tooltip.get("title", ""), ui.tooltip.get("lines", [])])
 	# the Temple's tech buttons: each Egyptian tech its own rendered 3D icon
 	# (egypt_tech_models.gd), not the generic scroll; and every one of the 36
 	var TI = load("res://game/ui/tech_icons.gd")
@@ -790,6 +819,47 @@ func _finish() -> void:
 	print("EGYPTPLAY clicks %d, keys %d" % [clicks, keys])
 	print("EGYPTPLAY_RESULT %s" % JSON.stringify({"passed": passes, "failed": fails, "steps": result}))
 	quit(fails.size())
+
+## A bust's signature for _bust_alike: the share of its opaque pixels in each
+## colour bin (6 levels a channel) and its 16 x 16 coverage (alpha) grid.
+func _bust_sig(img: Image) -> Dictionary:
+	var hist := {}
+	var tot := 0
+	var sil := PackedFloat32Array()
+	sil.resize(256)
+	if img == null:
+		return {"hist": hist, "sil": sil}
+	var w := img.get_width()
+	var h := img.get_height()
+	var cnt := PackedFloat32Array()
+	cnt.resize(256)
+	for y in range(0, h, 2):
+		for x in range(0, w, 2):
+			var c := img.get_pixel(x, y)
+			var cell := (y * 16 / h) * 16 + (x * 16 / w)
+			cnt[cell] += 1.0
+			if c.a < 0.5:
+				continue
+			sil[cell] += 1.0
+			var k := (c.r8 / 43) * 36 + (c.g8 / 43) * 6 + (c.b8 / 43)
+			hist[k] = int(hist.get(k, 0)) + 1
+			tot += 1
+	for i in 256:
+		sil[i] = sil[i] / maxf(1.0, cnt[i])
+	for k in hist:
+		hist[k] = float(hist[k]) / maxf(1.0, tot)
+	return {"hist": hist, "sil": sil}
+
+## How alike two busts look (0..1): their colour histograms' overlap times their
+## silhouettes' overlap (1 - mean coverage difference).
+func _bust_alike(a: Dictionary, b: Dictionary) -> float:
+	var hi := 0.0
+	for k in a.hist:
+		hi += minf(float(a.hist[k]), float(b.hist.get(k, 0.0)))
+	var d := 0.0
+	for i in 256:
+		d += absf(a.sil[i] - b.sil[i])
+	return hi * (1.0 - d / 256.0)
 
 ## (ui round 7) a button bust fills its tile: >= 30 % of the samples (every 4th
 ## pixel) opaque and the opaque pixels spanning >= 80 % of its width and of its
