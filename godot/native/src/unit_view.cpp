@@ -156,6 +156,7 @@ AovUnitView::Rig AovUnitView::parse_rig(const Dictionary &R, int t) {
 	rig.graze = (bool)R.get("graze", true);
 	rig.upright = (bool)R.get("upright", false);
 	rig.sprawl = (bool)R.get("sprawl", false);
+	rig.camel = (bool)R.get("camel", false);
 	rig.sting = (bool)R.get("sting", false);
 	rig.idles = (bool)R.get("idles", false);
 	{ const Variant sv = R.get("stance", 0.0); rig.stance = sv.get_type() == Variant::BOOL ? ((bool)sv ? 1.0f : 0.0f) : (float)(double)sv; }
@@ -452,14 +453,28 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 				set(up, (hind ? 0.1 : -0.05) - s * (hind ? 0.55 : 0.75) * A);
 				set(cannon, (hind ? std::max(0.0, c) * 1.1 + 0.1 : std::max(0.0, c) * 1.5 + 0.05) * A);
 			};
-			leg(CH_legBL, CH_cannonBL, 0, true);
-			leg(CH_legBR, CH_cannonBR, 0.5, true);
-			leg(CH_legFL, CH_cannonFL, 2.2, false);
-			leg(CH_legFR, CH_cannonFR, 2.7, false);
-			set(CH_body, S(p + 1.2) * 0.07);
-			set(CH_neck, 0.05 - S(p + 1.2) * 0.14);
-			set(CH_tail, -0.7 + S(p * 0.5) * 0.1, S(p) * 0.15);
-			bob = (1.2 + S(p + 2.8) * 1.3) * A;
+			if (rig.camel) {
+				// (the Camel Rider) a pace: the two legs of a side swing together
+				// (the hind a little ahead), the body rolling over the planted
+				// side, the long neck nodding forward with each step
+				leg(CH_legBL, CH_cannonBL, 0, true);
+				leg(CH_legFL, CH_cannonFL, 0.35, false);
+				leg(CH_legBR, CH_cannonBR, PI, true);
+				leg(CH_legFR, CH_cannonFR, PI + 0.35, false);
+				set(CH_body, S(p * 2 + 1.2) * 0.025, 0, S(p + 0.6) * 0.07);
+				set(CH_neck, 0.06 - S(p * 2 + 0.4) * 0.09, S(p + 0.6) * 0.06);
+				set(CH_tail, -0.4 + S(p * 2) * 0.08, S(p) * 0.2);
+				bob = (0.8 + S(p * 2 + 2.8) * 0.8) * A;
+			} else {
+				leg(CH_legBL, CH_cannonBL, 0, true);
+				leg(CH_legBR, CH_cannonBR, 0.5, true);
+				leg(CH_legFL, CH_cannonFL, 2.2, false);
+				leg(CH_legFR, CH_cannonFR, 2.7, false);
+				set(CH_body, S(p + 1.2) * 0.07);
+				set(CH_neck, 0.05 - S(p + 1.2) * 0.14);
+				set(CH_tail, -0.7 + S(p * 0.5) * 0.1, S(p) * 0.15);
+				bob = (1.2 + S(p + 2.8) * 1.3) * A;
+			}
 			if (rig.sprawl) {
 				// (the Petsuchos) a sprawling crocodile walk: each upper limb,
 				// reaching out sideways, sweeps forward and back about the
@@ -490,6 +505,21 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 				const double g = rig.graze ? smooth((S(t * 0.19 + id) - 0.7) * 5) : 0.0;
 				add(CH_neck, g * 0.75);
 				set(CH_legFL, -0.05); set(CH_legBR, 0.08); set(CH_cannonBR, 0.35);
+				if (rig.camel) {
+					// (the Camel Rider) each camel stands its own way, by unit id:
+					// square with the head up and turned; the weight back on a
+					// cocked hind leg, the neck low; a foreleg set forward, the
+					// head high; a foreleg rested on its toe; the neck sways and
+					// the jaw works (a slow nod of the head) out of step
+					const int sv = (int)std::floor(uhash(id, 41) * 4);
+					const double sw = S(t * 0.37 + id * 1.7), chew = S(t * 3.1 + id) * 0.025;
+					set(CH_legFL, 0); set(CH_legFR, 0); set(CH_legBL, 0); set(CH_legBR, 0); set(CH_cannonBR, 0);
+					if (sv == 0) { set(CH_neck, -0.12 + chew, 0.28 + sw * 0.1); set(CH_legBL, 0.06); }
+					else if (sv == 1) { set(CH_legBR, -0.12); set(CH_cannonBR, 0.55); set(CH_legBL, 0.08); set(CH_neck, 0.22 + chew, -0.12 + sw * 0.12); set(CH_body, 0.03, 0, -0.03); }
+					else if (sv == 2) { set(CH_legFL, -0.22); set(CH_cannonFL, 0.18); set(CH_legBR, 0.1); set(CH_neck, -0.2 + chew, -0.3 + sw * 0.1); }
+					else { set(CH_legFR, 0.1); set(CH_cannonFR, 0.5); set(CH_legBL, -0.06); set(CH_neck, 0.08 + chew, 0.15 + sw * 0.15); set(CH_body, 0, 0, 0.025); }
+					set(CH_torso, 0.02, (sv - 1.5) * 0.12 + S(t * 0.21 + id) * 0.08);
+				}
 				if (pose == P_CHARIOT) {
 					// (Egyptian chariot horse) stands mid-stride, head high: a
 					// foreleg lifted and pawing, a hind leg set back
@@ -500,7 +530,7 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 				}
 			}
 			set(CH_tail, -0.2 + S(t * 1.3) * 0.05, S(t * 0.9) * 0.25);
-			set(CH_torso, 0.02 + S(t * 1.6) * 0.015);
+			if (!rig.camel || st != aov::A_IDLE) set(CH_torso, 0.02 + S(t * 1.6) * 0.015);
 			if (rig.sprawl) {
 				// (the Petsuchos) at rest: belly down, the tail's tip curling
 				// slowly from side to side, the head now and then lifting

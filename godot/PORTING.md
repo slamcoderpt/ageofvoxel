@@ -2682,6 +2682,44 @@ front of the shoulders is painted a darker grey, so the head separates from
 the body. Check: `eu_focus=war_elephant`, `eu_one=war_elephant&eu_turn=30`
 (and `eu_turn=60` / `100`), `eu_group=mounted`.
 
+Camel Rider camel, round 36 (the camels read as stiff wooden toys: straight
+uniform pillar legs, a boxy horse head, a neck straight up from the chest, the
+hump buried under a stacked block of saddle voxels with the rider sunk in it).
+Every camel part of `camel_rider` (body, barding, riderLegs, neck, tail, the
+legs and cannons) is rebuilt on a grid twice as fine (part scale 0.5, flag
+`greedy`, outline 0.15, each part's origin at its joint, cells symmetric about
+x 0) from superellipsoids and tubes (`fillE`, `tube`). The body is a slim
+barrel on a deep chest with a dark kneeling callus, a sloping rump, a tucked
+belly and **one tall rounded hump** (crown 26.6 cells over the body joint). The
+**blanket** is a single cell over the hide, so the hump's dome shows through:
+a cream field over the hump's top, team front / back edges, two team rows and a
+brown / ochre zigzag hem at mid-flank; the hump's fore and aft slopes stay bare
+hide (the red cloth, gold trim, leather pad and dark rim are gone). The
+**neck** leaves the chest forward and down, dips to its low point well ahead of
+the chest and rises in an S to the poll; the **head** is carried level and
+ahead of it: a narrow rounded skull, a heavy brow over a dark eye, small ears
+laid back, a long face narrowing to the snout, a split overhanging upper lip
+over a drooping lower lip, nostril slits, a thin leather halter and a team
+scarf band with a knot and hanging ends. The **legs**: front, a broad forearm
+tapering to a knobbly dark knee callus, a slim pale cannon, a fetlock, a short
+pastern forward and a broad flat splayed pad (two toes, a cleft, dark nails);
+hind, a thigh into the rump and a gaskin running down and back to a pointed
+hock (the cannon joint behind the hip). The hide is woolly (2 x 2 x 2 clumps in
+three sandy tones), the belly, throat and cannons paler; all hide parts keep
+`coat` (the per-unit tint). The **rider** sits up on the hump's crown
+(`torsoJoint` [0, 15.2, 0.8]), his legs straddling its front slope over the
+cream: team kilt on the thigh, the knee out past the hump's side, a bare shin
+with a calf along the blanket, the foot turned forward. Animation
+(`unit_view.cpp`, rig flag `camel`, `Rig::camel`): idle, each camel takes one
+of four stances by `uhash(id, 41)` (square with the head up and turned; the
+weight back on a cocked hind leg with the neck low; a foreleg set forward with
+the head high; a foreleg resting on its toe), the neck sways and nods (chewing)
+out of step and the rider turns his body to one side; walking, it **paces**
+(the two legs of a side together, the hind 0.35 rad ahead), the body rolling
+over the planted side and the neck nodding twice a stride. Check:
+`eu_focus=camel_rider` (and `eu_state=walk` / `attack` / `die`),
+`eu_one=camel_rider&eu_turn=70&eu_zoom=1.5`, `eu_group=mounted`.
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower

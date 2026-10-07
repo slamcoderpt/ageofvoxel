@@ -62,6 +62,7 @@ public:
 		float hover = 0;            // flyers: height above the ground (rig voxels)
 		bool graze = true;          // four-legged idle: dips the head to graze now and then
 		bool sting = false;         // (the Scorpion Man) eight legs sweeping sideways in alternating fours, the curled tail (tailA/B/C) swaying and striking forward
+		bool camel = false;         // (the Camel Rider, round 36) a dromedary: idle stances by unit id (a cocked hind leg, a foreleg set forward, the neck high or low and turned, chewing), a pacing walk (both legs of a side together) with a side-to-side roll
 		bool sprawl = false;        // (the Petsuchos) a sprawling reptile: the upper limbs reach out sideways and sweep fore / aft (yaw) and lift (roll) as it walks, the body and tail sway side to side, no bob
 		bool upright = false;       // (the Egyptian Priest) the staff stays upright in the hand: the weapon counters the arm's and torso's pitch / roll
 		float stance = 0;           // (Egyptian men) idle in a relaxed stride (x this; robes less), not stiffly upright

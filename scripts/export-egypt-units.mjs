@@ -2352,161 +2352,209 @@ function chariotLegsM() {
   ]);
 }
 
-// Camel Rider (rig voxel 0.09, the rider at 0.065 / 0.09):
-// a dromedary in its own sandy-brown hide (a lighter belly and legs, a dark
-// muzzle), one high hump under a narrow white saddle cloth with a team
-// border, a gold trim and a two-tone fringe, a long S-curved neck that dips from the chest and
-// rises high above the rider's knees to a small head with a narrow muzzle,
-// long thin legs with knobby knees and broad pads, a team scarf at the throat.
-// The rider (round 29): bronze skin over a red cloth, a team kilt and
-// sleeves, a banded bronze corslet, a gold collar, Retold's tall cylindrical
-// cap, and an arm-long straight sword with a gold hilt held out from his side.
+// Camel Rider (rig voxel 0.09; round 36: the camel rebuilt on a grid twice
+// as fine, every camel part at part scale 0.5, authored in geometric cells,
+// cell i spanning [i, i + 1], x symmetric about 0, each part's origin at its
+// joint, +z forward). Retold's dromedary (unit_08): a slim barrel on a deep
+// chest, one tall rounded hump, a long low neck thrust forward from the chest
+// that dips and rises again in an S to a small head carried level, a narrow
+// snout with a split, drooping lip, heavy brows and small ears; long thin
+// legs with a broad forearm, a knobbly dark knee callus, a slim cannon, a
+// fetlock and a short pastern on a broad splayed two-toed pad; the hind legs
+// bent at a pointed hock. A sandy, woolly hide (clumps of three tones), a
+// paler belly, throat and legs. One thin blanket (a single cell over the
+// hide, so the hump's dome shows through): a cream field over the top of the
+// hump, a team border and a brown / ochre zigzag hem at mid-flank, the hump's
+// fore and aft slopes bare. A team scarf knotted round the neck with a
+// hanging end, a thin leather halter. The rider (round 29's man, at 1.15 x)
+// sits up on the hump's crown, his bare legs straddling its front slope over
+// the cream cloth (team kilt over the thighs, the knees out by the hump's
+// sides, the shins along the blanket), his sword arm clear. Idle (unit_view
+// rig.camel): each camel stands its own way (a cocked hind leg, a foreleg
+// set forward, the neck high or low, turned) and chews; it walks in a pace
+// (both legs of a side together), rolling.
 {
-  const HIDE = pick3(15, 0x9a7048, 0x8c6440, 0xa67a50, 0.5, 0.85);
-  const BELLY = pick3(17, 0xc9a67a, 0xbf9c70, 0xd2b084, 0.5, 0.85);
-  const MUZZLE = 0x7a5636, KNEE = 0x6e4e34, PAD = 0x3e2c20;
-  const HC = (x, y, z) => (y <= 2 ? BELLY(x, y, z) : HIDE(x, y, z));
-  const body = new VoxelModel();
-  body.ellipsoid(4, 4.5, 10, 3.8, 3.9, 7.5, HC);      // the barrel
-  body.ellipsoid(4, 4, 15.5, 3.5, 4.4, 3.2, HC);      // the deep chest (brisket)
-  body.ellipsoid(4, 4.8, 4, 3.5, 3.6, 3.4, HC);       // the narrow rump
-  body.ellipsoid(4, 9.5, 10.5, 2.9, 4.4, 4.2, HIDE);  // the single high hump
-  for (let z = 7; z < 13; z++) body.carve(0, -2, z, 9, 2 + (z > 8 && z < 11 ? 1 : 0), 1);   // the belly line
-  // the saddle cloth (round 14, unit_08): a narrow linen cloth laid over the
-  // hump, not a slab. It follows the hump and the barrel one voxel proud (so
-  // the hump keeps its dome and the cloth reads as draped), spans only the
-  // seat (z 8..13: the hump's tan fore and aft slopes and the whole rump,
-  // shoulders and lower flanks stay bare) and stops at mid-barrel, well above
-  // the elbows. From the top down: a red field (round 29; lit on top, a
-  // cream stripe at the foot), two rows of the army's colour, one gold trim
-  // row, and a two-tone fringe (brown / ochre, tassels on every other column)
-  const cloth = new VoxelModel();
-  // (round 29) the field a deep madder red with a cream stripe over the team
-  // border (Retold's chariot-horse blanket colours): the white field read as
-  // the rider's own white kilt and fused man and saddle; on red the team-and-
-  // bronze rider stands clear
-  const CZ0 = 6, CZ1 = 15, TRIM_Y = 5, CLOTH_TOP = 0xa8382a, CLOTH_SIDE = 0x8e2a1c, CLOTH_SH = BLANKET_CREAM;
-  const clothC = (y, z, top) => {
-    if (y <= TRIM_Y - 1) return (z & 1) ? LEATHER : OCHRE;      // the fringe (round 29: Retold's brown / ochre zigzag hem)
-    if (y === TRIM_Y) return GOLD;                              // the gold trim band
-    if (y <= TRIM_Y + 2) return TEAM;                           // the team border
-    return top ? CLOTH_TOP : y === TRIM_Y + 3 ? CLOTH_SH : CLOTH_SIDE;   // the linen field, shaded towards the hem
+  const inE = (p, c, r, e) => { let s = 0; for (let i = 0; i < 3; i++) s += Math.abs((p[i] - c[i]) / r[i]) ** e; return s <= 1; };
+  const fillE = (m, c, r, col, e = 2, keep = false) => {
+    for (let x = Math.floor(c[0] - r[0]) - 1; x <= Math.ceil(c[0] + r[0]); x++)
+      for (let y = Math.floor(c[1] - r[1]) - 1; y <= Math.ceil(c[1] + r[1]); y++)
+        for (let z = Math.floor(c[2] - r[2]) - 1; z <= Math.ceil(c[2] + r[2]); z++)
+          if (inE([x + 0.5, y + 0.5, z + 0.5], c, r, e) && !(keep && m.has(x, y, z))) m.set(x, y, z, typeof col === 'function' ? col(x, y, z) : col);
   };
-  // the drape narrows towards the top (a trapezoid seen from the side): the
-  // hem spans z 6..15, the field over the hump only the seat (z 8..13)
-  const zIn = (y, z) => { const k = y >= 12 ? 2 : y >= 10 ? 1 : 0; return z >= CZ0 + k && z <= CZ1 - k; };
-  for (let z = CZ0; z <= CZ1; z++) for (let x = 0; x <= 8; x++) {
-    let top = -1;
-    for (let y = 16; y >= 0; y--) if (body.has(x, y, z)) { top = y; break; }
-    if (top < TRIM_Y + 3 || !zIn(top + 1, z)) continue;
-    cloth.set(x, top + 1, z, clothC(top + 1, z, true));
+  const cellsOf = (m) => [...m.vox.keys()].map((k) => [((k >> 20) & 1023) - 512, ((k >> 10) & 1023) - 512, (k & 1023) - 512]);
+  // a woolly sandy hide: clumps of 2 x 2 x 2 cells in three tones
+  const HIDE_L = 0xa47a4c, HIDE_M = 0x9a7046, HIDE_D = 0x8a6440;
+  const WOOL = (x, y, z) => { const h = hash3(x >> 1, y >> 1, z >> 1, 61); return h < 0.22 ? HIDE_D : h < 0.8 ? HIDE_M : HIDE_L; };
+  const PALE_L = 0xbc966a, PALE_M = 0xb08a5e;
+  const PALE = (x, y, z) => (hash3(x >> 1, y >> 1, z >> 1, 62) < 0.4 ? PALE_M : PALE_L);
+  const HUMP_HI = 0x8c6238, CALLUS = 0x5e4430, PAD_C = 0x4a3626, NAIL = 0x2a1e16, MUZ = 0x8a6644, LIP = 0x6e5034;
+
+  // ---- the body (origin at the body joint, rig [0, 14, 0.5]: 28 cells over the ground)
+  const body = new VoxelModel();
+  fillE(body, [0, 7, -1], [6, 6.8, 13], WOOL, 2.3);        // the barrel, slim
+  fillE(body, [0, 6, 11], [5.6, 8.6, 5.6], WOOL, 2.3);      // the deep chest (brisket, its pad low)
+  fillE(body, [0, 11, 9.5], [4.8, 5, 5.2], WOOL, 2.2);      // the withers, where the neck leaves the chest
+  fillE(body, [0, 8.5, -12], [5.2, 6.4, 4.8], WOOL, 2.3);   // the rump, sloping to the tail
+  fillE(body, [0, 13, -0.5], [5.6, 4.4, 9.5], WOOL, 2.2);   // the hump's broad base
+  fillE(body, [0, 18, -0.5], [4.6, 8.6, 8], WOOL, 2.1);     // the tall, rounded hump (crown at y 26.6)
+  // a tucked-up belly between the legs (daylight under it)
+  for (const [x, y, z] of cellsOf(body)) if (y < 2 && z > -8 && z < 6) body.remove(x, y, z);
+  for (const [x, y, z] of cellsOf(body)) {
+    if (y <= 3 && body.has(x, y, z)) body.set(x, y, z, PALE(x, y, z));                // the paler belly
+    else if (y >= 24 && hash3(x >> 1, y >> 1, z >> 1, 63) < 0.25) body.set(x, y, z, HUMP_HI);         // a darker, shaggier hump crown
   }
-  for (let z = CZ0; z <= CZ1; z++) for (let y = TRIM_Y - 1; y <= 15; y++) {
-    if (!zIn(y, z)) continue;
-    let lo = 99, hi = -99;
-    for (let x = -1; x <= 9; x++) if (body.has(x, y, z)) { lo = Math.min(lo, x); hi = Math.max(hi, x); }
-    if (hi < lo) continue;
-    // one voxel proud of the hide, the hem (trim and fringe) flaring out a second
-    const out = y <= TRIM_Y ? 2 : 1;
-    for (const [x0, sg] of [[lo, -1], [hi, 1]]) for (let o = 1; o <= out; o++) if (!cloth.has(x0 + sg * o, y, z)) cloth.set(x0 + sg * o, y, z, clothC(y, z, false));
+  // a darker chest callus (the pad a camel kneels on)
+  for (const [x, y, z] of cellsOf(body)) if (y <= -1 && z >= 9 && Math.abs(x + 0.5) < 3) body.set(x, y, z, CALLUS);
+
+  // ---- the blanket: one cell proud of the hide over the hump's top and down the
+  // flanks to mid-barrel (a trapezoid seen from the side), a cream field, two team
+  // rows at the hem, a zigzag brown / ochre edge
+  const cloth = new VoxelModel();
+  const CREAM = 0xf0ebe0, CREAM_SH = 0xd8d0c0, HEM_Y = 9;
+  const zIn = (y, z) => Math.abs(z + 0.5) <= 5.5 + (24 - y) * 0.2;
+  const clothC = (x, y, z, top) => {
+    if (y <= HEM_Y) return ((z + 40) % 4 < 2) === (y === HEM_Y) ? LEATHER : OCHRE;   // the zigzag hem
+    if (y <= HEM_Y + 2) return TEAM;
+    return top ? CREAM : CREAM_SH;
+  };
+  for (const [x, y, z] of cellsOf(body)) {
+    if (y < HEM_Y - 1 || !zIn(y, z)) continue;
+    for (const [dx, dy] of [[0, 1], [1, 0], [-1, 0]]) {
+      const X = x + dx, Y = y + dy;
+      if (body.has(X, Y, z) || cloth.has(X, Y, z)) continue;
+      if (dy === 0 && Y < HEM_Y - 1) continue;
+      // the front and back edges of the field in the team colour
+      const edge = Y > HEM_Y + 2 && (!zIn(Y, z - 1) || !zIn(Y, z + 1));
+      if (edge) tset(cloth, X, Y, z, 0xffffff);
+      else { const c = clothC(X, Y, z, dy === 1); if (c === TEAM) tset(cloth, X, Y, z, Y === HEM_Y + 1 ? TEAM_SHADE : 0xffffff); else cloth.set(X, Y, z, c); }
+    }
   }
-  // the drape's front and back edges in the team colour, tassels hanging from
-  // the fringe on every other column
-  for (const k of [...cloth.vox.keys()]) {
-    const x = ((k >> 20) & 1023) - 512, y = ((k >> 10) & 1023) - 512, z = (k & 1023) - 512;
-    if (y > TRIM_Y + 2 && !zIn(y, z - 1) !== !zIn(y, z + 1) && (x < 3 || x > 5)) cloth.set(x, y, z, TEAM);
-  }
-  for (let z = CZ0; z <= CZ1; z += 2) for (let x = -3; x <= 11; x++) if (cloth.has(x, TRIM_Y - 1, z) && (x < 1 || x > 7)) cloth.set(x, TRIM_Y - 2, z, z % 4 === 1 ? LEATHER : OCHRE);
-  // (round 29) a dark leather saddle pad on the cloth's crown, framed by a
-  // near-black rim row: the rider's kilt sits on a dark outline instead of
-  // melting into the white field
-  for (let z = 8; z <= 13; z++) for (let x = 1; x <= 7; x++) {
-    let top = -1;
-    for (let y = 18; y >= 0; y--) if (cloth.has(x, y, z)) { top = y; break; }
-    if (top < 12) continue;
-    const rim = z === 8 || z === 13 || x === 1 || x === 7;
-    cloth.set(x, top + 1, z, rim ? DARK : LEATHER);
-  }
-  // the rider's legs (a separate part, so they carry their own outline): each
-  // a bent two-segment limb in half voxels of the camel, the white-kilted
-  // thigh running out and forward over the cloth from the hip, a knee, and
-  // the bare shin hanging down and a little back along the camel's flank,
-  // clear of the cloth, a darker foot turned forward at the ankle
+  // ---- the rider's legs (same frame): straddling the hump's front slope, the
+  // team kilt over the thigh, bare skin below, the knee out past the hump's
+  // side, the shin down along the cream cloth, the bare foot turned forward
   const legs = new VoxelModel();
-  const LEG_L = 0xb06a3a, LEG_M = 0x8c4c26, FOOT = 0x4a2a14;
-  const H = (v) => v.map((c) => c * 2);
-  const skin = (x, y, z) => (legs.has(x, y + 1, z) ? LEG_M : LEG_L);
+  const SK = PAL_SKIN;
   for (const s of [-1, 1]) {
-    // (round 29) the legs straddle the hump close to the cloth (Retold's
-    // rider, unit_08): the thigh forward and down over the shoulder of the
-    // drape to a knee over the camel's shoulder, the shin hanging in front of
-    // the cloth's front edge, the foot level with the fringe; no more long
-    // spread limb standing off the flank like a bow
-    const hip = [4 + s * 2.0, 15.8, 11.0], knee = [4 + s * 4.0, 13.6, 14.6], ankle = [4 + s * 4.6, 5.4, 15.8], toe = [4 + s * 4.7, 4.8, 17.2];
-    tube(legs, H(hip), H(knee), 2.1, 1.8, (x, y, z, t) => (t < 0.5 ? TEAM : LEG_M));   // the team kilt over the upper thigh (against the red cloth)
-    tube(legs, H(knee), H(ankle), 1.6, 1.3, LEG_M);
-    tube(legs, H(ankle), H(toe), 1.3, 1.1, FOOT);
+    const hip = [s * 2.4, 29.2, 1.5], knee = [s * 5.4, 25, 7.2], ankle = [s * 6.6, 15.6, 6.4], toe = [s * 6.8, 15, 8.8];
+    tube(legs, hip, knee, 2.0, 1.55, (x, y, z, t) => (t < 0.45 ? (y > 27 ? 0xffffff : 0xb4b4b4) : SK.L));
+    tube(legs, knee, ankle, 1.5, 1.05, SK.L);   // the shin, its calf a step fuller
+    tube(legs, [knee[0], knee[1] - 2, knee[2] - 0.6], [ankle[0], ankle[1] + 4, ankle[2] - 0.5], 1.7, 1.2, SK.L);
+    tube(legs, ankle, toe, 1.15, 0.9, SK.M);
   }
-  for (const [k, v] of legs.vox) if (v.c === LEG_M) {
-    const x = ((k >> 20) & 1023) - 512, y = ((k >> 10) & 1023) - 512, z = (k & 1023) - 512;
-    v.c = skin(x, y, z);
+  // the kilt cells as team dye
+  for (const [x, y, z] of cellsOf(legs)) { const v = legs.get(x, y, z); if (v.c === 0xffffff || v.c === 0xb4b4b4) tset(legs, x, y, z, v.c); }
+  // the skin's lit tops and its shaded undersides
+  for (const [x, y, z] of cellsOf(legs)) {
+    const v = legs.get(x, y, z);
+    if (v.team) continue;
+    if (!legs.has(x, y + 1, z) && v.c === SK.L) v.c = SK.H;
+    else if (!legs.has(x, y - 1, z) && v.c !== SK.H) v.c = SK.M;
   }
-  // the neck: an S-curve dipping forward from the chest, then rising high
+
+  // ---- the neck and head (origin at the neck joint, rig [0, 5, 6.5] = cells (0, 10, 13)):
+  // forward and down out of the chest, the low point well ahead of the chest,
+  // then up to the poll; the head carried level, ahead of the neck
   const neck = new VoxelModel();
-  const NP = [[1, 0, 2.6], [-0.3, 3.6, 2.1], [2.2, 7.0, 1.8], [8, 9.0, 1.6], [14, 9.0, 1.6]];
-  for (let i = 0; i < NP.length - 1; i++) capsuleYZ(neck, 0, 3, NP[i][0], NP[i][1], NP[i][2], NP[i + 1][0], NP[i + 1][1], NP[i + 1][2], HIDE);
-  for (let y = -2; y <= 10; y++) for (let z = 0; z <= 12; z++) if (neck.has(1, y, z) && !neck.has(1, y - 1, z) && y < 6) neck.set(1, y, z, BELLY(1, y, z));
-  // the small head held level, the narrow muzzle and the drooping lip
-  capsuleYZ(neck, 0, 3, 14.7, 8.4, 1.9, 14.5, 11.8, 1.5, HIDE);
-  capsuleYZ(neck, 0, 3, 14.3, 11.8, 1.25, 13.6, 14.8, 1.0, MUZZLE);
-  neck.set(1, 12, 14, MUZZLE).set(1, 12, 13, MUZZLE);
-  neck.set(0, 16, 8, HIDE).set(0, 17, 8, KNEE).set(2, 16, 8, HIDE).set(2, 17, 8, KNEE);   // small ears
-  for (const x of [0, 2]) if (neck.has(x, 15, 10)) neck.set(x, 15, 10, DARK);
-  neck.set(1, 13, 15, DARK);
-  // halter and the team scarf at the throat with a hanging end
-  for (let y = 11; y <= 17; y++) for (let x = 0; x <= 2; x++) { if (neck.has(x, y, 12)) neck.set(x, y, 12, LEATHER_DK); if (neck.has(x, y, 9) && y >= 15) neck.set(x, y, 9, LEATHER_DK); }
-  neck.set(1, 12, 15, 0x3a2a1e);
-  for (let y = -1; y <= 3; y++) for (let z = 0; z <= 5; z++) for (let x = -1; x <= 3; x++) {
-    if (!neck.has(x, y, z) || (neck.has(x + 1, y, z) && neck.has(x - 1, y, z) && neck.has(x, y + 1, z) && neck.has(x, y, z + 1) && neck.has(x, y, z - 1))) continue;
-    if (y >= 2) neck.set(x, y, z, TEAM); else if (y === 1) neck.set(x, y, z, GOLD);   // (round 14) a narrow scarf band over a gold edge, not a blue sleeve
+  const NP = [[0, 0, -1, 4.6], [0, -2.6, 5.5, 3.5], [0, -2.2, 10.5, 2.9], [0, 1.6, 15, 2.6], [0, 7, 18, 2.4], [0, 11.5, 19.6, 2.4]];
+  for (let i = 0; i < NP.length - 1; i++) {
+    const a = NP[i], b = NP[i + 1];
+    tube(neck, [a[0], a[1], a[2]], [b[0], b[1], b[2]], a[3], b[3], WOOL);
   }
-  neck.box(-1, 1, 4, 1, 2, 2, TEAM).box(-1, -3, 4, 1, 4, 1, TEAM).set(-1, -4, 4, TEAM_TRIM);
-  // long thin legs: a thick forearm / thigh, a knobby knee, a slim cannon, a broad pad
-  const up = (hind) => {
-    const m = new VoxelModel().box(0, 1, 0, 2, 7, 2, HIDE).box(0, 5, hind ? -1 : 0, 2, 3, 3, HIDE);
-    m.box(0, 0, hind ? -1 : 0, 2, 2, 3, KNEE);     // the knee (front) / hock (hind) knob
+  // the throat's underside paler
+  for (const [x, y, z] of cellsOf(neck)) if (!neck.has(x, y - 1, z) && z > 2) neck.set(x, y, z, PALE(x, y, z));
+  // the head: a rounded skull behind, a long narrow face forward and a touch
+  // down, the split upper lip overhanging a drooping lower lip
+  const HEAD = (x, y, z) => (hash3(x, y, z, 64) < 0.35 ? HIDE_M : HIDE_L);
+  fillE(neck, [0, 13.4, 21.2], [2.4, 2.8, 3.2], HEAD, 2.2);      // the skull
+  tube(neck, [0, 13.2, 22.5], [0, 12.2, 28.2], 2.2, 1.5, HEAD);   // the face, narrowing to the snout
+  fillE(neck, [0, 14.2, 23], [2.6, 0.8, 1.3], HIDE_D, 2.4, false); // the heavy brow ridge across the eyes
+  fillE(neck, [0, 12.1, 28.6], [1.5, 1.4, 1.6], MUZ, 2.2);        // the upper lip, overhanging
+  fillE(neck, [0, 10.6, 27.6], [1.2, 0.9, 1.5], LIP, 2.2);        // the drooping lower lip
+  tube(neck, [0, 11.8, 22], [0, 10.8, 27], 1.7, 1.1, PALE_M);     // the jaw's underside
+  // the split of the lip and the nostril slits, dark
+  neck.set(-1, 12, 30, DARK).set(0, 12, 30, DARK);
+  for (const sx of [-1, 1]) {
+    const xn = sx > 0 ? 1 : -2;
+    neck.set(xn, 13, 29, DARK);
+    // the eye: dark, high on the side of the skull under the brow, a pale lid line
+    const xe = sx > 0 ? 2 : -3;
+    neck.set(xe, 13, 23, DARK).set(xe, 13, 22, 0x2e2018).set(xe, 14, 22, PALE_L);
+    // small ears laid back on the poll
+    neck.set(sx > 0 ? 2 : -3, 16, 19, HIDE_D).set(sx > 0 ? 2 : -3, 16, 18, LIP);
+  }
+  // a thin leather halter: a noseband and a cheek strap over the poll
+  for (const [x, y, z] of cellsOf(neck)) {
+    if (!surfaceOf(neck, x, y, z)) continue;
+    if (z === 26 && y >= 10) neck.set(x, y, z, LEATHER_DK);
+    else if (z === 20 && y >= 11 && y <= 16) neck.set(x, y, z, LEATHER_DK);
+  }
+  // the team scarf knotted round the upper neck: a clean band two cells
+  // wide square to the neck's line, a darker knot under the throat and its
+  // two ends hanging from it
+  {
+    const a = [0, 1.6, 15], b = [0, 7, 18], d = [b[1] - a[1], b[2] - a[2]], L = Math.hypot(d[0], d[1]);
+    for (const [x, y, z] of cellsOf(neck)) {
+      if (!surfaceOf(neck, x, y, z)) continue;
+      const s0 = ((y + 0.5 - a[1]) * d[0] + (z + 0.5 - a[2]) * d[1]) / L;
+      if (s0 >= 0.6 && s0 <= 2.6) tset(neck, x, y, z, 0xffffff);
+    }
+    for (let y = -1; y <= 2; y++) for (let x = -1; x <= 0; x++) tset(neck, x, y, 16 - Math.max(0, y), TEAM_SHADE);
+    for (let y = -5; y <= -2; y++) { tset(neck, -1, y, 16 + Math.floor((y + 2) / -2), 0xffffff); tset(neck, 0, y + 1, 15, TEAM_SHADE); }
+  }
+
+  // ---- legs (origin at each joint). Front: the forearm broad at the top, a
+  // knobbly dark knee, a slim cannon, the fetlock, a short pastern forward, a
+  // broad flat splayed pad (two toes, a groove, dark nails)
+  const LEGC = (x, y, z) => (hash3(x >> 1, y >> 1, z >> 1, 65) < 0.35 ? HIDE_M : HIDE_L);
+  const foreUp = new VoxelModel();
+  fillE(foreUp, [0, -1, 0], [3.2, 4.6, 3.4], WOOL, 2.2);         // the shoulder / elbow mass into the body
+  tube(foreUp, [0, -3, 0], [0, -13.5, 0.2], 2.5, 1.6, LEGC);      // the forearm, tapering
+  fillE(foreUp, [0, -15, 0.4], [1.9, 1.9, 2.1], CALLUS, 2.4);     // the knee knob with its callus
+  const hindUp = new VoxelModel();
+  fillE(hindUp, [0, -1, 0.4], [3.4, 5.6, 4.2], WOOL, 2.2);       // the thigh, into the rump
+  tube(hindUp, [0, -4, -0.4], [0, -14.6, -2.6], 2.6, 1.5, LEGC);  // the gaskin, down and back to the hock
+  fillE(hindUp, [0, -15, -3.4], [1.6, 1.7, 1.6], CALLUS, 2.4);    // the pointed hock
+  const cannon = () => {
+    const m = new VoxelModel();
+    tube(m, [0, 0, 0], [0, -11.2, 0], 1.35, 1.05, PALE);           // the slim cannon
+    fillE(m, [0, -11.4, 0.2], [1.5, 1.3, 1.5], PALE_M, 2.2);       // the fetlock
+    tube(m, [0, -11.6, 0.3], [0, -13, 1.4], 1.15, 1.15, PALE_M);   // the pastern, forward
+    fillE(m, [0, -14.2, 1.6], [2.6, 0.95, 2.9], PAD_C, 2.6);       // the broad flat pad
+    for (const [x, y, z] of cellsOf(m)) {
+      if (m.get(x, y, z).c !== PAD_C) continue;
+      if ((x === -1 || x === 0) && z >= 3) m.remove(x, y, z);       // the cleft between the two toes
+      else if (z >= 3 && y >= -14) m.set(x, y, z, NAIL);             // the nails at the toes' front
+      else if (y >= -14) m.set(x, y, z, LIP);                        // the pad's top, lighter
+    }
     return m;
   };
-  const low = () => new VoxelModel().box(0, 2, 0, 2, 7, 2, BELLY).box(0, 1, 0, 2, 1, 2, KNEE).box(0, 0, -1, 2, 1, 4, PAD);
-  const coat = { coat: true };
-  // (round 29) the rider 1.15 x his old size (the head 1.35 x) and seated
-  // higher, so head and shoulders stand clear above the hump
+  const coat = { coat: true, scale: 0.5, greedy: true, outline: 0.15 };
+  // (round 29) the rider 1.15 x his old size (the head 1.35 x)
   const R = 0.065 / 0.09 * 1.15;
   const t = manTorso();
-  // the rider reads apart from the white-and-team cloth by value and hue
-  // (unit_08): a team kilt over the dark saddle pad, a banded bronze-brown
-  // scale corslet (warm mid / dark rows) from belt to chest, the team tunic
-  // only on the shoulders and sleeves above it, the gold collar
+  // the rider reads apart from the cream cloth by value and hue (unit_08): a
+  // team kilt, a banded bronze-brown scale corslet (warm mid / dark rows) from
+  // belt to chest, the team tunic on the shoulders and sleeves, the gold collar
   eKilt(t, { hem: TM_DK, len: 5, fold: false });
   paint(t, (x, y, z) => (y >= 2 && y <= 13 ? (z >= 2 && Math.abs(x + 0.5) < 5 ? TM : TM_SH) : null));   // the team tunic
   paint(t, (x, y, z) => (y >= 2 && y <= 9 ? ((y & 1) ? (Math.abs(x + 0.5) < 5 ? 0x9a6a34 : 0x7a5028) : 0x4a2c14) : null));   // the banded corslet all round
   eCollar(t, [GOLD, GOLD, TEAM_TRIM, TEAM_TRIM, GOLD], { r0: 2.6 });
   eBelt(t, LEATHER_DK, GOLD);
-  rig('camel_rider', { voxel: 0.09, anim: 'horse', style: 'camel', pose: 'mount', gait: 0.75, stride: 0.9, graze: false }, [
-    part('body', body, [4, 0, 10], [0, 14, 0.5], null, coat),
-    part('barding', cloth, [4, 0, 10], [0, 0, 0], 'body', { jitter: 0.015 }),
-    part('riderLegs', legs, [8, 0, 20], [0, 0, 0], 'body', { scale: 0.5, jitter: 0.015 }),
-    part('neck', neck, [1.5, 0, 1], [0, 5.5, 7.6], 'body', coat),
-    part('tail', new VoxelModel().box(0, -6, -1, 1, 6, 1, HIDE).box(0, -9, -1, 1, 3, 1, HAIR), [0.5, 0, 0], [0, 7, -9], 'body', coat),
-    part('legFL', up(false), [1, 8, 1], [2.5, 2, 5.5], 'body', coat),
-    part('cannonFL', low(), [1, 9, 1], [0, -7, 0], 'legFL', coat),
-    part('legFR', up(false), [1, 8, 1], [-2.5, 2, 5.5], 'body', coat),
-    part('cannonFR', low(), [1, 9, 1], [0, -7, 0], 'legFR', coat),
-    part('legBL', up(true), [1, 8, 1], [2.5, 2, -5.5], 'body', coat),
-    part('cannonBL', low(), [1, 9, 1], [0, -7, 0], 'legBL', coat),
-    part('legBR', up(true), [1, 8, 1], [-2.5, 2, -5.5], 'body', coat),
-    part('cannonBR', low(), [1, 9, 1], [0, -7, 0], 'legBR', coat),
-    ...riderMan({ torso: t, s: R, headScale: 1.05, torsoJoint: [0, 16.2, 0.2], torsoParent: 'body', head: 'camel', arm: { sleeve: TEAM, bracer: GOLD } }),
+  rig('camel_rider', { voxel: 0.09, anim: 'horse', style: 'camel', pose: 'mount', camel: true, gait: 0.75, stride: 0.9, graze: false }, [
+    part('body', body, [0, 0, 0], [0, 14, 0.5], null, coat),
+    part('barding', cloth, [0, 0, 0], [0, 0, 0], 'body', { scale: 0.5, greedy: true, outline: 0.15 }),
+    part('riderLegs', legs, [0, 0, 0], [0, 0, 0], 'body', { scale: 0.5, greedy: true, outline: 0.15 }),
+    part('neck', neck, [0, 0, 0], [0, 5, 6.5], 'body', coat),
+    part('tail', (() => { const m = new VoxelModel(); tube(m, [0, 0, 0], [0, -9, -1.2], 1.1, 0.8, WOOL); fillE(m, [0, -10.4, -1.4], [1, 1.8, 1], HAIR, 2); return m; })(), [0, 0, 0], [0, 7.5, -8.4], 'body', coat),
+    part('legFL', foreUp, [0, 0, 0], [1.8, 1, 4.6], 'body', coat),
+    part('cannonFL', cannon(), [0, 0, 0], [0, -7.5, 0.2], 'legFL', coat),
+    part('legFR', foreUp, [0, 0, 0], [-1.8, 1, 4.6], 'body', coat),
+    part('cannonFR', cannon(), [0, 0, 0], [0, -7.5, 0.2], 'legFR', coat),
+    part('legBL', hindUp, [0, 0, 0], [1.8, 1, -5.6], 'body', coat),
+    part('cannonBL', cannon(), [0, 0, 0], [0, -7.5, -1.3], 'legBL', coat),
+    part('legBR', hindUp, [0, 0, 0], [-1.8, 1, -5.6], 'body', coat),
+    part('cannonBR', cannon(), [0, 0, 0], [0, -7.5, -1.3], 'legBR', coat),
+    ...riderMan({ torso: t, s: R, headScale: 1.05, torsoJoint: [0, 15.2, 0.8], torsoParent: 'body', head: 'camel', arm: { sleeve: TEAM, bracer: GOLD } }),
     // the sword at the arm's own voxel size (one arm long), raised forward
     // and out to the side from the fist, so the blade reads in profile clear
     // of the body, the hump and the neck
