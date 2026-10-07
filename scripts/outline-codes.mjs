@@ -11,6 +11,8 @@
 export function outlineCodes(geo, { flatY = false } = {}) {
   const a = geo.attributes;
   const n = a.position.count;
+  // (round 39) a mesh shaded with smooth normals keeps its faces' own normals here
+  const N = geo.userData?.faceNormal || a.normal;
   const key = (i) => `${Math.round(a.position.getX(i) * 1e4)},${Math.round(a.position.getY(i) * 1e4)},${Math.round(a.position.getZ(i) * 1e4)}`;
   const corners = new Map();
   const keys = new Array(n);
@@ -18,7 +20,7 @@ export function outlineCodes(geo, { flatY = false } = {}) {
     const k = (keys[i] = key(i));
     let c = corners.get(k);
     if (!c) corners.set(k, (c = new Set()));
-    c.add(`${Math.round(a.normal.getX(i))},${Math.round(a.normal.getY(i))},${Math.round(a.normal.getZ(i))}`);
+    c.add(`${Math.round(N.getX(i))},${Math.round(N.getY(i))},${Math.round(N.getZ(i))}`);
   }
   const code = new Map();
   for (const [k, set] of corners) {

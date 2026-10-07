@@ -645,7 +645,7 @@ function fineHead(style) {
     // the jaw line: the lower sides of the face a step darker
     for (let y = 0; y <= 3; y++) { const hw = Math.ceil(2.5 + y * 0.45) - 1; paintF(X(-hw - 1), y, P.D); }
     for (const x of [-5, -4, -3]) paintF(X(x), 6, P.H);                   // the cheekbones
-    for (const x of [-4, -3, -2]) paintF(X(x), 9, P.BROW);                 // the brows
+    for (const x of [-5, -4, -3, -2]) paintF(X(x), 9, P.BROW);             // the brows (round 39: a voxel longer, one line over the eyes)
     // the eye sockets: recessed a voxel, a dark lid row over the eye
     for (const x of [-4, -3, -2]) for (const y of [7, 8]) { const z = front(X(x), y); if (z !== null) m.remove(X(x), y, z); }
     for (const x of [-4, -3, -2]) paintF(X(x), 8, P.SOCK);
@@ -771,7 +771,9 @@ function headPart(style, joint = [0, 10, 0.2], parent = 'torso', s = 1) {
   // (round 34) the fine heads: twice the grid, centred on the neck
   // (the chin sits half a rig voxel lower than the old head's, so the fine
   // neck stub covers the torso's neck block instead of a gap under the jaw)
-  if (FINE_HEADS.has(style)) return part('head', fineHead(style), [0, 0, 0], [joint[0], joint[1] - 0.5 * s, joint[2]], parent, { scale: HEAD_SCALE * 0.5 * s, rest: HEAD_TILT, greedy: true, outline: 0.22 });
+  // (round 39) 15 % larger: at RTS zoom the round-34 head read as a tiny block
+  // under its hair with no face
+  if (FINE_HEADS.has(style)) return part('head', fineHead(style), [0, 0, 0], [joint[0], joint[1] - 0.5 * s, joint[2]], parent, { scale: HEAD_SCALE * 0.5 * 1.15 * s, rest: HEAD_TILT, greedy: true, outline: 0.22 });
   // (round 32) the Pharaoh's head a thinner line: at 0.3 the hull round his
   // nose ridge drew a dark moustache across the calm face
   return part('head', headE(style), HEAD_PIVOT, joint, parent, { scale: HEAD_SCALE * s, rest: HEAD_TILT, ...(style === 'pharaoh' ? { outline: 0.12 } : {}) });
@@ -1577,7 +1579,30 @@ function crookM(hx = 1, { top = 28, butt = -7 } = {}) {
 }
 // tools (built along +z like the Greek villager's)
 function axeToolM() { return new VoxelModel().box(0, 0, -1, 1, 1, 10, WOOD).box(0, 0, 7, 1, 3, 2, BRONZE).box(0, -1, 8, 1, 5, 1, BRONZE); }
-function pickToolM() { return new VoxelModel().box(0, 0, -1, 1, 1, 10, WOOD).box(0, -3, 8, 1, 7, 1, BRONZE).box(0, 0, 9, 1, 1, 1, BRONZE); }
+// (round 39) the pick at half the rig voxel (part scale 0.5, the same pivot):
+// a thin haft and a curved, pointed head: two arms sweeping back from the
+// eye towards the hand, thick at the eye and tapering to a point at each
+// end, metal lit on its outer curve and dark underneath, a wooden wedge in
+// the eye (the round-38 head was a flat plank across the haft: a 'T')
+const PICK_HI = 0xc4ccd4, PICK_L = 0x88929c, PICK_M = 0x626a72, PICK_D = 0x30363c;   // iron grey: a bronze head graded to the skin's cream
+function pickToolM() {
+  const m = new VoxelModel();
+  for (let z = -2; z <= 18; z++) for (let x = 0; x <= 1; x++) for (let y = 0; y <= 1; y++) m.set(x, y, z, z <= -1 ? WOOD_DK : WOOD(x, y, z));
+  for (let y = -8; y <= 9; y++) {
+    const dy = Math.abs(y - 0.5);
+    const zc = 17.5 - (dy * dy) / 13;                 // the curve sweeps back towards the hand
+    const th = dy < 1.5 ? 4 : dy < 3.5 ? 3 : dy < 6 ? 2 : 1;
+    const z0 = Math.round(zc - th / 2), z1 = z0 + th - 1;
+    const tip = dy > 7;
+    for (let z = z0; z <= z1; z++) for (let x = 0; x <= 1; x++) {
+      if (tip && x === 1) continue;                   // the point: one cell
+      const c = tip ? PICK_HI : z === z1 ? (dy < 6 ? PICK_HI : PICK_L) : z === z0 ? PICK_D : x === 0 ? PICK_L : PICK_M;
+      m.set(x, y, z, c);
+    }
+  }
+  for (let x = 0; x <= 1; x++) m.set(x, 0, 20, WOOD_DK).set(x, 1, 20, WOOD_DK);   // the wedge in the eye
+  return m;
+}
 function hammerToolM() { return new VoxelModel().box(0, 0, -1, 1, 1, 7, WOOD).box(-1, -1, 5, 3, 3, 2, STONE); }
 function sickleToolM() {
   return new VoxelModel().box(0, 0, -1, 1, 1, 4, WOOD).line(0, 0, 3, 0, 2, 6, BRONZE).line(0, 2, 6, 0, 3, 8, BRONZE).line(0, 3, 8, 0, 1, 10, BRONZE);
@@ -1588,14 +1613,37 @@ function logsM() {
   for (const [x, y] of [[0, 0], [2, 0], [1, 2]]) m.box(x, y, 0, 2, 2, 12, BARK).box(x, y, 12, 2, 2, 1, 0xc9a26a).box(x, y, -1, 2, 2, 1, 0xc9a26a);
   return m;
 }
-// a pottery jar on the shoulder (food) / a basket of ore (gold)
+// a small woven basket low on the back (gold: ore heaped in it; food: grain
+// and fruit), at half the rig voxel in the torso's own space (part scale 0.5,
+// pivot and joint at the hip): 4 rig voxels wide and 3 tall from the belt to
+// mid-back, so the shoulders, the arms and the head stay clear (round 39: the
+// old 6 x 7 crate covered the whole back and stood up past the head), hung
+// on two thin leather straps up the back
 function basketM(fill) {
   const m = new VoxelModel();
-  const WICKER = (x, y, z) => ((x + y + z) % 2 ? 0xa57a3e : 0x8a6330);
-  m.box(0, 0, 0, 6, 4, 4, WICKER).carve(1, 1, 1, 4, 3, 2);
-  if (fill === 'gold') m.box(1, 3, 1, 4, 1, 2, GOLD, { glow: 0.12 }).box(2, 4, 1, 2, 1, 2, GOLD, { glow: 0.12 });
-  else m.box(1, 3, 1, 4, 1, 2, 0xc0a040).box(2, 4, 1, 2, 1, 2, 0xd8b850).set(1, 4, 2, 0x5a8a2c);
-  m.box(0, 4, 0, 1, 3, 1, LEATHER).box(5, 4, 0, 1, 3, 1, LEATHER);
+  const WK_L = 0xc4965a, WK_M = 0xa87a40, WK_D = 0x7a5428, RIM = 0x6a4420;
+  for (let y = 1; y <= 7; y++) {
+    const top = y >= 5;
+    const x0 = top ? -4 : -3, x1 = top ? 3 : 2, z0 = top ? -8 : -7, z1 = -4;
+    for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+      if ((x === x0 || x === x1) && (z === z0 || z === z1)) continue;    // the rounded corners
+      const inner = x > x0 && x < x1 && z > z0 && z < z1;
+      if (inner && y >= 3) continue;                                     // hollow
+      const c = y === 7 ? RIM : y === 1 ? WK_D : (y & 1) ? ((x + z) & 1 ? WK_L : WK_M) : ((x + z) & 1 ? WK_M : WK_L);
+      m.set(x, y, z, c);
+    }
+  }
+  // the load heaped over the rim
+  for (let x = -3; x <= 2; x++) for (let z = -7; z <= -5; z++) {
+    const h = hash3(x, 0, z, 177);
+    const heap = 6 + (Math.abs(x + 0.5) < 2 && z === -6 ? 2 : 1) + (h < 0.3 ? 1 : 0) - 1;
+    for (let y = 3; y <= heap; y++) {
+      if (fill === 'gold') m.set(x, y, z, h < 0.45 ? 0xf2d23a : 0xc89a18, { glow: 0.2 });
+      else m.set(x, y, z, y === heap && h < 0.35 ? 0x6a9a30 : h < 0.5 ? 0xd8b850 : 0xc0a040);
+    }
+  }
+  // the straps: flat on the back from the rim up to the shoulder blades
+  for (const x of [-3, 2]) for (let y = 8; y <= 12; y++) m.set(x, y, y <= 8 ? -4 : -5, LEATHER);
   return m;
 }
 
@@ -1635,11 +1683,17 @@ function splitArm(a, pal) {
 // muscles). The hand rows and the foot are only resampled, so grips and
 // gear on the fist do not move. Profiles: [y (body-grid rows), rx, rz,
 // cx (outwards), cz (forwards)], extents in body voxels from the axis.
+// (round 39) slimmer limbs with clear joints: the critic read the round-33
+// limbs as thick tubes with no wrists or knee breaks. Every radius is about
+// 15-20 % less, the knee (thigh row 0, shin row 13.5) and the elbow (upper
+// row 9, forearm row 9.5) pinch in to ~1.2 so the thigh, the calf, the
+// biceps and the forearm swell between them, and the wrist and the ankle are
+// thin necks under the hand and over the foot.
 const FINE_PROFILES = {
-  thigh: { rows: [0, 13], keys: [[0, 1.55, 1.6, 0, 0.1], [2, 1.75, 1.8, 0, 0], [5, 2.05, 2.1, 0, 0], [9, 2.35, 2.35, 0, 0], [13, 2.5, 2.45, 0, 0]] },
-  shin: { rows: [2, 13], keys: [[2, 1.0, 1.25, 0, 0.2], [3.5, 0.95, 1.0, 0, 0], [5, 1.2, 1.25, 0, -0.1], [7, 1.55, 1.75, 0, -0.35], [9.5, 1.85, 2.15, 0, -0.5], [11.5, 1.8, 1.95, 0, -0.25], [13.5, 1.55, 1.6, 0, 0.05]] },
-  upper: { rows: [9, 18], keys: [[9, 1.5, 1.5, 0, 0], [10.5, 1.55, 1.6, 0, 0], [12, 1.75, 1.95, 0, 0.3], [13.5, 1.95, 2.05, 0.3, 0.2], [15.5, 2.3, 2.1, 0.45, 0], [17.5, 2.05, 1.9, 0.2, 0], [19, 1.5, 1.5, 0, 0]] },
-  fore: { rows: [3, 10], keys: [[3, 0.95, 1.0, 0, 0], [4.5, 1.05, 1.1, 0, 0], [6.5, 1.4, 1.4, 0, 0.05], [8, 1.55, 1.5, 0.05, 0.05], [9.5, 1.45, 1.45, 0, 0], [11, 1.35, 1.35, 0, 0]] },
+  thigh: { rows: [0, 13], keys: [[0, 1.25, 1.3, 0, 0.1], [1.5, 1.4, 1.45, 0, 0.05], [4, 1.75, 1.8, 0, 0], [8, 2.0, 2.05, 0, 0], [13, 2.25, 2.2, 0, 0]] },
+  shin: { rows: [2, 13], keys: [[2, 0.85, 1.05, 0, 0.2], [3.5, 0.75, 0.8, 0, 0], [5, 0.95, 1.0, 0, -0.1], [7, 1.25, 1.45, 0, -0.35], [9.5, 1.5, 1.75, 0, -0.45], [11.5, 1.4, 1.55, 0, -0.2], [13.5, 1.2, 1.25, 0, 0.1]] },
+  upper: { rows: [9, 18], keys: [[9, 1.1, 1.15, 0, -0.05], [10.5, 1.2, 1.25, 0, 0], [12, 1.45, 1.6, 0, 0.3], [13.5, 1.6, 1.7, 0.2, 0.2], [15.5, 1.9, 1.8, 0.35, 0], [17.5, 1.8, 1.7, 0.2, 0], [19, 1.4, 1.4, 0, 0]] },
+  fore: { rows: [3, 10], keys: [[3, 0.7, 0.75, 0, 0], [4.5, 0.8, 0.85, 0, 0], [6.5, 1.1, 1.1, 0, 0.05], [8, 1.25, 1.2, 0.05, 0.05], [9.5, 1.1, 1.1, 0, -0.05], [11, 1.1, 1.1, 0, 0]] },
 };
 const fineProfile = (kind, y) => {
   const K = FINE_PROFILES[kind].keys;
@@ -1650,6 +1704,46 @@ const fineProfile = (kind, y) => {
   }
   return K[K.length - 1];
 };
+// (round 39) skin in one flat tone shaded as the smooth limb it stands for:
+// the round-33 per-voxel front / side / inner tones met along jagged
+// boundaries and every one-cell step of the profile caught the light as a
+// stripe, so a limb read as a noisy, dithered tube. Bare skin now takes the
+// palette's L tone only (plus a lit kneecap and knuckle row, a shaded knee pit
+// and elbow crease), and the model carries smoothN: every face in the profiled
+// rows takes the limb's own section normal (greedyGeometry), so the light
+// grades round the limb in one clean ramp. The forearm's fist is rebuilt on
+// the fine grid (fineHand): a 4-wide hand under the thin wrist, the fingers
+// closed round the haft's hole, a thumb over them on the inner side.
+function fineHand(m, src, out, pal, skin) {
+  // the source fist (rows 0..2): its colour (a glove or a dyed fist keeps it)
+  // and whether a haft passes through it (the grip hole at x 0, z 0..1)
+  let glove = null;
+  for (const [kk, v] of src.vox) {
+    const y = ((kk >> 10) & 1023) - 512;
+    if (y > 2) continue;
+    if (v.team || !skin.has(v.c)) { glove = v; break; }
+  }
+  const grip = !src.has(0, 1, 0) && !src.has(0, 1, 1);
+  const T = (c) => (glove ? glove : { c });
+  const put = (x, y, z, c) => { m.set(x, y, z, 0); Object.assign(m.get(x, y, z), T(c)); };
+  const L = pal.L, H = palH(pal), D = pal.D ?? pal.M, M = pal.M;
+  const inner = out > 0 ? -1 : 2, outer = out > 0 ? 2 : -1;   // the hand's columns towards / away from the body
+  for (let y = 0; y <= 5; y++) for (let x = -1; x <= 2; x++) for (let z = -1; z <= 4; z++) {
+    if ((x === -1 || x === 2) && (z === -1 || z === 4)) continue;     // the rounded section
+    if (y === 0 && z === -1) continue;                                 // the fingertips curl under
+    if (y === 5 && z === 4) continue;                                  // the back of the hand slopes to the wrist
+    if (grip && (x === 0 || x === 1) && z >= 0 && z <= 3) continue;    // the haft's hole
+    let c = L;
+    if (z === 4) c = y === 2 ? D : (y === 1 || y === 3) ? H : L;       // the curled fingers: two lit knuckle rows, a crease
+    else if (z === -1) c = M;                                          // the palm's heel
+    else if (x === outer && y >= 4) c = L;
+    put(x, y, z, c);
+  }
+  // the thumb laid over the fingers on the inner side
+  const tx = inner + (out > 0 ? -1 : 1);
+  for (const y of [3, 4]) for (const z of [1, 2, 3]) put(tx, y, z, L);
+  put(inner, 3, 4, H); put(inner, 4, 4, L);
+}
 function refineLimb(src, kind, out, { pal = null, k = 1 } = {}) {
   const P = FINE_PROFILES[kind];
   const m = new VoxelModel();
@@ -1657,17 +1751,24 @@ function refineLimb(src, kind, out, { pal = null, k = 1 } = {}) {
   let y0 = 1e9, y1 = -1e9;
   for (const [kk] of src.vox) { const y = ((kk >> 10) & 1023) - 512; y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
   const copy = (xf, yf, zf, v) => { m.set(xf, yf, zf, 0); Object.assign(m.get(xf, yf, zf), v); };
+  const hand = kind === 'fore' && pal && y0 <= 0;
   // the rows outside the profile (the fist, the foot, a sleeve's top): resampled
   for (const [kk, v] of src.vox) {
     const x = ((kk >> 20) & 1023) - 512, y = ((kk >> 10) & 1023) - 512, z = (kk & 1023) - 512;
     if (y >= P.rows[0] && y <= P.rows[1]) continue;
+    if (hand && y <= 2) continue;
     for (let i = 0; i < 8; i++) copy(2 * x + (i & 1), 2 * y + ((i >> 1) & 1), 2 * z + (i >> 2), v);
   }
-  // the profiled rows: a fine ellipse per fine row, coloured from the body grid
-  for (let yf = 2 * Math.max(P.rows[0], y0); yf <= 2 * Math.min(P.rows[1], y1) + 1; yf++) {
-    const hy = (yf + 0.5) / 2, ys = Math.floor(hy);
+  if (hand) fineHand(m, src, out, pal, skin);
+  const sec = (hy) => {
     const [, rx0, rz0, cxo, czo] = fineProfile(kind, hy);
-    const rx = rx0 * k, rz = rz0 * k, cx = 0.5 + cxo * out * k, cz = 0.5 + czo * k;
+    return { rx: rx0 * k, rz: rz0 * k, cx: 0.5 + cxo * out * k, cz: 0.5 + czo * k };
+  };
+  const yf0 = 2 * Math.max(P.rows[0], y0), yf1 = 2 * Math.min(P.rows[1], y1) + 1;
+  // the profiled rows: a fine ellipse per fine row, coloured from the body grid
+  for (let yf = yf0; yf <= yf1; yf++) {
+    const hy = (yf + 0.5) / 2, ys = Math.floor(hy);
+    const { rx, rz, cx, cz } = sec(hy);
     const row = [];
     for (const [kk, v] of src.vox) if (((kk >> 10) & 1023) - 512 === ys) row.push([((kk >> 20) & 1023) - 512, (kk & 1023) - 512, v]);
     if (!row.length) continue;
@@ -1684,11 +1785,51 @@ function refineLimb(src, kind, out, { pal = null, k = 1 } = {}) {
       }
       const v = best[2];
       if (!v.team && skin.has(v.c)) {
-        const inner = nx * out < -0.75 && nz < 0.2, front = nz > 0.3;
-        m.set(xf, yf, zf, front ? pal.L : inner ? pal.D : pal.M);
+        let c = pal.L;
+        const n = Math.hypot(nx, nz);
+        if (n > 0.7) {
+          // joint marks on the surface: the kneecap's light, the knee pit and
+          // the elbow crease in shade
+          if (kind === 'thigh' && yf <= 2 && nz > 0.75) c = palH(pal);
+          if (kind === 'shin' && yf >= 25 && nz < -0.7) c = pal.M;
+          if (kind === 'upper' && yf <= 20 && nz > 0.75) c = pal.M;
+          if (kind === 'fore' && yf >= 19 && nz > 0.75) c = pal.M;
+        }
+        m.set(xf, yf, zf, c);
       } else copy(xf, yf, zf, v);
     }
   }
+  // the kneecap and the elbow point stand a fine voxel proud
+  const bump = (yfs, front) => {
+    for (const yf of yfs) {
+      const { cx, cz, rz } = sec((yf + 0.5) / 2);
+      const zEdge = front ? Math.floor(2 * (cz + rz)) : Math.floor(2 * (cz - rz)) - 1;
+      for (const xf of [Math.floor(2 * cx) - 1, Math.floor(2 * cx)]) {
+        // only on bare skin
+        const zin = front ? zEdge - 1 : zEdge + 1;
+        const v = m.get(xf, yf, zin);
+        if (!v || v.team || !skin.has(v.c) || m.has(xf, yf, zEdge)) continue;
+        m.set(xf, yf, zEdge, front ? palH(pal) : pal.L);
+      }
+    }
+  };
+  if (pal && kind === 'thigh' && y0 <= 0) bump([0, 1, 2], true);
+  if (pal && kind === 'upper') bump([18, 19], false);
+  // smooth shading: the profiled rows take the section's outward normal
+  m.smoothN = (x, y, z, n) => {
+    const hy = (y + 0.5) / 2;
+    if (hy < P.rows[0] || hy > P.rows[1] + 1 || hy < y0 || hy > y1 + 1) return n;
+    if (hand && hy < 3.25) return n;
+    const s = sec(Math.max(P.rows[0] + 0.25, Math.min(P.rows[1] + 0.75, hy)));
+    const gx = (x / 2 - s.cx) / (s.rx * s.rx), gz = (z / 2 - s.cz) / (s.rz * s.rz);
+    const h = Math.hypot(gx, gz);
+    if (h < 1e-6) return n;
+    // keep a little of a ledge's own up / down facing, so the lit top of a
+    // shoulder or a foot is not shaded as a side
+    const ky = n[1] ? 0.35 * n[1] : 0;
+    const l = Math.hypot(gx / h, ky, gz / h);
+    return [gx / h / l, ky / l, gz / h / l];
+  };
   return m;
 }
 // (round 33) the torso on the fine grid too: each row resampled and its
@@ -1707,8 +1848,9 @@ function refineTorso(src, pal) {
     if (!r) rows.set(y, (r = { x0: x, x1: x, z0: z, z1: z }));
     r.x0 = Math.min(r.x0, x); r.x1 = Math.max(r.x1, x); r.z0 = Math.min(r.z0, z); r.z1 = Math.max(r.z1, z);
   }
-  const skin = pal ? new Set([pal.L, pal.M]) : new Set();
-  const HALF = pal ? mixC(pal.L, pal.M, 0.5) : 0;
+  // (round 39) bare skin in one flat tone (L), shaded by the smooth section
+  // normals below instead of painted front / half / side bands
+  const skin = pal ? new Set([pal.L, pal.M, palH(pal)]) : new Set();
   const P = 3;
   for (const [kk, v] of src.vox) {
     const x = ((kk >> 20) & 1023) - 512, y = ((kk >> 10) & 1023) - 512, z = (kk & 1023) - 512;
@@ -1721,12 +1863,24 @@ function refineTorso(src, pal) {
       if (e > 1 && ax >= 2 && az >= 1.5) continue;
       if (!v.team && skin.has(v.c)) {
         // the section's normal (the superellipse's gradient)
-        const gx = Math.sign(dx) * Math.abs(dx) ** (P - 1) / ax, gz = Math.sign(dz) * Math.abs(dz) ** (P - 1) / az;
-        const nz = gz / (Math.hypot(gx, gz) || 1);
-        m.set(xf, yf, zf, nz > 0.8 ? pal.L : nz > 0.35 ? HALF : pal.M);
+        m.set(xf, yf, zf, pal.L);
       } else { m.set(xf, yf, zf, 0); Object.assign(m.get(xf, yf, zf), v); }
     }
   }
+  // the section's normal (the superellipse's gradient) on every side face; a
+  // ledge (the shoulders' tops, the belt's) keeps most of its own facing
+  m.smoothN = (x, y, z, n) => {
+    const r = rows.get(Math.floor(y / 2)) || rows.get(Math.floor((y + 1) / 2));
+    if (!r) return n;
+    const cx = (r.x0 + r.x1 + 1) / 2, cz = (r.z0 + r.z1 + 1) / 2, ax = (r.x1 + 1 - r.x0) / 2, az = (r.z1 + 1 - r.z0) / 2;
+    const dx = (x / 2 - cx) / ax, dz = (z / 2 - cz) / az;
+    const gx = Math.sign(dx) * Math.abs(dx) ** (P - 1) / ax, gz = Math.sign(dz) * Math.abs(dz) ** (P - 1) / az;
+    const h = Math.hypot(gx, gz);
+    if (h < 1e-6) return n;
+    const ky = n[1] ? 1.6 * n[1] : 0;
+    const l = Math.hypot(gx / h, ky, gz / h);
+    return [gx / h / l, ky / l, gz / h / l];
+  };
   return m;
 }
 // the outline factor along a fine limb (model voxels of the fine grid): the
@@ -1803,12 +1957,12 @@ const sc = (j, s) => j.map((v) => v * s);
   rig('laborer', { voxel: 0.07, anim: 'human', style: 'villager', stance: true }, [
     ...manParts({ torso: t, head: 'laborer', leg: { sandal: null, kilt: TEAM } }),
     part('toolAxe', axeToolM(), [0, 0, 0], HAND_E, 'armR', showTool()),
-    part('toolPick', pickToolM(), [0, 0, 0], HAND_E, 'armR', showTool()),
+    part('toolPick', pickToolM(), [0, 0, 0], HAND_E, 'armR', { ...showTool(), scale: 0.5 }),
     part('toolSickle', sickleToolM(), [0, 0, 0], HAND_E, 'armR', showTool()),
     part('toolHammer', hammerToolM(), [0, 0, 0], HAND_E, 'armR', showTool()),
     part('carryWood', logsM(), [2, 0, 6], [-2.2, 7.4, 0], 'torso', showTool()),
-    part('carryGold', basketM('gold'), [3, 0, 4], [0, 1, -2.2], 'torso', showTool()),
-    part('carryFood', basketM('food'), [3, 0, 4], [0, 1, -2.2], 'torso', showTool()),
+    part('carryGold', basketM('gold'), [0, 0, 0], [0, 0, 0], 'torso', { ...showTool(), scale: 0.5 }),
+    part('carryFood', basketM('food'), [0, 0, 0], [0, 0, 0], 'torso', { ...showTool(), scale: 0.5 }),
   ]);
 }
 
@@ -4220,7 +4374,7 @@ const raptorLeg = (thigh, shank, claw) => {
 // ones did instead of three times the triangles
 const _gc = new THREE.Color();
 function greedyGeometry(model, { size, pivot }) {
-  const pos = [], nor = [], col = [], team = [], glow = [], idx = [];
+  const pos = [], nor = [], fnor = [], col = [], team = [], glow = [], idx = [];
   const V = model.vox;
   const K = (x, y, z) => ((x + 512) << 20) | ((y + 512) << 10) | (z + 512);
   let lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
@@ -4268,7 +4422,7 @@ function greedyGeometry(model, { size, pivot }) {
           pos.push((p[0] - pivot[0]) * size, (p[1] - pivot[1]) * size, (p[2] - pivot[2]) * size);
           // (round 38) a model may shade as the smooth form it stands for
           // (smoothN(x, y, z) at the corner; the Pharaoh's skirt)
-          nor.push(...(model.smoothN ? model.smoothN(p[0], p[1] - 0.5, p[2]) : n)); col.push(_gc.r, _gc.g, _gc.b); team.push(+ts); glow.push(+gs);
+          nor.push(...(model.smoothN ? model.smoothN(p[0], p[1] - 0.5, p[2], n) : n)); fnor.push(...n); col.push(_gc.r, _gc.g, _gc.b); team.push(+ts); glow.push(+gs);
         }
         idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
         i += wd;
@@ -4282,6 +4436,8 @@ function greedyGeometry(model, { size, pivot }) {
   geo.setAttribute('team', new THREE.Float32BufferAttribute(team, 1));
   geo.setAttribute('glow', new THREE.Float32BufferAttribute(glow, 1));
   geo.setIndex(pos.length / 3 > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
+  // (round 39) the outline hull is pushed along the faces' own normals, not the smooth ones
+  if (model.smoothN) geo.userData.faceNormal = new THREE.Float32BufferAttribute(fnor, 3);
   return geo;
 }
 

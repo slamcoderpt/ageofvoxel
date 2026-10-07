@@ -2816,6 +2816,45 @@ ignores part rests, as before. Check: `eu_one=pharaoh&eu_turn=20` (and
 `eu_zoom=0.6`), `eu_focus=pharaoh` with `eu_state=walk|attack|die`,
 `eu_group=eco`.
 
+Bodies, hands, heads, the pick and the basket, round 39 (unit_11; the men's
+arms and legs read as thick, noisy, dithered brown tubes with no hands,
+wrists or knee breaks, the heads as tiny blocks under a black cap, the
+miners' back-baskets as crates hiding the torso and clipping the head, the
+pick as a 'T'). **Skin in one tone, shaded smooth**: `refineLimb` and
+`refineTorso` paint bare skin in the palette's L tone only (the round-33
+front / side / inner tones met along jagged lines and every one-cell step of
+a profile caught the light as a stripe) and give the model `smoothN`, the
+limb's elliptical section normal (the torso's superellipse normal) at every
+side face; `greedyGeometry` passes the face normal as a fourth argument, so a
+ledge keeps part of its up / down facing and the hands and feet stay flat. The
+outline hull is still pushed along the faces' own normals
+(`geo.userData.faceNormal`, read by `scripts/outline-codes.mjs`). Accents
+only at the joints: a lit kneecap a fine voxel proud, a shaded knee pit, an
+elbow point behind and a crease in front. **Slimmer limbs with joints**
+(`FINE_PROFILES`): every radius 15-20 % less, the knee (thigh row 0, shin
+13.5) and the elbow (upper row 9, forearm 9.5) pinched to ~1.1-1.25 body
+voxels so the thigh, calf, biceps and forearm swell between them; wrist 0.7,
+ankle 0.75. **Hands** (`fineHand`, forearms with the fist rows): rebuilt on
+the fine grid, 4 x 6 x 6 cells under the thin wrist, rounded corners, the
+fingers' front with two lit knuckle rows and a crease, the palm's heel a tone
+down, a thumb laid over the fingers on the inner side; a gripping fist keeps
+the haft's hole (fine x 0..1, z 0..3) so the fingers close round the shaft; a
+gloved or dyed fist keeps its colour. **Heads**: the fine heads (Laborer,
+Spearman, Axeman, Slinger, Mercenaries) are 15 % larger (`headPart`), and the
+brows are a voxel longer, one dark line over each eye. **Pick**
+(`pickToolM`, part scale 0.5, same pivot): a thin haft and a curved head
+whose two arms sweep back towards the hand from the eye, 4 cells deep at the
+eye tapering to a one-cell point at each end, iron grey lit on the outer curve
+and dark beneath (bronze graded to the skin's cream), a wedge in the eye.
+**Basket** (`basketM`, part scale 0.5 in the torso's own space): 4 x 3.5 x 2
+rig voxels from the belt to mid-back (the old 6 x 7 crate covered the back
+and rose past the head), woven in alternating rows under a dark rim, ore or
+grain heaped over it, two thin leather straps flat on the back. Applies to
+every man on `manParts` / `archerArms` with fine limbs. Check:
+`eu_group=eco&eu_zoom=0.35&eu_ax=-4&eu_az=3.3` (the miners),
+`eu_one=laborer&eu_turn=30&eu_zoom=0.7&eu_az=-0.7`, `eu_group=eco`,
+`eu_group=foot`.
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower
