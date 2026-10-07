@@ -2509,6 +2509,41 @@ line of the surface's shade on every Egyptian unit. Check:
 `eu_one=pharaoh&eu_turn=30&eu_zoom=0.62&eu_ax=-0.45&eu_az=-0.9` (face and
 fists), `eu_focus=pharaoh&eu_state=walk`, `eu_group=eco`.
 
+Bodies as people, round 33 (the men's limbs read as chains of mid-brown
+timber cuboids with a dark seam at every joint, skin, sandals and wraps one
+brown, a boxy torso, small faces). Skin has its own warmer, lighter tan ramp
+(`PAL_SKIN` H 0xc27a48 / L 0xae683a / M 0x8e4e2c / D 0x6a361e, the heads'
+`SKIN`, `SKIN_FACE` on it), two value steps above `SANDAL`, `LEATHER` and
+`WOOD`. **Fine limbs and torsos**: every part `manParts` / `archerArms` build
+(thighs, shins, the split upper arms and forearms, the torso; not bent arms,
+the beast-headed warriors or the Mummy, `fine: false`) carries `fine: kind`
+and is resampled at export at twice the body grid (`refineLimb` /
+`refineTorso`, part scale halved, pivot doubled), so authoring stays on the
+body grid and grips, gear joints and anims are unchanged. Limbs follow a
+smooth profile per kind (`FINE_PROFILES`: a rounded deltoid and biceps to a
+slim elbow, a forearm swelling and tapering to a 2-voxel wrist over the full
+fist; a thigh narrowing to the knee, a calf bulging behind the shin, a thin
+ankle over the full foot), each fine voxel coloured from the body-grid voxel
+under it (bands, bracers, sleeves, team dye stay put) and bare skin re-shaded
+from the fine normal (front L, sides M, inner D). The torso's rows are
+rounded (a superellipse through each row's extents) and its bare front shaded
+L / half tone / M; no dark flank columns or pec row. Fine parts are meshed by
+`greedyGeometry` (coplanar same-colour faces merged, no AO / jitter), so a
+foot soldier is ~6-8 k triangles (fewer than before). **No joint seams**: a
+fine part's outline is ~0.55 of the width, never pushed vertically
+(`outlineCodes(geo, { flatY })`, so the hull cannot poke through the fine
+steps), and fades to nothing over the last rows at a joint
+(`FINE_FADE`, per-vertex width via `Group.add(..., { outlineAt })`): no dark
+ring at the knee, elbow or shoulder. **Sandals** (`manShinM`, sandal ===
+`SANDAL`): a pale cream lacing band round the ankle and a strap over the
+instep and heel (`SANDAL_TIE` 0xe2c89a) over the dark sole, so the leg breaks
+into thigh, shin and foot. **Faces** (the generic and Nubian heads): eyes two
+rows tall (ivory outer column, near-black pupil column) under the two-deep
+brow, one lit cheekbone row under them, no nostril shadows. Check:
+`eu_one=laborer&eu_turn=60&eu_zoom=0.35&eu_az=-0.3` (legs and arms close),
+`eu_one=spearman&eu_turn=30&eu_zoom=0.62&eu_az=-0.6`, `eu_group=foot`,
+`eu_group=eco`.
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower
