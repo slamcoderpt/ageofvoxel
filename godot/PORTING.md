@@ -2738,6 +2738,30 @@ over the planted side and the neck nodding twice a stride. Check:
 `eu_focus=camel_rider` (and `eu_state=walk` / `attack` / `die`),
 `eu_one=camel_rider&eu_turn=70&eu_zoom=1.5`, `eu_group=mounted`.
 
+Priest ankh and robe, round 37 (the ankh read as a blocky key or hammer: a
+tall rectangular loop with a jagged notch, a stepped hammer-head crossbar, all
+a muddy khaki; the puffy white sleeves and shapeless robe made a lumpy
+snowman). `ankhStaffM()` is rebuilt at a quarter of the rig voxel (part scale
+0.25, `ANKH_PIVOT` [2, 0, 2], jitter 0; the Son of Osiris carries the same
+staff): a 4 x 4 dark shaft with gold bands and ferrule, a short flared gold
+stem, a **thin straight crossbar** (3 fine rows, 24 wide) and a **rounded
+teardrop loop** (16 wide, 27 tall, its narrow foot on the crossbar) whose ring
+is every cell within 3 of the outside, round a clean oval eye about 10 x 20 cut
+through. Saturated gold ramp (`ANKH_HI` / `ANKH_L` / `ANKH_G` self-lit, glow
+0.78 .. 0.8, plus unlit `ANKH_D` / `ANKH_DD`), each ring cell shaded from a
+smoothed outward normal lit from above (glint on the top of the loop and the
+crossbar's top row, dark bronze under the loop's lower curves and under the
+crossbar). The Priest's body: cap sleeves only from arm row 15 with a navy trim
+row at the hem and shaded by facing (`manArmM` `sleeve` may now be
+`{from, trim, L, M, D}`; `deltoid: false` drops the widened shoulder), so the
+bare upper arm shows under the sleeve; a saturated self-lit lemon-gold sash
+(two rows round the waist plus a row proud in front), sash end, hem and
+armlets; a dark break under the bloused cloth, even knife pleats every third
+column down the skirt and round its sides, and the skirt a voxel deeper over
+the knees. Check: `eu_focus=priest&eu_zoom=0.7` (and `eu_state=walk`),
+`eu_one=priest&eu_turn=20&eu_zoom=0.9`, `eu_group=eco`,
+`eu_focus=son_of_osiris`.
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower

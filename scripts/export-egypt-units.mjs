@@ -1040,7 +1040,7 @@ const ARM_ROWS_CLEAN = [
   [13, 1.6, 1.6], [12, 1.6, 1.6], [11, 1.6, 1.6], [10, 1.6, 1.6], [9, 1.6, 1.6],
   [8, 1.6, 1.6], [7, 1.6, 1.6], [6, 1.6, 1.6], [5, 1.6, 1.6], [4, 1.6, 1.6], [3, 1.25, 1.25],
 ];
-function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, sleeve = null, fist = null, bend = 0, grip = false, slim = false, clean = false } = {}) {
+function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, sleeve = null, fist = null, bend = 0, grip = false, slim = false, clean = false, deltoid = true } = {}) {
   const m = new VoxelModel();
   const out = side === 'L' ? 1 : -1, H = palH(pal);
   const tone = (x, y, z, nx, nz) => {
@@ -1054,11 +1054,15 @@ function manArmM({ pal = PAL_SKIN, side = 'L', bracer = null, band: bnd = null, 
     }
     if (bracer && y >= 4 && y <= 7) c = bracer;
     if (bnd && y >= 12 && y <= 13) c = bnd;
-    if (sleeve && y >= 13) c = y === 13 ? (typeof sleeve === 'number' ? shadeC(sleeve, 0.86) : sleeve) : sleeve;
+    if (sleeve && typeof sleeve === 'object') {
+      // (round 37) a shaded cap sleeve from row `from` up with a dark trim
+      // row at its hem: the bare arm below it reads apart from the shoulder
+      if (y >= sleeve.from) c = y === sleeve.from && sleeve.trim ? sleeve.trim : front ? sleeve.L : inner ? sleeve.D : sleeve.M;
+    } else if (sleeve && y >= 13) c = y === 13 ? (typeof sleeve === 'number' ? shadeC(sleeve, 0.86) : sleeve) : sleeve;
     return c;
   };
   limbRows(m, slim ? ARM_ROWS_SLIM : clean ? ARM_ROWS_CLEAN : ARM_ROWS, tone);
-  if (!slim && !clean) {
+  if (!slim && !clean && deltoid) {
     // (round 30) shoulder and elbow mass: the deltoid a voxel wider on the
     // outer side (rows 13..16, a rounded 3-deep column, its top lit), the
     // biceps a voxel deeper in front, and an elbow knob behind
@@ -1464,40 +1468,75 @@ function slingM() {
   m.box(-2, -22, -1, 4, 2, 3, 0x8e8a82).box(-1, -21, 0, 2, 1, 1, 0xa8a49a);   // the grey stone
   return m;
 }
-// the priest's staff (round 10, unit_09), authored at half the rig voxel
-// (part scale 0.5, pivot [1, 0, 1]: a 2 x 2 shaft centred on the fist):
-// a dark shaft from the ground to above the head, topped by one clear ankh
-// in a deep orange gold (the grade turns the light GOLD cream on a small
-// emblem): a 12-wide crossbar with flared ends over a teardrop loop 8 wide
-// and 14 tall whose 4-wide, 9-tall eye is cut right through, so the ground
-// shows in the hole; a darker rim on the loop's outer edge keeps the shape
-// against a white robe, no glow (glow washes it to cream)
-const ANKH_G = pick3(84, 0x8c6c00, 0x846400, 0x947400);
-const ANKH_L = 0xb89400, ANKH_D = 0x483000;
+// the priest's staff (round 10, unit_09). (round 37) rebuilt at a quarter of
+// the rig voxel (part scale 0.25, pivot [2, 0, 2]: a 4 x 4 shaft centred on
+// the fist), so the ankh can be drawn with curves: a dark wood shaft banded in
+// gold from the ground to above the head, a short flared gold stem, a thin
+// straight crossbar (3 fine rows, 24 wide, no stepped hammer ends) and over it
+// a rounded teardrop loop, a 3-fine-voxel ring (one body voxel) round a clean
+// oval eye 10 wide and 20 tall cut right through, so the ground shows in it.
+// Saturated gold lit from above: each ring voxel is shaded by its surface
+// normal (the upper rim and the crossbar's top a bright glint, the flanks a
+// lit gold, the lower curves and the crossbar's underside a dark bronze), the
+// lit tones written as the unit shader's self-lit voxels (glow 0.78 .. 0.8,
+// as the Axeman's bronze): an unlit saturated gold grades to khaki or cream.
+const ANKH_HI = 0xffe070, ANKH_L = 0xf0b818, ANKH_G = 0xc88a0c, ANKH_D = 0x6a3e04, ANKH_DD = 0x3a2000;
+const ANKH_GLOW = { [ANKH_HI]: 0.8, [ANKH_L]: 0.78, [ANKH_G]: 0.78 };
 function ankhStaffM({ glow = 0 } = {}) {
   const m = new VoxelModel();
   const o = glow ? { glow } : undefined;
-  for (let y = -29; y <= 26; y++) for (let x = 0; x <= 1; x++) for (let z = 0; z <= 1; z++)
-    m.set(x, y, z, y >= 22 || (y + 40) % 14 === 0 || y <= -27 ? ANKH_G(x, y, z) : (x + z) % 2 ? WOOD_DK : 0x2a160a, o);
-  // the crossbar, the arms flaring at the ends
-  for (let x = -5; x <= 6; x++) {
-    const e = x <= -4 || x >= 5;
-    for (let y = e ? 26 : 27; y <= (e ? 30 : 29); y++) for (let z = 0; z <= 1; z++)
-      m.set(x, y, z, x === -5 || x === 6 ? ANKH_D : y === (e ? 30 : 29) ? ANKH_L : ANKH_G(x, y, z), o);
+  const gold = (x, y, z, c) => m.set(x, y, z, c, ANKH_GLOW[c] ? { glow: ANKH_GLOW[c] } : undefined);
+  // the shaft: 4 x 4 dark wood, gold bands every 28 rows, a gold ferrule
+  for (let y = -58; y <= 44; y++) for (let x = 0; x <= 3; x++) for (let z = 0; z <= 3; z++) {
+    const band = y <= -54 || ((y + 80) % 28 === 0 || (y + 80) % 28 === 1);
+    if (band) gold(x, y, z, y === -58 ? ANKH_D : z === 3 || x === 3 ? ANKH_L : ANKH_G);
+    else m.set(x, y, z, (x + z) % 2 ? WOOD_DK : 0x2a160a, o);
   }
-  // the loop: [outer half-width, eye half-width] per row from the crossbar up
-  const ROWS = [[1, 0], [2, 0], [3, 0], [3, 1], [4, 2], [4, 2], [4, 2], [4, 2], [4, 2], [4, 2], [4, 2], [3, 1], [3, 0], [2, 0]];
-  ROWS.forEach(([hw, eh], i) => {
-    const y = 30 + i;
-    for (let x = 1 - hw; x < 1 + hw; x++) {
-      if (eh && x >= 1 - eh && x < 1 + eh) continue;     // the eye, cut through
-      const rim = x === 1 - hw || x === hw;
-      for (let z = 0; z <= 1; z++) m.set(x, y, z, rim && hw >= 3 ? ANKH_D : i >= 11 ? ANKH_L : ANKH_G(x, y, z), o);
+  // the ankh's stem: a gold collar over the shaft's top flaring to the cross
+  for (let y = 45; y <= 52; y++) {
+    const hw = y <= 46 ? 3 : 2;                              // a flared foot ring, then the stem
+    for (let x = 2 - hw; x < 2 + hw; x++) for (let z = 0; z <= 3; z++) {
+      if (hw === 3 && (z === 0 || z === 3) && (x === 2 - hw || x === 1 + hw)) continue;
+      const c = y === 46 ? ANKH_HI : y === 45 ? ANKH_D : x === 2 - hw ? ANKH_D : x === 1 + hw ? ANKH_G : ANKH_L;
+      gold(x, y, z, c);
     }
-  });
+  }
+  // the crossbar: thin and straight, the top row a glint, the underside dark
+  for (let x = -10; x <= 13; x++) for (let y = 53; y <= 55; y++) for (let z = 1; z <= 2; z++) {
+    const end = x === -10 || x === 13;
+    gold(x, y, z, y === 55 ? (end ? ANKH_L : ANKH_HI) : y === 53 ? ANKH_DD : end ? ANKH_G : ANKH_L);
+  }
+  // the loop: a teardrop 16 wide, 27 tall, its narrow foot on the crossbar;
+  // the ring is every voxel of it within 3 of its outside (a clean even band
+  // round an oval eye about twice as tall as it is wide)
+  const Y0 = 56, H = 27, W = 8, UC = 17;
+  const halfW = (u) => {
+    if (u < 0 || u > H) return -1;
+    if (u >= UC) { const t = (u - UC) / (H - UC); return W * Math.sqrt(Math.max(0, 1 - t * t)); }
+    return 2.2 + (W - 2.2) * Math.sin((Math.PI / 2) * (u / UC));
+  };
+  const inside = (x, y) => { const u = y + 0.5 - Y0, w = halfW(u); return w > 0 && Math.abs(x + 0.5 - 2) <= w; };
+  const BAND = 3;
+  for (let y = Y0; y <= Y0 + H; y++) for (let x = -8; x <= 12; x++) {
+    if (!inside(x, y)) continue;
+    let near = 1e9;
+    for (let dy = -BAND; dy <= BAND; dy++) for (let dx = -BAND; dx <= BAND; dx++) {
+      const d = Math.hypot(dx, dy);
+      if (d <= BAND + 0.01 && !inside(x + dx, y + dy)) near = Math.min(near, d);
+    }
+    if (near > BAND + 0.01) continue;                           // the eye, cut through
+    // a smooth outward normal (the mean offset to the outside within 5,
+    // so neighbouring voxels shade alike, no speckle); lit from above
+    let sx = 0, sy = 0;
+    for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++)
+      if (dx * dx + dy * dy <= 25 && !inside(x + dx, y + dy)) { sx += dx; sy += dy; }
+    const l = (sy * 0.9 - sx * 0.25) / (Math.hypot(sx, sy) || 1);
+    const c = l > 0.6 ? ANKH_HI : l > -0.15 ? ANKH_L : l > -0.75 ? ANKH_G : ANKH_D;
+    for (let z = 1; z <= 2; z++) gold(x, y, z, z === 1 && c === ANKH_HI ? ANKH_L : c);
+  }
   return m;
 }
-const ANKH_PIVOT = [1, 0, 1];
+const ANKH_PIVOT = [2, 0, 2];
 // the pharaoh's crook (round 13, unit_04), authored at half the rig voxel
 // (part scale 0.5, pivot [1, 0, 1]: the 2 x 2 shaft centred in the fist): a
 // long shaft banded gold and the army's colour three rows each, a gold butt
@@ -1851,6 +1890,11 @@ const sc = (j, s) => j.map((v) => v * s);
   // the deep creases (under the arms, the belt's shadow, inside the folds
   // nearest the hem), so the robe reads as hanging cloth, not a white block
   const RB = 0xf2ecdc, RB_SH = LINEN_SH, RB_DK = 0xa8987a;
+  // (round 37) the sash, sash end and hem in a saturated lemon gold written
+  // as self-lit voxels (glow 0.78, as the ankh): the plain GOLD graded to a
+  // pale cream that melted into the linen, so the waist did not read
+  const SASH = 0xf4cc10, SASH_SH = 0xc89c08, SASH_DK = 0x5a4000;
+  const sash = (m, x, y, z, c) => m.set(x, y, z, c, c === SASH_DK ? undefined : { glow: 0.78 });
   paint(t, (x, y, z) => (y <= 14 ? (z >= 2 && Math.abs(x + 0.5) < 5 ? RB : RB_SH) : null));
   paint(t, (x, y, z) => (y >= 13 && y <= 14 ? RB : null));
   // the flanks under the arms and the chest's underside
@@ -1865,29 +1909,41 @@ const sc = (j, s) => j.map((v) => v * s);
     const y = 1 - i;
     // (round 10) the robe gathers to the 8-wide waist under the sash and
     // flares over the hips to 16 at the hem: a waist, not a slab
-    const w = i < 2 ? 8 : 2 * Math.round(Math.min(10 + (i - 2) * 0.5, 10 + (i - 2) * 6 / (LEN - 2)) / 2), z0 = -3 - Math.round(i * 1.5 / LEN), z1 = 2 + Math.round(i * 1.5 / LEN);
+    const w = i < 2 ? 8 : 2 * Math.round(Math.min(10 + (i - 2) * 0.5, 10 + (i - 2) * 6 / (LEN - 2)) / 2), z0 = -3 - Math.round(i * 1.5 / LEN), z1 = 2 + Math.round(i * 1.5 / LEN) + (i >= 6 ? 1 : 0);   // (round 37) a voxel deeper over the knees: the bent knee stays under the cloth
     // (round 13) the folds fanning out from the sash: an inner pair either side
     // of the sash's end and an outer pair over the thighs, each a shaded
     // crease with its deep core lower down
-    const fi = 2 + Math.floor(i * 0.12), fo = 3 + Math.floor(i * 0.2);
+    const fi = 2 + Math.floor(i * 0.12);
     for (let x = -w / 2; x < w / 2; x++) for (let z = z0; z <= z1; z++) {
       const ex = x === -w / 2 || x === w / 2 - 1;
       if (ex && (z === z0 || z === z1)) continue;
       let c = ex || z === z0 ? RB_SH : RB;
       if (z === z1) {
-        if (x === -fi || x === fi + 1 || (i >= 6 && (x === -fo - 1 || x === fo + 1))) c = i >= 12 ? RB_DK : RB_SH;
-        if (i >= 6 && (x === -fo || x === fo)) c = RB_SH;
+        // (round 37) even knife pleats over the whole skirt below the hips
+        // (the old fanning folds above them only), a shaded crease every
+        // third column, deep in the lower skirt
+        if (i < 4 && (x === -fi || x === fi + 1)) c = RB_SH;
+        if (i >= 4 && i < LEN - 2 && x !== 0 && x !== 1) c = (x + 40) % 3 === 0 ? (i >= 12 ? RB_DK : RB_SH) : RB;
       }
+      if (ex && i >= 4 && i < LEN - 2 && (z + 40) % 3 === 0) c = RB_DK;   // the pleats round the sides
+      if (i === 2 && (z === z1 || ex)) c = RB_DK;          // the robe bloused over the sash: a dark break under it
       if (ex && z === z1 - 1) c = RB_DK;                  // the sides turn away into shade
       if (ex && z === z0 + 1) c = RB_DK;
       if (i <= 1) c = i === 0 ? RB_DK : RB_SH;            // the belt's shadow under the sash
       if (i === LEN - 2) c = z === z1 || ex ? RB_SH : c;  // the cloth's shadow over the hem
-      t.set(x, y, z, i >= LEN - 1 ? GOLD : c);
+      if (i >= LEN - 1) sash(t, x, y, z, i === LEN - 1 && (z === z1 || ex) ? SASH : SASH_SH); else t.set(x, y, z, c);
     }
     if (i < 2) for (const x of [-5, 4]) for (let z = -3; z <= 2; z++) t.remove(x, y, z);
-    for (let x = 0; x <= 1; x++) t.set(x, y, z1 + 1, i === 0 ? GOLD_DK : x === 1 && i > 2 ? 0xc8a000 : GOLD);   // the sash's long end down the front, shaded on one edge
+    for (let x = 0; x <= 1; x++) sash(t, x, y, z1 + 1, i === 0 ? SASH_DK : x === 1 && i > 2 ? SASH_SH : SASH);   // the sash's long end down the front, shaded on one edge
   }
-  eBelt(t, GOLD, GOLD);
+  // the sash round the waist: two saturated rows over the robe's outside and
+  // a row a voxel proud in front, so the belt line reads from any side
+  for (let y = 2; y <= 3; y++) for (let x = -5; x <= 4; x++) for (let z = -4; z <= 3; z++) {
+    if (!t.has(x, y, z)) continue;
+    const out = !t.has(x + 1, y, z) || !t.has(x - 1, y, z) || !t.has(x, y, z + 1) || !t.has(x, y, z - 1);
+    if (out) sash(t, x, y, z, y === 3 ? SASH : SASH_SH);
+  }
+  for (let x = -3; x <= 2; x++) { if (!t.has(x, 3, 4)) sash(t, x, 3, 4, SASH); if (!t.has(x, 2, 4)) sash(t, x, 2, 4, SASH_SH); }
   // (round 10) not a T-pose: the staff arm's shoulder raised half a voxel and
   // its forearm bent forward to hold the staff out in front of the hip, the
   // free arm bent at the elbow with the fist at the waist
@@ -1895,12 +1951,16 @@ const sc = (j, s) => j.map((v) => v * s);
   // that swings out of the rigid robe reads as cloth, not a bare plank
   const BR = 0.95, BL = 1.35;
   rig('priest', { voxel: 0.07, anim: 'human', style: 'priest', pose: 'staff', stance: 0.3, upright: true }, [
-    ...manParts({ torso: t, head: 'priest', arm: { sleeve: RB, bracer: GOLD }, armL: { bend: BL }, armR: { bend: BR, grip: true }, leg: { sandal: null, pal: { L: RB, M: RB_SH, D: RB_SH }, foot: PAL_SKIN.M },
-      liftR: 0.5, restL: [0, -0.75, 0.1], restR: [0, -0.35, -0.2] }),
+    // (round 37) the armlets in the sash's self-lit gold (plain gold graded to a pale blob on the fist)
+    ...manParts({ torso: t, head: 'priest', arm: { sleeve: { from: 15, trim: 0x2a3a6a, L: RB, M: RB_SH, D: RB_DK }, bracer: SASH, deltoid: false }, armL: { bend: BL }, armR: { bend: BR, grip: true }, leg: { sandal: null, pal: { L: RB, M: RB, D: RB_SH }, foot: PAL_SKIN.M },
+      liftR: 0.5, restL: [0, -0.75, 0.1], restR: [0, -0.35, -0.2] }).map((p) => {
+      if (p.name.startsWith('arm') || p.name.startsWith('fore')) for (const v of p.model.vox.values()) if (v.c === SASH) v.glow = 0.78;
+      return p;
+    }),
     // the staff stands upright in the bent fist whatever the arm does (rig
     // "upright": unit_view.cpp gives the weapon the unit's orientation)
     // (round 13) through the fist: the fingers wrap the shaft (manArmM grip)
-    part('weapon', ankhStaffM(), ANKH_PIVOT, gripBent(BR), 'armR', { scale: 0.5 }),
+    part('weapon', ankhStaffM(), ANKH_PIVOT, gripBent(BR), 'armR', { scale: 0.25, jitter: 0 }),
   ]);
 }
 
@@ -2331,7 +2391,7 @@ function chariotLegsM() {
   eKilt(t, { color: KILT_LINEN, side: KILT_LINEN_SH, hem: KILT_LINEN_SH, len: 6, fold: true });
   scaleArmour(t);
   eBelt(t, ARMOUR_OL, GOLD);
-  eCollar(t, [ANKH_L, TM, ANKH_L], { r0: 2.4 });
+  eCollar(t, [0xb89400, TM, 0xb89400], { r0: 2.4 });
   t.box(2, 3, -6, 3, 11, 2, LEATHER).box(2, 3, -6, 3, 1, 2, LEATHER_DK).box(2, 13, -6, 3, 1, 2, LEATHER_DK);   // the quiver on the back
   for (const x of [2, 4]) t.set(x, 14, -6, 0xf4f0e8).set(x, 15, -5, 0xf4f0e8);
   const rider = riderMan({ torso: t, torsoJoint: [0, 14.5, -1], torsoParent: 'chariot', head: 'charioteer', headScale: 1.2 })
@@ -3043,7 +3103,7 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
   headM.ellipsoid(2.5, 8, 2.5, 2, 2.4, 2, 0xffe060, { glow: 0.9 });   // the sun disc
   rig('son_of_osiris', { voxel: 0.1, anim: 'beast', style: 'beast' }, [
     ...beastManParts({ torso: body, head: headM, headScale: 0.62, arm: { band: GOLD, bracer: GOLD }, leg: { kilt: TEAM }, shin: shinO }),
-    part('weapon', ankhStaffM({ glow: 0.15 }), ANKH_PIVOT, BEAST_FIST, 'foreR', { scale: 0.5 }),
+    part('weapon', ankhStaffM({ glow: 0.15 }), ANKH_PIVOT, BEAST_FIST, 'foreR', { scale: 0.25, jitter: 0 }),
   ]);
 }
 
