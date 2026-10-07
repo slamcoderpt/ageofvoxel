@@ -2495,34 +2495,35 @@ function house(v, age) {
 }
 
 // Granary (3 x 3; building_05): the flat-roofed store at the back left in
-// coursed sandstone with a deep cavetto cornice, a roof hatch and a ladder up
-// its front, the door beside it; two big domed brick silos in a row along its
-// east side (the silhouette), plank gangways from the store's roof up to their
-// loading mouths, a crate of grain and a barrel in front.
+// battered mud brick under a painted cavetto and a parapet, a framed roof
+// hatch, the door in its front, the owner's line on the coping; two big domed brick silos in a
+// row along its east side (the silhouette). Round 29: as in building_05 the
+// store's faces stay clear so the painted frieze runs unbroken round it: no
+// roof banner, no gangways from the roof to the silos, the one ladder
+// leaning on the west wall with its feet on the ground; the goods are one
+// clean group each: an open crate of grain beside the
+// door, a clay jar at each front corner.
 function granary() {
   const m = lot(24, 24);
-  const t = block(m, 1, 2, 11, 21, 1, 9, { wall: EMUD, roofC: EDECK, rimC: LIME, gorge: [BAND_B, BAND_R], torus: false, lipOut: 2, batter: 4, band: 'ochre', grime: false });
+  const t = block(m, 1, 2, 11, 21, 1, 9, { wall: EMUD, roofC: EDECK, rimC: LIME, gorge: [BAND_B, BAND_R], torus: false, lipOut: 2, batter: 4, band: 'ochre', grime: false, rim: true });
   const T = m.lastTop;
-  banner(m, T.c0 + 2, t, T.d1 - 3, 9, '+z');
   // the roof hatch with a timber frame
   for (let x = T.c0 + 3; x < T.c0 + 6; x++) for (let z = T.d0 + 9; z < T.d0 + 13; z++) m.set(x, t - 1, z, DARK);
   for (let x = T.c0 + 2; x < T.c0 + 7; x++) for (const z of [T.d0 + 8, T.d0 + 13]) m.set(x, t, z, 0x8a6a48);
   for (let z = T.d0 + 8; z < T.d0 + 14; z++) for (const x of [T.c0 + 2, T.c0 + 6]) m.set(x, t, z, 0x8a6a48);
-  // the door and a slit window on the front
-  door(m, '+z', 3, 2, 1, 5);
-  slit(m, '+z', 4, 9, 2, 1);
+  // the door in the middle of the front, framed in timber and kept under
+  // the painted band (rows 7..9) so the frieze runs unbroken over it
+  door(m, '+z', 5, 2, 1, 4, { frame: 0x7a5a3c, proud: false, lintel: false });
   // the silos
-  const A = silo(m, 17.5, 6.5, 1, 4.8, 14, { dome: 0.85 });
-  const B = silo(m, 17.5, 17.5, 1, 4.6, 12, { dome: 0.85 });
-  // a ladder from the store's roof up to each silo's loading mouth
-  for (const S0 of [A, B]) ladder(m, [T.c1 - 2.2, t, S0.cz], [S0.cx - S0.rm - 0.7, S0.lip + 0.6, S0.cz]);
-  // the ladder leaning on the front up to the roof
-  ladder(m, [8.5, 0.6, 23.6], [8.5, t + 0.8, 21.4]);
-  // a crate of grain and a barrel by the door
-  // the day's grain: a gold heap on a mat, linen sacks, a basket
-  grainHeap(m, 13.5, 21, 2.6, 4);
-  sack(m, 0, 1, 21); sack(m, 5, 1, 21);
-  basket(m, 9, 21, 'grain', 2);
+  silo(m, 17.5, 6.5, 1, 4.8, 14, { dome: 0.85 });
+  silo(m, 17.5, 17.5, 1, 4.6, 12, { dome: 0.85 });
+  // the ladder leaning on the west wall up to the roof, its feet on the ground
+  ladder(m, [0.2, 0.6, 9.5], [2.2, t + 0.8, 9.5]);
+  // an open crate of grain right of the door, a clay jar at each front
+  // corner (square rows, a dark mouth: no round barrel lumps)
+  goodsBox(m, 8, 1, 21, 4, 3, 'grain', 2, 0x8a6236);
+  for (const x of [9, 10]) pset(m, x, 3, 22, 0xe8c96e);
+  jar(m, 2, 1, 22, 0xb8683e); jar(m, 13, 1, 22, 0xa85c36);
   return m;
 }
 

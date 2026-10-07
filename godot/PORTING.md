@@ -1606,6 +1606,16 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   nothing stands, so a wing's cornice never cuts the taller block it abuts.
   Each house's main cube is battered a voxel in five rows (smoothed by
   `skin()`; the potter's portico block and the low wings stand plumb).
+- **A clear Granary, round 29** (`granary()`, building_05): the store's
+  faces are left clear so its painted band and cavetto read unbroken round
+  it, a storehouse beside two silos. No roof banner (the owner's colour is
+  now the inner coping line, `rim: true`), no gangways from the roof hatch
+  to the silos, no slit cut into the band; the door is centred, timber
+  framed, flush, and kept under the band (h 4, no lintel course); one ladder
+  leans on the west wall with its feet on the ground; the goods are an
+  open crate of grain by the door and a square-row clay jar at each front
+  corner (the lathe barrel and the loose sacks are gone).
+  `egt_focus=granary` (and `egt_yaw=208` for the ladder side) frames it.
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8
