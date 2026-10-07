@@ -111,7 +111,7 @@ struct CastCheck { bool ok; std::string reason; };
 
 // ---- the Egyptian powers' state (also what game/godpowers draws) ---------------------------
 // never cast: t0 / until far in the past, so no "just ended" fade-out shows at the start of a match
-struct TimedPower { int owner = 0; double t0 = -1e9, until = -1e9; }; // Rain, Prosperity, Eclipse
+struct TimedPower { int owner = 0; double t0 = -1e9, until = -1e9, x = 0, z = 0; }; // Rain, Prosperity, Eclipse (x, z: where it was cast; the visuals only)
 struct VisionCast { int owner; double x, z, t0, dur, r; };
 struct SandsCast { int owner; double sx, sz, dx, dz, t0, delay, radius; bool done = false; int moved = 0; };
 struct SpawnCast { int owner; int id; double x, z, t0; int spawned = 0, total = 0; double die_at = -1; std::vector<int32_t> units; };

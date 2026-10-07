@@ -95,8 +95,11 @@ static func scene_setup(game: Node) -> Dictionary:
 		sim.order_gather(PackedInt32Array([v]), gfarms[i])
 	var army := []
 	var az := -6.0 if power == "plague_of_serpents" else 0.0   # (drawn back out of the Serpents' guard reach)
+	# (the Eclipse: the Greek line drawn back east, so the empowered Sphinxes are seen charging
+	# across open sand at the t of the capture, the spell's marks clear of the melee's hit sparks)
+	var ax := 7.0 if power == "eclipse" else 0.0
 	for i in 18:
-		army.append(u.call("hoplite" if i % 3 else "toxotes", 2, 4.0 + (i % 6) * 1.1, az - 2.0 + (i / 6) * 1.2, -PI * 0.5))
+		army.append(u.call("hoplite" if i % 3 else "toxotes", 2, ax + 4.0 + (i % 6) * 1.1, az - 2.0 + (i / 6) * 1.2, -PI * 0.5))
 	var focus := Vector2(cx, cz)
 	var x2 := NAN
 	var z2 := NAN

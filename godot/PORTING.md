@@ -3709,7 +3709,7 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   earlier 0xff9a10 / 0xffc040 added at HDR strength came out as a pinkish lighter sand. A soft
   light pool (decal_add kind 8, no built-in hue) replaces the strike-flash disc (kind 1, which has
   a violet rim) under the mines and under the chain lightning's hits; Vision's swirling white edge and Eye of Horus; the
-  Eclipse's blue dusk and pink halos; sand vortices; glyph rings and rising serpents / Minions;
+  Eclipse's blue dusk and its mark (below); sand vortices; glyph rings and rising serpents / Minions;
   voxel locust clouds; the Citadel's pillar and heaving stones; the Son of Osiris' pillar, ring
   and gold chain lightning (its own ribbon group G_ARC, a linear gold kept below where AgX
   bleaches a saturated orange to pink, layered like the Lightning Storm's bolts: a tapering
@@ -3717,6 +3717,22 @@ reference/egypt/EGYPT.md 4 and 5; distances x0.6 (`DIST_SCALE`), speeds x0.65, a
   burst of light, a ground flash and sparks; `egypt_powers` power=son_of_osiris spawns five
   hoplites in an arc before the capture tick and orders him on the middle one, so the default
   t=1.05 is the first bolt and its 3 jumps, the next ones at about 4.2, 7.6 and 10.7 s); the sand funnel, debris and drifts of the Tornado; Thoth's circle.
+- **The Eclipse reads as one spell** (round 19, godpower_view_egypt.cpp, decal_add kind 10, ribbon
+  group G_ECLIPSE): a global power, so the sim keeps where it lands for the visuals only
+  (`TimedPower::x / z`, never read by the rules): the centroid of the caster's densest group of
+  myth units (the one with the most others within 8 tiles), else the given point, else his first
+  building (the HUD casts at 0, 0); `get_egypt_powers().timed` carries it. There: one hard-edged
+  magenta disc of radius 7 tiles (a faint fill, a crisp bright rim with a hot core, a thin inner
+  ring) for 8 s, fading by 12 s; a ring every second for 8 s travelling out from it at 9 tiles/s;
+  one core flash at the centre as it lands (no per-unit flares). Each of the caster's myth units
+  lights as the first ring reaches it and wears for the 55 s the empowered side's marker: a
+  magenta ring under it, a small pink glow on its head (power_05), four magenta streaks rising up
+  its body (all upward: a buff) and an eclipse corona (a ring and eight turning rays, camera
+  facing) over its health bar. Nothing is drawn on the enemy, so in a melee the buffed side is
+  the one with the coronas; the hit sparks are the combat renderer's. `egypt_powers`
+  power=eclipse draws the Greek line 7 tiles further east, so at the default t=4 the Sphinxes
+  stand in the mark clear of the melee. egypt_gods_check `eclipse.myth_and_favor` asserts the
+  mark lands on the Sphinx (cast at 0, 0).
 - **Horus' Tornado funnel** (round 12: egypt_fx.gd `_make_funnel`, tornado.gdshader `mode`):
   a value structure instead of a pale haze. The body (mode 1, the ring mesh's outer face;
   the meshes wind so that is the *back* face) is fully opaque except at its silhouette (a dark

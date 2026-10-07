@@ -131,7 +131,7 @@ Dictionary AovSim::get_egypt_powers() const {
 		if (G.rain[o].until > S.time - 3) { Dictionary e; e["kind"] = "rain"; e["owner"] = o; e["t0"] = G.rain[o].t0; e["until"] = G.rain[o].until; timed.push_back(e); }
 		if (G.prosperity[o].until > S.time - 3) { Dictionary e; e["kind"] = "prosperity"; e["owner"] = o; e["t0"] = G.prosperity[o].t0; e["until"] = G.prosperity[o].until; timed.push_back(e); }
 	}
-	if (G.eclipse.until > S.time - 3) { Dictionary e; e["kind"] = "eclipse"; e["owner"] = G.eclipse.owner; e["t0"] = G.eclipse.t0; e["until"] = G.eclipse.until; timed.push_back(e); }
+	if (G.eclipse.until > S.time - 3) { Dictionary e; e["kind"] = "eclipse"; e["owner"] = G.eclipse.owner; e["t0"] = G.eclipse.t0; e["until"] = G.eclipse.until; e["x"] = G.eclipse.x; e["z"] = G.eclipse.z; timed.push_back(e); }
 	d["timed"] = timed;
 	PackedFloat32Array vis, snd, sw, cit, son, tor, ar, rs, afx, dt;
 	PackedInt32Array rs_units, afx_units, dt_units;

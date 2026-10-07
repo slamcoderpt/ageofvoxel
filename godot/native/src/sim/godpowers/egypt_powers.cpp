@@ -307,7 +307,36 @@ bool GodPowers::cast_egypt(int owner, int id, double x, double z, double x2, dou
 	switch (id) {
 		case GP_RAIN: rain[owner] = { owner, now, now + d.duration }; break;
 		case GP_PROSPERITY: prosperity[owner] = { owner, now, now + d.duration }; break;
-		case GP_ECLIPSE: eclipse = { owner, now, now + d.duration }; break;
+		case GP_ECLIPSE: {
+			// a global power: the visuals centre its mark on the caster's densest group of myth
+			// units (the most others within 8 tiles; their centroid), else the given point if it
+			// is on the map, else his first building (x, z are never read by the rules)
+			const UnitStore &U = S.entities.units;
+			int best = -1, bn = 0;
+			for (int r = 0; r < U.size(); r++) {
+				if (U.removed[r] || U.dead[r] || U.owner[r] != owner || unit_def(U.type[r]).cls != CLS_MYTH) continue;
+				int n = 0;
+				for (int q = 0; q < U.size(); q++)
+					if (!U.removed[q] && !U.dead[q] && U.owner[q] == owner && unit_def(U.type[q]).cls == CLS_MYTH &&
+							(U.x[q] - U.x[r]) * (U.x[q] - U.x[r]) + (U.z[q] - U.z[r]) * (U.z[q] - U.z[r]) < 64) n++;
+				if (n > bn) { bn = n; best = r; }
+			}
+			double ex = x, ez = z;
+			if (best >= 0) {
+				ex = ez = 0;
+				for (int q = 0; q < U.size(); q++)
+					if (!U.removed[q] && !U.dead[q] && U.owner[q] == owner && unit_def(U.type[q]).cls == CLS_MYTH &&
+							(U.x[q] - U.x[best]) * (U.x[q] - U.x[best]) + (U.z[q] - U.z[best]) * (U.z[q] - U.z[best]) < 64) { ex += U.x[q]; ez += U.z[q]; }
+				ex /= bn;
+				ez /= bn;
+			} else if (!(x > 0 && z > 0)) {
+				const BuildingStore &B = S.entities.buildings;
+				for (int b = 0; b < B.size(); b++)
+					if (!B.removed[b] && !B.dead[b] && B.owner[b] == owner) { ex = B.x[b]; ez = B.z[b]; break; }
+			}
+			eclipse = { owner, now, now + d.duration, ex, ez };
+			break;
+		}
 		case GP_VISION: {
 			visions.push_back({ owner, x, z, now, d.duration, VISION_R0 });
 			S.techs.reveals.push_back({ owner, x, z, VISION_R0, now + d.duration });

@@ -22,6 +22,9 @@
 //     the bowl and up the lip, the plate cracks round the crater glowing near it; custom.y =
 //     heat 0..1 (white-yellow heart and orange cracks when fresh, a dull red when cool),
 //     custom.z = seed (the same seed as its decal_mix kind 5)
+//   10 the Eclipse's mark (round 19): one hard-edged disc, a faint fill (custom.y) inside a
+//     crisp bright rim with a hot white core, a thin inner ring, a soft halo just outside;
+//     COLOR.rgb * COLOR.a, custom.z = phase (a slow shimmer along the rim)
 // custom.w < -0.5: emissive, the colour kept by the grade (a negative blue: see
 //   flame.gdshader and game/lighting/grade_effect.gd)
 shader_type spatial;
@@ -210,6 +213,19 @@ void fragment() {
 		float haze = exp(-pow(d / R, 2.0) * 2.0) * 0.12 * (0.4 + 0.6 * heat);
 		c = (lava(T) * g * fl + lava(0.3) * haze) * v_col.a;
 		c *= 1.0 - smoothstep(0.9, 1.0, d);
+	} else if (kind == 10) {
+		float fill = v_c.y, ph = v_c.z;
+		float aa = max(fwidth(d) * 1.5, 0.004);
+		float inside = 1.0 - smoothstep(0.95 - aa, 0.95, d);
+		float rim = smoothstep(0.87 - aa, 0.87, d) * inside;
+		float core = smoothstep(0.905 - aa, 0.905, d) * (1.0 - smoothstep(0.925, 0.925 + aa, d));
+		float inner = 1.0 - smoothstep(0.006, 0.006 + aa, abs(d - 0.72));
+		float halo = exp(-pow((d - 0.95) / 0.035, 2.0)) * step(0.95, d);
+		float an = atan(p.y, p.x);
+		float shim = 0.85 + 0.15 * sin(an * 9.0 + ph * 2.0);
+		c = v_col.rgb * (fill * inside + rim * 1.5 * shim + inner * 0.55 + halo * 0.45) * v_col.a;
+		c += vec3(1.0) * core * 0.35 * v_col.a;
+		c *= 1.0 - smoothstep(0.99, 1.0, d);
 	} else if (kind == 8) {
 		c = v_col.rgb * v_col.a * (exp(-d * d * 3.5) - 0.03) * (1.0 - smoothstep(0.85, 1.0, d));
 		c = max(c, vec3(0.0));

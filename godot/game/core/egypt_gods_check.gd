@@ -761,8 +761,14 @@ func _case_eclipse() -> void:
 		var hop := _u(sim, "hoplite", 2, 1.4, 0)
 		sim.tick(1)
 		if on:
+			var at: Dictionary = sim.get_unit(sph)
 			r["cast"] = sim.cast_power(1, "eclipse", 0, 0)
 			sim.tick(1)
+			# a global power: its mark (the visuals' centre) lands on the caster's myth group,
+			# not at the (0, 0) the HUD passes
+			for e in sim.get_egypt_powers().get("timed", []):
+				if str(e.kind) == "eclipse":
+					r["mark [x, z] / the sphinx at the cast"] = [_r(float(e.x)), _r(float(e.z)), _r(float(at.x)), _r(float(at.z))]
 		speeds.append(_r(float(sim.get_unit_stats(sph).speed)))
 		hits.append(_r(_first_hit(sim, sph, hop)))
 		# what a hoplite blow does to the sphinx
@@ -772,7 +778,8 @@ func _case_eclipse() -> void:
 	r["sphinx blow on a hoplite [day, eclipse]"] = hits
 	r["sphinx speed"] = speeds
 	r["hoplite blow on the sphinx"] = taken
-	var ok: bool = r.get("cast", false) and _near(hits[1] / hits[0], 1.2, 0.01) and _near(speeds[1] / speeds[0], 1.15, 0.001)
+	var mk: Array = r.get("mark [x, z] / the sphinx at the cast", [0, 0, 1, 1])
+	var ok: bool = r.get("cast", false) and _near(hits[1] / hits[0], 1.2, 0.01) and _near(mk[0], mk[2], 0.01) and _near(mk[1], mk[3], 0.01) and _near(speeds[1] / speeds[0], 1.15, 0.001)
 	# -10 % hack vulnerability: the Sphinx's 0.3375 hack armor + 10 points = 0.4375 (TECHS.md)
 	ok = ok and _near(taken[1], 9.0 * (1.0 - 0.4375), 0.01) and _near(taken[0], 9.0 * (1.0 - 0.3375), 0.01)
 	# Monuments +50 % favor, one Eclipse at a time, 55 s

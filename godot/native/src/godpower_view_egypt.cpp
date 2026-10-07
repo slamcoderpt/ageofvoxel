@@ -12,8 +12,10 @@
 //   Vision          an Eye of Horus and a column of cyan light at its heart; the reveal's edge a
 //                   thick band under swirling rings and streaks racing out to 42 tiles, kicking up
 //                   sand; everything it passes flashes, the revealed enemy keeps a cyan rim
-//   Eclipse         the world sunk in a deep blue dusk (egypt_fx.gd), pink-violet halos and
-//                   motes round the caster's myth units, his Monuments glowing
+//   Eclipse         the world sunk in a deep blue dusk (egypt_fx.gd); one hard-edged magenta disc
+//                   where it lands with rings running out from it; each of the caster's myth units
+//                   lit as a ring reaches it: a magenta ring under it, a pink glow on its head,
+//                   streaks rising up it, an eclipse corona over its health bar
 //   Shifting Sands  sand vortices at both ends: a sand swirl on the ground, sand spiralling
 //                   up, grains whirling, a burst at the destination when the units arrive
 //   Plague of Serpents  a green glyph ring round the spot, the sand cracking open with a
@@ -524,43 +526,101 @@ void AovGodpowerView::egypt_fx(double now, double ua, const Vector3 &cam, int &l
 		if (!L.empty()) emit_lines(vg, L, 1);
 	}
 
-	// ---- Eclipse: halos on the caster's myth units, his Monuments glowing ---------------------------
+	// ---- Eclipse: one mark where it lands, rings out from it, a sign on every empowered myth unit ----
+	// (round 19) One strong shape with a clear centre, edge and job, apart from the melee's hit
+	// sparks: a single hard-edged magenta disc with a bright rim on the ground at its centre (the
+	// caster's densest myth group, sim TimedPower x / z), 7 tiles across its radius; rings travelling
+	// out from it for the first 8 s; one core flash at the centre at the cast. Each of the caster's
+	// myth units lights as the first ring reaches it and then wears, for the whole 55 s, the
+	// empowered side's marker: a magenta ring under it, a soft pink glow on its head (power_05), a
+	// few magenta streaks rising up its body (all one way: up, a buff) and a magenta eclipse corona
+	// (a ring with eight rays) over its health bar. Nothing is drawn on the enemy.
 	double ecl_k = 0;
 	if (G.eclipse.until > now - 3) {
 		ecl_k = clamp01((now - G.eclipse.t0) / 2.5) * clamp01((G.eclipse.until + 3 - now) / 3.0);
+		const double end_k = clamp01((G.eclipse.until + 3 - now) / 3.0);
 		const int o = G.eclipse.owner;
-		const Lin pk = hex_lin(0xff5ad8), vi = hex_lin(0xa070ff);
+		const double age = now - G.eclipse.t0;
+		const Lin mg = hex_lin(0xff28c8), pk = hex_lin(0xff6ad8);
+		const double ex = G.eclipse.x, ez = G.eclipse.z, eg0 = h_at(ex, ez);
+		constexpr double R = 7.0, RING_V = 9.0, RING_LIFE = 3.2;
+		// the mark: in hard over 0.35 s, held 8 s, gone by 12 s
+		const double mk = sstep(0, 0.35, age) * (1 - sstep(8, 12, age)) * end_k;
+		if (mk > 0.005) {
+			decal(I_DECAL_ADD, ex, eg0 + 0.1, ez, 2 * R, now * 0.12, mg.r, mg.g, mg.b, (float)(1.0 * mk), 10, 0.035f, (float)now);
+			lit(ex, eg0 + 2.5, ez, 0xff40d0, 5 * mk, 12, 1.5);
+		}
+		// rings travelling out from the centre: one every 1 s for the first 8 s
+		for (int i = 0; i < 8; i++) {
+			const double ra = age - i * 1.0;
+			if (ra < 0 || ra > RING_LIFE) continue;
+			const double r = R * 0.35 + ra * RING_V, f = 1 - ra / RING_LIFE;
+			decal(I_DECAL_ADD, ex, eg0 + 0.12, ez, 2 * r, 0, mg.r, mg.g, mg.b, (float)(2.2 * f * f * end_k), 2, (float)std::max(0.0, 1 - 0.9 / r));
+		}
+		// one core flash at the centre as it lands
+		if (age < 1.2) {
+			const double fk = (1 - age / 1.2) * (1 - age / 1.2);
+			glow(false, ex, eg0 + 1.0, ez, 4.5, 4.5, pk.r, pk.g, pk.b, 1.2 * fk, 0);
+			lit(ex, eg0 + 3, ez, 0xffa0ec, 40 * fk, 22, 1.5);
+		}
+		// the empowered: every myth unit of the caster
+		std::vector<Line> L;
 		int n = 0;
 		for (int u = 0; u < U.size() && n < 120; u++) {
 			if (U.removed[u] || U.dead[u] || U.owner[u] != o || aov::unit_def(U.type[u]).cls != aov::CLS_MYTH) continue;
 			n++;
 			double x, z;
 			upos(u, x, z);
-			const double h = type_height(U.type[u]), gy = h_at(x, z) + U.air_y[u];
-			const double p = 0.75 + 0.25 * std::sin(now * 3 + u);
-			double dx = x - cam.x, dz = z - cam.z;
-			const double dl = std::max(1e-6, std::hypot(dx, dz));
-			dx = dx / dl * 0.6;
-			dz = dz / dl * 0.6;
-			glow(true, x + dx, gy + h * 0.5, z + dz, h * 1.6, h * 1.7, pk.r, pk.g, pk.b, 0.42 * ecl_k * p, 0);
-			decal(I_DECAL_ADD, x, h_at(x, z) + 0.12, z, 2.6, now, pk.r, pk.g, pk.b, (float)(0.8 * ecl_k), 1);
-			for (int i = 0; i < 5; i++) {
-				const double f = std::fmod(now / 1.8 + hr(u, i, 51), 1.0), a = hr(u, i, 52) * TAU + f * 2;
-				const double s = 0.06 * std::sin(f * PI);
-				cube(I_EMBER, x + std::cos(a) * 0.7, gy + f * h * 1.2, z + std::sin(a) * 0.7, now, a, 0, s, s, s, vi.r * 3 * (float)ecl_k, vi.g * 3 * (float)ecl_k, vi.b * 3 * (float)ecl_k);
+			const double h = type_height(U.type[u]), g0 = h_at(x, z), gy = g0 + U.air_y[u];
+			// lit when the first ring reaches it
+			const double ton = std::max(0.0, std::hypot(x - ex, z - ez) - R * 0.35) / RING_V;
+			const double kk = sstep(ton, ton + 0.25, age) * end_k;
+			if (kk <= 0.005) continue;
+			const double fl = age > ton && age < ton + 0.7 ? 1 - (age - ton) / 0.7 : 0;
+			// the ring under it (hard edge, bright rim, faint fill)
+			decal(I_DECAL_ADD, x, g0 + 0.13, z, 2.6, now * 0.5 + u, mg.r, mg.g, mg.b, (float)(0.8 * kk + 1.2 * fl), 10, 0.04f, (float)now);
+			// the soft pink glow on its head (power_05), kept small: a tint, not a flare
+			const double p = 0.85 + 0.15 * std::sin(now * 3 + u);
+			glow(true, x, gy + h * 0.78, z, h * 0.75, h * 0.75, pk.r, pk.g, pk.b, (0.22 * p + 0.5 * fl) * kk, 0);
+			// streaks rising up its body, all upward
+			for (int i = 0; i < 4; i++) {
+				const double ph = std::fmod(now / 1.1 + hr(u, i, 51), 1.0), a = hr(u, i, 52) * TAU;
+				const double rr = 0.55 + 0.2 * hr(u, i, 53);
+				const double y0 = gy + 0.1 + ph * h * 1.05, len = 0.35 + 0.25 * hr(u, i, 54);
+				const double px = x + std::cos(a) * rr, pz = z + std::sin(a) * rr;
+				line(L, { P{ px, y0, pz }, P{ px, y0 + len, pz } }, 0.05, 1.3 * kk * std::sin(ph * PI), 0.8, 0.9);
+			}
+			// the eclipse corona over its health bar: a ring and eight short rays facing the camera
+			const double cyh = gy + h + 1.05;
+			double dx = x - cam.x, dy = cyh - cam.y, dz = z - cam.z;
+			const double dl = std::max(1e-6, std::sqrt(dx * dx + dy * dy + dz * dz));
+			dx /= dl; dy /= dl; dz /= dl;
+			// right = d x up(0,1,0) = (-dz, 0, dx); up' = right x d
+			double rx = -dz, rz = dx;
+			const double rl = std::max(1e-6, std::hypot(rx, rz));
+			rx /= rl; rz /= rl;
+			const double ux = -rz * dy, uy = rz * dx - rx * dz, uz2 = rx * dy;
+			const double cr = 0.26 * (1 + 0.6 * fl);
+			std::vector<P> ring;
+			for (int q = 0; q <= 20; q++) {
+				const double a = q * TAU / 20;
+				ring.push_back(P{ x + (rx * std::cos(a) + ux * std::sin(a)) * cr, cyh + uy * std::sin(a) * cr, z + (rz * std::cos(a) + uz2 * std::sin(a)) * cr });
+			}
+			line(L, ring, 0.07, 1.6 * kk, 0, 0);
+			for (int q = 0; q < 8; q++) {
+				const double a = q * TAU / 8 + now * 0.6;
+				const double c0 = std::cos(a), s0 = std::sin(a), r0 = cr * 1.35, r1 = cr * (q & 1 ? 1.75 : 2.05);
+				line(L, { P{ x + (rx * c0 + ux * s0) * r0, cyh + uy * s0 * r0, z + (rz * c0 + uz2 * s0) * r0 },
+								P{ x + (rx * c0 + ux * s0) * r1, cyh + uy * s0 * r1, z + (rz * c0 + uz2 * s0) * r1 } },
+						0.05, 1.3 * kk, 0.7, 0.6);
 			}
 		}
+		if (!L.empty()) emit_lines(G_ECLIPSE, L, 1);
 		for (int b = 0; b < B.size(); b++) {
 			if (B.removed[b] || B.dead[b] || B.owner[b] != o || !aov::is_monument(B.type[b])) continue;
 			const double gy = h_at(B.x[b], B.z[b]);
-			glow(false, B.x[b], gy + 2.5, B.z[b], 3, 6, pk.r, pk.g, pk.b, 0.3 * ecl_k, 0);
-		}
-		// falling dusk motes across the frame
-		for (int i = 0; i < 90; i++) {
-			const double f = std::fmod(now / (5 + 3 * hr(i, 53)) + hr(i, 54), 1.0);
-			const double x = cx + (hr(i, 55) - 0.5) * 50, z = cz + (hr(i, 56) - 0.5) * 50;
-			const double s = 0.05 * std::sin(f * PI);
-			cube(I_EMBER, x, h_at(x, z) + 12 * (1 - f), z, now, i, 0, s, s, s, vi.r * 2 * (float)ecl_k, vi.g * 2 * (float)ecl_k, vi.b * 3 * (float)ecl_k);
+			decal(I_DECAL_ADD, B.x[b], gy + 0.13, B.z[b], 4.2, now * 0.3 + b, mg.r, mg.g, mg.b, (float)(0.45 * ecl_k), 10, 0.03f, (float)now);
+			glow(false, B.x[b], gy + 2.5, B.z[b], 2.2, 4, pk.r, pk.g, pk.b, 0.2 * ecl_k, 0);
 		}
 	}
 	eg["eclipse"] = ecl_k;

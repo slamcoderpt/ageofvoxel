@@ -128,9 +128,12 @@ func setup(g: Node) -> void:
 		# core, drawn after the fog of war (fog_view.gd sits at RENDER_PRIORITY_MAX - 1) so the
 		# rings stand over the dark beyond the reveal's edge, as in power_04
 		_ribbon_mat(0x1aa8ff, 0xf2fbff, 2.4, 0x2a50ff),
+		# the Eclipse's rising streaks and the corona over each empowered myth unit: magenta
+		# round a pale pink core, drawn over the units (round 19)
+		_ribbon_mat(0xff20c0, 0xffd8f4, 2.2, 0xc010a0),
 	]
 	_ribbon_mats[14].set_shader_parameter("emit", true)
-	var prio := [30, 29, 31, 27, 27, 26, 30, 32, 29, 31, 24, 28, 31, 29, 30, Material.RENDER_PRIORITY_MAX]
+	var prio := [30, 29, 31, 27, 27, 26, 30, 32, 29, 31, 24, 28, 31, 29, 30, Material.RENDER_PRIORITY_MAX, 34]
 	for i in _ribbon_mats.size():
 		_ribbon_mats[i].render_priority = prio[i]
 	_ribbon_mesh.custom_aabb = aabb
