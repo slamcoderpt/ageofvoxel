@@ -2123,25 +2123,31 @@ stay planted) and rears the head; dying it slumps 0.12 rad to one flank
 instead of the horse's roll onto its side. `--params "eu_focus=petsuchos"`
 (`&eu_state=walk|die`) / `"eu_one=petsuchos&eu_turn=80&eu_pitch=12"` check it.
 
-Scarab (round 21, myth_07 / myth_14): the shell is no longer a noise field.
-Each elytron is an oval dome (footprint an ellipse 4.3 wide about 2.5 voxels
-out from the seam, round at the rear, square-shouldered at the front, height
-`6.2 * sqrt(q)`), so the two domes meet low at a two-voxel-deep near-black
-seam. One green ramp by height above the shell base: a near-black rim row
-(and the outermost voxel of the row above) as a lip over the dark belly
-keel, bottle green on the lower flanks, emerald, a light green crown and a
-five-voxel yellow-green glint along each crown. The team colour is one
-pattern painted by `d = |x - 6|`, so both halves match voxel for voxel: an
-oblique streak across each elytron and a round rear spot. No red or orange
-(those grade to salmon). In front, a rounded bronze-green pronotum behind a
-dark gap, two glints; the head (`neck` channel) a dark wedge with a brow
-ridge, pale yellow side eyes and two stag mandibles (three tapering tube
-segments, out, forward, then closing in, plus an inner tooth; lighter brown
-on top, near-black tips). Each of the six legs is a femur (`legFL`..,
-r 1.35 -> 1.0) leaving the body sideways and rising to the knee, and a tibia
-(`cannonFL`.., r 1.0 -> 0.72) angling down and out with two outer spurs, then
-a tarsus (r 0.72 -> 0.55) to a dark claw on the ground; the front pair reach
-forward, the middle out, the hind pair back. The middle legs ride the
+Scarab (round 28, myth_07 / myth_14): a shell, not two bricks. The elytra
+are one stepped dome over the whole back (footprint a superellipse 6.6 voxels
+either side of the seam, square-shouldered at the front, round at the rear;
+height `7.4 * q^0.8`), tallest along the seam and falling away to the rear
+and both sides, so every height contour is a visible terrace. It is painted
+by height in six value steps: a near-black green rim (the lowest row also
+reaches one voxel past the row above, a lip over the near-black belly),
+bottle green, green, emerald, a gold-green iridescent shoulder and a pale
+white-green highlight band along the ridge, with short white specular glints
+on each crown; a one-voxel dark seam runs down the crown. The team colour is
+an iridescent edge band on the outer face just above the rim (team, with a
+teal row over it that turns violet at the tail), no longer a stripe on the
+seam. The colours are authored dark (the game's lighting lifts lit faces a
+long way). In front, a rounded green pronotum behind a dark gap with two pale
+glints; the head (`neck` channel) a dark wedge with a brow ridge and pale
+yellow side eyes. The mandibles are smooth inward hooks: a cubic curve in ten
+tapering tube segments (r 1.7 -> 0.55) out, forward and closing in, a dark
+tip, every voxel open to the sky a lighter brown (`lightTops`), and a pale
+tooth stub off each inner edge. Each of the six legs is a femur (`legFL`..,
+r 1.5 -> 1.15) leaving the body sideways and rising to the knee, a 2x2x2
+bronze knee knob (lit top) at the head of the tibia (`cannonFL`..,
+r 1.1 -> 0.8) angling down and out with two outer spurs, a smaller ankle
+joint, then a tarsus (r 0.75 -> 0.55) to a dark claw; every segment's top
+face is a light tan so the legs separate from their shadow. The front pair
+reach forward, the middle out, the hind pair back; the middle legs ride the
 `BR / BL` channels (horse anim). `--params "eu_focus=scarab"`
 (`&eu_state=walk|die`) / `"eu_one=scarab&eu_turn=60"` check it.
 
