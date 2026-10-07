@@ -4352,6 +4352,8 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
   if (o.basalt) for (const [x, y, z] of touched) {
     const v = m.get(x, y, z);
     if (!v || v.team) continue;
+    const g = OS_GOLD.get(v.c);                               // (round 38) the Osiris' yellower kept gilt
+    if (g !== undefined) { v.c = g; continue; }
     const c = BASALT_STONE.get(v.c);
     if (c === undefined) continue;
     v.c = !m.has(x, y + 1, z) && c !== BAS_D ? BAS_H : c;
@@ -4375,10 +4377,12 @@ function cleanStatue(m, cx, y0, cz, o = {}) {
 }
 // the Monuments' basalt (cleanStatue o.basalt, round 37): the granite ramp
 // mapped to a mid grey-green (kept close to grey: warm light turns green olive)
-const BAS_D = 0x22292c, BAS_H = 0x6c7c80;
+// (round 38: a step darker and blue-grey, not sage: the grey-green came out
+// olive under the warm light and read as one dull tone with the gold)
+const BAS_D = 0x1a1d24, BAS_H = 0x606a78;
 const BASALT_STONE = new Map([
-  [0x1b1f26, 0x313b3f], [0x2a3039, 0x445054], [0x30363f, 0x485458], [0x262b33, 0x404c50],
-  [0x4b5563, BAS_H], [0x343d47, 0x56646a], [0x1c2027, BAS_D], [BAS_H, BAS_H],
+  [0x1b1f26, 0x262b34], [0x2a3039, 0x363d48], [0x30363f, 0x3a414c], [0x262b33, 0x323843],
+  [0x4b5563, BAS_H], [0x343d47, 0x48505d], [0x1c2027, BAS_D], [BAS_H, BAS_H],
 ]);
 // the Temple's sandstone god (cleanStatue o.sand): an ochre-gilt falcon
 // head (a pale one with dark eyes read as a skull), a dark brown ink for the eyes /
@@ -4456,6 +4460,169 @@ function polishStatue(m, pts) {
   }
   for (const [v, c] of out) v.c = c;
 }
+// The Monument to Soldiers' Osiris (round 38, building_14): its own figure,
+// not cleanStatue's mummy, built so stone, gold and paint read apart at RTS
+// zoom. Dark diorite for the body and face (the granite ramp mapped to
+// DIORITE after polishStatue), true gilt for the regalia (m.keep in
+// monument()), lapis only inside the gold. Mummiform: the feet block, the
+// shroud tapering out to square shoulders; the forearms crossed in an X on
+// the chest, the fists by the opposite shoulders holding the gold crook
+// (its hook over the figure's left shoulder) and the flail (three beaded
+// strands over the right); a lapis-and-gold broad collar in horizontal
+// bands narrowing to a U with a bead fringe, over the shoulders' tops too; a gold column down
+// the shroud with four distinct signs on the gold (a red sun disc, a dark
+// ankh, a lapis djed, lapis water) kept below the crossed arms; a carved
+// face (a lighter face plane, dark sockets with gold kohl wings out to the
+// temples, a proud nose with a lit tip, a mouth line) with a narrow braided
+// gold false beard; striped lappets; the Atef: a ribbed white bulb on a gold
+// diadem with the uraeus, gold ram horns, and two tall gold feathers
+// banded in lapis, their tips curling out: a stepped, symmetric crown.
+// (cx, cz): the body's centre (a voxel corner in x), facing +z, on y0.
+const DIORITE = new Map([
+  [GRAN_R, 0x14161b], [GRAN, 0x23272f], [GRAN_G, 0x282d35], [GRAN_G2, 0x1f232a],
+  [GRAN_H, 0x56606e], [GRAN_F, 0x363c46], [GRAN_D, 0x0e1013],
+]);
+// the gilt, yellower than CG (kept gold through the grade, CG reads orange)
+const OS_GOLD = new Map([[CG_D, 0x7a5a00], [CG, 0xb08800], [CG_L, 0xcca400], [CG_H, 0xe0b810]]);
+const OS_GLYPHS = [
+  ['.rrrr.', 'rrrrrr', 'rrrrrr', '.rrrr.'],                       // the sun disc
+  ['..kk..', '.k..k.', '..kk..', 'kkkkkk', '..kk..'],             // the ankh
+  ['bbbbbb', '.bbbb.', 'bbbbbb', '..bb..'],                        // the djed
+  ['b.b.b.', '.b.b.b'],                                            // water
+];
+function osirisStatue(m, cx, y0, cz) {
+  const touched = [];
+  const set = (x, y, z, c) => {
+    if (c == null) return;
+    m.set(cx + x, y0 + y, cz + z, c);
+    const v = m.get(cx + x, y0 + y, cz + z);
+    if (v) { v.clean = 1; touched.push([cx + x, y0 + y, cz + z]); }
+  };
+  const B = (xa, xb, ya, yb, za, zb, c) => {
+    for (let x = xa; x < xb; x++) for (let y = ya; y < yb; y++) for (let z = za; z < zb; z++) set(x, y, z, typeof c === 'function' ? c(x, y, z) : c);
+  };
+  const S = (hw, ya, yb, za, zb, c) => B(-hw, hw, ya, yb, za, zb, c);
+  const M = (xa, xb, ya, yb, za, zb, c) => { B(xa, xb, ya, yb, za, zb, c); B(-xb, -xa, ya, yb, za, zb, c); };
+  const P = (x, y, z, c) => { set(x, y, z, c); set(-1 - x, y, z, c); };
+  const stripe = (x, y) => ((y + 60) % 4 === 3 ? LAPIS_S : CG);   // wide gold bands, a lapis line every fourth row
+
+  // ---- the shroud: the feet block, tapering out to the shoulders
+  S(5, 0, 2, -4, 5, GRAN);
+  for (let y = 2; y < 26; y++) S(y < 11 ? 5 : y < 19 ? 6 : 7, y, y + 1, -3, 4, GRAN);
+  S(7, 26, 32, -3, 5, GRAN);                                 // the chest, a voxel proud
+  S(9, 32, 35, -3, 5, GRAN);                                 // square shoulders
+  S(8, 35, 36, -3, 4, GRAN);
+  // ---- the inscribed column: a gold band down the shroud, a lighter
+  // border, four signs on the gold
+  B(-4, 4, 0, 20, 4, 5, (x, y) => (x === -4 || x === 3 || y === 0 || y === 19 ? CG_L : CG));
+  let r = 18;
+  for (const g of OS_GLYPHS) {
+    g.forEach((row, j) => {
+      for (let i = 0; i < 6; i++) {
+        const ch = row[i]; if (ch === '.') continue;
+        set(-3 + i, r - j, 4, ch === 'r' ? ST_RED : ch === 'b' ? LAPIS_S : GRAN_D);
+      }
+    });
+    r -= g.length + 1;
+  }
+  // ---- the broad collar: horizontal bands on the chest narrowing to a
+  // U (gold, lapis, gold, lapis, gold, a fringe of gold drops), the same
+  // bands running back over the shoulders' tops
+  const COL = [CG_L, LAPIS_S, CG, LAPIS_S, CG_L];
+  for (let y = 30; y < 36; y++) {
+    const hw = [5, 6, 7, 8, 9, 9][y - 30];
+    for (let x = -hw; x < hw; x++) {
+      if (y >= 34 && Math.abs(x + 0.5) < 2.5) continue;      // the neck's opening
+      set(x, y, 4, y === 30 ? ((x + 64) & 1 ? CG_L : null) : COL[35 - y]);
+    }
+  }
+  for (let x = -9; x < 9; x++) for (let z = 0; z < 5; z++) {
+    if (Math.abs(x + 0.5) < 2.5 && z < 2) continue;
+    set(x, 35, z, COL[4 - z]);
+  }
+  // ---- the arms: upper arms down the sides, the elbows turning forward,
+  // the forearms crossed in an X over the chest (two voxels deep, the -x one
+  // in front), the fists by the opposite shoulders, gold bracelets
+  M(7, 10, 18, 35, -2, 3, GRAN);
+  M(7, 10, 30, 31, -2, 3, CG_L);                             // armlets
+  M(7, 10, 16, 19, 2, 5, GRAN);                              // the elbows, turning forward
+  for (const side of [1, -1]) {
+    const zf = side > 0 ? 5 : 6;
+    for (let s = 0; s <= 24; s++) {
+      const t = s / 24, ax = (8.5 - 12 * t) * side - 0.5, ay = 17.5 + 9.5 * t;
+      for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+        const x = Math.round(ax + i), y = Math.round(ay + j);
+        for (let z = zf; z < zf + 2; z++) set(x, y, z, t > 0.8 && t < 0.9 ? CG_L : GRAN);
+      }
+    }
+    const fx = side > 0 ? -6 : 2;                            // the fist
+    B(fx, fx + 4, 25, 29, zf, zf + 2, GRAN);
+    B(fx, fx + 4, 26, 27, zf + 1, zf + 2, GRAN_D);           // the knuckles' line
+  }
+  // the crook (heka) through the fist at -x: a lapis-banded gold shaft from
+  // under the fist up and out over the figure's left shoulder, the hook
+  // curling out and down beside the lappet
+  for (let y = 23; y < 38; y++) {
+    if (y >= 25 && y < 29) continue;                          // inside the fist
+    set(-4 - Math.round(Math.max(0, y - 28) * 0.4), y, 6, y % 3 === 0 ? LAPIS_S : CG);
+  }
+  for (const [x, y] of [[-8, 38], [-9, 39], [-10, 39], [-11, 38], [-11, 37]]) set(x, y, 6, CG_L);
+  // the flail (nekhakha) through the fist at +x: the shaft out over the
+  // right shoulder, three beaded strands falling from its tip over it
+  for (let y = 24; y < 37; y++) {
+    if (y >= 25 && y < 29) continue;
+    set(3 + Math.round(Math.max(0, y - 28) * 0.4), y, 7, y % 3 === 0 ? LAPIS_S : CG);
+  }
+  B(6, 10, 37, 38, 5, 8, CG_L);                              // the strands' cap
+  for (let k = 0; k < 3; k++) for (let y = 32 + k; y < 37; y++) set(7 + k, y, 5, (y + k) % 2 ? CG_L : LAPIS_S);
+  // ---- the neck and the head: a narrow face in the dark stone
+  S(2, 36, 38, -2, 2, GRAN);
+  S(5, 38, 48, -3, 4, (x, y, z) => (z === 3 ? GRAN_F : GRAN));   // the face plane a step lighter than the stone
+  M(1, 3, 45, 46, 3, 4, GRAN_D);                             // the eyes: dark sockets
+  M(3, 5, 45, 46, 3, 4, CG);                                 // the kohl wing, out to the temple
+  M(4, 5, 44, 45, 3, 4, CG_D);                               // its tail
+  B(-1, 1, 43, 47, 4, 5, GRAN_F);                            // the nose, proud
+  B(-1, 1, 42, 43, 4, 5, GRAN_H);                            // its lit tip
+  B(-2, 2, 41, 42, 3, 4, GRAN_F);                            // the upper lip
+  B(-2, 2, 40, 41, 3, 4, GRAN_D);                            // the mouth
+  // the false beard: narrow, braided gold, from the chin to the collar,
+  // the tip turned forward
+  B(-1, 1, 37, 39, 3, 5, CG);
+  for (let y = 33; y < 37; y++) B(-1, 1, y, y + 1, 5, 6, (y & 1) ? CG_L : CG_D);
+  B(-1, 1, 33, 34, 6, 7, CG_L);
+  // ---- the headcloth: striped lappets framing the face down to the
+  // shoulders, the back of the head
+  M(5, 7, 36, 48, -3, 3, stripe);
+  B(-7, 7, 37, 48, -4, -3, stripe);
+  // ---- the Atef crown
+  S(6, 48, 49, -4, 4, CG_L);                                 // the diadem
+  B(-1, 1, 48, 51, 4, 5, CG);                                // the uraeus, rearing
+  B(-1, 1, 50, 51, 5, 6, CG_L);
+  for (const [x, y] of [[6, 49], [7, 49], [8, 49]]) for (const z of [-1, 0]) P(x, y, z, CG);   // ram horns, level
+  // the white bulb: round sections tapering to a knob, faint reed ribs
+  for (let y = 49; y < 66; y++) {
+    const rr = y < 55 ? 3.5 : y < 60 ? 3.5 - (y - 54) * 0.35 : y < 63 ? 1.6 : y === 63 ? 1.1 : 1.6;
+    for (let x = -5; x < 5; x++) for (let z = -5; z < 5; z++) {
+      if (Math.hypot(x + 0.5, z) > rr) continue;
+      set(x, y, z, y >= 64 ? CG_L : ((x + 64) % 3 === 0 ? 0xd6ccb4 : ST_WHITE));
+    }
+  }
+  // the feathers: gold plates hugging the bulb's sides, following its taper,
+  // banded in lapis, the tips turned out a voxel
+  for (let y = 49; y < 64; y++) {
+    const rr = y < 55 ? 3.5 : y < 60 ? 3.5 - (y - 54) * 0.35 : 1.6;
+    const xa = Math.floor(rr - 0.5) + 1;
+    for (let x = xa; x < xa + 2; x++) for (const z of [-1, 0]) P(x, y, z, (y - 49) % 4 === 3 ? LAPIS_S : (x === xa ? CG : CG_L));
+  }
+  for (const z of [-1, 0]) { P(3, 64, z, CG_L); P(4, 64, z, CG_L); }
+  polishStatue(m, touched);
+  for (const [x, y, z] of touched) {
+    const v = m.get(x, y, z);
+    if (!v || v.team) continue;
+    const c = DIORITE.get(v.c) ?? OS_GOLD.get(v.c);
+    if (c !== undefined) v.c = c;
+  }
+}
 function monument(kind, god = 'ra') {
   if (kind <= 3) {
     const m = lot(32, 32, EARTH);
@@ -4467,7 +4634,15 @@ function monument(kind, god = 'ra') {
       { pose: 'mummy', arms: 'crossed', head: 'double', basalt: 1 },
       { pose: 'stride', arms: 'side', head: 'nemes', kilt: CG, anklets: 1, pillar: [-6, 6, 38], basalt: 1 },
     ][kind];
+    if (kind === 2) {
+      // round 38: the Osiris in its own diorite / gilt / lapis build; its
+      // gold keeps its colour through the grade (geo() m.keep)
+      osirisStatue(m, 16, pd, 15);
+      m.keep = [[3, pd, 6, 29, pd + 68, 27]];
+      return m;
+    }
     cleanStatue(m, 16, pd, kind === 1 ? 17 : 15, o);
+    m.keep = [[3, pd, 3, 29, pd + 68, 29]];                   // the regalia keep their gold (round 38)
     return m;
   }
   if (kind === 4) {
@@ -4479,6 +4654,7 @@ function monument(kind, god = 'ra') {
     // near hand on his arm; one back pillar joining them
     cleanStatue(m, 15, pd, 24, { pose: 'stride', head: 'nemes', crown: 'hedjet', arms: 'side', kilt: CG, anklets: 1, pillar: [-6, 25, 38], basalt: 1 });
     cleanStatue(m, 34, pd, 24, { pose: 'dress', head: 'wig', wig: 'gold', arms: 'embrace', kiltFront: null, basalt: 1 });
+    m.keep = [[2, pd, 4, 46, pd + 70, 44]];
     return m;
   }
   const m = lot(64, 64, EARTH);

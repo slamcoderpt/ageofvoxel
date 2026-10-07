@@ -1766,6 +1766,29 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   The plinth is unchanged. `m.keep` was tried on the statue's gold and
   dropped: unlimited, the nemes and pots went orange. Framing:
   `egt_row=monument_villagers/0/a1&egt_pitch=30&egt_lift=2.6&egt_dist=7&egt_yaw=20`.
+- **The Osiris of the Monument to Soldiers, round 38** (building_14; the
+  mummy read as a cartoon zombie: a flat sage face with white dot eyes, a
+  heap of maroon and white for a crown, one dull grey-green for stone, gold
+  and paint). Its own builder, `osirisStatue()` in export-egypt.mjs, in place
+  of `cleanStatue()`'s mummy: dark diorite (`DIORITE`, a blue-grey ramp
+  mapped after `polishStatue()`) for the body and face; the forearms swept
+  as 3 x 3 bars crossed in an X on the chest (the -x one in front), the fists
+  by the opposite shoulders, gold bracelets; the gold crook (lapis-banded
+  shaft, the hook beside the face) and the flail (three beaded strands over
+  the shoulder) through the fists; a broad collar in horizontal gold / lapis
+  bands narrowing to a U, a bead fringe, the bands running back over the
+  shoulders' tops; a lighter face plane with dark sockets, gold kohl wings
+  out to the temples, a proud nose with a lit tip, a mouth line; a narrow
+  braided gold false beard; gold lappets striped in lapis; the Atef: a ribbed
+  white bulb on a gold diadem with the uraeus, short level ram horns, two
+  gold feathers hugging the bulb, banded in lapis. A gold column down the
+  shroud, below the crossed arms, carries four signs on the gold: a red sun
+  disc, a dark ankh, a lapis djed, lapis water (`OS_GLYPHS`). The gold is
+  true gilt (`m.keep` over the statue) remapped to a yellower ramp
+  (`OS_GOLD`), which fixes round 37's orange: the other basalt Monuments
+  (Villagers, Priests, the Pharaoh pair) now take `OS_GOLD` and `m.keep` too,
+  and `BASALT_STONE` is a step darker and blue-grey (the grey-green came out
+  olive). Framing: `egt_row=monument_soldiers/0/a1&egt_pitch=18&egt_lift=3.6&egt_dist=7.5&egt_yaw=24`.
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8
