@@ -49,38 +49,53 @@ const shade = (c, f) => {
   const r = Math.round(((c >> 16) & 255) * f), g = Math.round(((c >> 8) & 255) * f), b = Math.round((c & 255) * f);
   return (Math.min(255, r) << 16) | (Math.min(255, g) << 8) | Math.min(255, b);
 };
-function masonry(tonesA, tonesB, { len = 8, course = 4, bed = 0.84, head = 0.9, grime = 4, seed = 3 } = {}) {
-  return (x, y, z) => {
-    const row = Math.floor(y / course);
-    const u = x + z + (row & 1) * (len >> 1) + 256;
+// Round 34: every stone palette is laid as deliberate ashlar, never per-voxel
+// noise. A course is `course` rows: its bottom row one even mortar line (a
+// shade darker, the same all round the building), the rows above it the
+// stone, each block `len` voxels long in a running bond (half a block offset
+// course to course) with a one-voxel head joint, its top row a hair lighter
+// (the block's lit upper arris), and ONE tone per block: the palette's mean
+// tone nudged by at most +-`spread` (per block, never per voxel). Every
+// colour a palette hands out is remembered in ASH (colour -> palette, factor)
+// so recourse() can re-lay a finished model's battered faces in face-local
+// coordinates (no joints stepping sideways a voxel at every batter step) and
+// grimed() keeps the link for its darkened foot rows.
+const ASH = new Map();
+const meanTone = (tones) => {
+  let r = 0, g = 0, b = 0;
+  for (const t of tones) { r += (t >> 16) & 255; g += (t >> 8) & 255; b += t & 255; }
+  const n = tones.length;
+  return (Math.round(r / n) << 16) | (Math.round(g / n) << 8) | Math.round(b / n);
+};
+function ashlar(tones, { course = 4, len = 7, head = 0.9, bed = 0.86, spread = 0.03, hi = 1.025, grime = 0, seed = 41 } = {}) {
+  const base = meanTone(tones);
+  const fn = (x, y, z) => {
+    const yy = Math.max(0, y - 1);
+    const row = Math.floor(yy / course), k = yy % course;
+    const u = x + z + (row & 1) * (len >> 1) + 512;
     const blk = Math.floor(u / len);
-    const h = hash3(blk, row, (x - z) >> 4, seed);
-    const fam = hash3(row, 1, (x - z) >> 4, seed + 1) < 0.5 ? tonesA : tonesB;
-    let c = pick(h, fam);
-    if (y % course === 0) c = shade(c, bed);
-    else if (u % len === 0) c = shade(c, head);
-    if (y < grime) c = shade(c, 0.88 + 0.03 * Math.max(0, y));
+    let f;
+    if (k === 0 && course > 1) f = bed;
+    else {
+      f = 1 + (hash3(blk, row, 7, seed) - 0.5) * 2 * spread;
+      if (u % len === 0) f *= head;
+      else if (k === course - 1 && course > 2) f *= hi;
+    }
+    if (grime && y < grime) f *= 0.9 + 0.025 * Math.max(0, y);
+    const c = shade(base, f);
+    if (!ASH.has(c)) ASH.set(c, { fn, f: 1 });
     return c;
   };
+  fn.ash = true;
+  return fn;
+}
+function masonry(tonesA, tonesB, { len = 8, course = 4, bed = 0.84, head = 0.9, grime = 4, seed = 3 } = {}) {
+  return ashlar([...tonesA, ...tonesB], { len, course, bed: Math.max(bed, 0.84), head: Math.max(head, 0.9), grime, seed, spread: 0.025 });
 }
 // Coursed: the stone courses read from the RTS camera (Retold's house and
-// camp walls: pale sandstone blocks in visible courses). Each course is
-// `course` voxels high and takes one of three sand tones in an A B A C
-// rhythm, its bottom row a darker bed joint, the blocks laid in a running
-// bond (head joints a shade darker, offset half a block each course), a
-// slight per-block tone wobble, so every course shows as a band on any face.
-function coursed(tones, { course = 3, len = 6, head = 0.94, bed = 0.84, seed = 41 } = {}) {
-  const seq = [0, 1, 0, 2];
-  return (x, y, z) => {
-    const row = Math.floor(Math.max(0, y - 1) / course);
-    const u = x + z + (row & 1) * (len >> 1) + 256;
-    const blk = Math.floor(u / len);
-    let c = tones[seq[row % 4] % tones.length];
-    c = shade(c, 0.985 + 0.03 * hash3(blk, row, (x - z) >> 4, seed));
-    if ((y - 1) % course === 0) c = shade(c, bed);
-    else if (u % len === 0) c = shade(c, head);
-    return c;
-  };
+// camp walls: pale sandstone blocks in visible courses): see ashlar().
+function coursed(tones, { course = 4, len = 7, head = 0.86, bed = 0.8, seed = 41 } = {}) {
+  return ashlar(tones, { course, len, head: Math.max(head, 0.82), bed: Math.max(bed, 0.76), seed });
 }
 // warm sandstone ashlar (Retold's walls: a light, slightly orange sandstone in big courses)
 const SAND = coursed([0xe2c491, 0xcca874, 0xd9b984], { len: 7, seed: 5 });
@@ -1570,7 +1585,7 @@ function weather(m) {
     const up = !m.has(x, y + 1, z);
     const under = !m.has(x, y - 1, z);
     let f = 1;
-    if (ex && ez) f *= hash3(x, y, z, 93) < 0.15 ? 0.88 : 1.06;
+    if (ex && ez) f *= 1.04;     // round 34: an even lit arris, no random dark corner voxels
     else if (up && (ex || ez)) f *= 1.05;
     if (under && (ex || ez)) f *= 0.82;
     if ((ex || ez) && y < 4) f *= 0.9 + 0.025 * Math.max(0, y);     // sand splash at the foot
@@ -1645,7 +1660,7 @@ function skin(m) {
           const uc = Math.max(a0, Math.min(a1 - 1, u));
           const [st, v, dd] = cellAt(uc, y);
           if (!st) continue;
-          const j = 1 + (hash3(uc, y, faceVox, 7) - 0.5) * 0.04;
+          const j = 1;     // round 34: no per-cell tint (the ashlar carries the variation, per block)
           const yb = y, yt = y + 1;
           if (st === 1) {
             emit([P(ub0, yb, plane(yb)), P(ub1, yb, plane(yb)), P(ut1, yt, plane(yt)), P(ut0, yt, plane(yt))], nrm, col(v, j), v.team ? v.team : 0);
@@ -2196,13 +2211,7 @@ const HROOF_C = (x, y, z) => { const c = pick(hash3(x >> 2, y, z >> 2, 87), [0xb
 // per-voxel speckle; the head joints a faint shade every `len` voxels in a
 // running bond, so a wall reads as horizontal courses, never a checker
 function brick(tones, { course = 2, len = 6, head = 0.95 } = {}) {
-  const seq = [0, 1, 0, 2];
-  return (x, y, z) => {
-    const row = Math.floor(Math.max(0, y - 1) / course);
-    const c = tones[seq[row % 4] % tones.length];
-    const u = x + z + (row & 1) * (len >> 1) + 512;
-    return head !== 1 && u % len === 0 ? shade(c, head) : c;
-  };
+  return ashlar(tones, { course, len, head, bed: 1, hi: 1, spread: 0.02, seed: 61 });
 }
 // a whitewashed limestone house wall (light, faintly cool so the grade's
 // sandstone pass leaves it cream, not tan)
@@ -2220,12 +2229,36 @@ const EDECK = (x, y, z) => {
 };
 // grime at a wall's foot: r = rows above the ground block's first row
 const GRIME = [0.5, 0.62, 0.74, 0.84, 0.92, 0.97];
-function grimed(c, x, y, z, r, drips = true) {
+// (round 34: no per-column drip streaks by default, they broke the courses
+// into vertical noise; a grimed ashlar colour keeps its link in ASH)
+function grimed(c, x, y, z, r, drips = false) {
   if (r < 0) return c;
   let f = r < GRIME.length ? GRIME[r] : 1;
   const drip = hash3(x, 3, z, 88);
   if (drips && drip < 0.28 && r < 8) f *= 0.86 + r * 0.012;
-  return f === 1 ? c : shade(c, f);
+  if (f === 1) return c;
+  const out = shade(c, f);
+  const e = ASH.get(c);
+  if (e && !ASH.has(out)) ASH.set(out, { fn: e.fn, f: e.f * f });
+  return out;
+}
+// Round 34: re-lay every ashlar voxel of a finished model on the face it
+// shows, in that face's own coordinates (u = x on a face looking along z,
+// u = z on one looking along x), so a battered wall's joints stay plumb
+// through every batter step instead of stepping a voxel sideways (the
+// diagonal "staircases" the old x + z bond drew over the skin)
+function recourse(m) {
+  for (const [x, y, z] of m.coords) {
+    const v = m.get(x, y, z);
+    if (!v || v.team || v.glow || v.clean) continue;
+    const e = ASH.get(v.c);
+    if (!e) continue;
+    const ez = !m.has(x, y, z + 1) || !m.has(x, y, z - 1);
+    const ex = !m.has(x + 1, y, z) || !m.has(x - 1, y, z);
+    if (!ez && !ex) continue;
+    const c = ez ? e.fn(x, y, 0) : e.fn(0, y, z);
+    v.c = e.f === 1 ? c : shade(c, e.f);
+  }
 }
 // a house block on [x0, x1) x [z0, z1) from y0, h wall rows, battered a
 // voxel every `batter` rows (registered for skin()); sets m.lastTop to the
@@ -3050,7 +3083,7 @@ function temple(god) {
 // band (a winged sun on lapis over a red / blue / green frieze) over the
 // hall's door, so the entrance is the focal point. In the yard: a spear rack
 // with cowhide shields, a practice dummy, a straw archery butt, barrels.
-const BK_WALL = coursed([0xd8b27c, 0xcfa872, 0xd4ad77], { course: 3, len: 7, bed: 0.87, head: 0.93, seed: 141 });
+const BK_WALL = coursed([0xd8b27c, 0xcfa872, 0xd4ad77], { course: 4, len: 8, bed: 0.77, head: 0.84, seed: 141 });
 const BK_BASE = 0x8e6c48, BK_TOP = 0xe2c38f;
 const BK_FLUTE = [0xd9ba86, 0xc29c66];
 const BK_DECK = (x, y, z) => (hash3(x >> 2, y, z >> 2, 143) < 0.5 ? 0xcdb48a : 0xc8ae84);
@@ -3105,19 +3138,53 @@ function barracks() {
     m.set(x, top + 2, z, e <= 1 ? LIME(x, top + 2, z) : BK_DECK(x, top + 2, z));
     if (e <= 2) m.set(x, top + 3, z, e === 2 ? TEAM : LIP(x, top + 3, z));
   }
-  // the attic step: a plain block on the deck towards the back, its own thin
-  // coping with the owner's line (the second and last coping)
-  const ay = top + 3, A0 = 12, A1 = 28, B0 = 6, B1 = 15, AH = 5;
-  for (let y = ay; y < ay + AH; y++) for (let x = A0; x < A1; x++) for (let z = B0; z < B1; z++) {
-    const edge = x === A0 || x === A1 - 1 || z === B0 || z === B1 - 1;
+  // round 34: the roof carries detail instead of one blank slab. The deck is
+  // laid in big flagstones (one tone each, a darker seam between them); at
+  // the back west corner a small stair kiosk (the old attic step cut down to
+  // a stair head: coursed walls, its own pale coping with the owner's line,
+  // a dark doorway facing the yard under a timber lintel); beside it an open
+  // stair hatch with a ladder's rails rising out of it; along the east half
+  // two water jars against the back parapet, a straw mat of drying grain
+  // and two linen sacks.
+  const DY = top + 2;
+  const flag = (x, z) => {
+    const fx = Math.floor((x + 1) / 6), fz = Math.floor((z + 2) / 5);
+    const seam = (x + 1) % 6 === 0 || (z + 2) % 5 === 0;
+    const c = shade(0xccb388, 0.975 + 0.05 * hash3(fx, fz, 3, 149));
+    return seam ? shade(0xccb388, 0.84) : c;
+  };
+  for (let x = c0 - 1; x <= c1; x++) for (let z = d0 - 1; z <= d1; z++) if (ring(x, z, 1) > 1) m.set(x, DY, z, flag(x, z));
+  // the stair kiosk
+  const K0 = c0 + 2, K1 = K0 + 8, L0 = d0 + 2, L1 = L0 + 6, KH = 5, ky = DY + 1;
+  for (let y = ky; y < ky + KH; y++) for (let x = K0; x < K1; x++) for (let z = L0; z < L1; z++) {
+    const edge = x === K0 || x === K1 - 1 || z === L0 || z === L1 - 1;
     m.set(x, y, z, edge ? BK_WALL(x, y, z) : shade(BK_WALL(x, y, z), 0.9));
   }
-  for (let x = A0 - 1; x <= A1; x++) for (let z = B0 - 1; z <= B1; z++) {
-    const e = Math.min(x - A0 + 1, A1 - x, z - B0 + 1, B1 - z);
-    m.set(x, ay + AH, z, e === 0 ? LIP(x, ay + AH, z) : e === 1 ? TEAM : BK_DECK(x, ay + AH, z));
+  for (let x = K0 - 1; x <= K1; x++) for (let z = L0 - 1; z <= L1; z++) {
+    const e = Math.min(x - K0 + 1, K1 - x, z - L0 + 1, L1 - z);
+    m.set(x, ky + KH, z, e === 0 ? LIP(x, ky + KH, z) : e === 1 ? TEAM : BK_DECK(x, ky + KH, z));
   }
-  // two small light slots in the attic's front (one pair, high and dark)
-  for (const x of [16, 23]) for (let y = ay + 1; y < ay + 4; y++) { m.remove(x, y, B1 - 1); m.set(x, y, B1 - 2, REVEAL); }
+  for (let x = K0 + 3; x < K0 + 5; x++) for (let y = ky; y < ky + 3; y++) { m.set(x, y, L1 - 1, 0x2a1d14); m.set(x, y, L1 - 2, 0x2a1d14); }
+  for (let x = K0 + 2; x < K0 + 6; x++) pset(m, x, ky + 3, L1, 0x6e4a2c);
+  // the open hatch with a ladder: a dark well framed by a pale kerb
+  const H0 = K1 + 2, H1 = H0 + 4, J0 = d0 + 2, J1 = J0 + 3;
+  for (let x = H0 - 1; x <= H1; x++) for (let z = J0 - 1; z <= J1; z++) {
+    const inner = x >= H0 && x < H1 && z >= J0 && z < J1;
+    if (inner) { m.set(x, DY, z, 0x231910); m.set(x, DY - 1, z, 0x1c140c); }
+    else pset(m, x, DY + 1, z, 0xe6d3ac);
+  }
+  for (const x of [H0, H1 - 1]) for (let y = DY; y <= DY + 3; y++) pset(m, x, y, J0 + 1, 0x7a5230);
+  pset(m, H0 + 1, DY + 2, J0 + 1, 0x8b6139); pset(m, H0 + 2, DY + 2, J0 + 1, 0x8b6139);
+  // two water jars against the back parapet, east half
+  for (const jx of [c1 - 8, c1 - 4]) jar(m, jx, DY + 1, d0 + 3, 0xa4552e);
+  // a straw mat of drying grain and two linen sacks, east front
+  const M0 = c1 - 14, M1 = M0 + 7, N0 = d1 - 6, N1 = N0 + 4;
+  for (let x = M0; x < M1; x++) for (let z = N0; z < N1; z++) {
+    const rim = x === M0 || x === M1 - 1 || z === N0 || z === N1 - 1;
+    pset(m, x, DY + 1, z, rim ? 0x9c7a44 : 0xe2c470);
+  }
+  sack(m, c1 - 5, DY + 1, d1 - 8);
+  sack(m, c1 - 5, DY + 1, d1 - 5);
   // the door: centred, deep, dark cedar leaves in a sandstone frame, the
   // painted lintel band over it (the only strong colour on the walls)
   door(m, '+z', 17, 6, 1, 10, { deep: 3, frame: shade(0xd2aa76, 0.86), lintel: false, proud: true });
@@ -5090,7 +5157,7 @@ function mergeGeo(a, b) {
 }
 const geo = (m, seed = 7, vox = VOX) => {
   const pivot = [m.W / 2, 0.8, m.D / 2];   // the ground row sinks to 0.025 above the terrain: a decal, no plinth
-  let out = withSkin(S.withExtras(buildVoxelGeometry(m, { size: vox, pivot, jitter: 0.05, seed }), m, vox, pivot, { maxY: m.extraMaxY ?? Infinity }), m, vox, pivot);
+  let out = withSkin(S.withExtras(buildVoxelGeometry(m, { size: vox, pivot, jitter: 0.012, seed }), m, vox, pivot, { maxY: m.extraMaxY ?? Infinity }), m, vox, pivot);
   // half-voxel insets (fineFigure): sub-voxel u lands at parent voxel u / k
   for (const f of m.fine || []) out = mergeGeo(out, buildVoxelGeometry(f.m, { size: vox / f.k, pivot: pivot.map((v) => v * f.k), jitter: 0.03, seed }));
   return out;
@@ -5103,6 +5170,7 @@ for (const [type, T] of Object.entries(TYPES)) {
     T.ages.forEach((age, ai) => {
       const full = T.build(vi, age);
       if (T.settle !== false) settle(full);
+      recourse(full);
       weather(full);
       skin(full);
       clothSkin(full);

@@ -1674,6 +1674,31 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   rack with two cowhide shields, a practice dummy, a straw archery butt and
   two hooped barrels. Three high slits in the back face, one in each end.
   `egt_focus=eg_barracks` frames it (`egt_yaw=208&egt_pitch=36` the back).
+- **Ashlar, not noise, round 34** (`ashlar()`, `recourse()`, every
+  Egyptian building; the Barracks' roof): walls read as random light / dark
+  voxel striping and the battered faces showed diagonal staircases. Causes
+  and fixes: (1) every stone palette (`coursed()`, `masonry()`, `brick()`)
+  now goes through `ashlar()`: courses of 4 rows (3 stone + one even mortar
+  row a shade darker, `bed` ~0.8), blocks `len` long in a running bond with
+  a one-voxel head joint, the block's top row a hair lighter (its lit
+  arris), and ONE tone per block (the palette's mean tone +-3 %), never the
+  old A B A C course tones or per-row random families; (2) the mesher's
+  per-voxel colour jitter is down from 5 % to 1.2 % and skin()'s per-cell
+  tint is gone; (3) `recourse(m)` (run before weather()) re-lays every
+  ashlar voxel in its face's own coordinates (u = x on a face looking along
+  z, u = z along x; the palette colours are remembered in `ASH`, grimed()
+  keeps the link for the foot rows), so on a battered face the joints stay
+  plumb through every batter step instead of stepping a voxel sideways
+  (the "staircases" the old x + z bond drew over the smooth skin);
+  (4) grime drips (per-column streaks) are off by default and weather()
+  lights every arris evenly (no random dark corner voxels). `BK_WALL` is
+  4-row courses (bed 0.77, head 0.84). The Barracks' roof is no longer a
+  blank slab: the deck is laid in 6 x 5 flagstones with darker seams, the
+  attic step became a small stair kiosk at the back west (coursed, its own
+  coping and owner's line, a dark doorway under a timber lintel facing the
+  yard), with an open stair hatch beside it (dark well, pale kerb, ladder
+  rails rising out), two water jars on the back parapet, a straw mat of
+  drying grain and two linen sacks.
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8
