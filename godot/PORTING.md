@@ -3332,6 +3332,34 @@ tip, a third of the way back towards the attacker and lower, not on the chest.
 Captures: `eu_focus=petsuchos&eu_state=attack`, `eu_one=petsuchos&eu_turn=70&eu_zoom=0.5&eu_state=attack`,
 `eu_group=battle`, `eu_group=myth&eu_state=attack`.
 
+The Roc's feathers, round 47 (myth_06; the critic read the Roc as a brown
+cross: flat plank wings of equal thickness with noise-painted tops, the team
+and cream primary tips hanging off as loose cubes, the head and body a stack
+of dark boxes). Rebuilt in `export-egypt-units.mjs` on its own (the raptor
+kit is no longer used), body, arms, hands and tail on the fine grid (`scale`
+0.5, greedy, outline 0.12 / 0.15; legs and basket stay on the rig grid). Each
+arm (24 columns, a dihedral of 2) is layered as a wing: a narrow buff leading
+edge (2 rows at the shoulder, 1 past the elbow), rufous lesser coverts with a
+scalloped edge, brown greater coverts with a pale fringe on each rounded tip,
+each tract one voxel lower than the one ahead of it; then the dark
+secondaries, one voxel thin, as eight 3-wide feather blocks with rounded,
+notched tips growing longer toward the wrist (5 -> 9 rows exposed), a cream
+row and the team colour on the last two voxels only. Each hand has the
+primary coverts narrowing to the tip and seven primaries rooted under them
+(flush, no gap): the inner three 2-wide blocks continuing the trailing edge,
+the outer four single 1-voxel fingers splayed 1.05 -> -0.03 rad so gaps open
+toward the tips; each finger's last four voxels run straight along its main
+axis (a clean cream / team bar, no hooked step), the team on the last two.
+`stepShade` darkens every top voxel overhung by the layer ahead (x 0.68), so
+each layer casts a line on the next. The body is rufous with a darker mantle
+and a lighter breast, a golden neck, a distinct pale cream head (gold crown
+and nape), an amber eye under a dark brow stripe, a yellow cere and a pale
+horn beak jutting five voxels past the head, hooking down to a dark tip; a
+fanned tail of nine feathers (a dark bar, cream, team tips) under rufous
+coverts. Captures: `eu_one=roc&eu_turn=140&eu_pitch=55` (from behind, as the
+reference), `eu_one=roc&eu_turn=20`, `eu_focus=roc&eu_state=walk|die`,
+`eu_group=myth`.
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower
