@@ -595,7 +595,7 @@ function block(m, x0, z0, x1, z1, y0, h, { wall = SAND, socle = 1, frieze = 0, b
     for (let x = a0; x < a1; x++) for (let z = b0; z < b1; z++) {
       const e = Math.min(x - a0, a1 - 1 - x, z - b0, b1 - 1 - z);
       m.set(x, top, z, e === 0 ? rimC : roofC);
-      if (e === 1 && rim) m.set(x, top, z, rimTeam);
+      // round 49: no owner's ring inset on a roof
     }
     m.lastTop = { c0: a0, c1: a1, d0: b0, d1: b1, y: top };
     return top + 1;
@@ -630,7 +630,7 @@ function block(m, x0, z0, x1, z1, y0, h, { wall = SAND, socle = 1, frieze = 0, b
   const c0 = a0 - lo, c1 = a1 + lo, d0 = b0 - lo, d1 = b1 + lo;
   for (let x = c0; x < c1; x++) for (let z = d0; z < d1; z++) {
     const e = Math.min(x - c0, c1 - 1 - x, z - d0, d1 - 1 - z);
-    m.set(x, ly, z, e === 0 ? rimC : (e === 1 && rim) ? rimTeam : roofC);
+    m.set(x, ly, z, e === 0 ? rimC : roofC);
   }
   m.lastTop = { c0, c1, d0, d1, y: ly };
   return ly + 1;
@@ -655,7 +655,10 @@ function bandRows(kind) {
 function pblock(m, x0, z0, x1, z1, y0, h, o) {
   const { wall, socle, frieze, roofC, rim, batter, solid, rimC, torus, gA, gB, cav, plinth, rimTeam, grime } = o;
   const band = o.band === null || o.band === false ? 'lapis' : o.band === true ? 'team' : o.band;
-  const rows = bandRows(band);
+  // round 49: the owner's line (rim) is the band's top row on the wall, not
+  // a ring inset on the roof (a coloured ring inside the coping read as a
+  // nested frame)
+  const rows = rim ? [rimTeam, ...bandRows(band).slice(1)] : bandRows(band);
   const baseH = y0 === 1 && plinth && h >= 6 ? BASE_H : 0;
   if (batter && m.blocks) m.blocks.push({ x0, z0, x1, z1, y0, h, b: batter, base: baseH });
   if (y0 === 1 && plinth && m.feet) m.feet.push({ x0, z0, x1, z1, hb: Math.max(1, baseH) });
@@ -711,7 +714,7 @@ function pblock(m, x0, z0, x1, z1, y0, h, o) {
     if (e <= 1) {
       if (!cav) m.set(x, yp, z, pw(x, yp, z));
       else if (e === 1) m.set(x, yp, z, LIP(x, yp, z));
-      m.set(x, yp + 1, z, e === 1 && rim ? rimTeam : rimC);
+      m.set(x, yp + 1, z, rimC);
     } else m.set(x, yp, z, roofC);
   }
   m.lastTop = { c0, c1, d0, d1, y: yp };
@@ -1706,7 +1709,8 @@ function skin(m) {
             if (a1c - a0c <= 1e-6 && b1c - b0c <= 1e-6) continue;
             if (B.skip && B.skip[face] && u >= B.skip[face][0] && u < B.skip[face][1]) continue;
             const G = B.cav.gorge;
-            _k.setHex(G.length > 2 ? G[((u % G.length) + G.length) % G.length] : ((u & 1) ? gA : gB));
+            if (B.cav.only && !B.cav.only.includes(face)) _k.setHex(B.cav.stone ?? 0xd8cbb0);
+            else _k.setHex(G.length > 2 ? G[((u % G.length) + G.length) % G.length] : ((u & 1) ? gA : gB));
             const f = (0.74 + 0.09 * r) * (B.cav.lift || 1);
             emit([P(a0c, ya, outer0 + sg * ea), P(a1c, ya, outer0 + sg * ea), P(b1c, yb2, outer0 + sg * eb), P(b0c, yb2, outer0 + sg * eb)], n3, [_k.r * f, _k.g * f, _k.b * f], 0);
           }
@@ -1735,7 +1739,7 @@ function skin(m) {
     // the corner torus (B.roll): a round moulding running up each battered
     // edge, a 270-degree roll round the hip line from the base course to the
     // horizontal roll under the cavetto, so every corner is one straight bead
-    if (B.roll) {
+    if (B.roll && B.cornerRoll !== false) {
       const sl = (y) => (y - y0) / b, r = 0.4, NS = 6;
       _k.setHex(B.roll === true ? ROLL_L : B.roll);
       const c = [_k.r, _k.g, _k.b];
@@ -2317,7 +2321,11 @@ function hbox(m, x0, z0, x1, z1, y0, h, { wall = EWHITE, roof = EDECK, batter = 
   const top = y0 + h;
   if (y0 === 1 && m.feet) m.feet.push({ x0, z0, x1, z1, hb: 1 });
   if (batter && m.blocks) m.blocks.push({ x0, z0, x1, z1, y0, h, b: batter, base: 0 });
-  const rows = !band ? [] : cav ? [torus ?? (band === 'red' ? LIP : HACC), ...bandRows(band).slice(0, h >= 8 ? 1 : 0)] : bandRows(band);
+  const rows0 = !band ? [] : cav ? [torus ?? (band === 'red' ? LIP : HACC), ...bandRows(band).slice(0, h >= 8 ? 1 : 0)] : bandRows(band);
+  // round 49: the owner's line is a wall row under the cornice (the band's
+  // row, or the top row), never a ring inset on the coping (a coloured ring
+  // inside the coping read as a nested frame from above)
+  const rows = rim ? (rows0.length > 1 ? [rows0[0], TEAM, ...rows0.slice(2)] : [TEAM]) : rows0;
   const nb = cav ? rows.length : h >= 6 ? rows.length : Math.min(1, rows.length);
   let I = 0;
   for (let y = y0; y < top; y++) {
@@ -2340,7 +2348,7 @@ function hbox(m, x0, z0, x1, z1, y0, h, { wall = EWHITE, roof = EDECK, batter = 
       const y = top + k;
       for (let x = c0; x < c1; x++) for (let z = d0; z < d1; z++) {
         const e = Math.min(x - c0, c1 - 1 - x, z - d0, d1 - 1 - z);
-        if (e <= 1) m.set(x, y, z, k < pRows ? wall(x, y, z) : (e === 1 && rim ? TEAM : lipC));
+        if (e <= 1) m.set(x, y, z, k < pRows ? wall(x, y, z) : lipC);
         else if (k === 0) m.set(x, y, z, roof);
       }
     }
@@ -2364,7 +2372,7 @@ function hbox(m, x0, z0, x1, z1, y0, h, { wall = EWHITE, roof = EDECK, batter = 
     for (let x = c0; x < c1; x++) for (let z = d0; z < d1; z++) {
       const e = Math.min(x - c0, c1 - 1 - x, z - d0, d1 - 1 - z);
       if (e > 1) { if (k === 1) m.set(x, y, z, roof); continue; }
-      const c = k === pRows + 1 ? (e === 1 && rim ? TEAM : lipC) : k === 1 && e === 0 ? fl(x, z) : wall(x, y, z);
+      const c = k === pRows + 1 ? lipC : k === 1 && e === 0 ? fl(x, z) : wall(x, y, z);
       if (e === 0) soft(x, y, z, c); else m.set(x, y, z, c);
     }
   }
@@ -2780,6 +2788,7 @@ function miningCamp() {
       let c;
       if (y === Y0) c = SAND_D(x, y, z);                                   // the dark base course
       else if (t === 0) c = (x + z) % 6 === 0 ? shade(LAPIS, 0.8) : LAPIS;  // the thin painted stripe
+      else if (t === 1) c = TEAM;                                         // round 49: the owner's line on the wall, not the roof
       else c = grimed(MC_WALL(x, y, z), x, y, z, y - Y0, false);
       m.set(x, y, z, c);
     }
@@ -2799,7 +2808,7 @@ function miningCamp() {
   for (let x = c0 - 1; x <= c1; x++) for (let z = d0 - 1; z <= d1; z++) {
     const e = ring(x, z, 1);
     m.set(x, top + 2, z, e <= 1 ? LIME(x, top + 2, z) : MC_DECK(x, top + 2, z));
-    if (e <= 2) m.set(x, top + 3, z, e === 2 ? TEAM : LIP(x, top + 3, z));
+    if (e <= 2) m.set(x, top + 3, z, LIP(x, top + 3, z));
   }
   m.lastTop = { c0: c0 - 1, c1: c1 + 1, d0: d0 - 1, d1: d1 + 1, y: top + 2 };
   // the door: a dark sandstone frame under a timber lintel (no pale
@@ -2931,14 +2940,13 @@ const TCF_SLAB = (g) => (x, y, z) => {
   return (((x % g) + g) % g === 0 || ((z % g) + g) % g === 0) ? shade(c, 0.78) : c;
 };
 function roofField(m, x0, z0, x1, z1, y, { cw = 2, g = 4, line = LAPIS, band = 0xc8562e, field = null } = {}) {
-  const f = field || TCF_SLAB(g);
+  // round 49: no inset rims: the coping stays as it is (one pale line) and
+  // the field inside it is plain stone with a little grain, flush (no lapis
+  // line, no red band, no sunk slab grid: those read as nested trays)
+  const f = field || RS_MID;
   for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) {
     const e = Math.min(x - x0, x1 - 1 - x, z - z0, z1 - 1 - z);
-    if (e < cw) {
-      const v = m.get(x, y + 1, z);
-      if (e === cw - 1 && line != null && v && !v.team) pset(m, x, y + 1, z, line);
-    } else if (e === cw) pset(m, x, y, z, band);
-    else { m.remove(x, y, z); pset(m, x, y - 1, z, f(x - x0, y - 1, z - z0)); }
+    if (e >= cw) pset(m, x, y, z, f(x, y, z));
   }
 }
 // the hall's sunk deck: reed mats in a basket weave (the strips of each 4 x 4
@@ -3004,92 +3012,98 @@ function townCenter() {
   const m = lot(N, N);
   // the courtyard: cool grey flagstones, a value apart from every wall
   patch(m, 6, 6, 50, 50, FLAG, { rag: 1, seed: 1 });
-  // the enclosure walls (battered, warm ochre sandstone, a gorge coping) with
-  // the gate gap on the front; squat piers at the two back corners
-  const wo = { wall: OCHRE_W, batter: 4, band: null, rim: false, torus: false, socle: 1, rimC: LIME, gorge: [0x34588a, 0x3f6596], roofC: MUDROOF };
-  block(m, 4, 4, 52, 7, 1, 5, wo);
-  block(m, 4, 4, 7, 52, 1, 5, wo);
-  block(m, 49, 4, 52, 49, 1, 5, wo);
-  block(m, 4, 49, 18, 52, 1, 4, wo);
-  block(m, 38, 49, 48, 52, 1, 4, wo);
-  for (const [px, pz] of [[2, 2], [48, 2]]) block(m, px, pz, px + 6, pz + 6, 1, 7, { wall: OCHRE_W, batter: 5, band: null, torus: false, rimC: LIME, roofC: MUDROOF });
-  // the gateway: two battered sandstone pylons with wide painted bands (red,
-  // ochre, turquoise between ink rules) over relief panels, a gate block
-  // between them with a deep black passage and a dark leaf, the lintel bridge
-  // with the gilt winged sun; a team pennant on a staff before each pylon
-  const PB = [INK, RED_B, RED_B, INK, OCHRE_B, OCHRE_B, INK, TURQ, TURQ, INK];
-  for (const [x0, x1] of [[14, 25], [31, 42]]) {
-    block(m, x0, 44, x1, 54, 1, 20, { batter: 8, band: null, frieze: 0, lipOut: 2 });
-    const T = m.lastTop;
-    bands(m, x0, 44, x1, 54, 19, PB);
-    roofField(m, T.c0, T.d0, T.c1, T.d1, T.y);
+  // round 49: three masses on one axis, each its own height and value so the
+  // complex reads at a glance: the GATE (two pale limestone pylons, the
+  // tallest thing in the compound, battered with a curved cavetto, colour
+  // only on their front face), the HALL (a mid sandstone mass behind a lotus
+  // portico, a value darker, stepping down once at its back) and the
+  // SANCTUARY (the lowest, darkest ochre block against the back wall). Every
+  // roof is one plain stone slab with a single pale line at its edge; no
+  // nested rims, no bands on any roof.
+  // the enclosure walls: plain ochre sandstone, a dark plain coping
+  const wo = { wall: OCHRE_W, roof: RS_DARK, line: null, out: 0, shadow: 0.86 };
+  mass(m, 4, 4, 52, 7, 1, 5, wo);
+  mass(m, 4, 4, 7, 52, 1, 5, wo);
+  mass(m, 49, 4, 52, 49, 1, 5, wo);
+  mass(m, 4, 49, 13, 52, 1, 4, wo);
+  mass(m, 44, 49, 52, 52, 1, 4, wo);
+  for (const [px, pz] of [[2, 2], [48, 2]]) mass(m, px, pz, px + 6, pz + 6, 1, 7, { ...wo, line: LIME_S, out: 1 });
+  // the gateway: two battered limestone pylons, 26 high (twice the hall),
+  // the gate block between them lower and set back
+  const PZ0 = 43, PZ1 = 54, PH = 26, PB = 7;
+  let PRT = 0;
+  const pyl = [[12, 25], [31, 44]];
+  for (const [x0, x1] of pyl) PRT = pylon(m, x0, PZ0, x1, PZ1, PH, { wall: LIME, b: PB, band: null, gorge: [0x34588a, 0x3f6596, 0x2f6f5a, 0x3f6596], lipOut: 2, y0: 1, flat: true, faces: ['+z'], stone: 0xd6c8aa, cornerRoll: false, top: RS_PALE });
+  // the gate block (x 23 .. 33), a voxel behind the towers' feet, filling
+  // only where the battered flanks leave room; its own plain slab
+  for (let x = 23; x < 33; x++) for (let z = PZ0 + 2; z < PZ1 - 1; z++) for (let y = 1; y < 17; y++) {
+    if (m.has(x, y, z)) continue;
+    m.set(x, y, z, y === 16 ? shade(LIME(x, y, z), 0.72) : y === 1 ? PLINTH(x, y, z) : LIME(x, y, z));
   }
-  for (let x = 24; x < 32; x++) for (let z = 46; z < 52; z++) for (let y = 1; y < 14; y++) m.set(x, y, z, y === 1 ? SAND_D(x, y, z) : SAND(x, y, z));
-  for (let x = 23; x < 33; x++) for (let z = 46; z < 53; z++) for (let y = 14; y < 18; y++) m.set(x, y, z, y === 17 ? LIME(x, y, z) : y === 14 ? LIME_S : y === 16 ? TURQ : SAND(x, y, z));
-  for (let x = 22; x < 34; x++) for (let z = 45; z < 54; z++) {
-    const e = Math.min(x - 22, 33 - x, z - 45, 53 - z);
-    m.set(x, 18, z, e <= 1 ? LIP(x, 18, z) : PLASTER(x, 18, z));
-    if (e <= 1) m.set(x, 19, z, LIME(x, 19, z));
+  for (let x = 22; x < 34; x++) for (let z = PZ0 + 1; z < PZ1; z++) {
+    if (m.has(x, 17, z)) continue;
+    const e = Math.min(x - 22, 33 - x, z - PZ0 - 1, PZ1 - 1 - z);
+    m.set(x, 17, z, e === 0 ? LIP(x, 17, z) : RS_PALE(x, 17, z));
   }
-  roofField(m, 22, 45, 34, 54, 18, { g: 3 });
+  // the gate face: all the paint is here. On each tower's front only: the
+  // owner's band under the cavetto, an ink rule, a register of signs, the
+  // god in a sunk relief, a lapis line over the base course
+  for (const [x0, x1] of pyl) {
+    faceRows(m, '+z', x0, x1, PH - 1, [TEAM, TEAM, GILT, null, RED_B, null, TURQ]);
+    faceRows(m, '+z', x0, x1, 2, [LAPIS]);
+  }
+  recessPanel(m, '+z', 15, 16, PANEL_GOD.slice(1, 12), RELIEF);
+  recessPanel(m, '+z', 34, 16, PANEL_GOD.slice(1, 12), RELIEF);
+  // the gate's doorway under a gilt winged sun, the owner's line over it
   door(m, '+z', 26, 4, 1, 11, { deep: 4, frame: LIME, lintel: false });
-  for (let y = 1; y < 11; y++) for (let x = 26; x < 30; x++) m.set(x, y, 47, x === 27 || x === 28 ? REVEAL : shade(DOOR(x, y, 47), 0.5));
-  // the flagstaffs against the pylons' fronts, the owner's pennants above the cornices
-  banner(m, 17, 1, 54, 30, '+z'); banner(m, 38, 1, 54, 30, '+z');
-  paint(m, '+z', 24, 16, ['GG.GGG.GG', '.GGGRGGG.'], { G: GILT, R: RED });
-  for (const px of [16, 34]) {
-    paint(m, '+z', px + 1, 9, ['.O.', 'OOO', '.O.', 'BOB', 'B.B', 'B.B', 'K.K'], { O: OCHRE, B: TURQ, K: INK });
-    paint(m, '+z', px + 5, 9, ['K', '.', 'R', 'K', '.', 'B', 'K'], { K: INK, R: RED, B: TURQ });
-  }
-  // round 46: ONE axis from the gate to the palace, no stacked tiers: the
-  // palace across the back of the court on the gate's axis, a single
-  // limestone storey under a lapis cornice and frieze with one ochre roof
-  // room on its middle, fronted by a portico of six painted columns under a
-  // flat roof, its doorway on the axis; the court before it open, flagged
-  // grey, a fire altar on the axis; the granary silo in the front left
-  // corner the only other mass
-  inner(m, (s) => {
-    const g = [0x34588a, 0x3f6596];
-    const t1 = block(s, 10, 8, 46, 24, 1, 12, { wall: LIME, batter: 0, band: 'lapis', frieze: 2, roofC: PLASTER, lipOut: 2, rimC: LIME, gorge: g });
-    roofField(s, s.lastTop.c0, s.lastTop.d0, s.lastTop.c1, s.lastTop.d1, s.lastTop.y);
-    block(s, 21, 10, 35, 20, t1 - 1, 6, { wall: OCHRE_P, batter: 0, band: 'team', roofC: PLASTER, lipOut: 1, rimC: LIME, gorge: [RED_M, 0xa8563a], torus: false });
-    roofField(s, s.lastTop.c0, s.lastTop.d0, s.lastTop.c1, s.lastTop.d1, s.lastTop.y, { line: RED_B, band: OCHRE_B, g: 3 });
-    door(s, '+z', 26, 4, 1, 8, { lattice: true, sun: true, deep: 3, frame: SAND });
-    slit(s, '+z', 14, 4, 3, 1); slit(s, '+z', 41, 4, 3, 1); slit(s, '-x', 14, 5, 3, 1); slit(s, '+x', 14, 5, 3, 1);
-    // the portico before the palace front (z 24 .. 30): six columns, a
-    // painted architrave and a reed-mat roof under a pale lip
-    // (round 47: a taller portico of lotus columns, 3 x 3 shafts painted at
-    // the foot and neck under open green and lapis bells, as the market's)
-    const X0 = 10, X1 = 46, Z0 = 24, Z1 = 31, H = 13;
-    for (const x of [13, 18, 23, 33, 38, 43]) lotusColumn(s, x, Z1 - 3, 1, H);
-    const R = bandRows('lapis');
-    for (let x = X0; x < X1; x++) for (let z = Z0; z < Z1; z++) {
-      const e = Math.min(x - X0, X1 - 1 - x, z - Z0 + 3, Z1 - 1 - z);
-      s.set(x, H - 1, z, e === 0 ? R[0] : SAND_D(x, H - 1, z));
-      s.set(x, H, z, e === 0 ? R[2](x, H, z) : e === 1 ? LIP(x, H, z) : TC_HALLROOF(x, H, z));
-      if (e <= 1) s.set(x, H + 1, z, LIP(x, H + 1, z));
+  for (let y = 1; y < 11; y++) for (let x = 26; x < 30; x++) m.set(x, y, PZ0 + 3, x === 27 || x === 28 ? REVEAL : shade(DOOR(x, y, PZ0 + 3), 0.5));
+  paint(m, '+z', 24, 14, ['GG.GGG.GG', '.GGGRGGG.'], { G: GILT, R: RED });
+  faceRows(m, '+z', 23, 33, 15, [TEAM]);
+  // a cedar mast on each tower's roof at its inner front corner, a long team
+  // streamer flying outward (the faces stay clear)
+  {
+    const K = Math.floor((PH - 1) / PB), RT = PRT - 1;
+    for (const [x, dir] of [[25 - K - 2, -1], [31 + K + 1, 1]]) {
+      const z = PZ1 - K - 2, top = RT + 12;
+      for (let y = RT; y <= top; y++) pset(m, x, y, z, POLE(x, y, z));
+      pset(m, x, top + 1, z, GILT);
+      for (let k = 1; k <= 8; k++) for (let r = 0; r < (k < 6 ? 2 : 1); r++) m.set(x + dir * k, top - 1 - r - (k >> 2), z, k === 8 ? GILT : TEAMB);
     }
-    roofField(s, X0, Z0 - 3, X1, Z1, H, { field: TC_MAT });
-  });
-  // round 47: a free colonnade down the court's west side, five lotus
-  // columns carrying an architrave painted in lapis and red with a pale lip
+  }
   inner(m, (s) => {
-    const CX = 11, Zs = [32, 36, 40, 44], TOP = 13;
+    // the SANCTUARY: the lowest, darkest block, against the back wall
+    mass(s, 19, 7, 37, 12, 1, 7, { wall: WALL_SANCT, roof: RS_DARK, line: LIME_S });
+    // the rear hall: a step down from the hall, narrower
+    mass(s, 14, 12, 42, 18, 1, 10, { wall: WALL_REAR, roof: TC_RS_MID2, line: LIP });
+    slit(s, '-x', 15, 5, 3, 1); slit(s, '+x', 15, 5, 3, 1);
+    // the HALL with its portico: one slab over both, the portico open under
+    // it on six lotus columns, the shadowed architrave row under the slab
+    mass(s, 10, 18, 46, 31, 1, 13, { wall: SAND, roof: RS_MID, line: LIP });
+    for (let x = 10; x < 46; x++) for (let z = 25; z < 31; z++) for (let y = 1; y < 13; y++) s.remove(x, y, z);
+    for (let x = 10; x < 46; x++) for (let y = 1; y < 13; y++) s.set(x, y, 24, y === 1 ? PLINTH(x, y, 24) : SAND(x, y, 24));
+    for (const x of [13, 18, 23, 33, 38, 43]) lotusColumn(s, x, 28, 1, 13);
+    door(s, '+z', 26, 4, 1, 8, { lattice: true, sun: true, deep: 3, frame: SAND });
+    slit(s, '-x', 21, 5, 3, 1); slit(s, '+x', 21, 5, 3, 1);
+  });
+  // a free colonnade down the court's west side, three lotus columns under a
+  // plain beam (no paint on its top)
+  inner(m, (s) => {
+    const CX = 10, Zs = [32, 36, 40], TOP = 11;
     for (const z of Zs) lotusColumn(s, CX, z, 1, TOP);
     for (let z = Zs[0] - 2; z <= Zs[Zs.length - 1] + 2; z++) for (let i = -1; i <= 1; i++) {
-      s.set(CX + i, TOP, z, SAND_D(CX + i, TOP, z));
-      s.set(CX + i, TOP + 1, z, i === 0 ? LIP(CX + i, TOP + 1, z) : (((z >> 1) & 1) ? LAPIS : RED_M));
+      s.set(CX + i, TOP, z, shade(SAND_D(CX + i, TOP, z), 0.8));
+      s.set(CX + i, TOP + 1, z, RS_MID(CX + i, TOP + 1, z));
     }
   });
   // the granary: a big domed silo at the front right with a ladder
   // (silo(), ladder() lay mesh polygons on m itself, so not through inner())
-  silo(m, 40.5, 38.5, 1, 6, 11);
-  ladder(m, [33.4, 1, 40.4], [34.6, 11.6, 39.6]);
+  silo(m, 40.5, 37.5, 1, 6, 11);
+  ladder(m, [33.4, 1, 39.4], [34.6, 11.6, 38.6]);
   // the court's one prop group: a fire altar on the axis before the portico
   m.box(25, 1, 34, 7, 2, 5, LIME); m.box(26, 2, 35, 5, 1, 3, DARK);
   m.set(28, 3, 36, FIRE[3], FG); m.set(27, 3, 36, FIRE[1], FG); m.set(29, 3, 35, FIRE[2], FG); m.set(28, 4, 36, FIRE[2], FG); m.set(28, 3, 37, FIRE[0], FG);
   // the stores by the silo: two tall amphorae and a grain sack
-  tcAmphora(m, 44, 1, 30); tcAmphora(m, 31, 1, 44); tcSack(m, 46, 1, 34, 3);
+  tcAmphora(m, 16, 1, 34); tcAmphora(m, 16, 1, 39); tcSack(m, 14, 1, 42, 3);
   // the Ra statue on its plinth at the front-left corner, in sandstone with
   // gold regalia and the owner's kilt (building_02)
   fineStatue(m, 2, 45, 12, 54, 1, 9, { h: 25, skin: BASALT, gold: GILT_L, kilt: GILT, kiltFront: TEAMB, head: 'falcon', crown: 'disc', arms: 'crossed', pose: 'stride' }, 1);
@@ -3151,65 +3165,51 @@ function temple(god) {
       }
     }
   };
-  // ---- the sanctuary (z 3 .. 15): the tallest block behind the hall, in
-  // limestone, a gilt band and the owner's line under its cornice, the
-  // shrine door on the axis
-  // a flat top flush with the coping (no sunk deck: a ring of coping round a
-  // dark slot read as one more roof frame)
-  const flatTop = (c = LIME_S) => { const T = m.lastTop; for (let x = T.c0 + 2; x < T.c1 - 2; x++) for (let z = T.d0 + 2; z < T.d1 - 2; z++) m.set(x, T.y + 1, z, typeof c === 'function' ? c(x, T.y + 1, z) : c); };
-  block(m, 10, 3, 30, 15, Y, 19, { wall: LIME, band: 'team', frieze: 0, roofC: LIME_S, rimC: LIME, lipOut: 2, plinth: false, gorge: [0x34588a, 0x3f6596], torus: false });
-  flatTop(TCF_SLAB(4));
-  bands(m, 10, 3, 30, 15, Y + 16, [GILT_D, GILT, GILT_D]);
+  // ---- round 49: four masses stepping DOWN from the gate to the shrine, a
+  // value darker each step, every roof one plain stone slab with a single
+  // pale edge line (no rims, no bands on any roof): the PYLON (pale
+  // limestone, 28 high, battered, curved cavetto, all the paint on its gate
+  // face), the open COURT with the god's statue (grey flags, side porticoes),
+  // the HALL (mid sandstone, 15 high, stepping to 12 at its back), the
+  // SANCTUARY (dark ochre, 9 high) at the back.
+  mass(m, 12, 4, 28, 12, Y, 9, { wall: WALL_SANCT, roof: RS_DARK, line: LIME_S });
+  mass(m, 8, 12, 32, 17, Y, 12, { wall: WALL_REAR, roof: TC_RS_MID2, line: LIP });
+  slit(m, '-x', 14, Y + 6, 3, 1); slit(m, '+x', 14, Y + 6, 3, 1);
+  mass(m, 5, 17, 35, 23, Y, 15, { wall: SAND, roof: RS_MID, line: LIP });
   door(m, '+z', AX - 2, 4, Y, 9, { deep: 3, frame: GILT_D, lintel: false, leaf: true });
-  // ---- the columned hall (z 15 .. 27): an open hypostyle of three rows of
-  // papyrus columns carrying ochre architraves along the rows, roofed over
-  // the side aisles in slabs, the central aisle on the axis left open to the
-  // sky so the god at the sanctuary door is seen from above between the
-  // columns; low ochre screen walls between the outer columns
-  const HC = 14;                                     // column height
-  const colX = [6, 11, 25, 30];                      // outer aisles; the axis aisle 14 .. 25 open
-  const rowZ = [16, 20, 24];
-  for (const z of rowZ) for (const x of colX) COLUMN(x, z, Y, HC);
-  const AY = Y + HC;                                  // the architrave row
-  for (const z of rowZ) for (let x = 5; x < 35; x++) {
-    if (x >= 15 && x < 25 && z !== 24) continue;    // the axis aisle stays open but for the front beam
-    for (let k = 0; k < 3; k++) { m.set(x, AY, z + k, k === 1 ? OCHRE_M : SAND_D(x, AY, z + k)); m.set(x, AY + 1, z + k, (x + z) % 4 === 0 ? LAPIS : RED_M); }
+  slit(m, '-x', 20, Y + 7, 3, 1); slit(m, '+x', 20, Y + 7, 3, 1);
+  // the court's side porticoes: a closed back wall, two papyrus columns to
+  // the court under one plain slab, lower than the hall
+  for (const [x0, x1, cx] of [[3, 10, 7], [30, 37, 30]]) {
+    mass(m, x0, 23, x1, 31, Y, 10, { wall: SAND, roof: RS_MID, line: LIP });
+    const open0 = cx === 7 ? 7 : 30, open1 = open0 + 3;
+    for (let x = open0; x < open1; x++) for (let z = 23; z < 31; z++) for (let y = Y; y < Y + 9; y++) m.remove(x, y, z);
+    for (let z = 23; z < 31; z++) for (let y = Y; y < Y + 9; y++) { const xi = cx === 7 ? 6 : 33; m.set(xi, y, z, y === Y ? PLINTH(xi, y, z) : SAND(xi, y, z)); }
+    for (const z of [24, 28]) COLUMN(open0, z, Y, 9);
   }
-  // roof slabs over the side aisles (between the architraves), a pale lip
-  for (const [x0, x1] of [[5, 15], [25, 35]]) for (let x = x0; x < x1; x++) for (let z = 16; z < 27; z++) {
-    if (!m.has(x, AY + 1, z)) m.set(x, AY + 1, z, EDECK(x, AY + 1, z));
-    const e = Math.min(x - x0, x1 - 1 - x, z - 16, 26 - z);
-    m.set(x, AY + 2, z, e === 0 ? LIP(x, AY + 2, z) : e === 1 && (x === x0 + 1 || x === x1 - 2) ? TEAM : EDECK(x, AY + 2, z));
-  }
-  // screen walls between the outer columns on the hall's sides, half height
-  for (const x of [5, 6, 33, 34]) for (let z = 16; z < 27; z++) for (let y = Y; y < Y + 6; y++) if (!m.has(x, y, z)) m.set(x, y, z, y === Y + 5 ? LIME(x, y, z) : y === Y + 4 ? RED_M : SAND_D(x, y, z));
-  // ---- round 47: the PYLON (z 30 .. 44), the temple's face: two tall
-  // trapezoidal towers battered a voxel in every four rows on all sides
-  // (smoothed by skin(), a torus roll up every edge), each under a curved
-  // cavetto flaring three voxels out over the owner's band; a painted
-  // register of hieroglyphs between ink rules wrapped round each tower's
-  // foot and a second one high on its flanks and back, the god in a sunk
-  // relief on each front; four tall flagpoles with long team streamers
-  // standing before the towers; the gate block between them set back two
-  // voxels, its own cornice, a two-step recessed doorway (a rebate, then the
-  // deep door) under a gilt winged sun. The court in front of the hall is
-  // gone: the pylon stands straight before the columned hall.
-  const PZ0 = 30, PZ1 = 44, PH = 22;
+  // ---- the PYLON (z 31 .. 44): two trapezoidal limestone towers battered a
+  // voxel in every six rows on all sides (smoothed by skin(), a torus roll
+  // under the cornice, no beads up the edges), each under a curved cavetto
+  // flaring two voxels out, painted only on the gate face; the plain flat
+  // top of each tower one slab with a single pale edge. The gate block
+  // between them set back, lower, its doorway under a gilt winged sun.
+  const PZ0 = 31, PZ1 = 44, PH = 28, PBt = 6;
   let PRT = 0;
   for (const [x0, x1] of [[0, 17], [23, 40]]) {
-    PRT = pylon(m, x0, PZ0, x1, PZ1, PH, { wall: LIME, b: 4, band: 'team', gorge: [0x34588a, 0x3f6596, 0x2f6f5a, 0x3f6596], lipOut: 3, roofC: LIME_S, y0: Y });
-    glyphRegister(m, x0, PZ0, x1, PZ1, Y + 1, ['+z', '-z', '+x', '-x'], x0);
-    glyphRegister(m, x0, PZ0, x1, PZ1, Y + 13, x0 ? ['+x', '-z'] : ['-x', '-z'], x0 + 3);
+    PRT = pylon(m, x0, PZ0, x1, PZ1, PH, { wall: LIME, b: PBt, band: null, gorge: [0x34588a, 0x3f6596, 0x2f6f5a, 0x3f6596], lipOut: 2, y0: Y, flat: true, faces: ['+z'], stone: 0xd6c8aa, cornerRoll: false, top: RS_PALE });
+    faceRows(m, '+z', x0, x1, Y + PH - 2, [TEAM, TEAM, GILT, null, LAPIS, null, RED_B]);
+    glyphRegister(m, x0, PZ0, x1, PZ1, Y + 1, ['+z'], x0);
   }
   // the gate block, set back two voxels from the towers' feet, filling only
-  // where the towers' battered flanks leave room
-  for (let x = 14; x < 26; x++) for (let z = PZ0 + 3; z < PZ1 - 2; z++) for (let y = Y; y < Y + 16; y++) {
+  // where the towers' battered flanks leave room, one plain slab
+  for (let x = 14; x < 26; x++) for (let z = PZ0 + 3; z < PZ1 - 2; z++) for (let y = Y; y < Y + 17; y++) {
     if (m.has(x, y, z)) continue;
-    m.set(x, y, z, y === Y + 15 ? LIP(x, y, z) : y === Y + 14 ? (((x + z) & 1) ? GORGE : GORGE_L) : y === Y + 13 ? LAPIS : y === Y + 12 ? GILT : y === Y ? SAND_D(x, y, z) : LIME(x, y, z));
+    m.set(x, y, z, y === Y + 16 ? shade(LIME(x, y, z), 0.72) : y === Y ? SAND_D(x, y, z) : LIME(x, y, z));
   }
   for (let x = 13; x < 27; x++) for (let z = PZ0 + 2; z < PZ1 - 1; z++) {
+    if (m.has(x, Y + 17, z)) continue;
     const e = Math.min(x - 13, 26 - x, z - PZ0 - 2, PZ1 - 2 - z);
-    if (e === 0 && !m.has(x, Y + 15, z)) m.set(x, Y + 15, z, LIP(x, Y + 15, z));
+    m.set(x, Y + 17, z, e === 0 ? LIP(x, Y + 17, z) : RS_PALE(x, Y + 17, z));
   }
   // the rebate: the doorway's outer frame cut a voxel into the gate's face
   for (let x = AX - 4; x < AX + 4; x++) for (let y = Y; y < Y + 12; y++) {
@@ -3218,16 +3218,15 @@ function temple(god) {
   }
   door(m, '+z', AX - 2, 4, Y, 9, { deep: 5, frame: GILT_D, lintel: false, leaf: true, leafShade: 0.5 });
   paint(m, '+z', AX - 4, Y + 11, ['GG.GG.GG', '.GGRRGG.'], { G: GILT, R: RED });
-  // the god in a sunk relief on each tower's front, over the foot register
+  faceRows(m, '+z', 14, 26, Y + 14, [TEAM]);
+  // the god in a sunk relief on each tower's front, between the registers
   const PG = PANEL_GOD.slice(1, 12);
-  recessPanel(m, '+z', 5, Y + 17, PG, RELIEF);
-  recessPanel(m, '+z', 29, Y + 17, PG, RELIEF);
+  recessPanel(m, '+z', 5, Y + 18, PG, RELIEF);
+  recessPanel(m, '+z', 29, Y + 18, PG, RELIEF);
   // the flagpoles: a cedar mast on each tower's roof at its inner front
-  // corner, a gilt tip and a long team streamer flying outward, so the
-  // towers' faces stay clear (masts standing before the faces read as
-  // scaffolding against the batter)
+  // corner, a gilt tip and a long team streamer flying outward
   {
-    const K = Math.floor((PH - 1) / 4), RT = PRT - 1;
+    const K = Math.floor((PH - 1) / PBt), RT = PRT - 1;
     for (const [x, dir] of [[17 - K - 2, -1], [23 + K + 1, 1]]) {
       const z = PZ1 - K - 2, top = RT + 12;
       for (let y = RT; y <= top; y++) pset(m, x, y, z, POLE(x, y, z));
@@ -3246,7 +3245,7 @@ function temple(god) {
   // columns, under the sanctuary's cornice, so it crowns the axis without
   // hiding the hall)
   {
-    const k = 3, x0 = AX - 4, x1 = AX + 4, z0 = 16, z1 = 22;
+    const k = 3, x0 = AX - 4, x1 = AX + 4, z0 = 24, z1 = 30;
     const sub = new Rec(m.W * k, m.D * k);
     const py = monPlinth(sub, x0 * k, z0 * k, x1 * k, z1 * k, Y * k, 2 * k, { seed: 2 });
     const pd = monDie(sub, x0 * k + 3, z0 * k + 3, x1 * k - 3, z1 * k - 3, py, 2);
@@ -3349,7 +3348,7 @@ function barracks() {
   for (let x = c0 - 1; x <= c1; x++) for (let z = d0 - 1; z <= d1; z++) {
     const e = ring(x, z, 1);
     m.set(x, top + 2, z, e <= 1 ? LIME(x, top + 2, z) : BK_DECK(x, top + 2, z));
-    if (e <= 2) m.set(x, top + 3, z, e === 2 ? TEAM : LIP(x, top + 3, z));
+    if (e <= 2) m.set(x, top + 3, z, LIP(x, top + 3, z));
   }
   // round 34: the roof carries detail instead of one blank slab. The deck is
   // laid in big flagstones (one tone each, a darker seam between them); at
@@ -3375,7 +3374,7 @@ function barracks() {
   }
   for (let x = K0 - 1; x <= K1; x++) for (let z = L0 - 1; z <= L1; z++) {
     const e = Math.min(x - K0 + 1, K1 - x, z - L0 + 1, L1 - z);
-    m.set(x, ky + KH, z, e === 0 ? LIP(x, ky + KH, z) : e === 1 ? TEAM : BK_DECK(x, ky + KH, z));
+    m.set(x, ky + KH, z, e === 0 ? LIP(x, ky + KH, z) : BK_DECK(x, ky + KH, z));
   }
   for (let x = K0 + 3; x < K0 + 5; x++) for (let y = ky; y < ky + 3; y++) { m.set(x, y, L1 - 1, 0x2a1d14); m.set(x, y, L1 - 2, 0x2a1d14); }
   for (let x = K0 + 2; x < K0 + 6; x++) pset(m, x, ky + 3, L1, 0x6e4a2c);
@@ -3427,7 +3426,11 @@ function barracks() {
   // painted lintel of crossed spears on red over it
   const GZ0 = 29, GZ1 = 39, GH = 20, Kb = Math.floor((GH - 1) / 4);
   let GT = 0;
-  for (const [x0, x1] of [[1, 15], [25, 39]]) GT = pylon(m, x0, GZ0, x1, GZ1, GH, { wall: BK_WALL, b: 4, band: 'team', gorge: [0x9a3f28, 0xb8503c, 0xc4923c, 0xb8503c], lipOut: 2, roofC: BK_DECK });
+  for (const [x0, x1] of [[1, 15], [25, 39]]) {
+    // round 49: a plain flat top, the cavetto and the owner's band painted on the gate face only
+    GT = pylon(m, x0, GZ0, x1, GZ1, GH, { wall: BK_WALL, b: 4, band: null, gorge: [0x9a3f28, 0xb8503c, 0xc4923c, 0xb8503c], lipOut: 2, roofC: BK_DECK, flat: true, faces: ['+z'], stone: 0xcfa872, cornerRoll: false, top: RS_MID });
+    faceRows(m, '+z', x0, x1, GH - 1, [TEAM]);
+  }
   for (let x = 13; x < 27; x++) for (let z = GZ0 + 2; z < GZ1 - 1; z++) for (let y = 1; y < 14; y++) {
     if (m.has(x, y, z)) continue;
     m.set(x, y, z, y === 13 ? LIP(x, y, z) : y === 12 ? (((x + z) & 1) ? 0x9a3f28 : 0xb8503c) : y === 11 ? TEAM : y === 1 ? BK_BASE : BK_WALL(x, y, z));
@@ -3514,16 +3517,87 @@ function migdol() {
   return m;
 }
 
+// Round 49: plain stone roof slabs, a value per mass (the gate palest, the
+// hall mid, the sanctuary darkest), two close tones and a sparse darker or
+// lighter voxel: stone with a little grain, never a pattern or a frame
+const ROOFSTONE = (tones, seed) => (x, y, z) => {
+  const c = pick(hash3(x >> 1, y, z >> 1, seed), tones), h = hash3(x, y, z, seed + 1);
+  return h < 0.07 ? shade(c, 0.91) : h > 0.95 ? shade(c, 1.04) : c;
+};
+const RS_PALE = ROOFSTONE([0xe9dfc8, 0xe4d9c0, 0xece3ce], 491);
+const RS_MID = ROOFSTONE([0xc4a87c, 0xbea276, 0xc9ad82], 493);
+const RS_DARK = ROOFSTONE([0x9a7a52, 0x94744c, 0xa07f57], 495);
+// a value step per mass: the rear hall's walls a shade under the hall's, the
+// sanctuary's darker again
+const WALL_REAR = (x, y, z) => shade(SAND(x, y, z), 0.9);
+const WALL_SANCT = (x, y, z) => shade(OCHRE_P(x, y, z), 0.86);
+const TC_RS_MID2 = ROOFSTONE([0xae9068, 0xa88a62, 0xb3956d], 497);
+// Round 49: one plain mass: walls (a dark base course on the ground, the top
+// row a value darker as the cornice's shadow), one roof slab projecting
+// `out` voxels with a single pale line round its edge (`line`, null: none)
+// and plain stone inside. Returns the row over the slab.
+function mass(m, x0, z0, x1, z1, y0, h, { wall = SAND, roof = RS_MID, line = LIP, out = 1, shadow = 0.7 } = {}) {
+  const top = y0 + h;
+  for (let y = y0; y < top; y++) for (let x = x0; x < x1; x++) for (let z = z0; z < z1; z++) {
+    const e = Math.min(x - x0, x1 - 1 - x, z - z0, z1 - 1 - z);
+    let c;
+    if (e > 0) c = SAND_D(x, y, z);
+    else if (y === y0 && y0 <= 3) c = PLINTH(x, y, z);
+    else { c = typeof wall === 'function' ? wall(x, y, z) : wall; if (y === top - 1) c = shade(c, shadow); }
+    m.set(x, y, z, c);
+  }
+  const c0 = x0 - out, c1 = x1 + out, d0 = z0 - out, d1 = z1 + out;
+  for (let x = c0; x < c1; x++) for (let z = d0; z < d1; z++) {
+    const e = Math.min(x - c0, c1 - 1 - x, z - d0, d1 - 1 - z);
+    m.set(x, top, z, e === 0 && line ? (typeof line === 'function' ? line(x, top, z) : line) : roof(x, top, z));
+  }
+  m.lastTop = { c0, c1, d0, d1, y: top };
+  return top + 1;
+}
+// Round 49: paint rows (top first) along one face only, on its outermost
+// voxels over [u0, u1) (the gate face's bands; the other faces stay stone)
+function faceRows(m, face, u0, u1, yTop, rows) {
+  rows.forEach((c, j) => {
+    if (c === null) return;
+    const y = yTop - j;
+    for (let u = u0; u < u1; u++) {
+      const p = outer(m, face, u, y, lim(m));
+      if (!p) continue;
+      const v = m.get(p[0], p[1], p[2]);
+      if (!v || v.glow) continue;
+      m.set(p[0], p[1], p[2], typeof c === 'function' ? c(p[0], p[1], p[2]) : c);
+    }
+  });
+}
 // A pylon tower (pylon()): a battered block whose slope is one clean voxel
 // step every `b` rows under the smooth skin, a round torus moulding up every
 // corner and along the top, a curved cavetto flaring `lipOut` voxels out to a
 // pale lip with the team line inside a one-voxel parapet over a recessed
 // roof deck. The voxel gorge rows block() lays are cut away (the skin draws
 // the curve over the wall's top). Returns the deck's y + 1.
-function pylon(m, x0, z0, x1, z1, h, { wall = SAND, b = 9, band = 'team', gorge = [GORGE, GORGE_L], lipOut = 2, roofC = PLASTER, frieze = 0, y0 = 1 } = {}) {
+// Round 49 (flat: true): the tower's top is ONE plain stone slab under the
+// cavetto, a single pale line round its edge and nothing inside (no sunk
+// deck, no parapet, no team ring: from above a pylon reads as one solid
+// mass, never a tray); `faces` limits the painted cavetto flutes to those
+// faces (the gate face), the others curve in the wall's own stone (`stone`);
+// cornerRoll: false keeps the torus under the cavetto but drops the beads
+// up the battered edges (they read as poles leaning on the tower)
+function pylon(m, x0, z0, x1, z1, h, { wall = SAND, b = 9, band = 'team', gorge = [GORGE, GORGE_L], lipOut = 2, roofC = PLASTER, frieze = 0, y0 = 1, flat = false, faces = null, stone = null, cornerRoll = true, top: topC = null } = {}) {
   block(m, x0, z0, x1, z1, y0, h, { wall, batter: b, band, lipOut, flare: true, gorge, torus: true, rimC: LIME, roofC, frieze, style: 'cornice' });
   const B = m.blocks[m.blocks.length - 1];
-  B.cav = { lipOut, gorge }; B.roll = true;
+  B.cav = { lipOut, gorge, only: faces, stone }; B.roll = true; B.cornerRoll = cornerRoll;
+  if (flat) {
+    const K0 = Math.floor((h - 1) / b), tp = y0 + h;
+    for (let y = tp; y <= tp + 1; y++) for (let x = x0 + K0 - lipOut; x < x1 - K0 + lipOut; x++) for (let z = z0 + K0 - lipOut; z < z1 - K0 + lipOut; z++) {
+      if (x < x0 + K0 || x >= x1 - K0 || z < z0 + K0 || z >= z1 - K0) m.remove(x, y, z);
+    }
+    const T = m.lastTop, R = topC || RS_PALE;
+    for (let x = T.c0; x < T.c1; x++) for (let z = T.d0; z < T.d1; z++) {
+      const e = Math.min(x - T.c0, T.c1 - 1 - x, z - T.d0, T.d1 - 1 - z);
+      m.set(x, T.y, z, e === 0 ? LIP(x, T.y, z) : R(x, T.y, z));
+    }
+    return T.y + 1;
+  }
   const top = y0 + h, K = Math.floor((h - 1) / b);
   const a0 = x0 + K, a1 = x1 - K, b0 = z0 + K, b1 = z1 - K;
   for (let y = top; y <= top + 1; y++) for (let x = a0 - lipOut; x < a1 + lipOut; x++) for (let z = b0 - lipOut; z < b1 + lipOut; z++) {
@@ -3623,8 +3697,8 @@ function siegeWorks() {
   const SW = coursed([0xeadcbc, 0xdccaa4, 0xe4d4b2], { len: 8, bed: 0.9, seed: 13 });
   const LOTUS = [(x, y, z) => RED_M, (x, y, z) => { const u = (x + z) % 4; return u === 0 ? FRIEZE_SEP : u === 2 ? GREENP : LAPIS; }, (x, y, z) => RED_M];
   // the back tower (taller) and the front tower
-  const tA = pylon(m, 6, 3, 26, 21, 30, { wall: SW });
-  const tB = pylon(m, 29, 24, 54, 42, 26, { wall: SW });
+  const tA = pylon(m, 6, 3, 26, 21, 30, { wall: SW, flat: true, cornerRoll: false });
+  const tB = pylon(m, 29, 24, 54, 42, 26, { wall: SW, flat: true, cornerRoll: false });
   bands(m, 6, 3, 26, 21, 9, LOTUS);
   bands(m, 29, 24, 54, 42, 9, LOTUS);
   // relief panels on every face
@@ -3639,7 +3713,7 @@ function siegeWorks() {
   recessPanel(m, '-z', 45, 24, PANEL_GOD, RELIEF);
   recessPanel(m, '-x', 29, 24, PANEL_GOD, RELIEF);
   // the roof decks: a stair hatch with a dark opening on each
-  for (const [hx, hz, ty] of [[10, 7, tA - 1], [44, 28, tB - 1]]) {
+  for (const [hx, hz, ty] of [[10, 7, tA], [44, 28, tB]]) {
     block(m, hx, hz, hx + 6, hz + 5, ty, 4, { wall: SW, batter: 0, band: null, lipOut: 1, rim: false, rimC: LIME, plinth: false, socle: 0, torus: false, roofC: PLASTER });
     for (let y = ty; y < ty + 3; y++) for (let x = hx + 2; x < hx + 4; x++) m.set(x, y, hz + 5 - 1, REVEAL);
   }
@@ -3669,7 +3743,7 @@ function siegeWorks() {
     m.set(x, cy, z, e === 0 ? AR[0] : LIME_S);
     m.set(x, cy + 1, z, e === 0 ? AR[2](x, cy + 1, z) : SAND_D(x, cy + 1, z));
     m.set(x, cy + 2, z, e <= 1 ? LIP(x, cy + 2, z) : EDECK(x, cy + 2, z));
-    if (e <= 1) m.set(x, cy + 3, z, e === 1 ? TEAM : LIP(x, cy + 3, z));
+    if (e <= 1) m.set(x, cy + 3, z, LIP(x, cy + 3, z));
   }
   // the long striped awning from the back tower's front down onto the
   // colonnade's parapet
@@ -3734,7 +3808,7 @@ function obelisk() {
   });
   // the fluted cavetto (lapis and ochre flutes) and the lip with the owner's line
   for (let y = 11; y <= 12; y++) ring(y, 8 - (y - 11), 28 + (y - 11), (x, z, e) => (e > 0 ? ST_D : (((x + z) >> 1) & 1) ? OBG_B : 0x3d65a0));
-  ring(13, 6, 30, (x, z, e) => (e === 2 ? TEAM : e === 0 ? LM : LM_D));
+  ring(13, 6, 30, (x, z, e) => (e === 0 ? LM : LM_D));
   ring(14, 9, 27, (x, z, e) => (e === 0 ? LM : LM_D));
   ring(15, 10, 26, (x, z, e) => (e === 0 ? LM : LM_D));
   // the shaft: voxels 13..23 from y 16, 114 rows, a voxel in each 50 rows
@@ -5457,7 +5531,7 @@ function market() {
   m.stageStep = 12;
   patch(m, 2, 20, 62, 64, PAVE, { seed: 2, rag: 3 });
   // the store hall
-  block(m, 4, 3, 60, 21, 1, 26, { wall: MKT_MUD, batter: 10, band: 'lapis', frieze: 2, style: 'cornice', lipOut: 3, flare: true, rimC: LIME, roofC: PLASTER, rim: true });
+  block(m, 4, 3, 60, 21, 1, 26, { wall: MKT_MUD, batter: 10, band: 'team', frieze: 2, style: 'cornice', lipOut: 3, flare: true, rimC: LIME, roofC: PLASTER, rim: true });
   let T = m.lastTop;
   for (let x = T.c0; x < T.c1; x++) for (let z = T.d0; z < T.d1; z++) {
     const e = Math.min(x - T.c0, T.c1 - 1 - x, z - T.d0, T.d1 - 1 - z);
@@ -5484,7 +5558,7 @@ function market() {
   // the back half roofed solid (a pale lip, the owner's line), the front an
   // open pergola of palm beams across the architraves
   for (let x = 2; x < 63; x++) for (let z = 21; z < 32; z++) {
-    m.set(x, AY + 2, z, (z === 31 || x === 2 || x === 62) ? LIP(x, AY + 2, z) : (z === 30 || x === 3 || x === 61) ? TEAM : EDECK(x, AY + 2, z));
+    m.set(x, AY + 2, z, (z === 31 || x === 2 || x === 62) ? LIP(x, AY + 2, z) : EDECK(x, AY + 2, z));
   }
   const bay = (x) => COLS.findIndex((c, i) => i + 1 < COLS.length && x > c && x < COLS[i + 1]);
   for (let x = 2; x < 63; x++) {
@@ -5629,7 +5703,7 @@ function lighthouse() {
   const G = top0 + 3, gy = B1 + 2;           // the gallery deck, a voxel past the gorge
   for (let x = C - G; x < C + G; x++) for (let z = C - G; z < C + G; z++) {
     const e = ring(x, z, G);
-    m.set(x, gy, z, e === 0 ? 0xfaf3e2 : e === 1 ? 0xf2e8d2 : e === 2 ? TEAM : PLASTER(x, gy, z));
+    m.set(x, gy, z, e === 0 ? 0xfaf3e2 : e === 1 ? 0xf2e8d2 : PLASTER(x, gy, z));
     if (e === 0) m.set(x, gy + 1, z, (x + z) & 1 ? 0xf0e6cf : 0xe8dcc2);    // a low solid rail (no merlons)
   }
   // the gilt Tritons on the gallery's corners: a pale socle, a gilt figure

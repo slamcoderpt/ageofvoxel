@@ -946,6 +946,33 @@ a few smooth parts (the silos), pivoted at the footprint centre, the front to
 Armory, Sentry Tower), warm sandstone ashlar (pylons, plinths), pale limestone cornices
 and copings, dark plaster / mud roof decks, mud brick and palm thatch
 (Archaic houses), painted friezes (blue / red / ochre), gilt, dark basalt.
+- **Round 49: massing before roofs.** Roof tops carry no inset colour rims.
+  `roofField()` now lays a plain, flush stone field: no lapis line, no red
+  band, no sunk slab grid. `pblock()` / `hbox()` / `block()` with `rim` put
+  the owner's line on a wall row under the cornice, never as a ring inside
+  the coping. The team rings inset on the Mining Camp, Barracks, Siege
+  Works, Obelisk, Market and Lighthouse roofs went the same way. New
+  helpers: `ROOFSTONE` (plain slabs, two close tones and a sparse grain
+  voxel; `RS_PALE` for gates, `RS_MID` for halls, `RS_DARK` for
+  sanctuaries), `mass()` (a plain block whose top row is a value darker as
+  the cornice's shadow, under one slab with a single pale edge line) and
+  `faceRows()` (bands painted on one face only). `pylon(..., { flat: true,
+  faces: ['+z'], stone, cornerRoll: false, top })` gives a plain flat top,
+  the curved cavetto painted on the gate face only (the other faces curve in
+  stone; `skin()` reads `B.cav.only` / `B.cav.stone`), and no beads up the
+  battered edges (`B.cornerRoll`). The **Town Center** and **Temple** are
+  re-massed on one axis, each mass with its own height and value. A pale
+  limestone pylon gate (Town Center 26 high, batter 1 in 7; Temple 28,
+  1 in 6) has all its paint on its front face: the team band, gilt, red /
+  turquoise or lapis lines, the god relief, a lapis line at the foot (the
+  Temple keeps one glyph register there). Its lower gate block is set back.
+  Behind it the mid-sandstone hall (Town Center: one slab over the hall and
+  its lotus portico, 13 high) steps down to a darker, narrower rear hall
+  (10 / 12) and then to the darkest ochre sanctuary (7 / 9) against the
+  back. The Temple has an open court with the god's statue and side
+  porticoes between the gate and the hall. The Barracks' gate towers and the
+  Siege Works' towers get the flat tops too. Check with `egt_focus=
+  town_center` / `temple` (add `egt_yaw=200` for the stepped backs).
 - **Warm shade** (`game/buildings/egypt_building.gdshader`, the Egyptian
   buildings' material, `EgyptBuildings.material(colour)`; Greek buildings keep
   `building.gdshader`): the scene's shade light is cool (the hemisphere's sky
