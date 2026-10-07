@@ -1873,6 +1873,32 @@ and copings, dark plaster / mud roof decks, mud brick and palm thatch
   spiral tail. Framing: the row `egt_row=monument_gods/ra/a1,monument_gods/set/a1,monument_gods/isis/a1&egt_pitch=40&egt_lift=3&egt_dist=18`,
   a head `egt_row=monument_gods/set/a1&egt_pitch=18&egt_lift=6&egt_dist=6&egt_yaw=40`,
   the Eye panel `egt_row=monument_gods/set/a1&egt_pitch=8&egt_lift=0.4&egt_dist=6&egt_yaw=0`.
+- **A smithy by value, round 42** (building_18; the forge was one sand-beige
+  pile: walls, chimney, parapets, awning and props at one value on beige
+  ground, coarse blurry voxels, a red winged-sun "zigzag" over the door, the
+  hearth a pink checker). `armory()` is rebuilt at half voxels (`fine: 2` in
+  TYPES, a 64 x 64 lot, 1/16 tile, `m.stageStep = 12`), so courses, trim and
+  tools keep crisp edges, and each mass has its own value: the hall and its
+  attic in pale limestone (`LIME`) under the team band and the painted
+  frieze the neighbours carry (`band: 'team', frieze: 2`; the attic `lapis`,
+  `frieze: 1`), laid roofs (`roofField`), no winged sun; the shed's back
+  wall and pier a step darker in ochre sandstone (`OCHRE_W`) with a lapis
+  band; the lean-to a smooth cloth (`clothAwning`, posts none, resting on the
+  pier) in cool indigo / pale blue stripes running wall to front, over dark
+  rafters; the furnace and its chimney (tapering in three stages to y 52) in
+  near-black soot-stained mud brick (`SOOT`, darkening up the stack), a fire
+  mouth of glowing coals under a limestone lintel, a glowing throat at the
+  top and five smoke puffs growing and paling as they drift east (a k = 1
+  inset on `m.fine`, so construction stages carry none). Before the shed,
+  on a cool grey flagged yard (`FLAG`), ONE work area: an open hearth (a
+  dark kerb round coals in three rings, hotter to the middle, flame tongues,
+  bellows), a black steel anvil (`ANV`, a bright face, horn and heel) on a
+  stump with a glowing billet and a hammer, and a pale limestone quench
+  trough of water. The fires and the gilt ankh are in `m.keep` (the ankh in
+  a low-blue gold, `ANKH_G`), so they keep their colour through the grade.
+  Framing: `egt_focus=armory&egt_dist=9&egt_pitch=40&egt_lift=1.5` (the whole
+  smithy with its smoke), `egt_focus=armory&egt_dist=7&egt_pitch=36&egt_lift=0.8`
+  (the work area close).
 - **Gilt** (round 14, egypt_building.gdshader): voxels painted a blue-free
   yellow (no blue, green 0.3-0.8 of red, not team) are lit as metal: the
   shade light x `gold_shade` 0.5, the plain sun term x `gold_diffuse` 0.8

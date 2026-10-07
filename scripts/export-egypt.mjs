@@ -5079,118 +5079,149 @@ function monument(kind, god = 'ra') {
   return m;
 }
 
-// Armory (4 x 4; building_18), round 19: ONE smithy. A continuous battered
-// mud-brick hall (the main body) under a curved cavetto painted in lapis /
-// red / ochre leaves over an ochre torus roll, a bright team band and a frieze
-// under it, a whitewashed attic on its roof (Retold's stepped roof); the
-// forge shed is an L of the same brick off its east end (a back wall and a
-// pier), a timber lean-to seated on a ledger pegged to the hall's wall and on
-// the pier's coping, a striped cloth laid on the rafters; the furnace is
-// built against the hall's front, its stone chimney rising up the wall
-// through the cornice and over the roof. The forge's parts stand apart at RTS
-// zoom: a glowing hearth under the lean-to, a steel anvil on a stump, a stone
-// quench trough of water. Each material has its own texture and value: brick
-// (mid red-brown, big bricks, dark mortar), whitewash (pale, smooth), stone
-// (pale grey ashlar, sooted up the stack), wood (dark brown, grain).
-const FBRICK = (x, y, z) => {
+// Armory (4 x 4; building_18), round 42: the smithy rebuilt at half voxels
+// (`fine: 2` in TYPES, 1/16 tile) so its courses, trim and tools keep crisp
+// edges, and laid out by VALUE, one material per mass, so it never reads as
+// one sand pile: the hall in pale limestone under the team band and the
+// painted frieze the neighbours carry (no winged sun: it read as a red
+// zigzag); the forge shed (a back wall and a pier) a step darker in ochre
+// sandstone with a lapis band; the lean-to cloth cool indigo / pale blue
+// stripes running wall to front; the furnace and its tall tapering chimney
+// in near-black soot-stained mud brick, darkening up the stack, a fire mouth
+// of glowing coals at its foot, a glowing throat at its top and smoke puffs
+// drifting off it (a k = 1 inset on m.fine, so construction stages carry
+// none); and before the shed, on a cool grey flagged yard, ONE work area: an
+// open hearth (a dark kerb round a bed of coals glowing hotter to the
+// middle, flame tongues, bellows), a black steel anvil on a stump with a
+// hot billet and a hammer, and a pale limestone quench trough of water. The
+// fire voxels keep their saturation through the grade (m.keep).
+const SOOT = (x, y, z) => {
   const row = Math.floor(Math.max(0, y - 1) / 3);
-  const u = x + z + (row & 1) * 3 + 256;
-  const blk = Math.floor(u / 6);
-  let c = pick(hash3(blk, row, (x - z) >> 3, 301), [0xb08356, 0xa77b50, 0xb88b5c]);
-  if ((y - 1) % 3 === 0) c = shade(c, 0.66);
-  else if (u % 6 === 0) c = shade(c, 0.7);
-  return c;
+  const u = x + z + (row & 1) * 3 + 512;
+  let c = pick(hash3(Math.floor(u / 6), row, 3, 311), [0x5a4334, 0x523d30, 0x614939]);
+  if ((y - 1) % 3 === 0) c = shade(c, 0.72);
+  else if (u % 6 === 0) c = shade(c, 0.76);
+  return shade(c, Math.max(0.48, 1 - Math.max(0, y - 10) * 0.011));   // the soot thickens up the stack
 };
-const PLAST_W = (x, y, z) => shade(hash3(x >> 2, y >> 2, z >> 2, 302) < 0.5 ? 0xefe4cc : 0xebdfc5, 0.995 + 0.01 * hash3(x, y, z, 303));
-const STONE_F = (x, y, z) => {
-  const row = Math.floor(Math.max(0, y - 1) / 4);
-  const u = x + z + (row & 1) * 3 + 256;
-  let c = pick(hash3(Math.floor(u / 5), row, 7, 304), [0xd6cdb9, 0xcbc1ab, 0xdfd6c4]);
-  if ((y - 1) % 4 === 0) c = shade(c, 0.8);
-  else if (u % 5 === 0) c = shade(c, 0.84);
-  if (y > 15) c = shade(c, Math.max(0.42, 1 - (y - 15) * 0.07));   // soot up the stack
-  return c;
-};
-const WOODG = (x, y, z) => pick(hash3(x >> 2, y, z, 305), [0x6a4428, 0x5c3b22, 0x734a2c]);
-const ANVIL = 0x3a3e42, ANVIL_T = 0x6c7278;
-const CAV = [BLUEP, BLUEP, 0xf2e8d0, RED_B, RED_B, 0xf2e8d0, OCHRE_B, OCHRE_B, 0xf2e8d0];
+const KERB = (x, y, z) => (y === 3 ? 0x6b5d50 : ((x + z) & 3) === 0 ? 0x3a3029 : 0x463a31);
+const ANV = 0x24272b, ANV_T = 0x6c747c, STUMP = 0x4a2e1a;
+const COAL = [0x8a2004, 0xb83006, 0xe05008];          // ember red to hot orange (keep: no grade chroma limit)
+const AWN_I = [0x2b4176, 0x283d70, 0x2f467e], AWN_P = [0xc3cedb, 0xbec9d6, 0xc9d4e0];
+const SMOKE = [0x77706a, 0x8c8781, 0xa29e99, 0xb5b2ad, 0xc4c2be];
+const ANKH_G = 0xd9a406;                              // a gold the keep flag recognises (low blue)
 function armory() {
-  const m = lot(32, 32);
-  patch(m, 18, 6, 31, 27, EARTH, { seed: 4 });
-  // the hall: one battered brick body, the cornice as a curved painted cavetto
-  // over a torus (skin()), the voxel gorge rows outside the wall cut away
-  const h = 14, b = 5, lipOut = 2;
-  block(m, 2, 3, 21, 17, 1, h, { wall: FBRICK, batter: b, band: 'teamb', frieze: 0, lipOut, flare: true, gorge: [LAPIS, RED_M], torus: true, rimC: LIME, roofC: PLASTER });
-  const B = m.blocks[m.blocks.length - 1];
-  B.cav = { lipOut, gorge: CAV, lift: 2.0 }; B.roll = OCHRE_M; B.skip = { '+z': [6, 10] };
-  const top = 1 + h, K = Math.floor((h - 1) / b);
-  const a0 = 2 + K, a1 = 21 - K, b0 = 3 + K, b1 = 17 - K;
-  for (let y = top; y <= top + 1; y++) for (let x = a0 - lipOut; x < a1 + lipOut; x++) for (let z = b0 - lipOut; z < b1 + lipOut; z++) {
-    if (x < a0 || x >= a1 || z < b0 || z >= b1) m.remove(x, y, z);
+  const m = lot(64, 64, EARTH);
+  m.stageStep = 12;
+  // the flagged work yard before the shed (cool grey, so the tools stand off the ground)
+  patch(m, 27, 36, 64, 64, FLAG, { seed: 4, rag: 3 });
+  // the hall: pale limestone, battered, the team band and a painted frieze under a blue cavetto
+  block(m, 3, 5, 41, 31, 1, 28, { wall: LIME, batter: 10, band: 'team', frieze: 2, lipOut: 2, flare: true, rimC: LIME, roofC: PLASTER });
+  let T = m.lastTop;
+  roofField(m, T.c0, T.d0, T.c1, T.d1, T.y);
+  // the stepped roof: a limestone attic on the hall's west half, its own lapis band
+  block(m, 8, 9, 25, 23, T.y, 10, { wall: LIME, batter: 0, band: 'lapis', frieze: 1, lipOut: 1, rimC: LIME, roofC: PLASTER, plinth: false });
+  T = m.lastTop;
+  roofField(m, T.c0, T.d0, T.c1, T.d1, T.y, { g: 3 });
+  door(m, '+z', 25, 6, 1, 14, { frame: LIME });
+  slit(m, '+z', 35, 13, 6, 1);
+  // the forge shed: a back wall and a pier in ochre sandstone, a step darker than the hall
+  const shed = { wall: OCHRE_W, batter: 8, band: 'lapis', frieze: 0, lipOut: 1, rimC: LIME, roofC: MUDROOF };
+  block(m, 40, 5, 61, 13, 1, 18, shed);
+  block(m, 53, 11, 61, 37, 1, 18, shed);
+  // the lean-to: rafters from a ledger on the hall's east wall down onto the
+  // pier's coping, the striped cloth laid over them
+  const yTop = 26, depth = 17, drop = 6, f = 38;
+  const ry = (d) => Math.floor(yTop + 1 - (drop * d) / depth - 0.5 * Math.sin((Math.PI * d) / depth)) - 1;
+  for (const z of [14, 20, 26, 32]) for (let d = 1; d <= depth; d++) m.set(f + d, ry(d), z, DARKWOOD);
+  clothAwning(m, '+x', f, 12, 37, yTop, depth, drop, { posts: [], sw: 3, sag: 0, belly: 0.5, stripes: [AWN_I, AWN_P], hem: 0x1e2c52 });
+  rack(m, 43, 14, 9);
+  // the furnace before the hall's west end and its chimney: soot-black mud
+  // brick, a pale coping on the furnace, the stack tapering in three stages
+  for (let x = 5; x < 21; x++) for (let z = 33; z < 47; z++) for (let y = 1; y < 13; y++) m.set(x, y, z, y === 12 ? LIME_S : SOOT);
+  const cTop = 52;
+  for (let y = 13; y < cTop; y++) {
+    const i = Math.floor((y - 13) / 15);
+    for (let x = 8 + i; x < 18 - i; x++) for (let z = 34 + i; z < 44 - i; z++) m.set(x, y, z, SOOT);
   }
-  // the roof: a pale lip with a parapet, a shadowed line inside, a plaster deck (no team outline)
-  const T = m.lastTop;
-  for (let x = T.c0; x < T.c1; x++) for (let z = T.d0; z < T.d1; z++) {
-    const e = Math.min(x - T.c0, T.c1 - 1 - x, z - T.d0, T.d1 - 1 - z);
-    // the coping painted as the cornice's top: a continuous band of lapis /
-    // red / ochre leaves, the pale lip outside it (no team outline on the roof)
-    if (e === 0) m.set(x, T.y, z, LIP);
-    else if (e === 1) m.set(x, T.y, z, [BLUEP, BLUEP, BLUEP, RED_B, RED_B, RED_B, OCHRE_B, OCHRE_B, OCHRE_B][(x + z) % 9]);
-    else if (e === 2) m.set(x, T.y, z, LIME_S);
+  // the stack's mouth: a dark lip, a glowing throat a voxel down
+  for (let x = 9; x < 17; x++) for (let z = 35; z < 43; z++) {
+    const rim = x === 9 || x === 16 || z === 35 || z === 42;
+    if (rim) m.set(x, cTop, z, 0x221a15);
+    else { m.remove(x, cTop - 1, z); m.set(x, cTop - 2, z, x > 10 && x < 15 && z > 36 && z < 41 ? COAL[2] : COAL[1], { glow: 0.9 }); }
   }
-  // the whitewashed attic on the roof's west half, its own small cornice
-  block(m, 3, 4, 12, 12, T.y, 5, { wall: PLAST_W, batter: 0, band: 'ochre', frieze: 0, lipOut: 1, rimC: LIME, roofC: PLASTER, rim: false, plinth: false });
-  door(m, '+z', 13, 3, 1, 7, { sun: true });
-  slit(m, '+z', 17, 8, 3, 1);
-  // the forge shed: a back wall and a pier in the same brick, one L with the hall
-  const shed = { wall: FBRICK, batter: 4, band: 'ochre', frieze: 0, lipOut: 1, gorge: [0x963f2a, 0xa5492f], rimC: LIME, roofC: MUDROOF, rim: false };
-  block(m, 19, 3, 30, 7, 1, 8, shed);
-  block(m, 26, 6, 30, 18, 1, 8, shed);
-  // the lean-to: a ledger beam pegged along the hall's east wall, rafters
-  // from it down onto the pier's coping (y 10), the cloth laid on them
-  const ry = (x) => (x >= 26 ? 11 : Math.round(13 - ((x - 19) * 2) / 7));
-  for (let z = 7; z < 19; z++) m.set(19, 12, z, WOODG);
-  for (const z of [8, 11, 14, 17]) for (let x = 19; x < 30; x++) m.set(x, ry(x), z, DARKWOOD);
-  for (let x = 20; x < 29; x++) for (let z = 10; z < 19; z++) {
-    if (z === 11 || z === 14 || z === 17) { m.set(x, ry(x) + 1, z, (z & 1) ? 0x5f6a8a : 0xd8ccb0); continue; }
-    m.set(x, ry(x) + 1, z, ((z >> 1) & 1) ? 0xd8ccb0 : 0x5f6a8a);
+  for (const [x, z] of [[12, 38], [13, 39], [12, 39]]) m.set(x, cTop - 1, z, COAL[2], { glow: 0.95 });
+  // the fire mouth in the furnace's front: cut three deep under a limestone lintel, coals glowing
+  for (let x = 10; x < 16; x++) for (let y = 1; y < 7; y++) {
+    for (let d = 0; d < 3; d++) m.remove(x, y, 46 - d);
+    m.set(x, y, 43, y <= 2 ? COAL[2] : y <= 4 ? COAL[1] : COAL[0], { glow: y <= 2 ? 0.95 : 0.7 });
+    if (y === 1) for (let d = 0; d < 3; d++) m.set(x, 1, 46 - d, d === 0 ? COAL[1] : COAL[2], { glow: 0.85 });
   }
-  for (let x = 20; x < 26; x += 2) m.set(x, ry(x), 18, 0x5f6a8a);   // the front hem
-  // the hearth under the lean-to: a stone kerb round glowing coals, bellows
-  for (let x = 21; x < 26; x++) for (let z = 9; z < 15; z++) {
-    const kerb = x === 21 || x === 25 || z === 9 || z === 14;
-    if (kerb) m.set(x, 1, z, STONE_F); else if (hash3(x, 1, z, 306) < 0.45) m.set(x, 1, z, hash3(x, 2, z, 307) < 0.5 ? FIRE[1] : FIRE[2], { glow: 0.5 }); else m.set(x, 1, z, 0x2a1a12);
-  }
-  m.box(22, 1, 7, 3, 2, 2, 0x6e4a30); m.set(23, 3, 7, WOODG); m.set(23, 1, 9, DARKWOOD);
-  // the anvil: a dark stump, a steel body with a bright face and a horn
-  m.box(21, 1, 18, 2, 2, 2, WOODG);
-  for (let x = 20; x < 24; x++) for (let z = 18; z < 20; z++) m.set(x, 3, z, ANVIL);
-  for (let x = 20; x < 24; x++) for (let z = 18; z < 20; z++) m.set(x, 4, z, ANVIL_T);
-  m.set(24, 4, 18, ANVIL_T); m.set(24, 4, 19, ANVIL_T);
-  m.set(23, 1, 20, DARKWOOD); m.set(23, 2, 20, DARKWOOD); m.set(23, 3, 20, ANVIL);   // a hammer leaning on it
-  // the quench trough: a limestone box of water before the shed
-  for (let x = 25; x < 31; x++) for (let z = 19; z < 23; z++) for (let y = 1; y < 3; y++) {
-    const rim = x === 25 || x === 30 || z === 19 || z === 22;
-    m.set(x, y, z, rim || y === 1 ? STONE_F : WATER);
-  }
-  // the furnace against the hall's front, its chimney up the wall and over the roof
-  for (let x = 4; x < 12; x++) for (let z = 14; z < 22; z++) for (let y = 1; y < 6; y++) m.set(x, y, z, y === 5 ? LIME : STONE_F);
-  for (let x = 6; x < 10; x++) for (let z = 14; z < 20; z++) for (let y = 6; y < 22; y++) {
-    const edge = x === 6 || x === 9 || z === 16 || z === 19;
-    if (z < 16) { m.set(x, y, z, STONE_F); continue; }
-    if (!edge && y === 21) continue;
-    m.set(x, y, z, !edge && y === 20 ? FIRE[0] : edge ? (y === 21 ? 0x3a3330 : STONE_F) : DARK, !edge && y === 20 ? { glow: 0.3 } : undefined);
-  }
-  // the fire mouth: cut two voxels into the front under a limestone lintel, coals glowing
-  for (let x = 6; x < 10; x++) for (let y = 1; y < 4; y++) { m.remove(x, y, 21); m.set(x, y, 20, y === 1 ? FIRE[1] : FIRE[0], { glow: y === 1 ? 0.5 : 0.25 }); }
-  for (let x = 5; x < 11; x++) m.set(x, 4, 21, LIME);
+  for (let x = 9; x < 17; x++) { m.set(x, 7, 46, LIME); m.set(x, 7, 47, LIME); }
   // a bold gilt ankh on a limestone step by the furnace
-  m.box(0, 1, 23, 5, 1, 3, LIME);
-  for (let y = 2; y < 6; y++) for (let z = 24; z < 26; z++) m.set(2, y, z, GILT);
-  for (let x = 0; x < 5; x++) for (let z = 24; z < 26; z++) m.set(x, 6, z, GILT);
-  for (const [x, y] of [[1, 7], [3, 7], [1, 8], [3, 8], [2, 9]]) for (let z = 24; z < 26; z++) m.set(x, y, z, GILT);
-  shield(m, '+z', 27, 3);
-  barrel(m, 21.5, 1, 23.5); crate(m, 27, 1, 24, 3, 3, 3); crate(m, 1, 1, 19, 2, 2, 2);
+  m.box(0, 1, 49, 9, 2, 5, LIME);
+  const A = (x, y, z) => m.box(x, y, z, 2, 2, 2, ANKH_G);
+  for (let y = 3; y < 11; y += 2) A(3, y, 50);
+  for (let x = 0; x < 9; x += 2) if (x < 8) A(x + 0.5 | 0, 11, 50);
+  for (const [x, y] of [[1, 13], [5, 13], [1, 15], [5, 15], [3, 17]]) A(x, y, 50);
+  // the work area: ONE group before the shed. The open hearth: a dark kerb
+  // round a bed of coals glowing hotter to the middle, flame tongues over it
+  const hx = 40.5, hz = 46;
+  for (let x = 35; x < 46; x++) for (let z = 41; z < 51; z++) {
+    const kerb = x === 35 || x === 45 || z === 41 || z === 50;
+    for (let y = 1; y < 4; y++) {
+      if (kerb) pset(m, x, y, z, KERB(x, y, z));
+      else if (y < 3) pset(m, x, y, z, 0x2a1e18);
+      else {
+        const d = Math.max(Math.abs(x + 0.5 - hx) / 4.5, Math.abs(z + 0.5 - hz) / 4);
+        m.set(x, y, z, d < 0.45 ? COAL[2] : d < 0.8 ? COAL[1] : COAL[0], { glow: d < 0.45 ? 0.95 : d < 0.8 ? 0.8 : 0.55 });
+      }
+    }
+  }
+  for (const [x, y, z] of [[40, 4, 46], [41, 4, 45], [39, 4, 45], [40, 4, 44], [42, 4, 47], [40, 5, 45], [41, 5, 46], [40, 6, 45], [39, 4, 47]]) m.set(x, y, z, COAL[2], { glow: 1 });
+  // the bellows on its west side: leather between two boards, a nozzle into the kerb
+  for (let x = 29; x < 34; x++) for (let z = 43; z < 49; z++) {
+    pset(m, x, 1, z, 0x4a3020);
+    if (x > 29 && z > 43 && z < 48) pset(m, x, 2, z, 0x7a4c2c);
+    pset(m, x, 3, z, x === 29 ? 0x4a3020 : 0x5c3a22);
+  }
+  for (let x = 33; x < 35; x++) pset(m, x, 2, 45, IRON);
+  // the anvil: a black steel body on a dark stump, a bright worn face, a
+  // horn, a glowing billet on it and a hammer laid by
+  m.box(50, 1, 43, 5, 4, 5, STUMP);
+  for (let x = 50; x < 55; x++) for (let z = 43; z < 48; z++) if (x === 50 || x === 54 || z === 43 || z === 47) pset(m, x, 4, z, 0x5e3c22);
+  for (let x = 50; x < 55; x++) for (let z = 44; z < 47; z++) pset(m, x, 5, z, ANV);
+  for (let x = 51; x < 54; x++) for (let z = 44; z < 47; z++) for (const y of [6, 7]) pset(m, x, y, z, ANV);
+  for (let x = 48; x < 56; x++) for (let z = 44; z < 47; z++) { pset(m, x, 8, z, ANV); pset(m, x, 9, z, ANV_T); }
+  for (const z of [44, 45, 46]) pset(m, 56, 9, z, z === 45 ? ANV_T : ANV);
+  pset(m, 57, 9, 45, ANV); pset(m, 58, 9, 45, ANV); pset(m, 56, 8, 45, ANV);
+  m.set(50, 10, 45, COAL[2], { glow: 0.9 }); m.set(51, 10, 45, COAL[2], { glow: 0.9 }); m.set(52, 10, 45, COAL[1], { glow: 0.7 });
+  for (let x = 51; x < 56; x++) pset(m, x, 10, 47, 0x6a4428);
+  for (const y of [10, 11]) for (const z of [46, 47]) pset(m, 55, y, z, ANV);
+  // the quench trough: a pale limestone box brimming with water
+  for (let x = 44; x < 59; x++) for (let z = 53; z < 60; z++) for (let y = 1; y < 5; y++) {
+    const rim = x === 44 || x === 58 || z === 53 || z === 59;
+    if (rim) pset(m, x, y, z, y === 4 ? 0xf3ead8 : 0xe2d6bd);
+    else if (y < 3) pset(m, x, y, z, 0xc9bca2);
+    else if (y === 3) pset(m, x, y, z, 0x2c6890);
+  }
+  // a few stores at the lot's edges, clear of the work area
+  crate(m, 1, 1, 56, 5, 5, 5); crate(m, 2, 6, 57, 3, 3, 3);
+  crate(m, 22, 1, 56, 4, 4, 4, 0x8a6236);
+  // the fires keep their colour through the grade, the ankh its gold
+  m.keep = [[28, 0, 40, 60, 14, 52], [4, 0, 30, 22, 60, 50], [0, 0, 48, 10, 20, 56]];
+  // smoke off the stack: puffs growing and paling as they drift east (an
+  // inset, so stages carry none)
+  const sub = new Rec(m.W, m.D);
+  const puffs = [[13, cTop + 4, 39, 2.6], [14.5, cTop + 9, 38.5, 3.2], [17, cTop + 15, 38, 3.8], [20.5, cTop + 22, 37.5, 4.3], [25, cTop + 29, 37, 4.0]];
+  puffs.forEach(([cx, cy, cz, R], i) => {
+    for (let y = Math.floor(cy - R); y <= Math.ceil(cy + R); y++) {
+      const dy = y + 0.5 - cy;
+      if (Math.abs(dy) > R) continue;
+      const r = Math.sqrt(R * R - dy * dy);
+      lathe(sub, cx, cz, y, y + 1, () => r, dy > R * 0.35 ? shade(SMOKE[i], 1.08) : dy < -R * 0.35 ? (i === 0 ? 0x8a5c40 : shade(SMOKE[i], 0.9)) : SMOKE[i]);
+    }
+  });
+  (m.fine ??= []).push({ m: sub, k: 1, jitter: 0.01 });
   return m;
 }
 
@@ -5873,7 +5904,7 @@ const TYPES = {
   eg_barracks: { w: 5, h: 5, variants: ['0'], ages: [1], build: () => barracks() },
   migdol: { w: 7, h: 7, variants: ['0'], ages: [1], build: () => migdol() },
   siege_works: { w: 7, h: 7, variants: ['0'], ages: [1], build: () => siegeWorks() },
-  armory: { w: 4, h: 4, variants: ['0'], ages: [1], build: () => armory() },
+  armory: { w: 4, h: 4, variants: ['0'], ages: [1], build: () => armory(), fine: 2 },
   market: { w: 4, h: 4, variants: ['0'], ages: [1], build: () => market() },
   obelisk: { w: 1, h: 1, variants: ['0'], ages: [1], build: () => obelisk(), draw: 1.5, fine: 3 },
   monument_villagers: { w: 2, h: 2, variants: ['0'], ages: [1], build: () => monument(1), fine: 2 },
