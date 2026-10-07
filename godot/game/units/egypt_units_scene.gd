@@ -205,6 +205,8 @@ static func scene_setup(game: Node) -> Dictionary:
 	# eu_ax / eu_az: shift the framed point (world units), eu_pitch: camera pitch
 	focus += Vector2(float(game.args.get("eu_ax", 0.0)), float(game.args.get("eu_az", 0.0)))
 	cam_pitch = float(game.args.get("eu_pitch", cam_pitch))
+	# eu_fh: aim at this height over the framed point (a rider's head, not the camel's feet)
+	focus -= front * float(game.args.get("eu_fh", 0.0)) / tan(deg_to_rad(cam_pitch))
 	if not game.args.has("cam"):
 		game.args["cam"] = "%f,%f,%f,%f,%f" % [focus.x, focus.y, cam_dist, cam_pitch, rad_to_deg(yaw)]
 	print("egypt_units: %d units (%s%s), state %s, %.1f s" % [spawned.size(), group, (" focus " + focus_type) if focus_type != "" else "", state, t])

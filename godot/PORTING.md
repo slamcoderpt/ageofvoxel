@@ -2308,6 +2308,7 @@ node scripts/godot-shoot.mjs --scene egypt_units --out shots/godot/egypt_units.p
      [--params "eu_one=axeman&eu_turn=30"]  # one unit framed close, turned from the camera (model checks)
      [--params "eu_zoom=0.75"]        # scale the camera distance of any group
      [--params "eu_ax=-0.8&eu_az=-1.7&eu_pitch=36"]  # shift the framed point (world x / z), camera pitch
+     [--params "eu_fh=2.6"]          # aim the camera this high over the framed point (a rider's head)
                                       # (eu_one=chariot_archer&eu_turn=30&eu_zoom=0.62 + these: the archer close)
 node scripts/export-egypt-units.mjs   # re-export godot/assets/models/egypt_units.{json,bin.gz}
 ```
@@ -2974,6 +2975,46 @@ torso the same way and keeps both elbows bent. Check:
 `eu_group=eco&eu_zoom=0.35&eu_ax=2.2&eu_az=4.2` (the builders),
 `eu_focus=laborer&eu_zoom=0.4&eu_yaw=200` (faces), `eu_focus=laborer&eu_state=walk`,
 `eu_group=eco`.
+
+The riders, round 41 (unit_01 / unit_03 / unit_08 / unit_13; the five camel
+riders and charioteers read as toy figures on the animals: one rig, a head a
+third of the seated figure under the same flat brown cap, a flat face, arms
+out in a near T-pose, the sword floating beside the hand; the elephant a box
+on pillar legs). **Heads**: the Charioteer, Camel Rider and Mahout now have the
+fine head (`FINE_HEADS` / `RIDER_HEADS`, `fineHead` + `riderHeadwear`) with
+the Laborer's strong face (a two-row brow, white eyes, the lit nose ridge and
+cheekbones, the jaw in shade; no stubble), at `headScale` 0.85 / 0.8 / 0.82,
+about a fifth of the figure, each under its own headdress: the charioteer a
+war helmet (unit_03: a steel-grey dome with gold ribs front to back, a team
+crest ridge, a gold brow rim, cheek guards, a flared neck guard), the camel
+rider a plumed cap (unit_08's tall cap made a short flared team modius with
+pleats, a dark leather brow band, a gold rim and a white plume sweeping up and
+back; black hair at the nape), the mahout a team / linen striped nemes. **Arms**
+(`unit_view.cpp`, pose "mount", now also on the War Elephant): elbows tucked
+in and bent near a right angle, the rein hand before the belly turned in, the
+weapon fist up before the right shoulder; attacking, the blade stands over the
+shoulder on the wind-up and comes forward on the cut (`CH_weapon` 0.5 + 0.7
+extend). **Grip**: the camel sword's grip runs through the closed fist square
+to the forearm (pivot [0.5, -2.5, 0.5] at `HAND_E`, rest [1.85, 0, 0.1]; the
+guard over the knuckles, the pommel under the fist; the dark end caps gone),
+the mahout's spear stands in his fist the same way (rest [1.75, 0, 0.12]).
+**Reins** (`reinsM`, part `reins` on the left forearm, half the arm's voxel):
+two thin leather lines from the fist forward and sagging towards the camel's
+neck. **Legs wrap the mount**: the camel rider's thighs run down the hump's
+front slope, knees bent forward by the withers, the shins drawn back along the
+barrel to the heel, the feet pointed down against the flank (slimmer: thigh
+1.75, calf 1.3, ankle 0.8 cells); the mahout's legs (fine, `mLegs`) straddle
+the neck with the feet tucked behind the ears. **Elephant**: body and legs on
+the fine grid (part scale 0.5): the same three ellipsoids sampled finely plus
+a sagging belly, shaded from the normal in four flat greys with wrinkle
+creases; the legs tapered columns (a heavy shoulder / thigh mass, two wrinkle
+rings and a lit kneecap at the knee, a broad round foot with a dark sole, a
+gold anklet, three ivory toenails); the cloth and howdah still sit on the
+coarse body. Capture param `eu_fh=<height>` aims the camera that high over the
+framed point (a rider's head). Check: `eu_group=mounted&eu_zoom=0.7` (also
+`eu_state=attack|walk`), `eu_one=camel_rider&eu_turn=50&eu_zoom=0.9&eu_pitch=30&eu_fh=2.6`,
+`eu_one=chariot_archer&eu_turn=40&eu_zoom=0.9&eu_pitch=30&eu_fh=1.9`,
+`eu_one=war_elephant&eu_turn=60&eu_zoom=1.0&eu_pitch=34&eu_fh=1.5`.
 
 ## Walls, gates, towers: placement (game/ui)
 

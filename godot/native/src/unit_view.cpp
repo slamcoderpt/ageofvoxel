@@ -598,9 +598,14 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 			// (Egyptian riders, "mount") elbows in at the sides, both forearms
 			// bent forward: the left fist on the reins before the lap, the right
 			// carrying the weapon forward (raised and swung through when attacking)
-			set(CH_armL, -0.12, 0.1, 0.05); set(CH_foreL, -0.85);
-			if (!attacking) { set(CH_armR, moving ? -0.4 : -0.3, 0, -0.06); set(CH_foreR, -1.0); set(CH_weapon, moving ? 0.5 : 0.2); }
-			else set(CH_foreR, -0.35 - 0.4 * wind);
+			// (round 41) the elbows tucked in at the sides and bent near a
+			// right angle (no arm held out from the body): the rein hand
+			// before the belly, turned in, the sword fist up before the
+			// right shoulder, the blade standing in it
+			const double rb = moving ? S(t * 7) * 0.05 : S(t * 1.3) * 0.03;
+			set(CH_armL, -0.32 + rb, -0.35, -0.04); set(CH_foreL, -1.25);
+			if (!attacking) { set(CH_armR, (moving ? -0.5 : -0.42) + rb, 0.3, -0.1); set(CH_foreR, -1.45); set(CH_weapon, moving ? 0.25 : 0.0); }
+			else { set(CH_foreR, -0.35 - 0.4 * wind); set(CH_weapon, 0.5 + 0.7 * extend); }   // (the blade up over the shoulder on the wind-up, forward on the cut)
 		}
 		if (rig.sprawl && (attacking || st == aov::A_DIE)) {
 			// (the Petsuchos) its level sprawled limbs only lift a little (roll),

@@ -621,6 +621,110 @@ const fhJaw = (x, y, z) => {
   return Math.abs((x + 0.5) / hw) ** 3 + Math.abs((z + 0.5 - cz) / az) ** 3 <= 1;
 };
 const fhInHead = (x, y, z) => fhCranium(x, y, z) || fhJaw(x, y, z);
+// (round 41) the riders' heads: the fine head (the strong laborer face: a
+// two-row brow, white eyes, the lit nose ridge and cheekbones, the jaw line in
+// shade) under one headdress per unit type, so the three mounted men read
+// apart at RTS zoom: the charioteer a war helmet (unit_03: a silver dome with
+// a team crest ridge front to back, gold ribs, a gold brow rim, cheek guards
+// and a flared neck guard), the camel rider a plumed cap (unit_08's tall cap,
+// now a short flared team modius over a dark leather brow band, a gold rim
+// and a white plume sweeping up and back; black hair at the nape), the mahout
+// a nemes cloth (team and linen stripes, side falls to the shoulders)
+const RIDER_HEADS = new Set(['charioteer', 'camel', 'mahout']);
+const fhShell = (x, y, z, d, column = true) => {
+  const py = y + 0.5 - FH_C.y, px = x + 0.5, pz = z + 0.5 - FH_C.z;
+  if (py > 0 || !column) return (px / (FH_C.rx + d)) ** 2 + (py / (FH_C.ry + d)) ** 2 + (pz / (FH_C.rz + d)) ** 2 <= 1;
+  return (px / (FH_C.rx + d)) ** 2 + (pz / (FH_C.rz + d)) ** 2 <= 1;
+};
+function riderHeadwear(m, style, front) {
+  const put = (x, y, z, c, o) => { if (c === TEAM) tset(m, x, y, z, o ?? 0xffffff); else m.set(x, y, z, c, o); };
+  if (style === 'charioteer') {
+    const HL = 0xc4cad0, HM = 0x98a0aa, HS = 0x6c747e, RIM = 0xc89a18, RIM_D = 0x7a5808;
+    for (let y = 2; y <= 18; y++) for (let x = -10; x <= 9; x++) for (let z = -10; z <= 9; z++) {
+      if (fhInHead(x, y, z) || m.has(x, y, z)) continue;
+      const px = x + 0.5, pz = z + 0.5, py = y + 0.5 - FH_C.y;
+      const guard = y < 8 && pz < -1.5 ? (8 - y) * 0.22 : 0;          // the neck guard flares out
+      if (!fhShell(x, y, z, 1.2 + guard)) continue;
+      const cheek = Math.abs(px) > 5.6 && pz > -1.5 && pz < 3.2 && y >= 3;   // cheek guards at the sides of the face
+      if (pz > 1.5 && y < 11 && !cheek) continue;                     // the face open below the brim
+      if (pz > -1.5 && pz <= 1.5 && y < 6 && !cheek) continue;        // the ears' fronts / the jaw
+      if (pz <= -1.5 && y < 3) continue;
+      const rimRow = (pz > 1.5 && y === 11) || (cheek && y === 3) || (pz <= -1.5 && y === 3);
+      let c = py > 3.8 ? HL : pz > -1 ? HM : HS;
+      if (!rimRow && py > 2.5 && ((x + 20) % 4 === 1)) c = RIM;         // gold ribs front to back
+      if (rimRow) c = (x + y) & 1 ? RIM : RIM_D;
+      if (cheek && !rimRow) c = y < 6 ? RIM_D : HM;
+      put(x, y, z, c, rimRow || c === RIM ? { glow: 0.5 } : undefined);
+    }
+    // the crest: a team ridge a voxel proud along the crown, front to back
+    for (let z = -8; z <= 7; z++) for (const x of [-1, 0]) {
+      let y = 22; while (y > 0 && !m.has(x, y, z)) y--;
+      if (y > 12) { put(x, y + 1, z, TEAM, (z & 1) ? 0xffffff : TEAM_SHADE); if (z > -6 && z < 5) put(x, y + 2, z, TEAM, 0xffffff); }
+    }
+    return;
+  }
+  if (style === 'camel') {
+    const LB = 0x3a2010, LB_L = 0x5a3418;
+    // black hair at the nape and behind the ears, under the cap
+    for (let y = 4; y <= 10; y++) for (let x = -9; x <= 8; x++) for (let z = -9; z <= 8; z++) {
+      if (fhInHead(x, y, z) || m.has(x, y, z) || !fhCranium(x, y, z, 0.95)) continue;
+      if (z + 0.5 > -1) continue;
+      m.set(x, y, z, hash3(x, y, z, 154) < 0.2 ? FH_HAIR.L : FH_HAIR.D);
+    }
+    // the cap: a flared cylinder from the brow to y 19, the face open below y 11
+    const cz = FH_C.z - 0.4;
+    for (let y = 8; y <= 19; y++) {
+      const rx = 7.0 + Math.max(0, y - 12) * 0.12, rz = 6.6 + Math.max(0, y - 12) * 0.12;
+      for (let x = -10; x <= 9; x++) for (let z = -10; z <= 9; z++) {
+        const px = x + 0.5, pz = z + 0.5 - cz;
+        if ((px / rx) ** 2 + (pz / rz) ** 2 > 1) continue;
+        if (y < 11 && pz > -1.2) continue;                             // the brow and temples open
+        if (fhInHead(x, y, z) && y < 15) continue;
+        const outer = (px / (rx - 1.1)) ** 2 + (pz / (rz - 1.1)) ** 2 > 1 || y === 19;
+        if (!outer && y < 19) { m.set(x, y, z, 0x2a1a0e); continue; }  // (the inside, never seen)
+        const lit = pz > 1, back = pz < -3;
+        let c;
+        if (y <= 12) c = y === 12 ? LB_L : LB;                          // the leather brow band
+        else if (y === 13) c = (x + z) & 1 ? GOLD(x, y, z) : 0xb08a10;    // a gold rim
+        else if (y === 19) c = TEAM;                                    // the lid
+        else c = TEAM;                                                  // the team felt
+        if (c === TEAM) {
+          const pleat = (Math.round(Math.atan2(px, pz) * 4) & 1) && y < 19;
+          put(x, y, z, TEAM, y === 19 ? 0xd8d8d8 : pleat ? TEAM_SHADE : back ? 0xc4c4c4 : 0xffffff);
+        } else m.set(x, y, z, lit ? c : (typeof c === 'number' && c === LB ? LB : c));
+      }
+    }
+    // a gold top rim and the plume: a white ostrich feather from the front of
+    // the lid, up and curling back
+    for (let x = -10; x <= 9; x++) for (let z = -10; z <= 9; z++) if (m.has(x, 19, z) && !m.has(x, 19, z + 1) && z > 0) m.set(x, 19, z, GOLD(x, 19, z));
+    const PL = [[-0.5, 19.5, 3.5, 1.5], [-0.5, 23.5, 3.2, 1.9], [-0.5, 26.5, 1.0, 1.7], [-0.5, 27.6, -2.5, 1.2], [-0.5, 26.4, -5.2, 0.7]];
+    for (let i = 0; i < PL.length - 1; i++) {
+      const a = PL[i], b = PL[i + 1];
+      tube(m, [a[0], a[1], a[2]], [b[0], b[1], b[2]], a[3], b[3], (x, y, z) => (y >= 24 && z > -3 ? 0xfaf6ec : y < 21 ? GOLD(x, y, z) : 0xe6dcc6));
+    }
+    return;
+  }
+  if (style === 'mahout') {
+    // the nemes: a rounded hood 1.4 over the cranium with side falls to the
+    // shoulders, striped round the head team / linen (two linen rows to one
+    // team), front to back on the crown, a gold brow band
+    for (let y = -3; y <= 17; y++) for (let x = -10; x <= 9; x++) for (let z = -9; z <= 8; z++) {
+      if (fhInHead(x, y, z) || m.has(x, y, z)) continue;
+      const flare = y < 6 ? (6 - y) * 0.14 : 0;
+      if (!fhShell(x, y, z, 1.4 + flare)) continue;
+      const px = x + 0.5;
+      if (y <= 10 && z + 0.5 > 0 && Math.abs(px) < 6.6) continue;
+      if (y <= 10 && z + 0.5 > 2) continue;
+      if (y < 3 && z + 0.5 > -1.5 && Math.abs(px) < 6.6) continue;
+      const top = y + 0.5 - FH_C.y > 4.2;
+      const stripe = top ? ((x + 20) % 3 === 0) : ((y + 30) % 3 === 0);
+      const edge = y === -3 || (y <= 10 && z + 0.5 > 1);
+      if (stripe) put(x, y, z, TEAM, edge ? TEAM_SHADE : 0xffffff);
+      else m.set(x, y, z, edge ? 0xc8bc9e : top ? 0xf8f2e2 : 0xe8dfc8);
+    }
+    for (let x = -6; x <= 5; x++) { const z = front(x, 11); if (z !== null) m.set(x, 11, z + 1, GOLD(x, 11, z), { glow: 0.5 }); }
+  }
+}
 // (round 40) wear: the Laborers' headwear (labHeadwear) built into the head
 // itself (a separate part over the hair let the hair and its outline show
 // through the cloth); under a khat there is no hair
@@ -664,7 +768,7 @@ function fineHead(style, wear = null) {
     paintF(x, 1, P.LIPL); paintF(x, 0, P.H);                              // the lower lip, the chin
     paintF(x, 10, P.H);                                                   // the forehead's light
   }
-  if (style === 'laborer') {
+  if (style === 'laborer' || RIDER_HEADS.has(style)) {
     // (round 40) a face that reads at RTS zoom (unit_11's labourers): the
     // brows a two-row dark ledge over the eyes, each eye a white, a dark
     // pupil two rows tall and a white, a dark chin under the lip and the jaw
@@ -674,10 +778,11 @@ function fineHead(style, wear = null) {
       for (const x of [-5, -4, -3, -2]) { paintF(X(x), 9, P.BROW); paintF(X(x), 10, x === -2 ? P.S : P.BROW); }
       paintF(X(-4), 8, P.SOCK); paintF(X(-3), 8, 0x0e0806); paintF(X(-2), 8, P.SOCK);
       paintF(X(-4), 7, 0xf4ece0); paintF(X(-3), 7, 0x0e0806); paintF(X(-2), 7, 0xf4ece0);
+      if (style !== 'laborer') return;
       for (let y = 0; y <= 2; y++) paintF(X(-3), y, SUB);                 // stubble along the jaw
       paintF(X(-2), 0, SUB);
     });
-    for (const x of [-1, 0]) { paintF(x, 0, SUB); paintF(x, -1, SUB); }  // the chin
+    if (style === 'laborer') for (const x of [-1, 0]) { paintF(x, 0, SUB); paintF(x, -1, SUB); }  // the chin
   }
   for (const s of [-1, 1]) {                                              // ears
     const ex = s < 0 ? -7 : 6;
@@ -783,7 +888,7 @@ function fineHead(style, wear = null) {
       else m.set(x, y, z, edge ? 0x7a4a08 : ((x + y + z) & 3) === 0 ? 0xc89410 : 0xb07a0e, { glow: edge ? 0 : 0.78 });
     }
     for (let x = -6; x <= 5; x++) { const z = front(x, 11); if (z !== null) m.set(x, 11, z + 1, 0xd8a420, { glow: 0.78 }); }   // the brow band
-  }
+  } else if (RIDER_HEADS.has(style)) riderHeadwear(m, style, front);
   if (wear) for (const [k, v] of labHeadwear(wear).vox) { const x = ((k >> 20) & 1023) - 512, y = ((k >> 10) & 1023) - 512, z = (k & 1023) - 512; m.set(x, y, z, v.c); }
   return m;
 }
@@ -830,7 +935,7 @@ function labHeadwear(kind) {
   }
   return m;
 }
-const FINE_HEADS = new Set(['laborer', 'spear', 'axe', 'sling', 'merc', 'mercCav']);
+const FINE_HEADS = new Set(['laborer', 'spear', 'axe', 'sling', 'merc', 'mercCav', 'charioteer', 'camel', 'mahout']);
 function headPart(style, joint = [0, 10, 0.2], parent = 'torso', s = 1) {
   // (round 34) the fine heads: twice the grid, centred on the neck
   // (the chin sits half a rig voxel lower than the old head's, so the fine
@@ -1424,8 +1529,9 @@ function camelSwordM() {
   const FACE = 0x4c545c, FULLER = 0x262a30, EDGE = 0xd8dee4, EDGE_IN = 0x8a929a;
   m.box(-1, -6, -1, 4, 2, 4, GOLD).box(0, -7, 0, 2, 1, 2, GOLD_DK);       // pommel
   m.box(0, -4, 0, 2, 4, 2, LEATHER_DK).box(0, -2, 0, 2, 1, 2, GOLD);   // grip, a gold band
-  m.box(-3, 0, -1, 8, 1, 4, GOLD).box(-3, -1, 0, 8, 1, 2, GOLD_DK);    // the crossguard, its shaded underside
-  for (const x of [-3, 4]) m.box(x, 0, -1, 1, 2, 4, LEATHER_DK);         // end caps
+  // (round 41) a slimmer guard, gold to its ends (the dark end caps read as a
+  // block beside the fist)
+  m.box(-2, 0, -1, 6, 1, 4, GOLD).box(-2, -1, 0, 6, 1, 2, GOLD_DK);    // the crossguard, its shaded underside
   const top = 13;
   for (let y = 1; y <= top; y++) {
     const [x0, x1] = y <= top - 3 ? [-1, 2] : y <= top - 2 ? [-1, 1] : y <= top - 1 ? [0, 1] : [0, 0];
@@ -1442,6 +1548,18 @@ function camelSwordM() {
 // raised spine down the middle), tapering over the last four rows to a
 // bright point; a gold crossguard nine wide with dark end caps, a leather
 // grip with a gold band, a gold pommel
+// (round 41) reins from a rider's fist (forearm frame: -y along the forearm
+// past the knuckles, -z under it): two thin leather lines running on from the
+// fist and sagging, at the arm's own voxel size
+function reinsM() {
+  const m = new VoxelModel();
+  // (on a grid twice as fine: part scale half the arm's, one cell thick)
+  for (const x of [-2, 1]) for (let i = 0; i <= 30; i++) {
+    const y = -2 - i, z = Math.round(i * 0.12 - 2 * Math.sin((i / 30) * Math.PI));
+    m.set(x, y, z, (i % 6) === 0 ? LEATHER : LEATHER_DK);
+  }
+  return m;
+}
 function bronzeSwordM() {
   const m = new VoxelModel();
   const EDGE = 0xf4d81c, FACE = 0xa07400, IN = 0x684a00, SPINE = 0x241800, GLD = 0xc49c00;
@@ -2788,7 +2906,7 @@ function chariotLegsM() {
   eCollar(t, [0xb89400, TM, 0xb89400], { r0: 2.4 });
   t.box(2, 3, -6, 3, 11, 2, LEATHER).box(2, 3, -6, 3, 1, 2, LEATHER_DK).box(2, 13, -6, 3, 1, 2, LEATHER_DK);   // the quiver on the back
   for (const x of [2, 4]) t.set(x, 14, -6, 0xf4f0e8).set(x, 15, -5, 0xf4f0e8);
-  const rider = riderMan({ torso: t, torsoJoint: [0, 14.5, -1], torsoParent: 'chariot', head: 'charioteer', headScale: 1.2 })
+  const rider = riderMan({ torso: t, torsoJoint: [0, 14.5, -1], torsoParent: 'chariot', head: 'charioteer', headScale: 0.85 })
     .filter((p) => !/^(arm|fore)[LR]$/.test(p.name));
   rig('chariot_archer', { voxel: 0.07, anim: 'centaur', style: 'chariot', pose: 'chariot', graze: false }, [
     part('body', chHorseBody(), [0, 0, 0], [0, 10, 12], null, { coat: true, ...CH_S }),
@@ -2889,11 +3007,16 @@ function chariotLegsM() {
   const legs = new VoxelModel();
   const SK = PAL_SKIN;
   for (const s of [-1, 1]) {
-    const hip = [s * 2.4, 29.2, 1.5], knee = [s * 5.4, 25, 7.2], ankle = [s * 6.6, 15.6, 6.4], toe = [s * 6.8, 15, 8.8];
-    tube(legs, hip, knee, 2.0, 1.55, (x, y, z, t) => (t < 0.45 ? (y > 27 ? 0xffffff : 0xb4b4b4) : SK.L));
-    tube(legs, knee, ankle, 1.5, 1.05, SK.L);   // the shin, its calf a step fuller
-    tube(legs, [knee[0], knee[1] - 2, knee[2] - 0.6], [ankle[0], ankle[1] + 4, ankle[2] - 0.5], 1.7, 1.2, SK.L);
-    tube(legs, ankle, toe, 1.15, 0.9, SK.M);
+    // (round 41) the legs wrap the mount: the thigh down the hump's front
+    // slope just proud of the cloth, the knee bent forward by the withers,
+    // the shin drawn back under it along the barrel's side to the heel, the
+    // foot pointed down against the flank; slimmer (thigh 1.6, calf 1.15,
+    // ankle 0.8) so the leg reads as a leg, not a pink column
+    const hip = [s * 2.6, 29.2, 1.5], knee = [s * 5.1, 23.6, 6.6], ankle = [s * 5.7, 16.2, 3.4], toe = [s * 5.9, 14.4, 4.8];
+    tube(legs, hip, knee, 1.75, 1.3, (x, y, z, t) => (t < 0.5 ? (y > 27 ? 0xffffff : 0xb4b4b4) : SK.L));
+    tube(legs, knee, ankle, 1.2, 0.8, SK.L);   // the shin, its calf a step fuller behind
+    tube(legs, [knee[0], knee[1] - 1.5, knee[2] - 0.9], [ankle[0], ankle[1] + 3.5, ankle[2] - 0.6], 1.3, 0.95, SK.L);
+    tube(legs, ankle, toe, 0.9, 0.7, SK.M);
   }
   // the kilt cells as team dye
   for (const [x, y, z] of cellsOf(legs)) { const v = legs.get(x, y, z); if (v.c === 0xffffff || v.c === 0xb4b4b4) tset(legs, x, y, z, v.c); }
@@ -3008,11 +3131,14 @@ function chariotLegsM() {
     part('cannonBL', cannon(), [0, 0, 0], [0, -7.5, -1.3], 'legBL', coat),
     part('legBR', hindUp, [0, 0, 0], [-1.8, 1, -5.6], 'body', coat),
     part('cannonBR', cannon(), [0, 0, 0], [0, -7.5, -1.3], 'legBR', coat),
-    ...riderMan({ torso: t, s: R, headScale: 1.05, torsoJoint: [0, 15.2, 0.8], torsoParent: 'body', head: 'camel', arm: { sleeve: TEAM, bracer: GOLD } }),
-    // the sword at the arm's own voxel size (one arm long), raised forward
-    // and out to the side from the fist, so the blade reads in profile clear
-    // of the body, the hump and the neck
-    part('weapon', camelSwordM(), [0.5, 0, 0.5], sc(HAND_E, R), 'armR', { scale: BODY_SCALE * R, jitter: 0.01, rest: [0.75, 0, 0.6] }),
+    ...riderMan({ torso: t, s: R, headScale: 0.8, torsoJoint: [0, 15.2, 0.8], torsoParent: 'body', head: 'camel', arm: { sleeve: TEAM, bracer: GOLD } }),
+    // the sword at the arm's own voxel size (one arm long); (round 41) its
+    // grip runs through the closed fist square to the forearm (the guard over
+    // the knuckles' top, the pommel under the fist), so with the elbow bent
+    // and the forearm forward the blade stands up before the shoulder
+    part('weapon', camelSwordM(), [0.5, -2.5, 0.5], sc(HAND_E, R), 'armR', { scale: BODY_SCALE * R, jitter: 0.01, rest: [1.85, 0, 0.1] }),
+    // the reins: two leather lines from the left fist forward and down to the halter
+    part('reins', reinsM(), [0, 0, 0], sc(HAND_E, R), 'armL', { scale: BODY_SCALE * R * 0.5, jitter: 0, outline: 0.1, portrait: false }),
   ]);
 }
 
@@ -3198,30 +3324,132 @@ function chariotLegsM() {
       else H.set(-xi - 2, y, z, outer).set(-xi - 1, y, z, EAR_IN);
     }
   }
-  const legUp = new VoxelModel().box(0, 0, 0, 4, 6, 4, G);
-  const legLow = new VoxelModel().box(0, 1, 0, 4, 6, 4, G).box(0, 0, 0, 4, 1, 4, GW);
-  for (let x = 0; x < 4; x += 2) legLow.set(x, 0, 4, NAIL).set(x + 1, 0, 4, GW);   // toenails
-  band(legLow, 5, GOLD_DK); band(legLow, 4, GOLD);
+  // (round 41) the body and legs on the grid twice as fine (part scale 0.5,
+  // geometric cells): the critic read a vertical box on four pillar legs.
+  // The body is the same three ellipsoids (barrel, high domed shoulders,
+  // rump; the cloth and howdah still sit on the coarse one) sampled finely,
+  // with a sagging belly between the legs, shaded from the surface normal
+  // in flat greys (lit back, mid flanks, dark belly) and faint wrinkle
+  // creases across the flanks; the legs are tapered columns, not boxes: a
+  // heavy shoulder / thigh mass into the body, a column narrowing to a
+  // knee (a lit kneecap, two dark wrinkle rings), widening again over the
+  // broad round foot pad with three ivory toenails, a gold anklet
+  const SK_L = 0x86827e, SK_M = 0x726e6b, SK_D = 0x5c5856, SK_B = 0x4c4846, SK_W = 0x64605d;
+  const shadeBy = (m, inside) => {
+    for (const [k, v] of m.vox) {
+      if (v.team || v.keep) continue;
+      const x = ((k >> 20) & 1023) - 512, y = ((k >> 10) & 1023) - 512, z = (k & 1023) - 512;
+      let nx = 0, ny = 0, nz = 0, open = false;
+      for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) for (let dz = -2; dz <= 2; dz++)
+        if (!inside(x + dx, y + dy, z + dz)) { nx += dx; ny += dy; nz += dz; open = true; }
+      if (!open) continue;
+      const l = Math.hypot(nx, ny, nz) || 1;
+      ny /= l;
+      v.c = ny > 0.55 ? SK_L : ny < -0.5 ? SK_B : ny < -0.1 ? SK_D : SK_M;
+    }
+  };
+  const bodyF = new VoxelModel();
+  {
+    const E = [[5.5, 6, 9.5, 5.6, 5.8, 9.2], [5.5, 7, 15, 5.4, 6, 4.4], [5.5, 6, 3.5, 5.2, 5.4, 4]];
+    const inB = (f, g, h) => {
+      const gx = (f + 0.5) / 2, gy = (g + 0.5) / 2, gz = (h + 0.5) / 2;
+      for (const [cx, cy, cz, rx, ry, rz] of E) {
+        const d = ((gx - cx - 0.5) / (rx + 0.3)) ** 2 + ((gy - cy - 0.5) / (ry + 0.3)) ** 2 + ((gz - cz - 0.5) / (rz + 0.3)) ** 2;
+        if (d <= 1) return true;
+      }
+      // the belly sagging low between the legs
+      return ((gx - 6) / 4.6) ** 2 + ((gy - 2.2) / 2.2) ** 2 + ((gz - 10) / 6.2) ** 2 <= 1;
+    };
+    for (let f = -2; f <= 26; f++) for (let g = -2; g <= 28; g++) for (let h = -2; h <= 44; h++) if (inB(f, g, h)) bodyF.set(f, g, h, SK_M);
+    shadeBy(bodyF, inB);
+    // wrinkle creases: short dark arcs down the flanks every few cells
+    for (const [k, v] of bodyF.vox) {
+      const f = ((k >> 20) & 1023) - 512, g = ((k >> 10) & 1023) - 512, h = (k & 1023) - 512;
+      if (v.c !== SK_M) continue;
+      if ((h + Math.round(g * 0.3)) % 7 === 0 && g > 4 && g < 18) v.c = SK_W;
+    }
+    // the dark crease round the front of the shoulders where the neck sinks in
+    for (const [k, v] of bodyF.vox) {
+      const f = ((k >> 20) & 1023) - 512, g = ((k >> 10) & 1023) - 512, h = (k & 1023) - 512;
+      if (h >= 36 && !bodyF.has(f, g, h + 1) && Math.hypot((f + 0.5) / 2 - 6, (g + 0.5) / 2 - 7.5) < 6.5) v.c = 0x4e4a48;
+    }
+  }
+  const legM = (upper, hind) => {
+    const m = new VoxelModel();
+    const SEG = upper
+      ? [[0, 6, hind ? -0.6 : 0.4, 5.6], [0, -2, 0, 4.6], [0, -10, 0, 3.9], [0, -12, 0.2, 3.9]]
+      : [[0, 2, 0.2, 4.0], [0, -1, 0.3, 3.7], [0, -8, 0, 3.6], [0, -11.5, 0.2, 4.1]];
+    const inL = (x, y, z) => {
+      for (let i = 0; i < SEG.length - 1; i++) {
+        const a = SEG[i], b = SEG[i + 1];
+        const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], L2 = d[0] ** 2 + d[1] ** 2 + d[2] ** 2;
+        const p = [x + 0.5 - a[0], y + 0.5 - a[1], z + 0.5 - a[2]];
+        const t = Math.max(0, Math.min(1, (p[0] * d[0] + p[1] * d[1] + p[2] * d[2]) / L2));
+        const r = a[3] + (b[3] - a[3]) * t;
+        if ((p[0] - d[0] * t) ** 2 + (p[1] - d[1] * t) ** 2 + (p[2] - d[2] * t) ** 2 <= r * r) return true;
+      }
+      // the foot: a broad round pad
+      return !upper && ((x + 0.5) / 4.6) ** 2 + ((y + 12.2) / 1.6) ** 2 + ((z + 0.5 - 0.6) / 4.9) ** 2 <= 1 && y >= -14;
+    };
+    for (let x = -7; x <= 6; x++) for (let y = -15; y <= 12; y++) for (let z = -7; z <= 7; z++) if (inL(x, y, z)) m.set(x, y, z, SK_M);
+    shadeBy(m, (x, y, z) => inL(x, y, z) || (upper && y > 4));
+    for (const [k, v] of m.vox) {
+      const x = ((k >> 20) & 1023) - 512, y = ((k >> 10) & 1023) - 512, z = (k & 1023) - 512;
+      if (upper && (y === -6 || y === -9) && v.c !== SK_L) v.c = SK_W;              // wrinkle rings over the knee
+      if (upper && y <= -10 && z >= 3 && v.c === SK_M) v.c = SK_L;                   // the kneecap, lit
+      if (!upper && (y === -3 || y === -6)) v.c = SK_W;
+      if (!upper && y <= -13) v.c = 0x3e3a38;                                        // the sole
+      if (!upper && y === -9) v.c = (x + z) & 1 ? GOLD(x, y, z) : 0xb08a10;          // a gold anklet
+    }
+    if (!upper) for (const tx of [-3, -1, 1]) for (let y = -13; y <= -11; y++) {   // three toenails at the front
+      let z = 8; while (z > -8 && !m.has(tx, y, z)) z--;
+      if (z > -8) { m.set(tx, y, z, NAIL).set(tx + 1, y, z, NAIL); }
+    }
+    return m;
+  };
+  const legUp = legM(true, false), legUpH = legM(true, true), legLow = legM(false);
+  // the mahout's legs (fine cells in the body joint's frame): astride the
+  // neck behind the head, the thighs out over the shoulders' tops, the knees
+  // bent forward, the shins drawn back down the sides, the feet tucked behind
+  // the ears as a real mahout steers
+  const mLegs = new VoxelModel();
+  {
+    const SK = PAL_SKIN;
+    for (const s of [-1, 1]) {
+      const hip = [s * 2.6, 26.2, 6.4], knee = [s * 8.4, 23.6, 10.6], ankle = [s * 10.2, 15.2, 8.2], toe = [s * 10.6, 13.6, 9.8];
+      tube(mLegs, hip, knee, 1.7, 1.25, (x, y, z, t) => (t < 0.55 ? (y > 24.6 ? 0xffffff : 0xb4b4b4) : SK.L));
+      tube(mLegs, knee, ankle, 1.15, 0.8, SK.L);
+      tube(mLegs, [knee[0], knee[1] - 1.5, knee[2] - 0.8], [ankle[0], ankle[1] + 3.2, ankle[2] - 0.5], 1.25, 0.9, SK.L);
+      tube(mLegs, ankle, toe, 0.85, 0.65, SK.M);
+    }
+    for (const [k, v] of mLegs.vox) {
+      const x = ((k >> 20) & 1023) - 512, y = ((k >> 10) & 1023) - 512, z = (k & 1023) - 512;
+      if (v.c === 0xffffff || v.c === 0xb4b4b4) { tset(mLegs, x, y, z, v.c); continue; }
+      if (!mLegs.has(x, y + 1, z) && v.c === SK.L) v.c = SK.H; else if (!mLegs.has(x, y - 1, z) && v.c !== SK.H) v.c = SK.M;
+    }
+  }
   const R = 0.7;   // mahout scale
   const t = manTorso();
   eKilt(t, { len: 6 }); eBelt(t, GOLD, GOLD_DK); eCollar(t, [GOLD, TM, GOLD], { r0: 2.6 });
-  rig('war_elephant', { voxel: 0.1, anim: 'horse', style: 'elephant', gait: 0.55, stride: 0.6, graze: false }, [
-    part('body', body, [5.5, 0, 9.5], [0, 9, 0], null),
+  rig('war_elephant', { voxel: 0.1, anim: 'horse', style: 'elephant', pose: 'mount', gait: 0.55, stride: 0.6, graze: false }, [
+    part('body', bodyF, [11, 0, 19], [0, 9, 0], null, { scale: 0.5, greedy: true, outline: 0.1 }),
     part('barding', cloth, [5.5, 0, 9.5], [0, 0, 0], 'body'),
     part('howdah', how, [6, 0, 5], [0, 12, -3], 'body'),
-    part('riderLegs', riderLegsM({ y: 13, x0: 2, x1: 9, z: 12, len: 5, sandal: false }), [5.5, 0, 9.5], [0, 0, 0], 'body'),
+    part('riderLegs', mLegs, [0, 0, 0], [0, 0, 0], 'body', { scale: 0.5, greedy: true, outline: 0.12 }),
     part('neck', headM, [0, 0, 0], [0, 8, 10], 'body', { scale: 0.5, greedy: true, outline: 0.08 }),
     part('tail', new VoxelModel().box(0, -8, 0, 1, 8, 1, G).box(-1, -10, 0, 3, 2, 1, HAIR), [0.5, 0, 0.5], [0, 9, -9], 'body'),
-    part('legFL', legUp, [2, 6, 2], [3.5, 3, 5.5], 'body'),
-    part('cannonFL', legLow, [2, 7, 2], [0, -5, 0], 'legFL'),
-    part('legFR', legUp, [2, 6, 2], [-3.5, 3, 5.5], 'body'),
-    part('cannonFR', legLow, [2, 7, 2], [0, -5, 0], 'legFR'),
-    part('legBL', legUp, [2, 6, 2], [3.5, 3, -5.5], 'body'),
-    part('cannonBL', legLow, [2, 7, 2], [0, -5, 0], 'legBL'),
-    part('legBR', legUp, [2, 6, 2], [-3.5, 3, -5.5], 'body'),
-    part('cannonBR', legLow, [2, 7, 2], [0, -5, 0], 'legBR'),
-    ...riderMan({ torso: t, s: R, torsoJoint: [0, 13, 3], torsoParent: 'body', head: 'mahout', arm: { bracer: TEAM } }),
-    part('weapon', spearM(28), [0, 0, 0], sc(HAND_E, R), 'armR', { scale: R }),
+    ...(() => { const L = { scale: 0.5, greedy: true, outline: 0.1 }; return [
+      part('legFL', legUp, [0, 0, 0], [3.5, 3, 5.5], 'body', L),
+      part('cannonFL', legLow, [0, 0, 0], [0, -5, 0], 'legFL', L),
+      part('legFR', legUp, [0, 0, 0], [-3.5, 3, 5.5], 'body', L),
+      part('cannonFR', legLow, [0, 0, 0], [0, -5, 0], 'legFR', L),
+      part('legBL', legUpH, [0, 0, 0], [3.5, 3, -5.5], 'body', L),
+      part('cannonBL', legLow, [0, 0, 0], [0, -5, 0], 'legBL', L),
+      part('legBR', legUpH, [0, 0, 0], [-3.5, 3, -5.5], 'body', L),
+      part('cannonBR', legLow, [0, 0, 0], [0, -5, 0], 'legBR', L)]; })(),
+    ...riderMan({ torso: t, s: R, torsoJoint: [0, 13, 3], torsoParent: 'body', head: 'mahout', headScale: 0.82, arm: { bracer: TEAM } }),
+    // (round 41) the spear stands in the fist across the bent forearm (the mount pose)
+    part('weapon', spearM(28), [0, 0, 0], sc(HAND_E, R), 'armR', { scale: R, rest: [1.75, 0, 0.12] }),
   ]);
 }
 
