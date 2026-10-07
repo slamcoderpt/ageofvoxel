@@ -160,6 +160,7 @@ AovUnitView::Rig AovUnitView::parse_rig(const Dictionary &R, int t) {
 	rig.sting = (bool)R.get("sting", false);
 	rig.idles = (bool)R.get("idles", false);
 	{ const Variant sv = R.get("stance", 0.0); rig.stance = sv.get_type() == Variant::BOOL ? ((bool)sv ? 1.0f : 0.0f) : (float)(double)sv; }
+	rig.leg = (float)(double)R.get("leg", 1.0);
 	rig.voxel = (float)(double)R.get("voxel", 0.07);
 	const Array parts = R.get("parts", Array());
 	for (int64_t i = 0; i < parts.size(); i++) {
@@ -775,14 +776,20 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 				// hand steadies the beam, the mallet is lifted behind the head
 				// on a bent elbow and driven in at chest height, the shoulders
 				// and hips following it (a slow lift, a fast blow)
+				// (round 40) no straight hammer arm: at the top the elbow is
+				// folded and lifted out to the side, the mallet cocked behind
+				// the head, the chest wound back to the right; the blow drives
+				// the elbow down with the forearm still bent (~35 degrees), the
+				// chest twisting through to the left and dipping into it, the
+				// head held on the work
 				const double cyc = std::fmod(t * 1.35 + uhash(id, 70), 1.0);
 				const double k = cyc < 0.62 ? smooth(cyc / 0.62) : 1 - smooth((cyc - 0.62) / 0.14);
 				set(CH_legL, -0.42, 0, 0.07); set(CH_shinL, 0.38);
 				set(CH_legR, 0.3, 0, -0.07); set(CH_shinR, 0.14);
-				set(CH_torso, 0.22 - k * 0.14, -0.1 - k * 0.12);
-				set(CH_head, -0.18 - k * 0.1);
-				set(CH_armR, ease(-1.2, -2.75, k), 0, -0.1); set(CH_foreR, ease(-0.3, -1.15, k));
-				set(CH_armL, -0.95 + k * 0.1, 0.2, 0.18); set(CH_foreL, -0.7);
+				set(CH_torso, 0.34 - k * 0.24, ease(0.24, -0.4, k), ease(-0.04, 0.08, k));
+				set(CH_head, -0.24 - k * 0.06, ease(-0.16, 0.3, k));
+				set(CH_armR, ease(-1.15, -2.45, k), 0, ease(-0.12, -0.5, k)); set(CH_foreR, ease(-0.62, -1.75, k));
+				set(CH_armL, -0.95 + k * 0.1, 0.2, 0.18); set(CH_foreL, -0.85);
 				bob = -0.85 - (1 - k) * 0.15;
 			} else if (res == aov::RES_FOOD) {
 				// squatting at the bush, both knees deep, reaching in and
@@ -805,10 +812,12 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 				const double tor = 0.55 - k * 0.5;
 				set(CH_legL, -0.75 - (1 - k) * 0.1, 0, 0.08); set(CH_shinL, 1.0 + (1 - k) * 0.15);
 				set(CH_legR, 0.4 + (1 - k) * 0.08, 0, -0.08); set(CH_shinR, 0.25 + (1 - k) * 0.1);
-				set(CH_torso, tor, -0.15);
-				set(CH_head, -0.2 - tor * 0.4);
-				set(CH_armR, ease(-1.45, -2.95, k) , 0, -0.06); set(CH_foreR, ease(-0.15, -0.95, k));
-				set(CH_armL, ease(-1.3, -2.8, k), 0, 0.16); set(CH_foreL, ease(-0.25, -0.9, k));
+				// (round 40) the torso twists back with the lift and through
+				// the blow, the elbows never locked straight
+				set(CH_torso, tor, ease(0.12, -0.32, k));
+				set(CH_head, -0.2 - tor * 0.4, ease(-0.08, 0.2, k));
+				set(CH_armR, ease(-1.45, -2.95, k) , 0, -0.06); set(CH_foreR, ease(-0.42, -1.05, k));
+				set(CH_armL, ease(-1.3, -2.8, k), 0, 0.16); set(CH_foreL, ease(-0.45, -1.0, k));
 				bob = -2.1 - (1 - k) * 0.7;
 			}
 		}
@@ -1168,7 +1177,9 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 			bob -= wide * 0.5;
 		}
 	}
-	bob_out = (float)bob;
+	// (round 40) the poses' sink is solved for 7 + 7 voxel legs: a shorter
+	// leg sinks in proportion, so the feet stay on the ground
+	bob_out = (float)(bob * rig.leg);
 	fwd_out = (float)fwd;
 }
 

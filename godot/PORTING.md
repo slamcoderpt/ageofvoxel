@@ -2912,6 +2912,42 @@ every man on `manParts` / `archerArms` with fine limbs. Check:
 `eu_one=laborer&eu_turn=30&eu_zoom=0.7&eu_az=-0.7`, `eu_group=eco`,
 `eu_group=foot`.
 
+The Laborer's build, face, headwear and swing, round 40 (unit_11; the four
+labourers read as mannequins beside the priests: one flat tan, spindly
+over-long legs, stick arms, no face, all four identical, the hammer arm locked
+straight). **Shorter legs**: `manParts({ legK: 0.85 })` compresses the fine
+thigh and shin rows towards their pivots (`refineLimb` `ky`; the foot keeps
+its size and rises to match, `legLens`), the hip and the knee joints follow,
+and the rig's new `leg` meta (hip / 14) scales every pose's sink in
+`unit_view.cpp` (`bob_out = bob * rig.leg`; default 1, so no other rig
+changes). **Mass**: `LAB_PROFILES` (passed as `prof`, per-kind keys in place
+of `FINE_PROFILES`) give the deltoid ~0.4 body voxels more and set it out
+over the arm, a thicker biceps, a forearm swelling under the elbow, a thicker
+thigh and a calf bulging ~0.35 more behind the shin over the same thin
+ankle. **Three skin tones** (`ramp`): on the fine limbs the lit front and
+outer side H, the back and inner face M, L between (the deltoid's cap lit
+wider, the calf's underside M); on the torso (`refineTorso({ ramp })`) the
+shoulders' tops and the chest H, a shadow row under the pectorals, the flanks
+and the back M. **Face** (`fineHead('laborer')`): a two-row dark brow ledge,
+each eye white / a two-row dark pupil / white, stubble along the jaw and a
+dark chin. **Four looks by the unit id** (part `vary: [k, 4]`): the head is
+four parts on the `head` channel (`head` bare crop, `headK` a linen khat
+gathered and tied at the nape, `headB` a red band knotted behind, `headS` a
+red-striped khat; the cloth is built into the head by `fineHead(style,
+wear)` / `labHeadwear`, no hair under it, since a cloth part over the hair
+let the hair's outline speckle through), and two cloth belts on the fine
+grid one voxel over the refined waist with a knot and hanging ends (`beltR`
+red with the khat, `beltO` ochre with the band; the others keep the linen
+sash). **Swing** (`unit_view.cpp`, stance men building): the hammer arm's
+elbow never straightens (forearm -0.62 at the blow, -1.75 cocked behind the
+head at the top, the elbow lifted out), the chest winds back to the right
+(yaw -0.4) and twists through to the left into the blow (+0.24), dipping
+forward, the head held on the work; the mining / chopping lunge twists the
+torso the same way and keeps both elbows bent. Check:
+`eu_group=eco&eu_zoom=0.35&eu_ax=2.2&eu_az=4.2` (the builders),
+`eu_focus=laborer&eu_zoom=0.4&eu_yaw=200` (faces), `eu_focus=laborer&eu_state=walk`,
+`eu_group=eco`.
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower

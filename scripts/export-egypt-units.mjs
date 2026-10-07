@@ -621,7 +621,10 @@ const fhJaw = (x, y, z) => {
   return Math.abs((x + 0.5) / hw) ** 3 + Math.abs((z + 0.5 - cz) / az) ** 3 <= 1;
 };
 const fhInHead = (x, y, z) => fhCranium(x, y, z) || fhJaw(x, y, z);
-function fineHead(style) {
+// (round 40) wear: the Laborers' headwear (labHeadwear) built into the head
+// itself (a separate part over the hair let the hair and its outline show
+// through the cloth); under a khat there is no hair
+function fineHead(style, wear = null) {
   const m = new VoxelModel();
   const dark = style === 'merc' || style === 'mercCav';
   const P = dark ? FH.dark : FH.skin;
@@ -661,6 +664,21 @@ function fineHead(style) {
     paintF(x, 1, P.LIPL); paintF(x, 0, P.H);                              // the lower lip, the chin
     paintF(x, 10, P.H);                                                   // the forehead's light
   }
+  if (style === 'laborer') {
+    // (round 40) a face that reads at RTS zoom (unit_11's labourers): the
+    // brows a two-row dark ledge over the eyes, each eye a white, a dark
+    // pupil two rows tall and a white, a dark chin under the lip and the jaw
+    // in stubble shade, so the head shows a brow, eyes and a jaw, not a blank
+    const SUB = 0x3a2414;
+    both((X) => {
+      for (const x of [-5, -4, -3, -2]) { paintF(X(x), 9, P.BROW); paintF(X(x), 10, x === -2 ? P.S : P.BROW); }
+      paintF(X(-4), 8, P.SOCK); paintF(X(-3), 8, 0x0e0806); paintF(X(-2), 8, P.SOCK);
+      paintF(X(-4), 7, 0xf4ece0); paintF(X(-3), 7, 0x0e0806); paintF(X(-2), 7, 0xf4ece0);
+      for (let y = 0; y <= 2; y++) paintF(X(-3), y, SUB);                 // stubble along the jaw
+      paintF(X(-2), 0, SUB);
+    });
+    for (const x of [-1, 0]) { paintF(x, 0, SUB); paintF(x, -1, SUB); }  // the chin
+  }
   for (const s of [-1, 1]) {                                              // ears
     const ex = s < 0 ? -7 : 6;
     for (let y = 5; y <= 8; y++) for (const z of [-1, 0]) m.set(ex, y, z, y === 5 || y === 8 ? P.D : P.S);
@@ -699,6 +717,8 @@ function fineHead(style) {
     }
     // the fringe: one straight edge across the forehead, a lit row on top
     for (let x = -6; x <= 5; x++) { const z = front(x, 11); if (z !== null) m.set(x, 11, z + 1, (x & 1) ? H.M : H.L); }
+  } else if (style === 'laborer' && (wear === 'khat' || wear === 'stripe')) {
+    // (no hair under the cloth)
   } else if (style === 'laborer' || style === 'merc' || style === 'mercCav') {
     // close-cropped hair hugging the cranium: from a hairline at the brow
     // (y 11 in front, falling to the ears at the sides) down to the nape (y 5),
@@ -763,6 +783,50 @@ function fineHead(style) {
       else m.set(x, y, z, edge ? 0x7a4a08 : ((x + y + z) & 3) === 0 ? 0xc89410 : 0xb07a0e, { glow: edge ? 0 : 0.78 });
     }
     for (let x = -6; x <= 5; x++) { const z = front(x, 11); if (z !== null) m.set(x, 11, z + 1, 0xd8a420, { glow: 0.78 }); }   // the brow band
+  }
+  if (wear) for (const [k, v] of labHeadwear(wear).vox) { const x = ((k >> 20) & 1023) - 512, y = ((k >> 10) & 1023) - 512, z = (k & 1023) - 512; m.set(x, y, z, v.c); }
+  return m;
+}
+// (round 40) the Laborers' headwear (unit_11), parts over the fine head in its
+// own grid, shown by the unit id (rig part "vary"), so four labourers are four
+// men: 'khat' a linen cloth over the crown and the ears gathered in a bag at
+// the nape, its front edge a band over the brows; 'band' a red cloth band
+// knotted at the back, its two ends hanging; 'stripe' the khat in red and
+// cream stripes round the head
+function labHeadwear(kind) {
+  const m = new VoxelModel();
+  const LN = { L: 0xf6efdc, M: 0xe2d6b8, D: 0xb8a882 }, RD = { L: 0xd8442a, M: 0xb43420, D: 0x7a2214 };
+  if (kind === 'band') {
+    for (let y = 11; y <= 12; y++) for (let x = -10; x <= 9; x++) for (let z = -10; z <= 9; z++) {
+      if (!fhCranium(x, y, z, 1.7) || fhInHead(x, y, z)) continue;   // (over the hair: no gaps)
+      m.set(x, y, z, y === 12 ? RD.L : RD.M);
+    }
+    // the knot at the back and its two ends falling to the nape
+    for (const x of [-2, -1, 0, 1]) m.set(x, 11, -8, RD.M).set(x, 12, -8, RD.L);
+    for (let y = 5; y <= 10; y++) { m.set(-2, y, -8 + (y < 8 ? 0 : 0), RD.M); m.set(1, y - 1, -8, RD.D); }
+    return m;
+  }
+  const striped = kind === 'stripe';
+  for (let y = 2; y <= 17; y++) for (let x = -10; x <= 9; x++) for (let z = -10; z <= 9; z++) {
+    const pz = z + 0.5;
+    const py = y + 0.5 - FH_C.y, px = x + 0.5, pzz = pz - FH_C.z;
+    // a shell 1.8 over the cranium; below its middle a column (the cloth
+    // falls straight past the ears instead of following the jaw in)
+    const d = 1.45 + (y < 7 && pz < -2 ? 0.6 : 0);                        // the bag at the nape a little fuller
+    const inside = py > 0 ? (px / (FH_C.rx + d)) ** 2 + (py / (FH_C.ry + d)) ** 2 + (pzz / (FH_C.rz + d)) ** 2 <= 1
+      : (px / (FH_C.rx + d)) ** 2 + (pzz / (FH_C.rz + d)) ** 2 <= 1;
+    if (!inside || fhInHead(x, y, z)) continue;   // (solid over the hair, so it never shows through)
+    if (y <= 10 && pz > -0.5) continue;                                  // the face, cheeks and ears' fronts open
+    if (pz > 1.5 && y <= 11) continue;
+    if (y < 6 && pz > -2) continue;                                      // the neck free
+    // the bag at the nape narrows to the tie
+    if (y < 6 && Math.abs(px) > 3 + (y - 2) * 0.6) continue;
+    const edge = (y === 11 && pz > 1.5) || (y === 12 && pz > 3.5);
+    const lit = py > 4 || (y > 8 && pz > 0);
+    let c;
+    if (striped) c = edge || (y === 5 && pz < -2) ? RD.D : ((y + 40) % 3 === 0 ? RD.M : (lit ? LN.L : LN.M));
+    else c = edge || y === 2 || (y === 5 && pz < -2) ? LN.D : lit ? LN.L : LN.M;   // the hem, the tie round the bag
+    m.set(x, y, z, c);
   }
   return m;
 }
@@ -1206,24 +1270,31 @@ function eSash(m, color, x0 = -5, x1 = 4, y0 = 13, y1 = 3) {
 }
 // the parts of a standing Egyptian man; s scales a rider (joints and voxels)
 function manParts({ torso, head: hs, headScale = 0.9, headZ = MAN.headZ, pal = PAL_SKIN, arm = {}, armL = {}, armR = {}, leg = {}, s = 1,
-  armX = MAN.armX, legs = true, torsoJoint = null, torsoParent = null, restL = null, restR = null, restFL = null, restFR = null, liftL = 0, liftR = 0, fine = true } = {}) {
+  armX = MAN.armX, legs = true, torsoJoint = null, torsoParent = null, restL = null, restR = null, restFL = null, restFR = null, liftL = 0, liftR = 0, fine = true,
+  legK = 1, prof = null, ramp = false } = {}) {
   // (round 12) no baked corner AO on the men's bodies: on the rounded limb
   // sections it drew dark grooves down every arm and leg (a stick-built doll);
   // the scene's light shades the round forms instead
   const S = BODY_SCALE * s, X = { scale: S, jitter: 0.015, ao: false };   // flat tones: almost no per-voxel jitter
   const P = [];
   // (round 33) fine limbs (refineLimb at export)
-  const F = (kind, side, p2, o = {}) => (fine ? { fine: kind, fineOut: side === 'L' ? 1 : -1, finePal: p2, ...o } : {});
+  // (round 40) legK: legs shortened by a row compression of the fine limbs
+  // (the hip lowered to match; the rig's "leg" scales the poses' sink in
+  // unit_view.cpp); prof: per-kind fine profiles; ramp: three skin tones
+  const ext = { ...(prof ? { fineProf: prof } : {}), ...(ramp ? { fineRamp: true } : {}) };
+  const F = (kind, side, p2, o = {}) => (fine ? { fine: kind, fineOut: side === 'L' ? 1 : -1, finePal: p2, ...ext, ...o } : {});
+  const LL = legLens(legK), hip = legK === 1 ? MAN.hip : LL.thigh + LL.shin;
+  const KY = legK === 1 ? {} : { fineKy: legK };
   if (legs) {
     const lp = leg.pal || pal;
     P.push(
-      part('legL', manThighM({ pal, ...leg, side: 'L' }), LEG_PIVOT, sc([MAN.legX, MAN.hip, 0], s), null, { ...X, ...F('thigh', 'L', lp) }),
-      part('shinL', manShinM({ pal, ...leg, side: 'L' }), LEG_PIVOT, sc([0, MAN.shin, 0], s), 'legL', { ...X, ...F('shin', 'L', lp) }),
-      part('legR', manThighM({ pal, ...leg, side: 'R' }), LEG_PIVOT, sc([-MAN.legX, MAN.hip, 0], s), null, { ...X, ...F('thigh', 'R', lp) }),
-      part('shinR', manShinM({ pal, ...leg, side: 'R' }), LEG_PIVOT, sc([0, MAN.shin, 0], s), 'legR', { ...X, ...F('shin', 'R', lp) }),
+      part('legL', manThighM({ pal, ...leg, side: 'L' }), LEG_PIVOT, sc([MAN.legX, hip, 0], s), null, { ...X, ...F('thigh', 'L', lp, KY) }),
+      part('shinL', manShinM({ pal, ...leg, side: 'L' }), LEG_PIVOT, sc([0, legK === 1 ? MAN.shin : -LL.thigh, 0], s), 'legL', { ...X, ...F('shin', 'L', lp, KY) }),
+      part('legR', manThighM({ pal, ...leg, side: 'R' }), LEG_PIVOT, sc([-MAN.legX, hip, 0], s), null, { ...X, ...F('thigh', 'R', lp, KY) }),
+      part('shinR', manShinM({ pal, ...leg, side: 'R' }), LEG_PIVOT, sc([0, legK === 1 ? MAN.shin : -LL.thigh, 0], s), 'legR', { ...X, ...F('shin', 'R', lp, KY) }),
     );
   }
-  P.push(part('torso', torso, [0, 0, 0], torsoJoint || sc([0, MAN.hip, 0], s), torsoParent, { ...X, ...(fine ? { fine: 'torso', finePal: pal } : {}) }));
+  P.push(part('torso', torso, [0, 0, 0], torsoJoint || sc([0, hip, 0], s), torsoParent, { ...X, ...(fine ? { fine: 'torso', finePal: pal, ...(ramp ? { fineRamp: true } : {}) } : {}) }));
   P.push(headPart(hs, sc([0, MAN.headY, headZ], s), 'torso', headScale * s));
   // (round 12) an arm with no baked bend is split at the elbow like the
   // archer's (splitArm: the upper arm and the forearm overlap two rows at a
@@ -1695,14 +1766,22 @@ const FINE_PROFILES = {
   upper: { rows: [9, 18], keys: [[9, 1.1, 1.15, 0, -0.05], [10.5, 1.2, 1.25, 0, 0], [12, 1.45, 1.6, 0, 0.3], [13.5, 1.6, 1.7, 0.2, 0.2], [15.5, 1.9, 1.8, 0.35, 0], [17.5, 1.8, 1.7, 0.2, 0], [19, 1.4, 1.4, 0, 0]] },
   fore: { rows: [3, 10], keys: [[3, 0.7, 0.75, 0, 0], [4.5, 0.8, 0.85, 0, 0], [6.5, 1.1, 1.1, 0, 0.05], [8, 1.25, 1.2, 0.05, 0.05], [9.5, 1.1, 1.1, 0, -0.05], [11, 1.1, 1.1, 0, 0]] },
 };
-const fineProfile = (kind, y) => {
-  const K = FINE_PROFILES[kind].keys;
-  if (y <= K[0][0]) return K[0];
-  for (let i = 1; i < K.length; i++) if (y <= K[i][0]) {
-    const a = K[i - 1], b = K[i], t = (y - a[0]) / (b[0] - a[0]);
-    return a.map((v, j) => v + (b[j] - v) * t);
-  }
-  return K[K.length - 1];
+// (round 40) the Laborer's working build (unit_11): the round-39 profiles
+// read as spindly sticks beside the robed priests. A rounded deltoid ~0.4 body
+// voxels (about a fine voxel a side) fuller and standing out over the arm, a
+// thicker biceps and a forearm that swells under the elbow; a thicker thigh
+// and a calf bulging ~0.35 more behind the shin over the same thin ankle
+const LAB_PROFILES = {
+  thigh: [[0, 1.35, 1.4, 0, 0.1], [1.5, 1.55, 1.6, 0, 0.05], [4, 2.0, 2.05, 0, 0.05], [8, 2.25, 2.3, 0, 0], [13, 2.45, 2.4, 0, 0]],
+  shin: [[2, 0.9, 1.1, 0, 0.2], [3.5, 0.82, 0.88, 0, 0], [5, 1.1, 1.15, 0, -0.15], [7, 1.5, 1.75, 0, -0.5], [9.5, 1.8, 2.1, 0, -0.62], [11.5, 1.65, 1.85, 0, -0.3], [13.5, 1.35, 1.4, 0, 0.1]],
+  upper: [[9, 1.2, 1.25, 0, -0.05], [10.5, 1.35, 1.4, 0, 0], [12, 1.7, 1.85, 0, 0.35], [13.5, 1.85, 1.9, 0.25, 0.2], [15.5, 2.3, 2.05, 0.5, 0], [17.5, 2.2, 1.95, 0.35, 0], [19, 1.6, 1.55, 0.1, 0]],
+  fore: [[3, 0.8, 0.85, 0, 0], [4.5, 0.95, 1.0, 0, 0], [6.5, 1.35, 1.3, 0.05, 0.1], [8, 1.5, 1.4, 0.1, 0.05], [9.5, 1.25, 1.25, 0, -0.05], [11, 1.2, 1.2, 0, 0]],
+};
+// the legs' lengths (rig voxels) at a row compression ky (refineLimb): the
+// thigh 7 ky, the shin the foot's row plus its profiled rows (2..13) * ky
+const legLens = (ky) => {
+  const shift = Math.round(2 * 12 * (1 - ky));
+  return { thigh: 7 * ky, shin: (14 - shift / 2) / 2 };
 };
 // (round 39) skin in one flat tone shaded as the smooth limb it stands for:
 // the round-33 per-voxel front / side / inner tones met along jagged
@@ -1744,30 +1823,50 @@ function fineHand(m, src, out, pal, skin) {
   for (const y of [3, 4]) for (const z of [1, 2, 3]) put(tx, y, z, L);
   put(inner, 3, 4, H); put(inner, 4, 4, L);
 }
-function refineLimb(src, kind, out, { pal = null, k = 1 } = {}) {
-  const P = FINE_PROFILES[kind];
+// (round 40) ky < 1 compresses the profiled rows towards the top of the limb
+// (the hip / knee pivot, row 14) and lifts the rows under them (the foot) to
+// match: the Laborer's legs 15 % shorter; prof: per-rig keys in place of
+// FINE_PROFILES[kind] (the Laborer's stocky deltoids, forearms and calves);
+// ramp: bare skin in three flat tones by the section's facing (lit front and
+// outer side H, L between, the back and the inner face M) instead of one
+function refineLimb(src, kind, out, { pal = null, k = 1, ky = 1, prof = null, ramp = false } = {}) {
+  const P = prof ? { ...FINE_PROFILES[kind], keys: prof } : FINE_PROFILES[kind];
+  const profAt = (y) => {
+    const K = P.keys;
+    if (y <= K[0][0]) return K[0];
+    for (let i = 1; i < K.length; i++) if (y <= K[i][0]) {
+      const a = K[i - 1], b = K[i], t = (y - a[0]) / (b[0] - a[0]);
+      return a.map((v, j) => v + (b[j] - v) * t);
+    }
+    return K[K.length - 1];
+  };
   const m = new VoxelModel();
   const skin = pal ? new Set([pal.H, pal.L, pal.M, pal.D, palH(pal)].filter((c) => c !== undefined)) : new Set();
   let y0 = 1e9, y1 = -1e9;
   for (const [kk] of src.vox) { const y = ((kk >> 10) & 1023) - 512; y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
   const copy = (xf, yf, zf, v) => { m.set(xf, yf, zf, 0); Object.assign(m.get(xf, yf, zf), v); };
   const hand = kind === 'fore' && pal && y0 <= 0;
+  // (round 40) the row compression: output half-row ho <- source hs
+  const lo = Math.max(P.rows[0], y0), T = Math.min(P.rows[1], y1) + 1;
+  const toSrc = (ho) => T - (T - ho) / ky, toOut = (hs) => T - (T - hs) * ky;
+  const shift = ky === 1 ? 0 : Math.round(2 * (T - lo) * (1 - ky));   // fine rows the foot rises
   // the rows outside the profile (the fist, the foot, a sleeve's top): resampled
   for (const [kk, v] of src.vox) {
     const x = ((kk >> 20) & 1023) - 512, y = ((kk >> 10) & 1023) - 512, z = (kk & 1023) - 512;
     if (y >= P.rows[0] && y <= P.rows[1]) continue;
     if (hand && y <= 2) continue;
-    for (let i = 0; i < 8; i++) copy(2 * x + (i & 1), 2 * y + ((i >> 1) & 1), 2 * z + (i >> 2), v);
+    const dy = y < lo ? shift : 0;
+    for (let i = 0; i < 8; i++) copy(2 * x + (i & 1), 2 * y + ((i >> 1) & 1) + dy, 2 * z + (i >> 2), v);
   }
   if (hand) fineHand(m, src, out, pal, skin);
   const sec = (hy) => {
-    const [, rx0, rz0, cxo, czo] = fineProfile(kind, hy);
+    const [, rx0, rz0, cxo, czo] = profAt(hy);
     return { rx: rx0 * k, rz: rz0 * k, cx: 0.5 + cxo * out * k, cz: 0.5 + czo * k };
   };
-  const yf0 = 2 * Math.max(P.rows[0], y0), yf1 = 2 * Math.min(P.rows[1], y1) + 1;
+  const yf0 = Math.floor(2 * toOut(lo)), yf1 = 2 * T - 1;
   // the profiled rows: a fine ellipse per fine row, coloured from the body grid
   for (let yf = yf0; yf <= yf1; yf++) {
-    const hy = (yf + 0.5) / 2, ys = Math.floor(hy);
+    const hy = Math.max(lo, toSrc((yf + 0.5) / 2)), ys = Math.floor(hy), ysf = 2 * hy - 0.5;
     const { rx, rz, cx, cz } = sec(hy);
     const row = [];
     for (const [kk, v] of src.vox) if (((kk >> 10) & 1023) - 512 === ys) row.push([((kk >> 20) & 1023) - 512, (kk & 1023) - 512, v]);
@@ -1787,13 +1886,24 @@ function refineLimb(src, kind, out, { pal = null, k = 1 } = {}) {
       if (!v.team && skin.has(v.c)) {
         let c = pal.L;
         const n = Math.hypot(nx, nz);
+        if (ramp && n > 0.35) {
+          // (round 40) light on the front and the outer side, shade behind and
+          // on the inner face (towards the body), the lit band widening up the
+          // deltoid's cap; under the calf's bulge and the forearm's belly a
+          // tone down
+          const f = (nz + (nx * out) * 0.55) / n;
+          const lit = kind === 'upper' && ysf >= 30 ? -0.35 : 0.3;
+          if (f > lit) c = palH(pal);
+          else if (f < -0.45) c = pal.M;
+          if (kind === 'shin' && ysf >= 12 && ysf <= 18 && nz < -0.35) c = pal.M;
+        }
         if (n > 0.7) {
           // joint marks on the surface: the kneecap's light, the knee pit and
           // the elbow crease in shade
-          if (kind === 'thigh' && yf <= 2 && nz > 0.75) c = palH(pal);
-          if (kind === 'shin' && yf >= 25 && nz < -0.7) c = pal.M;
-          if (kind === 'upper' && yf <= 20 && nz > 0.75) c = pal.M;
-          if (kind === 'fore' && yf >= 19 && nz > 0.75) c = pal.M;
+          if (kind === 'thigh' && ysf <= 2 && nz > 0.75) c = palH(pal);
+          if (kind === 'shin' && ysf >= 25 && nz < -0.7) c = pal.M;
+          if (kind === 'upper' && ysf <= 20 && nz > 0.75) c = pal.M;
+          if (kind === 'fore' && ysf >= 19 && nz > 0.75) c = pal.M;
         }
         m.set(xf, yf, zf, c);
       } else copy(xf, yf, zf, v);
@@ -1801,8 +1911,9 @@ function refineLimb(src, kind, out, { pal = null, k = 1 } = {}) {
   }
   // the kneecap and the elbow point stand a fine voxel proud
   const bump = (yfs, front) => {
-    for (const yf of yfs) {
-      const { cx, cz, rz } = sec((yf + 0.5) / 2);
+    for (const ysrc of yfs) {
+      const yf = Math.floor(2 * toOut((ysrc + 0.5) / 2));
+      const { cx, cz, rz } = sec((ysrc + 0.5) / 2);
       const zEdge = front ? Math.floor(2 * (cz + rz)) : Math.floor(2 * (cz - rz)) - 1;
       for (const xf of [Math.floor(2 * cx) - 1, Math.floor(2 * cx)]) {
         // only on bare skin
@@ -1817,7 +1928,7 @@ function refineLimb(src, kind, out, { pal = null, k = 1 } = {}) {
   if (pal && kind === 'upper') bump([18, 19], false);
   // smooth shading: the profiled rows take the section's outward normal
   m.smoothN = (x, y, z, n) => {
-    const hy = (y + 0.5) / 2;
+    const hy = toSrc((y + 0.5) / 2);
     if (hy < P.rows[0] || hy > P.rows[1] + 1 || hy < y0 || hy > y1 + 1) return n;
     if (hand && hy < 3.25) return n;
     const s = sec(Math.max(P.rows[0] + 0.25, Math.min(P.rows[1] + 0.75, hy)));
@@ -1839,7 +1950,10 @@ function refineLimb(src, kind, out, { pal = null, k = 1 } = {}) {
 // a half tone where it turns, the sides and back M); paint (collars, straps,
 // belts, the kilt) keeps its colours and is only rounded with it
 const mixC = (a, b, t) => { const f = (s) => [(a >> s) & 255, (b >> s) & 255]; const ch = (s) => { const [x, y] = f(s); return Math.round(x + (y - x) * t) << s; }; return ch(16) | ch(8) | ch(0); };
-function refineTorso(src, pal) {
+// (round 40) ramp: bare skin in three flat tones (the Laborer): the shoulders'
+// tops and the chest's front lit (H), a shadow row under the pectorals, the
+// flanks and the back a tone down (M), the belly L
+function refineTorso(src, pal, { ramp = false } = {}) {
   const m = new VoxelModel();
   const rows = new Map();
   for (const [kk, v] of src.vox) {
@@ -1862,8 +1976,14 @@ function refineTorso(src, pal) {
       const e = Math.abs(dx) ** P + Math.abs(dz) ** P;
       if (e > 1 && ax >= 2 && az >= 1.5) continue;
       if (!v.team && skin.has(v.c)) {
-        // the section's normal (the superellipse's gradient)
-        m.set(xf, yf, zf, pal.L);
+        let c = pal.L;
+        if (ramp) {
+          if (y >= 13) c = palH(pal);
+          else if (dz < -0.35 || (Math.abs(dx) > 0.8 && dz < 0.3)) c = pal.M;
+          else if (dz > 0.3 && y >= 9) c = palH(pal);
+          else if (dz > 0.3 && y === 8) c = pal.M;
+        }
+        m.set(xf, yf, zf, c);
       } else { m.set(xf, yf, zf, 0); Object.assign(m.get(xf, yf, zf), v); }
     }
   }
@@ -1954,8 +2074,36 @@ const sc = (j, s) => j.map((v) => v * s);
   eBelt(t, LINEN, LINEN_SH);
   t.box(0, -5, 3, 1, 6, 1, LINEN).set(0, -6, 3, LINEN_SH);                   // the sash's end down the front
   const showTool = () => ({ conditional: true, portrait: false });
-  rig('laborer', { voxel: 0.07, anim: 'human', style: 'villager', stance: true }, [
-    ...manParts({ torso: t, head: 'laborer', leg: { sandal: null, kilt: TEAM } }),
+  // (round 40) a working build: the legs 15 % shorter (legK), fuller
+  // deltoids, forearms and calves (LAB_PROFILES), the skin in three tones
+  // (ramp); four looks by the unit id (vary [k, 4]): 0 bare-headed with the
+  // linen sash, 1 a linen khat and a red belt, 2 a red headband and an ochre
+  // belt, 3 a red-striped khat
+  const LEG_K = 0.85, LL = legLens(LEG_K);
+  const men = manParts({ torso: t, head: 'laborer', leg: { sandal: null, kilt: TEAM }, legK: LEG_K, prof: LAB_PROFILES, ramp: true });
+  const hp = men.find((q) => q.name === 'head');
+  hp.vary = [0, 4];
+  const wear = (name, kind, v) => ({ ...hp, name, anim: 'head', model: fineHead('laborer', kind), vary: [v, 4], portrait: false });
+  // a cloth belt on the fine grid, one fine voxel over the refined waist
+  // (refineTorso's superellipse through rows 2..3: x -4..3, z -3..2), so it
+  // hugs the body instead of standing off it as a hoop; a knot at the front
+  // with its two ends hanging over the kilt
+  const beltM = (c, cl, cd) => {
+    const m = new VoxelModel();
+    const inS = (xf, zf, g) => Math.abs(((xf + 0.5) / 2) / (4 + g)) ** 3 + Math.abs(((zf + 0.5) / 2) / (3 + g)) ** 3 <= 1;
+    for (let yf = 4; yf <= 7; yf++) for (let xf = -12; xf <= 12; xf++) for (let zf = -12; zf <= 12; zf++) {
+      if (!inS(xf, zf, 0.5) || inS(xf, zf, 0)) continue;
+      m.set(xf, yf, zf, yf === 7 ? cl : zf > 0 ? c : cd);
+    }
+    for (let yf = 3; yf <= 8; yf++) for (const xf of [1, 2, 3]) m.set(xf, yf, 7, yf >= 7 ? cl : c);   // the knot
+    for (let yf = -4; yf <= 2; yf++) { m.set(2, yf, 8, yf & 1 ? c : cd); if (yf >= -2) m.set(4, yf + 1, 8, yf & 1 ? cd : c); }   // the ends
+    return m;
+  };
+  const belt = (name, c, cl, cd, v) => part(name, beltM(c, cl, cd), [0, 0, 0], [0, 0, 0], 'torso', { scale: BODY_SCALE / 2, greedy: true, outline: 0.15, vary: [v, 4], portrait: false });
+  rig('laborer', { voxel: 0.07, anim: 'human', style: 'villager', stance: true, leg: (LL.thigh + LL.shin) / MAN.hip }, [
+    ...men,
+    wear('headK', 'khat', 1), wear('headB', 'band', 2), wear('headS', 'stripe', 3),
+    belt('beltR', 0xc23a22, 0xd8583a, 0x8a2a18, 1), belt('beltO', 0xd8a030, 0xecc050, 0x9a6a18, 2),
     part('toolAxe', axeToolM(), [0, 0, 0], HAND_E, 'armR', showTool()),
     part('toolPick', pickToolM(), [0, 0, 0], HAND_E, 'armR', { ...showTool(), scale: 0.5 }),
     part('toolSickle', sickleToolM(), [0, 0, 0], HAND_E, 'armR', showTool()),
@@ -4477,7 +4625,8 @@ for (const [type, R] of Object.entries(RIGS)) {
     let model = p.model, size = R.voxel * (p.scale || 1), pivot = p.pivot, outlineAt = null;
     if (p.fine) {
       // (round 33) a fine limb (refineLimb): twice the grid, half the voxel
-      model = p.fine === 'torso' ? refineTorso(p.model, p.finePal) : refineLimb(p.model, p.fine, p.fineOut, { pal: p.finePal, k: p.fineK ?? 1 });
+      model = p.fine === 'torso' ? refineTorso(p.model, p.finePal, { ramp: !!p.fineRamp })
+        : refineLimb(p.model, p.fine, p.fineOut, { pal: p.finePal, k: p.fineK ?? 1, ky: p.fineKy ?? 1, prof: p.fineProf?.[p.fine] ?? null, ramp: !!p.fineRamp });
       size /= 2; pivot = pivot.map((v) => v * 2);
       if (p.fine !== 'torso') { const fo = fineOutline(p.fine), sz = size, py = pivot[1]; outlineAt = (y) => fo(y / sz + py); }
     }
