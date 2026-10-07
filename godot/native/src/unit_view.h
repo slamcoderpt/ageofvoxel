@@ -67,6 +67,7 @@ public:
 		bool upright = false;       // (the Egyptian Priest) the staff stays upright in the hand: the weapon counters the arm's and torso's pitch / roll
 		float stance = 0;           // (Egyptian men) idle in a relaxed stride (x this; robes less), not stiffly upright
 		float leg = 1;              // (round 40, the Laborer) leg length / the 14-voxel standard: every pose's sink (bob) scales by it
+		bool guard = false;         // (the Anubite, round 42) idles in one of three combat stances by unit id (knees bent, feet wide, the khopesh raised), walks with the blades up
 		bool idles = false;         // (the Mummy, round 24) each unit idles in one of four poses of its own (weight on one leg, the blade lowered / on the shoulder, slumped)
 		float voxel = 0.07f;
 		bool has_shield = false, has_armR = false;

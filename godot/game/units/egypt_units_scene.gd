@@ -94,7 +94,9 @@ static func scene_setup(game: Node) -> Dictionary:
 		var size := float(GAP.get(focus_type, 1.6))
 		for k in 4:
 			var ang: float = yaw + float([0.0, PI * 0.38, PI * 0.82, -PI * 0.4][k])
-			var p: Vector2 = at.call(float([-1.0, 1.0, 0.0, 0.0][k]) * size * 0.9, float([0.0, 0.0, -1.0, 1.0][k]) * size * 0.75)
+			# (round 42) the rear and the front man stand off the centre line, on
+			# opposite sides, so from the camera no two stack into one column
+			var p: Vector2 = at.call(float([-1.0, 1.0, 0.42, -0.42][k]) * size * 0.9, float([0.1, -0.1, -1.0, 1.0][k]) * size * 0.75)
 			spawn.call(focus_type, 1, p, ang)
 		cam_dist = 5.5 + size * 3.2
 		cam_pitch = 40.0

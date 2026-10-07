@@ -3525,65 +3525,225 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
 }
 
 // ---- myth units -------------------------------------------------------------------
-// Anubite (beast rig, 0.085): a jackal-headed warrior, dark fur, a team
-// headcloth, white linen straps, a team kilt, a sickle-sword in each hand.
-{
-  const FUR = pick3(21, 0x4a2e1c, 0x3e2616, 0x5a3a24);
-  const FUR_LT = 0x6e4a30;
-  // the men's body in two flat fur tones: linen straps crossed over the
-  // chest, a team kilt with a linen hem, silver anklets and armlets
-  const PAL_F = { L: 0x6a452c, M: 0x4a2e1c, D: 0x301c10 };
-  const body = manTorso(PAL_F);
-  eKilt(body, { len: 7, hem: LINEN });
-  eBelt(body, GOLD, GOLD_DK);
-  eSash(body, LINEN, -5, 4, 13, 3); eSash(body, LINEN, 4, -5, 13, 3);
-  eCollar(body, [TM, TM, LINEN], { r0: 2.6 });
-  // (round 15) the head reads muzzle and ears first from the RTS camera: a
-  // 5 x 5 x 5 skull, a long muzzle (3 wide, 6 forward) with a lighter bridge
-  // along its top and a black nose, tall pointed ears (2 wide at the base,
-  // a lighter inner face) standing clear above the crown; the team headcloth
-  // only wraps the skull, one voxel thin: the crown behind the ears, the
-  // sides beside the eyes, lappets down the cheeks and a short flap at the
-  // nape, never above the skull nor behind it as a slab
-  const headM = new VoxelModel();
-  const SNOUT_T = 0x7a5236, EAR_IN = 0x9a6a4c;
-  headM.box(0, 0, 0, 5, 5, 5, FUR);
-  headM.box(1, 0, 5, 3, 3, 3, FUR).box(1, 0, 8, 3, 2, 3, FUR).box(1, -1, 5, 3, 1, 4, FUR_LT);   // muzzle and jaw
-  for (let z = 5; z <= 10; z++) headM.set(2, z <= 7 ? 3 : 2, z, SNOUT_T);                       // the bridge
-  headM.box(1, 1, 11, 3, 1, 1, DARK).set(2, 2, 10, DARK);                                        // the nose
-  headM.set(1, 3, 5, 0xffd040, { glow: 0.6 }).set(3, 3, 5, 0xffd040, { glow: 0.6 });               // eyes beside the bridge
-  for (const ex of [0, 3]) {                                                                     // ears, x 0..1 and 3..4
-    headM.box(ex, 5, 2, 2, 2, 2, FUR).box(ex + (ex ? 1 : 0), 7, 2, 1, 2, 2, FUR).set(ex + (ex ? 1 : 0), 9, 2, FUR);
-    headM.box(ex, 5, 3, 2, 2, 1, EAR_IN).set(ex + (ex ? 1 : 0), 7, 3, EAR_IN);
-  }
-  // the headcloth (team): the crown z -1..1 behind the ears, the sides x 0 / 4
-  // (y 1..4, z 0..3) and the back of the skull painted, then a one-voxel
-  // lappet on each cheek (x -1 / 5, y -2..2, z 1..3) and a short nape flap (z -1, 3 wide, y -2..1)
-  for (let x = 0; x <= 4; x++) for (let z = 0; z <= 1; z++) tset(headM, x, 4, z, 0xffffff);
-  for (const x of [0, 4]) for (let y = 1; y <= 4; y++) for (let z = 0; z <= 3; z++) tset(headM, x, y, z, y === 4 ? 0xffffff : TEAM_SHADE);
-  for (let x = 0; x <= 4; x++) for (let y = 0; y <= 4; y++) tset(headM, x, y, 0, TEAM_SHADE);
-  for (const x of [-1, 5]) for (let y = -2; y <= 2; y++) for (let z = 1; z <= 3; z++) if (!(y === 2 && z === 3)) tset(headM, x, y, z, y === -2 ? 0xffffff : TEAM_SHADE);
-  for (let x = 1; x <= 3; x++) for (let y = -2; y <= 1; y++) tset(headM, x, y, -1, y === -2 ? 0xffffff : TEAM_SHADE);
-  // the sickle-sword (round 15): dark steel, apart from the white linen; a
-  // leather grip in the fist and a bronze guard, a straight neck, then the
-  // hooked blade (two voxels deep along the spine, a lighter honed edge on the
-  // inner curve). The part's rest turns it forward and down out of the fist,
-  // a fighting grip, so it never lies along the arm
-  const STEEL = 0x4e565e, STEEL_D = 0x383e44, STEEL_E = 0x8a949e, BRZ = 0x8a5a24;
-  const blade = () => {
-    const m = new VoxelModel();
-    m.box(0, -2, 0, 1, 3, 1, LEATHER_DK).set(0, -3, 0, BRZ).set(0, 1, 0, BRZ).set(0, 1, 1, BRZ).set(0, 1, -1, BRZ);
-    m.box(0, 2, 0, 1, 5, 1, STEEL).set(0, 4, 1, STEEL_D);
-    const arc = [[7, 0], [8, 1], [9, 2], [9, 3], [9, 4], [8, 5], [7, 6], [6, 6], [5, 7]];
-    for (const [y, z] of arc) { m.set(0, y, z, STEEL); if (y > 5) m.set(0, y - 1, z, z >= 2 && z <= 5 ? STEEL_E : STEEL_D); }
-    m.set(0, 4, 7, STEEL_E);
-    return m;
+// Anubite (round 42, myth_01): rebuilt on the men's fine body (manParts, as
+// the Spearman): a fur torso tapering from the chest to a narrow belted waist
+// over the team kilt, smooth-shaded limbs with knees, elbows and gripping
+// hands, so chest, waist, kilt and legs read as one figure (the round-15 beast
+// body was a stack of blocks: a chest box, a kilt box, stick legs). The head
+// is a fine-grid jackal (jackalHeadF) facing forward on a short neck: a domed
+// skull, a long tapering muzzle with a lit bridge and a black nose, amber
+// eyes under a brow, tall pointed ears standing through the cloth. The nemes
+// is opaque team cloth: a crown with a lit top and shaded sides, side falls
+// behind the cheeks to the shoulders and a back curtain, then two lappets
+// painted down the chest (anubiteBody) that frame the muzzle. A linen wrap
+// round the ribs, a team and gold belt, silver armlets and anklets, team
+// bracers; a khopesh (khopeshM) in each fist with its hook in the plane of
+// the arm's swing, so the crescent shows its face to the RTS camera.
+// Rig `guard`: each Anubite idles in one of three combat stances by unit id
+// (unit_view.cpp: knees bent, feet wide, one blade raised over the head).
+const AN_FUR = { H: 0x6e4a2e, L: 0x5e3d25, M: 0x4a2e1c, D: 0x301c10 };
+function jackalHeadF() {
+  const m = new VoxelModel();
+  const C = { y: 8.6, z: -1.2, rx: 4.9, ry: 5.0, rz: 5.0 };
+  const crown = (x, y, z, d = 0) => {
+    const px = x + 0.5, py = y + 0.5 - C.y, pz = z + 0.5 - C.z;
+    return (px / (C.rx + d)) ** 2 + (py / (C.ry + d)) ** 2 + (pz / (C.rz + d)) ** 2 <= 1;
   };
-  const GRIP_R = { rest: [2.15, 0, -0.2], scale: 0.7 }, GRIP_L = { rest: [2.15, 0, 0.2], scale: 0.7 };
-  rig('anubite', { voxel: 0.085, anim: 'beast', style: 'beast' }, [
-    ...beastManParts({ torso: body, pal: PAL_F, head: headM, headScale: 0.62, arm: { band: 0x8e959c, bracer: TEAM }, leg: { sandal: null, foot: FUR_LT, band: 0x8e959c, kilt: TEAM } }),
-    part('weapon', blade(), [0, 0, 0], BEAST_FIST, 'foreR', GRIP_R),
-    part('weapon2', blade(), [0, 0, 0], BEAST_FIST, 'foreL', { anim: 'weapon', ...GRIP_L }),
+  // the muzzle: a tapering wedge from the face (z 2) to the nose (z 13), its
+  // top sloping down from the brow, the lower jaw a narrower slab under it
+  const muzzle = (x, y, z) => {
+    const pz = z + 0.5;
+    if (pz < 1 || pz > 13.5) return false;
+    const t = (pz - 1) / 12.5;
+    const hw = 3.3 - t * 2.0, top = 8.8 - t * 1.6, bot = 3.8 + t * 1.6;
+    const py = y + 0.5;
+    if (py > top || py < bot) return false;
+    const yc = (top + bot) / 2, hy = (top - bot) / 2;
+    return Math.abs((x + 0.5) / hw) ** 2.6 + Math.abs((py - yc) / hy) ** 2.6 <= 1;
+  };
+  const jaw = (x, y, z) => {
+    const pz = z + 0.5, py = y + 0.5;
+    if (pz < 0 || pz > 11.5 || py < 1.6 || py > 3.8) return false;
+    const hw = 2.6 - (pz / 11.5) * 1.4;
+    return Math.abs(x + 0.5) <= hw;
+  };
+  const neck = (x, y, z) => y < 4 && y >= -4 && Math.hypot(x + 0.5, (z + 0.5 + 1.4) * 1.05) <= 3.1;
+  const inside = (x, y, z) => crown(x, y, z) || muzzle(x, y, z) || jaw(x, y, z) || neck(x, y, z);
+  const F = { T: 0x7a5234, L: 0x664229, S: 0x4e3020, B: 0x3c2416, D: 0x2a1a10 };
+  for (let y = -4; y <= 15; y++) for (let x = -7; x <= 6; x++) for (let z = -8; z <= 14; z++) {
+    if (!inside(x, y, z)) continue;
+    let nx = 0, ny = 0, nz = 0;
+    for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) for (let dz = -2; dz <= 2; dz++)
+      if (!inside(x + dx, y + dy, z + dz)) { nx += dx; ny += dy; nz += dz; }
+    const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+    const c = ny < -0.5 ? F.D : ny > 0.55 ? F.T : nz > 0.55 ? F.L : nz < -0.4 ? F.B : F.S;
+    m.set(x, y, z, c);
+  }
+  const top = (x, z) => { for (let y = 15; y >= -4; y--) if (m.has(x, y, z)) return y; return null; };
+  // the lit bridge of the muzzle, the black nose, the mouth line, the eyes
+  for (let z = 3; z <= 12; z++) for (const x of [-1, 0]) { const y = top(x, z); if (y !== null) m.set(x, y, z, 0x8e6440); }
+  for (let x = -2; x <= 1; x++) for (let y = 5; y <= 8; y++) for (let z = 12; z <= 14; z++) if (m.has(x, y, z) && (z === 13 || !m.has(x, y, z + 1))) m.set(x, y, z, 0x0e0a08);
+  for (let z = 3; z <= 12; z++) for (const x of [-3, 2]) { const xx = z > 7 ? (x < 0 ? -2 : 1) : x; for (let y = 3; y <= 6; y++) if (m.has(xx, y, z) && !m.has(xx, y - 1, z)) { m.set(xx, y, z, 0x1a0e08); break; } }
+  for (const s of [-1, 1]) {
+    const X = (x) => (s < 0 ? -1 - x : x);
+    // a brow ledge a voxel proud, the amber eye under it, a dark rim
+    for (const x of [1, 2, 3, 4]) m.set(X(x), 9, x === 1 ? 4 : 3, 0x24160c);
+    m.set(X(3), 8, 3, 0xffc030, { glow: 0.8 }).set(X(2), 8, 3, 0xffc030, { glow: 0.8 }).set(X(2), 8, 4, 0x1a0e08).set(X(4), 8, 3, 0x24160c).set(X(3), 7, 3, 0x2a1a10);
+  }
+  // the ears: tall, pointed, a little apart, their fronts a light inner face
+  for (const s of [-1, 1]) {
+    for (let y = 11; y <= 22; y++) {
+      const t = (y - 11) / 11, hw = 2.2 * (1 - t) + 0.4, cx = s * (3.2 + t * 0.6);
+      for (let x = Math.floor(cx - hw); x <= Math.ceil(cx + hw); x++) {
+        if (Math.abs(x + 0.5 - cx) > hw) continue;
+        for (let z = -3; z <= 0; z++) {
+          if (z === -3 && y > 18) continue;
+          const front = z === 0 && Math.abs(x + 0.5 - cx) < hw - 0.7 && y < 21;
+          m.set(x, y, z, front ? 0x9a6a4c : y > 19 ? F.B : z === -3 ? F.B : F.S);
+        }
+      }
+    }
+  }
+  // the nemes (team): the crown shell behind the brow with a lit top
+  const put = (x, y, z, base) => { if (!m.has(x, y, z) || m.get(x, y, z).team || true) tset(m, x, y, z, base); };
+  for (let y = 4; y <= 15; y++) for (let x = -8; x <= 7; x++) for (let z = -8; z <= 5; z++) {
+    if (crown(x, y, z) || !crown(x, y, z, 1.4)) continue;
+    if (z + 0.5 > 1.5 && y < 10) continue;                      // the face and muzzle open below the brow band
+    if (z + 0.5 > 3.5) continue;
+    const ear = m.has(x, y, z) && y >= 11;                      // the ears stand through the cloth
+    if (ear) continue;
+    const py = y + 0.5 - C.y;
+    put(x, y, z, py > 3.2 ? 0xffffff : z + 0.5 > 1.5 ? 0xd8d8d8 : TEAM_SHADE);
+  }
+  // the brow band: a linen hem across the forehead
+  for (let x = -5; x <= 4; x++) for (let z = 5; z >= -2; z--) if (m.has(x, 10, z) && m.get(x, 10, z).team) { m.set(x, 10, z + 1, 0xece4d0); break; }
+  // the side falls and the back curtain: one elliptical hood column round the
+  // back of the head from the temples (y 7) to the shoulders (y -5), open in
+  // front of the cheeks, flaring as it falls (a trapezoid seen from behind,
+  // not a box); two voxels thick, lit on the sides, shaded at the back, a
+  // dark hem row
+  for (let y = 8; y >= -5; y--) {
+    const k = (8 - y) / 13, rx = 5.4 + k * 2.6, rz = 5.0 + k * 1.2, cz = -1.6;
+    for (let x = -10; x <= 9; x++) for (let z = -9; z <= 2; z++) {
+      const px = (x + 0.5) / rx, pz = (z + 0.5 - cz) / rz, d = Math.hypot(px, pz);
+      const di = Math.hypot((x + 0.5) / (rx - 1.7), (z + 0.5 - cz) / (rz - 1.7));
+      if (d > 1 || di < 1) continue;
+      if (m.has(x, y, z) && !m.get(x, y, z).team) continue;
+      const side = Math.abs(px) > Math.abs(pz) * 1.1;
+      tset(m, x, y, z, y === -5 ? 0x8a8a8a : z >= 1 ? 0xa8a8a8 : side ? 0xe6e6e6 : TEAM_SHADE);
+    }
+  }
+  return m;
+}
+// (round 42) the Avenger's falcon head on the same fine grid (myth_11): a
+// round slate skull facing forward on a short feathered neck, a hooked dark
+// beak with a yellow cere standing out of the face, a pale ring round each
+// eye on the sides of the head, and a feathered mane falling from the crown
+// over the nape to the shoulders in scalloped rows
+function falconHeadF() {
+  const m = new VoxelModel();
+  const C = { y: 8.8, z: -0.8, rx: 5.0, ry: 5.3, rz: 5.4 };
+  const skull = (x, y, z) => ((x + 0.5) / C.rx) ** 2 + ((y + 0.5 - C.y) / C.ry) ** 2 + ((z + 0.5 - C.z) / C.rz) ** 2 <= 1;
+  const beak = (x, y, z) => {
+    const pz = z + 0.5, py = y + 0.5;
+    if (pz < 2.5 || pz > 10) return false;
+    const t = (pz - 2.5) / 7.5;
+    const hw = 2.6 - t * 1.7, top = 9.6 - t * 2.2, bot = 5.4 - t * 0.2 - (t > 0.7 ? (t - 0.7) * 6 : 0);
+    return py <= top && py >= bot && Math.abs(x + 0.5) <= hw;
+  };
+  const neck = (x, y, z) => y < 4 && y >= -4 && Math.hypot(x + 0.5, (z + 0.5 + 1.2) * 1.05) <= 3.2;
+  const inside = (x, y, z) => skull(x, y, z) || neck(x, y, z);
+  const F = { T: 0x5a626e, L: 0x4a525c, S: 0x3a4048, B: 0x2c3138, D: 0x20242a };
+  for (let y = -4; y <= 15; y++) for (let x = -7; x <= 6; x++) for (let z = -8; z <= 6; z++) {
+    if (!inside(x, y, z)) continue;
+    let nx = 0, ny = 0, nz = 0;
+    for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) for (let dz = -2; dz <= 2; dz++)
+      if (!inside(x + dx, y + dy, z + dz)) { nx += dx; ny += dy; nz += dz; }
+    const l = Math.hypot(nx, ny, nz) || 1; ny /= l; nz /= l;
+    m.set(x, y, z, ny < -0.5 ? F.D : ny > 0.55 ? F.T : nz > 0.55 ? F.L : nz < -0.4 ? F.B : F.S);
+  }
+  // the beak: a yellow cere at its root, dark horn, a pale hooked tip
+  for (let y = 1; y <= 10; y++) for (let x = -3; x <= 2; x++) for (let z = 2; z <= 13; z++) {
+    if (!beak(x, y, z) || (skull(x, y, z) && z < 4)) continue;
+    const pz = z + 0.5;
+    m.set(x, y, z, pz < 5.5 ? 0xf0c030 : pz > 8.5 ? 0x9aa2ac : y >= 7 ? 0x4a525e : 0x262a30, pz < 5.5 ? { glow: 0.6 } : undefined);
+  }
+  // the eyes on the sides: a pale ring, a dark pupil, a dark stripe under it
+  for (const s of [-1, 1]) {
+    const X = (x) => (s < 0 ? -1 - x : x);
+    for (let y = 8; y <= 10; y++) for (let z = 1; z <= 3; z++) {
+      const ring = !(y === 9 && z === 2);
+      let xs = 6; while (xs > 0 && !m.has(X(xs), y, z)) xs--;
+      if (xs <= 0) continue;
+      m.set(X(xs), y, z, ring ? 0xe8c858 : 0x0a0806);
+    }
+    for (let y = 5; y <= 7; y++) { let xs = 6; while (xs > 0 && !m.has(X(xs), y, 2)) xs--; if (xs > 0) m.set(X(xs), y, 2, 0x16181c); }
+  }
+  // the mane: feathers from the crown over the nape to the shoulders
+  for (let y = 11; y >= -5; y--) {
+    const k = (11 - y) / 16, rx = 4.8 + k * 2.6, rz = 4.6 + k * 1.4, cz = -1.6 - k * 0.8;
+    for (let x = -10; x <= 9; x++) for (let z = -10; z <= 1; z++) {
+      const d = Math.hypot((x + 0.5) / rx, (z + 0.5 - cz) / rz);
+      if (d > 1 || d < 0.62 || z + 0.5 > -0.5 + (y < 6 ? 1.5 : 0)) continue;
+      if (m.has(x, y, z)) continue;
+      const row = ((y + 40) % 3) === 0;
+      m.set(x, y, z, y === -5 ? 0x16181c : row ? F.T : (Math.abs(x + 0.5) > rx * 0.7 ? F.S : F.B));
+    }
+  }
+  return m;
+}
+// the khopesh / sickle-sword at half a rig voxel: a leather grip in the fist
+// (y -2..2), a bronze guard, a straight dark shank, then the crescent hooking
+// out to the side (+x; mirror for the other hand), three voxels deep: a dark
+// spine on the inside, steel, a bright honed edge on the outer curve, and two
+// voxels thick so it keeps a solid outline against the ground
+function khopeshM(s = 1) {
+  const m = new VoxelModel();
+  const STEEL = 0x56606a, SPINE = 0x2c3238, EDGE = 0x9eaab4, BRZ = 0x6a4410;
+  const X = (x) => (s > 0 ? x : -1 - x);
+  for (let y = -2; y <= 1; y++) for (const x of [-1, 0]) for (const z of [0, 1]) m.set(X(x), y, z, y === -2 ? BRZ : LEATHER_DK);
+  for (let x = -2; x <= 1; x++) for (const z of [0, 1]) m.set(X(x), 2, z, BRZ);
+  for (let y = 3; y <= 7; y++) for (const x of [-1, 0]) for (const z of [0, 1]) m.set(X(x), y, z, x === -1 ? SPINE : STEEL);
+  // the crescent: centre (3.5, 10), from the shank's top round over and down
+  const cx = 3.5, cy = 10;
+  for (let x = -3; x <= 12; x++) for (let y = 5; y <= 19; y++) {
+    const dx = x + 0.5 - cx, dy = y + 0.5 - cy, r = Math.hypot(dx, dy);
+    const a = Math.atan2(dy, dx);                               // 0 = out (+x), pi/2 = up
+    if (r < 3.4 || r > 6.2) continue;
+    if (!(a > -0.95 && a < Math.PI + 0.1)) continue;          // open below the hook's tip and at the shank
+    if (a > Math.PI - 0.15 && y < 8) continue;
+    const c = r > 5.4 ? EDGE : r < 4.3 ? SPINE : STEEL;
+    for (const z of [0, 1]) m.set(X(x), y, z, c);
+  }
+  return m;
+}
+{
+  const PAL_F = AN_FUR;
+  const body = manTorso(PAL_F);
+  eKilt(body, { len: 7, hem: LINEN, pleats: true });
+  eBelt(body, GOLD, TEAM_TRIM);
+  // the linen wrap round the ribs and belly (rows 4..10), banded every third
+  // row, under the lappets
+  paint(body, (x, y, z) => (y >= 4 && y <= 10 ? (y % 3 === 0 ? LINEN_SH : 0xf0e8d6) : null));
+  // the nemes lappets: two team bands from the shoulders' top down the chest
+  // to the wrap's middle, standing a voxel proud, framing the muzzle
+  for (const x0 of [-4, 2]) {
+    for (let y = 6; y <= 14; y++) for (let x = x0; x < x0 + 2; x++) {
+      let zf = null; for (let z = 8; z >= -6; z--) if (body.has(x, y, z)) { zf = z; break; }
+      if (zf === null) continue;
+      const hem = y === 6;
+      tset(body, x, y, zf + 1, hem ? 0x8a8a8a : x === x0 + (x0 < 0 ? 0 : 1) ? TEAM_SHADE : 0xffffff);
+    }
+    // over the top of the shoulder to the back
+    for (let x = x0; x < x0 + 2; x++) for (let z = -3; z <= 3; z++) if (body.has(x, 13, z) && !body.has(x, 14, z)) tset(body, x, 14, z, 0xe8e8e8);
+  }
+  const men = manParts({ torso: body, head: 'laborer', pal: PAL_F, arm: { band: SILVER_DK, bracer: TEAM }, leg: { sandal: null, foot: 0x3c2416, band: SILVER_DK, kilt: TEAM } });
+  const hp = men.findIndex((q) => q.name === 'head');
+  men[hp] = { ...men[hp], model: jackalHeadF(), rest: [-0.2, 0, 0] };
+  rig('anubite', { voxel: 0.085, anim: 'beast', style: 'beast', guard: true }, [
+    ...men,
+    part('weapon', khopeshM(-1), [0, 0, 0], HAND_E, 'armR', { scale: 0.42, rest: [1.45, 0, 0], outline: 0.18 }),
+    part('weapon2', khopeshM(1), [0, 0, 0], HAND_E, 'armL', { anim: 'weapon', scale: 0.42, rest: [1.45, 0, 0], outline: 0.18 }),
   ]);
 }
 
@@ -3610,15 +3770,22 @@ function ROPE() { return (x, y, z) => (hash3(x, y, z, 44) < 0.5 ? 0xc8b07a : 0xb
   const shinA = manShinM({ pal: PAL_SC, sandal: null, foot: 0xd8b060 });
   shinA.set(-2, 0, 5, DARK).set(1, 0, 5, DARK).set(-1, 0, -3, DARK);   // talons
   rig('avenger', { voxel: 0.1, anim: 'beast', style: 'beast', idles: true }, [
-    ...beastManParts({ torso: body, head: headE('falcon'), headPivot: HEAD_PIVOT, headScale: HEAD_SCALE, headZ: 0.4, arm: { band: GOLD, bracer: TEAM, slim: true }, leg: { kilt: TEAM, pal: { L: 0x4a5058, M: 0x3a3f48, D: 0x2e3239 } }, shin: shinA }),
+    // (round 42) on the men's fine body (manParts): a waist at the belt,
+    // smooth limbs with knees and elbows, instead of the beast rig's blocks
+    ...((() => {
+      const P = manParts({ torso: body, head: 'laborer', arm: { band: GOLD, bracer: TEAM }, leg: { kilt: TEAM, sandal: null, foot: 0xd8b060, pal: { L: 0x4a5058, M: 0x3a3f48, D: 0x2e3239 } } });
+      const i = P.findIndex((q) => q.name === 'head');
+      P[i] = { ...P[i], model: falconHeadF(), rest: [-0.3, 0, 0] };
+      return P;
+    })()),
     // (round 15) the blades low in a fighting grip, forward, down and out
     // from the fists (myth_12), never along the arms
     // in a deep orange-leaning gold (the plain GOLD reads pale beside the linen)
     // (round 25) short bronze swords (bronzeSwordM, about 0.6 of the leg) with
     // a crossguard and pommel, no outline hull round them (it blurred the
     // thin blade into a pale halo)
-    part('weapon', bronzeSwordM(), [0, 0, 0], BEAST_FIST, 'foreR', { rest: [2.0, 0, -0.35], scale: 0.5, outline: 0.01 }),
-    part('weapon2', bronzeSwordM(), [0, 0, 0], BEAST_FIST, 'foreL', { anim: 'weapon', rest: [2.0, 0, 0.35], scale: 0.5, outline: 0.01 }),
+    part('weapon', bronzeSwordM(), [0, 0, 0], HAND_E, 'armR', { rest: [2.0, 0, -0.35], scale: 0.5, outline: 0.01 }),
+    part('weapon2', bronzeSwordM(), [0, 0, 0], HAND_E, 'armL', { anim: 'weapon', rest: [2.0, 0, 0.35], scale: 0.5, outline: 0.01 }),
   ]);
 }
 

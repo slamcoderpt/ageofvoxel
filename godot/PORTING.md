@@ -3066,6 +3066,43 @@ framed point (a rider's head). Check: `eu_group=mounted&eu_zoom=0.7` (also
 `eu_one=chariot_archer&eu_turn=40&eu_zoom=0.9&eu_pitch=30&eu_fh=1.9`,
 `eu_one=war_elephant&eu_turn=60&eu_zoom=1.0&eu_pitch=34&eu_fh=1.5`.
 
+The Anubite and the Avenger, round 42 (myth_01 / myth_11 / myth_12; the beast
+rig's men read as broken: a chest box, a kilt box and stick legs with no waist,
+the Anubite's coarse jackal head turned sideways with a flat team slab behind
+it, the sickles hanging limp from the wrists at one angle, a stiff T-pose, and
+in the focus view the rear and front man on one vertical line). **Body**: both
+now stand on the men's fine body (`manParts`, as the Spearman: `refineTorso`
+tapers the chest to a narrow belted waist over the kilt, smooth limbs with
+knees, elbows and gripping hands); `beastManParts` stays for the Son of Osiris.
+The Anubite in a fur ramp (`AN_FUR`), a banded linen wrap round the ribs, a
+gold belt with a linen knot, a pleated team kilt with a linen hem, silver
+armlets and anklets, team bracers; the Avenger keeps its gold and team collar,
+feathered mantle and slate legs. **Heads** (fine grid, the fine heads' scale
+and neck joint, the face along +z on a short neck): `jackalHeadF`, a domed
+skull, a long tapering muzzle with a lit bridge, a black nose and a mouth line,
+amber eyes under a brow ledge, tall pointed ears with a light inner face
+standing through the cloth, and an opaque team nemes: a crown shell with a lit
+top over a linen brow band, then one elliptical hood column from the temples
+to the shoulders, flaring as it falls, open in front of the cheeks; its two
+lappets are painted on the chest (two voxels wide, a voxel proud, over the
+shoulder tops) and frame the muzzle. `falconHeadF`: a round slate skull, a
+yellow cere and a dark hooked beak, a gold-ringed eye on each side with a dark
+stripe under it, a feathered mane in scalloped rows to the shoulders.
+**Khopesh** (`khopeshM`, part scale 0.42 at `HAND_E`, rest [1.45, 0, 0]): a
+leather grip in the fist, a bronze guard, a short shank, then the crescent
+hooking outwards (mirrored per hand) in the plane of the arm's swing, so the
+curve faces the RTS camera; two voxels thick, a dark spine, steel and a pale
+honed outer edge. **Poses** (`unit_view.cpp`, rig flag `guard`): idle, each
+Anubite takes one of three combat stances by unit id (one blade cocked high
+over the head and the other low in guard; a crouch with both blades up and
+out; one blade wide to the side and the other raised by the head), feet wide,
+knees bent, the torso and head turned, the body sunk to the mean reach of the
+bent legs; walking, the blades are carried up before the chest. Capture: the
+focus view's rear and front man now stand off the centre line on opposite
+sides (`egypt_units_scene.gd`). Check: `eu_focus=anubite&eu_zoom=0.75` (also
+`eu_state=walk|attack|die`), `eu_focus=avenger&eu_zoom=0.7`,
+`eu_group=myth&eu_zoom=0.45&eu_az=2.4&eu_ax=-2`.
+
 ## Walls, gates, towers: placement (game/ui)
 
 With villagers selected the build grid has **Build Wall (W)** and the tower

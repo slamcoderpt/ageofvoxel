@@ -159,6 +159,7 @@ AovUnitView::Rig AovUnitView::parse_rig(const Dictionary &R, int t) {
 	rig.camel = (bool)R.get("camel", false);
 	rig.sting = (bool)R.get("sting", false);
 	rig.idles = (bool)R.get("idles", false);
+	rig.guard = (bool)R.get("guard", false);
 	{ const Variant sv = R.get("stance", 0.0); rig.stance = sv.get_type() == Variant::BOOL ? ((bool)sv ? 1.0f : 0.0f) : (float)(double)sv; }
 	rig.leg = (float)(double)R.get("leg", 1.0);
 	rig.voxel = (float)(double)R.get("voxel", 0.07);
@@ -1106,9 +1107,52 @@ void AovUnitView::pose_unit(int row, int ri, float out[][3], float &bob_out, flo
 				set(CH_weapon, 0.3);
 				bob = -1.5 + b * 0.15;
 			}
+			if (rig.guard) {
+				// (round 42, rig "guard": the Anubite, myth_01) never a mannequin:
+				// three combat stances by the unit id, each with the feet wide, the
+				// knees bent and the torso turned, a khopesh raised in the fist
+				// 0 one blade cocked high over the head, the other low in guard
+				// 1 a crouch, both blades up before the chest, hooks out
+				// 2 one blade out wide to the side, the other raised by the head
+				const int gv = (int)((id * 5 + 1) % 3);
+				const double sd = (id & 2) ? 1 : -1;   // turn left or right
+				double lL[3], sL, lR[3], sR;
+				if (gv == 0) {
+					lL[0] = -0.45; lL[1] = 0.1; lL[2] = 0.2; sL = 0.55; lR[0] = 0.22; lR[1] = -0.1; lR[2] = -0.2; sR = 0.32;
+					set(CH_torso, 0.14 + b * 0.02, 0.25 * sd, 0); set(CH_head, -0.08 + b * 0.02, -0.2 * sd);
+					set(CH_armR, -2.35 + b * 0.04, 0, -0.35); set(CH_foreR, -0.75);
+					set(CH_armL, -0.75 - b * 0.03, 0, 0.5); set(CH_foreL, -0.95);
+				} else if (gv == 1) {
+					lL[0] = -0.4; lL[1] = 0; lL[2] = 0.22; sL = 0.7; lR[0] = -0.12; lR[1] = 0; lR[2] = -0.22; sR = 0.6;
+					set(CH_torso, 0.26 + b * 0.02, 0.1 * sd, 0); set(CH_head, -0.2, -0.08 * sd);
+					set(CH_armR, -0.95 - b * 0.04, 0, -0.85); set(CH_foreR, -1.25);
+					set(CH_armL, -0.85 + b * 0.04, 0, 0.85); set(CH_foreL, -1.25);
+				} else {
+					lL[0] = -0.3; lL[1] = 0; lL[2] = 0.22; sL = 0.45; lR[0] = 0.25; lR[1] = 0; lR[2] = -0.22; sR = 0.3;
+					set(CH_torso, 0.1 + b * 0.02, -0.3 * sd, 0); set(CH_head, -0.06, 0.25 * sd);
+					set(CH_armR, -0.55, 0, -0.95 - b * 0.03); set(CH_foreR, -0.85);
+					set(CH_armL, -1.95 + b * 0.04, 0, 0.35); set(CH_foreL, -0.7);
+				}
+				set(CH_weapon, 0.0);
+				set(CH_legL, lL[0], lL[1], lL[2]); set(CH_shinL, sL);
+				set(CH_legR, lR[0], lR[1], lR[2]); set(CH_shinR, sR);
+				// sink to the mean reach of the two bent legs (7 + 7 rig voxels)
+				const double rL = (7 * std::cos(lL[0]) + 7 * std::cos(lL[0] + sL)) * std::cos(lL[2]);
+				const double rR = (7 * std::cos(lR[0]) + 7 * std::cos(lR[0] + sR)) * std::cos(lR[2]);
+				bob = (rL + rR) * 0.5 - 14 + b * 0.12;
+			}
 		}
 	}
 	if (beast && st == aov::A_WALK) { set(CH_foreR, -0.45 + S(t * 7) * 0.2); set(CH_foreL, -0.35 - S(t * 7) * 0.2); }
+	if (rig.guard && st == aov::A_WALK) {
+		// (round 42, the Anubite) a prowling walk, the blades carried up in
+		// front, elbows bent, the torso leaning in
+		const double p = t * 7;
+		set(CH_armR, -0.75 - S(p) * 0.25, 0, -0.35); set(CH_foreR, -1.0);
+		set(CH_armL, -0.6 + S(p) * 0.25, 0, 0.35); set(CH_foreL, -1.05);
+		set(CH_weapon, 0.0);
+		add(CH_torso, 0.08);
+	}
 
 	// hit reactions (hitReact)
 	const double ht = U.hit_t[row];
